@@ -1,0 +1,24 @@
+# Personal config — copy from *.example.py and fill in your own
+filters_config.py
+tags_config.py
+
+# Alfred workflow package (distributed via Releases, not committed)
+*.alfredworkflow
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Bundled lib — skip package metadata and binaries, keep the actual packages
+src/lib/*.dist-info/
+src/lib/bin/
+
+# macOS
+.DS_Store
+
+# Claude Code
+.claude/
+
+# Credentials (stored in ~/.ticktick_alfred/config.json, never here)
+config.json
