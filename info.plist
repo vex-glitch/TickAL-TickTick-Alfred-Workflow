@@ -376,6 +376,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>1776FE04-5850-40A5-B606-431BF8BA1A0A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>54AEE7F7-E4EE-45D6-A2D7-8707727DA7D0</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>17A71740-FBF6-4D92-9618-A7B76BD59084</key>
 		<array>
 			<dict>
@@ -2728,6 +2741,18 @@
 				<string></string>
 				<key>sourceoutputuid</key>
 				<string>0555BD7E-5289-4D65-A3F7-342CD33D4A18</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>1776FE04-5850-40A5-B606-431BF8BA1A0A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>B852B190-F88E-40D2-BA2A-9620E4194BBB</string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -8207,6 +8232,20 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 						<key>uid</key>
 						<string>0555BD7E-5289-4D65-A3F7-342CD33D4A18</string>
 					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>7-</string>
+						<key>outputlabel</key>
+						<string>Docs</string>
+						<key>uid</key>
+						<string>B852B190-F88E-40D2-BA2A-9620E4194BBB</string>
+					</dict>
 				</array>
 				<key>elselabel</key>
 				<string>N/A</string>
@@ -8372,7 +8411,7 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 				<key>fixedorder</key>
 				<true/>
 				<key>items</key>
-				<string>[{"title":"Sync","arg":"1-","subtitle":"Refresh workflow cache via API | ⇧⌘⏎ Go Back"},{"title":"Tags","arg":"2-","subtitle":"Set Tags | ⇧⌘⏎ Go Back"},{"title":"Filters","arg":"3-","subtitle":"Set Filters | ⇧⌘⏎ Go Back"},{"title":"Folders","arg":"4-","subtitle":"Set Folders | ⇧⌘⏎ Go Back"},{"title":"Login","arg":"5-","subtitle":"OAUTH - Get a token | ⌘⇧⏎ Go Back"},{"title":"Refresh TickTick","arg":"6-","subtitle":"Refresh TickTick | ⌘⇧ Go Back"}]</string>
+				<string>[{"title":"Sync","arg":"1-","subtitle":"Refresh workflow cache via API | ⇧⌘ Back"},{"title":"Tags","arg":"2-","subtitle":"Set Tags | ⇧⌘ Back"},{"title":"Filters","arg":"3-","subtitle":"Set Filters | ⇧⌘ Back"},{"title":"Folders","arg":"4-","subtitle":"Set Folders | ⇧⌘ Back"},{"title":"Login","arg":"5-","subtitle":"OAUTH - Get a token | ⌘⇧ Back"},{"title":"Refresh TickTick","arg":"6-","subtitle":"Refresh TickTick | ⌘⇧ Back"},{"title":"Open TickAL Docs","arg":"7-","subtitle":"GitHub · TickAL | ⌘⇧ Back"}]</string>
 				<key>matchmode</key>
 				<integer>0</integer>
 				<key>runningsubtext</key>
@@ -8947,16 +8986,51 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>browser</key>
+				<string></string>
+				<key>skipqueryencode</key>
+				<false/>
+				<key>skipvarencode</key>
+				<false/>
+				<key>spaces</key>
+				<string></string>
+				<key>url</key>
+				<string>https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.openurl</string>
+			<key>uid</key>
+			<string>54AEE7F7-E4EE-45D6-A2D7-8707727DA7D0</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>matchmode</key>
+				<integer>0</integer>
+				<key>matchstring</key>
+				<string>7-</string>
+				<key>replacestring</key>
+				<string></string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.replace</string>
+			<key>uid</key>
+			<string>1776FE04-5850-40A5-B606-431BF8BA1A0A</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>&gt; Workflow was initially designed to be ran from a single hotkey. Every item is placed intentionally and modifier keys are planned for optimised execution. In my opinion it is the smoothest experience.
-Upon receiving feedback, I decided to add some keywords to config as well. Feel free to use them or just use a hotkey. Set those up on the left side.
+Keywords are to make onboarding possibly "clearer" and for choice. Hotkey recommended.
 
-*🏁 Set your main hotkey inside workflow.*
-
-Follow the steps bellow to login in order for workflow to work. 
-
-*⚠️ Don't forget to run keyword ***"tlogin"*** after pasting you credentials into workflow configuration.*
+‼️ *Set your main hotkey inside workflow.* 
+‼️ *Don't forget to run keyword ***"tlogin"*** or hotkey&gt;update&gt;login after pasting you credentials into workflow configuration.*
 
 # Connecting account
 
@@ -8974,9 +9048,15 @@ Follow the steps bellow to login in order for workflow to work.
 
 **Some features require one-time manual setup due to TickTick API limitations.**
 
-- **Tags**: Run *Update → Set Tags* OR keyword ***"tup"*** — the API does not return your tags, add them manually
-- **Filters**: Run *Update → Set Filters* OR keyword ***"tup"*** — the API does not return your filters, add them manually
-- **Folders**: Run *Update → Set Folders* OR keyword ***"tup"*** — the API does not return folder names, match and name each folder from the list shown
+- **Tags**: *the API does not return your tags, add them manually*
+	- Set them on the left. 
+	- Can also be done by running: *Update → Set Tags* OR keyword ***"tup"***
+- **Folders**: *the API does not return folder names, match and name each folder from the list shown*
+	- Set them on the left.
+	-❗️You will still need to run *Update → Set Folders* OR keyword ***"tup"*** to match folder with it's content
+- **Filters**: the API does not return your filters, add them manually
+	- Run *Update → Set Filters* OR keyword ***"tup"***
+	- To complicated to be done in workflow config
 
 The rest of the workflow after initialising with set keystroke should be easy to follow. 
 
@@ -9133,6 +9213,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<real>1590</real>
 			<key>ypos</key>
 			<real>1790</real>
+		</dict>
+		<key>1776FE04-5850-40A5-B606-431BF8BA1A0A</key>
+		<dict>
+			<key>xpos</key>
+			<real>1320</real>
+			<key>ypos</key>
+			<real>2100</real>
 		</dict>
 		<key>17A71740-FBF6-4D92-9618-A7B76BD59084</key>
 		<dict>
@@ -9796,6 +9883,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<real>2625</real>
 			<key>ypos</key>
 			<real>915</real>
+		</dict>
+		<key>54AEE7F7-E4EE-45D6-A2D7-8707727DA7D0</key>
+		<dict>
+			<key>xpos</key>
+			<real>1385</real>
+			<key>ypos</key>
+			<real>2070</real>
 		</dict>
 		<key>56151466-748D-4737-985E-DD05C212B5BF</key>
 		<dict>
@@ -11004,6 +11098,59 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>config</key>
 			<dict>
 				<key>default</key>
+				<string>🔥CRM
+    🔥Lead 
+    🔥Consultation
+🚦Status
+    🔥Active
+    🔮Someday
+    ❓Consider</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<false/>
+				<key>verticalsize</key>
+				<integer>9</integer>
+			</dict>
+			<key>description</key>
+			<string>Delete prefilled example and fill you own. Must be exactly the same as in TickTick.</string>
+			<key>label</key>
+			<string>Set your tags</string>
+			<key>type</key>
+			<string>textarea</string>
+			<key>variable</key>
+			<string>tags_var</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>1) ➕ SAL
+2) 💼 Projects
+3) 1️⃣ Manager
+4) 2️⃣ Work
+5) 3️⃣ Personal</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<false/>
+				<key>verticalsize</key>
+				<integer>6</integer>
+			</dict>
+			<key>description</key>
+			<string>Delete example and write down your folders. To preserve hierarchy, use 1) &lt;foldername&gt;.
+*You will still need to run "tup"&gt;set folders to match folder with it's content.</string>
+			<key>label</key>
+			<string>Set your Folders</string>
+			<key>type</key>
+			<string>textarea</string>
+			<key>variable</key>
+			<string>folders_var</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
 				<string>ts</string>
 				<key>placeholder</key>
 				<string>ts</string>
@@ -11232,8 +11379,10 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<string>brinbox_kw</string>
 		</dict>
 	</array>
+	<key>variablesdontexport</key>
+	<array/>
 	<key>version</key>
-	<string>2.0</string>
+	<string>2.2</string>
 	<key>webaddress</key>
 	<string>https://github.com/vex-glitch</string>
 </dict>
