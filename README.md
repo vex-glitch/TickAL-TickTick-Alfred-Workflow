@@ -4,6 +4,8 @@
 
 One hotkey. Every list, section, task, subtask, and note — instantly reachable and fully actionable.
 
+> **Hotkey** is configured from inside the workflow — open it in Alfred Preferences and set it on the first node.
+
 ![TickAL Intro](assets/intro.gif)
 
 ---
@@ -32,7 +34,6 @@ One hotkey. Every list, section, task, subtask, and note — instantly reachable
 - [Alfred](https://www.alfredapp.com/) with **Powerpack** licence
 - **Python 3** — `/opt/homebrew/bin/python3` (install via [Homebrew](https://brew.sh))
 - **TickTick** account with API access (OAuth — see setup)
-- `parsedatetime` Python package (`pip3 install parsedatetime`)
 
 ---
 
