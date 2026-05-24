@@ -286,6 +286,7 @@ Maintenance actions for the workflow.
 - **Set Filters** — define your filters (saved to `filters_config.py`)
 - **Set Tags** — define your tag list (saved to `tags_config.py`)
 - **Set Folders** — name your TickTick folders and set their display order
+- **Open Docs** — open the workflow documentation on GitHub
 
 > **Tip:** If data looks stale or a task is missing, run Update → Sync and retry.
 
