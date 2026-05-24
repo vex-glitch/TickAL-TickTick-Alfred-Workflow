@@ -4,8 +4,6 @@
 <dict>
 	<key>bundleid</key>
 	<string>com.vex.tickal</string>
-	<key>category</key>
-	<string>💼 Projects</string>
 	<key>connections</key>
 	<dict>
 		<key>00B19EA4-CF22-43AA-B6BD-311D2C413C86</key>
@@ -378,6 +376,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>17A71740-FBF6-4D92-9618-A7B76BD59084</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>AF17BE48-99C7-453C-A15B-AB752A2AFE7A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>1973A6B0-A0E4-4AD7-A5B8-1456FE42962A</key>
 		<array>
 			<dict>
@@ -542,6 +553,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>20B25EF5-54D0-47D0-9117-FF9F910295BB</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E86FBD12-4202-4205-A6B9-E63851E8A01A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>20C83CA7-A591-4527-A807-33E17317A8CE</key>
 		<array>
 			<dict>
@@ -607,6 +631,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>2A6CB895-8D0E-44B4-9319-2AF6E78B358D</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0CC86E70-3E82-4D42-A419-0C90FB93997B</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>2A7A3086-D43A-414E-9A5F-113177BAC297</key>
 		<array>
 			<dict>
@@ -655,6 +692,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>2A7A3086-D43A-414E-9A5F-113177BAC297</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>2B0238A9-4BAC-4758-9305-E496C855A32E</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>36912BD3-B738-41D7-955D-7AD631C58A15</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -989,6 +1039,19 @@
 		</array>
 		<key>44485E06-B0E8-4D77-82FC-401DBEC79F89</key>
 		<array/>
+		<key>44C794E4-F18F-4440-9504-42F39ECE6DA9</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>22D8CBAE-17B1-4F54-827B-D3E7253663A7</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>4633E5D1-50E9-4879-8D50-CF2CFDB42645</key>
 		<array>
 			<dict>
@@ -1059,6 +1122,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>D07180DE-EC6F-46FE-AFD9-F0AE32DE67E6</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>4A9C8FE3-FDA9-4E90-B0BF-2F4C49D9DC84</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>BE074C02-C428-441B-A431-08AEFCA6619D</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -1418,6 +1494,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>57A4CFA4-FC25-4925-99E9-3B46F123875B</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>1AB1389E-637C-4C14-BC9A-BCD53603A265</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>581BB8A1-AF10-4100-B559-67B9EF71C7F4</key>
 		<array>
 			<dict>
@@ -1594,6 +1683,19 @@
 				<integer>1572864</integer>
 				<key>modifiersubtext</key>
 				<string>Copy URL</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>5DA38EB7-06DC-48CD-A826-8EC837227566</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>2A7A3086-D43A-414E-9A5F-113177BAC297</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -1937,6 +2039,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>73BA3D73-4946-4307-80D9-9D850EE43A3D</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>DB6F0DCF-2064-4F8C-8223-B013C2815E15</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>746B1DD7-A465-487C-866F-910F2B75D64D</key>
 		<array>
 			<dict>
@@ -2070,6 +2185,32 @@
 				<string></string>
 				<key>sourceoutputuid</key>
 				<string>79549A64-F950-4167-A08F-4294CDFEE944</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>76667082-C514-4C0E-BD2F-3C750743DED6</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>115CC5BB-AA7E-4D1A-A345-242952A9FC1D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>7AFC829A-8F89-4B62-AC96-43A8D03B5D5A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>5330B64C-D139-43CE-AC49-3029EE38685C</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -2213,6 +2354,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>2D2BB58F-59E2-483D-8D69-F5568793B06F</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>97046EAD-E8DB-4ADC-B931-2C1CC323F77A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0415216D-8474-4D0B-AA77-B45BAE944945</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -3069,6 +3223,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>F987BD29-9B15-4462-830B-E24CD6E4C3EA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>DAB4A71E-C5E1-484E-825B-DFDC28AF603D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>FBBA0DE0-DA19-4F29-B0B4-5DEF87E2B661</key>
 		<array>
 			<dict>
@@ -3156,6 +3323,29 @@
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:search_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Search everything and action</string>
+				<key>text</key>
+				<string>Search · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>20B25EF5-54D0-47D0-9117-FF9F910295BB</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>browser</key>
 				<string></string>
 				<key>skipqueryencode</key>
@@ -3211,6 +3401,29 @@
 			<string>alfred.workflow.action.openurl</string>
 			<key>uid</key>
 			<string>DAB4A71E-C5E1-484E-825B-DFDC28AF603D</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:optoday_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open today view in TickTick</string>
+				<key>text</key>
+				<string>Open Today · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>73BA3D73-4946-4307-80D9-9D850EE43A3D</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -3407,7 +3620,7 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 				<key>subtext</key>
 				<string></string>
 				<key>title</key>
-				<string>🏁 START HERE 🏁</string>
+				<string>Canvas Map</string>
 				<key>type</key>
 				<integer>11</integer>
 				<key>withspace</key>
@@ -3614,6 +3827,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>517693E6-D565-42F8-B342-08CE726114A7</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:opinbox_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open Inbox in TickTick</string>
+				<key>text</key>
+				<string>Open Inbox · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>F987BD29-9B15-4462-830B-E24CD6E4C3EA</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -4592,6 +4828,21 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<integer>1</integer>
 		</dict>
 		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>TT</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>6613B30E-773B-402F-9DDA-D42D49E769E2</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
 			<key>type</key>
 			<string>alfred.workflow.utility.junction</string>
 			<key>uid</key>
@@ -4662,6 +4913,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>34649695-0B91-49C3-8580-4809F322916F</string>
 			<key>version</key>
 			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:drill_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Browse and action items Folders down approach</string>
+				<key>text</key>
+				<string>Drill · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>97046EAD-E8DB-4ADC-B931-2C1CC323F77A</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -4761,21 +5035,6 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
 			<string>1FBBD53D-A240-4CD3-9EF5-DE75ACCE985A</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>TT</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>6613B30E-773B-402F-9DDA-D42D49E769E2</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -4975,6 +5234,58 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>2CC0FB9D-8276-4990-A303-832CA653A730</string>
 			<key>version</key>
 			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:smart_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Browse, open, action smart lists...</string>
+				<key>text</key>
+				<string>Smart Lists · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>5DA38EB7-06DC-48CD-A826-8EC837227566</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>1C0E0641-0983-47E1-A120-7D54111DB139</string>
+			<key>version</key>
+			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -5473,37 +5784,6 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>17</integer>
-				<key>hotmod</key>
-				<integer>1835008</integer>
-				<key>hotstring</key>
-				<string>T</string>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>1C0E0641-0983-47E1-A120-7D54111DB139</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
 				<string>1Search</string>
 				<key>passinputasargument</key>
@@ -5551,6 +5831,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<integer>1</integer>
 		</dict>
 		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:brtoday_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Browse and action today view in Alfred</string>
+				<key>text</key>
+				<string>Browse Today · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>2A6CB895-8D0E-44B4-9319-2AF6E78B358D</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
 			<key>type</key>
 			<string>alfred.workflow.utility.junction</string>
 			<key>uid</key>
@@ -5578,6 +5881,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
 			<string>737690F8-F45E-43D2-939C-0DA37AD8EFB2</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:filters_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Browse and action your Filters</string>
+				<key>text</key>
+				<string>Filters · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>4A9C8FE3-FDA9-4E90-B0BF-2F4C49D9DC84</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -5629,6 +5955,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>FBBA0DE0-DA19-4F29-B0B4-5DEF87E2B661</string>
 			<key>version</key>
 			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:start_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Make TickTick Dance</string>
+				<key>text</key>
+				<string>TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>44C794E4-F18F-4440-9504-42F39ECE6DA9</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -5844,6 +6193,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>539449B7-508C-4F42-8A89-BB9FCE54C343</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:brinbox_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Browse and action Inbox in Alfred</string>
+				<key>text</key>
+				<string>Browse Inbox · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>57A4CFA4-FC25-4925-99E9-3B46F123875B</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7532,6 +7904,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:sync_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Sync</string>
+				<key>text</key>
+				<string>Sync · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>2B0238A9-4BAC-4758-9305-E496C855A32E</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>argument</key>
 				<string>{var:task_list_id}:{var:task_id}:{query}</string>
 				<key>passthroughargument</key>
@@ -7676,6 +8071,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>B438F2BF-DDDB-4FD6-B4F3-2471B890A94B</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:add_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Add a task, subtask, list, note...</string>
+				<key>text</key>
+				<string>Add · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>76667082-C514-4C0E-BD2F-3C750743DED6</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -8109,6 +8527,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:update_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Login, Sync, Set: Tags · Filters · Folders, Refresh</string>
+				<key>text</key>
+				<string>Update · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>17A71740-FBF6-4D92-9618-A7B76BD59084</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>alfredfiltersresults</key>
 				<false/>
 				<key>alfredfiltersresultsmatchmode</key>
@@ -8391,6 +8832,29 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:login_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Trigger OAUTH to get token</string>
+				<key>text</key>
+				<string>Log in · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>7AFC829A-8F89-4B62-AC96-43A8D03B5D5A</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>matchmode</key>
 				<integer>0</integer>
 				<key>matchstring</key>
@@ -8485,23 +8949,38 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		</dict>
 	</array>
 	<key>readme</key>
-	<string>This workflow connects to your TickTick account via the official API. To set it up, you need to register a free developer app and run OAUTH — this takes 2 minutes.
+	<string>&gt; Workflow was initially designed to be ran from a single hotkey. Every item is placed intentionally and modifier keys are planned for optimised execution. In my opinion it is the smoothest experience.
+Upon receiving feedback, I decided to add some keywords to config as well. Feel free to use them or just use a hotkey. Set those up on the left side.
+
+*🏁 Set your main hotkey inside workflow.*
+
+Follow the steps bellow to login in order for workflow to work. 
+
+*⚠️ Don't forget to run keyword ***"tlogin"*** after pasting you credentials into workflow configuration.*
+
+# Connecting account
+
+&gt; This workflow connects to your TickTick account via the official API. To set it up, you need to register a free developer app and run OAUTH — this takes 2 minutes.
 
 1. Go to developer.ticktick.com/manage and sign in
 2. Click Create App, give it any name, set redirect URI to http://localhost:8080
 3. Paste client_id and client_secret into the fields
-4. Run the workflow and select: Update → Login
+4. Run the workflow using hotkey and select: Update → Login OR use keyword ***"tlogin"***
 5. A browser window opens — log in to TickTick and approve access
 6. Done. Your token is saved automatically
-7. Run: Update → Sync to prime the cache
+7. Run: Update → Sync to prime the cache OR use a keyword ***"tsync"***
 
-Some features require one-time manual setup due to TickTick API limitations.
+---
 
-- Tags: Run Update → Set Tags — the API does not return your tags, add them manually
-- Filters: Run Update → Set Filters — the API does not return your filters, add them manually
-- Folders: Run Update → Set Folders — the API does not return folder names, match and name each folder from the list shown
+**Some features require one-time manual setup due to TickTick API limitations.**
 
-The rest of the workflow is self explanatory. For detailed instructions, visit</string>
+- **Tags**: Run *Update → Set Tags* OR keyword ***"tup"*** — the API does not return your tags, add them manually
+- **Filters**: Run *Update → Set Filters* OR keyword ***"tup"*** — the API does not return your filters, add them manually
+- **Folders**: Run *Update → Set Folders* OR keyword ***"tup"*** — the API does not return folder names, match and name each folder from the list shown
+
+The rest of the workflow after initialising with set keystroke should be easy to follow. 
+
+For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow)</string>
 	<key>uidata</key>
 	<dict>
 		<key>00B19EA4-CF22-43AA-B6BD-311D2C413C86</key>
@@ -8655,6 +9134,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>1790</real>
 		</dict>
+		<key>17A71740-FBF6-4D92-9618-A7B76BD59084</key>
+		<dict>
+			<key>xpos</key>
+			<real>840</real>
+			<key>ypos</key>
+			<real>1730</real>
+		</dict>
 		<key>185C30C1-5AD9-41DB-B0A7-62C248181C0F</key>
 		<dict>
 			<key>colorindex</key>
@@ -8686,10 +9172,14 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 		</dict>
 		<key>1C0E0641-0983-47E1-A120-7D54111DB139</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>note</key>
+			<string>🏁 MAIN TRIGGER</string>
 			<key>xpos</key>
 			<real>35</real>
 			<key>ypos</key>
-			<real>470</real>
+			<real>415</real>
 		</dict>
 		<key>1D035961-38E5-42B5-9553-11F4E1507610</key>
 		<dict>
@@ -8761,6 +9251,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>350</real>
 		</dict>
+		<key>20B25EF5-54D0-47D0-9117-FF9F910295BB</key>
+		<dict>
+			<key>xpos</key>
+			<real>990</real>
+			<key>ypos</key>
+			<real>15</real>
+		</dict>
 		<key>20C83CA7-A591-4527-A807-33E17317A8CE</key>
 		<dict>
 			<key>colorindex</key>
@@ -8822,6 +9319,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>1120</real>
 		</dict>
+		<key>2A6CB895-8D0E-44B4-9319-2AF6E78B358D</key>
+		<dict>
+			<key>xpos</key>
+			<real>2845</real>
+			<key>ypos</key>
+			<real>515</real>
+		</dict>
 		<key>2A7A3086-D43A-414E-9A5F-113177BAC297</key>
 		<dict>
 			<key>colorindex</key>
@@ -8839,6 +9343,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<real>2845</real>
 			<key>ypos</key>
 			<real>290</real>
+		</dict>
+		<key>2B0238A9-4BAC-4758-9305-E496C855A32E</key>
+		<dict>
+			<key>xpos</key>
+			<real>990</real>
+			<key>ypos</key>
+			<real>1265</real>
 		</dict>
 		<key>2CC0FB9D-8276-4990-A303-832CA653A730</key>
 		<dict>
@@ -9060,6 +9571,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>20</real>
 		</dict>
+		<key>44C794E4-F18F-4440-9504-42F39ECE6DA9</key>
+		<dict>
+			<key>xpos</key>
+			<real>35</real>
+			<key>ypos</key>
+			<real>550</real>
+		</dict>
 		<key>45E5B9EF-50E3-4EA7-A992-816F5DD442C5</key>
 		<dict>
 			<key>colorindex</key>
@@ -9151,6 +9669,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<real>2635</real>
 			<key>ypos</key>
 			<real>455</real>
+		</dict>
+		<key>4A9C8FE3-FDA9-4E90-B0BF-2F4C49D9DC84</key>
+		<dict>
+			<key>xpos</key>
+			<real>990</real>
+			<key>ypos</key>
+			<real>540</real>
 		</dict>
 		<key>4AAC9C41-29D0-4613-8EF5-C7F5127EB3C6</key>
 		<dict>
@@ -9290,6 +9815,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>1985</real>
 		</dict>
+		<key>57A4CFA4-FC25-4925-99E9-3B46F123875B</key>
+		<dict>
+			<key>xpos</key>
+			<real>2845</real>
+			<key>ypos</key>
+			<real>625</real>
+		</dict>
 		<key>57CA3E24-551A-4323-BDBB-6FF2689E91DF</key>
 		<dict>
 			<key>colorindex</key>
@@ -9386,6 +9918,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>365</real>
 		</dict>
+		<key>5DA38EB7-06DC-48CD-A826-8EC837227566</key>
+		<dict>
+			<key>xpos</key>
+			<real>2845</real>
+			<key>ypos</key>
+			<real>405</real>
+		</dict>
 		<key>5E3CDE10-1918-4424-9E72-1785BA1B061B</key>
 		<dict>
 			<key>xpos</key>
@@ -9472,7 +10011,7 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>xpos</key>
 			<real>35</real>
 			<key>ypos</key>
-			<real>355</real>
+			<real>300</real>
 		</dict>
 		<key>67F8F58D-C8AB-41F0-A12E-D8E9EA1A537F</key>
 		<dict>
@@ -9582,6 +10121,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>535</real>
 		</dict>
+		<key>73BA3D73-4946-4307-80D9-9D850EE43A3D</key>
+		<dict>
+			<key>xpos</key>
+			<real>2940</real>
+			<key>ypos</key>
+			<real>15</real>
+		</dict>
 		<key>746B1DD7-A465-487C-866F-910F2B75D64D</key>
 		<dict>
 			<key>colorindex</key>
@@ -9611,6 +10157,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>45</real>
 		</dict>
+		<key>76667082-C514-4C0E-BD2F-3C750743DED6</key>
+		<dict>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>1450</real>
+		</dict>
 		<key>77461EBD-0E2E-497C-8B91-A3A939DBD075</key>
 		<dict>
 			<key>colorindex</key>
@@ -9619,6 +10172,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<real>645</real>
 			<key>ypos</key>
 			<real>130</real>
+		</dict>
+		<key>7AFC829A-8F89-4B62-AC96-43A8D03B5D5A</key>
+		<dict>
+			<key>xpos</key>
+			<real>1140</real>
+			<key>ypos</key>
+			<real>1840</real>
 		</dict>
 		<key>7CC1797C-FA5C-44BE-B425-B4C9A9E11AAD</key>
 		<dict>
@@ -9757,6 +10317,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>915</real>
 		</dict>
+		<key>97046EAD-E8DB-4ADC-B931-2C1CC323F77A</key>
+		<dict>
+			<key>xpos</key>
+			<real>990</real>
+			<key>ypos</key>
+			<real>335</real>
+		</dict>
 		<key>9EE68F98-2ED7-484F-A0FD-FCC6DD212147</key>
 		<dict>
 			<key>colorindex</key>
@@ -9777,11 +10344,8 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 		</dict>
 		<key>A015BA5B-9F2E-4DD5-944F-622AA58C9A98</key>
 		<dict>
-			<key>colorindex</key>
-			<integer>1</integer>
 			<key>note</key>
-			<string>🧭 MoC 🧭
-🏁 START HERE 🏁</string>
+			<string>Color Coding</string>
 			<key>xpos</key>
 			<real>30</real>
 			<key>ypos</key>
@@ -10322,6 +10886,13 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<key>ypos</key>
 			<real>520</real>
 		</dict>
+		<key>F987BD29-9B15-4462-830B-E24CD6E4C3EA</key>
+		<dict>
+			<key>xpos</key>
+			<real>2940</real>
+			<key>ypos</key>
+			<real>120</real>
+		</dict>
 		<key>FBBA0DE0-DA19-4F29-B0B4-5DEF87E2B661</key>
 		<dict>
 			<key>colorindex</key>
@@ -10386,6 +10957,279 @@ The rest of the workflow is self explanatory. For detailed instructions, visit</
 			<string>textfield</string>
 			<key>variable</key>
 			<string>client_secret</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tlogin</string>
+				<key>placeholder</key>
+				<string>tlogin</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Triggers OAUTH authentication to get a token *Required for workflow to work. Should be first action executed</string>
+			<key>label</key>
+			<string>[keyword] Login</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>login_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tt</string>
+				<key>placeholder</key>
+				<string>tt</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Starting point of workflow, display all actions in logical way. Best way to use the workflow</string>
+			<key>label</key>
+			<string>[keyword] Start (Main)</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>start_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>ts</string>
+				<key>placeholder</key>
+				<string>ts</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Search everything. Prefix L for lists, N for notes, T for tasks... Execute actions on selected items</string>
+			<key>label</key>
+			<string>[keyword] Search</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>search_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>td</string>
+				<key>placeholder</key>
+				<string>td</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Browse your directory inside Alfred folders down. *Requires setting folders - keyword "tup"</string>
+			<key>label</key>
+			<string>[keyword] Drill</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>drill_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tf</string>
+				<key>placeholder</key>
+				<string>tf</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Browse, open, action your filters. *Requires setting filters - keyword "tup"</string>
+			<key>label</key>
+			<string>[keyword] Filters</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>filters_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tl</string>
+				<key>placeholder</key>
+				<string>tl</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Browse, open, action smart lists</string>
+			<key>label</key>
+			<string>[keyword] Smart lists</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>smart_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>ta</string>
+				<key>placeholder</key>
+				<string>ta</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Add tasks, lists, subtasks... Assign date, time, tags, priority, lists, parent task...</string>
+			<key>label</key>
+			<string>[keyword] Add</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>add_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tup</string>
+				<key>placeholder</key>
+				<string>tup</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Contains all actions required to set up and keep workflow up to date</string>
+			<key>label</key>
+			<string>[keyword] Update</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>update_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tsync</string>
+				<key>placeholder</key>
+				<string>tsync</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Refreshes cache using TickTick API. *If workflow feels stale or experiencing issues, run this</string>
+			<key>label</key>
+			<string>[keyword] Sync</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>sync_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tot</string>
+				<key>placeholder</key>
+				<string>tot</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Open Today view in TickTick</string>
+			<key>label</key>
+			<string>[keyword] Open Today</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>optoday_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>toi</string>
+				<key>placeholder</key>
+				<string>toi</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Open Inbox in TickTick</string>
+			<key>label</key>
+			<string>[keyword] Open Inbox</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>opinbox_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tbt</string>
+				<key>placeholder</key>
+				<string>tbt</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Browse Today view in Alfred</string>
+			<key>label</key>
+			<string>[keyword] Browse Today</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>brtoday_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tbi</string>
+				<key>placeholder</key>
+				<string>tbi</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Browse Inbox in Alfred</string>
+			<key>label</key>
+			<string>[keyword] Browse Inbox</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>brinbox_kw</string>
 		</dict>
 	</array>
 	<key>version</key>
