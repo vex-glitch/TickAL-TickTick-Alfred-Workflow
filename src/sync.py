@@ -103,7 +103,7 @@ def do_sync():
 
     cache_store.set("all_notes", all_notes)
 
-    # Extract all unique tags from tasks, merged with tags_config.py
+    # Extract all unique tags from tasks, merged with tags_config.py (or tags_var env var)
     discovered = {tag for t in all_tasks for tag in (t.get("tags") or [])}
     try:
         import sys as _sys
@@ -111,13 +111,15 @@ def do_sync():
         if _workflow_dir not in _sys.path:
             _sys.path.insert(0, _workflow_dir)
         from tags_config import TAGS as _config_tags
-        # Preserve config order, then append discovered tags not already in config.
-        # Case-insensitive match — prevents "🔥Ongoing" + "🔥ongoing" duplicates.
-        config_lower = {t.lower() for t in _config_tags}
-        extra = sorted(t for t in discovered if t.lower() not in config_lower)
-        all_tags = list(_config_tags) + extra
     except Exception:
-        all_tags = sorted(discovered)  # tags_config missing or broken
+        # Fall back to tags_var from Alfred Configure panel
+        _tags_var = os.environ.get("tags_var", "").strip()
+        _config_tags = [t.strip() for t in _tags_var.splitlines() if t.strip()] if _tags_var else []
+    # Preserve config order, append discovered tags not already in config.
+    # Case-insensitive match — prevents "🔥Ongoing" + "🔥ongoing" duplicates.
+    config_lower = {t.lower() for t in _config_tags}
+    extra = sorted(t for t in discovered if t.lower() not in config_lower)
+    all_tags = list(_config_tags) + extra
     cache_store.set("tags", all_tags)
 
     summary = f"Synced {len(projects)} lists, {len(all_tasks)} tasks, {len(all_notes)} notes, {len(all_tags)} tags"

@@ -47,12 +47,23 @@ def main():
 
         name = query.strip()
 
+        # Parse folders_var for quick-select suggestions
+        folders_var = os.environ.get("folders_var", "").strip()
+        suggestions = [l.strip() for l in folders_var.splitlines() if l.strip()] if folders_var else []
+
         if not name:
             items = [alfred.item(
                 title="Type a folder name…",
                 subtitle=f"Prefix 1) for hierarchy order, e.g. '1) 1️⃣ Admin'  —  Lists: {lists_hint}",
                 valid=False,
             )]
+            for s in suggestions:
+                items.append(alfred.item(
+                    title=s,
+                    subtitle=f"From Configure panel  —  Lists: {lists_hint}  —  ⏎ to save",
+                    arg=s,
+                    variables={"folder_group_id": group_id, "folder_name": s},
+                ))
         else:
             items = [alfred.item(
                 title=f"Name folder: {name}",
@@ -60,6 +71,15 @@ def main():
                 arg=name,
                 variables={"folder_group_id": group_id, "folder_name": name},
             )]
+            # Also show matching suggestions
+            for s in suggestions:
+                if name.lower() in s.lower() and s != name:
+                    items.append(alfred.item(
+                        title=s,
+                        subtitle=f"From Configure panel  —  Lists: {lists_hint}  —  ⏎ to save",
+                        arg=s,
+                        variables={"folder_group_id": group_id, "folder_name": s},
+                    ))
 
         print(alfred.output(items, skipknowledge=True))
 
