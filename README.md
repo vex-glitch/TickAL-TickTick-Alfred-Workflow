@@ -272,7 +272,7 @@ Folders → Lists → Sections → Tasks → Subtasks
 - [Go Back](#go-back) available at every level
 - All [modifier actions](#modifier-actions) available on every task and subtask
 
-**Folder ordering:** The TickTick API does not expose folders. Run Update → Set Folders to define yours — use the `1) Folder Name` convention to preserve hierarchy and control display order. The number is used purely for ordering and is never displayed.
+**Folder ordering:** The TickTick API does not expose folders. Enter your folder names in the **Configure Workflow** panel, then run Update → Set Folders to match them to TickTick groups — use the `1) Folder Name` convention to preserve hierarchy and control display order. The number is used purely for ordering and is never displayed.
 
 ---
 
@@ -284,8 +284,8 @@ Maintenance actions for the workflow.
 
 - **Sync** — manually refresh the local cache from TickTick API
 - **Set Filters** — define your filters (saved to `filters_config.py`)
-- **Set Tags** — define your tag list (saved to `tags_config.py`)
-- **Set Folders** — name your TickTick folders and set their display order
+- **Set Tags** — open `tags_config.py` in your editor (seeded from Configure panel on first run)
+- **Set Folders** — match your folder names to TickTick groups (suggestions pulled from Configure panel)
 - **Open Docs** — open the workflow documentation on GitHub
 
 > **Tip:** If data looks stale or a task is missing, run Update → Sync and retry.
@@ -309,7 +309,7 @@ Some TickTick data is not accessible via the API. The following config files wor
 ### Tags
 **Problem:** The TickTick API only surfaces tags that are currently assigned to at least one active task. Tags not yet in use — or only used on completed tasks — will never appear in the picker automatically.
 
-**Solution:** Define your tags in `tags_config.py` by running Update → Set Tags. Tags listed there always appear in the picker regardless of usage. Tags discovered from your tasks during sync are merged in automatically (case-insensitive dedup — `🔥Ongoing` and `🔥ongoing` count as one).
+**Solution:** Enter your tags in the **Configure Workflow** panel (one per line) — they are picked up automatically on sync without any further steps. For advanced editing, run Update → Set Tags to open `tags_config.py` directly (pre-seeded from your Configure panel input on first run). Tags discovered from your tasks during sync are merged in automatically (case-insensitive dedup — `🔥Ongoing` and `🔥ongoing` count as one).
 
 ### Filters
 **Problem:** TickTick's built-in filters are locked inside their app and cannot be read or extended via the API.
@@ -319,7 +319,7 @@ Some TickTick data is not accessible via the API. The following config files wor
 ### Folders
 **Problem:** The TickTick API does not expose folders.
 
-**Solution:** Define yours by running Update → Set Folders. Use the `1) Folder Name` convention to control display order in Drill:
+**Solution:** Enter your folder names in the **Configure Workflow** panel (one per line, using the `1) Folder Name` convention). Then run Update → Set Folders to match each name to its TickTick group — your Configure panel entries appear as quick-select suggestions. Use the `1) Folder Name` convention to control display order in Drill:
 - `1) 1️⃣ Admin` → displays as `1️⃣ Admin`, sorts first
 - `2) Work` → displays as `Work`, sorts second
 - Folders without a prefix sort last, unchanged
