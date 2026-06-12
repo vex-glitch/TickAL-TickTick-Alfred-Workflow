@@ -105,25 +105,25 @@ def build_items():
             uid="tt_quick_add",
             title="Quick Add",
             subtitle="TickTick quick add window",
-            arg="km:E877AEEE-02A2-4885-9A58-535CACE9BCD9",
+            arg="tts:quick_add",
         ),
         alfred.item(
             uid="tt_mini_window",
             title="Mini Window",
             subtitle="TickTick mini window",
-            arg="km:4F20B9B8-8550-4E4A-9D95-9AE51A3F5B9D",
+            arg="tts:mini_window",
         ),
         alfred.item(
             uid="tt_pomo",
             title="Pomodoro",
             subtitle="TickTick Pomodoro timer",
-            arg="km:9A048ACD-C747-4BB1-B07C-3F7535FE3FBA",
+            arg="tts:pomo",
         ),
         alfred.item(
             uid="tt_sticky",
             title="Sticky Note",
             subtitle="TickTick sticky note",
-            arg="km:8C6621C4-0B11-4BC8-AE2C-5E4A384B2A52",
+            arg="tts:sticky",
         ),
     ]
 

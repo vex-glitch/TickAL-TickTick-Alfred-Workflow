@@ -4930,9 +4930,9 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 						<key>matchmode</key>
 						<integer>4</integer>
 						<key>matchstring</key>
-						<string>^km</string>
+						<string>^tts</string>
 						<key>outputlabel</key>
-						<string>KM Trigger</string>
+						<string>TT Shortcut</string>
 						<key>uid</key>
 						<string>FA123456-7890-ABCD-EF12-345678901234</string>
 					</dict>
@@ -6589,7 +6589,7 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>osascript -e 'tell application "Keyboard Maestro Engine" to do script "'${1#km:}'"'</string>
+				<string>/opt/homebrew/bin/python3 "Scripts/tt_shortcut.py" "$1"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
