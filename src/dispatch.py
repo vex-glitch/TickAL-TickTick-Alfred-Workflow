@@ -364,6 +364,8 @@ def main():
                 title=title,
                 project_id=payload.get("projectId"),
                 due_date=payload.get("dueDate"),
+                start_date=payload.get("startDate"),
+                content=payload.get("content"),
                 priority=payload.get("priority", 0),
                 tags=payload.get("tags"),
                 column_id=payload.get("columnId", None),

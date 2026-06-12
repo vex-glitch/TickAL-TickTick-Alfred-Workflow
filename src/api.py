@@ -85,13 +85,17 @@ class TickTickAPI:
         return r.json()
 
     def create_task(self, title, project_id=None, due_date=None, content=None,
-                    priority=0, tags=None, column_id=None, parent_id=None, kind=None):
+                    priority=0, tags=None, column_id=None, parent_id=None, kind=None,
+                    start_date=None):
         payload = {"title": title}
         if project_id:
             payload["projectId"] = project_id
+        if start_date:
+            # startDate + dueDate together define a time span (duration)
+            payload["startDate"] = start_date
         if due_date:
             payload["dueDate"]   = due_date
-            payload["isAllDay"]  = _is_all_day(due_date)
+            payload["isAllDay"]  = _is_all_day(due_date) and not start_date
         if content:
             payload["content"] = content
         if priority:
