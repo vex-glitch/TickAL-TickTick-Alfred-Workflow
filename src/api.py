@@ -4,8 +4,22 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 
 import requests  # noqa: E402
+from requests.adapters import HTTPAdapter  # noqa: E402
+from urllib3.util.retry import Retry  # noqa: E402
 
 BASE_URL = "https://api.ticktick.com/open/v1"
+
+# TickTick's Open API throws intermittent 500s (especially GET /project).
+# Retry transient server errors with a short backoff before surfacing them.
+# Only idempotent methods — retrying POST could create duplicates if the
+# first request succeeded server-side before erroring.
+_RETRY = Retry(
+    total=3,
+    backoff_factor=0.5,  # 0.5s, 1s, 2s
+    status_forcelist=[500, 502, 503, 504],
+    allowed_methods=["GET", "DELETE"],
+    raise_on_status=False,
+)
 
 
 def _is_all_day(date_str):
@@ -42,6 +56,8 @@ class TickTickAPI:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         })
+        adapter = HTTPAdapter(max_retries=_RETRY)
+        self.session.mount("https://", adapter)
 
     def create_project(self, name, group_id=None):
         payload = {"name": name, "kind": "TASK"}
