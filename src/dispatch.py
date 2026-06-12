@@ -371,6 +371,7 @@ def main():
                 column_id=payload.get("columnId", None),
                 parent_id=payload.get("parentId"),
                 kind=payload.get("kind"),
+                repeat_flag=payload.get("repeatFlag"),
             )
             # Update all_tasks in-place so searches work immediately after create
             proj_id = payload.get("projectId", "")

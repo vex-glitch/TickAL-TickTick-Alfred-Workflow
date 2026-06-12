@@ -1,21 +1,11 @@
 #!/bin/bash
-# Syncs TickTick and returns focus to the previously active app
+# Syncs the TickTick app in the background via its File > Sync menu item.
+# System Events can click a background app's menus without activating it,
+# so the frontmost app keeps focus. (The old approach activated TickTick,
+# sent ⌘S, then re-activated the "previous" app — and whenever that app
+# was Finder, macOS treated the activation like a Dock click and popped
+# open a Finder window.)
 
-osascript <<'EOF'
-set previousApp to name of (info for (path to frontmost application))
-
-tell application "TickTick" to activate
-delay 0.5
-
-tell application "System Events"
-    tell process "TickTick"
-        keystroke "s" using command down
-    end tell
-end tell
-
-delay 0.3
-
-tell application previousApp to activate
-EOF
+osascript -e 'tell application "System Events" to tell process "TickTick" to click menu item "Sync" of menu "File" of menu bar 1' >/dev/null 2>&1
 
 echo "TickTick Refreshed"

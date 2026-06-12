@@ -54,6 +54,17 @@ PRIORITY_OPTIONS = [
 PRIORITY_VAL = {"1": 1, "2": 3, "3": 5}
 PRIORITY_LABEL = {1: "↓", 3: "↑", 5: "⬆"}
 
+# &repeat presets — token, label, hint, RRULE
+REPEAT_OPTIONS = [
+    ("daily",    "Daily",    "every day",                  "RRULE:FREQ=DAILY"),
+    ("weekdays", "Weekdays", "Mon–Fri",                    "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
+    ("weekly",   "Weekly",   "same weekday every week",    "RRULE:FREQ=WEEKLY"),
+    ("monthly",  "Monthly",  "same day every month",       "RRULE:FREQ=MONTHLY"),
+    ("yearly",   "Yearly",   "same date every year",       "RRULE:FREQ=YEARLY"),
+]
+REPEAT_RRULE = {tok: rrule for tok, _, _, rrule in REPEAT_OPTIONS}
+REPEAT_LABEL = {tok: label for tok, label, _, _ in REPEAT_OPTIONS}
+
 # ── Data helpers ─────────────────────────────────────────────────────────────
 def get_lists():
     data = cache_store.get("projects")
@@ -89,7 +100,7 @@ def find_active_trigger(query):
     scan = query[:m.start()] if m else query
     for i in range(len(scan) - 1, -1, -1):
         ch = scan[i]
-        if ch not in ('~', '#', '!', '*', '/', '>', '@'):
+        if ch not in ('~', '#', '!', '*', '/', '>', '@', '&'):
             continue
         # Must be at start or preceded by a space
         if i > 0 and scan[i - 1] != ' ':
@@ -108,7 +119,7 @@ def find_active_trigger(query):
                 return None
             return (ch, prefix, fragment)
         # Single-word triggers: if fragment contains a space the token is done
-        if ch in ('#', '!', '/', '>') and ' ' in fragment:
+        if ch in ('#', '!', '/', '>', '&') and ' ' in fragment:
             return None
         # Date / time triggers: if fragment ends with a space the token is done
         if ch in ('*', '@') and fragment.endswith(' '):
@@ -129,21 +140,21 @@ def parse_task(query):
 
     # ~p parent_task (multi-word, ends at next trigger or end of string)
     parent_name = None
-    m = re.search(r'(?<!\S)~p\s+(.+?)(?=\s+[~#!*@/>=]|\s*$)', q)
+    m = re.search(r'(?<!\S)~p\s+(.+?)(?=\s+[~#!*@/>=&]|\s*$)', q)
     if m:
         parent_name = m.group(1)
         q = q[:m.start()] + q[m.end():]
 
     # ~s section (multi-word)
     section_name = None
-    m = re.search(r'(?<!\S)~s\s+(.+?)(?=\s+[~#!*@/>=]|\s*$)', q)
+    m = re.search(r'(?<!\S)~s\s+(.+?)(?=\s+[~#!*@/>=&]|\s*$)', q)
     if m:
         section_name = m.group(1)
         q = q[:m.start()] + q[m.end():]
 
     # ~l list (multi-word)
     list_name = None
-    m = re.search(r'(?<!\S)~l\s+(.+?)(?=\s+[~#!*@/>=]|\s*$)', q)
+    m = re.search(r'(?<!\S)~l\s+(.+?)(?=\s+[~#!*@/>=&]|\s*$)', q)
     if m:
         list_name = m.group(1)
         q = q[:m.start()] + q[m.end():]
@@ -166,7 +177,7 @@ def parse_task(query):
 
     # *date — greedily takes everything to next trigger or end (stops at @)
     date_str = None
-    m = re.search(r'(?<!\S)\*(.+?)(?=\s*[~#!/>@=]|$)', q)
+    m = re.search(r'(?<!\S)\*(.+?)(?=\s*[~#!/>@=&]|$)', q)
     if m:
         date_str = m.group(1).strip()
         q = q[:m.start()] + q[m.end():]
@@ -185,9 +196,16 @@ def parse_task(query):
         end_str = m.group(1)
         q = q[:m.start()] + q[m.end():]
 
+    # &repeat — preset token (daily/weekdays/weekly/monthly/yearly)
+    repeat = None
+    m = re.search(r'(?<!\S)&(\S+)', q)
+    if m:
+        repeat = m.group(1).lower()
+        q = q[:m.start()] + q[m.end():]
+
     title = ' '.join(q.split())
     return (title, date_str, time_str, end_str, priority, tags,
-            list_name, parent_name, section_name, note)
+            list_name, parent_name, section_name, note, repeat)
 
 def resolve_list_id(list_name, lists):
     """Find project ID by name (case-insensitive prefix/contains match)."""
@@ -249,6 +267,8 @@ def tag_picker(prefix, fragment):
 def priority_picker(prefix, fragment):
     items = []
     for token, label, _ in PRIORITY_OPTIONS:
+        if fragment and fragment not in label.lower() and fragment != token[1:]:
+            continue
         filled = f"{prefix}{token} "
         items.append(alfred.item(
             title=label,
@@ -257,8 +277,6 @@ def priority_picker(prefix, fragment):
             valid=False,
             autocomplete=filled,
         ))
-    if fragment:
-        items = [i for i in items if fragment in i["title"].lower()]
     return items or [alfred.item(title="Type 1, 2, or 3", valid=False)]
 
 def section_picker(fill, fragment, current_list_id=None):
@@ -445,6 +463,8 @@ def symbol_legend(has_date=False, has_time=False, note_mode=False):
         syms.append("@⏰")
     if has_time:
         syms.append(">⏳")
+    if has_date:
+        syms.append("&🔁")
     syms += ["!🚩", "#🏷️", "~🏠", "=📝"]
     return "/ More…  |  " + " ".join(syms)
 
@@ -453,7 +473,7 @@ def symbol_legend(has_date=False, has_time=False, note_mode=False):
 def master_menu(prefix, fragment, note_mode=False):
     """Typing / shows every add-on as a menu row. Selecting one autocompletes
     its symbol into the query — the menu doubles as a syntax reference."""
-    _, date_str, time_str, end_str, *_ = parse_task(prefix)
+    _, date_str, time_str, end_str, _, _, _, _, _, _, repeat = parse_task(prefix)
 
     rows = []
     if note_mode:
@@ -467,6 +487,8 @@ def master_menu(prefix, fragment, note_mode=False):
             rows.append(("@", "⏰", "Time", "hour, then minutes"))
         if time_str and not end_str:
             rows.append((">", "⏳", "Duration", "end time or length"))
+        if date_str and not repeat:
+            rows.append(("&", "🔁", "Repeat", "daily · weekly · monthly"))
         rows += [
             ("!", "🚩", "Priority",  "low · medium · high"),
             ("#", "🏷️", "Tag",       "from your tags"),
@@ -503,7 +525,7 @@ def location_router(prefix, fragment, lists=None, note_mode=False):
         if mode == 'l':
             return list_picker(fill, frag, lists=lists)
         # mode == 's' — use the already-chosen list to narrow sections
-        _, _, _, _, _, _, ln, _, _, _ = parse_task(prefix)
+        ln = parse_task(prefix)[6]
         cur_lid = None
         if ln:
             source = lists if lists is not None else get_lists()
@@ -621,6 +643,31 @@ def duration_picker(prefix, fragment):
     return items
 
 
+# ── & repeat picker ───────────────────────────────────────────────────────────
+def repeat_picker(prefix, fragment):
+    date_str = parse_task(prefix)[1]
+    if not date_str:
+        return [alfred.item(
+            title="Set a date first",
+            subtitle="Repeats need an anchor date — add one with *",
+            valid=False,
+        )]
+    items = []
+    for tok, label, hint, _ in REPEAT_OPTIONS:
+        items.append(alfred.item(
+            title=f"🔁 {label}",
+            subtitle=f"{hint}  ·  ↵ Select",
+            arg="",
+            valid=False,
+            autocomplete=f"{prefix}&{tok} ",
+        ))
+    if fragment:
+        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
+    if not items:
+        items = [alfred.item(title=f'No repeat matching "{fragment}"', valid=False)]
+    return items
+
+
 # ── Notification builder ─────────────────────────────────────────────────────
 def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, section_display=None):
     """
@@ -690,7 +737,7 @@ def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, 
 # ── Task preview ──────────────────────────────────────────────────────────────
 def task_preview(query):
     (title, date_str, time_str, end_str, priority, tags,
-     list_name, parent_name, section_name, note) = parse_task(query)
+     list_name, parent_name, section_name, note, repeat) = parse_task(query)
 
     if not title:
         return [alfred.item(
@@ -811,6 +858,11 @@ def task_preview(query):
         parts.append(f"⏳{_duration_label(time_str, end_norm)}")
     elif end_str and not time_str:
         parts.append(f">{end_str}?")
+    if repeat:
+        if repeat in REPEAT_RRULE and date_str:
+            parts.append(f"🔁{REPEAT_LABEL[repeat]}")
+        else:
+            parts.append(f"🔁{repeat}?")
     if priority:
         parts.append(f"{PRIORITY_LABEL[priority]} priority")
     for t in tags:
@@ -835,6 +887,8 @@ def task_preview(query):
         payload["tags"] = tags
     if note:
         payload["content"] = note
+    if repeat in REPEAT_RRULE and (due_date or end_date):
+        payload["repeatFlag"] = REPEAT_RRULE[repeat]
     if section_id and not effective_parent_id:
         payload["columnId"] = section_id
     elif env_section_id and not effective_parent_id:
@@ -867,7 +921,7 @@ def task_preview(query):
 # ── Note preview ─────────────────────────────────────────────────────────────
 def note_preview(query):
     (title, _, _, _, _, _,
-     list_name, parent_name, section_name, note) = parse_task(query)
+     list_name, parent_name, section_name, note, _) = parse_task(query)
 
     if not title:
         return [alfred.item(
@@ -1111,6 +1165,8 @@ def main():
                 items = time_picker(prefix, fragment)
             elif ch == '>':
                 items = duration_picker(prefix, fragment)
+            elif ch == '&':
+                items = repeat_picker(prefix, fragment)
             elif ch == '/':
                 items = master_menu(prefix, fragment)
         else:

@@ -86,7 +86,7 @@ class TickTickAPI:
 
     def create_task(self, title, project_id=None, due_date=None, content=None,
                     priority=0, tags=None, column_id=None, parent_id=None, kind=None,
-                    start_date=None):
+                    start_date=None, repeat_flag=None):
         payload = {"title": title}
         if project_id:
             payload["projectId"] = project_id
@@ -108,6 +108,8 @@ class TickTickAPI:
             payload["parentId"] = parent_id
         if kind:
             payload["kind"] = kind
+        if repeat_flag:
+            payload["repeatFlag"] = repeat_flag
         r = self.session.post(f"{BASE_URL}/task", json=payload)
         r.raise_for_status()
         return r.json()
