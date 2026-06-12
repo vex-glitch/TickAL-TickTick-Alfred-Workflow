@@ -283,6 +283,62 @@ def main():
                 cache_store.invalidate("all_tasks")
             print(f"{title} deleted")
 
+        elif arg.startswith("create_project_meta:"):
+            # create_project_meta:<base64 {name, tag, emoji}>
+            # Creates a project list in the Projects folder + a linked meta
+            # task in the Project Meta Tasks list, tagged with the area tag.
+            raw = arg[20:]
+            payload = json.loads(base64.b64decode(raw))
+            name  = payload.get("name", "").strip()
+            tag   = payload.get("tag", "")
+            emoji = payload.get("emoji", "")
+            if not name:
+                print("Error: project has no name")
+                return
+
+            folder_id = os.environ.get("projects_folder_id") or "69fcaeb9bac7d10a6914dfca"
+            meta_list = os.environ.get("project_meta_list_id") or "6a2ac922f6161196c5d02531"
+
+            api = TickTickAPI(cfg.get_token())
+            list_name = f"💼P • {name} {emoji}".rstrip()
+            proj = api.create_project(list_name, group_id=folder_id)
+            pid = proj.get("id") if isinstance(proj, dict) else None
+            if not pid:
+                cache_store.invalidate("projects")
+                print("Error: list created but no id returned — meta task skipped")
+                return
+
+            url = f"ticktick:///webapp/#p/{pid}/tasks"
+            task = api.create_task(
+                title=f"PM • [{name}]({url}) 🗺️",
+                project_id=meta_list,
+                tags=[tag] if tag else None,
+            )
+
+            # Update caches in-place
+            try:
+                projects_cache = cache_store.get("projects")
+                if projects_cache is not None:
+                    projects_cache.append(proj)
+                    cache_store.set("projects", projects_cache)
+                if task and task.get("id"):
+                    meta_name = ""
+                    if projects_cache:
+                        meta_name = next((p.get("name", "") for p in projects_cache
+                                          if p.get("id") == meta_list), "")
+                    entry = dict(task)
+                    entry["_projectId"]   = meta_list
+                    entry["_projectName"] = meta_name
+                    entry["_columnName"]  = ""
+                    cached_tasks = cache_store.get("all_tasks") or []
+                    cached_tasks.append(entry)
+                    cache_store.set("all_tasks", cached_tasks)
+            except Exception:
+                cache_store.invalidate("projects")
+                cache_store.invalidate("all_tasks")
+
+            print(f"💼 {name} created · {tag}")
+
         elif arg.startswith("create_list:"):
             raw = arg[12:]
             payload = json.loads(base64.b64decode(raw))

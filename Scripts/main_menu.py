@@ -86,7 +86,7 @@ def build_items():
         alfred.item(
             uid="add",
             title="Add...",
-            subtitle="Task, list",
+            subtitle="Task, list, note, project",
             arg="add",
         ),
         alfred.item(

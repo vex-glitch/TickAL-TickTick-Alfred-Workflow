@@ -744,6 +744,56 @@ def list_create_items(name):
     )]
 
 
+# ── Project creation mode ─────────────────────────────────────────────────────
+# Keycap number emoji: digit + U+FE0F (variation selector) + U+20E3 (keycap)
+AREA_RE = re.compile(r"^([0-9]️?⃣)")
+
+def get_area_tags():
+    """Area tags from tags_config.py — entries starting with a keycap number."""
+    try:
+        cfg_path = os.path.join(WORKFLOW_DIR, "tags_config.py")
+        ns = {}
+        with open(cfg_path, encoding="utf-8") as f:
+            exec(f.read(), ns)
+        tags = ns.get("TAGS", [])
+    except Exception:
+        tags = []
+    areas = []
+    for t in tags:
+        m = AREA_RE.match(t)
+        if m:
+            areas.append((t, m.group(1)))  # ("1️⃣Work", "1️⃣")
+    return areas
+
+
+def project_create_items(name):
+    if not name:
+        return [alfred.item(
+            title="Type a project name…",
+            subtitle="Creates 💼P • list + PM meta task  ⇧⌘ Back",
+            valid=False,
+        )]
+    areas = get_area_tags()
+    if not areas:
+        return [alfred.item(
+            title="No area tags found",
+            subtitle="tags_config.py has no tags starting with a number emoji (1️⃣…)",
+            valid=False,
+        )]
+    items = []
+    for tag, emoji in areas:
+        payload = base64.b64encode(json.dumps(
+            {"name": name, "tag": tag, "emoji": emoji}
+        ).encode()).decode()
+        items.append(alfred.item(
+            uid=f"area-{tag}",
+            title=tag,
+            subtitle=f"Create  💼P • {name} {emoji}  +  PM • {name} 🗺️",
+            arg=f"create_project_meta:{payload}",
+        ))
+    return items
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     query = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -760,7 +810,7 @@ def main():
         if not query:
             items = [alfred.item(
                 title="Type to add a task…",
-                subtitle="Prefix: L List · N Notes",
+                subtitle="Prefix: L List · N Notes · P Project",
                 valid=False,
             )]
             print(alfred.output(items, skipknowledge=True))
@@ -769,6 +819,12 @@ def main():
         # ── L prefix → create list ────────────────────────────────────────────
         if query.lower().startswith("l "):
             items = list_create_items(query[2:].strip())
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # ── P prefix → create project + meta task ─────────────────────────────
+        if query.lower().startswith("p "):
+            items = project_create_items(query[2:].strip())
             print(alfred.output(items, skipknowledge=True))
             return
 
