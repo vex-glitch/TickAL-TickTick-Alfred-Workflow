@@ -1416,6 +1416,28 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<true/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>EDF299A5-5B6C-47F2-BBDB-A1846016F4FB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>FA123456-7890-ABCD-EF12-345678901234</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>517693E6-D565-42F8-B342-08CE726114A7</key>
 		<array>
@@ -2251,6 +2273,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>7DEE972E-9AD6-44E8-8919-7B033F2099F4</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>BE074C02-C428-441B-A431-08AEFCA6619D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>7F0486C7-15ED-4139-B921-F83ACD805B88</key>
 		<array>
 			<dict>
@@ -2388,6 +2423,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>9BFC1C46-76D3-4986-93B4-F1962AEEC39D</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E86FBD12-4202-4205-A6B9-E63851E8A01A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>9EE68F98-2ED7-484F-A0FD-FCC6DD212147</key>
 		<array>
 			<dict>
@@ -2406,6 +2454,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>BE074C02-C428-441B-A431-08AEFCA6619D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>A18FBDF4-AF02-4287-AEC3-72488678C9F9</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>115CC5BB-AA7E-4D1A-A345-242952A9FC1D</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -2453,6 +2514,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>AAE96E42-B547-46DC-A255-DDFB39608820</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>AF17BE48-99C7-453C-A15B-AB752A2AFE7A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>AF17BE48-99C7-453C-A15B-AB752A2AFE7A</key>
 		<array>
 			<dict>
@@ -2472,6 +2546,19 @@
 				<integer>1179648</integer>
 				<key>modifiersubtext</key>
 				<string>Go Back</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>B0C4E207-421F-4F8D-9298-7BA86BAC35F5</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>DAB4A71E-C5E1-484E-825B-DFDC28AF603D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -2902,6 +2989,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>B2C19972-DE96-4F96-AD37-9F523B94E501</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>D9C53ADB-3884-40BA-BD32-88652477FBE5</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0415216D-8474-4D0B-AA77-B45BAE944945</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -3511,6 +3611,37 @@ osascript \
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>5</integer>
+				<key>hotmod</key>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>G</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>9BFC1C46-76D3-4986-93B4-F1962AEEC39D</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -3981,6 +4112,37 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
 			<string>C1512190-19BD-4E29-9619-FF4D3C931729</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>2</integer>
+				<key>hotmod</key>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>D</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>D9C53ADB-3884-40BA-BD32-88652477FBE5</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -4770,6 +4932,20 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 						<key>uid</key>
 						<string>ED7063BF-2836-4FD3-9D5D-A010075865C9</string>
 					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^km</string>
+						<key>outputlabel</key>
+						<string>KM Trigger</string>
+						<key>uid</key>
+						<string>FA123456-7890-ABCD-EF12-345678901234</string>
+					</dict>
 				</array>
 				<key>elselabel</key>
 				<string>N/A</string>
@@ -5295,9 +5471,11 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>17</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>T</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5935,6 +6113,37 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>124</integer>
+				<key>hotmod</key>
+				<integer>12451840</integer>
+				<key>hotstring</key>
+				<string>→</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>7DEE972E-9AD6-44E8-8919-7B033F2099F4</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>alfredfiltersresults</key>
 				<false/>
 				<key>alfredfiltersresultsmatchmode</key>
@@ -6390,6 +6599,52 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
+				<string>osascript -e 'tell application "Keyboard Maestro Engine" to do script "'${1#km:}'"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>EDF299A5-5B6C-47F2-BBDB-A1846016F4FB</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>osascript -e 'tell application "Keyboard Maestro Engine" to do script "'${1#km:}'"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
 				<string>open "${1#open:}"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
@@ -6402,6 +6657,37 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
 			<string>CC04E2DF-C2D4-4899-AB46-C9C391CB6A60</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>34</integer>
+				<key>hotmod</key>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>I</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>B0C4E207-421F-4F8D-9298-7BA86BAC35F5</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -8100,6 +8386,37 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>40</integer>
+				<key>hotmod</key>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>K</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>AAE96E42-B547-46DC-A255-DDFB39608820</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>argumenttype</key>
 				<integer>2</integer>
 				<key>keyword</key>
@@ -8505,6 +8822,37 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
 			<string>62E9A069-41F8-43FE-AACB-35390C75DDD4</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>38</integer>
+				<key>hotmod</key>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>J</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>A18FBDF4-AF02-4287-AEC3-72488678C9F9</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -9887,7 +10235,7 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 		<key>54AEE7F7-E4EE-45D6-A2D7-8707727DA7D0</key>
 		<dict>
 			<key>xpos</key>
-			<real>1385</real>
+			<real>1380</real>
 			<key>ypos</key>
 			<real>2070</real>
 		</dict>
@@ -10292,6 +10640,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>ypos</key>
 			<real>15</real>
 		</dict>
+		<key>7DEE972E-9AD6-44E8-8919-7B033F2099F4</key>
+		<dict>
+			<key>xpos</key>
+			<real>1130</real>
+			<key>ypos</key>
+			<real>540</real>
+		</dict>
 		<key>7F0486C7-15ED-4139-B921-F83ACD805B88</key>
 		<dict>
 			<key>colorindex</key>
@@ -10418,6 +10773,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>ypos</key>
 			<real>335</real>
 		</dict>
+		<key>9BFC1C46-76D3-4986-93B4-F1962AEEC39D</key>
+		<dict>
+			<key>xpos</key>
+			<real>805</real>
+			<key>ypos</key>
+			<real>15</real>
+		</dict>
 		<key>9EE68F98-2ED7-484F-A0FD-FCC6DD212147</key>
 		<dict>
 			<key>colorindex</key>
@@ -10453,6 +10815,22 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<real>990</real>
 			<key>ypos</key>
 			<real>435</real>
+		</dict>
+		<key>A18FBDF4-AF02-4287-AEC3-72488678C9F9</key>
+		<dict>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>1675</real>
+		</dict>
+		<key>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>970</real>
+			<key>ypos</key>
+			<real>680</real>
 		</dict>
 		<key>A309B074-08E6-4496-8979-73892C2D8F03</key>
 		<dict>
@@ -10499,6 +10877,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>ypos</key>
 			<real>345</real>
 		</dict>
+		<key>AAE96E42-B547-46DC-A255-DDFB39608820</key>
+		<dict>
+			<key>xpos</key>
+			<real>835</real>
+			<key>ypos</key>
+			<real>1445</real>
+		</dict>
 		<key>AB784C49-034D-4A89-9E0E-8B6605CE3603</key>
 		<dict>
 			<key>colorindex</key>
@@ -10523,6 +10908,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<real>990</real>
 			<key>ypos</key>
 			<real>1560</real>
+		</dict>
+		<key>B0C4E207-421F-4F8D-9298-7BA86BAC35F5</key>
+		<dict>
+			<key>xpos</key>
+			<real>2850</real>
+			<key>ypos</key>
+			<real>740</real>
 		</dict>
 		<key>B2C19972-DE96-4F96-AD37-9F523B94E501</key>
 		<dict>
@@ -10794,6 +11186,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>ypos</key>
 			<real>460</real>
 		</dict>
+		<key>D9C53ADB-3884-40BA-BD32-88652477FBE5</key>
+		<dict>
+			<key>xpos</key>
+			<real>800</real>
+			<key>ypos</key>
+			<real>125</real>
+		</dict>
 		<key>DA51AB19-B3F2-43D7-B760-414E7D9BFD2A</key>
 		<dict>
 			<key>note</key>
@@ -10928,6 +11327,15 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<real>2345</real>
 			<key>ypos</key>
 			<real>300</real>
+		</dict>
+		<key>EDF299A5-5B6C-47F2-BBDB-A1846016F4FB</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>1155</real>
+			<key>ypos</key>
+			<real>680</real>
 		</dict>
 		<key>EE44208D-E5C1-46E6-86AF-9A871A47B302</key>
 		<dict>
