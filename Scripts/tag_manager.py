@@ -4,12 +4,12 @@ tag_manager.py — Alfred Script Filter
 Consolidated tag management: view, add, change, remove.
 
 Default (no prefix): lists current tags assigned to the task
-  ↵         → remove this tag
-  ⌘↵        → change this tag (routes to change_tag_picker.py SF)
-  ⌃↵        → remove ALL tags
+  ⏎         → remove this tag
+  ⌘⏎        → change this tag (routes to change_tag_picker.py SF)
+  ⌃⏎        → remove ALL tags
 
 # <query>   → tag picker for adding a new tag
-  ↵         → add this tag
+  ⏎         → add this tag
 
 Alfred wiring after this SF:
   arg == "changetag"         → change_tag_picker.py SF
@@ -90,17 +90,17 @@ def current_tags_view(query, pid, tid, task_title):
     if not current:
         return [alfred.item(
             title="No tags assigned",
-            subtitle="Type # to add a tag  ⇧⌘ Back",
+            subtitle="Type # to add a tag  ⌘⇧ 🔙",
             valid=False,
         )]
 
-    mods_hint = "# Add tag  ↵ Remove  ⌘↵ Change  ⌃↵ Clear all"
+    mods_hint = "# Add tag  ⏎ Remove  ⌘⏎ Change  ⌃⏎ Clear all"
     items = []
     for tag in current:
         items.append(alfred.item(
             uid=f"curtag-{tag}",
             title=tag,
-            subtitle=f"{mods_hint}  ⇧⌘ Back",
+            subtitle=f"{mods_hint}  ⌘⇧ 🔙",
             arg=f"attr_tag_remove:{pid}:{tid}:{tag}",
             valid=True,
             mods={
@@ -156,7 +156,7 @@ def add_tag_view(fragment_str, pid, tid, task_title):
         arg_tags     = ",".join(confirmed)
         items.append(alfred.item(
             title=f"Add {len(confirmed)} tag{'s' if len(confirmed) > 1 else ''}: {tags_display}",
-            subtitle="↵ Confirm and close  ⇧⌘ Back",
+            subtitle="⏎ Confirm and close  ⌘⇧ 🔙",
             arg=f"attr_tags_multi:{pid}:{tid}:{arg_tags}",
             valid=True,
             variables={"task_list_id": pid, "task_id": tid},
@@ -173,8 +173,8 @@ def add_tag_view(fragment_str, pid, tid, task_title):
         item = alfred.item(
             uid=f"addtag-{tag}",
             title=f"#{tag}",
-            subtitle=("Already tagged  ⇧⌘ Back" if already
-                      else "↵ Queue  ⇧⌘ Back"),
+            subtitle=("Already tagged  ⌘⇧ 🔙" if already
+                      else "⏎ Queue  ⌘⇧ 🔙"),
             arg="",
             valid=False,
             variables={"task_list_id": pid, "task_id": tid},

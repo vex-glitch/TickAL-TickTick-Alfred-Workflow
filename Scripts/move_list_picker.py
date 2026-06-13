@@ -109,7 +109,7 @@ def list_picker(query, list_id, task_title):
         name = p["name"]
         items.append(alfred.item(
             title=name,
-            subtitle=f"Move \"{task_title}\" to {name}  ⇧⌘ Back",
+            subtitle=f"🏠 Move \"{task_title}\" here  ⌘⇧ 🔙",
             arg=f"list:{pid}",
             variables={"task_list_id": list_id},
         ))
@@ -142,7 +142,7 @@ def section_picker(query, task_title):
                 continue
             items.append(alfred.item(
                 title=f"{cname} | {pname}",
-                subtitle=f"Move \"{task_title}\" to {cname}  ⇧⌘ Back",
+                subtitle=f"🏠 Move \"{task_title}\" here  ⌘⇧ 🔙",
                 arg=f"section:{pid}:{cid}",
             ))
 
@@ -174,9 +174,9 @@ def task_picker(query, current_tid, task_title):
         parent_id = t.get("parentId", "")
         if parent_id and parent_id in task_map:
             parent_title = task_map[parent_id].get("title", "")
-            subtitle = f"↳ {parent_title}  ·  {lname}  ·  Make \"{task_title}\" a subtask  ⇧⌘ Back"
+            subtitle = f"↳ {parent_title}  ·  {lname}  ·  Make \"{task_title}\" a subtask  ⌘⇧ 🔙"
         else:
-            subtitle = f"{lname}  ·  Make \"{task_title}\" a subtask  ⇧⌘ Back"
+            subtitle = f"{lname}  ·  Make \"{task_title}\" a subtask  ⌘⇧ 🔙"
 
         items.append(alfred.item(
             title=name,

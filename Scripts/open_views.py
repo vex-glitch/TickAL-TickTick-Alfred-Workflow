@@ -26,7 +26,7 @@ def main():
     query = sys.argv[1] if len(sys.argv) > 1 else ""
 
     items = [
-        alfred.item(title=label, subtitle=f"{subtitle}  ⇧⌘ Back", arg=url)
+        alfred.item(title=label, subtitle=f"{subtitle}  ⌘⇧ 🔙", arg=url)
         for label, subtitle, url in VIEWS
     ]
 

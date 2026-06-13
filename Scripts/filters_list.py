@@ -73,7 +73,7 @@ def main():
             if f.get("no_date"):
                 criteria_parts.append("no date")
 
-            subtitle = "  ".join(criteria_parts) + "  |  ⏎ Browse  ⌘ Delete  ⌘⇧ Back" if criteria_parts else "⏎ Browse in Alfred  ⌘ Delete  ⌘⇧ Back"
+            subtitle = "  ".join(criteria_parts) + "  |  ⏎ ⤵️  ⌘ 🗑️  ⌘⇧ 🔙" if criteria_parts else "⏎ ⤵️  ⌘ 🗑️  ⌘⇧ 🔙"
 
             items.append(alfred.item(
                 uid=f"filter-{i}",

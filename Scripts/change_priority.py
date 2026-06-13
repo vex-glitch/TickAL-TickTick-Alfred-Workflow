@@ -63,7 +63,7 @@ def main():
         for val, label, desc in PRIORITIES:
             items.append(alfred.item(
                 title=label,
-                subtitle=f"{desc} for \"{task_title}\"  ⇧⌘ Back",
+                subtitle=f"{desc} for \"{task_title}\"  ⌘⇧ 🔙",
                 arg=str(val),
                 variables={"task_list_id": list_id, "task_id": tid},
             ))

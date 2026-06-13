@@ -34,7 +34,7 @@ try:
     import alfred
     import fuzzy as fuzz
     from api import TickTickAPI
-    from display import build_title, build_subtitle, col_lookup, list_name_for, join_breadcrumb, search_key
+    from display import build_title, build_subtitle, col_lookup, list_name_for, join_breadcrumb, search_key, MOD_BACK
 except Exception as e:
     emit_error(f"Import failed: {e} | SRC_DIR={SRC_DIR}")
     sys.exit(0)
@@ -110,8 +110,8 @@ def main():
                 link = f"ticktick:///webapp/#p/{list_id}/tasks/{tid}"
 
                 items.append(alfred.item(
-                    title=build_title(t, breadcrumb),
-                    subtitle=build_subtitle(sub_count),
+                    title=build_title(t),
+                    subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb),
                     arg=f"open:{link}",
                     mods={
                         "cmd":        {"arg": "",                                  "subtitle": "Add subtask"},
@@ -132,7 +132,7 @@ def main():
                 list_link = f"ticktick:///webapp/#p/{list_id}/tasks"
                 items.append(alfred.item(
                     title=f'No tasks matching "{query}"' if query else f"No tasks in {label}",
-                    subtitle="⇧⌘ Back",
+                    subtitle=MOD_BACK,
                     arg=f"open:{list_link}",
                     valid=True,
                     variables={"task_list_id": list_id, "list_id": list_id, "section_id": section_id},
@@ -162,8 +162,8 @@ def main():
                 link = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"
 
                 items.append(alfred.item(
-                    title=build_title(t, breadcrumb),
-                    subtitle=build_subtitle(sub_count),
+                    title=build_title(t),
+                    subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb),
                     arg=f"open:{link}",
                     mods={
                         "cmd":     {"arg": "",                              "subtitle": "Add subtask"},

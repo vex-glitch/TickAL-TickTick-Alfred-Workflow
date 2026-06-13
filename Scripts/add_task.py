@@ -232,7 +232,7 @@ def list_picker(fill, fragment, lists=None):
         filled = f"{fill}{name} "
         items.append(alfred.item(
             title=name,
-            subtitle="↵ Select",
+            subtitle="⏎ ✅",
             arg="",
             valid=False,
             autocomplete=filled,
@@ -251,7 +251,7 @@ def tag_picker(prefix, fragment):
         filled = f"{prefix}#{tag} "
         items.append(alfred.item(
             title=tag,
-            subtitle="↵ Select",
+            subtitle="⏎ ✅",
             arg="",
             valid=False,
             autocomplete=filled,
@@ -272,7 +272,7 @@ def priority_picker(prefix, fragment):
         filled = f"{prefix}{token} "
         items.append(alfred.item(
             title=label,
-            subtitle="↵ Select",
+            subtitle="⏎ ✅",
             arg="",
             valid=False,
             autocomplete=filled,
@@ -296,7 +296,7 @@ def section_picker(fill, fragment, current_list_id=None):
             filled   = f"{fill}{col_name} "
             items.append(alfred.item(
                 title=col_name,
-                subtitle=subtitle + ("  ↵ Select" if subtitle else "↵ Select"),
+                subtitle=subtitle + ("  ⏎ ✅" if subtitle else "⏎ ✅"),
                 arg="",
                 valid=False,
                 autocomplete=filled,
@@ -331,7 +331,7 @@ def task_picker(fill, fragment):
         filled = f"{fill}{title} "
         items.append(alfred.item(
             title=title,
-            subtitle=subtitle + "  ↵ Select" if subtitle else "↵ Select",
+            subtitle=subtitle + "  ⏎ ✅" if subtitle else "⏎ ✅",
             arg="",
             valid=False,
             autocomplete=filled,
@@ -441,7 +441,7 @@ def time_picker(prefix, fragment):
             filled = f"{prefix}@{label} "
             items.append(alfred.item(
                 title=label,
-                subtitle=f"↵ Set time to {label}",
+                subtitle=f"⏎ Set time to {label}",
                 arg="",
                 valid=False,
                 autocomplete=filled,
@@ -500,7 +500,7 @@ def master_menu(prefix, fragment, note_mode=False):
     for sym, emoji, name, hint in rows:
         items.append(alfred.item(
             title=f"{emoji} {name}",
-            subtitle=f"{sym}  ·  {hint}  ·  ↵ Select",
+            subtitle=f"{sym}  ·  {hint}  ·  ⏎ ✅",
             arg="",
             valid=False,
             autocomplete=f"{prefix}{sym}",
@@ -541,7 +541,7 @@ def location_router(prefix, fragment, lists=None, note_mode=False):
     for letter, emoji, name, hint in rows:
         items.append(alfred.item(
             title=f"{emoji} {name}",
-            subtitle=f"~{letter}  ·  {hint}  ·  ↵ Select",
+            subtitle=f"~{letter}  ·  {hint}  ·  ⏎ ✅",
             arg="",
             valid=False,
             autocomplete=f"{prefix}~{letter} ",
@@ -601,7 +601,7 @@ def duration_picker(prefix, fragment):
         end = f"{eh:02d}:{em:02d}"
         return [alfred.item(
             title=f"{time_str} → {end}",
-            subtitle=f"⏳ {_duration_label(time_str, end)}  ·  ↵ Select",
+            subtitle=f"⏳ {_duration_label(time_str, end)}  ·  ⏎ ✅",
             arg="", valid=False,
             autocomplete=f"{prefix}>{end} ",
         )]
@@ -630,7 +630,7 @@ def duration_picker(prefix, fragment):
             end = f"{hh}:{mi:02d}"
             items.append(alfred.item(
                 title=end,
-                subtitle=f"⏳ {_duration_label(time_str, end)}  ·  ↵ End at {end}",
+                subtitle=f"⏳ {_duration_label(time_str, end)}  ·  ⏎ End at {end}",
                 arg="", valid=False,
                 autocomplete=f"{prefix}>{end} ",
             ))
@@ -656,7 +656,7 @@ def repeat_picker(prefix, fragment):
     for tok, label, hint, _ in REPEAT_OPTIONS:
         items.append(alfred.item(
             title=f"🔁 {label}",
-            subtitle=f"{hint}  ·  ↵ Select",
+            subtitle=f"{hint}  ·  ⏎ ✅",
             arg="",
             valid=False,
             autocomplete=f"{prefix}&{tok} ",
@@ -1034,14 +1034,14 @@ def list_create_items(name):
     if not name:
         return [alfred.item(
             title="Type a list name…",
-            subtitle="Create list  ⇧⌘ Back",
+            subtitle="Create list  ⌘⇧ 🔙",
             valid=False,
         )]
     payload = {"name": name}
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
     return [alfred.item(
         title=f"Create list: {name}",
-        subtitle="Create  Move to a folder in TickTick afterwards  ⇧⌘ Back",
+        subtitle="Create  Move to a folder in TickTick afterwards  ⌘⇧ 🔙",
         arg=f"create_list:{encoded}",
         valid=True,
     )]
@@ -1073,7 +1073,7 @@ def project_create_items(name):
     if not name:
         return [alfred.item(
             title="Type a project name…",
-            subtitle="Creates 💼P • list + PM meta task  ⇧⌘ Back",
+            subtitle="Creates 💼P • list + PM meta task  ⌘⇧ 🔙",
             valid=False,
         )]
     areas = get_area_tags()

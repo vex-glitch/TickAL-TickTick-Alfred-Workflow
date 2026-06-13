@@ -217,8 +217,8 @@ def main():
 
             return alfred.item(
                 uid=f"task-{tid}",
-                title=build_title(t, breadcrumb),
-                subtitle=build_subtitle(sub_count),
+                title=build_title(t),
+                subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb),
                 arg=f"open:{link}",
                 mods={
                     "cmd":     {"arg": "",                              "subtitle": "Add subtask"},
@@ -256,7 +256,7 @@ def main():
                 items.append(alfred.item(
                     uid=f"tag-{tag}",
                     title=f"#{tag}",
-                    subtitle=f"{count} task{'s' if count != 1 else ''}  |  ⏎ Browse  ⇧⌘ Back",
+                    subtitle=f"{count} task{'s' if count != 1 else ''}  |  ⏎ ⤵️  ⌘⇧ 🔙",
                     arg="",
                     valid=True,
                     variables={"filter_tag": tag, "filter_index": str(filter_index)},
@@ -267,7 +267,7 @@ def main():
                 items.append(alfred.item(
                     uid="tag-untagged",
                     title="No Tag",
-                    subtitle=f"{count} task{'s' if count != 1 else ''}  |  ⏎ Browse  ⇧⌘ Back",
+                    subtitle=f"{count} task{'s' if count != 1 else ''}  |  ⏎ ⤵️  ⌘⇧ 🔙",
                     arg="",
                     valid=True,
                     variables={"filter_tag": "__untagged__", "filter_index": str(filter_index)},

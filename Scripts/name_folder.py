@@ -60,14 +60,14 @@ def main():
             for s in suggestions:
                 items.append(alfred.item(
                     title=s,
-                    subtitle=f"From Configure panel  —  Lists: {lists_hint}  —  ⏎ to save",
+                    subtitle=f"From Configure panel  —  Lists: {lists_hint}  —  ⏎ 💾",
                     arg=s,
                     variables={"folder_group_id": group_id, "folder_name": s},
                 ))
         else:
             items = [alfred.item(
                 title=f"Name folder: {name}",
-                subtitle=f"Lists: {lists_hint}  —  ⏎ to save",
+                subtitle=f"Lists: {lists_hint}  —  ⏎ 💾",
                 arg=name,
                 variables={"folder_group_id": group_id, "folder_name": name},
             )]
@@ -76,7 +76,7 @@ def main():
                 if name.lower() in s.lower() and s != name:
                     items.append(alfred.item(
                         title=s,
-                        subtitle=f"From Configure panel  —  Lists: {lists_hint}  —  ⏎ to save",
+                        subtitle=f"From Configure panel  —  Lists: {lists_hint}  —  ⏎ 💾",
                         arg=s,
                         variables={"folder_group_id": group_id, "folder_name": s},
                     ))

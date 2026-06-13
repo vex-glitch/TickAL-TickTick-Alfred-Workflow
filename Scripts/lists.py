@@ -34,6 +34,7 @@ try:
     import alfred
     import fuzzy as fuzz
     from api import TickTickAPI
+    from display import mods_for
 except Exception as e:
     emit_error(f"Import failed: {e} | SRC_DIR={SRC_DIR}")
     sys.exit(0)
@@ -84,10 +85,20 @@ def main():
             section_count = len(cached.get("columns", [])) if cached else None
             count_str = f"{section_count} section{'s' if section_count != 1 else ''}  " if section_count else ""
 
+            # Drilling a list shows its sections, or its tasks when it has none.
+            # Dead end only when it has neither. Unknown (uncached) → assume drillable.
+            if cached is None:
+                has_children = True
+            else:
+                has_children = bool(cached.get("columns")) or any(
+                    t.get("status", 0) == 0 and not t.get("parentId")
+                    for t in cached.get("tasks", [])
+                )
+
             items.append(alfred.item(
                 uid=f"list-{pid}",
                 title=name,
-                subtitle=f"{count_str}Open  ⌘ Add  ⌥ Sections  ⌥⌘ URL",
+                subtitle=f"{count_str}{mods_for('list', has_children=has_children)}",
                 arg=f"open:{link}",
                 mods={
                     "cmd": {

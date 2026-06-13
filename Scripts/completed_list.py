@@ -39,7 +39,7 @@ try:
     import cache as cache_store
     import alfred
     import fuzzy as fuzz
-    from display import join_breadcrumb, search_key, PRIORITY
+    from display import join_breadcrumb, search_key, PRIORITY, MODS_COMPLETED
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -88,7 +88,7 @@ def main():
             subtitle_parts = [f"✅ {completed_str}"]
             if breadcrumb:
                 subtitle_parts.append(breadcrumb)
-            subtitle_parts.append("⇧ Uncomplete  ⇧⌘ Back")
+            subtitle_parts.append(MODS_COMPLETED)
             subtitle = "  ".join(subtitle_parts)
 
             link = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"

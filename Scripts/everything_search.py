@@ -4,7 +4,7 @@ everything_search.py — Alfred Script Filter
 Searches across ALL item types: lists, sections, and tasks at every depth.
 
 Each result carries an item_type variable ("list" / "section" / "task") so
-Alfred's Conditional node can route ⌥↵ (Browse) to the correct Script Filter:
+Alfred's Conditional node can route ⌥⏎ (Browse) to the correct Script Filter:
   item_type == "list"    → sections.py   (needs: list_id)
   item_type == "section" → tasks.py      (needs: list_id, section_id, section_name)
   item_type == "task"    → subtasks.py   (needs: task_id, task_title, task_list_id)
@@ -37,7 +37,7 @@ try:
     import cache as cache_store
     import alfred
     import fuzzy as fuzz
-    from display import build_title, build_subtitle, join_breadcrumb, search_key
+    from display import build_title, build_subtitle, join_breadcrumb, search_key, MODS_NOTE
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -297,8 +297,8 @@ def main():
                 link = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"
 
                 items.append(alfred.item(
-                    title=build_title(t, breadcrumb),
-                    subtitle=build_subtitle(sub_count, "Task"),
+                    title=build_title(t),
+                    subtitle=build_subtitle(sub_count, "Task", breadcrumb=breadcrumb),
                     arg=f"open:{link}",
                     mods={
                         "cmd":     {"arg": "",                              "subtitle": "Add subtask"},
@@ -341,14 +341,16 @@ def main():
                 link     = f"ticktick:///webapp/#p/{npid}/tasks/{nid}"
 
                 if scope == "note_content":
-                    # Content mode: content in title, note name · folder in subtitle
+                    # Content mode: content preview in title, name · folder as breadcrumb
                     title       = snippet if snippet else ntitle
-                    subtitle    = f"{ntitle} · {nfolder}  ⇧⌘ Back" if nfolder else f"{ntitle}  ⇧⌘ Back"
+                    crumb       = f"{ntitle} · {nfolder}" if nfolder else ntitle
+                    subtitle    = f"Note  {MODS_NOTE}  |  {crumb}"
                     search_name = ncontent
                 else:
-                    # Title mode (default): note name | folder in title, snippet in subtitle
-                    title       = f"{ntitle} | {nfolder}" if nfolder else ntitle
-                    subtitle    = (snippet) if snippet else "⇧⌘ Back"
+                    # Title mode (default): note name in title, folder as breadcrumb
+                    title       = ntitle
+                    crumb       = nfolder
+                    subtitle    = f"Note  {MODS_NOTE}  |  {crumb}" if crumb else f"Note  {MODS_NOTE}"
                     search_name = f"{ntitle} {nfolder}"
 
                 items.append(alfred.item(

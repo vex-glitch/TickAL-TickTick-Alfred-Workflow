@@ -37,6 +37,7 @@ try:
     import alfred
     import fuzzy as fuzz
     from api import TickTickAPI
+    from display import mods_for, fmt_tags, MOD_BROWSE, MOD_BACK
 except Exception as e:
     emit_error(f"Import failed: {e} | SRC_DIR={SRC_DIR}")
     sys.exit(0)
@@ -84,7 +85,7 @@ def render_tasks(list_id, all_tasks, column_ids, section_id, section_name, query
         tid   = t["id"]
         name  = t.get("title", "Untitled")
         tags  = t.get("tags") or []
-        tag_str = " # " + " ".join(tags) if tags else ""
+        tag_str = " " + fmt_tags(tags) if tags else ""
         title = PRIORITY.get(t.get("priority", 0), "") + name + tag_str
         due   = t.get("dueDate", "")[:10] if t.get("dueDate") else ""
 
@@ -92,8 +93,7 @@ def render_tasks(list_id, all_tasks, column_ids, section_id, section_name, query
                         if s.get("parentId") == tid and s.get("status", 0) == 0)
         count_str = f"{sub_count} subtask{'s' if sub_count != 1 else ''}  " if sub_count else ""
 
-        sub = (f"Due {due}  " if due else "") + count_str + \
-              "Open  ⌘ Add  ⇧ Done  ⌥ Browse  ⌥⌘ URL  ⌃ Modify"
+        sub = (f"Due {due}  " if due else "") + count_str + mods_for("task", has_children=sub_count > 0)
 
         link = f"ticktick:///webapp/#p/{list_id}/tasks/{tid}"
 
@@ -120,7 +120,7 @@ def render_tasks(list_id, all_tasks, column_ids, section_id, section_name, query
         list_link = f"ticktick:///webapp/#p/{list_id}/tasks"
         items.append(alfred.item(
             title=f'No tasks matching "{query}"' if query else f"No tasks in {label}",
-            subtitle="⇧⌘ Back",
+            subtitle=MOD_BACK,
             arg=f"open:{list_link}",
             valid=True,
             variables={"list_id": list_id, "task_list_id": list_id},
@@ -195,7 +195,7 @@ def main():
             items.append(alfred.item(
                 uid="unsectioned",
                 title="Not sectioned",
-                subtitle=f"{count_str}⌥ Browse",
+                subtitle=f"{count_str}{MOD_BROWSE}  {MOD_BACK}",
                 arg="",
                 mods={
                     "alt": {"arg": "", "subtitle": "Browse unsectioned tasks"},
@@ -224,7 +224,7 @@ def main():
             items.append(alfred.item(
                 uid=f"section-{sid}",
                 title=sname,
-                subtitle=f"{count_str}Open  ⌘ Add  ⌥ Browse  ⌥⌘ URL",
+                subtitle=f"{count_str}{mods_for('section', has_children=task_count > 0)}",
                 arg=f"open:{list_link}",
                 mods={
                     "cmd":     {"arg": "", "subtitle": f"Add task to {sname}"},
@@ -242,7 +242,7 @@ def main():
             items.append(alfred.item(
                 uid="no-sections",
                 title=f"No sections in {list_name}",
-                subtitle="⇧⌘ Back",
+                subtitle=MOD_BACK,
                 arg=f"open:{list_link}",
                 valid=True,
                 variables={"list_id": list_id, "list_name": list_name, "folder_id": folder_id},
@@ -251,7 +251,7 @@ def main():
             items.append(alfred.item(
                 uid="no-results",
                 title=f'No sections matching "{query}"',
-                subtitle="⇧⌘ Back",
+                subtitle=MOD_BACK,
                 arg=f"open:{list_link}",
                 valid=True,
                 variables={"list_id": list_id, "list_name": list_name, "folder_id": folder_id},

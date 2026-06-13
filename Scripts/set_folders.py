@@ -89,7 +89,7 @@ def main():
             else:
                 title  = "Unnamed folder"
                 status = "⚠ Not named yet — e.g. '1 Manager'"
-            subtitle = f"{status}  —  {' · '.join(list_names)}  |  ⌘ Delete"
+            subtitle = f"{status}  —  {' · '.join(list_names)}  |  ⌘ 🗑️"
 
             items.append(alfred.item(
                 uid=f"folder-{gid}",

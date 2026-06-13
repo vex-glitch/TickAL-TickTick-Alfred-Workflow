@@ -110,8 +110,8 @@ def main():
 
             items.append(alfred.item(
                 uid=f"task-{tid}",
-                title=build_title(t, breadcrumb),
-                subtitle=build_subtitle(sub_count),
+                title=build_title(t),
+                subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb),
                 arg=f"open:{link}",
                 mods={
                     "cmd":     {"arg": "",                                "subtitle": "Add subtask"},

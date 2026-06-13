@@ -75,8 +75,8 @@ def main():
             link = f"ticktick:///webapp/#p/{real_pid}/tasks/{tid}"
 
             items.append(alfred.item(
-                title=build_title(t, "Inbox"),
-                subtitle=build_subtitle(sub_count),
+                title=build_title(t),
+                subtitle=build_subtitle(sub_count, breadcrumb="Inbox"),
                 arg=f"open:{link}",
                 mods={
                     "cmd":     {"arg": "",                                  "subtitle": "Add subtask"},

@@ -58,7 +58,7 @@ def main():
 
         items.append(alfred.item(
             title="📥 Inbox",
-            subtitle="Browse  ⇧⌘ Back",
+            subtitle="⏎ ⤵️  ⌘⇧ 🔙",
             arg="inbox",
             variables={"list_id": inbox_id or "", "list_name": "Inbox", "folder_id": ""},
         ))
@@ -90,7 +90,7 @@ def main():
                 items.append(alfred.item(
                     uid=f"folder-{group_id}",
                     title=clean,
-                    subtitle="Browse  ⇧⌘ Back",
+                    subtitle="⏎ ⤵️  ⌘⇧ 🔙",
                     arg="",
                     variables={"folder_id": group_id, "folder_name": clean},
                 ))

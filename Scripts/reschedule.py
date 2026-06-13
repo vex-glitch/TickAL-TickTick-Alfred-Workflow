@@ -133,7 +133,7 @@ def duration_picker(prefix, fragment, start_hm):
         end = f"{eh:02d}:{em:02d}"
         return [alfred.item(
             title=f"{start_hm} → {end}",
-            subtitle=f"⏳ {_duration_label(start_hm, end)}  ·  ⏎ Select",
+            subtitle=f"⏳ {_duration_label(start_hm, end)}  ·  ⏎ ✅",
             arg="", valid=False, autocomplete=f"{prefix}>{end} ",
         )]
 
@@ -278,7 +278,7 @@ def main():
                     items.append(alfred.item(
                         uid="dispatch",
                         title=f"{display}  @{time_str} → {end_str}",
-                        subtitle=f"⏳ {dur}  ·  ⏎ {action_verb} \"{task_title}\"  |  ⇧⌘ Back",
+                        subtitle=f"⏳ {dur}  ·  ⏎ {action_verb} \"{task_title}\"  |  ⌘⇧ 🔙",
                         arg=f"attr_span:{list_id}:{tid}:{iso}|{end_iso}",
                         valid=True,
                     ))
@@ -287,7 +287,7 @@ def main():
                     items.append(alfred.item(
                         uid="dispatch",
                         title=f"{display}{time_tag}",
-                        subtitle=f"⏎ {action_verb} \"{task_title}\"  |  ⇧⌘ Back",
+                        subtitle=f"⏎ {action_verb} \"{task_title}\"  |  ⌘⇧ 🔙",
                         arg=f"attr_date:{list_id}:{tid}:{iso}",
                         valid=True,
                     ))
@@ -311,7 +311,7 @@ def main():
                 items.append(alfred.item(
                     uid="bad-date",
                     title=f"Can't parse \"{date_part}\" as a date",
-                    subtitle="Press ⇧⌘ to go back and try again",
+                    subtitle="Press ⌘⇧ to go back and try again",
                     valid=False,
                 ))
 
@@ -333,7 +333,7 @@ def main():
                 items.append(alfred.item(
                     uid="clear-date",
                     title="Clear date",
-                    subtitle=f"Remove due date from \"{task_title}\"  |  ⇧⌘ Back",
+                    subtitle=f"Remove due date from \"{task_title}\"  |  ⌘⇧ 🔙",
                     arg=f"attr_cleardate:{list_id}:{tid}",
                     valid=True,
                 ))

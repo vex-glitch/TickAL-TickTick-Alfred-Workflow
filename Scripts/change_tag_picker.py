@@ -71,7 +71,7 @@ def main():
                 continue  # skip replacing with the same tag
             items.append(alfred.item(
                 title=f"#{tag}",
-                subtitle=f"{replacing} #{tag}  ⇧⌘ Back",
+                subtitle=f"{replacing} #{tag}  ⌘⇧ 🔙",
                 arg=tag,
                 variables={"task_list_id": list_id, "task_id": tid, "old_tag": old_tag},
             ))
@@ -82,7 +82,7 @@ def main():
         if not items:
             items.append(alfred.item(
                 title=f'No tags matching "{query}"' if query else "No tags — run Sync first",
-                subtitle="⇧⌘ Back",
+                subtitle="⌘⇧ 🔙",
                 arg="",
                 valid=True,
                 variables={"task_list_id": list_id, "task_id": tid},
