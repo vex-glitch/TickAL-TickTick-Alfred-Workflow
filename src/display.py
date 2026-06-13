@@ -25,7 +25,7 @@ MOD_DONE   = "⇧✔️"      # complete
 MOD_UNDONE = "⇧↩️"      # uncomplete
 MOD_BROWSE = "⌥⤵️"      # drill into children (Alfred)
 MOD_URL    = "⌥⌘🔗"     # copy link
-MOD_MODIFY = "⌃⚙️"      # change-attributes menu
+MOD_MODIFY = "⌃ℹ️"      # task details (schedule, move, tags, priority, rename, delete)
 MOD_BACK   = "⌘⇧🔙"     # go back
 
 # Per-type ordered modifier templates. MOD_BROWSE is conditional — it's

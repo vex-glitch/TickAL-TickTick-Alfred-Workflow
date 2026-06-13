@@ -7616,31 +7616,51 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<true/>
 				<key>argumenttrimmode</key>
 				<integer>0</integer>
 				<key>argumenttype</key>
 				<integer>1</integer>
-				<key>fixedorder</key>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
 				<true/>
-				<key>items</key>
-				<string>[{"title":"Scheduling...","arg":"1-","subtitle":"Schedule, reschedule, unschedule..."},{"title":"Move to Other List","arg":"2-","subtitle":"Move task to another list"},{"title":"Tags...","arg":"3-","subtitle":"Add, change, remove tags..."},{"title":"Priority","arg":"4-","subtitle":"Change tasks priority"},{"title":"Delete","arg":"5-","subtitle":"Delete task"},{"title":"Rename","arg":"6-","subtitle":"Rename task"}]</string>
-				<key>matchmode</key>
+				<key>queuedelaymode</key>
 				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
 				<key>runningsubtext</key>
 				<string></string>
+				<key>script</key>
+				<string>/opt/homebrew/bin/python3 "Scripts/change_attributes.py" "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>skipuniversalaction</key>
+				<true/>
 				<key>subtext</key>
-				<string>Choose an attribute to change</string>
+				<string>Task details</string>
 				<key>title</key>
-				<string>Change Attributes</string>
+				<string>Task Details</string>
+				<key>type</key>
+				<integer>5</integer>
 				<key>withspace</key>
 				<true/>
 			</dict>
 			<key>type</key>
-			<string>alfred.workflow.input.listfilter</string>
+			<string>alfred.workflow.input.scriptfilter</string>
 			<key>uid</key>
 			<string>E3A864A0-F789-4326-95EF-82ECE1806025</string>
 			<key>version</key>
-			<integer>1</integer>
+			<integer>3</integer>
 		</dict>
 		<dict>
 			<key>config</key>
