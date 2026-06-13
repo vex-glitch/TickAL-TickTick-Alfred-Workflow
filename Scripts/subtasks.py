@@ -54,6 +54,17 @@ def main():
     task_title = os.environ.get("task_title", "task")
     query      = sys.argv[1] if len(sys.argv) > 1 else ""
 
+    # Fired via external trigger (e.g. ⌘ Actions → Browse) → no env context.
+    # Recover task_list_id:task_id from the temp file.
+    if not list_id or not task_id:
+        try:
+            with open("/tmp/ticktick_reattribute.txt") as _f:
+                _parts = _f.read().strip().split(":", 1)
+                if len(_parts) == 2:
+                    list_id, task_id = _parts
+        except Exception:
+            pass
+
     try:
         all_tasks = get_all_tasks(list_id)
 
@@ -91,10 +102,10 @@ def main():
 
             items.append(alfred.item(
                 title=build_title(t),
-                subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb),
+                subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb, actions=True),
                 arg=f"open:{link}",
                 mods={
-                    "cmd":        {"arg": "",                                 "subtitle": "Add subtask"},
+                    "cmd":        {"arg": "",                                 "subtitle": "Actions"},
                     "shift":      {"arg": f"complete:{list_id}:{tid}:{name}", "subtitle": "Complete task"},
                     "alt":        {"arg": "",                                 "subtitle": "Browse subtasks"},
                     "ctrl+shift": {"arg": f"pomodoro:{list_id}:{tid}",        "subtitle": "Start Pomodoro"},

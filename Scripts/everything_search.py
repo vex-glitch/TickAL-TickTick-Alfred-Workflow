@@ -88,54 +88,53 @@ def get_task_breadcrumb(task, task_by_id):
     ancestor_titles.reverse()
     return join_breadcrumb(list_name, col_name, *ancestor_titles)
 
-# ── Prefix hint system ───────────────────────────────────────────────────────
-PREFIX_HINTS = [
-    ("l",  "L",  "Lists"),
-    ("s",  "S",  "Sections"),
-    ("t",  "T",  "Tasks"),
-    ("tt", "TT", "Subtasks"),
-    ("a",  "A",  "Tasks+Subs"),
-    ("n",  "N",  "Notes"),
-    ("nc", "NC", "NoteBody"),
+# ── Scope picker (/) ──────────────────────────────────────────────────────────
+# (prefix, emoji, name, description, letter shortcut)
+SCOPES = [
+    ("",    "🔍", "Everything",       "every item type",          ""),
+    ("l ",  "📋", "Lists",            "search only lists",        "L"),
+    ("s ",  "📑", "Sections",         "search only sections",     "S"),
+    ("t ",  "✅", "Tasks",            "top-level tasks",          "T"),
+    ("tt ", "↳",  "Subtasks",         "subtasks only",            "TT"),
+    ("a ",  "🗂",  "Tasks + Subtasks", "tasks at any depth",       "A"),
+    ("n ",  "📝", "Notes",            "note titles",              "N"),
+    ("nc ", "📄", "Note bodies",      "search inside note text",  "NC"),
 ]
 
-EMPTY_HINT = "Scope Prefix: L Lists  S Sections  T Tasks  TT Subs  A Tasks+Subs  N Notes  NC NoteBody"
+def scope_menu(fragment):
+    """Dropdown of search scopes, shown when the query starts with '/'.
+    Selecting one autocompletes its prefix; the letter shortcut is also shown."""
+    frag = fragment.lower().strip()
+    items = []
+    for prefix, emoji, name, desc, letter in SCOPES:
+        if frag and not (letter.lower().startswith(frag) or name.lower().startswith(frag)):
+            continue
+        items.append(alfred.item(
+            title=f"{emoji}  {name}",
+            subtitle=desc,
+            arg="", valid=False,
+            autocomplete=prefix,
+        ))
+    if not items:
+        items = [alfred.item(title=f'No scope matching "{fragment}"', valid=False)]
+    return items
 
 def get_hint_items(raw_query):
     """
-    Returns hint items if query is empty or looks like a partial prefix (no space).
+    Empty query → a hint pointing at '/'. Query starting with '/' → scope menu.
     Returns None to proceed with normal search.
     """
-    q = raw_query.lower()
-
-    # Empty → show full hint as single item
-    if not q:
-        item = alfred.item(
+    if not raw_query:
+        return [alfred.item(
             title="Type to search everything…",
-            subtitle=EMPTY_HINT,
+            subtitle="Type / to choose search scope",
             valid=False,
-        )
-        return [item]
+        )]
 
-    # Has space → either scoped (t finish) or plain search (finish) — no hints
-    if " " in q:
-        return None
+    if raw_query.startswith("/"):
+        return scope_menu(raw_query[1:])
 
-    # Partial prefix match — show only matching hints
-    matches = [(key, label, desc) for key, label, desc in PREFIX_HINTS if key.startswith(q)]
-    if not matches:
-        return None  # not a prefix, proceed to normal search
-
-    items = []
-    for key, label, desc in matches:
-        item = alfred.item(
-            title=f"{label}  {desc}",
-            subtitle=f"Add space after {label.lower()} to scope search to {desc}",
-            valid=False,
-        )
-        item["autocomplete"] = f"{key} "
-        items.append(item)
-    return items
+    return None
 
 # ── Scope prefix detection ───────────────────────────────────────────────────
 SCOPE_PREFIXES = {
@@ -232,7 +231,7 @@ def main():
                 items.append(alfred.item(
                     uid=f"list-{pid}",
                     title=pname,
-                    subtitle=build_subtitle(sub_count, "List", child_label),
+                    subtitle=build_subtitle(sub_count, "List", child_label, actions=True),
                     arg=f"open:{link}",
                     mods={
                         "alt":     {"arg": "",              "subtitle": "Browse sections"},
@@ -258,7 +257,7 @@ def main():
                     items.append(alfred.item(
                         uid=f"section-{sid}",
                         title=title,
-                        subtitle=build_subtitle(task_count, "Sect", "Task"),
+                        subtitle=build_subtitle(task_count, "Sect", "Task", actions=True),
                         arg=f"open:{link}",
                         mods={
                             "alt":     {"arg": "",             "subtitle": "Browse tasks"},
@@ -298,10 +297,10 @@ def main():
 
                 items.append(alfred.item(
                     title=build_title(t),
-                    subtitle=build_subtitle(sub_count, "Task", breadcrumb=breadcrumb),
+                    subtitle=build_subtitle(sub_count, "Task", breadcrumb=breadcrumb, actions=True),
                     arg=f"open:{link}",
                     mods={
-                        "cmd":     {"arg": "",                              "subtitle": "Add subtask"},
+                        "cmd":     {"arg": "",                              "subtitle": "Actions"},
                         "shift":   {"arg": f"complete:{pid}:{tid}:{name}",  "subtitle": "Complete task"},
                         "alt":     {"arg": "",                              "subtitle": "Browse subtasks"},
                         "alt+cmd": {"arg": f"copy:{link}",                 "subtitle": "Copy link to task"},
@@ -344,13 +343,12 @@ def main():
                     # Content mode: content preview in title, name · folder as breadcrumb
                     title       = snippet if snippet else ntitle
                     crumb       = f"{ntitle} · {nfolder}" if nfolder else ntitle
-                    subtitle    = f"Note  {MODS_NOTE}  |  {crumb}"
+                    subtitle    = build_subtitle(0, "Note", breadcrumb=crumb, actions=True)
                     search_name = ncontent
                 else:
                     # Title mode (default): note name in title, folder as breadcrumb
                     title       = ntitle
-                    crumb       = nfolder
-                    subtitle    = f"Note  {MODS_NOTE}  |  {crumb}" if crumb else f"Note  {MODS_NOTE}"
+                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True)
                     search_name = f"{ntitle} {nfolder}"
 
                 items.append(alfred.item(

@@ -19,14 +19,15 @@ PRIORITY = {0: "⚫️", 1: "🟡", 3: "🟠", 5: "🔴"}
 # ── Modifier vocabulary ───────────────────────────────────────────────────────
 # Single source of truth for the emoji hints shown in item subtitles.
 # key+emoji pairs; each item type advertises only the actions it actually wires.
-MOD_OPEN   = "⏎↗️"      # open in TickTick
-MOD_ADD    = "⌘➕"      # add task / subtask
-MOD_DONE   = "⇧✔️"      # complete
-MOD_UNDONE = "⇧↩️"      # uncomplete
-MOD_BROWSE = "⌥⤵️"      # drill into children (Alfred)
-MOD_URL    = "⌥⌘🔗"     # copy link
-MOD_MODIFY = "⌃ℹ️"      # task details (schedule, move, tags, priority, rename, delete)
-MOD_BACK   = "⌘⇧🔙"     # go back
+MOD_OPEN    = "⏎↗️"      # open in TickTick
+MOD_ADD     = "⌘➕"      # add task / subtask
+MOD_DONE    = "⇧✔️"      # complete
+MOD_UNDONE  = "⇧↩️"      # uncomplete
+MOD_BROWSE  = "⌥⤵️"      # drill into children (Alfred)
+MOD_URL     = "⌥⌘🔗"     # copy link
+MOD_MODIFY  = "⌃ℹ️"      # task details (schedule, move, tags, priority, rename, delete)
+MOD_ACTIONS = "⌘⚡"      # ⌘ Actions menu (all per-item actions)
+MOD_BACK    = "⌃⇧🔙"     # go back
 
 # Per-type ordered modifier templates. MOD_BROWSE is conditional — it's
 # dropped when the item has no children (nothing to drill into).
@@ -159,32 +160,41 @@ def build_title(task):
     return f"{core} {tag_str}" if tag_str else core
 
 
-def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb=""):
+def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb="",
+                   actions=False):
     """
-    Build the Alfred item subtitle field:
-      '[Type  ][N Children  ]<modifiers>  |  <breadcrumb>'
+    Build the Alfred item subtitle field.
 
-    Each item type shows only the modifier actions it actually wires; the
-    Browse hint is dropped when there are no children to drill into. The
-    breadcrumb (List>Section>…) lives here so the title row stays uncluttered.
+    Default (non-actions views): each type shows only the modifiers it wires,
+    Browse dropped when there are no children:
+      '9 Subtasks  ⏎↗️ ⌘➕ … ⌃⇧🔙  |  💼P • Onboard 4️⃣>Not Sectioned'
 
-      '9 Subtasks  ⏎↗️  ⌘➕  …  ⌘⇧🔙  |  💼P • Onboard 4️⃣>Not Sectioned'
-      'List  ⏎↗️  ⌘➕  ⌥⤵️  ⌥⌘🔗  ⌘⇧🔙'
+    actions=True (views wired to the ⌘ Actions menu): just three modifiers,
+    placed AFTER the breadcrumb:
+      '9 Subtasks  💼P • Onboard 4️⃣>Not Sectioned  |  ⏎↗️  ⌘⚡  ⌃⇧🔙'
     """
+    plural = "s" if sub_count != 1 else ""
+
+    if actions:
+        left = []
+        if item_type and sub_count:
+            left.append(f"{item_type}  {sub_count} {child_label}{plural}")
+        elif item_type:
+            left.append(item_type)
+        elif sub_count:
+            left.append(f"{sub_count} {child_label}{plural}")
+        if breadcrumb:
+            left.append(breadcrumb)
+        mods = f"{MOD_OPEN}  {MOD_ACTIONS}  {MOD_BACK}"
+        return f"{'  '.join(left)}  |  {mods}" if left else mods
+
     kind = _KIND_BY_TYPE.get(item_type, "task")
     mods = mods_for(kind, has_children=bool(sub_count))
-
     prefix = ""
     if item_type:
-        if sub_count:
-            plural = "s" if sub_count != 1 else ""
-            prefix = f"{item_type}  {sub_count} {child_label}{plural}  "
-        else:
-            prefix = f"{item_type}  "
+        prefix = f"{item_type}  {sub_count} {child_label}{plural}  " if sub_count else f"{item_type}  "
     elif sub_count:
-        plural = "s" if sub_count != 1 else ""
         prefix = f"{sub_count} {child_label}{plural}  "
-
     line = f"{prefix}{mods}"
     if breadcrumb:
         line += f"  |  {breadcrumb}"

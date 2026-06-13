@@ -99,10 +99,10 @@ def main():
 
             items.append(alfred.item(
                 title=build_title(t),
-                subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb),
+                subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb, actions=True),
                 arg=f"open:{link}",
                 mods={
-                    "cmd":        {"arg": "",                                 "subtitle": "Add subtask"},
+                    "cmd":        {"arg": "",                                 "subtitle": "Actions"},
                     "shift":      {"arg": f"complete:{list_id}:{tid}:{name}", "subtitle": "Complete task"},
                     "alt":        {"arg": "",                                 "subtitle": "Browse subtasks"},
                     "ctrl+shift": {"arg": f"pomodoro:{list_id}:{tid}",        "subtitle": "Start Pomodoro"},

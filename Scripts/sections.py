@@ -37,7 +37,7 @@ try:
     import alfred
     import fuzzy as fuzz
     from api import TickTickAPI
-    from display import mods_for, fmt_tags, MOD_BROWSE, MOD_BACK
+    from display import build_subtitle, fmt_tags, MOD_BACK
 except Exception as e:
     emit_error(f"Import failed: {e} | SRC_DIR={SRC_DIR}")
     sys.exit(0)
@@ -93,7 +93,7 @@ def render_tasks(list_id, all_tasks, column_ids, section_id, section_name, query
                         if s.get("parentId") == tid and s.get("status", 0) == 0)
         count_str = f"{sub_count} subtask{'s' if sub_count != 1 else ''}  " if sub_count else ""
 
-        sub = (f"Due {due}  " if due else "") + count_str + mods_for("task", has_children=sub_count > 0)
+        sub = (f"Due {due}  " if due else "") + build_subtitle(sub_count, actions=True)
 
         link = f"ticktick:///webapp/#p/{list_id}/tasks/{tid}"
 
@@ -102,7 +102,7 @@ def render_tasks(list_id, all_tasks, column_ids, section_id, section_name, query
             subtitle=sub,
             arg=f"open:{link}",
             mods={
-                "cmd":      {"arg": "", "subtitle": "Add subtask"},
+                "cmd":      {"arg": "", "subtitle": "Actions"},
                 "shift":    {"arg": f"complete:{list_id}:{tid}:{name}", "subtitle": "Complete task"},
                 "alt":      {"arg": "", "subtitle": "Browse subtasks"},
                 "ctrl+shift": {"arg": f"pomodoro:{list_id}:{tid}", "subtitle": "Start Pomodoro"},
@@ -195,7 +195,7 @@ def main():
             items.append(alfred.item(
                 uid="unsectioned",
                 title="Not sectioned",
-                subtitle=f"{count_str}{MOD_BROWSE}  {MOD_BACK}",
+                subtitle=build_subtitle(len(orphaned), child_label="Task", actions=True),
                 arg="",
                 mods={
                     "alt": {"arg": "", "subtitle": "Browse unsectioned tasks"},
@@ -224,10 +224,10 @@ def main():
             items.append(alfred.item(
                 uid=f"section-{sid}",
                 title=sname,
-                subtitle=f"{count_str}{mods_for('section', has_children=task_count > 0)}",
+                subtitle=build_subtitle(task_count, child_label="Task", actions=True),
                 arg=f"open:{list_link}",
                 mods={
-                    "cmd":     {"arg": "", "subtitle": f"Add task to {sname}"},
+                    "cmd":     {"arg": "", "subtitle": "Actions"},
                     "alt":     {"arg": "", "subtitle": f"Browse tasks in {sname}"},
                     "alt+cmd": {"arg": f"copy:{section_link}", "subtitle": f"Copy link to {sname}"},
                 },

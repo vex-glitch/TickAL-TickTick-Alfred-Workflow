@@ -470,9 +470,33 @@ def symbol_legend(has_date=False, has_time=False, note_mode=False):
 
 
 # ── / master menu ─────────────────────────────────────────────────────────────
+def mode_menu(fragment):
+    """Typing / on an empty field: choose what to create. Each row
+    autocompletes its prefix; the letter shortcut is shown too."""
+    rows = [
+        ("",   "✅", "Task",    "just type a name"),
+        ("L ", "📋", "List",    "a new list"),
+        ("N ", "📝", "Note",    "a new note"),
+        ("P ", "💼", "Project", "list + meta task"),
+    ]
+    items = []
+    for ac, emoji, name, hint in rows:
+        items.append(alfred.item(
+            title=f"{emoji} {name}", subtitle=hint,
+            arg="", valid=False, autocomplete=ac,
+        ))
+    if fragment:
+        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
+    return items or [alfred.item(title=f'No options matching "{fragment}"', valid=False)]
+
+
 def master_menu(prefix, fragment, note_mode=False):
     """Typing / shows every add-on as a menu row. Selecting one autocompletes
-    its symbol into the query — the menu doubles as a syntax reference."""
+    its symbol into the query — the menu doubles as a syntax reference. With no
+    task name yet (and not in note mode) it instead offers the creation modes."""
+    if not note_mode and not prefix.strip():
+        return mode_menu(fragment)
+
     _, date_str, time_str, end_str, _, _, _, _, _, _, repeat = parse_task(prefix)
 
     rows = []
@@ -500,7 +524,7 @@ def master_menu(prefix, fragment, note_mode=False):
     for sym, emoji, name, hint in rows:
         items.append(alfred.item(
             title=f"{emoji} {name}",
-            subtitle=f"{sym}  ·  {hint}  ·  ⏎ ✅",
+            subtitle=hint,
             arg="",
             valid=False,
             autocomplete=f"{prefix}{sym}",
@@ -1112,8 +1136,8 @@ def main():
         # ── Empty → hint ──────────────────────────────────────────────────────
         if not query:
             items = [alfred.item(
-                title="Type to add a task…",
-                subtitle="Prefix: L List · N Notes · P Project",
+                title="Type a task name…",
+                subtitle="or / to add a list, note or project…",
                 valid=False,
             )]
             print(alfred.output(items, skipknowledge=True))

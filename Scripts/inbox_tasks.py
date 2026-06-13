@@ -76,10 +76,10 @@ def main():
 
             items.append(alfred.item(
                 title=build_title(t),
-                subtitle=build_subtitle(sub_count, breadcrumb="Inbox"),
+                subtitle=build_subtitle(sub_count, breadcrumb="Inbox", actions=True),
                 arg=f"open:{link}",
                 mods={
-                    "cmd":     {"arg": "",                                  "subtitle": "Add subtask"},
+                    "cmd":     {"arg": "",                                  "subtitle": "Actions"},
                     "shift":   {"arg": f"complete:{real_pid}:{tid}:{name}", "subtitle": "Complete task"},
                     "alt":     {"arg": "",                                  "subtitle": "Browse subtasks"},
                     "alt+cmd": {"arg": f"copy:{link}",                      "subtitle": "Copy link to task"},
