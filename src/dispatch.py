@@ -129,6 +129,31 @@ def main():
             else:
                 print(f"{verb} · {task_title}\n{new_display}")
 
+        elif arg.startswith("attr_span:"):
+            # attr_span:projectId:taskId:startIso|endIso  → schedule with duration
+            raw = arg[10:]
+            parts = raw.split(":", 2)
+            pid, tid = parts[0], parts[1]
+            start_iso, end_iso = parts[2].split("|", 1)
+
+            had_date = os.environ.get("has_date", "0") == "1"
+            api = TickTickAPI(cfg.get_token())
+            api.update_task(tid, pid, startDate=start_iso, dueDate=end_iso)
+            _patch_task_cache(tid, startDate=start_iso, dueDate=end_iso)
+
+            task_title = os.environ.get("task_title", "Task")
+            verb = "Rescheduled" if had_date else "Scheduled"
+            start_disp = utc_to_long_display(start_iso)
+            end_disp   = utc_to_local_display(end_iso)[11:16]  # HH:MM
+            # Duration label from the two timestamps
+            from datetime import datetime
+            s = datetime.strptime(start_iso[:19], "%Y-%m-%dT%H:%M:%S")
+            e = datetime.strptime(end_iso[:19], "%Y-%m-%dT%H:%M:%S")
+            mins = int((e - s).total_seconds() // 60)
+            h, m = divmod(mins, 60)
+            dur = (f"{h}h {m}m" if h and m else f"{h}h" if h else f"{m}m")
+            print(f"{verb} · {task_title}\n🟢 {start_disp} → {end_disp}  ({dur})")
+
         elif arg.startswith("attr_cleardate:"):
             # attr_cleardate:projectId:taskId
             raw = arg[15:]

@@ -45,9 +45,11 @@ except Exception as e:
     sys.exit(0)
 
 try:
+    import re
     import alfred
     import cache as cache_store
-    from dateutil import (parse_date, utc_to_picker_display, build_date_shortcuts)
+    from dateutil import (parse_date, utc_to_picker_display, utc_to_local_display,
+                          build_date_shortcuts)
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -102,6 +104,73 @@ def time_picker(prefix, fragment):
     return items
 
 
+# ── Duration helpers ───────────────────────────────────────────────────────
+def _duration_label(start_hm, end_hm):
+    """Human duration between two HH:MM strings (end may wrap to next day)."""
+    sh, sm = (int(x) for x in start_hm.split(":"))
+    eh, em = (int(x) for x in end_hm.split(":"))
+    mins = (eh * 60 + em) - (sh * 60 + sm)
+    if mins <= 0:
+        mins += 24 * 60
+    h, m = divmod(mins, 60)
+    if h and m:
+        return f"{h}h {m}m"
+    return f"{h}h" if h else f"{m}m"
+
+
+def duration_picker(prefix, fragment, start_hm):
+    """End-time picker after a start time is set. Accepts an end time
+    (14, 14:30) or a length (2h, 90m, 1h30); autocompletes to >HH:MM."""
+    sh, sm = (int(x) for x in start_hm.split(":"))
+    frag = fragment.strip()
+
+    # Length syntax → resolve to an end time
+    m = re.match(r'^(\d+)h(\d+)?m?$|^(\d+)m$', frag)
+    if m:
+        mins = int(m.group(3)) if m.group(3) else int(m.group(1)) * 60 + int(m.group(2) or 0)
+        total = sh * 60 + sm + mins
+        eh, em = divmod(total % (24 * 60), 60)
+        end = f"{eh:02d}:{em:02d}"
+        return [alfred.item(
+            title=f"{start_hm} → {end}",
+            subtitle=f"⏳ {_duration_label(start_hm, end)}  ·  ⏎ Select",
+            arg="", valid=False, autocomplete=f"{prefix}>{end} ",
+        )]
+
+    items = []
+    if ':' not in frag:
+        for h in range(sh, 24):
+            hh = f"{h:02d}"
+            if frag and not (hh.startswith(frag) or str(h).startswith(frag)):
+                continue
+            end_preview = f"{hh}:{sm:02d}"
+            items.append(alfred.item(
+                title=hh,
+                subtitle=f"⏳ {_duration_label(start_hm, end_preview)} (at :{sm:02d})  ·  ⏎ pick minutes",
+                arg="", valid=False, autocomplete=f"{prefix}>{hh}:",
+            ))
+    else:
+        hour_part = frag.split(':')[0]
+        try:
+            hh = f"{int(hour_part):02d}"
+        except ValueError:
+            hh = hour_part
+        for mi in (0, 15, 30, 45):
+            end = f"{hh}:{mi:02d}"
+            items.append(alfred.item(
+                title=end,
+                subtitle=f"⏳ {_duration_label(start_hm, end)}  ·  ⏎ End at {end}",
+                arg="", valid=False, autocomplete=f"{prefix}>{end} ",
+            ))
+    if not items:
+        items = [alfred.item(
+            title=f'No end times matching "{frag}"',
+            subtitle="Type an hour, 14:30, or a length like 2h / 90m / 1h30",
+            valid=False,
+        )]
+    return items
+
+
 # ── Prefix stripping ─────────────────────────────────────────────────────────
 _PREFIXES = ("reschedule for ", "schedule for ")
 
@@ -132,36 +201,60 @@ def main():
     action_verb = "Reschedule" if has_date else "Schedule"
 
     try:
-        # ── Detect @ trigger ──────────────────────────────────────────────────
-        at_pos = None
+        # ── Detect active trigger (@ time or > duration) ──────────────────────
+        # Find the last @ or > that starts a word; whichever is open wins.
+        at_pos  = None
+        gt_pos  = None
         for i in range(len(raw) - 1, -1, -1):
-            if raw[i] == '@' and (i == 0 or raw[i - 1] == ' '):
-                at_pos = i
-                break
+            if raw[i] in ('@', '>') and (i == 0 or raw[i - 1] == ' '):
+                if raw[i] == '@' and at_pos is None:
+                    at_pos = i
+                elif raw[i] == '>' and gt_pos is None:
+                    gt_pos = i
+
+        # ── Screen 3c: duration picker (> after a committed time) ─────────────
+        if gt_pos is not None:
+            dur_fragment = raw[gt_pos + 1:]
+            if not dur_fragment.endswith(' '):
+                # Need the start time from the @ token before >
+                tm = re.search(r'(?<!\S)@(\d{1,2}:\d{2})\b', raw[:gt_pos])
+                if tm:
+                    items = duration_picker(raw[:gt_pos], dur_fragment, tm.group(1))
+                    print(alfred.output(items, skipknowledge=True))
+                    return
 
         if at_pos is not None:
             date_raw      = raw[:at_pos]            # may end with space
             time_fragment = raw[at_pos + 1:]
             date_part     = date_raw.strip()
 
-            if not time_fragment.endswith(' '):
+            # Strip any trailing > duration token from the time fragment
+            time_fragment_clean = re.sub(r'\s*>\S*\s*$', '', time_fragment)
+
+            if not time_fragment_clean.endswith(' ') and '>' not in time_fragment:
                 # ── Screen 3: time picker (hour or minute) ────────────────────
-                items = time_picker(raw[:at_pos], time_fragment)
+                items = time_picker(raw[:at_pos], time_fragment_clean)
                 print(alfred.output(items, skipknowledge=True))
                 return
 
-            time_str = time_fragment.strip()        # e.g. "08:30"
+            time_str = time_fragment_clean.strip()  # e.g. "08:30"
         else:
             date_raw  = raw
             date_part = raw.strip()
             time_str  = None
+
+        # >end duration — committed (HH:MM) once present anywhere in the query
+        end_str = None
+        em = re.search(r'(?<!\S)>(\d{1,2}:\d{2})(?=\s|$)', raw)
+        if em:
+            end_str = em.group(1)
 
         # Date is "committed" when it ends with a space (selected from autocomplete
         # or typed in full) — this triggers the confirm / time screen.
         date_committed = date_raw.endswith(' ') if date_raw else False
         show_confirm   = date_committed or bool(time_str)
 
-        # ── Screen 2: confirm / add-time ─────────────────────────────────────
+        # ── Screen 2: confirm / add-time / add-duration ──────────────────────
         if show_confirm:
             base = date_part if date_part else "today"
             combined = f"{base} {time_str}" if time_str else base
@@ -170,22 +263,50 @@ def main():
 
             if iso:
                 display  = utc_to_picker_display(iso)
-                time_tag = f"  @{time_str}" if time_str else ""
-                items.append(alfred.item(
-                    uid="dispatch",
-                    title=f"{display}{time_tag}",
-                    subtitle=f"⏎ {action_verb} \"{task_title}\"  |  ⇧⌘ Back",
-                    arg=f"attr_date:{list_id}:{tid}:{iso}",
-                    valid=True,
-                ))
-                if not time_str:
+
+                # Duration span: resolve end time on the same date (wrap if needed)
+                end_iso = None
+                if end_str and time_str:
+                    end_iso = parse_date(f"{base} {end_str}")
+                    if end_iso and end_iso <= iso:
+                        from datetime import datetime, timedelta
+                        dt = datetime.strptime(end_iso[:19], "%Y-%m-%dT%H:%M:%S") + timedelta(days=1)
+                        end_iso = dt.strftime("%Y-%m-%dT%H:%M:%S+0000")
+
+                if end_iso:
+                    dur = _duration_label(time_str, end_str)
                     items.append(alfred.item(
-                        uid="add-time",
-                        title="@ Add time",
-                        subtitle=f"Pick a specific time for {display}",
-                        arg="", valid=False,
-                        autocomplete=f"{date_part} @",
+                        uid="dispatch",
+                        title=f"{display}  @{time_str} → {end_str}",
+                        subtitle=f"⏳ {dur}  ·  ⏎ {action_verb} \"{task_title}\"  |  ⇧⌘ Back",
+                        arg=f"attr_span:{list_id}:{tid}:{iso}|{end_iso}",
+                        valid=True,
                     ))
+                else:
+                    time_tag = f"  @{time_str}" if time_str else ""
+                    items.append(alfred.item(
+                        uid="dispatch",
+                        title=f"{display}{time_tag}",
+                        subtitle=f"⏎ {action_verb} \"{task_title}\"  |  ⇧⌘ Back",
+                        arg=f"attr_date:{list_id}:{tid}:{iso}",
+                        valid=True,
+                    ))
+                    if not time_str:
+                        items.append(alfred.item(
+                            uid="add-time",
+                            title="@ Add time",
+                            subtitle=f"Pick a specific time for {display}",
+                            arg="", valid=False,
+                            autocomplete=f"{date_part} @",
+                        ))
+                    else:
+                        items.append(alfred.item(
+                            uid="add-duration",
+                            title="> Add duration",
+                            subtitle=f"Set an end time for {display} @{time_str}",
+                            arg="", valid=False,
+                            autocomplete=f"{date_part} @{time_str} >",
+                        ))
             else:
                 items.append(alfred.item(
                     uid="bad-date",
