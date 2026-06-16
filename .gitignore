@@ -22,3 +22,8 @@ src/lib/bin/
 
 # Credentials (stored in ~/.ticktick_alfred/config.json, never here)
 config.json
+
+# Local debug captures & config backups (not part of the workflow)
+Alfred Debuger*.txt
+Karabiner Event Viewer*.json
+*.backup.py
