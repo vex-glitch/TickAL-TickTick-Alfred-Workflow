@@ -33,13 +33,13 @@ def main():
 
     try:
         api     = TickTickAPI(cfg.get_token())
-        current = api.get_task(pid, tid)
+        current = cache_store.find_task(tid) or api.get_task(pid, tid)
         tags    = current.get("tags") or []
         # Remove old tag, add new tag, preserve everything else
         updated = [t for t in tags if t != old_tag]
         if new_tag not in updated:
             updated.append(new_tag)
-        api.update_task(tid, pid, tags=updated)
+        api.update_task(tid, pid, current=current, tags=updated)
         # Patch cache in-place — avoids triggering auto-fetch on next search
         try:
             cached = cache_store.get("all_tasks")

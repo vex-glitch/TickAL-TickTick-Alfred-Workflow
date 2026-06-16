@@ -101,7 +101,6 @@ def main():
                 mods={
                     "shift": {
                         "arg":      f"uncomplete:{pid}:{tid}:{name}",
-                        "subtitle": "Uncomplete task",
                     },
                 },
                 variables={"task_id": tid, "task_title": name, "task_list_id": pid},

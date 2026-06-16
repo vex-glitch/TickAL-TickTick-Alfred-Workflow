@@ -81,7 +81,7 @@ def main():
                 subtitle=subtitle,
                 arg="",
                 mods={
-                    "cmd": {"arg": f"delete:{str(i)}", "subtitle": f"Delete {name}"},
+                    "cmd": {"arg": f"delete:{str(i)}"},
                 },
                 variables={"filter_index": str(i)},
             ))

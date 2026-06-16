@@ -100,7 +100,6 @@ def main():
                 mods={
                     "cmd": {
                         "arg": "delete_folder",
-                        "subtitle": f"⌘ Delete: {title}",
                     }
                 },
             ))

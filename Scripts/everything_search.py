@@ -97,6 +97,7 @@ SCOPES = [
     ("t ",  "✅", "Tasks",            "top-level tasks",          "T"),
     ("tt ", "↳",  "Subtasks",         "subtasks only",            "TT"),
     ("a ",  "🗂",  "Tasks + Subtasks", "tasks at any depth",       "A"),
+    ("g ",  "🏷",  "Tags",             "find tasks by tag",        "G"),
     ("n ",  "📝", "Notes",            "note titles",              "N"),
     ("nc ", "📄", "Note bodies",      "search inside note text",  "NC"),
 ]
@@ -143,6 +144,7 @@ SCOPE_PREFIXES = {
     "t ":  "task",
     "tt ": "subtask",
     "a ":  "all_tasks",
+    "g ":  "tag",
     "n ":  "note",
     "nc ": "note_content",
 }
@@ -234,8 +236,21 @@ def main():
                     subtitle=build_subtitle(sub_count, "List", child_label, actions=True),
                     arg=f"open:{link}",
                     mods={
-                        "alt":     {"arg": "",              "subtitle": "Browse sections"},
-                        "alt+cmd": {"arg": f"copy:{link}",  "subtitle": "Copy link to list"},
+                        # LIST: Complete / Change Attributes are task-only → suppress
+                        # (valid False + blank subtitle so the preview text disappears).
+                        "shift":     {"valid": False, "subtitle": ""},
+                        "ctrl":      {"valid": False, "subtitle": ""},
+                        # ⌥ Browse tags → conditional's Tags branch ({query}=="tags").
+                        # item_type must NOT be "list" here or the List branch
+                        # (→ sections) matches first. Mod-level variables REPLACE the
+                        # item-level set, so carry list_id/task_list_id for drill_tags.
+                        "alt":       {"arg": "tags", "subtitle": "Browse tags",
+                                      "variables": {"item_type": "tag",
+                                                    "list_id": pid,
+                                                    "task_list_id": pid}},
+                        # ⌥⇧ Browse sections → stays item_type=="list" → List → sections.
+                        "alt+shift": {"arg": "", "subtitle": "Browse sections"},
+                        "alt+cmd":   {"arg": f"copy:{link}"},
                     },
                     variables={"item_type": "list", "list_id": pid, "search_name": pname, "type_rank": 0},
                 ))
@@ -251,17 +266,24 @@ def main():
                                      and t.get("status", 0) == 0
                                      and not t.get("parentId"))
 
-                    link  = f"ticktick:///webapp/#p/{pid}/tasks/{sid}"
+                    link      = f"ticktick:///webapp/#p/{pid}/tasks/{sid}"
+                    list_link = f"ticktick:///webapp/#p/{pid}/tasks"
                     title = f"{sname} | {pname}"
 
                     items.append(alfred.item(
                         uid=f"section-{sid}",
                         title=title,
                         subtitle=build_subtitle(task_count, "Sect", "Task", actions=True),
-                        arg=f"open:{link}",
+                        arg=f"open:{list_link}",   # ⏎ opens the list the section lives in
                         mods={
-                            "alt":     {"arg": "",             "subtitle": "Browse tasks"},
-                            "alt+cmd": {"arg": f"copy:{link}", "subtitle": "Copy link to section"},
+                            # SECTION: Complete / Change Attributes task-only → suppress.
+                            "shift":     {"valid": False, "subtitle": ""},
+                            "ctrl":      {"valid": False, "subtitle": ""},
+                            # ⌥ → item_type=="section" → Section branch → tasks.py
+                            "alt":       {"arg": "", "subtitle": "Browse tasks"},
+                            # ⌥⇧ Browse sections is list-only → suppress on a section.
+                            "alt+shift": {"valid": False, "subtitle": ""},
+                            "alt+cmd":   {"arg": f"copy:{link}"},
                         },
                         variables={
                             "item_type":    "section",
@@ -278,16 +300,19 @@ def main():
         # s   = subtasks only (has parentId)
         # ts  = all tasks at any depth
         # none = all tasks at any depth (part of everything)
-        if scope in (None, "task", "subtask", "all_tasks"):
+        if scope in (None, "task", "subtask", "all_tasks", "tag"):
             for t in [t for t in all_tasks if t.get("status", 0) == 0]:
                 if t.get("kind") == "NOTE": continue   # notes rendered in their own section
                 is_subtask = bool(t.get("parentId"))
                 if scope == "task"    and is_subtask:     continue
                 if scope == "subtask" and not is_subtask: continue
+                if scope == "tag"     and not t.get("tags"): continue  # tag scope: tagged tasks only
 
                 tid  = t["id"]
                 pid  = t.get("projectId") or t.get("_projectId", "")
                 name = t.get("title", "Untitled")
+                # In tag scope the query matches the task's tags, not its title
+                ssearch = " ".join(t.get("tags") or []) if scope == "tag" else name
 
                 breadcrumb = get_task_breadcrumb(t, task_by_id)
                 sub_count  = sum(1 for s in all_tasks
@@ -300,18 +325,21 @@ def main():
                     subtitle=build_subtitle(sub_count, "Task", breadcrumb=breadcrumb, actions=True),
                     arg=f"open:{link}",
                     mods={
-                        "cmd":     {"arg": "",                              "subtitle": "Actions"},
-                        "shift":   {"arg": f"complete:{pid}:{tid}:{name}",  "subtitle": "Complete task"},
-                        "alt":     {"arg": "",                              "subtitle": "Browse subtasks"},
-                        "alt+cmd": {"arg": f"copy:{link}",                 "subtitle": "Copy link to task"},
-                        "ctrl":    {"arg": "",                              "subtitle": "Change attributes"},
+                        "cmd":       {"arg": ""},
+                        "shift":     {"arg": f"complete:{pid}:{tid}:{name}"},
+                        # ⌥ → item_type=="task" → else branch → subtasks.py
+                        "alt":       {"arg": "", "subtitle": "Browse subtasks"},
+                        # ⌥⇧ Browse sections is list-only → suppress on a task.
+                        "alt+shift": {"valid": False, "subtitle": ""},
+                        "alt+cmd":   {"arg": f"copy:{link}"},
+                        "ctrl":      {"arg": ""},
                     },
                     variables={
                         "item_type":    "task",
                         "task_id":      tid,
                         "task_title":   name,
                         "task_list_id": pid,
-                        "search_name":  name,
+                        "search_name":  ssearch,
                         "type_rank":    2 + depths.get(tid, 0),
                     },
                 ))
@@ -319,7 +347,7 @@ def main():
         # ── Notes ─────────────────────────────────────────────────────────────
         # n  = search by title (title field = note name | folder)
         # nc = search by content (title field = content snippet, subtitle = note name · folder)
-        if scope in (None, "note", "note_content"):
+        if scope in (None, "note", "note_content", "tag"):
             # Prefer the dedicated all_notes cache (has content for nc search).
             # Fall back to all_tasks filtered by kind=="NOTE" — covers inbox notes
             # and works without a full sync immediately after note creation.
@@ -339,7 +367,16 @@ def main():
                 snippet  = ncontent[:120].replace("\n", " ") if ncontent else ""
                 link     = f"ticktick:///webapp/#p/{npid}/tasks/{nid}"
 
-                if scope == "note_content":
+                ntags = n.get("tags") or []
+                if scope == "tag" and not ntags:
+                    continue   # tag search: only tagged notes
+
+                if scope == "tag":
+                    # Tag mode: match the query against the note's tags
+                    title       = ntitle
+                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True)
+                    search_name = " ".join(ntags)
+                elif scope == "note_content":
                     # Content mode: content preview in title, name · folder as breadcrumb
                     title       = snippet if snippet else ntitle
                     crumb       = f"{ntitle} · {nfolder}" if nfolder else ntitle
@@ -357,8 +394,13 @@ def main():
                     subtitle=subtitle,
                     arg=f"open:{link}",
                     mods={
-                        "ctrl":    {"arg": "", "subtitle": "Change attributes"},
-                        "alt+cmd": {"arg": f"copy:{link}", "subtitle": "Copy link to note"},
+                        # NOTE: everything but Complete (⇧). No children to browse
+                        # from the search view → suppress ⌥/⌥⇧. ⌃ keeps note details.
+                        "shift":     {"valid": False, "subtitle": ""},
+                        "alt":       {"valid": False, "subtitle": ""},
+                        "alt+shift": {"valid": False, "subtitle": ""},
+                        "ctrl":      {"arg": ""},
+                        "alt+cmd":   {"arg": f"copy:{link}"},
                     },
                     variables={
                         "item_type":    "note",
@@ -392,22 +434,18 @@ def main():
             for item in items:
                 groups[item_list_id(item)].append(item)
 
-            # Within each group: hierarchy first, then fuzzy score
+            # Within each group: best fuzzy match first (relevance, not type).
+            # type_rank is only a tiebreaker — and _pos is unique, so it rarely bites.
             for gid in groups:
                 groups[gid].sort(key=lambda x: (
-                    x.get("variables", {}).get("type_rank", 99),
                     x["_pos"],
+                    x.get("variables", {}).get("type_rank", 99),
                 ))
 
-            # Order groups by: best type_rank in group → best fuzzy position
-            def group_sort_key(gid):
-                g = groups[gid]
-                return (
-                    min(x.get("variables", {}).get("type_rank", 99) for x in g),
-                    min(x["_pos"] for x in g),
-                )
-
-            sorted_gids = sorted(groups, key=group_sort_key)
+            # Order groups by their single best (lowest) fuzzy position, so the group
+            # holding the strongest match leads — a name match now outranks the list /
+            # section it lives under instead of being forced below them.
+            sorted_gids = sorted(groups, key=lambda gid: min(x["_pos"] for x in groups[gid]))
             items = [item for gid in sorted_gids for item in groups[gid]]
 
             # Clean up temp field

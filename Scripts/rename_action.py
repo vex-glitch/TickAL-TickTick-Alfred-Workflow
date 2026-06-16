@@ -2,8 +2,8 @@
 """
 rename_action.py — Alfred Run Script
 Renames a task to the new title provided by rename_task.py.
-$1 = new task title
-task_id and task_list_id come from Alfred env vars.
+$1 = "{task_list_id}:{task_id}:{new_title}" (Arg-and-Vars node prepends the ids
+to the bare title). Titles may contain ':', so parse with maxsplit=2.
 """
 import sys
 import os
@@ -18,10 +18,19 @@ import config as cfg
 import cache as cache_store
 from api import TickTickAPI
 
-pid        = os.environ.get("task_list_id", "")
-tid        = os.environ.get("task_id", "")
 task_title = os.environ.get("task_title", "Task")
-new_title  = sys.argv[1].strip() if len(sys.argv) > 1 else ""
+arg        = sys.argv[1] if len(sys.argv) > 1 else ""
+
+# Wiring delivers "pid:tid:new_title". Titles may contain ':', so split with
+# maxsplit=2 to keep any ':' inside the title. Prefer parsed ids, fall back to env.
+parts = arg.split(":", 2)
+if len(parts) == 3:
+    pid, tid, new_title = parts[0], parts[1], parts[2]
+else:
+    pid, tid, new_title = os.environ.get("task_list_id", ""), os.environ.get("task_id", ""), arg
+pid = pid or os.environ.get("task_list_id", "")
+tid = tid or os.environ.get("task_id", "")
+new_title = new_title.strip()
 
 if not pid or not tid:
     print("Error: missing task context")
@@ -33,7 +42,7 @@ if not new_title:
 
 try:
     api = TickTickAPI(cfg.get_token())
-    api.update_task(tid, pid, title=new_title)
+    api.update_task(tid, pid, current=cache_store.find_task(tid), title=new_title)
 
     # Patch cache in-place
     try:

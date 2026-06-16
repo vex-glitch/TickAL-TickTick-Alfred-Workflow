@@ -92,18 +92,18 @@ def main():
                 mods={
                     "cmd": {
                         "arg": "",
-                        "subtitle": "Actions",
                     },
                     "alt": {
                         "arg": "",
-                        "subtitle": f"Browse sections in {name}",
+                    },
+                    "alt+shift": {
+                        "arg": "",
                     },
                     "alt+cmd": {
                         "arg": f"copy:{link}",
-                        "subtitle": f"Copy link to {name}",
                     },
                 },
-                variables={"list_id": pid, "list_name": name, "folder_id": folder_id},
+                variables={"item_type": "list", "list_id": pid, "list_name": name, "folder_id": folder_id},
             ))
 
         if query:

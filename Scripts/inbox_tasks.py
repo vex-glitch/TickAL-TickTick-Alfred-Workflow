@@ -79,11 +79,11 @@ def main():
                 subtitle=build_subtitle(sub_count, breadcrumb="Inbox", actions=True),
                 arg=f"open:{link}",
                 mods={
-                    "cmd":     {"arg": "",                                  "subtitle": "Actions"},
-                    "shift":   {"arg": f"complete:{real_pid}:{tid}:{name}", "subtitle": "Complete task"},
-                    "alt":     {"arg": "",                                  "subtitle": "Browse subtasks"},
-                    "alt+cmd": {"arg": f"copy:{link}",                      "subtitle": "Copy link to task"},
-                    "ctrl":    {"arg": "",                                  "subtitle": "Change attributes"},
+                    "cmd":     {"arg": ""},
+                    "shift":   {"arg": f"complete:{real_pid}:{tid}:{name}"},
+                    "alt":     {"arg": ""},
+                    "alt+cmd": {"arg": f"copy:{link}"},
+                    "ctrl":    {"arg": ""},
                 },
                 variables={"task_id": tid, "task_title": name, "task_list_id": real_pid},
             ))

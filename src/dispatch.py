@@ -18,7 +18,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "lib"))
 
 import config as cfg
-from api import TickTickAPI
+from api import TickTickAPI, RateLimitError
 import cache as cache_store
 from dateutil import utc_to_local_display, utc_to_long_display
 
@@ -38,6 +38,11 @@ def _patch_task_cache(tid, **fields):
         cache_store.set("all_tasks", updated)
     except Exception:
         cache_store.invalidate("all_tasks")
+
+
+def _cached_task(tid):
+    """Cached task/note for tid (avoids a live GET), or None. See cache.find_task."""
+    return cache_store.find_task(tid)
 
 
 def main():
@@ -117,7 +122,7 @@ def main():
                     pass
 
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, startDate=due, dueDate=due)
+            api.update_task(tid, pid, current=_cached_task(tid), startDate=due, dueDate=due)
             _patch_task_cache(tid, startDate=due, dueDate=due)
 
             task_title = os.environ.get("task_title", "Task")
@@ -138,7 +143,7 @@ def main():
 
             had_date = os.environ.get("has_date", "0") == "1"
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, startDate=start_iso, dueDate=end_iso)
+            api.update_task(tid, pid, current=_cached_task(tid), startDate=start_iso, dueDate=end_iso)
             _patch_task_cache(tid, startDate=start_iso, dueDate=end_iso)
 
             task_title = os.environ.get("task_title", "Task")
@@ -159,7 +164,7 @@ def main():
             raw = arg[15:]
             pid, tid = raw.split(":", 1)
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, startDate=None, dueDate=None)
+            api.update_task(tid, pid, current=_cached_task(tid), startDate=None, dueDate=None)
             _patch_task_cache(tid, startDate=None, dueDate=None)
             task_title = os.environ.get("task_title", "Task")
             print(f"{task_title} · Unscheduled")
@@ -170,7 +175,7 @@ def main():
             parts = raw.split(":", 2)
             pid, tid, pval = parts[0], parts[1], int(parts[2])
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, priority=pval)
+            api.update_task(tid, pid, current=_cached_task(tid), priority=pval)
             _patch_task_cache(tid, priority=pval)
             labels = {0: "None", 1: "Low", 3: "Medium", 5: "High"}
             task_title = os.environ.get("task_title", "Task")
@@ -182,14 +187,16 @@ def main():
             parts = raw.split(":", 2)
             pid, tid, tag = parts[0], parts[1], parts[2]
             api = TickTickAPI(cfg.get_token())
-            # Fetch current task to preserve existing tags
-            try:
-                task = api.get_task(pid, tid)
-                existing = task.get("tags") or []
-            except Exception:
-                existing = []
+            # Prefer the cached task (no live GET); fetch only if not cached
+            task = _cached_task(tid)
+            if task is None:
+                try:
+                    task = api.get_task(pid, tid)
+                except Exception:
+                    task = {}
+            existing = task.get("tags") or []
             merged = list(dict.fromkeys(existing + [tag]))  # deduplicated, order preserved
-            api.update_task(tid, pid, tags=merged)
+            api.update_task(tid, pid, current=(task or None), tags=merged)
             _patch_task_cache(tid, tags=merged)
             task_title = os.environ.get("task_title", "Task")
             print(f"{task_title} tagged #{tag}")
@@ -201,10 +208,10 @@ def main():
             pid, tid, tags_csv = parts[0], parts[1], parts[2]
             new_tags = [t.strip() for t in tags_csv.split(",") if t.strip()]
             api = TickTickAPI(cfg.get_token())
-            current = api.get_task(pid, tid)
+            current = _cached_task(tid) or api.get_task(pid, tid)
             existing = current.get("tags") or []
             merged = list(dict.fromkeys(existing + new_tags))
-            api.update_task(tid, pid, tags=merged)
+            api.update_task(tid, pid, current=current, tags=merged)
             _patch_task_cache(tid, tags=merged)
             task_title = os.environ.get("task_title", "Task")
             tags_display = "  ".join(f"#{t}" for t in new_tags)
@@ -216,9 +223,9 @@ def main():
             parts = raw.split(":", 2)
             pid, tid, tag = parts[0], parts[1], parts[2]
             api = TickTickAPI(cfg.get_token())
-            current = api.get_task(pid, tid)
+            current = _cached_task(tid) or api.get_task(pid, tid)
             updated = [t for t in (current.get("tags") or []) if t != tag]
-            api.update_task(tid, pid, tags=updated)
+            api.update_task(tid, pid, current=current, tags=updated)
             _patch_task_cache(tid, tags=updated)
             task_title = os.environ.get("task_title", "Task")
             print(f"{task_title} tag #{tag} removed")
@@ -228,7 +235,7 @@ def main():
             raw = arg[15:]
             pid, tid = raw.split(":", 1)
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, tags=[])
+            api.update_task(tid, pid, current=_cached_task(tid), tags=[])
             _patch_task_cache(tid, tags=[])
             task_title = os.environ.get("task_title", "Task")
             print(f"{task_title} — all tags removed")
@@ -258,7 +265,7 @@ def main():
             parts = raw.split(":", 2)
             pid, tid, new_title = parts[0], parts[1], parts[2]
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, title=new_title)
+            api.update_task(tid, pid, current=_cached_task(tid), title=new_title)
             _patch_task_cache(tid, title=new_title)
             print(f"{new_title} renamed")
 
@@ -429,6 +436,8 @@ def main():
             # Fallback: treat as raw URL
             subprocess.run(["open", arg], check=False)
 
+    except RateLimitError as e:
+        print(f"⏳ {e}")
     except Exception as e:
         print(f"Error: {e}")
 

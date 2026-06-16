@@ -26,6 +26,15 @@ def get(key):
         return None
 
 
+def find_task(tid):
+    """Return the cached task/note object with this id, or None (no API call)."""
+    for key in ("all_tasks", "all_notes"):
+        for t in (get(key) or []):
+            if t.get("id") == tid:
+                return t
+    return None
+
+
 def set(key, value):
     with open(_path(key), "w") as fp:
         json.dump({"ts": time.time(), "value": value}, fp)

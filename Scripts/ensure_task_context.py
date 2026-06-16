@@ -10,8 +10,11 @@ import os, json, sys
 pid        = os.environ.get("task_list_id", "")
 tid        = os.environ.get("task_id", "")
 task_title = os.environ.get("task_title", "")
+itype      = os.environ.get("item_type", "")
 
-if not pid or not tid:
+# Recover task context (go-back path) for task-like items only. For a list/section
+# there is no task, so never pull a stale task_id from the temp file.
+if itype not in ("list", "section") and (not pid or not tid):
     try:
         with open("/tmp/ticktick_reattribute.txt") as f:
             parts = f.read().strip().split(":", 1)
@@ -27,6 +30,9 @@ print(json.dumps({
             "task_list_id": pid,
             "task_id":      tid,
             "task_title":   task_title,
+            "item_type":    itype,
+            "list_id":      os.environ.get("list_id", ""),
+            "section_id":   os.environ.get("section_id", ""),
         }
     }
 }))

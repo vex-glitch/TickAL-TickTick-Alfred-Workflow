@@ -455,14 +455,12 @@ def time_picker(prefix, fragment):
     return items
 
 # ── Symbol legend (contextual) ───────────────────────────────────────────────
-def symbol_legend(has_date=False, has_time=False, note_mode=False):
+def symbol_legend(has_date=False, note_mode=False):
     if note_mode:
         return "/ More…  |  ~🏠 =📝"
     syms = ["*📅"]
-    if has_date:
-        syms.append("@⏰")
-    if has_time:
-        syms.append(">⏳")
+    # @ time and > duration are offered as selectable rows once a date/time is
+    # set (see task_preview), so they're intentionally left out of the legend.
     if has_date:
         syms.append("&🔁")
     syms += ["!🚩", "#🏷️", "~🏠", "=📝"]
@@ -895,7 +893,7 @@ def task_preview(query):
         short = note if len(note) <= 24 else note[:24] + "…"
         parts.append(f"📝{short}")
     subtitle = ("  ".join(parts) + "  |  " if parts else "") + symbol_legend(
-        has_date=bool(due_date), has_time=bool(time_str))
+        has_date=bool(due_date))
 
     payload = {"title": title, "listName": list_display}
     if list_id:
@@ -935,12 +933,36 @@ def task_preview(query):
 
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
 
-    return [alfred.item(
+    items = [alfred.item(
         title=f"Create: {title}",
         subtitle=subtitle,
         arg=f"create:{encoded}",
         valid=True,
     )]
+
+    # Offer the next scheduling step as a selectable row (mirrors reschedule.py
+    # Screen 2): once a date is set, surface "Add time"; once a time is set,
+    # "Add duration" — each drops into the existing @ / > picker. Skipped when a
+    # =note is present (the trigger would land after the opaque note text). Date
+    # entry stays on the * picker.
+    if not note:
+        base_q = query.rstrip()
+        if due_date and not time_str:
+            items.append(alfred.item(
+                title="⏰ Add time",
+                subtitle=f"Pick a time for {_utc_iso_to_picker_display(due_date)}  ·  ⏎",
+                arg="", valid=False,
+                autocomplete=f"{base_q} @",
+            ))
+        elif time_str and not end_str:
+            items.append(alfred.item(
+                title="⏳ Add duration",
+                subtitle=f"Set an end time for @{time_str}  ·  ⏎",
+                arg="", valid=False,
+                autocomplete=f"{base_q} >",
+            ))
+
+    return items
 
 # ── Note preview ─────────────────────────────────────────────────────────────
 def note_preview(query):

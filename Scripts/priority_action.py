@@ -2,8 +2,8 @@
 """
 priority_action.py — Alfred Run Script
 Sets the priority on a task.
-$1 = priority int (0=none, 1=low, 3=medium, 5=high) from change_priority.py
-task_id and task_list_id come from Alfred env vars.
+$1 = "{task_list_id}:{task_id}:{priority_int}" (Arg-and-Vars node prepends the
+ids to the bare value emitted by change_priority.py). Env vars are a fallback.
 """
 import sys
 import os
@@ -20,24 +20,34 @@ from api import TickTickAPI
 
 LABELS = {0: "None", 1: "Low", 3: "Medium", 5: "High"}
 
-pid        = os.environ.get("task_list_id", "")
-tid        = os.environ.get("task_id", "")
 task_title = os.environ.get("task_title", "Task")
 arg        = sys.argv[1] if len(sys.argv) > 1 else ""
+
+# Wiring delivers "pid:tid:value"; parse it, preferring parsed ids but
+# falling back to env vars (priority has no ':' so maxsplit=2 is safe).
+parts = arg.split(":", 2)
+if len(parts) == 3:
+    pid, tid, value = parts
+else:
+    pid   = os.environ.get("task_list_id", "")
+    tid   = os.environ.get("task_id", "")
+    value = arg
+pid = pid or os.environ.get("task_list_id", "")
+tid = tid or os.environ.get("task_id", "")
 
 if not pid or not tid:
     print("Error: missing task context")
     sys.exit(1)
 
 try:
-    priority = int(arg)
+    priority = int(value)
 except (ValueError, TypeError):
-    print(f"Error: invalid priority value: {arg!r}")
+    print(f"Error: invalid priority value: {value!r}")
     sys.exit(1)
 
 try:
     api = TickTickAPI(cfg.get_token())
-    api.update_task(tid, pid, priority=priority)
+    api.update_task(tid, pid, current=cache_store.find_task(tid), priority=priority)
 
     # Patch cache in-place
     try:

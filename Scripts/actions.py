@@ -74,13 +74,16 @@ def section_name(task):
 
 
 def main():
-    pid    = os.environ.get("task_list_id", os.environ.get("list_id", ""))
+    pid    = os.environ.get("task_list_id", "") or os.environ.get("list_id", "")
     tid    = os.environ.get("task_id", "")
+    sid    = os.environ.get("section_id", "")
     title  = os.environ.get("task_title", "task")
     itype  = os.environ.get("item_type", "")
     query  = sys.argv[1] if len(sys.argv) > 1 else ""
 
-    if not pid or not tid:
+    # Recover task context (go-back path) for task-like items only — never for a
+    # list/section, where pulling a stale task_id from the temp file is the bug.
+    if itype not in ("list", "section") and (not pid or not tid):
         try:
             with open("/tmp/ticktick_reattribute.txt") as f:
                 parts = f.read().strip().split(":", 1)
@@ -89,12 +92,32 @@ def main():
         except Exception:
             pass
 
-    vars_ = {"task_id": tid, "task_list_id": pid, "task_title": title}
-    link  = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"
-
     try:
-        task = find_task(tid) or {}
-        is_note = (task.get("kind") == "NOTE") or itype == "note"
+        task = (find_task(tid) if tid else {}) or {}
+
+        # Infer the item type when the source filter didn't set one.
+        if not itype:
+            if tid:
+                itype = "note" if task.get("kind") == "NOTE" else \
+                        ("subtask" if task.get("parentId") else "task")
+            elif sid:  itype = "section"
+            elif pid:  itype = "list"
+            else:      itype = "task"
+
+        is_note      = itype == "note" or task.get("kind") == "NOTE"
+        is_container = itype in ("list", "section")   # list/section: no task attributes
+        is_task_like = not is_container               # task / subtask / note
+
+        if itype == "list":
+            link = f"ticktick:///webapp/#p/{pid}/tasks"
+        elif itype == "section":
+            link = f"ticktick:///webapp/#p/{pid}/tasks/{sid}"
+        else:
+            link = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"
+
+        # Context every action carries onward (add_task / move / … read these).
+        vars_ = {"task_id": tid, "task_list_id": pid, "task_title": title,
+                 "item_type": itype, "list_id": pid, "section_id": sid}
 
         sched = fmt_date(task) or "📅 Not scheduled"
         crumb = join_breadcrumb(task.get("_projectName", ""), section_name(task)) \
@@ -102,22 +125,27 @@ def main():
         tags  = fmt_tags(task.get("tags")) or "🏷️ No tags"
         prio  = PRIO.get(task.get("priority", 0), PRIO[0])
         name  = task.get("title") or title
-        has_kids = any(s.get("parentId") == tid and s.get("status", 0) == 0
-                       for s in (cache_store.get("all_tasks") or []))
+        has_kids = bool(tid) and any(
+            s.get("parentId") == tid and s.get("status", 0) == 0
+            for s in (cache_store.get("all_tasks") or []))
+        add_sub = "Add a subtask" if is_task_like else f"Add a task to this {itype}"
 
         # (title, subtitle, arg, search keywords, show?)
+        # Notes get everything but Complete and Priority; list/section get only the
+        # container-applicable actions (open / browse / add / copy / back).
         rows = [
-            ("↗️ Open",      "Open in TickTick",  f"open:{link}", "open",     True),
-            ("⤵️ Browse subtasks", "Drill into subtasks", "browse", "browse subtasks", has_kids),
-            (sched,          "Schedule…",         "schedule",     "schedule date when", True),
-            (tags,           "Tags…",             "tags",         "tags tag",  True),
-            (prio,           "Priority…",         "priority",     "priority",  not is_note),
-            (crumb,          "Move…",             "move",         "move list section", True),
-            ("🔗 Copy link", "Copy item URL",     f"copy:{link}", "copy url",  True),
-            ("✔️ Complete",  "Mark this done",    f"complete:{pid}:{tid}:{title}", "complete done", not is_note),
-            (name,           "Rename…",           "rename",       "rename title name", True),
-            ("🗑️ Delete",    "Delete this item",  "delete",       "delete remove", True),
-            ("🔙 Go back",   "Back to search",    "back",         "back",      True),
+            ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
+            ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and has_kids),
+            (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like),
+            (tags,                 "Tags…",                "tags",          "tags tag",          is_task_like),
+            (prio,                 "Priority…",            "priority",      "priority",          is_task_like and not is_note),
+            (crumb,                "Move…",                "move",          "move list section", is_task_like),
+            ("➕ Add task",        add_sub,                "add",           "add new task",      True),
+            ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
+            ("✔️ Complete",        "Mark this done",       f"complete:{pid}:{tid}:{title}", "complete done", is_task_like and not is_note),
+            (name,                 "Rename…",              "rename",        "rename title name", is_task_like),
+            ("🗑️ Delete",          "Delete this item",     "delete",        "delete remove",     is_task_like),
+            ("🔙 Go back",         "Back to search",       "back",          "back",              True),
         ]
 
         items = [alfred.item(title=t, subtitle=s, arg=a, variables=vars_, match=f"{kw} {t}")

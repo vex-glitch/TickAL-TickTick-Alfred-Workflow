@@ -9,17 +9,37 @@ from urllib3.util.retry import Retry  # noqa: E402
 
 BASE_URL = "https://api.ticktick.com/open/v1"
 
-# TickTick's Open API throws intermittent 500s (especially GET /project).
-# Retry transient server errors with a short backoff before surfacing them.
-# Only idempotent methods — retrying POST could create duplicates if the
-# first request succeeded server-side before erroring.
+# Retry only genuine transient gateway errors with a short backoff.
+# NOT 500: TickTick returns HTTP 500 for its rate limit (300 requests / 5 min,
+# errorCode "exceed_query_limit"). Retrying that just spends more of the budget
+# and deepens the lockout — _check() below turns it into a clear RateLimitError
+# instead. Idempotent methods only — retrying POST could create duplicates.
 _RETRY = Retry(
     total=3,
     backoff_factor=0.5,  # 0.5s, 1s, 2s
-    status_forcelist=[500, 502, 503, 504],
+    status_forcelist=[502, 503, 504],
     allowed_methods=["GET", "DELETE"],
     raise_on_status=False,
 )
+
+
+class RateLimitError(Exception):
+    """TickTick Open API rate limit (300 requests / 5 min), returned as HTTP 500."""
+
+
+def _check(r):
+    """Like raise_for_status(), but surface TickTick's rate-limit-as-500 clearly."""
+    if r.status_code == 500:
+        try:
+            err = r.json()
+        except Exception:
+            err = {}
+        if err.get("errorCode") == "exceed_query_limit":
+            raise RateLimitError(
+                err.get("errorMessage")
+                or "TickTick rate limit exceeded (300 requests / 5 min). Wait a few minutes and retry."
+            )
+    r.raise_for_status()
 
 
 def _is_all_day(date_str):
@@ -64,24 +84,24 @@ class TickTickAPI:
         if group_id:
             payload["groupId"] = group_id
         r = self.session.post(f"{BASE_URL}/project", json=payload)
-        r.raise_for_status()
+        _check(r)
         return r.json() if r.text.strip() else {}
 
 
     def get_projects(self):
         r = self.session.get(f"{BASE_URL}/project")
-        r.raise_for_status()
+        _check(r)
         return r.json()
 
     def get_project_data(self, project_id):
         """Returns dict with keys: project, tasks, groups (sections)."""
         r = self.session.get(f"{BASE_URL}/project/{project_id}/data")
-        r.raise_for_status()
+        _check(r)
         return r.json()
 
     def get_task(self, project_id, task_id):
         r = self.session.get(f"{BASE_URL}/project/{project_id}/task/{task_id}")
-        r.raise_for_status()
+        _check(r)
         return r.json()
 
     def create_task(self, title, project_id=None, due_date=None, content=None,
@@ -111,23 +131,27 @@ class TickTickAPI:
         if repeat_flag:
             payload["repeatFlag"] = repeat_flag
         r = self.session.post(f"{BASE_URL}/task", json=payload)
-        r.raise_for_status()
+        _check(r)
         return r.json()
 
     def complete_task(self, project_id, task_id, task_data=None):
         r = self.session.post(
             f"{BASE_URL}/project/{project_id}/task/{task_id}/complete"
         )
-        r.raise_for_status()
+        _check(r)
         return True
 
-    def update_task(self, task_id, project_id, **fields):
-        """Fetch current task, merge changes, post full object.
+    def update_task(self, task_id, project_id, current=None, **fields):
+        """Merge changes into the full task object and post it.
         TickTick ignores partial updates — full object required to persist.
         Pass field=None to send explicit null (clears the field in TickTick).
+        Pass `current` (e.g. the cached task) to skip the GET round-trip;
+        falls back to fetching only when not supplied.
         """
-        current = self.get_task(project_id, task_id)
-        payload = {**current}
+        if current is None:
+            current = self.get_task(project_id, task_id)
+        # Drop workflow-internal (_-prefixed) keys so we post clean API fields
+        payload = {k: v for k, v in current.items() if not k.startswith("_")}
         for key, value in fields.items():
             payload[key] = value  # None serialises as JSON null — clears the field
         # Auto-set isAllDay based on date fields
@@ -145,16 +169,16 @@ class TickTickAPI:
         if "projectId" in fields and fields["projectId"] != project_id:
             payload["columnId"] = None
         r = self.session.post(f"{BASE_URL}/task/{task_id}", json=payload)
-        r.raise_for_status()
+        _check(r)
         return r.json()
 
     def move_task(self, task_id, from_project_id, to_project_id):
         payload = [{"fromProjectId": from_project_id, "toProjectId": to_project_id, "taskId": task_id}]
         r = self.session.post(f"{BASE_URL}/task/move", json=payload)
-        r.raise_for_status()
+        _check(r)
         return r.json()
 
     def delete_task(self, project_id, task_id):
         r = self.session.delete(f"{BASE_URL}/project/{project_id}/task/{task_id}")
-        r.raise_for_status()
+        _check(r)
         return True

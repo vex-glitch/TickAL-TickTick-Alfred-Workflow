@@ -102,12 +102,12 @@ def render_tasks(list_id, all_tasks, column_ids, section_id, section_name, query
             subtitle=sub,
             arg=f"open:{link}",
             mods={
-                "cmd":      {"arg": "", "subtitle": "Actions"},
-                "shift":    {"arg": f"complete:{list_id}:{tid}:{name}", "subtitle": "Complete task"},
-                "alt":      {"arg": "", "subtitle": "Browse subtasks"},
-                "ctrl+shift": {"arg": f"pomodoro:{list_id}:{tid}", "subtitle": "Start Pomodoro"},
-                "alt+cmd":  {"arg": f"copy:{link}", "subtitle": "Copy link to task"},
-                "ctrl":     {"arg": "", "subtitle": "Change attributes"},
+                "cmd":      {"arg": ""},
+                "shift":    {"arg": f"complete:{list_id}:{tid}:{name}"},
+                "alt":      {"arg": ""},
+                "ctrl+shift": {"arg": f"pomodoro:{list_id}:{tid}"},
+                "alt+cmd":  {"arg": f"copy:{link}"},
+                "ctrl":     {"arg": ""},
             },
             variables={"task_id": tid, "task_title": name, "task_list_id": list_id},
         ))
@@ -198,9 +198,10 @@ def main():
                 subtitle=build_subtitle(len(orphaned), child_label="Task", actions=True),
                 arg="",
                 mods={
-                    "alt": {"arg": "", "subtitle": "Browse unsectioned tasks"},
+                    "alt": {"arg": ""},
                 },
-                variables={"section_id": "UNSECTIONED", "section_name": "Not sectioned", "folder_id": folder_id},
+                variables={"item_type": "section", "list_id": list_id, "task_list_id": list_id,
+                           "section_id": "UNSECTIONED", "section_name": "Not sectioned", "folder_id": folder_id},
             ))
 
         for s in sections:
@@ -227,11 +228,12 @@ def main():
                 subtitle=build_subtitle(task_count, child_label="Task", actions=True),
                 arg=f"open:{list_link}",
                 mods={
-                    "cmd":     {"arg": "", "subtitle": "Actions"},
-                    "alt":     {"arg": "", "subtitle": f"Browse tasks in {sname}"},
-                    "alt+cmd": {"arg": f"copy:{section_link}", "subtitle": f"Copy link to {sname}"},
+                    "cmd":     {"arg": ""},
+                    "alt":     {"arg": ""},
+                    "alt+cmd": {"arg": f"copy:{section_link}"},
                 },
-                variables={"section_id": sid, "section_name": sname, "folder_id": folder_id},
+                variables={"item_type": "section", "list_id": list_id, "task_list_id": list_id,
+                           "section_id": sid, "section_name": sname, "folder_id": folder_id},
             ))
 
         if query:

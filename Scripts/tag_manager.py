@@ -104,8 +104,8 @@ def current_tags_view(query, pid, tid, task_title):
             arg=f"attr_tag_remove:{pid}:{tid}:{tag}",
             valid=True,
             mods={
-                "cmd":  {"arg": "changetag",                   "subtitle": f"Change #{tag}"},
-                "ctrl": {"arg": f"attr_tag_clear:{pid}:{tid}", "subtitle": "Remove all tags"},
+                "cmd":  {"arg": "changetag"},
+                "ctrl": {"arg": f"attr_tag_clear:{pid}:{tid}"},
             },
             variables={"task_list_id": pid, "task_id": tid, "old_tag": tag},
         ))
