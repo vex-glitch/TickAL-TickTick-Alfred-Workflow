@@ -41,18 +41,21 @@ try:
                           utc_to_local_display   as _utc_iso_to_local_display,
                           utc_to_picker_display  as _utc_iso_to_picker_display,
                           build_date_shortcuts)
+    from reminders import (PRESETS as REMINDER_OPTIONS,
+                           trigger as _reminder_trigger,
+                           human   as _reminder_human)
 except Exception as e:
     print(json.dumps({"items": [{"title": "Import error", "subtitle": str(e), "valid": False}]}))
     sys.exit(0)
 
 # ── Constants ────────────────────────────────────────────────────────────────
 PRIORITY_OPTIONS = [
-    ("!1", "↓ Low priority",    1),
-    ("!2", "↑ Medium priority", 3),
-    ("!3", "⬆ High priority",   5),
+    ("!1", "🟡 Low priority",    1),
+    ("!2", "🟠 Medium priority", 3),
+    ("!3", "🔴 High priority",   5),
 ]
 PRIORITY_VAL = {"1": 1, "2": 3, "3": 5}
-PRIORITY_LABEL = {1: "↓", 3: "↑", 5: "⬆"}
+PRIORITY_LABEL = {1: "🟡", 3: "🟠", 5: "🔴"}
 
 # &repeat presets — token, label, hint, RRULE
 REPEAT_OPTIONS = [
@@ -100,7 +103,7 @@ def find_active_trigger(query):
     scan = query[:m.start()] if m else query
     for i in range(len(scan) - 1, -1, -1):
         ch = scan[i]
-        if ch not in ('~', '#', '!', '*', '/', '>', '@', '&'):
+        if ch not in ('~', '#', '!', '*', '/', '>', '@', '&', '%'):
             continue
         # Must be at start or preceded by a space
         if i > 0 and scan[i - 1] != ' ':
@@ -119,7 +122,7 @@ def find_active_trigger(query):
                 return None
             return (ch, prefix, fragment)
         # Single-word triggers: if fragment contains a space the token is done
-        if ch in ('#', '!', '/', '>', '&') and ' ' in fragment:
+        if ch in ('#', '!', '/', '>', '&', '%') and ' ' in fragment:
             return None
         # Date / time triggers: if fragment ends with a space the token is done
         if ch in ('*', '@') and fragment.endswith(' '):
@@ -140,21 +143,21 @@ def parse_task(query):
 
     # ~p parent_task (multi-word, ends at next trigger or end of string)
     parent_name = None
-    m = re.search(r'(?<!\S)~p\s+(.+?)(?=\s+[~#!*@/>=&]|\s*$)', q)
+    m = re.search(r'(?<!\S)~p\s+(.+?)(?=\s+[~#!*@/>=&%]|\s*$)', q)
     if m:
         parent_name = m.group(1)
         q = q[:m.start()] + q[m.end():]
 
     # ~s section (multi-word)
     section_name = None
-    m = re.search(r'(?<!\S)~s\s+(.+?)(?=\s+[~#!*@/>=&]|\s*$)', q)
+    m = re.search(r'(?<!\S)~s\s+(.+?)(?=\s+[~#!*@/>=&%]|\s*$)', q)
     if m:
         section_name = m.group(1)
         q = q[:m.start()] + q[m.end():]
 
     # ~l list (multi-word)
     list_name = None
-    m = re.search(r'(?<!\S)~l\s+(.+?)(?=\s+[~#!*@/>=&]|\s*$)', q)
+    m = re.search(r'(?<!\S)~l\s+(.+?)(?=\s+[~#!*@/>=&%]|\s*$)', q)
     if m:
         list_name = m.group(1)
         q = q[:m.start()] + q[m.end():]
@@ -177,7 +180,7 @@ def parse_task(query):
 
     # *date — greedily takes everything to next trigger or end (stops at @)
     date_str = None
-    m = re.search(r'(?<!\S)\*(.+?)(?=\s*[~#!/>@=&]|$)', q)
+    m = re.search(r'(?<!\S)\*(.+?)(?=\s*[~#!/>@=&%]|$)', q)
     if m:
         date_str = m.group(1).strip()
         q = q[:m.start()] + q[m.end():]
@@ -203,9 +206,18 @@ def parse_task(query):
         repeat = m.group(1).lower()
         q = q[:m.start()] + q[m.end():]
 
+    # %reminder — preset/offset tokens (multiple allowed); resolved to TRIGGER later
+    reminders = []
+    while True:
+        m = re.search(r'(?<!\S)%(\S+)', q)
+        if not m:
+            break
+        reminders.append(m.group(1).lower())
+        q = q[:m.start()] + q[m.end():]
+
     title = ' '.join(q.split())
     return (title, date_str, time_str, end_str, priority, tags,
-            list_name, parent_name, section_name, note, repeat)
+            list_name, parent_name, section_name, note, repeat, reminders)
 
 def resolve_list_id(list_name, lists):
     """Find project ID by name (case-insensitive prefix/contains match)."""
@@ -232,7 +244,7 @@ def list_picker(fill, fragment, lists=None):
         filled = f"{fill}{name} "
         items.append(alfred.item(
             title=name,
-            subtitle="⏎ ✅",
+            subtitle="",
             arg="",
             valid=False,
             autocomplete=filled,
@@ -251,7 +263,7 @@ def tag_picker(prefix, fragment):
         filled = f"{prefix}#{tag} "
         items.append(alfred.item(
             title=tag,
-            subtitle="⏎ ✅",
+            subtitle="",
             arg="",
             valid=False,
             autocomplete=filled,
@@ -265,19 +277,20 @@ def tag_picker(prefix, fragment):
     return items
 
 def priority_picker(prefix, fragment):
+    task_title = parse_task(prefix)[0] or "task"
     items = []
-    for token, label, _ in PRIORITY_OPTIONS:
+    for token, label, val in PRIORITY_OPTIONS:
         if fragment and fragment not in label.lower() and fragment != token[1:]:
             continue
         filled = f"{prefix}{token} "
         items.append(alfred.item(
             title=label,
-            subtitle="⏎ ✅",
+            subtitle=f"{PRIORITY_LABEL[val]} {task_title}",
             arg="",
             valid=False,
             autocomplete=filled,
         ))
-    return items or [alfred.item(title="Type 1, 2, or 3", valid=False)]
+    return items or [alfred.item(title=f'No priority matching "{fragment}"', valid=False)]
 
 def section_picker(fill, fragment, current_list_id=None):
     projects = cache_store.get("projects") or []
@@ -296,7 +309,7 @@ def section_picker(fill, fragment, current_list_id=None):
             filled   = f"{fill}{col_name} "
             items.append(alfred.item(
                 title=col_name,
-                subtitle=subtitle + ("  ⏎ ✅" if subtitle else "⏎ ✅"),
+                subtitle=subtitle,
                 arg="",
                 valid=False,
                 autocomplete=filled,
@@ -331,7 +344,7 @@ def task_picker(fill, fragment):
         filled = f"{fill}{title} "
         items.append(alfred.item(
             title=title,
-            subtitle=subtitle + "  ⏎ ✅" if subtitle else "⏎ ✅",
+            subtitle=subtitle,
             arg="",
             valid=False,
             autocomplete=filled,
@@ -463,6 +476,7 @@ def symbol_legend(has_date=False, note_mode=False):
     # set (see task_preview), so they're intentionally left out of the legend.
     if has_date:
         syms.append("&🔁")
+        syms.append("%🔔")
     syms += ["!🚩", "#🏷️", "~🏠", "=📝"]
     return "/ More…  |  " + " ".join(syms)
 
@@ -495,7 +509,7 @@ def master_menu(prefix, fragment, note_mode=False):
     if not note_mode and not prefix.strip():
         return mode_menu(fragment)
 
-    _, date_str, time_str, end_str, _, _, _, _, _, _, repeat = parse_task(prefix)
+    _, date_str, time_str, end_str, _, _, _, _, _, _, repeat, _ = parse_task(prefix)
 
     rows = []
     if note_mode:
@@ -511,6 +525,8 @@ def master_menu(prefix, fragment, note_mode=False):
             rows.append((">", "⏳", "Duration", "end time or length"))
         if date_str and not repeat:
             rows.append(("&", "🔁", "Repeat", "daily · weekly · monthly"))
+        if date_str:
+            rows.append(("%", "🔔", "Reminder", "at time · before due"))
         rows += [
             ("!", "🚩", "Priority",  "low · medium · high"),
             ("#", "🏷️", "Tag",       "from your tags"),
@@ -536,8 +552,9 @@ def master_menu(prefix, fragment, note_mode=False):
 
 # ── ~ location menu / sub-pickers ────────────────────────────────────────────
 def location_router(prefix, fragment, lists=None, note_mode=False):
-    """Bare ~ shows the location menu (Parent / List / Section). Picking one
-    autocompletes ~p / ~l / ~s, which routes to the matching sub-picker."""
+    """Bare ~ shows the location menu (List / Section / Parent task). Picking one
+    autocompletes ~l / ~s / ~p and drills into its sub-picker. Typing with no
+    scope letter defaults to list-filtering (same UX as the Move picker)."""
     sub = re.match(r'([pls]) (.*)$', fragment)
     if sub:
         mode, frag = sub.group(1), sub.group(2)
@@ -554,24 +571,28 @@ def location_router(prefix, fragment, lists=None, note_mode=False):
             cur_lid = resolve_list_id(ln, source)[0]
         return section_picker(fill, frag, current_list_id=cur_lid)
 
+    stripped = fragment.strip()
+
+    # Typing with no scope letter → default to list, filter lists by fragment
+    # (same UX as the Move picker)
+    if stripped:
+        return list_picker(f"{prefix}~l ", stripped, lists=lists)
+
+    # Idle (bare ~) → the location menu (all options visible)
     rows = [
-        ("l", "📋", "List",        "which list the task lives in"),
-        ("s", "📑", "Section",     "kanban column inside a list"),
-        ("p", "🧬", "Parent task", "make it a subtask"),
+        ("l", "📋", "List",        "Add to a list"),
+        ("s", "📑", "Section",     "Add to a section"),
+        ("p", "🧬", "Parent task", "Make it a subtask"),
     ]
     items = []
     for letter, emoji, name, hint in rows:
         items.append(alfred.item(
             title=f"{emoji} {name}",
-            subtitle=f"~{letter}  ·  {hint}  ·  ⏎ ✅",
+            subtitle=hint,
             arg="",
             valid=False,
             autocomplete=f"{prefix}~{letter} ",
         ))
-    if fragment:
-        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
-    if not items:
-        items = [alfred.item(title=f'No location matching "{fragment}"', valid=False)]
     return items
 
 
@@ -623,7 +644,7 @@ def duration_picker(prefix, fragment):
         end = f"{eh:02d}:{em:02d}"
         return [alfred.item(
             title=f"{time_str} → {end}",
-            subtitle=f"⏳ {_duration_label(time_str, end)}  ·  ⏎ ✅",
+            subtitle=f"⏳ {_duration_label(time_str, end)}",
             arg="", valid=False,
             autocomplete=f"{prefix}>{end} ",
         )]
@@ -678,7 +699,7 @@ def repeat_picker(prefix, fragment):
     for tok, label, hint, _ in REPEAT_OPTIONS:
         items.append(alfred.item(
             title=f"🔁 {label}",
-            subtitle=f"{hint}  ·  ⏎ ✅",
+            subtitle=hint,
             arg="",
             valid=False,
             autocomplete=f"{prefix}&{tok} ",
@@ -687,6 +708,41 @@ def repeat_picker(prefix, fragment):
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     if not items:
         items = [alfred.item(title=f'No repeat matching "{fragment}"', valid=False)]
+    return items
+
+
+def reminder_picker(prefix, fragment):
+    date_str = parse_task(prefix)[1]
+    if not date_str:
+        return [alfred.item(
+            title="Set a date first",
+            subtitle="Reminders need an anchor date — add one with *",
+            valid=False,
+        )]
+    frag = fragment.strip().lower()
+    preset_tokens = {tok for tok, _, _ in REMINDER_OPTIONS}
+
+    # Free-typed custom offset (e.g. 45, 45m, 2h, 3d) that isn't already a preset
+    if frag and frag not in preset_tokens and _reminder_trigger(frag):
+        return [alfred.item(
+            title=f"🔔 {_reminder_human(frag)}",
+            subtitle="custom reminder offset",
+            arg="", valid=False,
+            autocomplete=f"{prefix}%{frag} ",
+        )]
+
+    items = []
+    for tok, label, hint in REMINDER_OPTIONS:
+        items.append(alfred.item(
+            title=f"🔔 {label}",
+            subtitle=hint,
+            arg="", valid=False,
+            autocomplete=f"{prefix}%{tok} ",
+        ))
+    if fragment:
+        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
+    if not items:
+        items = [alfred.item(title=f'No reminder matching "{fragment}"', valid=False)]
     return items
 
 
@@ -759,7 +815,7 @@ def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, 
 # ── Task preview ──────────────────────────────────────────────────────────────
 def task_preview(query):
     (title, date_str, time_str, end_str, priority, tags,
-     list_name, parent_name, section_name, note, repeat) = parse_task(query)
+     list_name, parent_name, section_name, note, repeat, reminders) = parse_task(query)
 
     if not title:
         return [alfred.item(
@@ -885,6 +941,9 @@ def task_preview(query):
             parts.append(f"🔁{REPEAT_LABEL[repeat]}")
         else:
             parts.append(f"🔁{repeat}?")
+    for rem in reminders:
+        ok = _reminder_trigger(rem) and (due_date or end_date)
+        parts.append(f"🔔{rem}" if ok else f"🔔{rem}?")
     if priority:
         parts.append(f"{PRIORITY_LABEL[priority]} priority")
     for t in tags:
@@ -911,6 +970,16 @@ def task_preview(query):
         payload["content"] = note
     if repeat in REPEAT_RRULE and (due_date or end_date):
         payload["repeatFlag"] = REPEAT_RRULE[repeat]
+    if reminders and (due_date or end_date):
+        seen = set()
+        triggers = []
+        for rem in reminders:
+            trig = _reminder_trigger(rem)
+            if trig and trig not in seen:
+                seen.add(trig)
+                triggers.append(trig)
+        if triggers:
+            payload["reminders"] = triggers
     if section_id and not effective_parent_id:
         payload["columnId"] = section_id
     elif env_section_id and not effective_parent_id:
@@ -961,13 +1030,22 @@ def task_preview(query):
                 arg="", valid=False,
                 autocomplete=f"{base_q} >",
             ))
+        # Always offer a reminder once a date is set (mirrors reschedule.py)
+        if due_date or end_date:
+            items.append(alfred.item(
+                title="🔔 Add another reminder" if reminders else "🔔 Add reminder",
+                subtitle=(f"Current: {', '.join(reminders)}  ·  add another  ·  ⏎"
+                          if reminders else "Get reminded before it's due  ·  ⏎"),
+                arg="", valid=False,
+                autocomplete=f"{base_q} %",
+            ))
 
     return items
 
 # ── Note preview ─────────────────────────────────────────────────────────────
 def note_preview(query):
     (title, _, _, _, _, _,
-     list_name, parent_name, section_name, note, _) = parse_task(query)
+     list_name, parent_name, section_name, note, _, _) = parse_task(query)
 
     if not title:
         return [alfred.item(
@@ -1086,8 +1164,8 @@ def list_create_items(name):
     payload = {"name": name}
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
     return [alfred.item(
-        title=f"Create list: {name}",
-        subtitle="Create  Move to a folder in TickTick afterwards  ⌘⇧ 🔙",
+        title="Create list",
+        subtitle="⌘⇧ 🔙",
         arg=f"create_list:{encoded}",
         valid=True,
     )]
@@ -1213,6 +1291,8 @@ def main():
                 items = duration_picker(prefix, fragment)
             elif ch == '&':
                 items = repeat_picker(prefix, fragment)
+            elif ch == '%':
+                items = reminder_picker(prefix, fragment)
             elif ch == '/':
                 items = master_menu(prefix, fragment)
         else:

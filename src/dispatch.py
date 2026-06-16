@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(SCRIPT_DIR, "lib"))
 import config as cfg
 from api import TickTickAPI, RateLimitError
 import cache as cache_store
+import reminders as rem
 from dateutil import utc_to_local_display, utc_to_long_display
 
 
@@ -43,6 +44,28 @@ def _patch_task_cache(tid, **fields):
 def _cached_task(tid):
     """Cached task/note for tid (avoids a live GET), or None. See cache.find_task."""
     return cache_store.find_task(tid)
+
+
+def _split_reminders(raw):
+    """Pull a trailing ';R:tok1,tok2' off an attr arg → (raw_without, [tokens])."""
+    if ";R:" in raw:
+        base, rempart = raw.split(";R:", 1)
+        return base, [t for t in rempart.split(",") if t]
+    return raw, []
+
+
+def _merge_reminders(api, pid, tid, current, tokens):
+    """Merge reminder tokens (→ TRIGGER strings) into the task's existing
+    reminders. Returns (merged_list, resolved_current). Dedup, order preserved."""
+    if current is None:
+        try:
+            current = api.get_task(pid, tid)
+        except Exception:
+            current = {}
+    existing = (current or {}).get("reminders") or []
+    triggers = [t for t in (rem.trigger(tok) for tok in tokens) if t]
+    merged = list(dict.fromkeys(list(existing) + triggers))
+    return merged, current
 
 
 def main():
@@ -104,8 +127,9 @@ def main():
             print(f"{title} completed")
 
         elif arg.startswith("attr_date:"):
-            # attr_date:projectId:taskId:isoDate
+            # attr_date:projectId:taskId:isoDate[;R:tok,tok]
             raw = arg[10:]
+            raw, rem_tokens = _split_reminders(raw)
             parts = raw.split(":", 2)
             pid, tid, due = parts[0], parts[1], parts[2]
 
@@ -122,29 +146,39 @@ def main():
                     pass
 
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, current=_cached_task(tid), startDate=due, dueDate=due)
-            _patch_task_cache(tid, startDate=due, dueDate=due)
+            current = _cached_task(tid)
+            fields = {"startDate": due, "dueDate": due}
+            if rem_tokens:
+                fields["reminders"], current = _merge_reminders(api, pid, tid, current, rem_tokens)
+            api.update_task(tid, pid, current=current, **fields)
+            _patch_task_cache(tid, **fields)
 
             task_title = os.environ.get("task_title", "Task")
             verb = "Rescheduled" if had_date else "Scheduled"
+            rem_line = f"\n🔔 {', '.join(rem.human(t) for t in rem_tokens)}" if rem_tokens else ""
             new_display = utc_to_long_display(due)
             if had_date and old_due:
                 old_display = utc_to_long_display(old_due)
-                print(f"{verb} · {task_title}\n🟢 {new_display}\n🔴 {old_display}")
+                print(f"{verb} · {task_title}\n🟢 {new_display}\n🔴 {old_display}{rem_line}")
             else:
-                print(f"{verb} · {task_title}\n{new_display}")
+                print(f"{verb} · {task_title}\n{new_display}{rem_line}")
 
         elif arg.startswith("attr_span:"):
-            # attr_span:projectId:taskId:startIso|endIso  → schedule with duration
+            # attr_span:projectId:taskId:startIso|endIso[;R:tok,tok]  → schedule with duration
             raw = arg[10:]
+            raw, rem_tokens = _split_reminders(raw)
             parts = raw.split(":", 2)
             pid, tid = parts[0], parts[1]
             start_iso, end_iso = parts[2].split("|", 1)
 
             had_date = os.environ.get("has_date", "0") == "1"
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, current=_cached_task(tid), startDate=start_iso, dueDate=end_iso)
-            _patch_task_cache(tid, startDate=start_iso, dueDate=end_iso)
+            current = _cached_task(tid)
+            fields = {"startDate": start_iso, "dueDate": end_iso}
+            if rem_tokens:
+                fields["reminders"], current = _merge_reminders(api, pid, tid, current, rem_tokens)
+            api.update_task(tid, pid, current=current, **fields)
+            _patch_task_cache(tid, **fields)
 
             task_title = os.environ.get("task_title", "Task")
             verb = "Rescheduled" if had_date else "Scheduled"
@@ -404,6 +438,7 @@ def main():
                 parent_id=payload.get("parentId"),
                 kind=payload.get("kind"),
                 repeat_flag=payload.get("repeatFlag"),
+                reminders=payload.get("reminders"),
             )
             # Update all_tasks in-place so searches work immediately after create
             proj_id = payload.get("projectId", "")

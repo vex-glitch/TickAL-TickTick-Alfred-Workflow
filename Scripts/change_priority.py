@@ -36,10 +36,10 @@ except Exception as e:
     sys.exit(0)
 
 PRIORITIES = [
-    (5, "⬆ High",   "Highest priority"),
-    (3, "↑ Medium", "Medium priority"),
-    (1, "↓ Low",    "Low priority"),
-    (0, "— None",   "No priority"),
+    (5, "🔴", "High"),
+    (3, "🟠", "Medium"),
+    (1, "🟡", "Low"),
+    (0, "⚫️", "No priority"),
 ]
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -60,10 +60,10 @@ def main():
 
     try:
         items = []
-        for val, label, desc in PRIORITIES:
+        for val, circle, name in PRIORITIES:
             items.append(alfred.item(
-                title=label,
-                subtitle=f"{desc} for \"{task_title}\"  ⌘⇧ 🔙",
+                title=f"{circle} {name}",
+                subtitle=f"{circle} {task_title}  ⌘⇧ 🔙",
                 arg=str(val),
                 variables={"task_list_id": list_id, "task_id": tid},
             ))

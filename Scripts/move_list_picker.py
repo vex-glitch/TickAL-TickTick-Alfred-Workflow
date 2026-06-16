@@ -3,10 +3,12 @@
 move_list_picker.py — Alfred Script Filter
 Multi-mode picker for moving/re-parenting a task.
 
-Empty / partial-prefix → shows scope hints
-Default (no prefix)    → list picker  (move to another list)
-S <query>              → section picker (move to a section, any list)
-T <query>              → task picker   (make a subtask of another task)
+Mirrors the add-flow ~ location menu:
+  Empty query → scope menu (📋 List / 📑 Section / 🧬 Task); picking a row
+                autocompletes its prefix and drills into that sub-picker.
+  l <query>   → list picker    (move to another list)
+  s <query>   → section picker  (move to a section, any list)
+  t <query>   → task picker     (make a subtask of another task)
 
 arg output (consumed by Args & Vars node → move_action.py):
   list:{new_pid}
@@ -43,51 +45,34 @@ except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
 
-# ── Prefix hint system ───────────────────────────────────────────────────────
-PREFIX_HINTS = [
-    ("s", "S", "Section"),
-    ("t", "T", "Task"),
+# ── Scope menu (mirrors the add-flow ~ location menu) ─────────────────────────
+SCOPE_ROWS = [
+    ("l", "📋", "List",    "Move to another list"),
+    ("s", "📑", "Section", "Move to another section"),
+    ("t", "🧬", "Task",    "Make it a subtask"),
 ]
 
-EMPTY_SUBTITLE = "Scope Prefix: S Section · T Task"
-
-def get_hint_items(raw_query):
-    """Return hint items for empty or partial-prefix input, else None."""
-    q = raw_query.lower()
-
-    if not q:
-        return [alfred.item(
-            title="Type or press space to filter lists…",
-            subtitle=EMPTY_SUBTITLE,
-            valid=False,
-        )]
-
-    if " " in q:
-        return None  # has space → scoped or plain search, no hints
-
-    matches = [(key, label, desc) for key, label, desc in PREFIX_HINTS if key.startswith(q)]
-    if not matches:
-        return None
-
+def scope_menu():
+    """Idle (empty) state → the three-scope menu. Picking a row autocompletes
+    its prefix and drills into that sub-picker (same UX as add's ~ menu).
+    Typing with no prefix defaults to list-filtering (handled in main)."""
     items = []
-    for key, label, desc in matches:
-        item = alfred.item(
-            title=f"{label}  {desc}",
-            subtitle=f"Add space after {label.lower()} to move to a {desc}",
+    for letter, emoji, name, hint in SCOPE_ROWS:
+        items.append(alfred.item(
+            title=f"{emoji} {name}",
+            subtitle=hint,
             valid=False,
-        )
-        item["autocomplete"] = f"{key} "
-        items.append(item)
+            autocomplete=f"{letter} ",
+        ))
     return items
 
 # ── Scope detection ──────────────────────────────────────────────────────────
 def detect_scope(query):
-    """Return ('section'|'task'|None, stripped_query)."""
+    """Return ('list'|'section'|'task'|None, stripped_query)."""
     q = query.lower()
-    if q.startswith("s "):
-        return "section", query[2:].strip()
-    if q.startswith("t "):
-        return "task", query[2:].strip()
+    for letter, scope in (("l", "list"), ("s", "section"), ("t", "task")):
+        if q.startswith(f"{letter} "):
+            return scope, query[2:].strip()
     return None, query
 
 # ── Pickers ──────────────────────────────────────────────────────────────────
@@ -211,19 +196,23 @@ def main():
             pass
 
     try:
-        hints = get_hint_items(raw_query)
-        if hints is not None:
-            print(alfred.output(hints, skipknowledge=True))
+        stripped = raw_query.strip()
+
+        # Idle (empty) → scope menu (all options visible)
+        if not stripped:
+            print(alfred.output(scope_menu(), skipknowledge=True))
             return
 
         scope, query = detect_scope(raw_query)
-
         if scope == "section":
             items = section_picker(query, task_title)
         elif scope == "task":
             items = task_picker(query, tid, task_title)
-        else:
+        elif scope == "list":
             items = list_picker(query, list_id, task_title)
+        else:
+            # Typing with no scope prefix → default to list, filter by query
+            items = list_picker(stripped, list_id, task_title)
 
         print(alfred.output(items, skipknowledge=True))
 

@@ -18,9 +18,14 @@ Three-screen flow (all in one script filter via autocomplete):
     Autocomplete 00 / 15 / 30 / 45.  Pressing ⏎ fills "tomorrow @08:30 "
     and returns to a time-aware confirm screen.
 
+  Reminders (%):  available once a date is set, through the whole flow. Type %
+  (or pick "🔔 Add reminder") for presets / custom offsets; multiple allowed.
+  They ride into the dispatch arg as a ';R:tok,tok' suffix.
+
 Outputs to dispatch.py:
-  attr_date:{list_id}:{task_id}:{iso}   → set date (+ time if provided)
-  attr_cleardate:{list_id}:{task_id}    → clear date
+  attr_date:{list_id}:{task_id}:{iso}[;R:tok,tok]            → set date (+ time)
+  attr_span:{list_id}:{task_id}:{startIso}|{endIso}[;R:tok]  → date + duration
+  attr_cleardate:{list_id}:{task_id}                         → clear date
 """
 import sys
 import os
@@ -50,6 +55,7 @@ try:
     import cache as cache_store
     from dateutil import (parse_date, utc_to_picker_display, utc_to_local_display,
                           build_date_shortcuts)
+    import reminders as rem
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -171,6 +177,41 @@ def duration_picker(prefix, fragment, start_hm):
     return items
 
 
+# ── Reminder picker (% trigger) ──────────────────────────────────────────────
+def reminder_picker(prefix, fragment):
+    """Reminder presets for the schedule flow (mirrors add_task's % picker).
+    Each row autocompletes %{token} into the query; multiple reminders allowed."""
+    frag = fragment.strip().lower()
+    # Free-typed custom offset (45, 2h, 3d…) that isn't a preset
+    if frag and frag not in rem.PRESET_TOKENS and rem.trigger(frag):
+        return [alfred.item(
+            uid="rem-custom",
+            title=f"🔔 {rem.human(frag)}",
+            subtitle="Custom offset  ·  ⏎ add to this schedule  |  ⌘⇧ 🔙",
+            arg="", valid=False,
+            autocomplete=f"{prefix}%{frag} ",
+        )]
+    items = []
+    for tok, label, hint in rem.PRESETS:
+        if frag and frag not in tok and frag not in label.lower():
+            continue
+        items.append(alfred.item(
+            uid=f"rem-{tok}",
+            title=f"🔔 {label}",
+            subtitle=f"{hint}  |  ⌘⇧ 🔙",
+            arg="", valid=False,
+            autocomplete=f"{prefix}%{tok} ",
+        ))
+    if not items:
+        items = [alfred.item(
+            uid="rem-none",
+            title=f'No reminder matching "{fragment}"',
+            subtitle="Try: at · 15 · 30 · 1h · 1d · or a custom offset like 45 / 2h",
+            valid=False,
+        )]
+    return items
+
+
 # ── Prefix stripping ─────────────────────────────────────────────────────────
 _PREFIXES = ("reschedule for ", "schedule for ")
 
@@ -201,6 +242,15 @@ def main():
     action_verb = "Reschedule" if has_date else "Schedule"
 
     try:
+        # ── Reminders: active % being typed → picker; else extract committed ──
+        mrem = re.search(r'(?<!\S)%(\S*)$', raw)
+        if mrem:
+            items = reminder_picker(raw[:mrem.start()], mrem.group(1))
+            print(alfred.output(items, skipknowledge=True))
+            return
+        reminder_tokens = [t.lower() for t in re.findall(r'(?<!\S)%(\S+)', raw)]
+        raw = re.sub(r'(?<!\S)%\S+\s*', '', raw)   # strip for clean date/time parsing
+
         # ── Detect active trigger (@ time or > duration) ──────────────────────
         # Find the last @ or > that starts a word; whichever is open wins.
         at_pos  = None
@@ -264,6 +314,13 @@ def main():
             if iso:
                 display  = utc_to_picker_display(iso)
 
+                rem_suffix   = (";R:" + ",".join(reminder_tokens)) if reminder_tokens else ""
+                rem_tag      = ("  🔔 " + ", ".join(reminder_tokens)) if reminder_tokens else ""
+                rem_tag_lead = ("🔔 " + ", ".join(reminder_tokens) + "  ·  ") if reminder_tokens else ""
+                rem_q        = "".join(f" %{t}" for t in reminder_tokens)
+                committed_dt = date_part + (f" @{time_str}" if time_str else "") + \
+                               (f" >{end_str}" if end_str else "")
+
                 # Duration span: resolve end time on the same date (wrap if needed)
                 end_iso = None
                 if end_str and time_str:
@@ -278,8 +335,8 @@ def main():
                     items.append(alfred.item(
                         uid="dispatch",
                         title=f"{display}  @{time_str} → {end_str}",
-                        subtitle=f"⏳ {dur}  ·  ⏎ {action_verb} \"{task_title}\"  |  ⌘⇧ 🔙",
-                        arg=f"attr_span:{list_id}:{tid}:{iso}|{end_iso}",
+                        subtitle=f"⏳ {dur}{rem_tag}  ·  ⏎ {action_verb} \"{task_title}\"  |  ⌘⇧ 🔙",
+                        arg=f"attr_span:{list_id}:{tid}:{iso}|{end_iso}{rem_suffix}",
                         valid=True,
                     ))
                 else:
@@ -287,8 +344,8 @@ def main():
                     items.append(alfred.item(
                         uid="dispatch",
                         title=f"{display}{time_tag}",
-                        subtitle=f"⏎ {action_verb} \"{task_title}\"  |  ⌘⇧ 🔙",
-                        arg=f"attr_date:{list_id}:{tid}:{iso}",
+                        subtitle=f"{rem_tag_lead}⏎ {action_verb} \"{task_title}\"  |  ⌘⇧ 🔙",
+                        arg=f"attr_date:{list_id}:{tid}:{iso}{rem_suffix}",
                         valid=True,
                     ))
                     if not time_str:
@@ -297,7 +354,7 @@ def main():
                             title="@ Add time",
                             subtitle=f"Pick a specific time for {display}",
                             arg="", valid=False,
-                            autocomplete=f"{date_part} @",
+                            autocomplete=f"{date_part}{rem_q} @",
                         ))
                     else:
                         items.append(alfred.item(
@@ -305,8 +362,18 @@ def main():
                             title="> Add duration",
                             subtitle=f"Set an end time for {display} @{time_str}",
                             arg="", valid=False,
-                            autocomplete=f"{date_part} @{time_str} >",
+                            autocomplete=f"{date_part} @{time_str}{rem_q} >",
                         ))
+
+                # Always available once a date is set — even with no time/duration
+                items.append(alfred.item(
+                    uid="add-reminder",
+                    title="🔔 Add another reminder" if reminder_tokens else "🔔 Add reminder",
+                    subtitle=(f"Current: {', '.join(reminder_tokens)}  ·  add another  |  ⌘⇧ 🔙"
+                              if reminder_tokens else "Get reminded before it's due  |  ⌘⇧ 🔙"),
+                    arg="", valid=False,
+                    autocomplete=f"{committed_dt}{rem_q} %",
+                ))
             else:
                 items.append(alfred.item(
                     uid="bad-date",

@@ -137,6 +137,7 @@ def main():
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
             ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and has_kids),
             (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like),
+            ("🔔 Reminder",        "Set a reminder…",      "reminder",      "reminder remind alert", is_task_like),
             (tags,                 "Tags…",                "tags",          "tags tag",          is_task_like),
             (prio,                 "Priority…",            "priority",      "priority",          is_task_like and not is_note),
             (crumb,                "Move…",                "move",          "move list section", is_task_like),
