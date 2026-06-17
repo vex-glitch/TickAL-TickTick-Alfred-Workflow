@@ -51,6 +51,12 @@ except Exception as e:
 
 PRIORITY = {0: "", 1: "🟡 ", 3: "🟠 ", 5: "🔴 "}
 
+# 🔥CRM: on this list's tag screen, ⌘⏎ on a tag opens the CRM add pre-tagged, and
+# the tag list is restricted to the 🔥CRM tag group — bookings also carry status /
+# people / place tags, which would otherwise clutter the CRM search.
+CRM_ID   = "69fed9d51fe6d10d8510bf15"
+CRM_TAGS = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
+
 # ── Data ─────────────────────────────────────────────────────────────────────
 def get_project_data(list_id):
     cache_key = f"project_data_{list_id}"
@@ -78,14 +84,29 @@ def render_tags(list_id, all_tasks, query):
     counts = tag_counts(all_tasks)
     items = []
     for tag in sorted(counts):
-        items.append(alfred.item(
+        if list_id == CRM_ID and tag.lower() not in CRM_TAGS:
+            continue   # CRM search surfaces only the 🔥CRM tag group
+        item = alfred.item(
             uid=f"tag-{tag}",
             title=fmt_tags([tag]) or f"#{tag}",
             subtitle=build_subtitle(counts[tag], child_label="Task", actions=True),
             arg="", valid=False,
             autocomplete=f"{tag} ",   # ⏎ → advance to this tag's tasks
             variables={"list_id": list_id, "task_list_id": list_id},
-        ))
+        )
+        # 🔥CRM: ⇧⌘⏎ on a tag opens the CRM add pre-tagged (booking flow). Wire the
+        # drill node → Call ET "Add" (pass variables) on a ⇧⌘ modifier filter;
+        # list_id + prefill_tag + item_type ride along. TEMPORARY — to be reworked
+        # in the restructure session.
+        if list_id == CRM_ID:
+            item["mods"] = {"cmd+shift": {
+                "arg": "add", "valid": True,
+                "subtitle": f"⇧⌘ Add a 🔥CRM booking tagged {fmt_tags([tag]) or '#'+tag}",
+                "variables": {"list_id": CRM_ID, "task_list_id": CRM_ID,
+                              "list_name": "🔥CRM", "prefill_tag": tag,
+                              "item_type": "list"},
+            }}
+        items.append(item)
     if query:
         items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
     if not items:

@@ -96,6 +96,12 @@ def build_items():
             arg="URL",
         ),
         alfred.item(
+            uid="crm",
+            title="CRM...",
+            subtitle="Search or add a booking",
+            arg="crm",
+        ),
+        alfred.item(
             uid="drill",
             title="Drill",
             subtitle="Drill Sergeant",

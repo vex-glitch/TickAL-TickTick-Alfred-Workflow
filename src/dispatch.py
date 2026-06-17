@@ -23,6 +23,13 @@ import cache as cache_store
 import reminders as rem
 from dateutil import utc_to_local_display, utc_to_long_display
 
+# CRM booking flow — a new CRM task carrying a booking tag auto-prefills a
+# "Prepare for …" follow-up (a 🔥prepare task has no booking tag → never loops).
+CRM_ID       = "69fed9d51fe6d10d8510bf15"
+BOOKING_TAGS = {"🔥lead", "🔥consultation", "🔥tattoo", "🔥ongoing"}
+ALFRED_APP   = "com.runningwithcrayons.Alfred"
+WF_BUNDLE    = "com.vex.tickal"
+
 
 def _patch_task_cache(tid, **fields):
     """Update specific fields on a task in the all_tasks cache without a full wipe."""
@@ -464,8 +471,43 @@ def main():
                 except Exception:
                     cache_store.invalidate("all_tasks")  # fallback
 
+            # / add-flow "🖼️ Add image": upload the clipboard image as a real
+            # attachment to the task we just created (needs its id + projectId).
+            attach_note = ""
+            if payload.get("_attach_image") and result and result.get("id"):
+                try:
+                    import clipboard as clip_util
+                    import api_v2
+                    img = clip_util.png_bytes()
+                    if not img:
+                        attach_note = "\n🖼️ no image on clipboard — task created without it"
+                    else:
+                        up_pid = result.get("projectId") or proj_id
+                        api_v2.TickTickV2().upload_attachment(
+                            up_pid, result["id"], img, "screenshot.png")
+                        attach_note = "\n🖼️ image attached"
+                except Exception as e:
+                    attach_note = f"\n🖼️ image not attached — {e}"
+
+            # CRM booking → auto-prefill a "Prepare for …" follow-up. Fires only
+            # when the new task carries a booking tag, so the 🔥prepare follow-up
+            # itself (and any non-booking CRM add) never re-triggers it — loop-proof.
+            # Re-opens the Add window pre-typed via osascript (no extra wiring); the
+            # booking is already in the all_tasks cache above, so [[title]] resolves
+            # to its link on the next ⏎. Token order (~l … then #) keeps the multi-
+            # word ~l from swallowing the title and lands on the preview, not a picker.
+            tags_lc = {str(t).lower() for t in (payload.get("tags") or [])}
+            if (proj_id == CRM_ID and result and result.get("id")
+                    and (tags_lc & BOOKING_TAGS)):
+                q = f"~l 🔥CRM #🔥prepare Prepare for [[{title}]]"
+                osa = ('on run argv\n'
+                       f'tell application id "{ALFRED_APP}" to run trigger "Add" '
+                       f'in workflow "{WF_BUNDLE}" with argument (item 1 of argv)\n'
+                       'end run')
+                subprocess.run(["osascript", "-e", osa, q], check=False)
+
             notif = payload.get("_notif_text") or f"Task added to {payload.get('listName') or 'Inbox'}"
-            print(notif)
+            print(notif + attach_note)
 
         else:
             # Fallback: treat as raw URL

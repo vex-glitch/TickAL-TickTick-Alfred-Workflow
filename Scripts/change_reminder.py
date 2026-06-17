@@ -75,11 +75,12 @@ def main():
 
         items = []
 
-        # Free-typed custom offset (e.g. 45, 45m, 2h, 3d) that isn't a preset
-        if frag and frag not in rem.PRESET_TOKENS and rem.trigger(frag):
+        # Any typed token that resolves → one direct "Add" row (covers free-typed
+        # offsets and preset tokens like 2d/7d/7am whose labels don't contain them).
+        if frag and rem.trigger(frag):
             items.append(alfred.item(
                 title=f"🔔 Add {rem.human(frag)}",
-                subtitle=f"Custom offset{no_date}{back}",
+                subtitle=f"Reminder offset{no_date}{back}",
                 arg=frag,
                 variables=vars_,
             ))
@@ -91,9 +92,10 @@ def main():
                     subtitle=(f"Already set{back}" if already else f"{hint}{no_date}{back}"),
                     arg=tok,
                     variables=vars_,
+                    match=f"{tok} {label}",
                 ))
             if query:
-                items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
+                items = fuzz.filter_and_score(query, items, key_fn=lambda x: x.get("match", x["title"]))
 
         if not items:
             items = [alfred.item(title=f'No reminder matching "{query}"', valid=False)]

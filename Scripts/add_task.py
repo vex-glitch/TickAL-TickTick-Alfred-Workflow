@@ -44,6 +44,7 @@ try:
     from reminders import (PRESETS as REMINDER_OPTIONS,
                            trigger as _reminder_trigger,
                            human   as _reminder_human)
+    import clipboard as clip_util
 except Exception as e:
     print(json.dumps({"items": [{"title": "Import error", "subtitle": str(e), "valid": False}]}))
     sys.exit(0)
@@ -56,6 +57,11 @@ PRIORITY_OPTIONS = [
 ]
 PRIORITY_VAL = {"1": 1, "2": 3, "3": 5}
 PRIORITY_LABEL = {1: "🟡", 3: "🟠", 5: "🔴"}
+
+# 🔥CRM — Vex's bookings list. Adds targeting it auto-attach a clipboard image
+# (except 🔥prepare follow-ups) and scope the [[ task-link picker to CRM bookings.
+CRM_ID = "69fed9d51fe6d10d8510bf15"
+PREPARE_TAG = "🔥prepare"
 
 # &repeat presets — token, label, hint, RRULE
 REPEAT_OPTIONS = [
@@ -101,6 +107,11 @@ def find_active_trigger(query):
     """
     m = re.search(r'(?<!\S)=', query)
     scan = query[:m.start()] if m else query
+    # [[ task-link picker — active while an unclosed [[ is being typed (no ]] after
+    # the last [[). Takes priority since the user is mid-link; closes once ]] lands.
+    idx = scan.rfind('[[')
+    if idx != -1 and ']]' not in scan[idx + 2:]:
+        return ('[[', scan[:idx], scan[idx + 2:])
     for i in range(len(scan) - 1, -1, -1):
         ch = scan[i]
         if ch not in ('~', '#', '!', '*', '/', '>', '@', '&', '%'):
@@ -140,6 +151,14 @@ def parse_task(query):
     if m:
         note = m.group(1).strip() or None
         q = q[:m.start()]
+
+    # ^attach-image flag — a standalone marker (no value) set by the / menu's
+    # "Add image" row; on create, dispatch uploads the clipboard image to the
+    # new task. Stripped from the pre-note text only (a literal ^ inside a =note
+    # stays put). All occurrences are removed so re-selecting can't leave a stray.
+    new_q, n_attach = re.subn(r'(?<!\S)\^ ?', '', q)
+    attach_image = n_attach > 0
+    q = new_q
 
     # ~p parent_task (multi-word, ends at next trigger or end of string)
     parent_name = None
@@ -217,7 +236,8 @@ def parse_task(query):
 
     title = ' '.join(q.split())
     return (title, date_str, time_str, end_str, priority, tags,
-            list_name, parent_name, section_name, note, repeat, reminders)
+            list_name, parent_name, section_name, note, repeat, reminders,
+            attach_image)
 
 def resolve_list_id(list_name, lists):
     """Find project ID by name (case-insensitive prefix/contains match)."""
@@ -232,6 +252,34 @@ def resolve_list_id(list_name, lists):
         if name_lower in p["name"].lower():
             return p["id"], p["name"]
     return None, list_name
+
+
+def resolve_wikilinks(text, prefer_pid=None):
+    """Replace [[Task Name]] with a TickTick task-link, matching how the app stores
+    native links: [Title](https://ticktick.com/webapp/#p/<pid>/tasks/<tid>). The
+    name is resolved against cached tasks/notes by exact (case-insensitive) title;
+    ties prefer the current list, then the most-recent (ids are time-ordered).
+    Unresolved names are left as literal [[Name]] rather than breaking the title."""
+    if "[[" not in text:
+        return text
+    pool = (cache_store.get("all_tasks") or []) + (cache_store.get("all_notes") or [])
+
+    def _sub(m):
+        name = m.group(1).strip()
+        hits = [t for t in pool if (t.get("title") or "").strip().lower() == name.lower()]
+        if not hits:
+            return m.group(0)
+        hits.sort(key=lambda t: (
+            (t.get("_projectId") or t.get("projectId")) == prefer_pid,
+            t.get("status", 0) == 0,
+            t.get("id", ""),
+        ), reverse=True)
+        t   = hits[0]
+        pid = t.get("_projectId") or t.get("projectId") or ""
+        tid = t.get("id", "")
+        return f"[{t.get('title') or name}](https://ticktick.com/webapp/#p/{pid}/tasks/{tid})"
+
+    return re.sub(r'\[\[(.+?)\]\]', _sub, text)
 
 # ── Sub-pickers ───────────────────────────────────────────────────────────────
 # `fill` is the full query text to put before the picked name (e.g. "Task ~l ")
@@ -358,6 +406,53 @@ def task_picker(fill, fragment):
     return items
 
 
+def link_picker(prefix, fragment, scope_list_id=None):
+    """[[ task-link picker. Selecting a task inserts the readable wiki form
+    [[Title]] (resolved to a real TickTick link on create). In a CRM add it scopes
+    to CRM bookings (excludes 🔥prepare follow-ups); else spans all tasks + notes."""
+    all_tasks = cache_store.get("all_tasks") or []
+    task_map  = {t["id"]: t for t in all_tasks}
+    crm = scope_list_id == CRM_ID
+    if crm:
+        candidates = [t for t in all_tasks
+                      if t.get("_projectId") == CRM_ID and t.get("status", 0) == 0
+                      and PREPARE_TAG not in (t.get("tags") or [])]
+    else:
+        candidates = [t for t in all_tasks if t.get("status", 0) == 0]
+        candidates += list(cache_store.get("all_notes") or [])
+
+    items, seen = [], set()
+    for t in candidates:
+        tid = t.get("id")
+        if tid in seen:
+            continue
+        seen.add(tid)
+        title     = t.get("title", "Untitled")
+        list_name = t.get("_projectName", "")
+        parent_id = t.get("parentId", "")
+        if parent_id:
+            parent   = task_map.get(parent_id)
+            ptitle   = parent.get("title", "") if parent else ""
+            crumb    = f"↳ {ptitle}  ·  {list_name}" if ptitle else list_name
+        else:
+            crumb = list_name or ""
+        items.append(alfred.item(
+            title=title,
+            subtitle=f"🔗 Link to:  {crumb}" if crumb else "🔗 Link to this task",
+            arg="", valid=False,
+            autocomplete=f"{prefix}[[{title}]] ",
+        ))
+
+    if fragment:
+        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
+    if not items:
+        what = "CRM bookings" if crm else "tasks"
+        msg = (f'No {what} matching "{fragment}"' if fragment
+               else f"No {what} cached — run Sync first")
+        items = [alfred.item(title=msg, valid=False)]
+    return items
+
+
 def date_picker(prefix, fragment):
     shortcuts  = build_date_shortcuts()
     items      = []
@@ -470,7 +565,11 @@ def time_picker(prefix, fragment):
 # ── Symbol legend (contextual) ───────────────────────────────────────────────
 def symbol_legend(has_date=False, note_mode=False):
     if note_mode:
-        return "/ More…  |  ~🏠 =📝"
+        syms = ["*📅"]
+        if has_date:
+            syms += ["&🔁", "%🔔"]
+        syms += ["#🏷️", "~🏠", "=📝"]
+        return "/ More…  |  " + " ".join(syms)
     syms = ["*📅"]
     # @ time and > duration are offered as selectable rows once a date/time is
     # set (see task_preview), so they're intentionally left out of the legend.
@@ -551,11 +650,21 @@ def master_menu(prefix, fragment, note_mode=False):
     if not note_mode and not prefix.strip() and not _adding_to_container():
         return mode_menu(fragment)
 
-    _, date_str, time_str, end_str, _, _, _, _, _, _, repeat, _ = parse_task(prefix)
+    _, date_str, time_str, end_str, _, _, _, _, _, _, repeat, _, _ = parse_task(prefix)
 
     rows = []
     if note_mode:
-        rows = [
+        rows.append(("*", "📅", "Date", "natural language"))
+        if date_str:
+            rows.append(("@", "⏰", "Time", "hour, then minutes"))
+        if time_str and not end_str:
+            rows.append((">", "⏳", "Duration", "end time or length"))
+        if date_str and not repeat:
+            rows.append(("&", "🔁", "Repeat", "daily · weekly · monthly"))
+        if date_str:
+            rows.append(("%", "🔔", "Reminder", "at time · before due"))
+        rows += [
+            ("#", "🏷️", "Tag",       "from your tags"),
             ("~", "🏠", "Location",  "list · section · parent"),
             ("=", "📝", "Note",      "add note text"),
         ]
@@ -574,6 +683,7 @@ def master_menu(prefix, fragment, note_mode=False):
             ("#", "🏷️", "Tag",       "from your tags"),
             ("~", "🏠", "Location",  "list · section · parent"),
             ("=", "📝", "Note",      "add note text"),
+            ("^", "🖼️", "Add image", "attach the clipboard screenshot on create"),
         ]
 
     items = []
@@ -762,13 +872,14 @@ def reminder_picker(prefix, fragment):
             valid=False,
         )]
     frag = fragment.strip().lower()
-    preset_tokens = {tok for tok, _, _ in REMINDER_OPTIONS}
 
-    # Free-typed custom offset (e.g. 45, 45m, 2h, 3d) that isn't already a preset
-    if frag and frag not in preset_tokens and _reminder_trigger(frag):
+    # Any typed token that resolves to a trigger → one direct row (covers free-typed
+    # offsets like 45m/2h AND preset tokens like 2d/7d/7am whose labels — "Two days
+    # before", "Week before", "Day of · 7am" — don't contain the token to fuzzy on).
+    if frag and _reminder_trigger(frag):
         return [alfred.item(
             title=f"🔔 {_reminder_human(frag)}",
-            subtitle="custom reminder offset",
+            subtitle="reminder offset",
             arg="", valid=False,
             autocomplete=f"{prefix}%{frag} ",
         )]
@@ -780,9 +891,10 @@ def reminder_picker(prefix, fragment):
             subtitle=hint,
             arg="", valid=False,
             autocomplete=f"{prefix}%{tok} ",
+            match=f"{tok} {label}",
         ))
     if fragment:
-        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
+        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x.get("match", x["title"]))
     if not items:
         items = [alfred.item(title=f'No reminder matching "{fragment}"', valid=False)]
     return items
@@ -857,13 +969,20 @@ def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, 
 # ── Task preview ──────────────────────────────────────────────────────────────
 def task_preview(query):
     (title, date_str, time_str, end_str, priority, tags,
-     list_name, parent_name, section_name, note, repeat, reminders) = parse_task(query)
+     list_name, parent_name, section_name, note, repeat, reminders,
+     attach_image) = parse_task(query)
 
     # A link grabbed by the URL hotkey rides along as a session variable so the
     # add window opens "as usual" (empty title to type) with the URL already in
     # the description. A typed =note stays on top; the link is appended below it.
     pre = os.environ.get("prefill_note", "").strip()
     eff_note = (f"{note}\n\n{pre}" if note and pre else (note or pre or None))
+
+    # A tag pre-applied by the CRM tag-drill (⌘ add-with-tag) rides in like the
+    # note prefill; merge it into the parsed tags so the chip + payload include it.
+    pre_tag = os.environ.get("prefill_tag", "").strip()
+    if pre_tag and pre_tag not in tags:
+        tags = tags + [pre_tag]
 
     if not title:
         return [alfred.item(
@@ -942,6 +1061,12 @@ def task_preview(query):
     # Effective parent: explicit /task choice wins over env
     effective_parent_id = parent_id or env_task_id
 
+    # CRM bookings auto-attach the clipboard image (the reference-image step) — but
+    # never the 🔥prepare follow-up. Manual ^ / 🖼️ Add image still works elsewhere.
+    if (list_id == CRM_ID and PREPARE_TAG not in tags
+            and not attach_image and clip_util.has_image()):
+        attach_image = True
+
     # Combine *date and @time into a single string for parsing
     if date_str and time_str:
         combined_date_str = f"{date_str} {time_str}"
@@ -1001,10 +1126,17 @@ def task_preview(query):
         parts.append(f"📝{short}")
     if pre:
         parts.append("🔗 link")
+    if attach_image:
+        parts.append("🖼️ image")
+    if "[[" in title:
+        parts.append("🔗 linked")
     subtitle = ("  ".join(parts) + "  |  " if parts else "") + symbol_legend(
         has_date=bool(due_date))
 
-    payload = {"title": title, "listName": list_display}
+    # [[Name]] in the title resolves to a real TickTick task link for the payload
+    # (prefer the current list when names collide); the "Create:" row below keeps
+    # the readable [[Name]] form.
+    payload = {"title": resolve_wikilinks(title, prefer_pid=list_id), "listName": list_display}
     if list_id:
         payload["projectId"] = list_id
     if end_date and due_date:
@@ -1018,6 +1150,8 @@ def task_preview(query):
         payload["tags"] = tags
     if eff_note:
         payload["content"] = eff_note
+    if attach_image:
+        payload["_attach_image"] = True
     if repeat in REPEAT_RRULE and (due_date or end_date):
         payload["repeatFlag"] = REPEAT_RRULE[repeat]
     if reminders and (due_date or end_date):
@@ -1094,8 +1228,8 @@ def task_preview(query):
 
 # ── Note preview ─────────────────────────────────────────────────────────────
 def note_preview(query):
-    (title, _, _, _, _, _,
-     list_name, parent_name, section_name, note, _, _) = parse_task(query)
+    (title, date_str, time_str, end_str, _, tags,
+     list_name, parent_name, section_name, note, repeat, reminders, _) = parse_task(query)
 
     if not title:
         return [alfred.item(
@@ -1155,6 +1289,24 @@ def note_preview(query):
 
     effective_parent_id = parent_id or env_task_id
 
+    # Scheduling — notes support dates/duration/repeat/reminders too (verified via
+    # API). Same computation as task_preview.
+    if date_str and time_str:
+        combined_date_str = f"{date_str} {time_str}"
+    elif time_str:
+        combined_date_str = f"today {time_str}"
+    else:
+        combined_date_str = date_str
+    due_date = parse_date(combined_date_str)
+    end_date = None
+    end_norm = _normalize_end(end_str) if end_str else None
+    if end_norm and time_str and due_date:
+        end_date = parse_date(f"{date_str} {end_norm}" if date_str else f"today {end_norm}")
+        if end_date and end_date <= due_date:
+            from datetime import datetime, timedelta
+            dt = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%S%z") + timedelta(days=1)
+            end_date = dt.strftime("%Y-%m-%dT%H:%M:%S+0000")
+
     # Build subtitle
     parts = []
     parts.append(f"~{list_display}" if list_display else "~Notes")
@@ -1166,17 +1318,51 @@ def note_preview(query):
         parts.append(f"↳{parent_display}")
     elif parent_name:
         parts.append(f"↳{parent_name}?")
+    if date_str or time_str:
+        date_display = _utc_iso_to_local_display(due_date) if due_date else f"{combined_date_str or ''}?"
+        parts.append(f"*{date_display}")
+    if end_date and time_str:
+        parts.append(f"⏳{_duration_label(time_str, end_norm)}")
+    elif end_str and not time_str:
+        parts.append(f">{end_str}?")
+    if repeat:
+        parts.append(f"🔁{REPEAT_LABEL[repeat]}" if repeat in REPEAT_RRULE and date_str else f"🔁{repeat}?")
+    for rem in reminders:
+        ok = _reminder_trigger(rem) and (due_date or end_date)
+        parts.append(f"🔔{rem}" if ok else f"🔔{rem}?")
+    for t in tags:
+        parts.append(f"#{t}")
     if note:
         short = note if len(note) <= 24 else note[:24] + "…"
         parts.append(f"📝{short}")
-    subtitle = ("  ".join(parts) + "  |  " if parts else "") + symbol_legend(note_mode=True)
+    subtitle = ("  ".join(parts) + "  |  " if parts else "") + symbol_legend(
+        has_date=bool(due_date), note_mode=True)
 
     # Build payload
-    payload = {"title": title, "kind": "NOTE"}
+    payload = {"title": resolve_wikilinks(title, prefer_pid=list_id), "kind": "NOTE"}
     if list_id:
         payload["projectId"] = list_id
     if note:
         payload["content"] = note
+    if tags:
+        payload["tags"] = tags
+    if end_date and due_date:
+        payload["startDate"] = due_date
+        payload["dueDate"]   = end_date
+    elif due_date:
+        payload["dueDate"] = due_date
+    if repeat in REPEAT_RRULE and (due_date or end_date):
+        payload["repeatFlag"] = REPEAT_RRULE[repeat]
+    if reminders and (due_date or end_date):
+        seen = set()
+        triggers = []
+        for rem in reminders:
+            trig = _reminder_trigger(rem)
+            if trig and trig not in seen:
+                seen.add(trig)
+                triggers.append(trig)
+        if triggers:
+            payload["reminders"] = triggers
     if section_id and not effective_parent_id:
         payload["columnId"] = section_id
     if effective_parent_id:
@@ -1195,12 +1381,33 @@ def note_preview(query):
 
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
 
-    return [alfred.item(
+    items = [alfred.item(
         title=f"Create note: {title}",
         subtitle=subtitle,
         arg=f"create:{encoded}",
         valid=True,
     )]
+    # Offer the next scheduling step (mirrors task_preview). The "n " prefix keeps
+    # the autocomplete in note mode; skipped when a =note body is present.
+    if not note:
+        base_q = "n " + query.rstrip()
+        if due_date and not time_str:
+            items.append(alfred.item(
+                title="⏰ Add time",
+                subtitle=f"Pick a time for {_utc_iso_to_picker_display(due_date)}  ·  ⏎",
+                arg="", valid=False, autocomplete=f"{base_q} @"))
+        elif time_str and not end_str:
+            items.append(alfred.item(
+                title="⏳ Add duration",
+                subtitle=f"Set an end time for @{time_str}  ·  ⏎",
+                arg="", valid=False, autocomplete=f"{base_q} >"))
+        if due_date or end_date:
+            items.append(alfred.item(
+                title="🔔 Add another reminder" if reminders else "🔔 Add reminder",
+                subtitle=(f"Current: {', '.join(reminders)}  ·  add another  ·  ⏎"
+                          if reminders else "Get reminded before it's due  ·  ⏎"),
+                arg="", valid=False, autocomplete=f"{base_q} %"))
+    return items
 
 
 # ── List creation mode ────────────────────────────────────────────────────────
@@ -1321,6 +1528,18 @@ def main():
                 ch, prefix, fragment = trigger
                 if ch == '~':
                     items = location_router(prefix, fragment, lists=all_lists, note_mode=True)
+                elif ch == '#':
+                    items = tag_picker(prefix, fragment)
+                elif ch == '*':
+                    items = date_picker(prefix, fragment)
+                elif ch == '@':
+                    items = time_picker(prefix, fragment)
+                elif ch == '>':
+                    items = duration_picker(prefix, fragment)
+                elif ch == '&':
+                    items = repeat_picker(prefix, fragment)
+                elif ch == '%':
+                    items = reminder_picker(prefix, fragment)
                 elif ch == '/':
                     items = master_menu(prefix, fragment, note_mode=True)
                 else:
@@ -1351,6 +1570,11 @@ def main():
                 items = repeat_picker(prefix, fragment)
             elif ch == '%':
                 items = reminder_picker(prefix, fragment)
+            elif ch == '[[':
+                sl = parse_task(prefix)[6]   # list typed so far (~l …)
+                scope = (resolve_list_id(sl, get_lists())[0] if sl
+                         else os.environ.get("list_id") or os.environ.get("task_list_id") or None)
+                items = link_picker(prefix, fragment, scope)
             elif ch == '/':
                 items = master_menu(prefix, fragment)
         else:
