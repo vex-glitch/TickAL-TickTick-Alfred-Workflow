@@ -90,6 +90,12 @@ def build_items():
             arg="add",
         ),
         alfred.item(
+            uid="url",
+            title="Save link / URL...",
+            subtitle="Save the active browser tab as a task",
+            arg="URL",
+        ),
+        alfred.item(
             uid="drill",
             title="Drill",
             subtitle="Drill Sergeant",

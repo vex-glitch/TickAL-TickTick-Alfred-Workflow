@@ -481,6 +481,48 @@ def symbol_legend(has_date=False, note_mode=False):
     return "/ More…  |  " + " ".join(syms)
 
 
+# ── Container context (Add invoked on a specific list/section/task) ───────────
+def _adding_to_container():
+    """True when Add was invoked on a specific item via ⌘ Actions — the item's
+    type rides in as item_type (the master add keyword never sets it). Then we're
+    adding INTO that list/section/task, not choosing what to create at top level."""
+    return bool(os.environ.get("item_type", "").strip())
+
+
+def _list_display_name(lid):
+    if not lid:
+        return ""
+    for p in (cache_store.get("projects") or []):
+        if p.get("id") == lid:
+            return p.get("name", "") or ""
+    return ""
+
+
+def _add_target_label():
+    """Short 'where it lands' subtitle when adding into a container, else None."""
+    itype = os.environ.get("item_type", "").strip()
+    if not itype:
+        return None
+    tid   = os.environ.get("task_id", "")
+    sid   = os.environ.get("section_id", "")
+    lid   = os.environ.get("list_id") or os.environ.get("task_list_id", "")
+    title = os.environ.get("task_title", "").strip()
+    if itype in ("task", "subtask") and tid:
+        return f"↳ Subtask of “{title}”" if title else "↳ Adding a subtask"
+    if itype == "section" and sid:
+        sname = ""
+        pdata = cache_store.get(f"project_data_{lid}") if lid else None
+        for col in (pdata or {}).get("columns", []) or []:
+            if col.get("id") == sid:
+                sname = (col.get("name") or "").strip()
+                break
+        lname = _list_display_name(lid)
+        tail  = f"  ·  {lname}" if lname else ""
+        return (f"Adding to §{sname}{tail}" if sname else f"Adding to this section{tail}")
+    lname = _list_display_name(lid)
+    return f"Adding to {lname}" if lname else "Adding to this list"
+
+
 # ── / master menu ─────────────────────────────────────────────────────────────
 def mode_menu(fragment):
     """Typing / on an empty field: choose what to create. Each row
@@ -506,7 +548,7 @@ def master_menu(prefix, fragment, note_mode=False):
     """Typing / shows every add-on as a menu row. Selecting one autocompletes
     its symbol into the query — the menu doubles as a syntax reference. With no
     task name yet (and not in note mode) it instead offers the creation modes."""
-    if not note_mode and not prefix.strip():
+    if not note_mode and not prefix.strip() and not _adding_to_container():
         return mode_menu(fragment)
 
     _, date_str, time_str, end_str, _, _, _, _, _, _, repeat, _ = parse_task(prefix)
@@ -817,6 +859,12 @@ def task_preview(query):
     (title, date_str, time_str, end_str, priority, tags,
      list_name, parent_name, section_name, note, repeat, reminders) = parse_task(query)
 
+    # A link grabbed by the URL hotkey rides along as a session variable so the
+    # add window opens "as usual" (empty title to type) with the URL already in
+    # the description. A typed =note stays on top; the link is appended below it.
+    pre = os.environ.get("prefill_note", "").strip()
+    eff_note = (f"{note}\n\n{pre}" if note and pre else (note or pre or None))
+
     if not title:
         return [alfred.item(
             title="Type a task name…",
@@ -951,6 +999,8 @@ def task_preview(query):
     if note:
         short = note if len(note) <= 24 else note[:24] + "…"
         parts.append(f"📝{short}")
+    if pre:
+        parts.append("🔗 link")
     subtitle = ("  ".join(parts) + "  |  " if parts else "") + symbol_legend(
         has_date=bool(due_date))
 
@@ -966,8 +1016,8 @@ def task_preview(query):
         payload["priority"] = priority
     if tags:
         payload["tags"] = tags
-    if note:
-        payload["content"] = note
+    if eff_note:
+        payload["content"] = eff_note
     if repeat in REPEAT_RRULE and (due_date or end_date):
         payload["repeatFlag"] = REPEAT_RRULE[repeat]
     if reminders and (due_date or end_date):
@@ -1235,9 +1285,17 @@ def main():
     try:
         # ── Empty → hint ──────────────────────────────────────────────────────
         if not query:
+            pre = os.environ.get("prefill_note", "").strip()
+            err = os.environ.get("prefill_error", "").strip()
+            if pre:
+                sub = f"🔗 {pre}"
+            elif err:
+                sub = f"⚠️ {err}"
+            else:
+                sub = _add_target_label() or "or / to add a list, note or project…"
             items = [alfred.item(
                 title="Type a task name…",
-                subtitle="or / to add a list, note or project…",
+                subtitle=sub,
                 valid=False,
             )]
             print(alfred.output(items, skipknowledge=True))

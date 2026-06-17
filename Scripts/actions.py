@@ -41,6 +41,7 @@ try:
     import alfred
     import fuzzy as fuzz
     import cache as cache_store
+    import links as links_util
     from display import fmt_date, fmt_tags, join_breadcrumb
 except Exception as e:
     emit_error(f"Import failed: {e}")
@@ -108,6 +109,32 @@ def main():
         is_container = itype in ("list", "section")   # list/section: no task attributes
         is_task_like = not is_container               # task / subtask / note
 
+        # "Open link" shows only when the item actually has a link — checked
+        # cheaply against the cached title + description (no network call). A lone
+        # link that lives in the title opens directly (emit open:<url>); anything
+        # else (a description link, or several links) hands off to the picker.
+        title_links = links_util.extract_links(task.get("title") or title) if is_task_like else []
+        desc_links  = links_util.extract_links(task.get("content") or "")  if is_task_like else []
+        has_links   = bool(title_links or desc_links)
+        if len(title_links) == 1 and not desc_links:
+            open_link_arg = f"open:{title_links[0][1]}"
+        else:
+            open_link_arg = "links"
+        # In the direct-open case, ⌘⏎ copies the URL instead (reuses copy: → pbcopy,
+        # already reachable from the Actions menu — no extra wiring).
+        open_link_mods = None
+        if open_link_arg.startswith("open:"):
+            _u = open_link_arg[len("open:"):]
+            open_link_mods = {"cmd": {"arg": f"copy:{_u}",
+                                      "subtitle": f"⌘ Copy to clipboard:  {_u}"}}
+        # The direct-open row also advertises the ⌘ copy shortcut in its subtitle.
+        open_link_sub = "Open a link from this item" + (", ⌘ copy URL" if open_link_mods else "")
+
+        # 📝 Note — view/edit the description in a Text View. Subtitle previews it.
+        _note = (task.get("content") or "").strip().replace("\n", " ")
+        note_sub = (f"Edit: {_note[:48]}…" if len(_note) > 48 else f"Edit: {_note}") \
+            if _note else "Add a description"
+
         if itype == "list":
             link = f"ticktick:///webapp/#p/{pid}/tasks"
         elif itype == "section":
@@ -143,14 +170,22 @@ def main():
             (crumb,                "Move…",                "move",          "move list section", is_task_like),
             ("➕ Add task",        add_sub,                "add",           "add new task",      True),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
+            ("🌐 Open link",       open_link_sub,          open_link_arg, "link url web open", has_links),
+            ("📝 Note",            note_sub,               "note",          "note description body edit", is_task_like),
+            ("🖼️ Add image",       "Append the clipboard link to the description", "attach", "attach add image clipboard screenshot link", is_task_like),
             ("✔️ Complete",        "Mark this done",       f"complete:{pid}:{tid}:{title}", "complete done", is_task_like and not is_note),
             (name,                 "Rename…",              "rename",        "rename title name", is_task_like),
             ("🗑️ Delete",          "Delete this item",     "delete",        "delete remove",     is_task_like),
             ("🔙 Go back",         "Back to search",       "back",          "back",              True),
         ]
 
-        items = [alfred.item(title=t, subtitle=s, arg=a, variables=vars_, match=f"{kw} {t}")
-                 for (t, s, a, kw, show) in rows if show]
+        items = []
+        for (t, s, a, kw, show) in rows:
+            if not show:
+                continue
+            extra = {"mods": open_link_mods} if (t == "🌐 Open link" and open_link_mods) else {}
+            items.append(alfred.item(title=t, subtitle=s, arg=a, variables=vars_,
+                                     match=f"{kw} {t}", **extra))
 
         if query:
             items = fuzz.filter_and_score(query, items, key_fn=lambda x: x.get("match", x["title"]))
