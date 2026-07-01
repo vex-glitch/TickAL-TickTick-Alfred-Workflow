@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(SCRIPT_DIR, "lib"))
 import config as cfg
 from api import TickTickAPI, RateLimitError
 import cache as cache_store
+import areas
 import reminders as rem
 from dateutil import utc_to_local_display, utc_to_long_display
 
@@ -29,6 +30,17 @@ CRM_ID       = "69fed9d51fe6d10d8510bf15"
 BOOKING_TAGS = {"🔥lead", "🔥consultation", "🔥tattoo", "🔥ongoing"}
 ALFRED_APP   = "com.runningwithcrayons.Alfred"
 WF_BUNDLE    = "com.vex.tickal"
+
+
+def _fire_add_prefill(query):
+    """Open the workflow's Add window pre-typed with `query` via Alfred's external
+    trigger (no extra wiring). Shared by the CRM booking auto-flow and the manual
+    "Add Prepare" action so both open the same prefilled window."""
+    osa = ('on run argv\n'
+           f'tell application id "{ALFRED_APP}" to run trigger "Add" '
+           f'in workflow "{WF_BUNDLE}" with argument (item 1 of argv)\n'
+           'end run')
+    subprocess.run(["osascript", "-e", osa, query], check=False)
 
 
 def _patch_task_cache(tid, **fields):
@@ -358,8 +370,8 @@ def main():
 
         elif arg.startswith("create_project_meta:"):
             # create_project_meta:<base64 {name, tag, emoji}>
-            # Creates a project list in the Projects folder + a linked meta
-            # task in the Project Meta Tasks list, tagged with the area tag.
+            # Creates a project list in the Projects folder + a linked project
+            # CTA task in the 📌CTA list, tagged with the area tag.
             raw = arg[20:]
             payload = json.loads(base64.b64decode(raw))
             name  = payload.get("name", "").strip()
@@ -370,7 +382,7 @@ def main():
                 return
 
             folder_id = os.environ.get("projects_folder_id") or "69fcaeb9bac7d10a6914dfca"
-            meta_list = os.environ.get("project_meta_list_id") or "6a2ac922f6161196c5d02531"
+            cta_list  = os.environ.get("cta_list_id") or areas.CTA_LIST_ID
 
             api = TickTickAPI(cfg.get_token())
             list_name = f"💼P • {name} {emoji}".rstrip()
@@ -383,8 +395,8 @@ def main():
 
             url = f"ticktick:///webapp/#p/{pid}/tasks"
             task = api.create_task(
-                title=f"PM • [{name}]({url}) 🗺️",
-                project_id=meta_list,
+                title=f"💼 P • [{name}]({url}) 🔗",
+                project_id=cta_list,
                 tags=[tag] if tag else None,
             )
 
@@ -398,9 +410,9 @@ def main():
                     meta_name = ""
                     if projects_cache:
                         meta_name = next((p.get("name", "") for p in projects_cache
-                                          if p.get("id") == meta_list), "")
+                                          if p.get("id") == cta_list), "")
                     entry = dict(task)
-                    entry["_projectId"]   = meta_list
+                    entry["_projectId"]   = cta_list
                     entry["_projectName"] = meta_name
                     entry["_columnName"]  = ""
                     cached_tasks = cache_store.get("all_tasks") or []
@@ -424,6 +436,22 @@ def main():
             cache_store.invalidate("projects")
             cache_store.invalidate("all_tasks")
             print(f"{name} created")
+
+        elif arg.startswith("cta:"):
+            # cta:<base64 {mode, pid, tid, title}> — the one dynamic "Add CTA /
+            # Prepare" Actions row. Every mode opens the Add window prefilled (via
+            # the shared helper) so the CTA/Prepare task can be SCHEDULED before it
+            # is created — same "back in the driver's seat" flow as CRM bookings.
+            spec   = json.loads(base64.b64decode(arg[4:]))
+            action = areas.build_action(spec.get("mode"), spec.get("pid", ""),
+                                        spec.get("tid", ""), spec.get("title", ""))
+            # Emit the prefill query as this node's OUTPUT. The canvas routes it to a
+            # Call-External-Trigger → "Add" (pass input as argument = Yes), so the Add
+            # window opens NATIVELY and stays interactive (schedule via *, / menu…).
+            # osascript-ing "Add" from inside an Actions action yields a non-focused
+            # window; that path (_fire_add_prefill) is only safe post-create, which is
+            # why the CRM booking auto-flow still uses it.
+            sys.stdout.write(action["query"])
 
         elif arg.startswith("create:"):
             raw = arg[7:]
@@ -499,12 +527,7 @@ def main():
             tags_lc = {str(t).lower() for t in (payload.get("tags") or [])}
             if (proj_id == CRM_ID and result and result.get("id")
                     and (tags_lc & BOOKING_TAGS)):
-                q = f"~l 🔥CRM #🔥prepare Prepare for [[{title}]]"
-                osa = ('on run argv\n'
-                       f'tell application id "{ALFRED_APP}" to run trigger "Add" '
-                       f'in workflow "{WF_BUNDLE}" with argument (item 1 of argv)\n'
-                       'end run')
-                subprocess.run(["osascript", "-e", osa, q], check=False)
+                _fire_add_prefill(f"~l 🔥CRM #🔥prepare Prepare for [[{title}]]")
 
             notif = payload.get("_notif_text") or f"Task added to {payload.get('listName') or 'Inbox'}"
             print(notif + attach_note)

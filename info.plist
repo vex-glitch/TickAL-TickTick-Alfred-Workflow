@@ -2287,6 +2287,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>6F562108-2122-497B-84ED-8B6399D1D8BE</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>C6BA86CF-C897-4A52-890B-3A3F0F3DDCF0</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>6F984940-470E-419D-822A-B890BF31D0AA</key>
 		<array>
 			<dict>
@@ -2491,6 +2504,18 @@
 				<string></string>
 				<key>sourceoutputuid</key>
 				<string>E6D8EA21-EE59-4E5C-A921-805C99177632</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>2C2FC5EE-1ABF-49D5-BD04-513703B710B5</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>58D356F3-3DC3-4300-9708-333F8B6CED8D</string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -3458,6 +3483,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>C6BA86CF-C897-4A52-890B-3A3F0F3DDCF0</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>1F345368-6001-4504-B5C4-BA6654DD2399</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>CB5F6864-C4F4-4FA8-8EF0-F80837CA8EDC</key>
 		<array>
 			<dict>
@@ -3725,6 +3763,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>0415216D-8474-4D0B-AA77-B45BAE944945</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>DA03CCC1-579C-40F6-849D-6DA5262E0FB1</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>6F562108-2122-497B-84ED-8B6399D1D8BE</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -7158,6 +7209,20 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 						<string>IMAGE</string>
 						<key>uid</key>
 						<string>E6D8EA21-EE59-4E5C-A921-805C99177632</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>cta:</string>
+						<key>outputlabel</key>
+						<string>CTA</string>
+						<key>uid</key>
+						<string>58D356F3-3DC3-4300-9708-333F8B6CED8D</string>
 					</dict>
 				</array>
 				<key>elselabel</key>
@@ -10698,23 +10763,6 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>matchmode</key>
-				<integer>0</integer>
-				<key>matchstring</key>
-				<string>3-</string>
-				<key>replacestring</key>
-				<string></string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.utility.replace</string>
-			<key>uid</key>
-			<string>DAD77D83-492D-4E9F-B590-99FA260329EE</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
 				<string>attributeNote</string>
 				<key>passinputasargument</key>
@@ -10730,6 +10778,23 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 			<string>30500A05-F472-4848-B535-76CA085442FD</string>
 			<key>version</key>
 			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>matchmode</key>
+				<integer>0</integer>
+				<key>matchstring</key>
+				<string>3-</string>
+				<key>replacestring</key>
+				<string></string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.replace</string>
+			<key>uid</key>
+			<string>DAD77D83-492D-4E9F-B590-99FA260329EE</string>
+			<key>version</key>
+			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -10991,6 +11056,25 @@ osascript -e "tell application id \"com.runningwithcrayons.Alfred\" to run trigg
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>externaltriggerid</key>
+				<string>attributeAttach</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>12B34F9C-A192-4408-8F26-16EE8DBBCB72</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>action</key>
 				<integer>0</integer>
 				<key>argument</key>
@@ -11245,25 +11329,6 @@ printf '%s' "$1"</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>externaltriggerid</key>
-				<string>attributeAttach</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>12B34F9C-A192-4408-8F26-16EE8DBBCB72</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -11342,6 +11407,25 @@ printf '%s' "$1"</string>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
 			<string>95B04880-2BA8-4612-AB80-655F867E0F9C</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>cta</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<false/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>2C2FC5EE-1ABF-49D5-BD04-513703B710B5</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -11759,6 +11843,86 @@ printf '%s' "$1"</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>cta</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>DA03CCC1-579C-40F6-849D-6DA5262E0FB1</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/opt/homebrew/bin/python3 "src/dispatch.py" "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>C6BA86CF-C897-4A52-890B-3A3F0F3DDCF0</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/opt/homebrew/bin/python3 "Scripts/ensure_task_context.py" "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>6F562108-2122-497B-84ED-8B6399D1D8BE</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Add</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<false/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>1F345368-6001-4504-B5C4-BA6654DD2399</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -11996,9 +12160,9 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 		<key>12B34F9C-A192-4408-8F26-16EE8DBBCB72</key>
 		<dict>
 			<key>xpos</key>
-			<real>4995</real>
+			<real>5000</real>
 			<key>ypos</key>
-			<real>1810</real>
+			<real>1750</real>
 		</dict>
 		<key>13954017-56A7-4D67-AAE3-C1355D18624F</key>
 		<dict>
@@ -12156,6 +12320,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>ypos</key>
 			<real>1955</real>
 		</dict>
+		<key>1F345368-6001-4504-B5C4-BA6654DD2399</key>
+		<dict>
+			<key>xpos</key>
+			<real>2755</real>
+			<key>ypos</key>
+			<real>2160</real>
+		</dict>
 		<key>1FBBD53D-A240-4CD3-9EF5-DE75ACCE985A</key>
 		<dict>
 			<key>colorindex</key>
@@ -12288,6 +12459,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>ypos</key>
 			<real>1265</real>
 		</dict>
+		<key>2C2FC5EE-1ABF-49D5-BD04-513703B710B5</key>
+		<dict>
+			<key>xpos</key>
+			<real>5000</real>
+			<key>ypos</key>
+			<real>1855</real>
+		</dict>
 		<key>2CC7FB87-9AF7-4F9A-B47C-C852932BBC2F</key>
 		<dict>
 			<key>colorindex</key>
@@ -12329,7 +12507,7 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>xpos</key>
 			<real>5000</real>
 			<key>ypos</key>
-			<real>1660</real>
+			<real>1645</real>
 		</dict>
 		<key>31F468DA-51F2-4C26-B6AA-ACC0F66810F9</key>
 		<dict>
@@ -13159,6 +13337,15 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<key>ypos</key>
 			<real>435</real>
 		</dict>
+		<key>6F562108-2122-497B-84ED-8B6399D1D8BE</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>2435</real>
+			<key>ypos</key>
+			<real>2160</real>
+		</dict>
 		<key>6F984940-470E-419D-822A-B890BF31D0AA</key>
 		<dict>
 			<key>colorindex</key>
@@ -13790,9 +13977,9 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 		<key>BDFC3AF2-4472-4DAF-93FB-B738697F6A3F</key>
 		<dict>
 			<key>xpos</key>
-			<real>4995</real>
+			<real>5000</real>
 			<key>ypos</key>
-			<real>1550</real>
+			<real>1540</real>
 		</dict>
 		<key>BE074C02-C428-441B-A431-08AEFCA6619D</key>
 		<dict>
@@ -13874,6 +14061,13 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<real>2955</real>
 			<key>ypos</key>
 			<real>1690</real>
+		</dict>
+		<key>C6BA86CF-C897-4A52-890B-3A3F0F3DDCF0</key>
+		<dict>
+			<key>xpos</key>
+			<real>2595</real>
+			<key>ypos</key>
+			<real>2160</real>
 		</dict>
 		<key>C75F058A-228F-46A2-AF0B-53B72FA04924</key>
 		<dict>
@@ -14030,6 +14224,15 @@ For detailed instructions, visit [Github · TickAL](https://github.com/vex-glitc
 			<real>800</real>
 			<key>ypos</key>
 			<real>125</real>
+		</dict>
+		<key>DA03CCC1-579C-40F6-849D-6DA5262E0FB1</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>2265</real>
+			<key>ypos</key>
+			<real>2160</real>
 		</dict>
 		<key>DA51AB19-B3F2-43D7-B760-414E7D9BFD2A</key>
 		<dict>

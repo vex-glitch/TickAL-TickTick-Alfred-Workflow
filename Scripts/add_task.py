@@ -1454,7 +1454,7 @@ def project_create_items(name):
     if not name:
         return [alfred.item(
             title="Type a project name…",
-            subtitle="Creates 💼P • list + PM meta task  ⌘⇧ 🔙",
+            subtitle="Creates 💼P • list + 📌CTA entry  ⌘⇧ 🔙",
             valid=False,
         )]
     areas = get_area_tags()
@@ -1472,7 +1472,7 @@ def project_create_items(name):
         items.append(alfred.item(
             uid=f"area-{tag}",
             title=tag,
-            subtitle=f"Create  💼P • {name} {emoji}  +  PM • {name} 🗺️",
+            subtitle=f"Create  💼P • {name} {emoji}  +  💼 P • {name} 🔗",
             arg=f"create_project_meta:{payload}",
         ))
     return items

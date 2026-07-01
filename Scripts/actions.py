@@ -22,6 +22,7 @@ Args:
 import sys
 import os
 import json
+import base64
 import traceback
 
 def emit(items): print(json.dumps({"items": items}))
@@ -42,6 +43,7 @@ try:
     import fuzzy as fuzz
     import cache as cache_store
     import links as links_util
+    import areas
     from display import fmt_date, fmt_tags, join_breadcrumb
 except Exception as e:
     emit_error(f"Import failed: {e}")
@@ -157,6 +159,30 @@ def main():
             for s in (cache_store.get("all_tasks") or []))
         add_sub = "Add a subtask" if is_task_like else f"Add a task to this {itype}"
 
+        # 📌 Create CTA / 🔥 Add Prepare — one dynamic row (lists + task-like).
+        # areas.classify picks the mode from the item; build_action supplies the
+        # label + preview so the row reads correctly before you commit.
+        cta_row, cta_vars = None, vars_
+        if itype == "list" or is_task_like:
+            try:
+                _mode = areas.classify(pid, tid, itype, task)
+                _act  = areas.build_action(_mode, pid, tid, name)
+                _spec = base64.b64encode(json.dumps(
+                    {"mode": _mode, "pid": pid, "tid": tid, "title": name}
+                ).encode()).decode()
+                cta_row = (_act["label"], _act["preview"], f"cta:{_spec}",
+                           "cta prepare call to action", True)
+                # The CTA opens the Add window from its query alone — it must NOT
+                # inherit the selected item's context vars, or add_task turns the new
+                # task into a SUBTASK (task_id → parentId). Clear them; carry the
+                # parent-list body link as prefill_note (appended to the description)
+                # instead of a =note that would block * / and typing.
+                cta_vars = {"task_id": "", "task_list_id": "", "list_id": "",
+                            "section_id": "", "item_type": "",
+                            "prefill_note": _act.get("note", "")}
+            except Exception:
+                cta_row = None
+
         # (title, subtitle, arg, search keywords, show?)
         # Notes get everything but Complete and Priority; list/section get only the
         # container-applicable actions (open / browse / add / copy / back).
@@ -179,12 +205,16 @@ def main():
             ("🔙 Go back",         "Back to search",       "back",          "back",              True),
         ]
 
+        if cta_row:
+            rows.insert(8, cta_row)   # place it just after ➕ Add task
+
         items = []
         for (t, s, a, kw, show) in rows:
             if not show:
                 continue
             extra = {"mods": open_link_mods} if (t == "🌐 Open link" and open_link_mods) else {}
-            items.append(alfred.item(title=t, subtitle=s, arg=a, variables=vars_,
+            row_vars = cta_vars if a.startswith("cta:") else vars_
+            items.append(alfred.item(title=t, subtitle=s, arg=a, variables=row_vars,
                                      match=f"{kw} {t}", **extra))
 
         if query:
