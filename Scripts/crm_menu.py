@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""
+crm_menu.py — Alfred Script Filter (the 🔥CRM hub)
+
+The CRM hotkey / "CRM…" main-menu row opens this: two options, both scoped to the
+🔥CRM list (its id rides on as a variable). Type "a" / "s" to pick (fuzzy).
+
+  • Add    → arg "add"  → ET "Add" with list_id=CRM → the normal add flow pinned
+             to CRM: auto-attaches a clipboard image, the [[ picker scopes to CRM
+             bookings, and a booking tag triggers the "Prepare for …" follow-up.
+  • Search → arg "tags" → the tag-drill (drill_tags.py) scoped to CRM. "tags" is
+             the sentinel drill_tags already normalises to an empty query.
+
+Wiring: this filter's output → a Conditional — add → ET "Add", tags → the
+drill/tags ET — both passing variables (so list_id reaches the target).
+"""
+import sys
+import os
+import json
+import re
+
+# ── script_base bootstrap ────────────────────────────────────────────────────
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+try:
+    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR
+    bootstrap()
+except Exception as e:
+    print(json.dumps({"items": [{"uid": "err", "title": "TickTick Error",
+                                 "subtitle": f"Path setup failed: {e}", "valid": False}]}))
+    sys.exit(0)
+
+try:
+    import alfred
+    import fuzzy as fuzz
+    import areas
+except Exception as e:
+    print(json.dumps({"items": [{"title": "Import error", "subtitle": str(e), "valid": False}]}))
+    sys.exit(0)
+
+CRM_ID   = areas.CRM_ID          # from the Configure panel; empty = dormant
+CRM_NAME = areas.crm_list_name()
+# item_type=list marks this as "adding INTO the CRM list" — so the add window
+# shows "Adding to 🔥CRM" (not the generic / create-a-list/note/project hint) and
+# the / menu offers task attributes, not the top-level creation modes.
+CRM_VARS = {"list_id": CRM_ID, "task_list_id": CRM_ID, "list_name": CRM_NAME,
+            "item_type": "list"}
+
+
+
+
+def build_items():
+    if not areas.crm_configured():
+        # Dormant until crm_list_id is set in Configure Workflow — the one row
+        # opens the setup guide (arg routes via the ^open conditional branch).
+        return [alfred.item(**areas.setup_row("CRM", "45-crm.md"))]
+    return [
+        alfred.item(
+            uid="crm-add",
+            title="Add",
+            subtitle='New entry in CRM + "prepare" follow up',
+            arg="add",
+            variables=CRM_VARS,
+        ),
+        alfred.item(
+            uid="crm-search",
+            title="Search",
+            subtitle=f"Drill {CRM_NAME} by tag",
+            arg="tags",
+            variables={**CRM_VARS, "browse_ctx": f"ctx:tags:{CRM_ID}"},
+        ),
+    ]
+
+
+# P4c: back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# (mod-level valid=True lets it fire even from invalid prompt/hint rows).
+_orig_output = alfred.output
+def _output_backstamped(items, **kw):
+    for _it in items:
+        _it.setdefault("mods", {}).setdefault("ctrl", {"valid": True, "arg": "", "subtitle": "🔙 Main menu"})
+    return _orig_output(items, **kw)
+alfred.output = _output_backstamped
+
+
+def main():
+    raw = sys.argv[1] if len(sys.argv) > 1 else ""
+    stripped = raw.strip()
+    # Treat Alfred placeholder values (e.g. "…", "...") as empty, like main_menu.py.
+    query = stripped if re.search(r'[a-zA-Z0-9]', stripped) else ""
+    try:
+        items = build_items()
+        if query:
+            # Narrow only when a real term actually matches — a 2-row menu should
+            # never disappear, so an empty filter result falls back to all rows.
+            filtered = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
+            if filtered:
+                items = filtered
+        print(alfred.output(items, skipknowledge=True))
+    except Exception as e:
+        import traceback
+        print(json.dumps({"items": [{
+            "title": "Error in crm_menu.py",
+            "subtitle": f"{type(e).__name__}: {e}  |  {traceback.format_exc()}",
+            "valid": False,
+        }]}))
+
+
+if __name__ == "__main__":
+    main()

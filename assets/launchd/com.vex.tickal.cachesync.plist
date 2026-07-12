@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.vex.tickal.cachesync</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID/src/sync.py</string>
+        <string>sync</string>
+    </array>
+    <key>WorkingDirectory</key><string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID</string>
+    <key>StartInterval</key><integer>3600</integer>
+    <key>RunAtLoad</key><true/>
+    <key>StandardOutPath</key><string>/tmp/tickal_cachesync.log</string>
+    <key>StandardErrorPath</key><string>/tmp/tickal_cachesync.log</string>
+</dict>
+</plist>

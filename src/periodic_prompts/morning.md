@@ -1,0 +1,38 @@
+## random
+- What am I grateful for?
+- What would make today great?
+- Who made your life better this week — have you told them?
+- What small comfort are you taking for granted right now?
+- What ability would you miss most if it vanished tomorrow?
+- What went right yesterday that you never acknowledged?
+- Which ordinary thing about today deserves a second look?
+- If today were your last, what would still be worth doing?
+- What could go wrong today — and how would you meet it calmly?
+- What is in your control today, and what is not?
+- What would the person you want to become do before noon?
+- Which discomfort could you choose on purpose today?
+- What would you attempt today if fear had no vote?
+- What is the one thing that makes everything else easier today?
+- Which task are you avoiding, and what is its first two minutes?
+- If you could only finish one thing today, what must it be?
+- What deserves your deepest hour of attention today?
+- What will you say no to today so the yes counts?
+- Where should your energy absolutely not go today?
+- What are you quietly excited about right now?
+- What strength of yours does today's plan actually use?
+- What would make you proud to describe at dinner tonight?
+- Which win from this week can you build on before lunch?
+- What does your best self sound like when things get loud today?
+- What is one bet on yourself worth placing this morning?
+- What is tomorrow counting on you to start today?
+- Which decision have you been postponing that today could settle?
+- What will future-you thank you for doing this morning?
+- What needs preparing now so next week runs itself?
+- Which loose end from yesterday deserves ten minutes today?
+- What is one step toward this quarter's goal you can take today?
+- What do you need to forgive yourself for before the day starts?
+- What would treating yourself like a friend look like today?
+- Which rule of yours deserves to be questioned today?
+- What pace would actually serve you today — and can you keep it?
+- Who deserves five undistracted minutes from you today?
+- What kindness could you make effortless today?

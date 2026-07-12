@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.vex.tickal.periodic</string>
+    <!-- 04:30 mint-ahead: tomorrow's daily + any period tomorrow begins,
+         catch-up (current period of all 5 tiers), refresh today, roll-ups.
+         Missed while asleep → fires once on wake; missed while powered off →
+         RunAtLoad + the pn_last_mint stamp catch up at login (fresh stamp =
+         exit with zero network). Lazy-mint keeps the feature alive even with
+         no agent at all. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID/Scripts/py.sh</string>
+        <string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID/Scripts/xact.py</string>
+        <string>xact:pn_mint</string>
+    </array>
+    <key>WorkingDirectory</key><string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID</string>
+    <!-- The list id comes from ~/.ticktick_alfred/config.json — written
+         through automatically on the first interactive pn use. No env pin:
+         one source of truth, and blanking the Alfred field turns the agent
+         off with the rest of the feature. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key><integer>4</integer>
+        <key>Minute</key><integer>30</integer>
+    </dict>
+    <key>RunAtLoad</key><true/>
+    <key>StandardOutPath</key><string>/tmp/tickal_periodic.log</string>
+    <key>StandardErrorPath</key><string>/tmp/tickal_periodic.log</string>
+</dict>
+</plist>
