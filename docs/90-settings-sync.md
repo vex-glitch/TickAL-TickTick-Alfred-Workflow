@@ -2,7 +2,7 @@
 
 _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-cheatsheet.md)_
 
-> Maintain the workflow from one menu: refresh the cache, re-authenticate, edit tags/filters/folders, and store the optional v2 token.
+> Maintain the workflow from one menu: refresh the cache, re-authenticate, and store the optional v2 token.
 
 **Keyword:** `tup` — opens the Settings menu. ⌃⏎ on any row returns to the main menu.
 

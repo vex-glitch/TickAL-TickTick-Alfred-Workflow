@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""periodic_rows.py — the 💫 pn search scope (R5a, reworked R5a-R2).
+"""periodic_rows.py — the 💫 pn search scope.
 
 Imported by everything_search.py AFTER its bootstrap, so src/ is already on
 sys.path. Renders: the idle action rows and the submodes — `+` entry (with
 the 😢–😁 mood faces), `$` income, `goal` / `day` task pickers, `today` /
 `tmrw` schedule pickers (two-screen: pick → add-or-time). All state rides
 the query — no handshake files; ⏎ always fires an xact: arg (the only shape
-search-⏎ forwards to a script). Caveman subtitles (Vex law): no syntax in
+search-⏎ forwards to a script). Subtitles stay plain: no syntax in
 subtitles, ever — autocomplete rows teach by doing.
 
-Chord LAW (R4.4): the search SF has live mod edges (⌘ Actions chain, ⇧, ⌥,
+Chord rule: the search SF has live mod edges (⌘ Actions chain, ⇧, ⌥,
 ⌥⇧ X1 router, ⌥⌘ copy, ⌃⇧ modOpen) — a row with NO mods entry fires its
 DEFAULT arg down every one of them. Every row here carries a full mods dict:
 dead chords everywhere, ⌃⇧ = sticky on the six open rows. ⌘ physically
-routes to the Actions chain and can never reach dispatch (attack SB-2).
+routes to the Actions chain and can never reach dispatch.
 """
 import base64
 import json
@@ -26,6 +26,7 @@ import areas
 import cache as cache_store
 import fuzzy as fuzz
 import periodic_model as pm
+from script_base import run_path
 
 
 def _b64(d):
@@ -39,7 +40,7 @@ def _mods(sticky_spec=None):
     # alt+cmd included: the search SF has a wired ⌥⌘ (copy-link) edge — without
     # an explicit entry the row's DEFAULT xact: arg would ride it into pbcopy.
     # ⌃ is NOT dead: the wired ⌃ edge is the universal 🔙 back-to-main-menu
-    # (every other search row gets it via _output_backstamped — fleet R2).
+    # (every other search row gets it via _output_backstamped).
     m = {k: dict(_DEAD)
          for k in ("cmd", "shift", "alt", "alt+shift", "alt+cmd")}
     m["ctrl"] = {"valid": True, "arg": "", "subtitle": "🔙 Main menu"}
@@ -71,7 +72,7 @@ def _period_of(spec, today):
 def _goalseq_active():
     """The weekly journal's three-things sequence (xact writes the file)."""
     try:
-        with open("/tmp/tickal_pn_goalseq.json") as f:
+        with open(run_path("tickal_pn_goalseq.json")) as f:
             d = json.load(f)
         return d if (time.time() - d.get("ts", 0) < 600
                      and d.get("remaining", 0) > 0) else None
@@ -172,11 +173,11 @@ def entry_rows(rest):
     kind, text = "thought", rest.strip()
     head, _, tail = text.partition(" ")
     if head.lower() == "m" and not tail:
-        # mood is a picker now (Vex R2): faces first, note dialog after
+        # mood is a picker: faces first, note dialog after
         return _mood_rows()
     if head.lower() in _KINDS and not tail and head.lower() != "l":
         # bare kind letter (fresh from the legend) → prompt, never a valid
-        # "💭 Thought — w" row an accidental ⏎ would log (fleet)
+        # "💭 Thought — w" row an accidental ⏎ would log
         return [alfred.item(title=f"Type the {_KINDS[head.lower()]} text…",
                             valid=False, mods=_mods())]
     if head.lower() in _KINDS and (tail or head.lower() == "l"):

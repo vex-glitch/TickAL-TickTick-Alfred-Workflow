@@ -30,7 +30,7 @@ import traceback
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 try:
-    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR
+    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR, run_path
     bootstrap()
 except Exception as e:
     print(json.dumps({"items": [{"uid": "err", "title": "TickTick Error",
@@ -56,12 +56,12 @@ PRIO = {0: "⚫️ No priority", 1: "🟡 Low", 3: "🟠 Medium", 5: "🔴 High"
 
 
 def fx_session():
-    """R3.95 running-session probe for the ⌘ rows:
+    """Running-session probe for the ⌘ rows:
     ("task", pid, tid, title) task-bound · ("bare",) running-unattributed ·
     None idle. Cheap path first — the pomo defaults read only happens when a
     sidecar file actually exists / no timer file."""
     try:
-        with open("/tmp/tickal_focus.json") as f:
+        with open(run_path("tickal_focus.json")) as f:
             st = json.load(f)
         if st.get("tid"):
             return ("task", st.get("pid", ""), st["tid"], st.get("title", ""))
@@ -94,7 +94,7 @@ def _is_top_level_tag(tag):
     """True when the tag is a legal nest target: ITS OWN tree entry has no
     parent (TickTick nests one level). Membership in the top-level label set
     is NOT enough — emoji-blind keys collide, a child '🔥X' next to a
-    top-level 'X' passed (R4.5 fleet catch, live collision). No tree cached
+    top-level 'X' passed (real collision seen live). No tree cached
     (no v2 token) → False — creating tags needs the token anyway."""
     try:
         from display import tag_match_key
@@ -129,7 +129,7 @@ def section_name(task):
     return ""
 
 
-# P4c: back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# Back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
 _orig_output = alfred.output
 def _output_backstamped(items, **kw):
@@ -147,7 +147,7 @@ def main():
     itype  = os.environ.get("item_type", "") or "task"  # act-again re-entry has
     query  = sys.argv[1] if len(sys.argv) > 1 else ""    # no env; only tasks reopen
 
-    # 🗓 View rows (Run 3.75): smart-list rows in search get a small ⌘ menu —
+    # 🗓 View rows: smart-list rows in search get a small ⌘ menu —
     # the headline act is sending the whole view to the focus, in view order.
     if itype == "view":
         try:
@@ -166,8 +166,8 @@ def main():
                  f"open:{vurl}",          "open app view",          bool(vurl)),
                 # Views without a working deep link (Summary) open via the
                 # app's List menu — the xact:view_open System-Events click.
-                # Won't Do has NEITHER route (no deep link, no List-menu item,
-                # both probed 2026-07-11) — Alfred-inline only, no Open row.
+                # Won't Do has NEITHER route (no deep link, no List-menu
+                # item) — Alfred-inline only, no Open row.
                 ("↗️ Open in TickTick",  f"Open {vname}",
                  f"xact:view_open:{vkey}", "open app view",
                  not vurl and vkey in ("summary", "habits", "matrix", "pomo")),
@@ -186,7 +186,7 @@ def main():
             emit_error(f"{type(e).__name__}: {e} | {traceback.format_exc()}")
         return
 
-    # 🏷️ Tag rows (Run 2): tags aren't tasks — short-circuit to the tag menu
+    # 🏷️ Tag rows: tags aren't tasks — short-circuit to the tag menu
     # BEFORE the temp-file context recovery below, which would poison pid/tid
     # with the last acted-on task.
     if itype == "tag":
@@ -204,7 +204,7 @@ def main():
                  "browse drill subtasks tasks",          bool(pid)),
                 ("➕ Add task",  f"New task tagged {fmt_tags([tag]) or '#' + tag}",
                  "add",          "add new task pretagged",                True),
-                # R4.5: create a child tag right here (dialog asks the name);
+                # Create a child tag right here (dialog asks the name);
                 # only top-level tags are legal nest targets (one level)
                 ("➕ Add nested tag",
                  f"New tag under {fmt_tags([tag]) or '#' + tag}",
@@ -228,7 +228,7 @@ def main():
                 if a == "browse":   # unified Browse box reads ctx from env
                     row_vars["browse_ctx"] = f"ctx:tagitems:{pid}:{tag}"
                 if a == "add":
-                    # B2 (Run 3): open the Add window pre-tagged — same var
+                    # Open the Add window pre-tagged — same var
                     # shape as the CRM ⇧⌘ booking wire. task_id must be empty
                     # or the new task becomes a subtask.
                     row_vars = {"task_id": "", "section_id": "",
@@ -249,12 +249,12 @@ def main():
             emit_error(f"{type(e).__name__}: {e} | {traceback.format_exc()}")
         return
 
-    # 🧺 Buffer rows (Run 3.5): batch menu — tag/move ride the EXISTING pickers
+    # 🧺 Buffer rows: batch menu — tag/move ride the EXISTING pickers
     # with the BUFFER sentinel; dispatch loops the buffer file.
     if itype == "buffer_item":
         try:
             try:
-                with open("/tmp/tickal_buffer.txt") as _bf:
+                with open(run_path("tickal_buffer.txt")) as _bf:
                     _n = len([ln for ln in _bf if ln.strip()])
             except OSError:
                 _n = 0
@@ -417,7 +417,7 @@ def main():
         # Notes get everything but Complete and Priority; list/section get only the
         # container-applicable actions (open / browse / add / copy / back).
         # Every "browse" row re-enters the unified Browse box; the ctx it lands
-        # on rides as a row variable, keyed here by row title (B1, Run 3).
+        # on rides as a row variable, keyed here by row title.
         browse_ctxs = {
             "⤵️ Browse subtasks": f"ctx:subtasks:{pid}:{tid}",
             "⤵️ Browse sections": f"ctx:sections:{pid}",
@@ -425,12 +425,11 @@ def main():
             "⤵️ Browse tasks":    (f"ctx:tasks:{pid}:{sid}" if sid else f"ctx:tasks:{pid}"),
         }
 
-        _sess = fx_session()   # R3.95 rows below key off the running session
+        _sess = fx_session()   # rows below key off the running session
 
-        # R5a-R2 (Vex): one-⏎ scheduling + the 💫 day-goal pin. The rows ride
-        # xact:pn_sched (ungated scheduling) — the Actions conditional only
-        # routes xact:/bare-verb shapes, attr_date would hit an unwired else
-        # (fleet R2 blocker).
+        # One-⏎ scheduling + the 💫 day-goal pin. The rows ride xact:pn_sched
+        # (ungated scheduling) — the Actions conditional only routes
+        # xact:/bare-verb shapes; attr_date would hit an unwired else.
         try:
             _pn_on = areas.periodic_configured()
         except Exception:
@@ -461,15 +460,15 @@ def main():
             ("🌐 Open link",       open_link_sub,          open_link_arg, "link url web open", has_links),
             ("📝 Note",            note_sub,               "note",          "note description body edit", is_task_like),
             ("🖼️ Add image",       "Clipboard link → description", "attach", "attach add image clipboard screenshot link", is_task_like),
-            # R4.4: one dynamic row — whatever the item is, offer the other
+            # One dynamic row — whatever the item is, offer the other
             # kind. Gated on a CACHED (= open) item: completed rows carry a
             # tid too, and converting one mints a status-2 "note" that
-            # evaporates at the next sync (fleet catch).
+            # evaporates at the next sync.
             (f"🔃 Convert to {'task' if is_note else 'note'}",
              "Keeps title, dates, tags",
              f"xact:convert:{pid}:{tid}", "convert note task kind switch turn",
              is_task_like and bool(tid) and bool(task)),
-            # R3.95 gate: ONE 🎯 Focus row replaces Start-focus / Focus
+            # ONE 🎯 Focus row replaces Start-focus / Focus
             # (sticky+timer) / Start-pomo — ⏎ opens the ⏱/🍅 flow for THIS task.
             ("🎯 Focus",           "Timer or Pomodoro, sticky optional",
              f"xact:focus_open:{pid}:{tid}", "focus timer pomo pomodoro start track time",
@@ -478,7 +477,7 @@ def main():
              f"xact:sticky:{pid}:{tid}", "sticky note desktop pin", is_task_like and bool(tid)),
             ("🅿️ Add to buffer",   "Collect tasks, act on all (🅿️ in search)",
              f"xact:buffer_add:{pid}:{tid}", "buffer collect batch", is_task_like and bool(tid)),
-            # R3.95 focus-block staging: direct add when a task-bound session
+            # Focus-block staging: direct add when a task-bound session
             # runs; the stage screen (both directions) always; live-link only
             # while a session runs unattributed.
             (f"🎯 Add to focus ({(_sess[3][:24] if _sess and _sess[0] == 'task' else '')})",
@@ -493,7 +492,7 @@ def main():
              f"xact:fx_link:{pid}:{tid}", "link focus attribute session running",
              is_task_like and bool(tid) and bool(_sess) and _sess[0] == "bare"),
             ("✔️ Complete",        "Mark this done",       f"complete:{pid}:{tid}:{title}", "complete done", is_task_like and not is_note),
-            # R4.5: TickTick's third status — off the lists, kept on record
+            # TickTick's third status — off the lists, kept on record
             ("🚫 Won't do",        "Abandon task",         f"xact:wontdo:{pid}:{tid}", "wont do abandon skip cancel", is_task_like and not is_note and bool(tid)),
             (md_links_display(name) if is_task_like else (lname or "Rename"),
                                    "Rename…",              "rename",        "rename title name", is_task_like or itype == "list"),
@@ -503,7 +502,7 @@ def main():
 
         if cta_row:
             # just after ➕ Add task — found by title, not a raw index that
-            # silently drifts when rows are added above it (fleet R2)
+            # silently drifts when rows are added above it
             _add_idx = next((i for i, r in enumerate(rows)
                              if r[0] == "➕ Add task"), 7)
             rows.insert(_add_idx + 1, cta_row)
@@ -524,7 +523,7 @@ def main():
             items.append(alfred.item(title=t, subtitle=s, arg=a, variables=row_vars,
                                      match=f"{kw} {t}", **extra))
 
-        # 🗑️ Delete list (B4, Run 3) — typed confirm, zero canvas: the first row
+        # 🗑️ Delete list — typed confirm, zero canvas: the first row
         # is invalid and autocompletes the bar to "delete list yes"; only then
         # does the valid confirm row (arg "delete" → delete_action list branch)
         # survive the fuzzy filter.
@@ -545,10 +544,10 @@ def main():
                     arg="delete", match="delete list yes confirm",
                     variables=del_vars))
 
-        # Running focus timer → a ⏹ Stop row on top of every menu (Run 3.5;
-        # pause-aware elapsed via xact.focus_elapsed since R3.9)
+        # Running focus timer → a ⏹ Stop row on top of every menu
+        # (pause-aware elapsed via xact.focus_elapsed)
         try:
-            with open("/tmp/tickal_focus.json") as _f:
+            with open(run_path("tickal_focus.json")) as _f:
                 _fs = json.load(_f)
             try:
                 from xact import focus_elapsed as _fe    # Scripts sibling

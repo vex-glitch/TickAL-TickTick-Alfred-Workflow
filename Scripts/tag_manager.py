@@ -77,7 +77,7 @@ def detect_mode(raw_query):
     Returns ('add', fragment) for a # prefix, ('current', query) otherwise.
     Bare '#' and '#frag' land straight in the add dropdown — the old
     space-gate hint row ("Space after # to search") made every entry a
-    two-step (Vex 2026-07-11).
+    two-step.
     """
     q = raw_query
     if q.startswith("# "):
@@ -159,7 +159,7 @@ def add_tag_view(fragment_str, pid, tid, task_title):
         crm_lc   = {c.lower() for c in areas.CRM_TAGS}
         all_tags = [t for t in all_tags if t.lower() in crm_lc]
     else:
-        # Parent drill (Run 3.5): exact parent fragment → its children; parents
+        # Parent drill: exact parent fragment → its children; parents
         # appear as drill rows (autocomplete keeps them as the live fragment).
         import tagtree
         kids = tagtree.children_of(current_fragment) if current_fragment else []
@@ -228,7 +228,7 @@ def add_tag_view(fragment_str, pid, tid, task_title):
 
     items = rest_items + tag_items
 
-    # ➕ new tag (R4.2): unmatched fragment → queue it anyway; the REAL tag is
+    # ➕ new tag: unmatched fragment → queue it anyway; the REAL tag is
     # created at apply time (dispatch._ensure_tags_exist, v2). Not on CRM
     # tasks — their tag family is fixed.
     from display import tag_match_key

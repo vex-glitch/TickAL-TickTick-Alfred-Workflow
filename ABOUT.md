@@ -28,6 +28,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 | Core | `tal` main menu · `tse` search · `tad` add · `tup` settings · `tca` calendar |
 | Views | `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer |
 | More | `tfo` focus · `tur` save browser tab · `tst` statistics · `tcr` crm · `tsy` sync · `tdo` docs |
+| Periodic | `pn` scope in search — daily / weekly / monthly notes, journals, money log |
 
 Add tokens: `*` date · `@` time · `!` priority · `#` tag · `=` note · `[[` task link — or type `/` for the menu.
 

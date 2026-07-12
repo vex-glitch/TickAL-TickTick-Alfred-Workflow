@@ -7,6 +7,7 @@ formatting of titles, subtitles, dates, priority, and breadcrumbs.
 """
 import re
 from datetime import datetime, timezone
+from script_base import run_path
 
 # Pre-compiled patterns for search key cleaning
 _MD_LINK_RE     = re.compile(r'\[([^\]]*)\]\([^)]*\)')  # [text](url) → text
@@ -27,12 +28,12 @@ MOD_BROWSE  = "⌥⤵️"      # drill into children (Alfred)
 MOD_URL     = "⌥⌘🔗"     # copy link
 MOD_ACTIONS = "⌘⚡"      # ⌘ Actions menu (all per-item actions)
 MOD_BACK    = "⌃🔙"      # go back
-MOD_BUFFER  = "⌥⇧🅿️"    # add to the buffer (R3.9 — task/subtask rows only)
+MOD_BUFFER  = "⌥⇧🅿️"    # add to the buffer (task/subtask rows only)
 
 # Per-type ordered modifier templates. MOD_BROWSE is conditional — it's
 # dropped when the item has no children (nothing to drill into).
-# (⌃ task-details was retired in the 2026-07 restructure — everything lives
-# in the ⌘ Actions menu now.)
+# (the ⌃ task-details view was retired — everything lives in the ⌘ Actions
+# menu now.)
 _MOD_TEMPLATES = {
     "task":      [MOD_OPEN, MOD_ADD, MOD_DONE, MOD_BROWSE, MOD_URL, MOD_BACK],
     "list":      [MOD_OPEN, MOD_ADD, MOD_BROWSE, MOD_URL, MOD_BACK],
@@ -148,8 +149,8 @@ def fmt_tags(tags):
 
 def tag_match_key(name):
     """Existence-comparison key for tag names: emoji/symbols stripped +
-    lowercased. Vex types 'CRM' for '🔥CRM' — a ➕ Create row must not offer
-    a bald duplicate of an emoji-prefixed tag (R4.3)."""
+    lowercased. Users type 'CRM' for '🔥CRM' — a ➕ Create row must not offer
+    a bald duplicate of an emoji-prefixed tag."""
     s = re.sub(r"[^\w\s·-]", "", name or "").strip().lower()
     return s or (name or "").strip().lower()
 
@@ -157,7 +158,7 @@ def tag_match_key(name):
 def note_snippet(content, limit=48):
     """First meaningful description line for the 📝 subtitle marker — focus
     checkbox blocks (### date headers, - [ ] lines) don't count as a
-    description (R4.3)."""
+    description."""
     for ln in (content or "").splitlines():
         s = ln.strip()
         if (not s or re.match(r"### 20\d\d-\d\d-\d\d", s)
@@ -183,7 +184,7 @@ def tag_link(tag):
 
 
 def md_links_display(text):
-    """DISPLAY-ONLY link rendering: '[name](url)' → '[name]🔗' (R3.9).
+    """DISPLAY-ONLY link rendering: '[name](url)' → '[name]🔗'.
     Never applied to data — raw titles keep round-tripping through
     add_task's [[ ]] link syntax and actions.py's Open-link URL counting."""
     return _MD_LINK_RE.sub(r'[\1]🔗', text or "")
@@ -192,12 +193,12 @@ def md_links_display(text):
 _BUFFERED_IDS = None
 
 def buffered_ids():
-    """Task ids currently in the 🅿️ buffer (/tmp/tickal_buffer.txt) —
+    """Task ids currently in the 🅿️ buffer (~/.ticktick_alfred/run/tickal_buffer.txt) —
     read once per script invocation, cached for every row after."""
     global _BUFFERED_IDS
     if _BUFFERED_IDS is None:
         try:
-            with open("/tmp/tickal_buffer.txt") as f:
+            with open(run_path("tickal_buffer.txt")) as f:
                 _BUFFERED_IDS = {ln.strip().split(":", 1)[1]
                                  for ln in f if ":" in ln}
         except OSError:
@@ -211,7 +212,7 @@ def build_title(task, buffered=False):
     Format: 'Task Name ⚫️ 📆 13/05/2026 08:00-17:00 #🔥Active #🔥Lead'
              'Task Name ⚫️ #🔥Active'                  (no date)
              'Task Name ⚫️'                            (no date, no tags)
-             'Task Name 🅿️ ⚫️'                         (buffered — R3.9)
+             'Task Name 🅿️ ⚫️'                         (buffered)
     Markdown links in the name render as '[name]🔗' (display-only).
     """
     name     = md_links_display(task.get("title", "Untitled"))
@@ -235,8 +236,8 @@ def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb=
       '9 Subtasks  ⏎↗️ ⌘➕ … ⌃⇧🔙  |  💼P • Onboard 4️⃣>Not Sectioned'
 
     actions=True (views wired to the ⌘ Actions menu): search-style rows
-    (item_type given) carry the FULL modifier legend (Vex ruling 2026-07-07 —
-    ⌥ only with children, ⇧✅ only on tasks):
+    (item_type given) carry the FULL modifier legend (⌥ only with children,
+    ⇧✅ only on tasks):
       'Task  💼P • Onboard 4️⃣  |  ⌘ All Actions  ⌥⤵️  ⏎↗️  ⌃🔙  ⇧✅  ⌥⌘🔗  ⌘⇧➕'
     Rows without item_type (browse task rows) keep the compact set:
       '9 Subtasks  💼P • Onboard 4️⃣>Not Sectioned  |  ⏎↗️  ⌥⤵️  ⌘⚡  ⌃🔙'
@@ -262,10 +263,10 @@ def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb=
                 parts += ["⇧✅", MOD_BUFFER]
             parts += [MOD_URL, "⌘⇧➕"]
             if item_type == "Task":
-                parts.append("⌃⇧🎯")   # Start focus — search task rows (R4.4)
+                parts.append("⌃⇧🎯")   # Start focus — search task rows
         else:
             # Compact set — browse rows; buffer_mod=True only on task rows
-            # (⌥⇧🅿️ is a task/subtask-only chord — R3.9)
+            # (⌥⇧🅿️ is a task/subtask-only chord)
             parts = ([MOD_OPEN] + ([MOD_BROWSE] if sub_count else [])
                      + [MOD_ACTIONS] + ([MOD_BUFFER] if buffer_mod else [])
                      + [MOD_BACK])
@@ -306,8 +307,8 @@ def list_name_for(list_id, projects_cache):
 
 def join_breadcrumb(*parts):
     """Join non-empty parts with '>' — no spaces. The 'Not Sectioned' pseudo-
-    section never appears in a breadcrumb (Vex ruling 2026-07-07): a task
-    without a real section shows just its list."""
+    section never appears in a breadcrumb: a task without a real section
+    shows just its list."""
     return ">".join(p for p in parts
                     if p and p.strip().lower() != "not sectioned")
 

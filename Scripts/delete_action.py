@@ -9,7 +9,7 @@ import os
 
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from script_base import bootstrap
+from script_base import bootstrap, run_path
 bootstrap()
 
 import config as cfg
@@ -21,7 +21,7 @@ pid        = os.environ.get("task_list_id", "") or os.environ.get("list_id", "")
 tid        = os.environ.get("task_id", "")
 task_title = os.environ.get("task_title", "Task")
 
-# 🧺 BUFFER sentinel (Run 3.5): delete every buffered task (typed-confirm row)
+# 🧺 BUFFER sentinel: delete every buffered task (typed-confirm row)
 if tid == "BUFFER":
     try:
         import xact
@@ -39,14 +39,14 @@ if tid == "BUFFER":
                 _patch_project_data(btid, pid_old=bpid, remove=True)
             except Exception:
                 pass
-        open("/tmp/tickal_buffer.txt", "w").close()
+        open(run_path("tickal_buffer.txt"), "w").close()
         print(f"🅿️ {done} tasks deleted — they're in TickTick's Trash")
     except Exception as e:
         print(f"Delete failed: {e}")
         sys.exit(1)
     sys.exit(0)
 
-# B4 (Run 3): deleting a LIST — reached only via the typed-confirm row in the
+# Deleting a LIST — reached only via the typed-confirm row in the
 # ⌘ menu ("delete list yes"). Tasks land in TickTick's Trash.
 if os.environ.get("item_type", "") == "list":
     lname = os.environ.get("list_name", "") or task_title

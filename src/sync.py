@@ -103,7 +103,7 @@ def do_sync():
 
     cache_store.set("all_notes", all_notes)
 
-    # Tags — zero setup (R4.2): the v2 tag tree is the source of truth
+    # Tags — zero setup: the v2 tag tree is the source of truth
     # (TickTick's own list + order, which also drives group-by-tag sections);
     # tags discovered on tasks append after. Tokenless installs run on the
     # discovered set alone — new tags are creatable from the pickers.
@@ -144,7 +144,7 @@ def do_sync():
     all_tags = base + extra
     cache_store.set("tags", all_tags)
 
-    # Folders + native filters via ONE v2 sync-meta call (R4.2) — the open API
+    # Folders + native filters via ONE v2 sync-meta call — the open API
     # returns bare group ids and no filters at all. config.get_folders()
     # overlays manual names on the folder_groups cache; filtering.load_filters
     # prefers the translated filters_v2 cache. Best-effort, never fails sync.
@@ -161,9 +161,10 @@ def do_sync():
     except Exception:
         pass
 
-    # Completed list = server truth via the same v2 session (R3.95 — the Open
-    # API can't list completed; the old local snapshots only knew completions
-    # made THROUGH the workflow, hence Vex's "7 tasks"). Best-effort.
+    # Completed list = server truth via the same v2 session — the Open API
+    # can't list completed tasks, and the old local snapshots only knew
+    # completions made THROUGH the workflow, so counts ran far too low.
+    # Best-effort.
     try:
         import api_v2
         v2c = api_v2.TickTickV2()
@@ -180,7 +181,7 @@ def do_sync():
             done = v2c.get_completed(days=60, limit=200)
             if isinstance(done, list) and done:
                 cache_store.set("completed_tasks", _enrich(done))
-            # Won't Do twin (R4.5) — None = fetch failed (keep last-known-
+            # Won't Do twin — None = fetch failed (keep last-known-
             # good); [] is the account's truth and DOES clear the cache
             wontdo = v2c.get_abandoned(days=60, limit=200)
             if isinstance(wontdo, list):
@@ -196,10 +197,9 @@ def do_sync():
 
 
 def _notify(text, title="TickAL sync"):
-    """macOS notification so the hourly background sync is visible (Vex ruling
-    2026-07-06: 'show notification every time it syncs so I know it works').
-    Run 3.75: routed through Alfred's notification chain — launchd osascript
-    banners were silently eaten by Notification-Center permissions."""
+    """macOS notification so the hourly background sync is visible. Routed
+    through Alfred's notification chain — launchd osascript banners were
+    silently eaten by Notification-Center permissions."""
     from script_base import notify
     notify(text, title=title)
 

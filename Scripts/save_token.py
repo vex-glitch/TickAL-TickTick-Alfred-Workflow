@@ -53,10 +53,13 @@ except Exception:
     pass  # offline / transient → save anyway
 
 try:
+    # Feed the token on stdin (`-w` with no value makes `security` prompt twice)
+    # so it never appears in the process table via ps.
     subprocess.run(
         ["security", "add-generic-password", "-U",
          "-s", "ticktick_v2_token", "-a", os.environ.get("USER", "ticktick"),
-         "-w", clip],
+         "-w"],
+        input=f"{clip}\n{clip}\n".encode(),
         check=True, capture_output=True,
     )
     print(f"TickTick attachment token saved ✓{verified}")

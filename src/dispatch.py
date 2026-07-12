@@ -23,6 +23,7 @@ import cache as cache_store
 import areas
 import reminders as rem
 from dateutil import utc_to_local_display, utc_to_long_display
+from script_base import run_path
 
 # CRM booking flow — a new CRM task carrying a booking tag auto-prefills a
 # "Prepare for …" follow-up (a 🔥prepare task has no booking tag → never loops).
@@ -43,7 +44,7 @@ def _fire_add_prefill(query):
     subprocess.run(["osascript", "-e", osa, query], check=False)
 
 
-# Act-again (D3-b): attribute changes reopen the ⌘ Actions menu for the same
+# Act-again: attribute changes reopen the ⌘ Actions menu for the same
 # task — fresh values on every row, esc dismisses. Alfred is closed by the time
 # dispatch runs, so the external-trigger fire opens a live window (same timing
 # pattern as the CRM prepare prefill above).
@@ -53,9 +54,8 @@ ACT_AGAIN = ("attr_date:", "attr_span:", "attr_cleardate:", "attr_priority:",
 
 
 def _reopen_actions(pid, tid):
-    """Write the task context (dispatch is the temp file's ONLY writer since
-    the P4 back migration; ensure_task_context is its only reader) and fire
-    the Actions trigger."""
+    """Write the task context (dispatch is the temp file's ONLY writer;
+    ensure_task_context is its only reader) and fire the Actions trigger."""
     try:
         with open("/tmp/ticktick_reattribute.txt", "w") as f:
             f.write(f"{pid}:{tid}")
@@ -68,15 +68,15 @@ def _reopen_actions(pid, tid):
 
 def _ensure_tags_exist(tags, parents=None):
     """Tags unknown to the cache become REAL entities before the task write
-    (R4.2 — the pickers offer ➕ new-tag rows; `parents` maps lowercase name →
-    parent tag for the nest-under-parent flow, R4.3). NOTE: a plain v1 task
-    write does NOT create the tag entity (probe-proven 2026-07-09) — without
-    a v2 token the label still attaches to the task, the entity just waits
-    for the app/token. Best-effort, never blocks the write."""
+    (the pickers offer ➕ new-tag rows; `parents` maps lowercase name →
+    parent tag for the nest-under-parent flow). NOTE: a plain v1 task write
+    does NOT create the tag entity — without a v2 token the label still
+    attaches to the task, the entity just waits for the app/token.
+    Best-effort, never blocks the write."""
     try:
         from display import tag_match_key
         # emoji-blind, like the ➕ picker guards — a hand-typed '#logbook'
-        # must not coin a bald twin of '📓Logbook' (fleet catch R4.3)
+        # must not coin a bald twin of '📓Logbook'
         known = {tag_match_key(t) for t in (cache_store.get("tags") or [])}
         fresh, seen_l = [], set()
         for t in (tags or []):
@@ -154,11 +154,11 @@ def _patch_project_data(tid, fields=None, pid_old=None, pid_new=None, remove=Fal
 
 
 def _buffer_apply(fn):
-    """Run fn(pid, tid, cached_task) over every buffered task (Run 3.5 🧺).
+    """Run fn(pid, tid, cached_task) over every buffered task (🧺).
     Skips strays that error; clears the buffer afterwards. Returns count."""
     done = 0
     try:
-        with open("/tmp/tickal_buffer.txt") as f:
+        with open(run_path("tickal_buffer.txt")) as f:
             lines = [ln.strip() for ln in f if ln.strip()]
     except OSError:
         lines = []
@@ -170,7 +170,7 @@ def _buffer_apply(fn):
         except Exception:
             pass
     try:
-        open("/tmp/tickal_buffer.txt", "w").close()
+        open(run_path("tickal_buffer.txt"), "w").close()
     except OSError:
         pass
     return done
@@ -272,13 +272,13 @@ def main():
             except Exception:
                 pass
 
-            # R3.95 complete-guard: completing the CURRENT focus task also
-            # ends its session (sweep + note + record) — BEFORE the complete,
-            # while the task is guaranteed still GET-able. Pomo sidecar match
-            # does nothing (Vex ruling: the app's pomo keeps running).
+            # Complete-guard: completing the CURRENT focus task also ends
+            # its session (sweep + note + record) — BEFORE the complete,
+            # while the task is guaranteed still GET-able. A matching pomo
+            # sidecar is left alone (the app's pomo keeps running).
             guard_note = ""
             try:
-                with open("/tmp/tickal_focus.json") as _ff:
+                with open(run_path("tickal_focus.json")) as _ff:
                     _fst = json.load(_ff)
                 if _fst.get("tid") == tid:
                     import io
@@ -428,7 +428,7 @@ def main():
             _ensure_tags_exist(new_tags)
             api = TickTickAPI(cfg.get_token())
             if tid == "BUFFER":
-                # 🧺 apply to every buffered task (Run 3.5)
+                # 🧺 apply to every buffered task
                 done = _buffer_apply(lambda bpid, btid, cur:
                     (api.update_task(btid, bpid, current=cur,
                                      tags=_norm_tags((cur.get("tags") or []) + new_tags)),
@@ -474,7 +474,7 @@ def main():
             old_pid, tid, new_pid = parts[0], parts[1], parts[2]
             api = TickTickAPI(cfg.get_token())
             if tid == "BUFFER":
-                # 🧺 move every buffered task (Run 3.5)
+                # 🧺 move every buffered task
                 projects = cache_store.get("projects") or []
                 new_list = next((p["name"] for p in projects if p["id"] == new_pid), "")
                 def _mv(bpid, btid, cur):
@@ -535,7 +535,7 @@ def main():
                     _patch_project_data(tid, pid_old=pid)
                 elif snap is None or cached is None:
                     # no snap to restore — invalidate, or the reopened task
-                    # stays invisible until the hourly sync (R4.5 fleet)
+                    # stays invisible until the hourly sync
                     cache_store.invalidate("all_tasks")
             except Exception:
                 cache_store.invalidate("all_tasks")
@@ -736,8 +736,8 @@ def main():
             notif = payload.get("_notif_text") or f"Task added to {payload.get('listName') or 'Inbox'}"
             print(notif + attach_note)
 
-            # Post-create chaining (R4.2 — the / menu's +stage / +focus rows;
-            # R4.4 — the preview row's ⌘/⇧⌘ chords add _post_fstart): stage
+            # Post-create chaining (the / menu's +stage / +focus rows; the
+            # preview row's ⌘/⇧⌘ chords add _post_fstart): stage
             # the new task, push it into the running focus block, or open the
             # ⏱/🍅 start flow on it, so add → search → stage collapses into
             # one flow. CRM's Prepare window keeps priority; act-again yields
@@ -781,7 +781,7 @@ def main():
                 _reopen_actions(result.get("projectId") or proj_id, _parent)
 
         elif arg.startswith("xact:"):
-            # Add-window rows can carry xact verbs (the T tag scope, R4.5) —
+            # Add-window rows can carry xact verbs (the T tag scope) —
             # the raw-URL fallback below would open() them. In-process like
             # the _post_stage chain; stdout still lands in the notification.
             _xdir = os.path.join(os.path.dirname(SCRIPT_DIR), "Scripts")

@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Orientation page: what TickAL is and where every doc lives.
 
-TickAL v3.0 is a keyboard-driven TickTick front end for Alfred 5. It covers search, browsing, task creation with a token grammar, a full actions menu, focus sessions with a floating bar, a CRM booking hub, and v2 extras (attachments, completed tasks, nested tags) — 20 keywords, all re-mappable in Configure Workflow. Everything runs on three chords, everywhere:
+TickAL is a keyboard-driven TickTick front end for Alfred 5. It covers search, browsing, task creation with a token grammar, a full actions menu, focus sessions with a floating bar, a CRM booking hub, and v2 extras (attachments, completed tasks, nested tags) — 20 keywords, all re-mappable in Configure Workflow. Everything runs on three chords, everywhere:
 
 | Chord | Does |
 |-------|------|

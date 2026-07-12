@@ -1,4 +1,4 @@
-"""periodic_engine.py — impure periodic-notes engine (R5a).
+"""periodic_engine.py — impure periodic-notes engine.
 
 Owns: the note index (one v1 get_project_data call), lazy-mint + the 04:30
 mint-ahead run, the refresh pipelines, money/stat roll-ups, and the journal
@@ -31,13 +31,14 @@ import periodic_sections as ps
 from api import TickTickAPI
 from display import md_links_display
 from filtering import utc_str_to_local_date
+from script_base import run_path
 
 LOCK_FILE = os.path.join(cfg.CONFIG_DIR, "periodic.lock")
 STAMP_FILE = os.path.join(cfg.CONFIG_DIR, "pn_last_mint")
 LOG_FILE = "/tmp/tickal_periodic.log"
 TPL_REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "periodic_templates")
 TPL_USER = os.path.join(cfg.CONFIG_DIR, "periodic_templates")
-REFRESH_TTL = 600          # pn_open skips a re-refresh younger than this (P-3)
+REFRESH_TTL = 600          # pn_open skips a re-refresh younger than this
 POST_GAP = 0.25            # rate-limit insurance between consecutive POSTs
 
 SPECS = ("daily", "yesterday", "weekly", "monthly", "quarterly", "yearly")
@@ -227,9 +228,9 @@ def _load_template(kind):
 
 
 # Smart-view rows: (label, url) — EXACTLY the VIEWS deep links shipped +
-# verified in everything_search (R3.75); routes not in that table are dead.
-# Whether the app hyperlinks ticktick:// inside note bodies is a Vex smoke
-# item — if not, this row drops and row 2 (https task-anchors) stays.
+# verified against the app in everything_search; routes not in that table
+# are dead. If the app doesn't hyperlink ticktick:// inside note bodies,
+# drop row 1 — row 2 (https task-anchors) still works.
 def _nav_lines():
     row1 = [("📅 Today", "ticktick://v1/show?smartlist=today"),
             ("🌄 Tomorrow", "ticktick://v1/show?smartlist=tomorrow"),
@@ -273,7 +274,7 @@ def _crumb(p, index):
 
 
 def _compose_lead(doc, p, index, refetch):
-    """The lead is ENGINE-OWNED (R2b — Vex's hand layout): crumb / nav / ---
+    """The lead is ENGINE-OWNED (hand-tuned layout): crumb / nav / ---
     and, on dailies, weather + quote + Mood/Day lines + a closing ---.
     Existing weather/quote/mood/day lines carry over; refetch=True swaps in
     fresh weather+quote (today's note only). Returns changed?"""
@@ -327,8 +328,8 @@ def _set_lead_line(doc, line_re, new_line):
 
 # ── mint ─────────────────────────────────────────────────────────────────────
 def _ensure_tags():
-    """Real tag entities before any note write (R4.2 law: v1 writes don't
-    create tags). Lazy-mint path needs this too (attack B-8)."""
+    """Real tag entities before any note write (v1 writes don't create
+    tags). Lazy-mint path needs this too."""
     try:
         from dispatch import _ensure_tags_exist
         _ensure_tags_exist(list(pm.TIER_TAGS.values()) + [pm.TAG_PARENT],
@@ -350,7 +351,7 @@ def create_note(p, index):
     })
     # Child tag ONLY — TickTick's group-by-tag prefers the PARENT when both
     # are attached, which would collapse the kanban into one 💫Periodic
-    # column (Vex smoke). The parent exists as the tree node, never on tasks.
+    # column. The parent exists as the tree node, never on tasks.
     task = _api().create_task(
         title=pm.title(p), project_id=areas.PERIODIC_LIST_ID,
         content=content, kind="NOTE",
@@ -395,8 +396,8 @@ _COMPLETED = None      # [(local_date_str, task)] — one v2 call per process
 
 
 def _completed_batch():
-    """One get_completed(days=15) client-filtered later into windows (B-7:
-    the method has no from/to params). None = no v2 token / call failed —
+    """One get_completed(days=15) client-filtered later into windows (the
+    method has no from/to params). None = no v2 token / call failed —
     consumers drop their lines (never fake zeros)."""
     global _COMPLETED
     if _COMPLETED is not None:
@@ -457,7 +458,7 @@ def _dailies_between(index, d0, d1):
 
 
 def _day_mood_of(task):
-    """A daily task → (score, note) | None. Lead Mood: line first (R2b),
+    """A daily task → (score, note) | None. Lead Mood: line first,
     legacy 💬 section then 📓 Notes 😊 entry for older notes."""
     doc = ps.parse_sections(task.get("content") or "")
     mood = pm.quote_mood(doc.lead)
@@ -525,13 +526,13 @@ def _tier2():
 
 
 # ── sweep (✅ Today → real completions) ──────────────────────────────────────
-SWEPT_FILE = "/tmp/tickal_pn_swept.json"
+SWEPT_FILE = run_path("tickal_pn_swept.json")
 
 
 def _swept_load():
     """{note_date_iso: [tids]} — the per-day swept ledger. Checked lines stay
     in the note as the day's record (never pruned), so WITHOUT this ledger
-    every refresh would re-POST the same completions all day (fleet finding)."""
+    every refresh would re-POST the same completions all day."""
     try:
         with open(SWEPT_FILE) as f:
             d = json.load(f)
@@ -542,7 +543,7 @@ def _swept_load():
 
 def _ledger_expired(key, horizon):
     """Date-aware prune: daily keys by their date, weekly keys by their
-    week's END + grace (fleet R2: a raw string compare dropped '2026-W53'
+    week's END + grace (a raw string compare dropped '2026-W53'
     mid-window once the horizon rolled into 2027)."""
     m = re.match(r"^(\d{4})-W(\d{2})$", key)
     if m:
@@ -605,14 +606,14 @@ def _complete_many(pairs):
 
 
 # ── refresh pipelines ────────────────────────────────────────────────────────
-# Sweepable checkbox sections per tier (R5a-R2: ⏩ Tomorrow and the ♻️ review
+# Sweepable checkbox sections per tier (⏩ Tomorrow and the ♻️ review
 # mirror sweep exactly like ✅ Today — tick anywhere, real task completes).
 _SWEEP_SECTIONS = {"daily": (pm.SEC_TODAY, pm.SEC_TOMORROW),
                    "weekly": (pm.SEC_REVIEW,)}
 
 
 def refresh_period(p, index=None, force=False):
-    """Refresh a note's generated sections. Note-date-anchored (B-5): live
+    """Refresh a note's generated sections. Note-date-anchored: live
     fillers run only while the period is current (+1 day of grace so the
     closing pass seals final numbers); historical notes get breadcrumb
     self-heal + money re-total only. Returns a short summary string."""
@@ -626,12 +627,12 @@ def refresh_period(p, index=None, force=False):
     notes_swept = []
 
     def mutate(doc, live):
-        # step 0 (SB-4): complete checked+linked boxes BEFORE any merge; the
+        # step 0: complete checked+linked boxes BEFORE any merge; the
         # merges then dedupe against ALL lines so nothing re-enters unchecked.
         # Window = the period + one day of grace (late-night ticks survive the
         # rollover via mint_ahead's closing-period refresh); the swept ledger
-        # stops re-POSTing the same completions on every refresh (fleet:
-        # checked lines stay in the note as the record by design).
+        # stops re-POSTing the same completions on every refresh (checked
+        # lines stay in the note as the record by design).
         if p.start <= today <= p.end + timedelta(days=1):
             key = pm.title_key(p)
             ledger = set(_swept_load().get(key, []))
@@ -655,7 +656,7 @@ def refresh_period(p, index=None, force=False):
                           refetch=(p.kind == "daily" and p.start == today))
         else:
             pm.set_breadcrumb(doc, _crumb(p, index))
-        # divider hygiene (R2b, Vex: --- hugs content — no blank lines around
+        # divider hygiene (--- hugs content — no blank lines around
         # separators): decor pre-lines lose stray blanks, and a body followed
         # by decor loses its trailing blanks
         for i, sec in enumerate(doc.sections):
@@ -683,7 +684,7 @@ def refresh_period(p, index=None, force=False):
 def _fill_daily(doc, p, index, is_today):
     day = p.start
     # 🎯 Week goals mirror — verbatim copy; absent/empty weekly keeps the
-    # template pointer line (bootstrap window, B-3 note)
+    # template pointer line (bootstrap window)
     wk = lookup(index, pm.period_for("weekly", day))
     if wk:
         wdoc = ps.parse_sections(wk.get("content") or "")
@@ -693,7 +694,7 @@ def _fill_daily(doc, p, index, is_today):
             ps.set_body(doc, pm.SEC_WEEK_GOALS, goals)
         elif gsec is not None:
             # weekly goals CLEARED → mirror resets to the pointer, never
-            # keeps stale copies (fleet)
+            # keeps stale copies
             ps.set_body(doc, pm.SEC_WEEK_GOALS,
                         [f"{pm.T1}_(mirrors this week's weekly note — "
                          "edit goals there)_"])
@@ -709,7 +710,7 @@ def _fill_daily(doc, p, index, is_today):
                 ps.set_body(doc, pm.SEC_HABITS, pm.ind(hb))
 
         # ⏪ Yesterday recap — honest-absence rule per line; FULL completed
-        # list (Vex R2), nested one level deeper
+        # list, nested one level deeper
         yd = day - timedelta(days=1)
         lines = []
         comp = _completed_between(yd, yd)
@@ -775,7 +776,7 @@ def _fill_daily(doc, p, index, is_today):
         ps.set_body(doc, pm.SEC_DAY_SUM,
                     pm.ind(sums) if sums else [f"{pm.T1}_(no data)_"])
 
-        # 🌅/🌙 journal Q lines seed at refresh (Vex R2: never-empty sections,
+        # 🌅/🌙 journal Q lines seed at refresh (never-empty sections,
         # phone-answerable); unanswered fixed prompts refresh their text so
         # the evening 'did you achieve {goal}' bakes in a goal set at noon
         _seed_daily_journals(doc, day)
@@ -789,7 +790,7 @@ def _fill_daily(doc, p, index, is_today):
 def _refresh_fixed_q(sec, fixed):
     """Rewrite UNANSWERED fixed-prompt Q lines to their current text (dynamic
     prompts bake in live goal text). Answered ones are frozen history; the
-    Q line's own indentation survives (R2b)."""
+    Q line's own indentation survives."""
     body = list(sec.body)
     changed = False
     for n, _q, a, a_idx in pm.journal_pairs(body):
@@ -805,7 +806,7 @@ def _refresh_fixed_q(sec, fixed):
 
 
 def _canon_journal_indent(sec):
-    """Normalize journal nesting (R2b): every Q line at T1, every A line at
+    """Normalize journal nesting: every Q line at T1, every A line at
     T2 — answers keep their text, only the leading whitespace converges (old
     flat-seeded notes + phone-typed answers drift otherwise)."""
     out, changed = [], False
@@ -858,7 +859,7 @@ def _by_proj(tasks, projects):
 
 
 def _set_headed(doc, prefix, data, body_lines=None):
-    """Data-in-header subsection (R2b): find by prefix, rewrite the header to
+    """Data-in-header subsection: find by prefix, rewrite the header to
     '### <prefix>: <data>' (bare prefix when data is None) and optionally the
     body. Missing section = kill switch, skip."""
     sec = ps.find_prefix(doc, prefix)
@@ -870,7 +871,7 @@ def _set_headed(doc, prefix, data, body_lines=None):
 
 
 def _fill_weekly(doc, p, index):
-    """The 📌 This Week subsections (data-in-header, Vex's layout) + 📨
+    """The 📌 This Week subsections (data-in-header) + 📨
     Entries + 😊 Moods + habits + 📔 journal seed + ♻️ review mirror + ⏪
     Last week. Live while current (+1 closing-grace day); older weeklies
     keep their sealed numbers."""
@@ -1021,8 +1022,8 @@ def _fill_weekly(doc, p, index):
 
 
 def _fill_review(doc):
-    """♻️ Weekly Review — a LIVE mirror of the weekly_review_id source (Vex
-    B3: focus-bar semantics, both directions). The sweep (step 0) completes
+    """♻️ Weekly Review — a LIVE mirror of the weekly_review_id source
+    (focus-bar semantics, both directions). The sweep (step 0) completes
     ticked boxes; this rebuild then re-pulls the source, so note and source
     converge on every refresh. Check-states of still-open tasks survive via
     the tid map. Unset/unknown id or a failed pull → section untouched."""
@@ -1118,19 +1119,19 @@ def _read_stamp():
 
 
 def mint_ahead(force=False):
-    """The agent run. R5a-R2 (Vex smoke): mint the day that JUST STARTED —
-    the 04:30 run creates TODAY's periods, so a 'tomorrow' card never sits in
-    the kanban all day. Exception: the weekly still mints Sunday for the week
-    AHEAD (his original spec — Sunday planning + the weekly journal's
-    three-things handoff write into it). Plus catch-up (current period of ALL
-    5 tiers — heals powered-off gaps, first-run bootstrap, guarantees roll-up
-    targets, B-3), refresh today, closing-period seals. Stamped: RunAtLoad
-    re-fires cost zero network when fresh."""
+    """The agent run: mint the day that JUST STARTED — the 04:30 run creates
+    TODAY's periods, so a 'tomorrow' card never sits in the kanban all day.
+    Exception: the weekly still mints Sunday for the week AHEAD (Sunday
+    planning — the weekly journal's three-things handoff writes into it).
+    Plus catch-up (current period of ALL 5 tiers — heals powered-off gaps,
+    first-run bootstrap, guarantees roll-up targets), refresh today,
+    closing-period seals. Stamped: RunAtLoad re-fires cost zero network when
+    fresh."""
     today = _today()
     stamp = _read_stamp()
     if not force and stamp == today.isoformat():
         return None                      # fresh stamp — nothing to do
-    # Narrow lock (fleet R2): index + creates only. The old outer lock held
+    # Narrow lock: index + creates only. The old outer lock held
     # through every refresh's Tier-2 HTTP, so an interactive pn_open at
     # Monday-morning wake blocked for the whole agent run. Refreshes
     # serialize per-note via _pn_rmw's own lock.
@@ -1145,7 +1146,7 @@ def mint_ahead(force=False):
             if not lookup(index, p):
                 create_note(p, index)
                 minted.append(pm.title(p))
-    # Closing pass FIRST (fleet R2): sweep yesterday's late ✅/⏩ ticks and
+    # Closing pass FIRST: sweep yesterday's late ✅/⏩ ticks and
     # seal ended periods BEFORE today's ✅ merge reads the cache — else a
     # task the sweep is about to complete re-enters today's note as a
     # permanent stale unchecked line. Stamp-gap walk (≤31 days): a
@@ -1193,7 +1194,7 @@ def resolve(spec):
 
 
 def _refresh_fresh(p):
-    """P-3 stamp: an open within REFRESH_TTL of the last refresh skips it."""
+    """Refresh stamp: an open within REFRESH_TTL of the last refresh skips it."""
     st = cache_store.get("pn_refresh_stamp") or {}
     return (st.get("key") == f"{p.kind}:{pm.title_key(p)}"
             and time.time() - st.get("ts", 0) < REFRESH_TTL)
@@ -1218,7 +1219,7 @@ def open_period(spec, refresh=True):
 
 def refresh_spec(spec):
     """Refresh one period by spec — the background half of the instant-open
-    path (Vex R2: opens were slow because refresh ran BEFORE the app opened).
+    path (opens were slow because refresh ran BEFORE the app opened).
     Ensures, refreshes, stamps. Returns a toast."""
     p, task, minted = resolve(spec)
     if not task:
@@ -1247,7 +1248,7 @@ def append_entry(kind, text, when=None):
         real = _api().create_task(title=text)      # Inbox
         rpid, rtid = real.get("projectId"), real.get("id")
         # patch the new task into the local cache — else it's invisible in
-        # search until the hourly sync (Vex R2 bug; same fix as the old
+        # search until the hourly sync (same fix as the old
         # fresh-inbox-add polish)
         try:
             cached = cache_store.get("all_tasks")
@@ -1283,9 +1284,9 @@ def append_entry(kind, text, when=None):
 
 
 def _lead_rmw_line(line_re, new_line, day=None):
-    """Replace-or-insert one managed line in a daily note's LEAD (R2b — the
-    Mood:/Day: lines live beside the quote now). day pins journal flows that
-    cross midnight (fleet R2)."""
+    """Replace-or-insert one managed line in a daily note's LEAD (the
+    Mood:/Day: lines live beside the quote). day pins journal flows that
+    cross midnight."""
     p = pm.period_for("daily", day or _today())
     task, _ = ensure_note(p)
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
@@ -1337,8 +1338,8 @@ def day_goal_now():
 
 def set_day_goal(pid_or_text, tid=None, title=None):
     """☀️ Day Goal (One Thing) — REPLACES the section body (one thing!).
-    Linked form also schedules the task for today (Vex: picking a goal rides
-    the schedule flow with today prefilled); text form creates a real Inbox
+    Linked form also schedules the task for today (picking a goal rides the
+    schedule flow with today prefilled); text form creates a real Inbox
     task due today and links it."""
     today_iso = _today().strftime("%Y-%m-%dT00:00:00+0000")
     if tid:
@@ -1429,7 +1430,7 @@ def journal_seed(slot):
     keys[n-1] routes answer n (mood/money/rating/highlight land outside the
     journal); pairs carry existing answers so the dialogs skip what's done;
     period PINS the note for the whole dialog run (a run that crosses
-    midnight must keep writing the day it started on — fleet R2)."""
+    midnight must keep writing the day it started on)."""
     sec_name = _JOURNAL_SECTIONS[slot]
     p = _journal_target(slot)
     task, _ = ensure_note(p)

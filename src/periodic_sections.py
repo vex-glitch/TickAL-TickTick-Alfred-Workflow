@@ -1,4 +1,4 @@
-"""periodic_sections.py — pure generic `###`-section splitter (R5a).
+"""periodic_sections.py — pure generic `###`-section splitter.
 
 Periodic notes (daily/weekly/monthly/quarterly/yearly) are NOTE-kind tasks
 whose content is a sequence of `### <name>` sections. Every feature is a
@@ -11,7 +11,7 @@ the document structure.
     ### 💰 Money
     <body lines>
 
-Contracts (unit-tested in tools/test_periodic.py):
+Contracts:
   * serialize_sections(parse_sections(c)) == c for every c (byte-preserving;
     CRLF-stripped \\r is the ONE normalization — the focus_blocks rule).
   * find() is an EXACT header-name match; a missing/renamed header means the
@@ -21,7 +21,7 @@ Contracts (unit-tested in tools/test_periodic.py):
     one section's line list.
 
 Sibling of focus_blocks.py, deliberately separate: the focus grammar keys on
-date headers only and its 40-case suite must stay untouched. Checkbox/link
+date headers only and its parser must stay untouched. Checkbox/link
 line classification is shared by importing focus_blocks' regex CONSTANTS
 (never its block model).
 
@@ -32,7 +32,7 @@ import re
 SECTION_HEADER_RE = re.compile(r'^###\s+(?P<name>.+?)\s*$')
 
 
-# Decor lines (R5a-R2b, Vex's hand layout): `---` dividers and `#`/`##`
+# Decor lines: `---` dividers and `#`/`##`
 # GROUP headers between sections. They belong to the section that FOLLOWS
 # them (its `pre`), so fillers rewriting a body can never wipe the divider
 # or group header sitting above the next section.
@@ -144,8 +144,8 @@ def set_header(sec, name):
 
 def _canon(lines):
     """Body content with no trailing blanks — the gap to the next header is
-    decided by _gap (R2b: Vex's style keeps --- dividers TIGHT against the
-    body, plain sections get one blank line)."""
+    decided by _gap (--- dividers sit TIGHT against the body; plain
+    sections get one blank line)."""
     body = list(lines)
     while body and not body[-1].strip():
         body.pop()

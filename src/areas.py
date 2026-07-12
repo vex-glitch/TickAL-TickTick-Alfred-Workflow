@@ -6,8 +6,8 @@ Shared by Scripts/actions.py (row preview) and src/dispatch.py (execution) so th
 one dynamic "Add CTA / Prepare" Actions row and its handler agree on exactly one
 behaviour per item.
 
-Area-tag derivation (matches Vex's hierarchy):
-  • a PROJECT list carries the area keycap in its own NAME  (💼P • Claude 4️⃣)
+Area-tag derivation (keycap naming convention):
+  • a PROJECT list carries the area keycap in its own NAME  (💼P • Website 4️⃣)
   • a regular list carries it on its parent FOLDER          (2️⃣Personal)
   • a TASK resolves via its parent list, same rule
 Matched by the keycap emoji, so folder-name spacing ("2️⃣ Personal" vs
@@ -29,14 +29,14 @@ CTA_LIST_NAME      = "📌CTA"    # display fallback — live name via cta_list_
 CRM_LIST_NAME      = "🔥CRM"    # display fallback — live name via crm_list_name()
 PROJECTS_FOLDER_ID = os.environ.get("projects_folder_id") or ""  # 💼Projects-style folder
 CRM_ID             = os.environ.get("crm_list_id") or ""         # 🔥CRM-style list
-PERIODIC_LIST_ID   = cfg.get_periodic_list_id()                  # 💫Periodic notes list (R5a)
+PERIODIC_LIST_ID   = cfg.get_periodic_list_id()                  # 💫Periodic notes list
 DOCS_BASE = "https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs"
 PREPARE_TAG        = "🔥prepare"                   # normalised (lower) form
 # The 🔥CRM tag group — every CRM-scoped picker offers ONLY these (canonical
 # home; add_task.py/browse.py keep local copies for their own flows)
 CRM_TAGS           = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
 # A new CRM task carrying one of these chains to the Prepare window
-# (dispatch) — add_task suppresses the R4.4 focus chords for the same set.
+# (dispatch) — add_task suppresses the focus chords for the same set.
 BOOKING_TAGS       = CRM_TAGS - {PREPARE_TAG}
 
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -76,7 +76,7 @@ def is_project(name):
 
 
 def clean_project_name(name):
-    """'💼P • Claude 4️⃣' → 'Claude' (strip the prefix and the trailing keycap)."""
+    """'💼P • Website 4️⃣' → 'Website' (strip the prefix and the trailing keycap)."""
     n = PROJECT_RE.sub("", name or "")
     n = KEYCAP_RE.sub("", n)
     return n.strip()

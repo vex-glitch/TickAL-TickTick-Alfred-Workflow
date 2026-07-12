@@ -39,7 +39,7 @@ def main():
         # TickTick's server-side tag-name case (labels keep theirs).
         updated = _norm_tags([t for t in tags if t.lower() != old_tag.lower()]
                              + [new_tag])
-        _ensure_tags_exist([new_tag])   # R4.2 — a ➕ picker row may coin it
+        _ensure_tags_exist([new_tag])   # a ➕ picker row may coin it
         api.update_task(tid, pid, current=current, tags=updated)
         # all_tasks + the per-list project_data mirror in one call
         _patch_task_cache(tid, tags=updated)

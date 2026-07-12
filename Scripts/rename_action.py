@@ -36,7 +36,7 @@ if not new_title:
     print("Error: new title is empty")
     sys.exit(1)
 
-# B4 (Run 3): renaming a LIST — same input flow, no task id; item_type rides
+# Renaming a LIST — same input flow, no task id; item_type rides
 # the session vars from the ⌘ menu row. No act-again reopen (task-centric).
 if os.environ.get("item_type", "") == "list":
     if not pid:

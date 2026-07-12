@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-browse.py — Alfred Script Filter  (P3: unified browse box, decision D1)
+browse.py — Alfred Script Filter (unified browse box)
 
 ONE node renders every level of the browse tree. The whole state rides in $1:
 
     ctx:<level>[:<id1>[:<id2>]] [query…]
 
-Levels (see tools/plist_surgery/P3_BROWSE_DESIGN.md):
+Levels:
     ctx:folders                         folder picker (+ 📥 Inbox row)
     ctx:lists[:<folderId>]              lists — all, or those in a folder
     ctx:sections:<listId>               sections — auto-skips straight to tasks
@@ -22,7 +22,7 @@ Levels (see tools/plist_surgery/P3_BROWSE_DESIGN.md):
     ctx:wontdo                          Won't Do (abandoned) tasks
 
 Anything after the ctx token is the fuzzy filter query. `ctx:subtasks:<taskId>`
-(single id, per the design doc example) is also accepted — the list is then
+(single id) is also accepted — the list is then
 resolved from the all_tasks cache.
 
 Every row emits:
@@ -35,10 +35,9 @@ Every row emits:
     mods.alt    arg = child ctx (⌥ drill loop); on task rows valid only when
                 the task actually has incomplete children
 
-Replaces at final cutover: folders / lists / sections / tasks / subtasks /
-subsubtasks / drill_tags / inbox_tasks / smart_list / completed_list script
-filters. Their logic is COPIED here (they print on run; not worth refactoring
-scripts that are about to die) — they stay untouched on disk until deletion.
+Replaced the old per-level script filters (folders / lists / sections / tasks /
+subtasks / subsubtasks / drill_tags / inbox_tasks / smart_list /
+completed_list); their rendering logic was copied here.
 """
 import sys
 import os
@@ -50,7 +49,7 @@ from datetime import datetime, timedelta, timezone
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 try:
-    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR
+    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR, run_path
     bootstrap()
 except Exception as e:
     print(json.dumps({"items": [{"uid": "err", "title": "TickTick Error",
@@ -68,7 +67,7 @@ try:
                          col_lookup, list_name_for, join_breadcrumb, search_key,
                          PRIORITY, MOD_BACK, MODS_COMPLETED, buffered_ids,
                          note_snippet)
-    # Run 3.75: smart-list helpers live in src/filtering.py (shared with
+    # Smart-list helpers live in src/filtering.py (shared with
     # everything_search's inline views).
     from filtering import (SMART_LABELS, smart_filter, task_local_date,
                            utc_str_to_local_date)
@@ -81,7 +80,7 @@ INBOX_API_ID = "inbox"   # literal string accepted by the TickTick API
 
 # 🔥CRM (ported from drill_tags.py): on this list's tag screen, ⇧⌘⏎ on a tag
 # opens the CRM add pre-tagged, and the tag list is restricted to the 🔥CRM tag
-# group. TEMPORARY wire — retire-or-keep is an open item at cutover step 3.
+# group.
 import areas as _areas
 CRM_ID   = _areas.CRM_ID   # Configure panel; empty = CRM branches never match
 CRM_TAGS = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
@@ -96,11 +95,11 @@ def parse_ctx(raw):
     token = parts[0] if parts else ""
     query = parts[1].strip() if len(parts) > 1 else ""
     # bare aliases let plain menu args ("today") reach the right level
-    # without argument-injector nodes (P3d cutover)
+    # without argument-injector nodes
     ALIASES = {"today": "ctx:smart:today", "tomorrow": "ctx:smart:tomorrow",
                "next7days": "ctx:smart:next7", "7days": "ctx:smart:next7",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
-               # main-menu view args (▷50F14423 branches, P3d retarget)
+               # main-menu view args (▷50F14423 branches)
                "view_today": "ctx:smart:today",
                "view_tomorrow": "ctx:smart:tomorrow",
                "view_7": "ctx:smart:next7", "view_inbox": "ctx:inbox"}
@@ -207,7 +206,7 @@ def _tag_group_key(task, rank):
     return (0, rank[best], "") if best in rank else (1, 0, best)
 
 def _sort_tasks(tasks, group_by_tag=False):
-    """R4 polish (Vex): priority floats to the top of every drill view; the
+    """Priority floats to the top of every drill view; the
     whole-list 'Show all' view additionally groups by tag. Stable sorts —
     cache order survives inside each band, and a typed query's fuzzy scoring
     still wins (this order is its tiebreak)."""
@@ -218,7 +217,7 @@ def _sort_tasks(tasks, group_by_tag=False):
     return tasks
 
 def _show_all_row(list_id, all_tasks, uid="tag-all"):
-    """Top row of the tag/section drill screens (R4 polish, Vex): ⏎ rewrites
+    """Top row of the tag/section drill screens: ⏎ rewrites
     the bar to the 'all ' sentinel — the whole list flat, grouped by tag,
     priority first. ⌥⏎ does the same through a proper ctx hop."""
     n_open = sum(1 for t in all_tasks
@@ -306,7 +305,7 @@ def task_item(t, pid, sub_count, breadcrumb="", uid="", child_level="subtasks"):
         "ctrl":    {"valid": True, "subtitle": "🔙 Back"},
     }
     if not is_note:
-        # ⌥⇧ → buffer (R3.9 — tasks/subtasks only; X1 routes xact: args)
+        # ⌥⇧ → buffer (tasks/subtasks only; X1 routes xact: args)
         mods["alt+shift"] = {"valid": True,
                              "arg": f"xact:buffer_add:{pid}:{tid}",
                              "subtitle": "🅿️ Add to buffer",
@@ -378,7 +377,7 @@ def render_folders(query):
         # Manual "1) Name" prefixes rank first; unprefixed (v2 auto-named)
         # folders follow in TickTick's own sidebar order (group sortOrder);
         # folders with no live group (tokenless installs, ghosts of deleted
-        # groups) sink below the autos in insertion order — the pre-R4.1
+        # groups) sink below the autos in insertion order — the original
         # rendering for tokenless users.
         v2_order = {g.get("id"): (g.get("sortOrder") or 0)
                     for g in (cache_store.get("folder_groups") or [])}
@@ -435,8 +434,8 @@ def render_lists(folder_id, query):
         link = f"ticktick:///webapp/#p/{pid}/tasks"
 
         # Sub-count: distinct TAGS on the list's open tasks — the count must
-        # match what ⌥ drills into (Vex ruling 2026-07-06). Browse aligned
-        # with search at R3.9 gate #2: ⌥ tags · ⌥⇧ sections on BOTH.
+        # match what ⌥ drills into. Browse and search agree: ⌥ tags ·
+        # ⌥⇧ sections on both.
         list_tags = {tag for t in all_tasks
                      if t.get("_projectId") == pid and t.get("status", 0) == 0
                      for tag in (t.get("tags") or [])}
@@ -495,7 +494,7 @@ def render_sections(list_id, query):
         sid = unsectioned_col["id"] if unsectioned_col else "UNSECTIONED"
         return render_tasks(list_id, sid, query, back_override=lists_parent(list_id))
 
-    # "all " sentinel (R4 polish): ⏎ on the 📋 Show-all row rewrites the bar —
+    # "all " sentinel: ⏎ on the 📋 Show-all row rewrites the bar —
     # the whole list renders flat, grouped by tag; anything after the token
     # filters it. Human-readable advance, same idea as "#Tag ".
     if query == "all" or query.startswith("all "):
@@ -598,7 +597,7 @@ def render_tasks(list_id, section_id, query, back_override=None):
     # Only incomplete top-level tasks
     tasks = [t for t in tasks if t.get("status", 0) == 0 and not t.get("parentId")]
     # Priority first everywhere; the section-less whole-list view also groups
-    # by tag in TickTick's own tag order (R4 polish, Vex).
+    # by tag in TickTick's own tag order.
     _sort_tasks(tasks, group_by_tag=not section_id)
 
     items = []
@@ -690,8 +689,8 @@ def render_tags(list_id, query):
     all_tasks = (get_project_data(list_id) or {}).get("tasks", [])
     counts    = tag_counts(all_tasks)
 
-    # ⏎ on a tag row autocompletes "#<Tag> " — a human-readable advance (Vex:
-    # no ctx: strings in the bar). An exact #tag token renders that tag's
+    # ⏎ on a tag row autocompletes "#<Tag> " — a human-readable advance (keeps
+    # raw ctx: tokens out of the bar). An exact #tag token renders that tag's
     # tasks; anything after it filters them.
     if query.startswith("#"):
         head, _, rest = query[1:].partition(" ")
@@ -714,13 +713,12 @@ def render_tags(list_id, query):
             subtitle=build_subtitle(counts[tag], child_label="Task", actions=True),
             arg="", valid=False,
             # ⏎ → advance to this tag's tasks. The bar gets a human-readable
-            # "#Tag " (parsed back above) — never a raw ctx: token (Vex ruling
-            # 2026-07-06).
+            # "#Tag " (parsed back above) — never a raw ctx: token.
             autocomplete=f"{fmt_tags([tag]) or '#' + tag} ",
             mods={
                 "alt": {"arg": "", "valid": True, "subtitle": "Browse this tag's tasks",
                         "variables": {"browse_ctx": f"ctx:tagitems:{list_id}:{tag}"}},
-                # Run 2: real ⌘ Actions for tags (open tag / copy link / back)
+                # Real ⌘ Actions for tags (open tag / copy link / back)
                 "cmd": {"arg": "", "valid": True, "subtitle": "⌘ Actions"},
                 "alt+cmd": {"arg": f"copy:{tag_link(tag)}", "valid": True,
                             "subtitle": "Copy tag link"},
@@ -729,8 +727,7 @@ def render_tags(list_id, query):
                        "item_type": "tag", "tag_name": tag},
         )
         # 🔥CRM: ⇧⌘⏎ on a tag opens the CRM add pre-tagged (booking flow).
-        # TEMPORARY wire ported verbatim from drill_tags.py — cutover step 3
-        # decides whether it survives as a ctx:tags mode flag or retires.
+        # Ported from the old tag-drill screen.
         if CRM_ID and list_id == CRM_ID:
             item["mods"]["cmd+shift"] = {
                 "arg": "add", "valid": True,
@@ -744,7 +741,7 @@ def render_tags(list_id, query):
     if query:
         items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
 
-        # Run 3 (Vex): typing on a tag screen also filters the list's tasks
+        # Typing on a tag screen also filters the list's tasks
         # directly — matching tasks follow the tag rows, so the CRM search
         # works without picking a tag first. Clearing the query brings back
         # the pure tag list.
@@ -802,10 +799,10 @@ def render_tagitems(list_id, tag, query):
 
     return add_back(items, f"ctx:tags:{list_id}")
 
-# ── Level: buffer (Run 3.5, 🅿️ since R3.9 — tasks collected via ⌘/⌥⇧) ───────
+# ── Level: buffer (🅿️ — tasks collected via ⌘/⌥⇧) ───────────────────────────
 def render_buffer(query):
     try:
-        with open("/tmp/tickal_buffer.txt") as f:
+        with open(run_path("tickal_buffer.txt")) as f:
             pairs = [ln.strip().split(":", 1) for ln in f if ln.strip()]
     except OSError:
         pairs = []
@@ -942,7 +939,7 @@ def render_completed(query):
     return add_back(items, "")
 
 
-# ── Level: wontdo (R4.5 — the third status; twin of render_completed) ────────
+# ── Level: wontdo (the third status; twin of render_completed) ──────────────
 def render_wontdo(query):
     tasks = cache_store.get("wontdo_tasks") or []
 
@@ -998,7 +995,7 @@ def render_wontdo(query):
     return add_back(items, "")
 
 
-# ── Level: filter (Run 3.75 — custom filters from filters_config.py) ─────────
+# ── Level: filter (custom filters from filters_config.py) ───────────────────
 def render_filter(index, query):
     """Tasks matching FILTERS[index], as canonical task rows (full ⌘ Actions).
     Flat — the retired filter_view's L1 tag-grouping is not reproduced. Back

@@ -1,4 +1,4 @@
-"""periodic_model.py — pure model for periodic notes (R5a).
+"""periodic_model.py — pure model for periodic notes.
 
 Everything deterministic lives here: period math, the frozen title/tag lookup
 contracts, section-header constants (the SINGLE source — templates render from
@@ -6,12 +6,12 @@ them and every writer looks anchors up here, never hand-typed twice), line
 grammars, money parsing/roll-ups, journal prompt selection + Q/A merge,
 sparklines, harvest, summary composition.
 
-Locale law (PEP538 scar): English day/month names come from the explicit
-tables below — NEVER strftime %a/%B.
+Locale rule: English day/month names come from the explicit tables below —
+NEVER strftime %a/%B (locale-dependent).
 
 Pure module: no I/O, no workflow imports except focus_blocks' regex constants
 (CHECKBOX_RE / LINK_TAIL_RE / make_line — shared line grammar, not the block
-model). Unit suite: tools/test_periodic.py.
+model).
 """
 import re
 import random
@@ -32,12 +32,12 @@ TIER_TAGS = {"daily": "💫Daily", "weekly": "💫Weekly", "monthly": "💫Month
              "quarterly": "💫Quarterly", "yearly": "💫Yearly"}
 KINDS = ("daily", "weekly", "monthly", "quarterly", "yearly")
 
-# ── Section header constants (attack SB-1: one source of truth) ─────────────
-# R5a-R2b: Vex's hand layout is the shipped default — nav/quote/weather/mood
-# moved into the LEAD (engine-composed), `#` group headers + `---` dividers
-# are decor (periodic_sections pre), several anchors renamed to his taxonomy,
-# and the weekly 📌 This Week block became data-in-HEADER subsections
-# (PREFIX anchors, found via ps.find_prefix, headers rewritten on refresh).
+# ── Section header constants (one source of truth) ──────────────────────────
+# The shipped default layout: nav/quote/weather/mood live in the LEAD
+# (engine-composed), `#` group headers + `---` dividers are decor
+# (periodic_sections pre), and the weekly 📌 This Week block is data-in-HEADER
+# subsections (PREFIX anchors, found via ps.find_prefix, headers rewritten on
+# refresh).
 SEC_COUNTDOWNS = "⏳ Countdowns"
 SEC_HABITS     = "🔄 Habits"
 SEC_WEEK_GOALS = "🗓️ Weekly"              # daily mirror of the weekly Goals
@@ -67,7 +67,7 @@ SEC_WEEKLY_JNL = "📔 Weekly journal"
 SEC_REVIEW     = "♻️ Weekly Review"
 SEC_INCOME     = "💰 Income"              # prefix
 SEC_STATS      = "📈 Stats"               # monthly
-# LEGACY names (pre-R2b notes) — readers fall back to these, writers don't
+# LEGACY names (older notes) — readers fall back to these, writers don't
 LEGACY_NAV     = "🧭 Nav"
 LEGACY_QUOTE   = "💬 Quote & weather"
 LEGACY_TODAY   = "✅ Today"
@@ -90,9 +90,9 @@ SEC_THEME      = "🧭 Theme of the year"
 SEC_ANTI       = "🚫 Anti-goals"
 SEC_DECEMBER   = "🧪 December test"
 
-# Anchors every writer targets, per tier — test 18 asserts each appears as a
-# `### <anchor>…` header line in the shipped template (startswith: prefix
-# anchors seed bare, the engine appends `: data` on refresh). SB-1 net.
+# Anchors every writer targets, per tier — each must appear as a
+# `### <anchor>…` header line in the shipped template (prefix anchors seed
+# bare, the engine appends `: data` on refresh).
 WRITER_ANCHORS = {
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
                   SEC_YESTERDAY, SEC_TODAY, SEC_TOMORROW, SEC_MORNING,
@@ -106,8 +106,9 @@ WRITER_ANCHORS = {
     "yearly":    [SEC_MONEY],
 }
 
-# Tab indents — Vex's hand layout nests section bodies (R5a-R2b). Parsers are
-# whitespace-tolerant; WRITERS use these so generated lines match his look.
+# Tab indents — the default layout nests section bodies. Parsers are
+# whitespace-tolerant; WRITERS use these so generated lines match the
+# shipped look.
 T1, T2, T3 = "\t", "\t\t", "\t\t\t"
 
 
@@ -267,9 +268,9 @@ def set_breadcrumb(doc, line):
 
 
 # ── Money ────────────────────────────────────────────────────────────────────
-# Whitespace-tolerant + total-as-bullet (R5a-R2b: Vex's layout indents body
-# lines with tabs and bullets the Total — the old anchored regexes silently
-# zeroed his Saturday sum).
+# Whitespace-tolerant + total-as-bullet (the layout indents body lines with
+# tabs and bullets the Total — the old anchored regexes silently zeroed
+# indented sums).
 MONEY_TOTAL_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*Total = (?P<amt>.+)\*\*\s*$")
 WEEK_DAY_RE = re.compile(
     r"^\s*- (?P<dow>Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?P<d>\d{1,2}) "
@@ -306,8 +307,8 @@ def fmt_amount(x):
 
 def parse_money_entry(line):
     """Daily-money entry → (amount, label) | None. Canonical '- 485 · label';
-    lenient (P-1): '- 485' and '- 485 - label' also parse; any indentation
-    tolerated (R2b). Checkbox / day-line / total lines fall out via the
+    lenient: '- 485' and '- 485 - label' also parse; any indentation
+    tolerated. Checkbox / day-line / total lines fall out via the
     parse_amount guard or explicit checks."""
     s = line.strip()
     if not s.startswith("- ") or MONEY_TOTAL_RE.match(s):
@@ -332,7 +333,7 @@ def money_entry_line(amount, label):
 
 
 def money_day_line(d, total):
-    # EXACT weekly contract (Vex): "- Sat 11 Jul 2026 • 485" — no zero-pad day
+    # EXACT weekly line format: "- Sat 11 Jul 2026 • 485" — no zero-pad day
     return (f"- {DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]} "
             f"{d.year} • {fmt_amount(total)}")
 
@@ -347,7 +348,7 @@ def section_money_sum(body_lines):
 
 
 def money_total_line(total, n=2):
-    """Canonical total line — indented bullet (Vex R2b style)."""
+    """Canonical total line — indented bullet."""
     return ("\t" * n) + f"- **Total = {fmt_amount(total)}**"
 
 
@@ -395,8 +396,8 @@ def harvest_entries(body_lines):
 
 def day_mood(body_lines):
     """Last 😊 entry of the day → (score:int, note) | None. LEGACY reader —
-    R5a-R2 moved mood to the 💬 Mood: line (quote_mood below); this survives
-    for pre-R2 notes only."""
+    mood has since moved to the 💬 Mood: line (quote_mood below); this
+    survives for older notes only."""
     best = None
     for _, glyph, body in harvest_entries(body_lines):
         if glyph == "😊":
@@ -406,7 +407,7 @@ def day_mood(body_lines):
     return best
 
 
-# ── Mood faces + day rating (💬 section lines, R5a-R2) ──────────────────────
+# ── Mood faces + day rating (💬 section lines) ──────────────────────────────
 MOOD_FACES = {1: "😢", 2: "😞", 3: "😐", 4: "🙂", 5: "😁"}
 FACE_SCORE = {v: k for k, v in MOOD_FACES.items()}
 MOOD_LINE_RE = re.compile(r"^Mood: (?P<face>😢|😞|😐|🙂|😁)(?: · (?P<note>.*))?$")
@@ -470,17 +471,17 @@ def set_line_in_body(body_lines, line_re, new_line):
 PENDING_RE = re.compile(r"^_\(.*\)_$")
 
 
-# ── 📨 Entries (weekly harvest, R5a-R2) ──────────────────────────────────────
-GROUP_ORDER = ["🏆", "👎", "💭", "🔗"]     # 😊 gets its own weekly section (R2b)
+# ── 📨 Entries (weekly harvest) ──────────────────────────────────────────────
+GROUP_ORDER = ["🏆", "👎", "💭", "🔗"]     # 😊 gets its own weekly section
 GROUP_LABELS = {"🏆": "Wins", "👎": "Nags", "💭": "Thoughts",
                 "🔗": "Links", "😊": "Moods"}
 
 
 def entries_grouped(items, glyphs=None, gi=T2, ei=T3):
     """items = [(date, hm, glyph, body)] → 📨 Entries body: grouped by type,
-    newest first inside each group, timestamp AFTER the text (Vex contract:
-    '- body · Thu 14:32'), tab-nested per his layout (gi = group indent,
-    ei = entry indent)."""
+    newest first inside each group, timestamp AFTER the text
+    ('- body · Thu 14:32'), tab-nested (gi = group indent, ei = entry
+    indent)."""
     lines = []
     for glyph in (glyphs or GROUP_ORDER):
         grp = sorted([it for it in items if it[2] == glyph],
@@ -520,7 +521,7 @@ def chip(cur, prev, kind="count", unit="tasks"):
 
 # ── Checkbox merge (✅ Today, MANAGED) ───────────────────────────────────────
 def checkbox_tids(body_lines):
-    """tid → checked for every LINKED checkbox line (checked or not — SB-4)."""
+    """tid → checked for every LINKED checkbox line (checked or not)."""
     out = {}
     for ln in body_lines:
         cb = fb.CHECKBOX_RE.match(ln)
@@ -546,10 +547,10 @@ def checked_linked(body_lines):
 
 def merge_checkboxes(body_lines, items, indent=""):
     """items = [(pid, tid, title)] → (new_body, added). Dedupe by tid against
-    ALL existing linked lines, checked or unchecked (attack SB-4 — a phone-
-    ticked task must NOT re-enter unchecked). User lines + check states are
-    preserved verbatim; new links append after the last checkbox (or at top),
-    prefixed with `indent` (R2b tab nesting)."""
+    ALL existing linked lines, checked or unchecked (a phone-ticked task must
+    NOT re-enter unchecked). User lines + check states are preserved verbatim;
+    new links append after the last checkbox (or at top), prefixed with
+    `indent` (tab nesting)."""
     known = set(checkbox_tids(body_lines))
     fresh = [indent + fb.make_line(pid, tid, ttl).raw
              for pid, tid, ttl in items if tid not in known]
@@ -575,7 +576,7 @@ JOURNAL_Q_RE = re.compile(r"^\s*\*\*Q(?P<n>\d+) · (?P<q>.+)\*\*\s*$")
 JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)A: ?(?P<a>.*)$")
 
 
-# Fixed journal prompts (R5a-R2) — code-owned because they ROUTE: each key
+# Fixed journal prompts — code-owned because they ROUTE: each key
 # tells the merge step where the answer lands (mood → 💬 Mood line, money →
 # 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
 # live day-goal / weekly-goals text baked into the prompt.
@@ -623,8 +624,9 @@ def journal_fixed(slot, ctx=None):
 
 def select_prompts(pool, d, which, k=None):
     """k seeded-random picks from the pool's random section. Deterministic
-    across processes: random.Random(f'{date}:{slot}') — NEVER hash() (attack
-    SB-3). Fixed prompts live in journal_fixed, not the pool."""
+    across processes: random.Random(f'{date}:{slot}') — NEVER hash(), which
+    is salted per process. Fixed prompts live in journal_fixed, not the
+    pool."""
     rnd_pool = list(pool.get("random", []))
     k = JOURNAL_RANDOM_K.get(which, 3) if k is None else k
     k = min(k, len(rnd_pool))
@@ -635,7 +637,7 @@ def select_prompts(pool, d, which, k=None):
 def seed_journal_lines(prompts):
     lines = []
     for i, q in enumerate(prompts, 1):
-        lines.append(f"{T1}**Q{i} · {q}**")     # R2b: Vex's nested journal
+        lines.append(f"{T1}**Q{i} · {q}**")     # nested journal layout
         lines.append(f"{T2}A: ")
     return lines
 
@@ -662,9 +664,8 @@ def journal_pairs(body_lines):
 
 
 def merge_journal_answers(body_lines, answers):
-    """answers = {n: text}. Fill ONLY still-empty A-lines (phone wins — attack
-    B-2). The A-line's own indentation survives (R2b). Returns (new_body,
-    filled_count)."""
+    """answers = {n: text}. Fill ONLY still-empty A-lines (phone wins). The
+    A-line's own indentation survives. Returns (new_body, filled_count)."""
     body = list(body_lines)
     filled = 0
     for n, _q, a, idx in journal_pairs(body):
@@ -751,8 +752,7 @@ _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 
 def strip_md_links(s):
     """Repeated md-link strip + leftover URL-paren cleanup — titles that
-    themselves contain ']' or '](' must not leak raw URLs into prompts
-    (fleet R2)."""
+    themselves contain ']' or '](' must not leak raw URLs into prompts."""
     prev = None
     while prev != s:
         prev = s

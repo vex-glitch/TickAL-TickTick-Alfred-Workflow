@@ -62,8 +62,8 @@ def main():
             pass
 
     # No back chip: this Script Filter has NO ctrl (or any back) edge on the
-    # canvas — the old "⌘⇧ 🔙" advertised a chord that never existed (R4.5
-    # fleet catch). Wire a real ⌃ back before re-adding a chip.
+    # canvas — the old "⌘⇧ 🔙" advertised a chord that never existed.
+    # Wire a real ⌃ back before re-adding a chip.
     back = ""
 
     try:

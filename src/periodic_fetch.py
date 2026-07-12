@@ -1,4 +1,4 @@
-"""periodic_fetch.py — Tier-2 fetchers for periodic notes (R5a).
+"""periodic_fetch.py — Tier-2 fetchers for periodic notes.
 
 Weather + quote (first external HTTP in the repo) and the three v2 readers
 probed live 2026-07-11: GET /api/v2/habits + POST /api/v2/habitCheckins/query,
@@ -82,9 +82,9 @@ def get_latlon():
     if data.get("periodic_lat") is not None and data.get("periodic_lon") is not None:
         return data["periodic_lat"], data["periodic_lon"]
     try:
-        r = requests.get("http://ip-api.com/json", timeout=_TIMEOUT)
+        r = requests.get("https://ipwho.is/", timeout=_TIMEOUT)
         j = r.json()
-        lat, lon = j.get("lat"), j.get("lon")
+        lat, lon = j.get("latitude"), j.get("longitude")
         if lat is None or lon is None:
             return None
         data["periodic_lat"], data["periodic_lon"] = lat, lon
@@ -124,8 +124,8 @@ def get_weather():
 
 
 def get_quote():
-    """'> "text" — Author' from zenquotes.io, once per date. Explicitly
-    discardable (Vex: 'easily discarded if proves naggy')."""
+    """'> "text" — Author' from zenquotes.io, once per date. Deliberately
+    easy to discard if it proves naggy."""
     today = date.today().isoformat()
     st = cache_store.get("pn_quote") or {}
     if st.get("date") == today:
@@ -186,8 +186,7 @@ def focus_minutes(d0, d1):
 def focus_by_day(d0, d1):
     """{iso_date: (minutes, top_task_title|None)} for LOCAL start dates in
     [d0, d1]. Top task = the title with the most focused minutes that day,
-    surfaced only when the day had MORE than one distinct task (Vex: 'with
-    task I was focusing on most that day if there was more than one focus').
+    surfaced only when the day had MORE than one distinct task.
     None when the timeline reader failed."""
     recs = _timeline()
     if recs is None:

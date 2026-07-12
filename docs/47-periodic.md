@@ -57,7 +57,7 @@ Log on the daily (`pn $ 485 tattoo` → `- 485 · tattoo`, day **Total** recompu
 
 Minted Sunday for the week ahead. 🏆 Goals → ✨ Highlight → **📌 This Week**, where the numbers live in the section headers themselves, each with a vs-last-week chip: `### ✅ Completed: 121 · 🟢 25 ahead of last week (+26%)` — 🔥 Top list, 🚀 Top tasks, ➕ Created, ✅ Completed, 📈 Stats (per-day bars), 🎯 Focus (by day, with the day's top task), **📨 Entries** (every win/nag/thought/link, grouped, newest first), 😊 Moods (by day + average), 🔄 Habit consistency, 💰 Income (day lines) → 📔 Weekly journal → **♻️ Weekly Review** — a live mirror of your review list, sections preserved, both directions: tick in the note and the real task completes; the source re-mirrors on every refresh → ⏪ Last week.
 
-**Monthly** adds sparklines and top wins; **quarterly** and **yearly** ship as templates + money roll-ups in v3.0 (their reviews land in a point release — the first real quarterly mint is Sep 30).
+**Monthly** adds sparklines and top wins; **quarterly** and **yearly** ship as templates + money roll-ups for now — their review sections land in a later release (the first real quarterly mint is Sep 30).
 
 ## The 04:30 agent
 

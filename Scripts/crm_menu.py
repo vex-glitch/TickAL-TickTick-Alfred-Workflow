@@ -8,11 +8,11 @@ The CRM hotkey / "CRM…" main-menu row opens this: two options, both scoped to 
   • Add    → arg "add"  → ET "Add" with list_id=CRM → the normal add flow pinned
              to CRM: auto-attaches a clipboard image, the [[ picker scopes to CRM
              bookings, and a booking tag triggers the "Prepare for …" follow-up.
-  • Search → arg "tags" → the tag-drill (drill_tags.py) scoped to CRM. "tags" is
-             the sentinel drill_tags already normalises to an empty query.
+  • Search → arg "tags" → the browse tag screen (browse.py, ctx:tags) scoped to
+             CRM. "tags" only routes the conditional — the ET call drops it.
 
-Wiring: this filter's output → a Conditional — add → ET "Add", tags → the
-drill/tags ET — both passing variables (so list_id reaches the target).
+Wiring: this filter's output → a Conditional — add → ET "Add", tags → ET
+"Browse" — both passing variables (so list_id and browse_ctx reach the target).
 """
 import sys
 import os
@@ -71,7 +71,7 @@ def build_items():
     ]
 
 
-# P4c: back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# Back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
 _orig_output = alfred.output
 def _output_backstamped(items, **kw):

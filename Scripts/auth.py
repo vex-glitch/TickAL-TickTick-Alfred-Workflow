@@ -9,6 +9,7 @@ import sys
 import os
 import plistlib
 import subprocess
+import secrets
 import webbrowser
 import urllib.parse
 import http.server
@@ -78,11 +79,13 @@ def main():
         sys.exit(1)
 
     # ── Build auth URL ────────────────────────────────────────────────────────
+    state = secrets.token_urlsafe(16)   # CSRF guard (RFC 8252 §8.9)
     auth_url = AUTH_URL + "?" + urllib.parse.urlencode({
         "client_id":     client_id,
         "response_type": "code",
         "redirect_uri":  REDIRECT_URI,
         "scope":         "tasks:read tasks:write",
+        "state":         state,
     })
 
     # ── Local server to capture the redirect ──────────────────────────────────
@@ -91,9 +94,13 @@ def main():
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            if "code" in qs:
+            if "code" in qs and qs.get("state", [""])[0] == state:
                 code_holder["code"] = qs["code"][0]
                 body = b"<html><body><h2>Done. You can close this tab.</h2></body></html>"
+            elif "code" in qs:
+                # state mismatch — not our redirect; reject it and keep waiting
+                body = (b"<html><body><h2>Login was denied or failed."
+                        b" Close this tab and run tlogin again.</h2></body></html>")
             elif "error" in qs:
                 code_holder["error"] = qs["error"][0]
                 body = (b"<html><body><h2>Login was denied or failed."

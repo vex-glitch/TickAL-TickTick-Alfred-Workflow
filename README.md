@@ -26,7 +26,7 @@ Extras — attachments, CRM, filters, hourly sync → [docs/30-setup.md](docs/30
 
 ## What you get
 
-**Search** — one box over lists, sections, tasks, subtasks, tags, folders, smart lists, filters, notes, and note bodies, with 12 typed scopes (`tse [scope] query`) including 👉 Last Added; task rows carry a `📝 first line` peek at their description.
+**Search** — one box over lists, sections, tasks, subtasks, tags, folders, smart lists, filters, notes, and note bodies, with 13 typed scopes (`tse [scope] query`) including 👉 Last Added; task rows carry a `📝 first line` peek at their description.
 → there is more magic than fits here: [docs/40-search.md](docs/40-search.md)
 
 **Browse & views** — drill any list → section → task → subtask ladder with ⌥⏎, walk back up with ⌃⏎; 📋 Show-all flattens a list grouped by your TickTick tag order, priority first; Inbox/Today/Tomorrow/Next-7 views one keyword away.
@@ -69,4 +69,4 @@ Optional hourly background sync: copy `assets/launchd/com.vex.tickal.cachesync.p
 
 ---
 
-Docs index: [docs/00-index.md](docs/00-index.md) · Bugs and questions: [Issues](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/issues) · License: not yet declared (no LICENSE file in this repo)
+Docs index: [docs/00-index.md](docs/00-index.md) · Bugs and questions: [Issues](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/issues) · License: TBD

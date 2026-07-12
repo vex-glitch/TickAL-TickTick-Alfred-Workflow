@@ -20,7 +20,7 @@ Writes made through TickAL patch the cache in place, so your own adds/edits appe
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| The TickTick app opens instead of a browser, then nothing | The desktop app claims ticktick.com links (universal links) and swallows the consent page | Update to 3.0 — `tlogin` now opens your default browser explicitly |
+| The TickTick app opens instead of a browser, then nothing | The desktop app claims ticktick.com links (universal links) and swallows the consent page | Update to 2.5 — `tlogin` now opens your default browser explicitly |
 | Browser opens, TickTick rejects the redirect | Redirect URI in your dev app is not exactly `http://localhost:8080` | Fix it at developer.ticktick.com/manage — see [Setup](30-setup.md) |
 | "invalid client" or similar | Client ID/Secret mistyped | Re-paste both in Configure Workflow, run `tlogin` again |
 | Browser approves but nothing comes back | Another process holds port 8080 (the login runs a local server there) | Free the port, retry `tlogin` |
@@ -36,7 +36,7 @@ Writes made through TickAL patch the cache in place, so your own adds/edits appe
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `tfi` / the `f` search scope shows nothing | No v2 token, or never synced since login | Run `tsy` after Settings → **Attachment Login** — your TickTick filters sync over, rules included. Tokenless fallback: hand-write `filters_config.py` in the workflow folder (copy `filters_config.example.py`) — see [Search](40-search.md) |
+| `tfi` / the `f` search scope shows nothing | No v2 token, or never synced since login | Run `tsy` after Settings → **Attachment Login** — your TickTick filters sync over, rules included. Tokenless fallback: hand-write `filters_config.py` in the workflow folder — see [Setup](30-setup.md#filters) |
 
 ## Attachments fail / Completed list sparse
 

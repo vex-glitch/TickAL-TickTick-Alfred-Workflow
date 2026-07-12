@@ -3,11 +3,8 @@
 everything_search.py — Alfred Script Filter
 Searches across ALL item types: lists, sections, and tasks at every depth.
 
-Each result carries an item_type variable ("list" / "section" / "task") so
-Alfred's Conditional node can route ⌥⏎ (Browse) to the correct Script Filter:
-  item_type == "list"    → sections.py   (needs: list_id)
-  item_type == "section" → tasks.py      (needs: list_id, section_id, section_name)
-  item_type == "task"    → subtasks.py   (needs: task_id, task_title, task_list_id)
+Each result carries an item_type variable ("list" / "section" / "task") plus a
+browse_ctx, so ⌥⏎ (Browse) drills into the matching browse.py context.
 """
 import sys
 import os
@@ -17,7 +14,7 @@ import traceback
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 try:
-    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR
+    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR, run_path
     bootstrap()
 except Exception as e:
     print(json.dumps({"items": [{"uid": "err", "title": "TickTick Error",
@@ -132,7 +129,7 @@ def get_hint_items(raw_query):
         )]
         # 🅿️ non-empty buffer → surface it (⌥ opens the buffer view)
         try:
-            with open("/tmp/tickal_buffer.txt") as f:
+            with open(run_path("tickal_buffer.txt")) as f:
                 n = len([ln for ln in f if ln.strip()])
         except OSError:
             n = 0
@@ -178,13 +175,13 @@ def detect_scope(query):
     return None, query
 
 
-# Inline /x tokens (R3.9): the same letters as the leading-prefix grammar,
+# Inline /x tokens: the same letters as the leading-prefix grammar,
 # usable anywhere in the bar ("monday /t").
 _INLINE_TOKENS = {k.strip(): v for k, v in SCOPE_PREFIXES.items()}
 
 
 def _tag_create_parent_rows(fragment):
-    """'g +<name> ' — step 2 of ➕ Create tag (R4.2): create top-level, or pick
+    """'g +<name> ' — step 2 of ➕ Create tag: create top-level, or pick
     a parent to nest under. Rows fire xact:tag_create:<b64> — the xact route
     is the only arg shape search-⏎ (modOpen) forwards to a script."""
     import base64
@@ -228,7 +225,7 @@ def _tag_create_parent_rows(fragment):
     return rows
 
 
-# ── G scope tag rows (Run 2) ─────────────────────────────────────────────────
+# ── G scope tag rows ─────────────────────────────────────────────────────────
 def tag_scope_rows(all_tasks, fragment, only=None):
     """Every tag on an incomplete item, with counts — the first screen of the
     G scope. ⏎ advances the bar to 'g #<tag> ' (exact-tag mode below); ⌘ opens
@@ -278,7 +275,7 @@ def tag_scope_rows(all_tasks, fragment, only=None):
         rows = fuzz.filter_and_score(
             fragment, rows,
             key_fn=lambda x: x.get("variables", {}).get("search_name", x["title"]))
-        # ➕ new tag (R4.2): the typed name matches no existing tag → offer to
+        # ➕ new tag: the typed name matches no existing tag → offer to
         # coin it; ⏎ opens the top-level / nest-under-parent step. Checked
         # against the FULL cache (not the drill-restricted counts) and never
         # offered inside a parent drill — `only` hides existing tags there.
@@ -295,11 +292,11 @@ def tag_scope_rows(all_tasks, fragment, only=None):
             ))
     return rows
 
-# ── V/F scopes (Run 3.75): smart lists + filters live in search ──────────────
+# ── V/F scopes: smart lists + filters live in search ─────────────────────────
 # (key, emoji, name, kind, browse ctx, app-open URL). kind "alfred" renders
 # inline on ⏎ (locked scope, G-scope pattern); kind "app" opens the view in
 # TickTick on ⏎ via its deep-link route (ticktick://habit|matrix|focus —
-# verified live 2026-07-07; the alfred://runtrigger URL scheme does NOT fire
+# verified against the app; the alfred://runtrigger URL scheme does NOT fire
 # from modOpen, don't go back to it).
 VIEWS = [
     ("today",     "☀️", "Today",       "alfred", "ctx:smart:today",
@@ -312,14 +309,13 @@ VIEWS = [
      "ticktick:///webapp/#p/inbox/tasks"),
     ("summary",   "📈", "Summary",     "app", None, None),
     # Summary has NO working deep link (v1/show?smartlist=summary,
-    # ticktick://summary, webapp/#summary all verified dead 2026-07-07) —
-    # url None routes it through xact:view_open (List-menu click; the menu
-    # holds Open "Summary"). ⏎ needs the modOpen runscript's xact passthrough
-    # (Phase 2 config edit); ⌘ → Open works from day one.
+    # ticktick://summary, webapp/#summary are all dead) — url None routes it
+    # through xact:view_open (List-menu click). ⏎ needs the modOpen
+    # runscript's xact passthrough; ⌘ → Open always works.
     ("completed", "✅", "Completed",   "alfred", "ctx:completed",
      "ticktick://v1/show?smartlist=completed"),
     # Won't Do has NO app route at all (v1/show + webapp hashes + List menu
-    # all probed dead 2026-07-11) — Alfred-inline only, url None.
+    # all probed dead) — Alfred-inline only, url None.
     ("wontdo",    "🚫", "Won't Do",    "alfred", "ctx:wontdo", None),
     ("habits",    "🔄", "Habits",      "app", None, "ticktick://habit"),
     ("matrix",    "🧭", "Matrix",      "app", None, "ticktick://matrix"),
@@ -439,12 +435,12 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
         shift = {"arg": f"complete:{pid}:{tid}:{name}"}
         alt   = {"arg": "", "subtitle": "Browse subtasks",
                  "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{tid}"}}
-        # ⌥⇧ → buffer (R3.9)
+        # ⌥⇧ → buffer
         altshift = {"valid": True, "arg": f"xact:buffer_add:{pid}:{tid}",
                     "subtitle": "🅿️ Add to buffer",
                     "variables": {"task_title": name, "task_id": tid,
                                   "task_list_id": pid, "item_type": "task"}}
-        # ⌃⇧ → the ⏱/🍅 start flow (R4.4); notes don't focus
+        # ⌃⇧ → the ⏱/🍅 start flow; notes don't focus
         ctrlshift = ({"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
                       "subtitle": "Start focus",
                       "variables": {"task_title": name, "task_id": tid,
@@ -470,7 +466,7 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
 
 
 def last_added_rows(query, all_tasks):
-    """LA scope (R4.2): incomplete tasks, newest createdTime first. Typing
+    """LA scope: incomplete tasks, newest createdTime first. Typing
     filters, but recency keeps ruling the order (fuzzy decides inclusion,
     not position)."""
     pool = [t for t in all_tasks if t.get("status", 0) == 0]
@@ -487,7 +483,7 @@ def last_added_rows(query, all_tasks):
 
 
 def folder_scope_rows(query):
-    """FO scope (R4.2): your TickTick folders (v2 auto-named at sync, manual
+    """FO scope: your TickTick folders (v2 auto-named at sync, manual
     config.json overrides on top) — ⌥⏎ drills into the folder's lists, same
     ordering as browse's folder root."""
     import config as cfg
@@ -634,7 +630,7 @@ def render_vf_scope(scope, raw_query, all_tasks, projects):
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
-# P4c: back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# Back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
 _orig_output = alfred.output
 def _output_backstamped(items, **kw):
@@ -653,7 +649,7 @@ _PN_KEYWORDS = [("daily", "daily", "💫", "Daily"),
 
 def _periodic_keyword_rows(query):
     """'daily note' / 'weekly'… typed in the everything or note scopes →
-    the matching 💫 open row on top (R5a-R2, Vex ask)."""
+    the matching 💫 open row on top."""
     q = (query or "").strip().lower()
     if len(q) < 3:
         return []
@@ -675,7 +671,7 @@ def _periodic_keyword_rows(query):
                     arg=f"xact:pn_open:{spec}", valid=True,
                     # top-tier type rank + a search_name matching the typed
                     # words, or any list named "Daily…" outranks the row the
-                    # feature promises on top (fleet R2)
+                    # feature promises on top
                     variables={"item_type": "view",
                                "search_name": f"{word} note"},
                     mods=pr._mods(spec)))
@@ -693,7 +689,7 @@ def main():
             print(alfred.output(hint_items, skipknowledge=True))
             return
 
-        # ── Inline /x scope (R3.9) ────────────────────────────────────────────
+        # ── Inline /x scope ───────────────────────────────────────────────────
         # A space-preceded /token anywhere in the bar switches the scope
         # instantly — zero extra keypresses, the token is inert for matching
         # ("monday /t" ≡ "t monday"). Unknown tokens (e.g. "/support") stay
@@ -755,7 +751,7 @@ def main():
         parent_kids = None
         if scope == "tag" and query.startswith("#"):
             head, _, rest = query[1:].partition(" ")
-            # Parent tag (Run 3.5): ⏎ on 🎩Area/🔥CRM/… lists its CHILDREN as
+            # Parent tag: ⏎ on 🎩Area/🔥CRM/… lists its CHILDREN as
             # tag rows instead of an (always empty) exact-tag view.
             import tagtree
             kids = tagtree.children_of(head)
@@ -770,7 +766,7 @@ def main():
                     exact_tag = head.lower()
                     query = rest.strip()
 
-        # ── V/F scopes render standalone (Run 3.75) ───────────────────────────
+        # ── V/F scopes render standalone ──────────────────────────────────────
         if scope in ("view", "filter"):
             if inline_hit:
                 # Inline "/v" | "/f": picker rows filtered by the cleaned query
@@ -782,7 +778,7 @@ def main():
             print(alfred.output(rows, skipknowledge=True))
             return
 
-        # ── LA / FO scopes render standalone too (R4.2) ───────────────────────
+        # ── LA / FO scopes render standalone too ──────────────────────────────
         if scope == "last_added":
             print(alfred.output(last_added_rows(query, all_tasks),
                                 skipknowledge=True))
@@ -790,7 +786,7 @@ def main():
         if scope == "folders":
             print(alfred.output(folder_scope_rows(query), skipknowledge=True))
             return
-        # ── PN scope: periodic notes (R5a) — standalone, config-gated ────────
+        # ── PN scope: periodic notes — standalone, config-gated ──────────────
         if scope == "periodic":
             import periodic_rows
             print(alfred.output(periodic_rows.rows(query), skipknowledge=True))
@@ -798,14 +794,14 @@ def main():
 
         items = []
 
-        # ── 💫 Periodic keyword rows (R5a-R2, Vex): "daily note", "weekly"…
+        # ── 💫 Periodic keyword rows: "daily note", "weekly"…
         # in the everything or note scopes → the matching open row on top.
         if scope in (None, "note"):
             items += _periodic_keyword_rows(query)
 
-        # Run 3.75: smart lists + filters are searchable like everything else —
+        # Smart lists + filters are searchable like everything else —
         # first in on ties (stable sort), so an exact name beats a task hit.
-        # R4.2: folders too (their rows only surface when the query matches).
+        # Folders too (their rows only surface when the query matches).
         if scope is None:
             items += view_rows("") + filter_rows("")
             items += [r for r in folder_scope_rows("")
@@ -820,7 +816,7 @@ def main():
 
             # Sub-count: distinct TAGS on the list's open tasks — the count must
             # match what ⌥ drills into here (⌥ = Browse tags on search list
-            # rows; sections live on ⌥⇧). Vex ruling 2026-07-06.
+            # rows; sections live on ⌥⇧).
             list_tags = {tag for t in all_tasks
                          if t.get("_projectId") == pid and t.get("status", 0) == 0
                          for tag in (t.get("tags") or [])}
@@ -856,8 +852,7 @@ def main():
                 for s in sections:
                     sid   = s["id"]
                     sname = s.get("name", "Untitled")
-                    # The "Not Sectioned" pseudo-section never surfaces — same
-                    # ruling as breadcrumbs (Vex, gate #1 2026-07-07).
+                    # The "Not Sectioned" pseudo-section never surfaces — same rule as breadcrumbs.
                     if sname.strip().lower() == "not sectioned":
                         continue
 
@@ -937,7 +932,7 @@ def main():
                         # ⌥ → unified Browse box (this task's subtasks)
                         "alt":       {"arg": "", "subtitle": "Browse subtasks",
                                       "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{tid}"}},
-                        # ⌥⇧ → buffer (R3.9 — X1 routes xact: args to the executor)
+                        # ⌥⇧ → buffer (the router node forwards xact: args to the executor)
                         "alt+shift": {"valid": True,
                                       "arg": f"xact:buffer_add:{pid}:{tid}",
                                       "subtitle": "🅿️ Add to buffer",
@@ -945,7 +940,7 @@ def main():
                                                     "task_id": tid,
                                                     "task_list_id": pid,
                                                     "item_type": "task"}},
-                        # ⌃⇧ → the ⏱/🍅 start flow (R4.4)
+                        # ⌃⇧ → the ⏱/🍅 start flow
                         "ctrl+shift": {"valid": True,
                                        "arg": f"xact:focus_open:{pid}:{tid}",
                                        "subtitle": "Start focus",
@@ -1070,8 +1065,7 @@ def main():
                 key_fn=lambda x: search_key(x.get("variables", {}).get("search_name", x["title"])),
             )
 
-            # ── Relevance-first sort (Vex ruling 2026-07-07, supersedes the
-            # morning's plain tier sort) ──────────────────────────────────────
+            # ── Relevance-first sort ──────────────────────────────────────────
             # Match STRENGTH always beats type: exact name → word-start match
             # ("test" in "test ⌘V…" / "Testo") → inside-a-word ("rest" in
             # "interests") → letter-scatter (t…e…s…t across a whole row — the

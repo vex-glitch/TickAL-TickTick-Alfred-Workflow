@@ -123,8 +123,8 @@ All notable user-visible changes to TickAL. Format follows
 - Core keywords renamed: `tt`→`tal`, `ts`→`tse`, `ta`→`tad`, `tsync`→`tsy`
   (all still re-mappable in Configure Workflow).
 - Every row subtitle swept to a terse house style — fewer words, one chip
-  vocabulary, one separator convention (a few pre-restructure hints still
-  advertised chords that no longer existed).
+  vocabulary, one separator convention (a few older hints still advertised
+  chords that no longer existed).
 
 ### Fixed
 
@@ -142,14 +142,6 @@ All notable user-visible changes to TickAL. Format follows
 - Personal defaults — no hard-coded list ids, tag names or machine paths
   remain; everything is set in Configure Workflow.
 
-## [2.2]
+## Earlier versions
 
-Pre-restructure snapshot — see git tag `2.2`.
-
-## [2.1]
-
-Incremental fixes on 2.0 — see git tag `2.1`.
-
-## [2.0]
-
-First tagged version of the original workflow — see git tag `2.0`.
+Versions 2.0–2.2 predate this repository's public history and are not tagged here.

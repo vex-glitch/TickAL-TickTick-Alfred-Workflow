@@ -1,4 +1,4 @@
-"""script_base.py — shared bootstrap + Alfred emitters for Scripts/*.py (R1-P8).
+"""script_base.py — shared bootstrap + Alfred emitters for Scripts/*.py.
 
 Kills the copy-pasted per-script header (fallback emit/emit_error defs plus the
 SCRIPT_DIR/WORKFLOW_DIR/SRC_DIR sys.path block). Every script now opens with a
@@ -38,6 +38,29 @@ SRC_DIR      = os.path.dirname(os.path.abspath(__file__))
 WORKFLOW_DIR = os.path.dirname(SRC_DIR)
 LIB_DIR      = os.path.join(SRC_DIR, "lib")
 
+# Runtime state (buffer, focus session, bar position, …) lives per-user with
+# 0700 perms — a shared /tmp would let any local account read or pre-create it.
+RUN_DIR = os.path.join(os.path.expanduser("~"), ".ticktick_alfred", "run")
+
+
+def run_path(name):
+    """Absolute path for a runtime-state file, creating RUN_DIR on first use
+    and adopting any pre-move copy still sitting in /tmp (one-time)."""
+    try:
+        if not os.path.isdir(RUN_DIR):
+            os.makedirs(RUN_DIR, exist_ok=True)
+        os.chmod(RUN_DIR, 0o700)
+    except OSError:
+        pass
+    new = os.path.join(RUN_DIR, name)
+    old = os.path.join("/tmp", name)
+    if not os.path.exists(new) and os.path.isfile(old):
+        try:
+            os.replace(old, new)
+        except OSError:
+            pass
+    return new
+
 
 def bootstrap():
     """Idempotent sys.path setup: ensure [SRC_DIR, LIB_DIR, …] at the front."""
@@ -58,7 +81,7 @@ def emit_error(msg):
 
 
 def notify(text, title="TickAL"):
-    """User-visible notification (Run 3.75). Primary route: Alfred's own
+    """User-visible notification. Primary route: Alfred's own
     notification chain — fire ET XAct with the pass-through `notify` verb;
     Alfred has Notification-Center permission, while bare osascript under
     launchd usually doesn't (the invisible-hourly-sync bug). Fallback: plain
@@ -78,7 +101,7 @@ def notify(text, title="TickAL"):
 
 
 def reopen_actions(pid, tid):
-    """Act-again (D3-b): reopen the ⌘ Actions menu on a task with fresh values.
+    """Act-again: reopen the ⌘ Actions menu on a task with fresh values.
     Writes the context temp file (single-writer convention) and fires the
     Actions trigger — Alfred is closed when executors run, so the window opens
     live. No-ops silently without full context."""

@@ -164,8 +164,8 @@ def parse_task(query):
     attach_image = n_attach > 0
     q = new_q
 
-    # +stage / +focus — standalone post-create markers set by the / menu
-    # (R4.2): dispatch stages the new task / adds it to the running focus
+    # +stage / +focus — standalone post-create markers set by the / menu:
+    # dispatch stages the new task / adds it to the running focus
     # session right after the create lands. Stripped like ^ above.
     # (?=\s|$) not \b — \b matches before punctuation and would strip a
     # legitimate "+stage:" / "+stage-two" out of a title
@@ -345,7 +345,7 @@ def tag_picker(prefix, fragment):
     crm_scoped = (bool(CRM_ID) and os.environ.get("list_id", "") == CRM_ID) \
         or "🔥CRM" in prefix
 
-    # '#name>pfrag' — parent step of ➕ new tag (R4.3): pick which existing
+    # '#name>pfrag' — parent step of ➕ new tag: pick which existing
     # tag the new one nests under; the token '#name>parent' rides the query
     # and task_preview splits it into payload tags + _tag_parents. Never on
     # a locked CRM picker — its tag family is fixed.
@@ -375,7 +375,7 @@ def tag_picker(prefix, fragment):
         scoped = [t for t in tags if t.lower() in crm_lc]
         tags = scoped or tags
     else:
-        # Parent drill (Run 3.5): an exact parent fragment lists its children;
+        # Parent drill: an exact parent fragment lists its children;
         # parents also appear as drill rows (they're never committed to tasks).
         kids = tagtree.children_of(fragment) if fragment else []
         if kids:
@@ -400,7 +400,7 @@ def tag_picker(prefix, fragment):
         ))
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
-        # ➕ new tag (R4.2/R4.3): no match → two rows, like scheduling — plain,
+        # ➕ new tag: no match → two rows, like scheduling — plain,
         # or pick a parent first. Matching is emoji-stripped (typing CRM must
         # count as existing when 🔥CRM does). Created at save time (v2).
         frag_tag = (fragment.strip().lstrip("#")
@@ -764,7 +764,7 @@ def _fx_running():
 
 
 def _fx_probe():
-    """Cheap per-keystroke session probe for the preview chords (R4.4 fleet):
+    """Cheap per-keystroke session probe for the preview chords:
     _fx_running()'s pomo self-validation shells out to `defaults` (~150 ms) —
     too hot for a path that re-renders on every character. Timer file first,
     then the RAW sidecar file. A stale sidecar only mislabels the ⌘ chord;
@@ -793,7 +793,7 @@ def master_menu(prefix, fragment, note_mode=False):
     if note_mode:
         rows.append(("*", "📅", "Date", "natural language"))
         if not date_str:
-            # R5a-R2 (Vex): one-pick today/tomorrow — plain *date shortcuts,
+            # One-pick today/tomorrow — plain *date shortcuts,
             # the 💫 daily note pulls them in on its next refresh
             rows.append(("*today ", "☀️", "Today", "due today"))
             rows.append(("*tomorrow ", "🌙", "Tomorrow", "due tomorrow"))
@@ -1117,7 +1117,7 @@ def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, 
 
 def _split_tag_parents(tags):
     """'name>parent' picker tokens → (clean names, {name_lower: parent}) —
-    the ➕ new-tag parent step rides the query as one token (R4.3)."""
+    the ➕ new-tag parent step rides the query as one token."""
     names, parents = [], {}
     for t in (tags or []):
         name, _, par = str(t).partition(">")
@@ -1145,7 +1145,7 @@ def task_preview(query):
     # A tag pre-applied by the CRM tag-drill (⌘ add-with-tag) rides in like the
     # note prefill; merge it into the parsed tags so the chip + payload include it.
     # Split BEFORE the prefill merge — dedup must compare clean names, not
-    # raw 'name>parent' tokens (fleet catch R4.3).
+    # raw 'name>parent' tokens.
     tags, tag_parents = _split_tag_parents(tags)
     pre_tag = os.environ.get("prefill_tag", "").strip()
     if pre_tag and pre_tag.lower() not in {t.lower() for t in tags}:
@@ -1304,7 +1304,7 @@ def task_preview(query):
         parts.append("🔗 linked")
     # A CRM booking's post-create slot belongs to the Prepare window
     # (dispatch's _crm_chained wins) — advertising the focus chords there
-    # would promise a step that gets silently dropped (R4.4 fleet).
+    # would promise a step that gets silently dropped.
     _crm_book = bool(CRM_ID and list_id == CRM_ID
                      and {t.lower() for t in tags} & _areas.BOOKING_TAGS)
     _hint = "" if _crm_book else "⌘🎯 ⇧⌘📍  |  "
@@ -1370,7 +1370,7 @@ def task_preview(query):
 
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
 
-    # R4.4 focus chords on the preview row: ⌘ chains the new task into the
+    # Focus chords on the preview row: ⌘ chains the new task into the
     # focus world — running session → fx_add, idle → the ⏱/🍅 start flow —
     # and ⇧⌘ stages it. Each chord rides its own payload copy; the typed
     # +stage/+focus markers stay untouched on plain ⏎. Bookings get honest
@@ -1601,10 +1601,10 @@ def note_preview(query):
 
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
 
-    # R4.4 focus chords, note parity: the ⌘ Actions menu already offers
+    # Focus chords, note parity: the ⌘ Actions menu already offers
     # 🎯 Focus / Add-to-focus / Stage on notes, so the preview chords mirror
-    # the task path — same payload-copy trick (fleet: the new canvas edges
-    # would otherwise fire the plain create silently on a chorded ⏎).
+    # the task path — same payload-copy trick (without the copies, the new
+    # canvas edges would fire the plain create silently on a chorded ⏎).
     p_cmd = dict(payload)
     if _fx_probe():
         p_cmd["_post_fx"] = True
@@ -1660,7 +1660,7 @@ def list_create_items(name):
         )]
     payload = {"name": name}
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
-    # Chorded ⏎ must NOT silently fall through the R4.4 ⌘/⇧⌘ canvas edges
+    # Chorded ⏎ must NOT silently fall through the ⌘/⇧⌘ canvas edges
     # and create the list anyway — the focus chords are a preview-row thing.
     _no_chord = {"cmd": {"valid": False, "subtitle": ""},
                  "cmd+shift": {"valid": False, "subtitle": ""}}
@@ -1673,12 +1673,12 @@ def list_create_items(name):
     )]
 
 
-# ── Tag creation mode (R4.5 — the T scope; two-step like the schedule flow) ──
+# ── Tag creation mode (the T scope; two-step like the schedule flow) ────────
 def tag_create_items(fragment):
     """'T <name>' → exactly TWO rows: ➕ create top-level, or 🪆 nest — ⏎ on
     nest autocompletes 'T <name>>' and only THEN the parent list appears,
-    text after the '>' filtering it (Vex 2026-07-11: the flat all-at-once
-    parent list couldn't be filtered). The arg is xact:tag_create:<b64> —
+    text after the '>' filtering it (a flat all-at-once parent list
+    couldn't be filtered). The arg is xact:tag_create:<b64> —
     dispatch grew an xact: passthrough for it (its raw-URL fallback would
     open() the arg)."""
     import tagtree
@@ -1713,7 +1713,7 @@ def tag_create_items(fragment):
         return "xact:tag_create:" + base64.b64encode(
             json.dumps(spec).encode()).decode()
 
-    # chorded ⏎ must not fall through the R4.4 ⌘/⇧⌘ canvas edges
+    # chorded ⏎ must not fall through the ⌘/⇧⌘ canvas edges
     _no_chord = {"cmd": {"valid": False, "subtitle": ""},
                  "cmd+shift": {"valid": False, "subtitle": ""}}
 
@@ -1792,7 +1792,7 @@ def project_create_items(name):
             title=tag,
             subtitle=f"Create  💼P • {name} {emoji}  →  schedule  💼 P • {name} 🔗",
             arg=f"create_project_meta:{payload}",
-            # chorded ⏎ must not fall through the R4.4 mod edges and
+            # chorded ⏎ must not fall through the mod edges and
             # commit the whole project flow
             mods={"cmd": {"valid": False, "subtitle": ""},
                   "cmd+shift": {"valid": False, "subtitle": ""}},
@@ -1801,9 +1801,9 @@ def project_create_items(name):
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
-# P4c: back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# Back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
-# R3.75: opened on a TASK (add-subtask from ⌘ Actions) → ⌃ returns to that
+# Opened on a TASK (add-subtask from ⌘ Actions) → ⌃ returns to that
 # task's Actions menu instead of the main menu. The ⌃ wire is hardcoded to
 # the MainMenu Call-ET (passinputasargument=False, passvariables=True), so
 # the return request rides a session variable that main_menu.py honors.
@@ -1862,7 +1862,7 @@ def main():
             print(alfred.output(items, skipknowledge=True))
             return
 
-        # ── T prefix → create tag (R4.5) ──────────────────────────────────────
+        # ── T prefix → create tag ─────────────────────────────────────────────
         if query.lower().startswith("t "):
             items = tag_create_items(query[2:].strip())
             print(alfred.output(items, skipknowledge=True))

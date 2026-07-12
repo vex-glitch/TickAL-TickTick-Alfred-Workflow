@@ -58,14 +58,14 @@ def main():
 
         tags = cache_store.get("tags") or cfg.get_tags()
         # 🔥CRM: the change picker offers only the booking tags — same scoping
-        # as the CRM add window's # picker (Vex ruling 2026-07-06). Truthiness
+        # as the CRM add window's # picker. Truthiness
         # guard: with CRM unconfigured (CRM_ID "") an empty list_id must fall
         # through to the parent-drill branch, not CRM-scope the picker.
         if areas.crm_configured() and list_id == areas.CRM_ID:
             crm_lc = {c.lower() for c in areas.CRM_TAGS}
             tags = [t for t in tags if t.lower() in crm_lc]
         else:
-            # Parent drill (Run 3.5): exact parent query → children only;
+            # Parent drill: exact parent query → children only;
             # parents also listed as drill rows (never assignable themselves)
             import tagtree
             kids = tagtree.children_of(query) if query else []
@@ -112,7 +112,7 @@ def main():
 
         if query:
             items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
-            # ➕ new tag (R4.2): unmatched query → assignable anyway; the REAL
+            # ➕ new tag: unmatched query → assignable anyway; the REAL
             # tag is created at exec time (v2). Not on CRM tasks.
             from display import tag_match_key
             frag_tag = query.strip().lstrip("#").replace(",", "").replace(":", "")

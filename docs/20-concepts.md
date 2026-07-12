@@ -38,7 +38,7 @@ Three more ride alongside on task rows:
 
 ## Organizing
 
-**Smart list** — a built-in computed view: Today, Tomorrow, Next 7 Days, Inbox, Summary, Completed. Searchable via the `tse` keyword's `v` scope — the `tsl` keyword jumps straight into it, and Today, Tomorrow, Next 7 Days and Inbox have their own keywords too. Completed shows the last 60 days of server history once the optional v2 token is set (see [Setup](30-setup.md)); without it, only tasks completed through the workflow are tracked.
+**Smart list** — a built-in computed view: Today, Tomorrow, Next 7 Days, Inbox, Summary, Completed, Won't Do, and the app-only views (Habits, Matrix, Pomodoro). Searchable via the `tse` keyword's `v` scope — the `tsl` keyword jumps straight into it, and Today, Tomorrow, Next 7 Days and Inbox have their own keywords too. Completed shows the last 60 days of server history once the optional v2 token is set (see [Setup](30-setup.md)); without it, only tasks completed through the workflow are tracked.
 
 **Filter** — a TickTick filter, synced over with the v2 token (names, sidebar order, and rules — translated into the workflow's matcher) and searchable via the `f` scope. Smart lists ship built in; filters are yours — that is the whole difference. Tokenless fallback: a hand-written `filters_config.py`.
 

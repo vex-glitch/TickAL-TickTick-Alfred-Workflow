@@ -43,6 +43,8 @@ Compressed version — the full walkthrough with screenshots is in [Setup](30-se
 | `n` | note titles |
 | `nc` | note bodies |
 
+Three more scopes — `fo` folders, `la` last added, `pn` periodic notes — are on the [Search](40-search.md) page.
+
 <details><summary>Screenshot</summary>
 
 ![Search results with breadcrumbs and modifier hints](assets/shots/01-hero-search.png)

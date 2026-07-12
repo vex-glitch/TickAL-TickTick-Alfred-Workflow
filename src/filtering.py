@@ -1,5 +1,5 @@
 """
-filtering.py — shared filter-matching engine (Run 3.75).
+filtering.py — shared filter-matching engine.
 
 Home of the filters_config.py matcher so BOTH the search inline view
 (everything_search.py `f ` scope) and browse.py (ctx:filter:<index>) can use
@@ -65,7 +65,7 @@ def smart_filter(all_tasks, smartlist):
 # ── Config access ─────────────────────────────────────────────────────────────
 def load_filters():
     """Native TickTick filters first (synced + translated → cache key
-    filters_v2, R4.2 — zero setup), filters_config.py as the tokenless /
+    filters_v2 — zero setup), filters_config.py as the tokenless /
     power-user fallback. [] if neither exists."""
     try:
         import cache as cache_store
@@ -83,7 +83,7 @@ def load_filters():
         return []
 
 
-# ── Native-rule translator (R4.2) ─────────────────────────────────────────────
+# ── Native-rule translator ────────────────────────────────────────────────────
 # TickTick rule JSON: {"type":0|1,"and":[cond,…]} (or a top-level "or"), each
 # cond {"conditionType":1,"or":[values],"conditionName":…}. We express what the
 # engine speaks and mark the rest: dropped clauses → _partial, nothing at
@@ -247,7 +247,7 @@ def filter_criteria_summary(f):
 # ── Filter matching ───────────────────────────────────────────────────────────
 def _expand_tags(tag_list):
     """{lowercase tags} with parent tags expanded to their children — TickTick
-    filter semantics (a filter on 👽People matches 👽Ivona etc.). Uses the
+    filter semantics (a filter on a parent tag also matches its children). Uses the
     tags_tree cache via tagtree; falls back to the literal tags."""
     out = set()
     try:
@@ -290,8 +290,8 @@ def matches(task, f, project_name_to_id):
 
     DATE_MAP = {"today": today, "tomorrow": tomorrow, "next7days": next7, "next14days": next14}
 
-    # Include — title must contain the string; a LIST means any-of (R4.2,
-    # native "keywords" clauses carry multiple values)
+    # Include — title must contain the string; a LIST means any-of (native
+    # "keywords" clauses carry multiple values)
     if f.get("include"):
         inc = f["include"]
         inc = [inc] if isinstance(inc, str) else inc
@@ -338,7 +338,7 @@ def matches(task, f, project_name_to_id):
         if task.get("_projectId") not in project_ids:
             return False
 
-    # Project ids — direct id match (R4.2, native "list"/"listOrGroup" clauses;
+    # Project ids — direct id match (native "list"/"listOrGroup" clauses;
     # rename-proof where names are not). Checks BOTH ids: inbox tasks carry
     # the normalized _projectId "inbox" while the rule stores the real
     # "inbox<uid>" projectId.
@@ -361,7 +361,7 @@ def matches(task, f, project_name_to_id):
         if d:
             return False
 
-    # Shorthand due field — a LIST means any-of (R4.2, native "dueDate"
+    # Shorthand due field — a LIST means any-of (native "dueDate"
     # clauses OR their values, e.g. overdue-or-today)
     due = f.get("due")
     if due and due != "all":

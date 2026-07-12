@@ -27,7 +27,8 @@ def load():
 
 def save(data):
     os.makedirs(CONFIG_DIR, exist_ok=True)
-    with open(CONFIG_FILE, "w") as f:
+    fd = os.open(CONFIG_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         json.dump(data, f, indent=2)
     try:
         os.chmod(CONFIG_FILE, 0o600)   # holds session tokens — owner-only
@@ -67,7 +68,7 @@ def save_v2_token(token):
     save(data)
 
 def get_periodic_list_id():
-    """Periodic-notes home list (R5a). Under Alfred the field ALWAYS exports
+    """Periodic-notes home list. Under Alfred the field ALWAYS exports
     an env var — a present-but-blank var means the user turned the feature
     OFF, so it must NOT fall through to the config.json mirror (that mirror
     exists solely for the headless launchd agent, which has no Alfred env)."""
@@ -76,7 +77,7 @@ def get_periodic_list_id():
     return load().get("periodic_list_id", "")
 
 def get_weekly_review_id():
-    """♻️ Weekly-review source (R5a-R2): the list/task id the weekly note
+    """♻️ Weekly-review source: the list/task id the weekly note
     mirrors. Same env-present-wins semantics as periodic_list_id."""
     if "weekly_review_id" in os.environ:
         return os.environ["weekly_review_id"]
@@ -101,8 +102,8 @@ def get_folders():
 
 def get_manual_folders():
     """Names the user placed in config.json's `folders` map — a silent,
-    UI-less override on top of the v2 auto-names (R4.2: the Settings naming
-    flow is gone; this stays as the power-user escape hatch)."""
+    UI-less override on top of the v2 auto-names (the Settings naming flow
+    was removed; this stays as the power-user escape hatch)."""
     return load().get("folders", {})
 
 def set_folder(group_id, name):

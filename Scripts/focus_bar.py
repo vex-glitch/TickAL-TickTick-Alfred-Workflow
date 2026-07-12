@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-focus_bar.py — the floating focus pill (R3.95). PyObjC, ships in the workflow.
+focus_bar.py — the floating focus pill. PyObjC, ships in the workflow.
 
 A Slash-style always-on-top capsule showing the running session:
   Row 1  ● done · task title (→ open in TickTick) · clock · ⏸/▶ · ⏹ · 🗒 · ⌄
@@ -11,10 +11,10 @@ DUMB RENDERER: every mutation exits through an xact verb —
   channel A (direct subprocess, pure API):  focus_pause/resume · fx_tick
   channel B (Alfred ET "XAct", AX + toast): sticky · pomo_toggle/abandon ·
                                             focus_stop · focus_done
-Reads: /tmp/tickal_focus.json · /tmp/tickal_pomo.json · /tmp/tickal_focus_bar.json
+Reads: ~/.ticktick_alfred/run/tickal_focus.json · ~/.ticktick_alfred/run/tickal_pomo.json · ~/.ticktick_alfred/run/tickal_focus_bar.json
 (xact only touches `visible` in the bar file; the bar owns origin), TickTick's
 pomo defaults keys, and LIVE api.get_task for the checkbox block (server truth
-— probe P2: TickTick merges concurrent sticky/API edits, so ticks are safe).
+— TickTick merges concurrent sticky/API edits, so ticks are safe).
 
 Polling: 1 s UI clock (timestamps only) · 1 s state files (defaults read every
 2nd tick) · content 5 s → 20 s backoff after 10 min without change (rate
@@ -23,7 +23,7 @@ state files are polled, not kqueue-watched — worst-case 1 s show/hide latency,
 far fewer moving parts.
 
 Lifecycle: spawned detached by xact (focus_start/pomo/fx_link/bar_show);
-flock singleton on /tmp/tickal_focus_bar.lock; exits after 10 s of idle;
+flock singleton on ~/.ticktick_alfred/run/tickal_focus_bar.lock; exits after 10 s of idle;
 SIGTERM persists position first. stderr → /tmp/tickal_focus_bar.log.
 Run `focus_bar.py --probe` to print the model JSON headlessly (test hook).
 """
@@ -44,23 +44,24 @@ sys.path.insert(0, os.path.join(WF_DIR, "Scripts"))
 import focus_blocks as fb           # noqa: E402  (pure)
 import xact                          # noqa: E402  (state readers + verb host)
 import config as cfg                 # noqa: E402
+from script_base import run_path  # noqa: E402
 try:
     from display import md_links_display as _disp   # noqa: E402  ([name]🔗)
 except Exception:
     def _disp(s):
         return s
 
-FOCUS_FILE = "/tmp/tickal_focus.json"
-POMO_FILE = "/tmp/tickal_pomo.json"
-BAR_STATE = "/tmp/tickal_focus_bar.json"
-BAR_LOCK = "/tmp/tickal_focus_bar.lock"
+FOCUS_FILE = run_path("tickal_focus.json")
+POMO_FILE = run_path("tickal_pomo.json")
+BAR_STATE = run_path("tickal_focus_bar.json")
+BAR_LOCK = run_path("tickal_focus_bar.lock")
 PY = sys.executable   # the bar's own python runs xact fine (xact needs no PyObjC)
 XACT = os.path.join(WF_DIR, "Scripts", "xact.py")
 
 W = 620          # initial only — width is dynamic per relayout
-ROW1_H = 50      # +50% size pass (Vex glow-up round 2)
+ROW1_H = 50
 ROW2_H = 38
-CHK_H  = 28      # expanded checkbox rows pack tight (Vex R4: "much smaller")
+CHK_H  = 28      # expanded checkbox rows pack tight
 RADIUS = 20.0
 IDLE_EXIT_S = 10
 
@@ -95,7 +96,7 @@ def read_state():
 
 
 def fmt_timer(secs):
-    """mm:ss under an hour, h:mm:ss beyond (Vex gate ruling 2026-07-07)."""
+    """mm:ss under an hour, h:mm:ss beyond."""
     secs = max(0, int(secs))
     h, rem = divmod(secs, 3600)
     mn, s = divmod(rem, 60)
@@ -168,7 +169,7 @@ class NonActivatingPanel(NSPanel):
         return False
 
     def scrollWheel_(self, event):
-        # R4.3: >MAX_ROWS checkboxes scroll — labels/buttons don't consume
+        # >MAX_ROWS checkboxes scroll — labels/buttons don't consume
         # wheel events, so they bubble here
         bar = getattr(self, "_bar", None)
         if bar is not None:
@@ -182,8 +183,8 @@ class PillButton(NSButton):
 
 class PassThroughView(NSView):
     """Confetti host ABOVE the vibrancy view — sublayers added inside an
-    NSVisualEffectView get vibrancy-composited into invisibility (the reason
-    gate-round-1 confetti never showed). Clicks pass straight through."""
+    NSVisualEffectView get vibrancy-composited into invisibility, so confetti
+    drawn there never shows. Clicks pass straight through."""
 
     def hitTest_(self, point):
         return None
@@ -218,7 +219,7 @@ def sym_image(name, pt=None, weight=None):
 
 
 # The glow's own green, slightly translucent — systemGreen read fluorescent
-# against the HUD chrome (Vex R4.4).
+# against the HUD chrome.
 GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.18, 0.75, 0.47, 0.95)
 
 
@@ -229,9 +230,11 @@ def _dot_cgimage(color, d=8):
     NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(0, 0, d, d)).fill()
     img.unlockFocus()
     cg = img.CGImageForProposedRect_context_hints_(None, None, None)
-    if isinstance(cg, tuple):   # PyObjC returns (CGImage, out-rect) — the
-        cg = cg[0]              # tuple fed to setContents_ was gate-2's
-    return cg                   # invisible-confetti bug
+    # PyObjC may return (CGImage, out-rect); feeding the tuple to
+    # setContents_ leaves the confetti invisible.
+    if isinstance(cg, tuple):
+        cg = cg[0]
+    return cg
 
 
 class BarController(NSObject):
@@ -244,7 +247,7 @@ class BarController(NSObject):
         self.block = None               # block_summary dict
         self.expanded = False           # chevron: full checkbox list
         self.row_pool = []              # lazily-built expanded item rows
-        self.visible_items = []         # the filtered+scrolled window (R4.3)
+        self.visible_items = []         # the filtered+scrolled window
         self.scroll_off = 0             # first visible row index
         self._scroll_accum = 0.0
         self._rmw_lock = threading.Lock()   # serialize tick/move live writes
@@ -280,9 +283,9 @@ class BarController(NSObject):
         panel.setBecomesKeyOnlyIfNeeded_(True)
         panel.setAppearance_(NSAppearance.appearanceNamed_(NSAppearanceNameDarkAqua))
 
-        # Two-tone flat chrome (Vex glow-up ruling): NO vibrancy — precise
-        # colors. Top ≈ Claude's input box (#28282a), bottom near-black
-        # (#161617) with an inner dark-green glow. Rounding via layer corners.
+        # Two-tone flat chrome: no vibrancy — precise colors. Top dark gray
+        # (#28282a), bottom near-black (#161617) with an inner dark-green
+        # glow. Rounding via layer corners.
         container = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, W, ROW1_H))
         container.setWantsLayer_(True)
 
@@ -324,7 +327,7 @@ class BarController(NSObject):
         container.addSubview_(overlay)   # above fx — confetti lives here
         panel.setContentView_(container)
         self.panel = panel
-        panel._bar = self               # scroll-wheel backref (R4.3)
+        panel._bar = self               # scroll-wheel backref
         self.fx = fx
         self.overlay = overlay
         self.bg_top = bg_top
@@ -360,7 +363,7 @@ class BarController(NSObject):
             fx.addSubview_(l)
             return l
 
-        # row 1 (hover tooltips — Vex gate ruling)
+        # row 1 (hover tooltips)
         self.b_done = btn("circle", "onDone:", 30, 18)
         self.b_done.setToolTip_("Complete the task — stops & logs the session")
         self.t_title = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 10, 20))
@@ -374,7 +377,7 @@ class BarController(NSObject):
         self.t_title.cell().setLineBreakMode_(NSLineBreakByTruncatingTail)
         self.t_title.setToolTip_("Open in TickTick")
         fx.addSubview_(self.t_title)
-        self.l_clock = label(23, mono=True,   # dominant but not shiny (Vex)
+        self.l_clock = label(23, mono=True,   # dominant but not shiny
                              color=NSColor.colorWithWhite_alpha_(0.68, 1.0))
         self.l_clock.setFont_(NSFont.monospacedDigitSystemFontOfSize_weight_(
             23, NSFontWeightSemibold))
@@ -394,7 +397,7 @@ class BarController(NSObject):
         self.b_chev.setToolTip_("Show every checkbox")
         # row 2
         self.b_tick = btn("circle", "onTick:", 26, 15)
-        self.b_tick.setContentTintColor_(GREEN)   # the glow's green (Vex)
+        self.b_tick.setContentTintColor_(GREEN)   # the glow's green
         self.b_tick.setToolTip_("Tick — the task completes on sweep/stop")
         self.t_item = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 10, 18))
         self.t_item.setBordered_(False)
@@ -541,7 +544,7 @@ class BarController(NSObject):
             except Exception as e:
                 _log(f"content_loop: {e}")
                 # Back off hard on rate limits (TickTick also enforces
-                # 100 req/min — seen live at gate round 1), gently otherwise.
+                # 100 req/min), gently otherwise.
                 time.sleep(60 if "rate limit" in str(e).lower() else 15)
 
     def _content_interval(self):
@@ -658,7 +661,7 @@ class BarController(NSObject):
             return
         att = m["attributed"]
         all_items = (self.block or {}).get("items", []) if att else []
-        # R4.3 (Vex): ticked rows leave the BAR — the description keeps them
+        # ticked rows leave the BAR — the description keeps them
         items = [it for it in all_items if not it["checked"]]
         nxt = self._first_unchecked() if att else None
         expanded = self.expanded and bool(items)
@@ -671,7 +674,7 @@ class BarController(NSObject):
         H = (ROW1_H + (CHK_H if expanded else ROW2_H) * n_rows
              + (16 if overflow else 0))
 
-        # dynamic width: fit title + clock + buttons (Vex glow-up ruling)
+        # dynamic width: fit title + clock + buttons
         title_w = 0.0
         if att:
             full = _disp(m["title"]) or "Task"   # links render as [name]🔗
@@ -742,7 +745,7 @@ class BarController(NSObject):
                         (self.t_item, two), (self.l_count, two)):
             v.setHidden_(not show)
         if two:
-            # lower rows sit indented (~25%) under the title — Vex ruling
+            # lower rows sit indented (~25%) under the title
             y2 = (ROW2_H - 26) / 2.0
             self.b_tick.setFrame_(NSMakeRect(30, y2, 26, 26))
             done, total = self.block["done"], self.block["total"]
@@ -759,7 +762,7 @@ class BarController(NSObject):
             self.t_item.setFrame_(NSMakeRect(64, y2 + 1, w - 64 - 76, 24))
 
         # expanded: the scrolled window of UNchecked boxes, top→bottom, each
-        # with ⤒↑↓⤓ reorder buttons (R4.3, edges + tighter run R4.4)
+        # with ⤒↑↓⤓ reorder buttons
         for i, views in enumerate(self.row_pool):
             show = expanded and i < n_rows
             for v in views:
@@ -852,14 +855,14 @@ class BarController(NSObject):
             self._xact_et(f"sticky:{m['pid']}:{m['tid']}")
 
     def onSweep_(self, sender):
-        """Sweep (R4.4): ticked checkboxes complete for real. Via the XAct ET
-        like the picker's 🧹 row — the '🧹 N swept' toast lands as an Alfred
+        """Sweep: ticked checkboxes complete for real. Via the XAct ET like
+        the picker's 🧹 row — the '🧹 N swept' toast lands as an Alfred
         notification, and a long sweep isn't SIGKILLed by _xact_direct's 30 s
-        subprocess timeout (fleet catch). Sweep never rewrites the block
-        content, so there is nothing to reconcile bar-side. The button goes
-        green + disabled while the sweep is in flight (R4.5 — the chain used
-        to run 4-20 s with zero feedback; it also debounces a double-press),
-        reset by tick_'s 8 s fallback."""
+        subprocess timeout. Sweep never rewrites the block content, so there
+        is nothing to reconcile bar-side. The button goes green + disabled
+        while the sweep is in flight (the chain can run 4–20 s with zero
+        feedback; this also debounces a double-press), reset by tick_'s 8 s
+        fallback."""
         m = self.state
         if not m["tid"] or self.pending_sweep:
             return
@@ -938,7 +941,7 @@ class BarController(NSObject):
         self._move_row(sender, "bottom")
 
     def _move_row(self, sender, direction):
-        """⤒↑↓⤓ reorder (R4.3/R4.4): OPTIMISTIC local move first — the bar
+        """⤒↑↓⤓ reorder: OPTIMISTIC local move first — the bar
         moves the instant you click, same trick as _do_tick — then the
         authoritative xact fx_move write lands in the background (serialized
         on _rmw_lock so rapid clicks stack instead of racing) and a fresh
@@ -983,7 +986,7 @@ class BarController(NSObject):
         threading.Thread(target=work, daemon=True).start()
 
     def onScroll_(self, event):
-        """Wheel over the bar: slide the expanded checkbox window (R4.3)."""
+        """Wheel over the bar: slide the expanded checkbox window."""
         items = [it for it in ((self.block or {}).get("items") or [])
                  if not it["checked"]]
         if not (self.expanded and len(items) > self.MAX_ROWS):

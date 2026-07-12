@@ -59,7 +59,7 @@ Without the token, tags are discovered from your tasks at every sync — new tag
 
 Zero setup as well: your TickTick filters sync over with the token — names, sidebar order, and rules. The rules are translated into the workflow's own matcher (tags incl. parent expansion, lists and folders, keywords, due dates, priority); the rare untranslatable clause is dropped honestly, with a ⚠ note in the filter's subtitle. Browse them via the `tfi` keyword or the `f` search scope.
 
-Tokenless (or on top of the synced ones — the cache wins when both exist): define filters by hand in `filters_config.py` in the workflow folder, copied from `filters_config.example.py` — criteria `include`, `tags`, `any_tags`, `priority`, `projects`, `due`, plus `due_before` / `due_after` / `no_date`, documented inline in the file.
+Tokenless (or on top of the synced ones — the cache wins when both exist): define filters by hand in a `filters_config.py` in the workflow folder — a `FILTERS` list of dicts with criteria `include`, `tags`, `any_tags`, `priority`, `projects`, `due`, plus `due_before` / `due_after` / `no_date`.
 
 ## Attachments & Completed (v2 token)
 

@@ -1,4 +1,4 @@
-"""focus_blocks.py — pure parse/model/serialize for focus session blocks (R3.95).
+"""focus_blocks.py — pure parse/model/serialize for focus session blocks.
 
 A "focus task"'s description carries dated session blocks above the original
 description text:
@@ -12,7 +12,7 @@ description text:
     ---
     <original description — NEVER touched>
 
-Contracts (unit-tested in tools/test_focus_blocks.py):
+Contracts:
   * serialize(parse(c)) == c for every well-formed c (byte-preserving:
     trailing spaces, CRLF-stripped \\r is the ONE normalization, blank lines
     between blocks, tail verbatim).
@@ -20,7 +20,7 @@ Contracts (unit-tested in tools/test_focus_blocks.py):
     lines, flip "[ ]"→"[x]" once, or move whole unchecked Line objects.
   * Zero-line blocks are never emitted (drops empty headers silently).
 
-Format facts verified live 2026-07-07 (probe P1): the app writes "- [x]"
+Format facts verified against the live app: the app writes "- [x]"
 lowercase, preserves our trailing space after the link, and merges concurrent
 sticky-side + API-side edits (op-based sync — no whole-buffer clobber).
 
@@ -221,7 +221,7 @@ def tick(doc, today, target_tid=None):
 
 def move_item(doc, today, tid, direction):
     """Reorder a checkbox line among the UNCHECKED checkbox lines of the
-    current block (R4.3/R4.4 — the bar's ⤒↑↓⤓ buttons; the bar only shows
+    current block (the bar's ⤒↑↓⤓ buttons; the bar only shows
     unchecked rows, so moving across checked lines would look dead).
     direction: up/down = one slot, top/bottom = edge. Checked and freehand
     lines keep their positions — only the unchecked lines permute among

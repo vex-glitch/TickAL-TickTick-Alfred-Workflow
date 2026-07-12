@@ -10,7 +10,7 @@ import os
 
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from script_base import bootstrap, reopen_actions
+from script_base import bootstrap, reopen_actions, run_path
 bootstrap()
 
 import config as cfg
@@ -45,7 +45,7 @@ except (ValueError, TypeError):
     print(f"Error: invalid priority value: {value!r}")
     sys.exit(1)
 
-# 🧺 BUFFER sentinel (Run 3.5): apply the picked priority to every buffered task
+# 🧺 BUFFER sentinel: apply the picked priority to every buffered task
 if tid == "BUFFER":
     try:
         import xact
@@ -60,7 +60,7 @@ if tid == "BUFFER":
                 _patch_task_cache(btid, priority=priority)
             except Exception:
                 pass
-        open("/tmp/tickal_buffer.txt", "w").close()
+        open(run_path("tickal_buffer.txt"), "w").close()
         print(f"🅿️ {done} tasks → priority {LABELS.get(priority, priority)}")
     except Exception as e:
         print(f"Priority update failed: {e}")

@@ -13,7 +13,8 @@ Args passed to Alfred (routed by conditional ▷50F14423):
   update   → ET Update
   open:*   → open the URL (Statistics row)
   tts:*    → tt_shortcut.py (TickTick's own global shortcuts)
-(view/filters retired R3.75 — search's v /f scopes; drill retired R3.75-C.)
+(the old View/Filters and Drill entries were retired — search's v / f scopes
+and ⌥ drilling replaced them.)
 """
 import sys
 import os
@@ -22,7 +23,7 @@ import json
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 try:
-    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR
+    from script_base import bootstrap, emit, emit_error, WORKFLOW_DIR, SRC_DIR, run_path
     bootstrap()
 except Exception as e:
     print(json.dumps({"items": [{"uid": "err", "title": "TickTick Error",
@@ -39,9 +40,9 @@ except Exception as e:
 # ── Menu items ────────────────────────────────────────────────────────────────
 def _focus_subtitle():
     """Idle → static hint; workflow timer running → live status (pause-aware);
-    else TickTick's own pomodoro running → its status (R3.9 gate-#2 ask)."""
+    else TickTick's own pomodoro running → its status."""
     try:
-        with open("/tmp/tickal_focus.json") as f:
+        with open(run_path("tickal_focus.json")) as f:
             st = json.load(f)
     except OSError:
         st = None
@@ -73,16 +74,16 @@ def _focus_subtitle():
 
 def build_items():
     return [
-        # Every row leads with an emoji — Vex ruling 2026-07-07 (post-R3.9).
+        # Every row leads with an emoji.
         alfred.item(
             uid="search",
             title="🔎 Search",
             subtitle="Choose criteria",
             arg="search",
         ),
-        # View.../Filters... rows retired R3.75 (search v /f scopes own them);
-        # Drill row retired R3.75-C (redundant with search + ⌥ drilling).
-        # Add sits above Calendar — Vex ruling 2026-07-07.
+        # View.../Filters... rows were retired (search's v /f scopes own them);
+        # the Drill row was redundant with search + ⌥ drilling.
+        # Add sits above Calendar.
         alfred.item(
             uid="add",
             title="➕ Add...",
@@ -101,16 +102,16 @@ def build_items():
                 "ctrl":      {"arg": "cal_y"},
             },
         ),
-        # Focus below Calendar — Vex ruling at R3.9 plan approval.
+        # Focus sits below Calendar.
         alfred.item(
             uid="focus",
             title="🎯 Focus",
             subtitle=_focus_subtitle(),
             arg="focus",
         ),
-        # Periodic below Focus (R5a smoke ask: reachable from the main list).
+        # Periodic below Focus — reachable from the main list.
         # arg "periodic" → conditional branch → runscript fires ET Search
-        # prefilled "pn " (phase_r5b).
+        # prefilled "pn ".
         alfred.item(
             uid="periodic",
             title="💫 Periodic Notes",
@@ -135,13 +136,10 @@ def build_items():
             subtitle="TickTick stats overview (web)",
             arg="open:https://ticktick.com/webapp/#statistics/overview",
         ),
-        # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) retired
-        # 2026-07-07 — they only re-fired TickTick's own global shortcuts, and
-        # the task-bound sticky/pomo in ⌘ Actions are the better versions.
-        # tt_shortcut.py stays (xact sticky imports its decoder); the canvas
-        # ^tts branch is dead wiring → remove in the Run 4 ship surgery.
-        # CRM last: very personal sub-workflow — publishing fate decided at
-        # Run 4 (row removal = canvas surgery, the crm ET chain hangs off it).
+        # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) were
+        # retired — they only re-fired TickTick's own global shortcuts, and
+        # the task-bound sticky/pomo in ⌘ Actions are better. tt_shortcut.py
+        # stays (xact sticky imports its decoder).
         alfred.item(
             uid="crm",
             title="📈 CRM...",
@@ -158,7 +156,7 @@ def main():
     import re
     query = stripped if re.search(r'[a-zA-Z0-9]', stripped) else ""
 
-    # R3.75: a picker's ⌃ that should land on a task's ⌘ Actions menu — not
+    # A picker's ⌃ that should land on a task's ⌘ Actions menu — not
     # here — rides in as menu_return (the ⌃ canvas wire only knows MainMenu).
     # Honor it: act-again on the task and get out of the way.
     ret = os.environ.get("menu_return", "")

@@ -957,6 +957,18 @@
 			</dict>
 			<dict>
 				<key>destinationuid</key>
+				<string>7B51C97E-59DE-4EFE-BA35-696D32790762</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>DF46D3DC-13C4-496F-92B7-D7E39BC49273</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
 				<string>14B3DE58-0B25-4FE9-B3C2-73E371C96D28</string>
 				<key>modifiers</key>
 				<integer>0</integer>
@@ -1024,18 +1036,6 @@
 				<string></string>
 				<key>sourceoutputuid</key>
 				<string>D5E7C4EA-9F39-4FF4-925E-3129F18844F4</string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-			<dict>
-				<key>destinationuid</key>
-				<string>7B51C97E-59DE-4EFE-BA35-696D32790762</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>sourceoutputuid</key>
-				<string>DF46D3DC-13C4-496F-92B7-D7E39BC49273</string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -3079,6 +3079,29 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "Search" in workflow "com.vex.tickal" with argument "pn "'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>7B51C97E-59DE-4EFE-BA35-696D32790762</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>conditions</key>
 				<array>
 					<dict>
@@ -4199,7 +4222,7 @@ fi</string>
 				<key>subtext</key>
 				<string>Sync, login, attachment token, docs...</string>
 				<key>title</key>
-				<string>Update</string>
+				<string>Settings</string>
 				<key>withspace</key>
 				<true/>
 			</dict>
@@ -4503,7 +4526,7 @@ fi</string>
 				<key>subtext</key>
 				<string>Login, Sync, Attachment Token, Refresh</string>
 				<key>text</key>
-				<string>Update · TickAL</string>
+				<string>Settings · TickAL</string>
 				<key>withspace</key>
 				<false/>
 			</dict>
@@ -8199,29 +8222,6 @@ printf '%s' "$1"</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "Search" in workflow "com.vex.tickal" with argument "pn "'</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>7B51C97E-59DE-4EFE-BA35-696D32790762</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL — TickTick, without opening TickTick.** One hotkey (or `tal`) opens your whole TickTick world in Alfred: browse, search, add, schedule, tag, complete, focus — every change mirrored instantly in a local cache.
@@ -8252,16 +8252,16 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>03330C3C-889F-4E1D-B09F-6365B93C4283</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>3100.0</real>
+			<real>3100</real>
 		</dict>
 		<key>07936603-BC94-4FE4-8007-D7AC0AEA8FB8</key>
 		<dict>
 			<key>xpos</key>
-			<real>840.0</real>
+			<real>840</real>
 			<key>ypos</key>
-			<real>4920.0</real>
+			<real>4920</real>
 		</dict>
 		<key>0871794A-C9F4-4284-A7D9-11D89F55013F</key>
 		<dict>
@@ -8270,108 +8270,108 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>BROWSE (unified)</string>
 			<key>xpos</key>
-			<real>3770.0</real>
+			<real>3770</real>
 			<key>ypos</key>
-			<real>340.0</real>
+			<real>340</real>
 		</dict>
 		<key>0A07346C-76BC-4642-A897-2DF60381521A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1555.0</real>
+			<real>1555</real>
 		</dict>
 		<key>0BAEF960-1A61-4EB6-A988-352C9B7E67E7</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>2080.0</real>
+			<real>2080</real>
 		</dict>
 		<key>0E34EE05-DE5E-4F58-A36E-77D0D8938B4A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>985.0</real>
+			<real>985</real>
 			<key>ypos</key>
-			<real>430.0</real>
+			<real>430</real>
 		</dict>
 		<key>0FB36198-E46E-42C3-B9EA-86B4BC2175C5</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>540.0</real>
+			<real>540</real>
 		</dict>
 		<key>1009D9A3-3070-4F97-AD6F-4B6D4C98FF04</key>
 		<dict>
 			<key>note</key>
 			<string>Hotkey (unset) → Calendar</string>
 			<key>xpos</key>
-			<real>580.0</real>
+			<real>580</real>
 			<key>ypos</key>
-			<real>4660.0</real>
+			<real>4660</real>
 		</dict>
 		<key>115CC5BB-AA7E-4D1A-A345-242952A9FC1D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>2320.0</real>
+			<real>2320</real>
 			<key>ypos</key>
-			<real>1510.0</real>
+			<real>1510</real>
 		</dict>
 		<key>122DC22C-099E-4070-B2F8-708ACEE899EC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1870.0</real>
+			<real>1870</real>
 		</dict>
 		<key>12B34F9C-A192-4408-8F26-16EE8DBBCB72</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>750.0</real>
+			<real>750</real>
 		</dict>
 		<key>14B3DE58-0B25-4FE9-B3C2-73E371C96D28</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>495.0</real>
+			<real>495</real>
 			<key>ypos</key>
-			<real>265.0</real>
+			<real>265</real>
 		</dict>
 		<key>1776FE04-5850-40A5-B606-431BF8BA1A0A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>2095.0</real>
+			<real>2095</real>
 			<key>ypos</key>
-			<real>775.0</real>
+			<real>775</real>
 		</dict>
 		<key>17A71740-FBF6-4D92-9618-A7B76BD59084</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>1640.0</real>
+			<real>1640</real>
 			<key>ypos</key>
-			<real>620.0</real>
+			<real>620</real>
 		</dict>
 		<key>185C30C1-5AD9-41DB-B0A7-62C248181C0F</key>
 		<dict>
@@ -8380,9 +8380,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Go Back</string>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>65.0</real>
+			<real>65</real>
 		</dict>
 		<key>1C0E0641-0983-47E1-A120-7D54111DB139</key>
 		<dict>
@@ -8391,36 +8391,36 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>🏁 MAIN TRIGGER</string>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>410.0</real>
+			<real>410</real>
 		</dict>
 		<key>1C682F2A-3CAF-422B-9C1C-75AD8FEF612A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>480.0</real>
+			<real>480</real>
 			<key>ypos</key>
-			<real>1660.0</real>
+			<real>1660</real>
 		</dict>
 		<key>1D315252-0DDD-4633-BE8C-2D4DEA1BCDEC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>1620.0</real>
+			<real>1620</real>
 			<key>ypos</key>
-			<real>1670.0</real>
+			<real>1670</real>
 		</dict>
 		<key>1DC6C6B2-E967-4BF5-93C6-8D4656A49E7D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1240.0</real>
+			<real>1240</real>
 		</dict>
 		<key>1DE74713-9BB7-40D1-ADB0-A6CBB915C7FB</key>
 		<dict>
@@ -8429,269 +8429,269 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Go Back</string>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>15.0</real>
+			<real>15</real>
 		</dict>
 		<key>1E09DAC4-F274-4478-A03B-226B84508CDD</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>615.0</real>
+			<real>615</real>
 			<key>ypos</key>
-			<real>1450.0</real>
+			<real>1450</real>
 		</dict>
 		<key>1E8F9211-D5F4-4E95-96A6-F7FF83BF0172</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>645.0</real>
+			<real>645</real>
 		</dict>
 		<key>1F345368-6001-4504-B5C4-BA6654DD2399</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>480.0</real>
+			<real>480</real>
 			<key>ypos</key>
-			<real>1975.0</real>
+			<real>1975</real>
 		</dict>
 		<key>20763FC8-608A-4375-8829-AF741445D817</key>
 		<dict>
 			<key>note</key>
 			<string>Hotkey (unset) → Inbox</string>
 			<key>xpos</key>
-			<real>580.0</real>
+			<real>580</real>
 			<key>ypos</key>
-			<real>4400.0</real>
+			<real>4400</real>
 		</dict>
 		<key>20B25EF5-54D0-47D0-9117-FF9F910295BB</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>2840.0</real>
+			<real>2840</real>
 			<key>ypos</key>
-			<real>65.0</real>
+			<real>65</real>
 		</dict>
 		<key>20C83CA7-A591-4527-A807-33E17317A8CE</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1135.0</real>
+			<real>1135</real>
 		</dict>
 		<key>211BDA0D-E717-49C5-98D0-CC51100BEFE3</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>2580.0</real>
+			<real>2580</real>
 		</dict>
 		<key>21D00428-ED86-43AB-ADC3-167DFCB24C40</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>2985.0</real>
+			<real>2985</real>
 			<key>ypos</key>
-			<real>265.0</real>
+			<real>265</real>
 		</dict>
 		<key>21DE1F5D-1336-4430-A870-3E45B11DB2DF</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>730.0</real>
+			<real>730</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>22D8CBAE-17B1-4F54-827B-D3E7253663A7</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>180.0</real>
+			<real>180</real>
 			<key>ypos</key>
-			<real>410.0</real>
+			<real>410</real>
 		</dict>
 		<key>24B6CB64-82DD-4C0E-AD1B-8C9E8156F38B</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1240.0</real>
+			<real>1240</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>24F42E69-25AF-4599-B397-F66C5BC3231C</key>
 		<dict>
 			<key>note</key>
-			<string>ET Focus (R3.9)</string>
+			<string>ET Focus</string>
 			<key>xpos</key>
-			<real>860.0</real>
+			<real>860</real>
 			<key>ypos</key>
-			<real>840.0</real>
+			<real>840</real>
 		</dict>
 		<key>262FDF11-B59B-4BBA-9D7A-4BBD12232291</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>3880.0</real>
+			<real>3880</real>
 		</dict>
 		<key>273A2CD8-6DDA-4A7B-9F04-EF92D0784964</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>520.0</real>
+			<real>520</real>
 			<key>ypos</key>
-			<real>1585.0</real>
+			<real>1585</real>
 		</dict>
 		<key>293D2911-58AD-4FD9-883F-8B4B8544478B</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>3750.0</real>
+			<real>3750</real>
 		</dict>
 		<key>295CC368-0916-4D3F-8963-DD03200DC26A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>475.0</real>
+			<real>475</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>2999920C-4E93-4814-9D41-CFEFA9787FFE</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>520.0</real>
+			<real>520</real>
 			<key>ypos</key>
-			<real>1165.0</real>
+			<real>1165</real>
 		</dict>
 		<key>29A4F7B6-1F33-4BE1-A0D4-557C27D80399</key>
 		<dict>
 			<key>note</key>
 			<string>Hotkey (unset) → Focus</string>
 			<key>xpos</key>
-			<real>580.0</real>
+			<real>580</real>
 			<key>ypos</key>
-			<real>4790.0</real>
+			<real>4790</real>
 		</dict>
 		<key>2A6CB895-8D0E-44B4-9319-2AF6E78B358D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>790.0</real>
+			<real>790</real>
 		</dict>
 		<key>2B0238A9-4BAC-4758-9305-E496C855A32E</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>1640.0</real>
+			<real>1640</real>
 			<key>ypos</key>
-			<real>200.0</real>
+			<real>200</real>
 		</dict>
 		<key>2C2FC5EE-1ABF-49D5-BD04-513703B710B5</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>855.0</real>
+			<real>855</real>
 		</dict>
 		<key>2D46367F-3DE6-4EDD-B26E-CCECFA7795DD</key>
 		<dict>
 			<key>note</key>
 			<string>Hotkey (unset) → Today</string>
 			<key>xpos</key>
-			<real>580.0</real>
+			<real>580</real>
 			<key>ypos</key>
-			<real>4010.0</real>
+			<real>4010</real>
 		</dict>
 		<key>2E0C573C-CDAA-42CD-9723-46812B369BEA</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>2565.0</real>
+			<real>2565</real>
 			<key>ypos</key>
-			<real>1135.0</real>
+			<real>1135</real>
 		</dict>
 		<key>2E8E2D6E-FF47-434B-B275-936665674633</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>1245.0</real>
+			<real>1245</real>
 		</dict>
 		<key>301711DE-458E-4900-974D-C0F5FD98073A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1555.0</real>
+			<real>1555</real>
 		</dict>
 		<key>30500A05-F472-4848-B535-76CA085442FD</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>750.0</real>
+			<real>750</real>
 		</dict>
 		<key>32E76899-5125-4F94-A359-1306EAA587F2</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>3230.0</real>
+			<real>3230</real>
 		</dict>
 		<key>3421E2C6-A72F-4D24-905D-6A30858D1117</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1450.0</real>
+			<real>1450</real>
 		</dict>
 		<key>34985C1E-0342-4F87-929B-E3C7A2DA2302</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>1510.0</real>
+			<real>1510</real>
 		</dict>
 		<key>35A6A310-A4FE-4853-BBFB-EE4BDFB20257</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>3100.0</real>
+			<real>3100</real>
 		</dict>
 		<key>36912BD3-B738-41D7-955D-7AD631C58A15</key>
 		<dict>
@@ -8700,27 +8700,27 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Sync</string>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>120.0</real>
+			<real>120</real>
 		</dict>
 		<key>36CF7250-5B09-4E47-B1C8-E6913A80E911</key>
 		<dict>
 			<key>note</key>
 			<string>kw → ctx:inbox</string>
 			<key>xpos</key>
-			<real>3525.0</real>
+			<real>3525</real>
 			<key>ypos</key>
-			<real>895.0</real>
+			<real>895</real>
 		</dict>
 		<key>38EECB9D-1B7A-4C1F-983F-29F514A85C88</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>2605.0</real>
+			<real>2605</real>
 			<key>ypos</key>
-			<real>490.0</real>
+			<real>490</real>
 		</dict>
 		<key>3A018EA5-992F-4FC5-8133-A3844A093149</key>
 		<dict>
@@ -8729,124 +8729,124 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Set var:task_id</string>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>3ABED849-0550-4774-BF06-9841567C4B01</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>3B04F032-C7FD-4513-9F08-7D396DC636BF</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>1140.0</real>
+			<real>1140</real>
 		</dict>
 		<key>3B586275-5A45-4999-9905-23E9A9A2E57B</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>3C19041A-4954-4A49-86C4-45E8C04F344A</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>3490.0</real>
+			<real>3490</real>
 		</dict>
 		<key>3E85A690-3763-44A9-9883-DA10117B3259</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>480.0</real>
+			<real>480</real>
 			<key>ypos</key>
-			<real>1765.0</real>
+			<real>1765</real>
 		</dict>
 		<key>40486E67-3FA0-48F7-86AB-80D60687DB51</key>
 		<dict>
 			<key>note</key>
-			<string>→ XAct (R3.5)</string>
+			<string>→ XAct</string>
 			<key>xpos</key>
-			<real>1445.0</real>
+			<real>1445</real>
 			<key>ypos</key>
-			<real>730.0</real>
+			<real>730</real>
 		</dict>
 		<key>443C59EC-DC33-4036-A263-88EE1D8DD149</key>
 		<dict>
 			<key>note</key>
-			<string>xact.py — buffer/focus/pomo/slash</string>
+			<string>xact.py — buffer/focus/pomo verbs</string>
 			<key>xpos</key>
-			<real>2045.0</real>
+			<real>2045</real>
 			<key>ypos</key>
-			<real>730.0</real>
+			<real>730</real>
 		</dict>
 		<key>44A7DDC3-4ADD-4E73-AE8B-9B4D314C3900</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>495.0</real>
+			<real>495</real>
 			<key>ypos</key>
-			<real>55.0</real>
+			<real>55</real>
 		</dict>
 		<key>44C794E4-F18F-4440-9504-42F39ECE6DA9</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>535.0</real>
+			<real>535</real>
 		</dict>
 		<key>4633E5D1-50E9-4879-8D50-CF2CFDB42645</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>615.0</real>
+			<real>615</real>
 			<key>ypos</key>
-			<real>1345.0</real>
+			<real>1345</real>
 		</dict>
 		<key>469188A5-BD73-4B34-9944-503AE6BF9743</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>615.0</real>
+			<real>615</real>
 			<key>ypos</key>
-			<real>1765.0</real>
+			<real>1765</real>
 		</dict>
 		<key>46991866-509D-4C5F-BB88-A1ABEE37A5B8</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>2095.0</real>
+			<real>2095</real>
 			<key>ypos</key>
-			<real>570.0</real>
+			<real>570</real>
 		</dict>
 		<key>4756DC4F-1B5F-4D18-AD4C-E4B34BE324CE</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1450.0</real>
+			<real>1450</real>
 		</dict>
 		<key>47801D61-518E-4F41-B7C5-ED984DE4CF50</key>
 		<dict>
@@ -8855,72 +8855,72 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Go Back</string>
 			<key>xpos</key>
-			<real>2720.0</real>
+			<real>2720</real>
 			<key>ypos</key>
-			<real>1510.0</real>
+			<real>1510</real>
 		</dict>
 		<key>48041D49-1871-4C61-BEDD-FE47BF8E4852</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>920.0</real>
+			<real>920</real>
 			<key>ypos</key>
-			<real>2215.0</real>
+			<real>2215</real>
 		</dict>
 		<key>484F263E-70C2-4EAA-9D62-29291F04E88A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1210.0</real>
+			<real>1210</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>48D69398-EFE1-4108-BDA3-F443C7885EDE</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>165.0</real>
+			<real>165</real>
 		</dict>
 		<key>4915B7D0-3BF0-4446-91F0-D1140E1CEEEB</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>265.0</real>
+			<real>265</real>
 		</dict>
 		<key>49348112-086F-44BB-BBF8-029C062D1B12</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>890.0</real>
+			<real>890</real>
 			<key>ypos</key>
-			<real>1365.0</real>
+			<real>1365</real>
 		</dict>
 		<key>498DF111-7830-4660-B1D2-2C4FB6AFF9BC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>1140.0</real>
+			<real>1140</real>
 		</dict>
 		<key>49BFE032-4FC3-4D7A-ADCE-20958B1E2B20</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>1465.0</real>
+			<real>1465</real>
 			<key>ypos</key>
-			<real>1245.0</real>
+			<real>1245</real>
 		</dict>
 		<key>4B4D2267-5F21-4655-914B-E9507F37D9F3</key>
 		<dict>
@@ -8929,70 +8929,70 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Set var:task_id</string>
 			<key>xpos</key>
-			<real>835.0</real>
+			<real>835</real>
 			<key>ypos</key>
-			<real>430.0</real>
+			<real>430</real>
 		</dict>
 		<key>4BA16262-7658-4E1E-B167-FC0C4C27D34C</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1345.0</real>
+			<real>1345</real>
 		</dict>
 		<key>4BC81709-6EC7-4A74-92B4-1A78BD23CEE0</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>15.0</real>
+			<real>15</real>
 		</dict>
 		<key>4E80A48E-2F84-4325-9827-7C64C874B2D6</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>2580.0</real>
+			<real>2580</real>
 		</dict>
 		<key>4EC0A0B7-5095-4A0C-862B-F6D21D79F902</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>2455.0</real>
+			<real>2455</real>
 			<key>ypos</key>
-			<real>1510.0</real>
+			<real>1510</real>
 		</dict>
 		<key>4EFEA313-A75F-46A5-8556-67EE852AE0B5</key>
 		<dict>
 			<key>note</key>
 			<string>Hotkey (unset) → Smart Lists</string>
 			<key>xpos</key>
-			<real>580.0</real>
+			<real>580</real>
 			<key>ypos</key>
-			<real>4530.0</real>
+			<real>4530</real>
 		</dict>
 		<key>50F14423-86F2-4560-B16A-CF577B68953D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>5</integer>
 			<key>xpos</key>
-			<real>340.0</real>
+			<real>340</real>
 			<key>ypos</key>
-			<real>220.0</real>
+			<real>220</real>
 		</dict>
 		<key>51B8E7A2-78CF-41E3-81B0-7821A94A9DEC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>645.0</real>
+			<real>645</real>
 		</dict>
 		<key>51D50972-BAE6-4C3B-BFBF-40384532F712</key>
 		<dict>
@@ -9001,45 +9001,45 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>⌘ Actions</string>
 			<key>xpos</key>
-			<real>3390.0</real>
+			<real>3390</real>
 			<key>ypos</key>
-			<real>485.0</real>
+			<real>485</real>
 		</dict>
 		<key>5330B64C-D139-43CE-AC49-3029EE38685C</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>540.0</real>
+			<real>540</real>
 		</dict>
 		<key>53FD7D9F-0A86-4788-96F1-2407A71082C2</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1135.0</real>
+			<real>1135</real>
 		</dict>
 		<key>54AEE7F7-E4EE-45D6-A2D7-8707727DA7D0</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>745.0</real>
+			<real>745</real>
 		</dict>
 		<key>55BB7660-02DC-481A-A662-7B1CE72E8207</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>120.0</real>
+			<real>120</real>
 		</dict>
 		<key>56151466-748D-4737-985E-DD05C212B5BF</key>
 		<dict>
@@ -9048,27 +9048,27 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Open ⏎</string>
 			<key>xpos</key>
-			<real>3390.0</real>
+			<real>3390</real>
 			<key>ypos</key>
-			<real>200.0</real>
+			<real>200</real>
 		</dict>
 		<key>57934B7F-2042-44D1-BD17-D0A45F8ADCFC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>2095.0</real>
+			<real>2095</real>
 			<key>ypos</key>
-			<real>675.0</real>
+			<real>675</real>
 		</dict>
 		<key>57A4CFA4-FC25-4925-99E9-3B46F123875B</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>970.0</real>
+			<real>970</real>
 		</dict>
 		<key>581BB8A1-AF10-4100-B559-67B9EF71C7F4</key>
 		<dict>
@@ -9077,9 +9077,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Complete Task ⇧⏎</string>
 			<key>xpos</key>
-			<real>3390.0</real>
+			<real>3390</real>
 			<key>ypos</key>
-			<real>345.0</real>
+			<real>345</real>
 		</dict>
 		<key>59162DF3-5036-46C0-967E-2FB832755916</key>
 		<dict>
@@ -9088,27 +9088,27 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>back router</string>
 			<key>xpos</key>
-			<real>3789.0</real>
+			<real>3789</real>
 			<key>ypos</key>
-			<real>750.0</real>
+			<real>750</real>
 		</dict>
 		<key>599C0F74-1721-46D6-B82E-667C0D441C28</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1765.0</real>
+			<real>1765</real>
 		</dict>
 		<key>5B2DC84C-B972-4BC4-875D-9FC678DBEDD3</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>465.0</real>
+			<real>465</real>
 		</dict>
 		<key>5DA59B9D-3C8A-4BD9-B406-88B48F23D5E7</key>
 		<dict>
@@ -9117,34 +9117,34 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>⌃⇧ back emit</string>
 			<key>xpos</key>
-			<real>3770.0</real>
+			<real>3770</real>
 			<key>ypos</key>
-			<real>615.0</real>
+			<real>615</real>
 		</dict>
 		<key>5DDFDACB-39AB-4885-A1A5-E298A6AF13F7</key>
 		<dict>
 			<key>note</key>
-			<string>→ Focus (R3.9)</string>
+			<string>→ Focus</string>
 			<key>xpos</key>
-			<real>600.0</real>
+			<real>600</real>
 			<key>ypos</key>
-			<real>840.0</real>
+			<real>840</real>
 		</dict>
 		<key>5F30E4DF-AE1E-4F75-8972-03FE2237DF60</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>540.0</real>
+			<real>540</real>
 		</dict>
 		<key>60C1372F-9FBD-4140-9731-23C83B26EB88</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>2450.0</real>
+			<real>2450</real>
 		</dict>
 		<key>61A9E48B-C99E-493A-BC9C-986429F616F0</key>
 		<dict>
@@ -9153,151 +9153,151 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>CRM</string>
 			<key>xpos</key>
-			<real>2320.0</real>
+			<real>2320</real>
 			<key>ypos</key>
-			<real>1190.0</real>
+			<real>1190</real>
 		</dict>
 		<key>62A4E417-E45A-4F1A-A0A5-719DB164407C</key>
 		<dict>
 			<key>note</key>
 			<string>End</string>
 			<key>xpos</key>
-			<real>2365.0</real>
+			<real>2365</real>
 			<key>ypos</key>
-			<real>730.0</real>
+			<real>730</real>
 		</dict>
 		<key>6405F860-1CE7-4630-8E05-176576F92949</key>
 		<dict>
 			<key>note</key>
 			<string>Hotkey (unset) → Tomorrow</string>
 			<key>xpos</key>
-			<real>580.0</real>
+			<real>580</real>
 			<key>ypos</key>
-			<real>4140.0</real>
+			<real>4140</real>
 		</dict>
 		<key>64097EEE-04FF-4066-99BC-944B7ADCA795</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>560.0</real>
+			<real>560</real>
 			<key>ypos</key>
-			<real>2215.0</real>
+			<real>2215</real>
 		</dict>
 		<key>6613B30E-773B-402F-9DDA-D42D49E769E2</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>305.0</real>
+			<real>305</real>
 		</dict>
 		<key>67F8F58D-C8AB-41F0-A12E-D8E9EA1A537F</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>520.0</real>
+			<real>520</real>
 			<key>ypos</key>
-			<real>1480.0</real>
+			<real>1480</real>
 		</dict>
 		<key>68878D5E-EF46-4FEA-B80A-64C79D3A0931</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>615.0</real>
+			<real>615</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>68E8E269-32C0-40D2-B0A0-514BB81F9D57</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1660.0</real>
+			<real>1660</real>
 		</dict>
 		<key>6A9F3530-C710-41D1-A911-D3B5753308C7</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1870.0</real>
+			<real>1870</real>
 		</dict>
 		<key>6B859668-344A-496F-839C-35C2957E6604</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1640.0</real>
+			<real>1640</real>
 			<key>ypos</key>
-			<real>515.0</real>
+			<real>515</real>
 		</dict>
 		<key>6F562108-2122-497B-84ED-8B6399D1D8BE</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1975.0</real>
+			<real>1975</real>
 		</dict>
 		<key>70C446B1-996B-4FCA-BBE2-A71C136DEA93</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>3750.0</real>
+			<real>3750</real>
 		</dict>
 		<key>7138F7EA-799C-48B6-A178-B49AAC36D559</key>
 		<dict>
 			<key>note</key>
 			<string>kw → ctx:smart:today</string>
 			<key>xpos</key>
-			<real>3525.0</real>
+			<real>3525</real>
 			<key>ypos</key>
-			<real>895.0</real>
+			<real>895</real>
 		</dict>
 		<key>719FBC51-0A88-4F3F-9D69-3B98604DE31D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>5</integer>
 			<key>xpos</key>
-			<real>1145.0</real>
+			<real>1145</real>
 			<key>ypos</key>
-			<real>210.0</real>
+			<real>210</real>
 		</dict>
 		<key>725157E4-B198-4187-B0E8-204046FE36E3</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>225.0</real>
+			<real>225</real>
 		</dict>
 		<key>7267AC5D-69F9-4D3F-82C6-E741F1A689EC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1660.0</real>
+			<real>1660</real>
 		</dict>
 		<key>72CC3D8E-BDE8-4014-BA6F-97235C8ABE3B</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>1455.0</real>
+			<real>1455</real>
 		</dict>
 		<key>73254623-88C8-40AD-A328-B14C8266609E</key>
 		<dict>
@@ -9306,144 +9306,144 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Save URL</string>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>2080.0</real>
+			<real>2080</real>
 		</dict>
 		<key>746B1DD7-A465-487C-866F-910F2B75D64D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1135.0</real>
+			<real>1135</real>
 		</dict>
 		<key>755818E2-1D84-4546-818A-3DA3E93D6C31</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1240.0</real>
+			<real>1240</real>
 		</dict>
 		<key>755D7A2D-D3FB-4665-A213-3703EAA23312</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>2080.0</real>
+			<real>2080</real>
 		</dict>
 		<key>75CD7665-F41F-432F-9C5C-424567EFE5F1</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>76667082-C514-4C0E-BD2F-3C750743DED6</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>10</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>1400.0</real>
+			<real>1400</real>
 		</dict>
 		<key>77461EBD-0E2E-497C-8B91-A3A939DBD075</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>620.0</real>
+			<real>620</real>
 			<key>ypos</key>
-			<real>55.0</real>
+			<real>55</real>
 		</dict>
 		<key>7AFC829A-8F89-4B62-AC96-43A8D03B5D5A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>1640.0</real>
+			<real>1640</real>
 			<key>ypos</key>
-			<real>725.0</real>
+			<real>725</real>
 		</dict>
 		<key>7B51C97E-59DE-4EFE-BA35-696D32790762</key>
 		<dict>
 			<key>note</key>
-			<string>Periodic → Search "pn " (R5a)</string>
+			<string>Periodic → Search "pn "</string>
 			<key>xpos</key>
-			<real>495.0</real>
+			<real>495</real>
 			<key>ypos</key>
-			<real>205.0</real>
+			<real>205</real>
 		</dict>
 		<key>7CC1797C-FA5C-44BE-B425-B4C9A9E11AAD</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>790.0</real>
+			<real>790</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>7DEE972E-9AD6-44E8-8919-7B033F2099F4</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>2840.0</real>
+			<real>2840</real>
 			<key>ypos</key>
-			<real>565.0</real>
+			<real>565</real>
 		</dict>
 		<key>7F059654-32A8-42D1-A038-A7130A96FD9F</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>2095.0</real>
+			<real>2095</real>
 			<key>ypos</key>
-			<real>880.0</real>
+			<real>880</real>
 		</dict>
 		<key>81EBECC2-C83C-4934-B2C6-B4234961AD65</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>620.0</real>
+			<real>620</real>
 			<key>ypos</key>
-			<real>685.0</real>
+			<real>685</real>
 		</dict>
 		<key>82076720-C27C-4E9C-94E8-B4B69F578EBF</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>850.0</real>
+			<real>850</real>
 		</dict>
 		<key>8878FCA2-A160-4945-9D9A-6F839E299916</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>495.0</real>
+			<real>495</real>
 			<key>ypos</key>
-			<real>370.0</real>
+			<real>370</real>
 		</dict>
 		<key>88B993CA-2CFB-494D-B7E6-00243003CB94</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>480.0</real>
+			<real>480</real>
 			<key>ypos</key>
-			<real>1870.0</real>
+			<real>1870</real>
 		</dict>
 		<key>8905807F-7918-4745-9319-65FAAF0CDD24</key>
 		<dict>
@@ -9452,18 +9452,18 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Copy URL ⌥⌘⏎</string>
 			<key>xpos</key>
-			<real>3390.0</real>
+			<real>3390</real>
 			<key>ypos</key>
-			<real>415.0</real>
+			<real>415</real>
 		</dict>
 		<key>892DFDB7-8887-4495-A136-D1F61C167167</key>
 		<dict>
 			<key>note</key>
-			<string>⌥⇧ router: xact→XAct, else→Browse (R3.9)</string>
+			<string>⌥⇧ router: xact→XAct, else→Browse</string>
 			<key>xpos</key>
-			<real>3396.0</real>
+			<real>3396</real>
 			<key>ypos</key>
-			<real>365.0</real>
+			<real>365</real>
 		</dict>
 		<key>89370DEB-A897-4BC7-A306-0594B7868EB0</key>
 		<dict>
@@ -9472,90 +9472,90 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Set var:task_id</string>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1450.0</real>
+			<real>1450</real>
 		</dict>
 		<key>8C64FDCF-5C97-4E2F-8167-B23C177E41F1</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1345.0</real>
+			<real>1345</real>
 		</dict>
 		<key>8D1E6B35-9EB0-4D18-9F8D-DF6A9564F510</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>2450.0</real>
+			<real>2450</real>
 		</dict>
 		<key>8DE52BFF-E62A-499B-91F5-021E8814345E</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>615.0</real>
+			<real>615</real>
 			<key>ypos</key>
-			<real>1135.0</real>
+			<real>1135</real>
 		</dict>
 		<key>8E7DA6CB-0474-4300-9986-F455631BC3A8</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>note</key>
-			<string>Back → tag manager (P4)</string>
+			<string>Back → tag manager</string>
 			<key>xpos</key>
-			<real>1105.0</real>
+			<real>1105</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>8F737DE6-F891-41A5-AD0A-CFFAFBDA836A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>480.0</real>
+			<real>480</real>
 			<key>ypos</key>
-			<real>2080.0</real>
+			<real>2080</real>
 		</dict>
 		<key>92EF7CBA-D74D-4975-B995-D96E7DB05239</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>note</key>
-			<string>Back → ⌘ Actions (P4)</string>
+			<string>Back → ⌘ Actions</string>
 			<key>xpos</key>
-			<real>890.0</real>
+			<real>890</real>
 			<key>ypos</key>
-			<real>1480.0</real>
+			<real>1480</real>
 		</dict>
 		<key>94227A21-5200-4698-8433-1522BD44D267</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>1330.0</real>
+			<real>1330</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>95B04880-2BA8-4612-AB80-655F867E0F9C</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1090.0</real>
+			<real>1090</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>96DEE019-3296-434C-8F69-344D78F15D28</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>3620.0</real>
+			<real>3620</real>
 		</dict>
 		<key>9818E252-053D-4564-BDD5-4781F30247FC</key>
 		<dict>
@@ -9564,18 +9564,18 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Go Back</string>
 			<key>xpos</key>
-			<real>2700.0</real>
+			<real>2700</real>
 			<key>ypos</key>
-			<real>1190.0</real>
+			<real>1190</real>
 		</dict>
 		<key>98578A19-1E4B-4A8A-82D7-3BC5EBC6173F</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>615.0</real>
+			<real>615</real>
 			<key>ypos</key>
-			<real>1555.0</real>
+			<real>1555</real>
 		</dict>
 		<key>9B190025-FCAB-4318-A17C-B4A761E304BF</key>
 		<dict>
@@ -9584,72 +9584,72 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>loop → Browse</string>
 			<key>xpos</key>
-			<real>3770.0</real>
+			<real>3770</real>
 			<key>ypos</key>
-			<real>480.0</real>
+			<real>480</real>
 		</dict>
 		<key>9BFC1C46-76D3-4986-93B4-F1962AEEC39D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>2840.0</real>
+			<real>2840</real>
 			<key>ypos</key>
-			<real>365.0</real>
+			<real>365</real>
 		</dict>
 		<key>9E5D6DBD-EDA8-4142-830D-BF7B50BF38AD</key>
 		<dict>
 			<key>note</key>
 			<string>Hotkey (unset) → Next 7 Days</string>
 			<key>xpos</key>
-			<real>580.0</real>
+			<real>580</real>
 			<key>ypos</key>
-			<real>4270.0</real>
+			<real>4270</real>
 		</dict>
 		<key>9EE68F98-2ED7-484F-A0FD-FCC6DD212147</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>520.0</real>
+			<real>520</real>
 			<key>ypos</key>
-			<real>1375.0</real>
+			<real>1375</real>
 		</dict>
 		<key>9F7C564A-41AB-4B75-8913-6E7721E0A2F2</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>850.0</real>
+			<real>850</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>A18FBDF4-AF02-4287-AEC3-72488678C9F9</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>10</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>1625.0</real>
+			<real>1625</real>
 		</dict>
 		<key>A1B32A75-1B8A-4A3E-AE2A-D978D84F2C76</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>120.0</real>
+			<real>120</real>
 		</dict>
 		<key>A3112F57-3DE0-4771-8B9A-F4E848560B62</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>435.0</real>
+			<real>435</real>
 		</dict>
 		<key>A65445A5-5D56-4DAC-9050-215EBBEDD1EE</key>
 		<dict>
@@ -9658,106 +9658,106 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Go Back</string>
 			<key>xpos</key>
-			<real>1640.0</real>
+			<real>1640</real>
 			<key>ypos</key>
-			<real>1385.0</real>
+			<real>1385</real>
 		</dict>
 		<key>AA713892-6071-4507-9FAB-CA187E163EF0</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>835.0</real>
+			<real>835</real>
 			<key>ypos</key>
-			<real>320.0</real>
+			<real>320</real>
 		</dict>
 		<key>AAC72823-02A8-497F-BB92-8651F4D7A93E</key>
 		<dict>
 			<key>note</key>
 			<string>focus_picker.py — timer/pomo grammar</string>
 			<key>xpos</key>
-			<real>1120.0</real>
+			<real>1120</real>
 			<key>ypos</key>
-			<real>840.0</real>
+			<real>840</real>
 		</dict>
 		<key>AAE96E42-B547-46DC-A255-DDFB39608820</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>1640.0</real>
+			<real>1640</real>
 			<key>ypos</key>
-			<real>410.0</real>
+			<real>410</real>
 		</dict>
 		<key>ABD31D58-6B8E-4842-81A8-9AB98221285D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>2465.0</real>
+			<real>2465</real>
 			<key>ypos</key>
-			<real>1210.0</real>
+			<real>1210</real>
 		</dict>
 		<key>AE2A8A94-30F4-41AE-B239-B6331D200B44</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>2840.0</real>
+			<real>2840</real>
 		</dict>
 		<key>AF17BE48-99C7-453C-A15B-AB752A2AFE7A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>1795.0</real>
+			<real>1795</real>
 			<key>ypos</key>
-			<real>465.0</real>
+			<real>465</real>
 		</dict>
 		<key>B438F2BF-DDDB-4FD6-B4F3-2471B890A94B</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>2095.0</real>
+			<real>2095</real>
 			<key>ypos</key>
-			<real>150.0</real>
+			<real>150</real>
 		</dict>
 		<key>B6476841-6258-4E03-8DE8-F5BE30FBC1ED</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>2155.0</real>
+			<real>2155</real>
 			<key>ypos</key>
-			<real>1255.0</real>
+			<real>1255</real>
 		</dict>
 		<key>B68EE3B3-9727-4507-89C9-8102727E9893</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>1670.0</real>
+			<real>1670</real>
 		</dict>
 		<key>B6C0F7D7-5419-46E4-A990-9A3E616D06B7</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>970.0</real>
+			<real>970</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>B7C69A9C-CC9F-4D69-85E1-FB6C8174DBF6</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1765.0</real>
+			<real>1765</real>
 		</dict>
 		<key>B853011E-B74C-4F8F-ACA2-8FFF22A7102D</key>
 		<dict>
@@ -9766,142 +9766,142 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>ET Browse</string>
 			<key>xpos</key>
-			<real>3770.0</real>
+			<real>3770</real>
 			<key>ypos</key>
-			<real>200.0</real>
+			<real>200</real>
 		</dict>
 		<key>B9303710-A720-4CA5-93AD-FA274D42F9B0</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>225.0</real>
+			<real>225</real>
 		</dict>
 		<key>B9D20B5B-C1EA-43DD-8490-1D5BAB446163</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>565.0</real>
+			<real>565</real>
 		</dict>
 		<key>BD5367D5-4884-49B1-8833-5E7A776D8F54</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>2590.0</real>
+			<real>2590</real>
 			<key>ypos</key>
-			<real>1510.0</real>
+			<real>1510</real>
 		</dict>
 		<key>BDF4A7B4-3413-41D5-AE7C-6BD077B51242</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>745.0</real>
+			<real>745</real>
 			<key>ypos</key>
-			<real>2215.0</real>
+			<real>2215</real>
 		</dict>
 		<key>BDFC3AF2-4472-4DAF-93FB-B738697F6A3F</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>645.0</real>
+			<real>645</real>
 		</dict>
 		<key>C530603D-D2C6-41C4-90F5-50EA70D29F13</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>1465.0</real>
+			<real>1465</real>
 			<key>ypos</key>
-			<real>1140.0</real>
+			<real>1140</real>
 		</dict>
 		<key>C64DA1C8-FCD3-4CCC-B6C9-828C0F403D1A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>1465.0</real>
+			<real>1465</real>
 			<key>ypos</key>
-			<real>1350.0</real>
+			<real>1350</real>
 		</dict>
 		<key>C67163F0-1C1B-430A-B5AF-20E1479942D6</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>610.0</real>
+			<real>610</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>C6BA86CF-C897-4A52-890B-3A3F0F3DDCF0</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1975.0</real>
+			<real>1975</real>
 		</dict>
 		<key>C75F058A-228F-46A2-AF0B-53B72FA04924</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>15.0</real>
+			<real>15</real>
 		</dict>
 		<key>C81C7584-BA6B-4382-9F72-A7058627DC84</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>3230.0</real>
+			<real>3230</real>
 		</dict>
 		<key>C9280B37-8329-49CC-930F-97B7C110F310</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1450.0</real>
+			<real>1450</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>CB5F6864-C4F4-4FA8-8EF0-F80837CA8EDC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>5</integer>
 			<key>xpos</key>
-			<real>1950.0</real>
+			<real>1950</real>
 			<key>ypos</key>
-			<real>380.0</real>
+			<real>380</real>
 		</dict>
 		<key>CC04E2DF-C2D4-4899-AB46-C9C391CB6A60</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>620.0</real>
+			<real>620</real>
 			<key>ypos</key>
-			<real>580.0</real>
+			<real>580</real>
 		</dict>
 		<key>CD050B59-74DF-4DA4-B12B-8421590F3BCA</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>485.0</real>
+			<real>485</real>
 			<key>ypos</key>
-			<real>2205.0</real>
+			<real>2205</real>
 		</dict>
 		<key>CD0C4152-B888-4009-B830-F6DDE4B46BC4</key>
 		<dict>
@@ -9910,36 +9910,36 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>→ CRM</string>
 			<key>xpos</key>
-			<real>495.0</real>
+			<real>495</real>
 			<key>ypos</key>
-			<real>790.0</real>
+			<real>790</real>
 		</dict>
 		<key>CF7AFAF3-7AC7-40B7-AF38-60813A83B43C</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1425.0</real>
+			<real>1425</real>
 			<key>ypos</key>
-			<real>330.0</real>
+			<real>330</real>
 		</dict>
 		<key>CFF9A653-308A-4236-8F39-F4A38BF4C6D7</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>2565.0</real>
+			<real>2565</real>
 			<key>ypos</key>
-			<real>1250.0</real>
+			<real>1250</real>
 		</dict>
 		<key>D07180DE-EC6F-46FE-AFD9-F0AE32DE67E6</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>1640.0</real>
+			<real>1640</real>
 			<key>ypos</key>
-			<real>1210.0</real>
+			<real>1210</real>
 		</dict>
 		<key>D17D4DC1-5A17-4AB9-867F-ECEA13D14FC5</key>
 		<dict>
@@ -9948,182 +9948,182 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Copy URL</string>
 			<key>xpos</key>
-			<real>1465.0</real>
+			<real>1465</real>
 			<key>ypos</key>
-			<real>1455.0</real>
+			<real>1455</real>
 		</dict>
 		<key>D2FAD236-C478-479F-A74A-29110965FD84</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>2710.0</real>
+			<real>2710</real>
 		</dict>
 		<key>D340ECFD-1EB2-4FB7-B8D5-782E0BC4417C</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>3620.0</real>
+			<real>3620</real>
 		</dict>
 		<key>D7263363-0AB6-405F-8780-00DAF42DE44A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>1350.0</real>
+			<real>1350</real>
 		</dict>
 		<key>D739EAF0-8F5F-4C0D-894F-15B1E20E500A</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>2710.0</real>
+			<real>2710</real>
 		</dict>
 		<key>D8785DAC-A90C-4A93-AF5C-B602D68DE758</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>2970.0</real>
+			<real>2970</real>
 		</dict>
 		<key>D8E536D6-F702-4DD2-9CBF-053E5A92822D</key>
 		<dict>
 			<key>note</key>
-			<string>leader-key Filters → Search "f " (R3.75)</string>
+			<string>Filters → Search "f "</string>
 			<key>xpos</key>
-			<real>3100.0</real>
+			<real>3100</real>
 			<key>ypos</key>
-			<real>565.0</real>
+			<real>565</real>
 		</dict>
 		<key>DA03CCC1-579C-40F6-849D-6DA5262E0FB1</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1975.0</real>
+			<real>1975</real>
 		</dict>
 		<key>DB148E17-3DDB-4B07-BE32-491E2811F2EF</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>750.0</real>
+			<real>750</real>
 			<key>ypos</key>
-			<real>1765.0</real>
+			<real>1765</real>
 		</dict>
 		<key>DD6A241E-7811-4CAD-81A3-5FD5DE749732</key>
 		<dict>
 			<key>note</key>
 			<string>Focus ⌃ → MainMenu</string>
 			<key>xpos</key>
-			<real>1380.0</real>
+			<real>1380</real>
 			<key>ypos</key>
-			<real>960.0</real>
+			<real>960</real>
 		</dict>
 		<key>DE724C0E-089B-454F-B621-70710AC3E3F3</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>3360.0</real>
+			<real>3360</real>
 		</dict>
 		<key>DEAA60D1-0AA6-4B51-93A2-E98A82255D10</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>2970.0</real>
+			<real>2970</real>
 		</dict>
 		<key>DED12649-258F-4B03-94CB-688172B27F0D</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>E0941691-035E-457B-9181-1C45BE6DA88A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1870.0</real>
+			<real>1870</real>
 		</dict>
 		<key>E124F0E6-914A-41E3-9BBF-B14D6F724AD3</key>
 		<dict>
 			<key>note</key>
-			<string>ET XAct (R3.5)</string>
+			<string>ET XAct</string>
 			<key>xpos</key>
-			<real>1765.0</real>
+			<real>1765</real>
 			<key>ypos</key>
-			<real>730.0</real>
+			<real>730</real>
 		</dict>
 		<key>E3DC8580-FF44-4281-9877-6D82EF4A1B3F</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>2840.0</real>
+			<real>2840</real>
 		</dict>
 		<key>E48E5384-D8CD-47FA-9ED0-4E1B41C0AD09</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>970.0</real>
+			<real>970</real>
 			<key>ypos</key>
-			<real>2185.0</real>
+			<real>2185</real>
 		</dict>
 		<key>E4A4F37D-41A8-45BD-B0CD-D6879646E7C8</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1555.0</real>
+			<real>1555</real>
 		</dict>
 		<key>E5B8BA07-A248-420C-8EED-25F7104E2EBC</key>
 		<dict>
 			<key>xpos</key>
-			<real>320.0</real>
+			<real>320</real>
 			<key>ypos</key>
-			<real>3880.0</real>
+			<real>3880</real>
 		</dict>
 		<key>E86FBD12-4202-4205-A6B9-E63851E8A01A</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>3135.0</real>
+			<real>3135</real>
 			<key>ypos</key>
-			<real>165.0</real>
+			<real>165</real>
 		</dict>
 		<key>E92A2C6B-E234-4B60-91FC-FB587C3AE083</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>30.0</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>1765.0</real>
+			<real>1765</real>
 		</dict>
 		<key>EB20AFED-ED23-42E8-9D8F-AB800F3BD677</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2290</real>
 		</dict>
 		<key>EDE420E3-AFCE-4509-B279-8333920CA098</key>
 		<dict>
@@ -10132,68 +10132,68 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>New Task ⇧⌘</string>
 			<key>xpos</key>
-			<real>3390.0</real>
+			<real>3390</real>
 			<key>ypos</key>
-			<real>275.0</real>
+			<real>275</real>
 		</dict>
 		<key>EE44208D-E5C1-46E6-86AF-9A871A47B302</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>3480.0</real>
+			<real>3480</real>
 			<key>ypos</key>
-			<real>365.0</real>
+			<real>365</real>
 		</dict>
 		<key>EEAD4463-39AA-4435-A4A5-732F66A5BBD6</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>615.0</real>
+			<real>615</real>
 			<key>ypos</key>
-			<real>1660.0</real>
+			<real>1660</real>
 		</dict>
 		<key>EF2C8B49-9B42-472C-95D6-7251657A98C4</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>12</integer>
 			<key>xpos</key>
-			<real>345.0</real>
+			<real>345</real>
 			<key>ypos</key>
-			<real>1660.0</real>
+			<real>1660</real>
 		</dict>
 		<key>F07AE399-2723-47C5-8264-4B09ADC2F318</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>3490.0</real>
+			<real>3490</real>
 		</dict>
 		<key>F08535DC-1974-4995-B963-0FF7FC66C269</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>1465.0</real>
+			<real>1465</real>
 			<key>ypos</key>
-			<real>1670.0</real>
+			<real>1670</real>
 		</dict>
 		<key>F140642C-C4F7-46FB-933A-AE1D228CB3B7</key>
 		<dict>
 			<key>xpos</key>
-			<real>60.0</real>
+			<real>60</real>
 			<key>ypos</key>
-			<real>3360.0</real>
+			<real>3360</real>
 		</dict>
 		<key>F74F7EDC-BD25-4434-951F-470A21901B93</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>330.0</real>
+			<real>330</real>
 		</dict>
 		<key>F798D9B9-9B49-410C-BDA3-DA68F991317B</key>
 		<dict>
@@ -10202,18 +10202,18 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Check AND OR set task_id</string>
 			<key>xpos</key>
-			<real>200.0</real>
+			<real>200</real>
 			<key>ypos</key>
-			<real>1345.0</real>
+			<real>1345</real>
 		</dict>
 		<key>F855BE76-FE26-4D93-90E9-87F79B129658</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>2</integer>
 			<key>xpos</key>
-			<real>1300.0</real>
+			<real>1300</real>
 			<key>ypos</key>
-			<real>435.0</real>
+			<real>435</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
@@ -10651,7 +10651,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>Your custom filters (Settings → Filters to define).</string>
+			<string>Your custom filters, synced from TickTick after Attachment Login (see the docs).</string>
 			<key>label</key>
 			<string>[keyword] Filters</string>
 			<key>type</key>
@@ -10787,7 +10787,15 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 	</array>
 	<key>variablesdontexport</key>
-	<array/>
+	<array>
+		<string>client_id</string>
+		<string>client_secret</string>
+		<string>crm_list_id</string>
+		<string>cta_list_id</string>
+		<string>projects_folder_id</string>
+		<string>periodic_list_id</string>
+		<string>weekly_review_id</string>
+	</array>
 	<key>version</key>
 	<string>2.5</string>
 	<key>webaddress</key>
