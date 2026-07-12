@@ -4,7 +4,7 @@ BUNDLE       := $(WORKFLOW_NAME).alfredworkflow
 # same homebrew python the cache-sync LaunchAgent runs on.
 PYTHON       := /opt/homebrew/bin/python3
 
-.PHONY: all bundle install test-api test-lists test-tasks clean
+.PHONY: all bundle install test test-api test-lists test-tasks test-add test-sync clean
 
 all: bundle
 
@@ -23,7 +23,12 @@ bundle:
 install: bundle
 	open $(BUNDLE)
 
-# ── Smoke tests ───────────────────────────────────────────────────────────
+# ── Unit tests (pure stdlib, no credentials or network needed) ────────────
+test:
+	@python3 tests/test_periodic.py
+	@python3 tests/test_focus_blocks.py
+
+# ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:
 	@echo "--- GET /project ---"
 	@cd src && $(PYTHON) -c "\
