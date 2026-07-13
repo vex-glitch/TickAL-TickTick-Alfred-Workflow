@@ -2,7 +2,7 @@
 {{navlinks}}
 ---
 ### 🎯 OKR review
-_(score last quarter's OKRs — keep / kill / change)_
+_(score last quarter's OKRs - keep / kill / change)_
 
 ### 🚀 Next-Q OKRs
 

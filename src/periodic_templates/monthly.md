@@ -16,5 +16,5 @@ _(pending)_
 ### 💡 Observations
 
 ### 💰 Money
-_week lines may straddle months — Total counts this month's days only_
+_week lines may straddle months - Total counts this month's days only_
 **Total = 0**

@@ -588,14 +588,14 @@ def journal_fixed(slot, ctx=None):
     ctx = ctx or {}
     if slot == "morning":
         return [
-            ("mood", "Mood — 1-5 (1 😢 · 3 😐 · 5 😁), optional note after ·"),
+            ("mood", "Mood 1-5 (1 😢 · 3 😐 · 5 😁), optional note after ·"),
             ("free", "What is on your mind?"),
             ("free", "What is the one thing you need to do today? What would, "
                      "if achieved, make this day count?"),
         ]
     if slot == "evening":
         goal = (ctx.get("goal") or "").strip()
-        goal_q = (f"Did you achieve your daily goal — {goal}? "
+        goal_q = (f"Did you achieve your daily goal, {goal}? "
                   "Describe success/failure factors."
                   if goal else
                   "Did you achieve your daily goal? "
@@ -604,13 +604,13 @@ def journal_fixed(slot, ctx=None):
             ("free", "What is on your mind?"),
             ("goal", goal_q),
             ("money", "How much money did you earn today? (logs to 💰 Money)"),
-            ("rating", "Rate the day — 1-5 stars"),
+            ("rating", "Rate the day, 1-5 stars"),
         ]
     # weekly - the three-things picker is NOT a seeded question: it runs as
     # the Alfred goal-picker handoff after the dialogs (phones edit next
     # week's 🎯 Goals directly instead)
     goals = (ctx.get("goals") or "").strip()
-    goals_q = (f"Did you achieve your weekly goals — {goals}? "
+    goals_q = (f"Did you achieve your weekly goals, {goals}? "
                "Describe success/fail factors on each."
                if goals else
                "Did you achieve your weekly goals? "

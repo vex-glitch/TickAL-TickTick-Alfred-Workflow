@@ -113,7 +113,7 @@ def get_weather():
             timeout=_TIMEOUT)
         d = r.json()["daily"]
         line = (f"{_wmo_emoji(int(d['weather_code'][0]))} "
-                f"{round(d['temperature_2m_min'][0])}–"
+                f"{round(d['temperature_2m_min'][0])}-"
                 f"{round(d['temperature_2m_max'][0])}°C · "
                 f"rain {int(d['precipitation_probability_max'][0] or 0)}%")
         cache_store.set("pn_weather", {"date": today, "ts": time.time(),
@@ -133,7 +133,7 @@ def get_quote():
     try:
         r = requests.get("https://zenquotes.io/api/today", timeout=_TIMEOUT)
         j = r.json()[0]
-        line = f"> “{j['q'].strip()}” — {j['a'].strip()}"
+        line = f"> “{j['q'].strip()}” · {j['a'].strip()}"
         cache_store.set("pn_quote", {"date": today, "line": line})
         return line
     except Exception:

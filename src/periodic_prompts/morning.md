@@ -1,13 +1,13 @@
 ## random
 - What am I grateful for?
 - What would make today great?
-- Who made your life better this week — have you told them?
+- Who made your life better this week - have you told them?
 - What small comfort are you taking for granted right now?
 - What ability would you miss most if it vanished tomorrow?
 - What went right yesterday that you never acknowledged?
 - Which ordinary thing about today deserves a second look?
 - If today were your last, what would still be worth doing?
-- What could go wrong today — and how would you meet it calmly?
+- What could go wrong today - and how would you meet it calmly?
 - What is in your control today, and what is not?
 - What would the person you want to become do before noon?
 - Which discomfort could you choose on purpose today?
@@ -33,6 +33,6 @@
 - What do you need to forgive yourself for before the day starts?
 - What would treating yourself like a friend look like today?
 - Which rule of yours deserves to be questioned today?
-- What pace would actually serve you today — and can you keep it?
+- What pace would actually serve you today - and can you keep it?
 - Who deserves five undistracted minutes from you today?
 - What kindness could you make effortless today?

@@ -3,10 +3,10 @@
 ---
 # 🏆 Goals
 ### 🗓️ Weekly
-	_(mirrors this week's weekly note — edit goals there)_
+	_(mirrors this week's weekly note - edit goals there)_
 
 ### ☀️ Daily
-	_(pick one — ☀️ in search, or the morning journal asks)_
+	_(pick one - ☀️ in search, or the morning journal asks)_
 ---
 # ☀️ Today
 ### ✅ Tasks

@@ -1,13 +1,13 @@
 ## random
 - What drained you this week that you could refuse next week?
-- Which day worked best — and what made it work?
+- Which day worked best - and what made it work?
 - What did you start this week that deserves to survive next week?
 - Which task did you avoid all week, and what is it really about?
 - Who did you not make time for that you meant to?
 - What did this week teach you about your estimates?
-- Which habit earned its keep this week — and which didn't?
+- Which habit earned its keep this week - and which didn't?
 - What would you tell last Monday's you?
-- Where did most of your focus actually go — and was it worth it?
+- Where did most of your focus actually go - and was it worth it?
 - What almost went wrong this week and quietly didn't?
 - What did you say yes to that should have been a no?
 - Which small win this week deserves to be repeated on purpose?
@@ -17,5 +17,5 @@
 - Which conversation this week changed something?
 - What would have made this week 10% calmer?
 - What are you still pretending not to know?
-- Which system broke this week — and what is its two-minute patch?
+- Which system broke this week - and what is its two-minute patch?
 - What made you laugh this week?

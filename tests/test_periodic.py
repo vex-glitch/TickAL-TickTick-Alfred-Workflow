@@ -248,18 +248,18 @@ check("19.mood-line", pm.mood_line(4, "tired") == "Mood: 🙂 · tired"
       and pm.mood_line(1) == "Mood: 😢")
 check("19.rating-line", pm.rating_line(3) == "Day: ★★★"
       and pm.rating_line(9) == "Day: ★★★★★")
-qbody = ['> "q" — A', "🌤 16–26°C", "Mood: 🙂 · ok", "Day: ★★★★"]
+qbody = ['> "q" · A', "🌤 16-26°C", "Mood: 🙂 · ok", "Day: ★★★★"]
 check("19.quote-mood", pm.quote_mood(qbody) == (4, "ok"))
 check("19.quote-rating", pm.quote_rating(qbody) == 4)
-mq = pm.merge_quote_body(qbody, '> "new" — B', None)
-check("19.merge-quote", mq == ['> "new" — B', "🌤 16–26°C",
+mq = pm.merge_quote_body(qbody, '> "new" · B', None)
+check("19.merge-quote", mq == ['> "new" · B', "🌤 16-26°C",
                                "Mood: 🙂 · ok", "Day: ★★★★"], mq)
 mq2 = pm.merge_quote_body(["_(pending)_"], None, "🌧 10°C")
 check("19.merge-pending", mq2 == ["🌧 10°C"], mq2)
 nb = pm.set_line_in_body(qbody, pm.MOOD_LINE_RE, pm.mood_line(2))
 check("19.set-line-replace", "Mood: 😞" in nb and "Mood: 🙂 · ok" not in nb)
-nb2 = pm.set_line_in_body(['> "q" — A'], pm.RATING_LINE_RE, pm.rating_line(5))
-check("19.set-line-append", nb2 == ['> "q" — A', "Day: ★★★★★"])
+nb2 = pm.set_line_in_body(['> "q" · A'], pm.RATING_LINE_RE, pm.rating_line(5))
+check("19.set-line-append", nb2 == ['> "q" · A', "Day: ★★★★★"])
 ents = pm.entries_grouped([
     (date(2026, 7, 9), "14:32", "🏆", "Shipped"),
     (date(2026, 7, 10), "09:11", "🏆", "Won"),
@@ -306,7 +306,7 @@ DOC = """crumbs
 		- **Total = 310**
 ---
 
-### 🔥 Top list: old - 1 done
+### 🔥 Top list: old · 1 done
 	body
 """
 d20 = ps.parse_sections(DOC)
@@ -321,8 +321,8 @@ out20 = ps.serialize_sections(d20)
 check("20.decor-survives", "# ☀️ Today" in out20 and out20.count("---") == 3)
 sec20 = ps.find_prefix(d20, "🔥 Top list")
 check("20.find-prefix", sec20 is not None and sec20.name.endswith("1 done"))
-ps.set_header(sec20, "🔥 Top list: new — 2 done")
-check("20.set-header", "### 🔥 Top list: new — 2 done"
+ps.set_header(sec20, "🔥 Top list: new · 2 done")
+check("20.set-header", "### 🔥 Top list: new · 2 done"
       in ps.serialize_sections(d20))
 msec20 = ps.find(d20, "💰 Money")
 check("20.indented-sum", pm.section_money_sum(msec20.body) == 310.0)

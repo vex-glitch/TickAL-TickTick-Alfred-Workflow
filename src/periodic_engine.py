@@ -696,7 +696,7 @@ def _fill_daily(doc, p, index, is_today):
             # weekly goals CLEARED → mirror resets to the pointer, never
             # keeps stale copies
             ps.set_body(doc, pm.SEC_WEEK_GOALS,
-                        [f"{pm.T1}_(mirrors this week's weekly note — "
+                        [f"{pm.T1}_(mirrors this week's weekly note - "
                          "edit goals there)_"])
 
     if is_today:
@@ -900,7 +900,7 @@ def _fill_weekly(doc, p, index):
     if traffic:
         top = max(traffic.items(), key=lambda kv: kv[1])[0]
         _set_headed(doc, pm.SEC_TOP_LIST,
-                    f"{top} — {done_bp.get(top, 0)} done · "
+                    f"{top} · {done_bp.get(top, 0)} done · "
                     f"{created_bp.get(top, 0)} added")
     if comp_cur:
         top3 = ", ".join(md_links_display(t.get("title") or "")[:32]
@@ -1001,7 +1001,7 @@ def _fill_weekly(doc, p, index):
             traffic[nm] = traffic.get(nm, 0) + c
         if traffic:
             top = max(traffic.items(), key=lambda kv: kv[1])[0]
-            lw.append(f"- 🔥 Top list: {top} — {prev_bp.get(top, 0)} done · "
+            lw.append(f"- 🔥 Top list: {top} · {prev_bp.get(top, 0)} done · "
                       f"{prev_created_bp.get(top, 0)} added")
         lw.append(f"- Completed: {len(comp_prev)}")
         top3 = ", ".join(md_links_display(t.get("title") or "")[:32]
@@ -1091,7 +1091,7 @@ def _fill_rollup_money(doc, p, index):
             d += timedelta(days=7 - d.weekday())
         for wk in weeks:
             iso = wk.start.isocalendar()
-            rng = (f"{wk.start.day:02d}–{wk.end.day:02d} "
+            rng = (f"{wk.start.day:02d}-{wk.end.day:02d} "
                    f"{pm.MONTH_ABBR[wk.end.month]}")
             lines.append(f"- W{iso[1]:02d} ({rng}) • "
                          f"{pm.fmt_amount(pm.sum_in_period(day_sums, wk))}")

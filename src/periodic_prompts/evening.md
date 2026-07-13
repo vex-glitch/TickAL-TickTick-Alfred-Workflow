@@ -13,17 +13,17 @@
 - What about your ordinary routine quietly worked today?
 - What are you glad exists exactly as it is tonight?
 - Which small pleasure today deserved more attention than it got?
-- What did you do badly today — and what would better look like?
+- What did you do badly today - and what would better look like?
 - Where were you ruled by impulse instead of intention today?
 - Which of today's frustrations will not matter in a year?
 - What did you control today, and what controlled you?
-- Where did you act beneath your own standards — without excuses?
+- Where did you act beneath your own standards - without excuses?
 - What virtue did today actually ask of you?
 - What can you now stop carrying from today?
-- What stays unfinished tonight — and is that acceptable?
+- What stays unfinished tonight - and is that acceptable?
 - Which worry from this morning never showed up?
 - What do you need to put down before you sleep?
-- What deserves to be forgiven — in yourself or someone else — tonight?
+- What deserves to be forgiven - in yourself or someone else - tonight?
 - If today taught one lesson, what is its single sentence?
 - What would you do differently if today repeated tomorrow?
 - What did a mistake today reveal that success would have hidden?
