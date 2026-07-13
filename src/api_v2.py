@@ -1,27 +1,27 @@
 """
-TickTick internal v2 API client — quarantined.
+TickTick internal v2 API client - quarantined.
 
 The official Open API (src/api.py, OAuth) has no attachment endpoint, so image
 attachments go through TickTick's own internal API. Kept SEPARATE from api.py so
-this fragile, undocumented surface stays contained — v1 features keep working
+this fragile, undocumented surface stays contained - v1 features keep working
 regardless of v2 breakage.
 
 Confirmed by capturing + reproducing the web app's requests:
 
   LOGIN   POST https://api.ticktick.com/api/v2/user/signon?wc=true&remember=true
           json {"username","password"} + x-device header  →  {"token": …}
-          (TickTick rate-limits logins — see remainderTimes — so we cache the
+          (TickTick rate-limits logins - see remainderTimes - so we cache the
            token and only log in when there isn't a valid one.)
 
   UPLOAD  POST https://api.ticktick.com/api/v1/attachment/upload/{projectId}/{taskId}/{attachmentId}
           multipart field "file"; auth = cookie t=<token> + x-device.
-          (CSRF is NOT required — verified.) {attachmentId} is a client-generated
+          (CSRF is NOT required - verified.) {attachmentId} is a client-generated
           24-hex ObjectId. The upload alone attaches + renders + syncs the image;
           no follow-up task update needed.
 
 Credentials: a one-time masked sign-in (xact v2login) or a pasted session
-token (Scripts/save_token.py — the Sign-in-with-Apple path). Only the session
-token is ever stored: Keychain `ticktick_v2_token` or config.json (0600) —
+token (Scripts/save_token.py - the Sign-in-with-Apple path). Only the session
+token is ever stored: Keychain `ticktick_v2_token` or config.json (0600) -
 never a password, and nothing in the Configure panel (Alfred prefs are
 plaintext and often cloud-synced).
 """
@@ -41,7 +41,7 @@ import config as cfg  # noqa: E402
 SIGNON_URL   = "https://api.ticktick.com/api/v2/user/signon?wc=true&remember=true"
 UPLOAD_BASE  = "https://api.ticktick.com/api/v1/attachment/upload"
 
-# The x-device id is generated PER INSTALL (cached in config.json) — never a
+# The x-device id is generated PER INSTALL (cached in config.json) - never a
 # fingerprint baked into shipped source.
 X_DEVICE_TMPL = ('{{"platform":"web","os":"macOS","device":"Chrome","name":"",'
                  '"version":8101,"id":"{did}","channel":"website",'
@@ -107,7 +107,7 @@ class TickTickV2:
         user = user or cfg.get_v2_username()
         pw   = pw or cfg.get_v2_password()
         if not user or not pw:
-            raise V2AuthError("no session token — run Settings → Attachment Login, "
+            raise V2AuthError("no session token · run Settings → Attachment Login, "
                               "or paste one via Settings → Attachment Token")
         r = requests.post(SIGNON_URL, json={"username": user, "password": pw},
                           headers={**_base_headers(), "content-type": "application/json"},
@@ -142,7 +142,7 @@ class TickTickV2:
         return r.json() if r.text.strip() else {}
 
     def get_completed(self, days=60, limit=200):
-        """Completed tasks across ALL projects — server truth (the Open API
+        """Completed tasks across ALL projects - server truth (the Open API
         can't list completed; the old local snapshots only knew workflow-side
         completions). GET /api/v2/project/all/completed, verified 2026-07-07.
         Returns full task dicts incl. completedTime/status/tags/content."""
@@ -160,7 +160,7 @@ class TickTickV2:
         return r.json() if r.text.strip() else []
 
     def get_abandoned(self, days=60, limit=200):
-        """Won't-do ("Abandoned") tasks across ALL projects — same route
+        """Won't-do ("Abandoned") tasks across ALL projects - same route
         family as get_completed but /closed with a status param
         (probe-verified 2026-07-11). Returns the list on success ([] = the
         account truly has none), None on any failure so callers keep their
@@ -185,7 +185,7 @@ class TickTickV2:
 
     def abandon_task(self, task):
         """Mark a task Won't Do the way the app does: POST /api/v2/batch/task
-        update with status -1 AND a client-stamped completedTime — without the
+        update with status -1 AND a client-stamped completedTime - without the
         stamp the task never enters the closed index (probe-verified
         2026-07-11: v1 carries status -1 but silently drops the stamp).
         `task` = the FULL task dict (v1 GET shape). True on a clean ack."""
@@ -210,9 +210,9 @@ class TickTickV2:
             return False
 
     def get_tags(self):
-        """GET /api/v2/tags — the full tag list incl. `parent` links (the open
+        """GET /api/v2/tags - the full tag list incl. `parent` links (the open
         API has no tag endpoint). Returns the list on success ([] = the
-        account truly has no tags), None on any failure — callers keep their
+        account truly has no tags), None on any failure - callers keep their
         last-known-good tree so a transient blip can't shrink the tags cache."""
         if not self.token:
             return None
@@ -230,10 +230,10 @@ class TickTickV2:
 
     def get_sync_meta(self):
         """One GET /api/v2/batch/check/0 → the metadata the open API hides:
-        project groups (folders) WITH names, and native filters WITH rules —
+        project groups (folders) WITH names, and native filters WITH rules -
         both with sortOrder (ascending = the sidebar order; probe-verified
         2026-07-09, the dedicated /projectgroups route 404s). Returns
-        {"groups": [...], "filters": [...]} on success (possibly empty —
+        {"groups": [...], "filters": [...]} on success (possibly empty -
         that IS the account's truth), None on any failure so callers can
         keep their last-known-good caches."""
         if not self.token:
@@ -249,7 +249,7 @@ class TickTickV2:
                 return None
             return {
                 "groups": [{"id": g["id"], "name": g["name"],
-                            # `or 0` — an explicit JSON null slips past a .get
+                            # `or 0` - an explicit JSON null slips past a .get
                             # default and would TypeError the sort downstream
                             "sortOrder": g.get("sortOrder") or 0}
                            for g in (d.get("projectGroups") or [])
@@ -263,7 +263,7 @@ class TickTickV2:
             return None
 
     def get_project_groups(self):
-        """Back-compat shim — see get_sync_meta."""
+        """Back-compat shim - see get_sync_meta."""
         return (self.get_sync_meta() or {"groups": []})["groups"]
 
     def create_tag(self, label, parent=None):
@@ -289,7 +289,7 @@ class TickTickV2:
 
     def delete_tag(self, name):
         """DELETE /api/v2/tag?name= (probe-verified 2026-07-09). Tasks keep
-        living — only the tag entity goes. True on a 2xx ack."""
+        living - only the tag entity goes. True on a 2xx ack."""
         name = (name or "").strip().lstrip("#").lower()
         if not self.token or not name:
             return False
@@ -307,7 +307,7 @@ class TickTickV2:
         Apple account just gets a clear 'recapture token' message when it expires."""
         if not self.token:
             if not self._has_login():
-                raise V2AuthError("no session token — run Settings → Attachment "
+                raise V2AuthError("no session token · run Settings → Attachment "
                                   "Login (or Settings → Attachment Token)")
             self.signon()
             return self._upload(project_id, task_id, file_bytes, file_name, mime)
@@ -315,7 +315,7 @@ class TickTickV2:
             return self._upload(project_id, task_id, file_bytes, file_name, mime)
         except V2AuthError:
             if not self._has_login():
-                raise V2AuthError("session expired — run Settings → Attachment "
+                raise V2AuthError("session expired · run Settings → Attachment "
                                   "Login again (or re-paste it via Settings → "
                                   "Attachment Token)")
             self.signon()  # stored-credential fallback only: refresh once

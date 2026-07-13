@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-browse.py — Alfred Script Filter (unified browse box)
+browse.py - Alfred Script Filter (unified browse box)
 
 ONE node renders every level of the browse tree. The whole state rides in $1:
 
@@ -8,8 +8,8 @@ ONE node renders every level of the browse tree. The whole state rides in $1:
 
 Levels:
     ctx:folders                         folder picker (+ 📥 Inbox row)
-    ctx:lists[:<folderId>]              lists — all, or those in a folder
-    ctx:sections:<listId>               sections — auto-skips straight to tasks
+    ctx:lists[:<folderId>]              lists - all, or those in a folder
+    ctx:sections:<listId>               sections - auto-skips straight to tasks
                                         when the list only has unsectioned content
     ctx:tasks:<listId>[:<sectionId>]    tasks (sectionId may be UNSECTIONED)
     ctx:subtasks:<listId>:<taskId>      children of a task
@@ -22,14 +22,14 @@ Levels:
     ctx:wontdo                          Won't Do (abandoned) tasks
 
 Anything after the ctx token is the fuzzy filter query. `ctx:subtasks:<taskId>`
-(single id) is also accepted — the list is then
+(single id) is also accepted - the list is then
 resolved from the all_tasks cache.
 
 Every row emits:
     arg         ⏎ meaning per row type (open:<deeplink> → existing OPEN path;
                 completed rows keep their ⇧ uncomplete:<…> ride)
     variables   full task context (task_id / task_title / task_list_id /
-                list_id / section_id / item_type — same keys the old per-level
+                list_id / section_id / item_type - same keys the old per-level
                 scripts emitted, so the ⌘ Actions rail keeps working)
                 + browse_back = ctx of the parent screen (⌃⇧ back loop)
     mods.alt    arg = child ctx (⌥ drill loop); on task rows valid only when
@@ -135,7 +135,7 @@ def get_project_data(list_id):
     cache_key = f"project_data_{list_id}"
     data = cache_store.get(cache_key)
     # Inbox tasks carry their real projectId ("inbox…") but the cache is keyed
-    # by the literal "inbox" — fall back before hitting the API.
+    # by the literal "inbox" - fall back before hitting the API.
     if data is None and list_id.startswith("inbox"):
         data = cache_store.get("project_data_inbox")
     if data is None:
@@ -185,7 +185,7 @@ def tag_counts(all_tasks):
 
 def _tag_rank():
     """Tag name (lower) → position in TickTick's OWN tag order (v2 tags_tree
-    sortOrder — the deliberate order that drives the app's group-by-tag
+    sortOrder - the deliberate order that drives the app's group-by-tag
     sections). Falls back to the tags cache order when the tree is absent
     (no v2 token)."""
     tree = cache_store.get("tags_tree") or []
@@ -207,7 +207,7 @@ def _tag_group_key(task, rank):
 
 def _sort_tasks(tasks, group_by_tag=False):
     """Priority floats to the top of every drill view; the
-    whole-list 'Show all' view additionally groups by tag. Stable sorts —
+    whole-list 'Show all' view additionally groups by tag. Stable sorts -
     cache order survives inside each band, and a typed query's fuzzy scoring
     still wins (this order is its tiebreak)."""
     tasks.sort(key=lambda t: -(t.get("priority") or 0))
@@ -218,7 +218,7 @@ def _sort_tasks(tasks, group_by_tag=False):
 
 def _show_all_row(list_id, all_tasks, uid="tag-all"):
     """Top row of the tag/section drill screens: ⏎ rewrites
-    the bar to the 'all ' sentinel — the whole list flat, grouped by tag,
+    the bar to the 'all ' sentinel - the whole list flat, grouped by tag,
     priority first. ⌥⏎ does the same through a proper ctx hop."""
     n_open = sum(1 for t in all_tasks
                  if t.get("status", 0) == 0 and not t.get("parentId"))
@@ -274,7 +274,7 @@ def add_back(items, back):
     """Stamp the ⌃ back mod + browse_back onto every row (empty-state rows
     included) so the ⌃ → R:emit-back → back-router loop always knows where up
     is. The ⌃ mod carries its OWN variables (mod vars REPLACE item vars): it
-    must RESET browse_ctx — the ⌥ drill hop plants it as a session variable,
+    must RESET browse_ctx - the ⌥ drill hop plants it as a session variable,
     and a stale value otherwise outranks browse_back in parse_ctx, re-rendering
     the same screen (the childless-drill "back does nothing" bug)."""
     for it in items:
@@ -338,7 +338,7 @@ def render_folders(query):
     folders  = cfg.get_folders()  # {groupId: name}
     projects = cache_store.get("projects") or []
 
-    # ── Inbox (special: ⌥ drills directly to tasks — the old Inbox-skip
+    # ── Inbox (special: ⌥ drills directly to tasks - the old Inbox-skip
     #    conditional 42264365, now in-script) ───────────────────────────────
     inbox_id   = find_inbox_id()
     inbox_data = cache_store.get("project_data_inbox") or {}
@@ -377,7 +377,7 @@ def render_folders(query):
         # Manual "1) Name" prefixes rank first; unprefixed (v2 auto-named)
         # folders follow in TickTick's own sidebar order (group sortOrder);
         # folders with no live group (tokenless installs, ghosts of deleted
-        # groups) sink below the autos in insertion order — the original
+        # groups) sink below the autos in insertion order - the original
         # rendering for tokenless users.
         v2_order = {g.get("id"): (g.get("sortOrder") or 0)
                     for g in (cache_store.get("folder_groups") or [])}
@@ -400,7 +400,7 @@ def render_folders(query):
                 mods={
                     "alt": {"arg": "", "valid": True, "subtitle": "Browse lists",
                             "variables": {"browse_ctx": f"ctx:lists:{group_id}"}},
-                    # Actions can't handle folder context yet — dead ⌘ here
+                    # Actions can't handle folder context yet - dead ⌘ here
                     # would otherwise fire the junction and crash actions.py.
                     "cmd": {"valid": False, "subtitle": ""},
                 },
@@ -418,7 +418,7 @@ def render_folders(query):
             valid=False,
         )]
 
-    return add_back(items, "")   # root — no parent inside browse
+    return add_back(items, "")   # root - no parent inside browse
 
 # ── Level: lists ─────────────────────────────────────────────────────────────
 def render_lists(folder_id, query):
@@ -433,7 +433,7 @@ def render_lists(folder_id, query):
         name = p["name"]
         link = f"ticktick:///webapp/#p/{pid}/tasks"
 
-        # Sub-count: distinct TAGS on the list's open tasks — the count must
+        # Sub-count: distinct TAGS on the list's open tasks - the count must
         # match what ⌥ drills into. Browse and search agree: ⌥ tags ·
         # ⌥⇧ sections on both.
         list_tags = {tag for t in all_tasks
@@ -464,7 +464,7 @@ def render_lists(folder_id, query):
         items.append(alfred.item(
             uid="no-results",
             title=f'No lists matching "{query}"' if query else
-                  ("No lists in this folder" if folder_id else "No lists — run Sync first"),
+                  ("No lists in this folder" if folder_id else "No lists · run Sync first"),
             valid=False,
         ))
 
@@ -494,7 +494,7 @@ def render_sections(list_id, query):
         sid = unsectioned_col["id"] if unsectioned_col else "UNSECTIONED"
         return render_tasks(list_id, sid, query, back_override=lists_parent(list_id))
 
-    # "all " sentinel: ⏎ on the 📋 Show-all row rewrites the bar —
+    # "all " sentinel: ⏎ on the 📋 Show-all row rewrites the bar -
     # the whole list renders flat, grouped by tag; anything after the token
     # filters it. Human-readable advance, same idea as "#Tag ".
     if query == "all" or query.startswith("all "):
@@ -640,7 +640,7 @@ def render_children(list_id, task_id, query, level):
     parent_title   = (parent or {}).get("title", "task")
 
     # Breadcrumb: List>Section(top ancestor)>…ancestor titles…>parent title
-    # (walks the parent chain — matches subtasks.py at depth 1 and
+    # (walks the parent chain - matches subtasks.py at depth 1 and
     #  subsubtasks.py at depth 2, and keeps working below that).
     chain, cur, seen = [], parent, set()
     while cur and cur["id"] not in seen and len(chain) < 6:
@@ -689,7 +689,7 @@ def render_tags(list_id, query):
     all_tasks = (get_project_data(list_id) or {}).get("tasks", [])
     counts    = tag_counts(all_tasks)
 
-    # ⏎ on a tag row autocompletes "#<Tag> " — a human-readable advance (keeps
+    # ⏎ on a tag row autocompletes "#<Tag> " - a human-readable advance (keeps
     # raw ctx: tokens out of the bar). An exact #tag token renders that tag's
     # tasks; anything after it filters them.
     if query.startswith("#"):
@@ -698,7 +698,7 @@ def render_tags(list_id, query):
         if match:
             return render_tagitems(list_id, match, rest.strip())
 
-    # "all " sentinel — the 📋 Show-all top row's advance (see _show_all_row)
+    # "all " sentinel - the 📋 Show-all top row's advance (see _show_all_row)
     if query == "all" or query.startswith("all "):
         return render_tasks(list_id, "", query[3:].strip(),
                             back_override=f"ctx:tags:{list_id}")
@@ -713,7 +713,7 @@ def render_tags(list_id, query):
             subtitle=build_subtitle(counts[tag], child_label="Task", actions=True),
             arg="", valid=False,
             # ⏎ → advance to this tag's tasks. The bar gets a human-readable
-            # "#Tag " (parsed back above) — never a raw ctx: token.
+            # "#Tag " (parsed back above) - never a raw ctx: token.
             autocomplete=f"{fmt_tags([tag]) or '#' + tag} ",
             mods={
                 "alt": {"arg": "", "valid": True, "subtitle": "Browse this tag's tasks",
@@ -742,7 +742,7 @@ def render_tags(list_id, query):
         items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
 
         # Typing on a tag screen also filters the list's tasks
-        # directly — matching tasks follow the tag rows, so the CRM search
+        # directly - matching tasks follow the tag rows, so the CRM search
         # works without picking a tag first. Clearing the query brings back
         # the pure tag list.
         data           = get_project_data(list_id) or {}
@@ -799,7 +799,7 @@ def render_tagitems(list_id, tag, query):
 
     return add_back(items, f"ctx:tags:{list_id}")
 
-# ── Level: buffer (🅿️ — tasks collected via ⌘/⌥⇧) ───────────────────────────
+# ── Level: buffer (🅿️ - tasks collected via ⌘/⌥⇧) ───────────────────────────
 def render_buffer(query):
     try:
         with open(run_path("tickal_buffer.txt")) as f:
@@ -812,7 +812,7 @@ def render_buffer(query):
     for pid, tid in pairs:
         t = by_id.get(tid)
         if not t:
-            continue   # stray (completed/deleted since buffering) — skip
+            continue   # stray (completed/deleted since buffering) - skip
         it = task_item(t, pid, _child_count(all_tasks, tid),
                        breadcrumb=t.get("_projectName", ""), uid=f"buf-{tid}")
         it["variables"]["item_type"] = "buffer_item"   # ⌘ → batch menu
@@ -998,7 +998,7 @@ def render_wontdo(query):
 # ── Level: filter (custom filters from filters_config.py) ───────────────────
 def render_filter(index, query):
     """Tasks matching FILTERS[index], as canonical task rows (full ⌘ Actions).
-    Flat — the retired filter_view's L1 tag-grouping is not reproduced. Back
+    Flat - the retired filter_view's L1 tag-grouping is not reproduced. Back
     is inert ("" → the back-router's unconnected else): this ctx is entered
     from search via ⌥, and ⌫ / ⌃-main-menu are the ways out."""
     import filtering
@@ -1067,7 +1067,7 @@ def main():
             if len(ids) >= 2:
                 lid, tid = ids[0], ids[1]
             elif len(ids) == 1:
-                # Design-doc short form ctx:subtasks:<taskId> — resolve the list
+                # Design-doc short form ctx:subtasks:<taskId> - resolve the list
                 tid = ids[0]
                 t   = cache_store.find_task(tid) or {}
                 lid = t.get("_projectId") or t.get("projectId") or ""

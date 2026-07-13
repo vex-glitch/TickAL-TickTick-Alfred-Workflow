@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-note_load.py — Alfred Run Script
+note_load.py - Alfred Run Script
 
 Prints a task's current description / note body (markdown) so it can be loaded
 into a Text View for viewing & editing. The stdout of this script becomes the
@@ -11,7 +11,7 @@ Flow:  ⌘ Actions "📝 Note" → conditional → ET "attributeNote" →
 
 Reads task_list_id / task_id from env (with the /tmp/ticktick_reattribute.txt
 go-back fallback). Content comes from the cache when present, else a single
-api.get_task() fetch. Prints nothing extra — not even a trailing newline — so the
+api.get_task() fetch. Prints nothing extra - not even a trailing newline - so the
 editor opens with exactly the stored text.
 """
 import sys

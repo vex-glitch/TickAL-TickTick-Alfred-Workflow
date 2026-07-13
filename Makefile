@@ -1,6 +1,6 @@
 WORKFLOW_NAME := TickAL
 BUNDLE       := $(WORKFLOW_NAME).alfredworkflow
-# System python (3.9) can't import the vendored urllib3 (needs 3.10+) — use the
+# System python (3.9) can't import the vendored urllib3 (needs 3.10+) - use the
 # same homebrew python the cache-sync LaunchAgent runs on.
 PYTHON       := /opt/homebrew/bin/python3
 
@@ -65,10 +65,10 @@ clean:
 	find src -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null; true
 
 # ── Workflow ⇄ repo sync (iron rule: info.plist live→repo ONLY) ───────────
-# The live workflow path is personal — define it in untracked local.mk:
+# The live workflow path is personal - define it in untracked local.mk:
 #   LIVE := $(HOME)/path/to/Alfred.alfredpreferences/workflows/user.workflow.<your-id>
 -include local.mk
-LIVE ?= $(error LIVE undefined — create local.mk with your live workflow path)
+LIVE ?= $(error LIVE undefined - create local.mk with your live workflow path)
 
 .PHONY: sync-pull sync-push
 # Pull the live canvas into the repo (the ONLY allowed plist direction)

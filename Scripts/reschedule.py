@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-reschedule.py — Alfred Script Filter
+reschedule.py - Alfred Script Filter
 Three-screen flow (all in one script filter via autocomplete):
 
-  Screen 1 — Date picker
+  Screen 1 - Date picker
     Autocomplete shortcuts + free typing.  Pressing ⏎ on a date fills the
     query (e.g. "tomorrow ") and advances to screen 2.
 
-  Screen 2 — Confirm / add time
+  Screen 2 - Confirm / add time
     Shows one valid dispatch item.  Press ⏎ to set date with no time.
     Type @ to enter the hour picker (screen 3a).
 
-  Screen 3a — Hour picker  (@)
-    Autocomplete 00–23 with AM/PM hints.  Pressing ⏎ fills "tomorrow @08:".
+  Screen 3a - Hour picker  (@)
+    Autocomplete 00-23 with AM/PM hints.  Pressing ⏎ fills "tomorrow @08:".
 
-  Screen 3b — Minute picker  (@HH:)
+  Screen 3b - Minute picker  (@HH:)
     Autocomplete 00 / 15 / 30 / 45.  Pressing ⏎ fills "tomorrow @08:30 "
     and returns to a time-aware confirm screen.
 
@@ -56,7 +56,7 @@ except Exception as e:
 
 # ── Back chord ────────────────────────────────────────────────────────────────
 def back_mod(list_id, tid):
-    """⌘⇧ back must work even on invalid rows — a mod-level valid=True
+    """⌘⇧ back must work even on invalid rows - a mod-level valid=True
     overrides the row's valid=False (Alfred ignores action chords on invalid
     rows). Mod variables REPLACE item-level ones, so carry the full context."""
     return {"ctrl": {"valid": True, "arg": "",
@@ -110,7 +110,7 @@ def time_picker(prefix, fragment, back):
     if not items:
         items = [alfred.item(
             title=f'No hours matching "{fragment}"',
-            subtitle="Type 0–23 to filter",
+            subtitle="Type 0-23 to filter",
             valid=False,
             mods=back,
         )]
@@ -309,14 +309,14 @@ def main():
             date_part = raw.strip()
             time_str  = None
 
-        # >end duration — committed (HH:MM) once present anywhere in the query
+        # >end duration - committed (HH:MM) once present anywhere in the query
         end_str = None
         em = re.search(r'(?<!\S)>(\d{1,2}:\d{2})(?=\s|$)', raw)
         if em:
             end_str = em.group(1)
 
         # Date is "committed" when it ends with a space (selected from autocomplete
-        # or typed in full) — this triggers the confirm / time screen.
+        # or typed in full) - this triggers the confirm / time screen.
         date_committed = date_raw.endswith(' ') if date_raw else False
         show_confirm   = date_committed or bool(time_str)
 
@@ -385,7 +385,7 @@ def main():
                             mods=back,
                         ))
 
-                # Always available once a date is set — even with no time/duration
+                # Always available once a date is set - even with no time/duration
                 items.append(alfred.item(
                     uid="add-reminder",
                     title="🔔 Add another reminder" if reminder_tokens else "🔔 Add reminder",
@@ -407,7 +407,7 @@ def main():
             print(alfred.output(items, skipknowledge=True))
             return
 
-        # ── Screen 1: date picker (autocomplete — no dispatches yet) ──────────
+        # ── Screen 1: date picker (autocomplete - no dispatches yet) ──────────
         items  = []
         dl     = date_part.lower()
 

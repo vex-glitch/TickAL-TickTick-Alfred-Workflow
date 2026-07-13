@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-auth.py — Run Script
+auth.py - Run Script
 OAuth 2.0 flow for TickTick.
 Opens browser to TickTick auth page, captures the redirect,
 exchanges the code for a token, saves it to config.
@@ -58,7 +58,7 @@ def _open_in_browser(url):
     """Open the URL in the default BROWSER explicitly (`open -b`).
 
     A plain `webbrowser.open` runs `open location`, which honors universal
-    links — TickTick.app claims the ticktick.com applinks domain, so the
+    links - TickTick.app claims the ticktick.com applinks domain, so the
     consent page gets swallowed by the desktop app and the OAuth dance never
     completes (GitHub issue #1). Naming the app bypasses link routing."""
     for bundle in (_default_browser_bundle(), "com.apple.Safari"):
@@ -68,7 +68,7 @@ def _open_in_browser(url):
                 return
         except Exception:
             pass
-    webbrowser.open(url)   # last resort — better a hijacked open than none
+    webbrowser.open(url)   # last resort - better a hijacked open than none
 
 def main():
     client_id     = cfg.get_client_id()
@@ -98,7 +98,7 @@ def main():
                 code_holder["code"] = qs["code"][0]
                 body = b"<html><body><h2>Done. You can close this tab.</h2></body></html>"
             elif "code" in qs:
-                # state mismatch — not our redirect; reject it and keep waiting
+                # state mismatch - not our redirect; reject it and keep waiting
                 body = (b"<html><body><h2>Login was denied or failed."
                         b" Close this tab and run tlogin again.</h2></body></html>")
             elif "error" in qs:
@@ -122,7 +122,7 @@ def main():
     print("Opening TickTick login in your browser...")
     _open_in_browser(auth_url)
 
-    # ── Wait for code (bounded — socketserver's timeout alone never breaks
+    # ── Wait for code (bounded - socketserver's timeout alone never breaks
     # the loop, so an abandoned login used to zombie on port 8080 forever) ──
     import time
     deadline = time.time() + 180
@@ -134,7 +134,7 @@ def main():
         print(f"Login denied or failed ({code_holder['error']}). Run tlogin again.")
         sys.exit(1)
     if "code" not in code_holder:
-        print("No login within 3 minutes — run tlogin again.")
+        print("No login within 3 minutes · run tlogin again.")
         sys.exit(1)
 
     # ── Exchange code for token ───────────────────────────────────────────────

@@ -12,8 +12,8 @@ BASE_URL = "https://api.ticktick.com/open/v1"
 # Retry only genuine transient gateway errors with a short backoff.
 # NOT 500: TickTick returns HTTP 500 for its rate limit (300 requests / 5 min,
 # errorCode "exceed_query_limit"). Retrying that just spends more of the budget
-# and deepens the lockout — _check() below turns it into a clear RateLimitError
-# instead. Idempotent methods only — retrying POST could create duplicates.
+# and deepens the lockout - _check() below turns it into a clear RateLimitError
+# instead. Idempotent methods only - retrying POST could create duplicates.
 _RETRY = Retry(
     total=3,
     backoff_factor=0.5,  # 0.5s, 1s, 2s
@@ -90,9 +90,9 @@ class TickTickAPI:
 
     def create_focus(self, start_time, end_time, task_id=None, focus_type=1,
                      note=None):
-        """Log a completed focus session (type 1 = timing, 0 = pomodoro) —
+        """Log a completed focus session (type 1 = timing, 0 = pomodoro) -
         shows in TickTick's calendar/stats, attributed to task_id if given.
-        `note` rides as the record's focus note (undocumented but accepted —
+        `note` rides as the record's focus note (undocumented but accepted -
         probe-verified 2026-07-07, echoed back in the create response)."""
         payload = {"startTime": start_time, "endTime": end_time, "type": focus_type}
         if task_id:
@@ -104,13 +104,13 @@ class TickTickAPI:
         return r.json() if r.text.strip() else {}
 
     def update_project(self, project_id, **fields):
-        """Partial project update (e.g. name=…) — POST /project/{id}."""
+        """Partial project update (e.g. name=…) - POST /project/{id}."""
         r = self.session.post(f"{BASE_URL}/project/{project_id}", json=fields)
         _check(r)
         return r.json() if r.text.strip() else {}
 
     def delete_project(self, project_id):
-        """Delete a project — its tasks land in TickTick's Trash."""
+        """Delete a project - its tasks land in TickTick's Trash."""
         r = self.session.delete(f"{BASE_URL}/project/{project_id}")
         _check(r)
         return True
@@ -172,7 +172,7 @@ class TickTickAPI:
 
     def update_task(self, task_id, project_id, current=None, **fields):
         """Merge changes into the full task object and post it.
-        TickTick ignores partial updates — full object required to persist.
+        TickTick ignores partial updates - full object required to persist.
         Pass field=None to send explicit null (clears the field in TickTick).
         Pass `current` (e.g. the cached task) to skip the GET round-trip;
         falls back to fetching only when not supplied.
@@ -182,7 +182,7 @@ class TickTickAPI:
         # Drop workflow-internal (_-prefixed) keys so we post clean API fields
         payload = {k: v for k, v in current.items() if not k.startswith("_")}
         for key, value in fields.items():
-            payload[key] = value  # None serialises as JSON null — clears the field
+            payload[key] = value  # None serialises as JSON null - clears the field
         # Auto-set isAllDay based on date fields
         date_val = fields.get("startDate") or fields.get("dueDate")
         if "startDate" in fields or "dueDate" in fields:
@@ -194,7 +194,7 @@ class TickTickAPI:
         # Preserve explicit projectId override (for move operations)
         if "projectId" not in fields:
             payload["projectId"] = project_id
-        # Moving to a new project: clear columnId — it belongs to the old project
+        # Moving to a new project: clear columnId - it belongs to the old project
         if "projectId" in fields and fields["projectId"] != project_id:
             payload["columnId"] = None
         r = self.session.post(f"{BASE_URL}/task/{task_id}", json=payload)

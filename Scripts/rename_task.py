@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-rename_task.py — Alfred Script Filter
+rename_task.py - Alfred Script Filter
 Text input for renaming a task. Whatever is typed becomes the new title.
 Reads task_id, task_list_id, task_title from env vars.
 Outputs arg: attr_rename:{list_id}:{task_id}:{new_title}
@@ -45,7 +45,7 @@ def main():
     try:
         new_name = query.strip()
 
-        # ⌘⇧ back must work even on the invalid prompt row — a mod-level
+        # ⌘⇧ back must work even on the invalid prompt row - a mod-level
         # valid=True overrides the row's valid=False (this was why "back from
         # a picker" never fired: Alfred ignores actions on invalid rows).
         back_mod = {"ctrl": {"valid": True, "arg": "",

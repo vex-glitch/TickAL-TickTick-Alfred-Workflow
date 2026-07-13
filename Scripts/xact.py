@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-xact.py — Alfred Run Script: the action executor router.
+xact.py - Alfred Run Script: the action executor router.
 
 One canvas branch (`xact:` prefix on the Actions router) fans out here:
     xact:buffer_add:<pid>:<tid>     add task to the buffer, reopen Search
@@ -13,7 +13,7 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
     xact:focus_resume               resume a paused timer
     xact:focus_stop                 stop + log a focus record to TickTick
                                     (duration-true: pauses compressed out)
-    xact:focus_stop_as:<pid>:<tid>  stop + log ONTO a picked task — the
+    xact:focus_stop_as:<pid>:<tid>  stop + log ONTO a picked task - the
                                     unattributed stop-twist
     xact:focus_discard              stop without logging
     xact:focus_log:<pid>:<tid>:<m>  retro-log <m> minutes ending now
@@ -40,7 +40,7 @@ Focus session blocks (checkbox staging):
     xact:fx_add_sticky:<pid>:<tid>  fx_add + open the FOCUS task's sticky
     xact:fx_add_to:<tpid>:<ttid>:<spid>:<stid>  insert source into a target
     xact:fx_add_multi:<b64>         batch insert; b64 JSON {tpid,ttid,items:
-                                    [[pid,tid,title]…]} — ONE content write
+                                    [[pid,tid,title]…]} - ONE content write
     xact:fx_tick:<pid>:<tid>[:<ctid>]  tick the first unchecked checkbox (or
                                     the one linking ctid). env TICKAL_JSON=1
                                     → block_summary JSON (the focus bar's
@@ -51,9 +51,9 @@ Focus session blocks (checkbox staging):
     xact:fx_copy[:<pid>:<tid>]      today's UNTICKED checkboxes → clipboard
                                     as a paste-ready "- Title" bullet list
     xact:convert:<pid>:<tid>        flip the item kind TEXT↔NOTE (⌘ Actions
-                                    "🔃 Convert" — v1 full-object update)
+                                    "🔃 Convert" - v1 full-object update)
     xact:wontdo:<pid>:<tid>         abandon the task (status -1, "Won't Do")
-                                    — v2 batch write, v1 fallback
+                                    - v2 batch write, v1 fallback
     xact:wontdo_undo:<pid>:<tid>    Won't Do → open again
     xact:tag_create_under:<parent>  ⌘ tag menu "➕ Add nested tag": dialog
                                     asks the name, creates under parent
@@ -74,7 +74,7 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     or plain "w Shipped it"; kinds w/n/t/k/l/m)
     xact:pn_income:<b64|plain>      💰 "- amt · label" + re-total (plain
                                     "485 label"; empty → dialog)
-    xact:pn_journal:<slot>          morning|evening — dialog per unanswered
+    xact:pn_journal:<slot>          morning|evening - dialog per unanswered
                                     prompt, partial-save, phone-wins merge
     xact:pn_goal:<pid>:<tid>        task → weekly 🎯 Goals + daily mirror
                                     (three-things seq active → NEXT week)
@@ -150,7 +150,7 @@ def _run_trigger(name, arg=None):
 
 
 def _app_sync():
-    """Click TickTick's File ▸ Sync (background-safe SE menu click — the
+    """Click TickTick's File ▸ Sync (background-safe SE menu click - the
     refresh-after-add pattern). Makes an OPEN sticky redraw our content
     writes within seconds instead of the app's own ~1 min sync cadence."""
     subprocess.run(
@@ -187,7 +187,7 @@ def buffer_add(pid, tid):
 def buffer_remove(pid, tid):
     lines = [ln for ln in buffer_ids() if ln != f"{pid}:{tid}"]
     _write_buffer(lines)
-    print(f"🅿️ removed — {len(lines)} left in buffer")
+    print(f"🅿️ removed · {len(lines)} left in buffer")
 
 
 def buffer_complete():
@@ -240,7 +240,7 @@ def _write_focus(st):
 
 
 def focus_elapsed(st):
-    """True focused seconds of a focus-file state — pauses compressed out.
+    """True focused seconds of a focus-file state - pauses compressed out.
     Schema v2 {pid,tid,title,start, paused_at?, paused_total=0}; v1 files
     (no paused_* keys) behave unchanged via the .get defaults."""
     ref = _parse_ts(st["paused_at"]) if st.get("paused_at") \
@@ -253,7 +253,7 @@ def focus_start(pid, tid):
     # One timer at a time: starting on a
     # DIFFERENT task stops + logs the previous timer; the same task keeps
     # its original start (no accidental reset, no duplicate records).
-    # Empty pid+tid = unattributed timer — logs a taskless record.
+    # Empty pid+tid = unattributed timer - logs a taskless record.
     st = _focus_state()
     note = ""
     if st and st.get("tid") == tid:
@@ -292,7 +292,7 @@ def focus_pause():
     st["paused_at"] = _now_iso()
     st.setdefault("paused_total", 0)
     _write_focus(st)
-    print(f"⏸ Paused — {int(focus_elapsed(st) // 60)}m so far on {st['title']}")
+    print(f"⏸ Paused · {int(focus_elapsed(st) // 60)}m so far on {st['title']}")
 
 
 def focus_resume():
@@ -301,13 +301,13 @@ def focus_resume():
         print("No focus timer running")
         return
     if not st.get("paused_at"):
-        print(f"⏱ Not paused — timer running on {st['title']}")
+        print(f"⏱ Not paused · timer running on {st['title']}")
         return
     st["paused_total"] = st.get("paused_total", 0) + (
         datetime.now(timezone.utc) - _parse_ts(st["paused_at"])).total_seconds()
     st["paused_at"] = None
     _write_focus(st)
-    print(f"▶️ Resumed {st['title']} — {int(focus_elapsed(st) // 60)}m so far")
+    print(f"▶️ Resumed {st['title']} · {int(focus_elapsed(st) // 60)}m so far")
 
 
 def focus_stop(discard=False, as_pid=None, as_tid=None):
@@ -321,19 +321,19 @@ def focus_stop(discard=False, as_pid=None, as_tid=None):
         print(f"⏱ discarded ({st['title']} · {mins}m not logged)")
         return
     if as_tid:
-        # stop-twist: log onto a picked task instead — sweep/note follow it
+        # stop-twist: log onto a picked task instead - sweep/note follow it
         st = dict(st)
         st["tid"] = as_tid
         st["pid"] = as_pid or ((cache_store.find_task(as_tid) or {}).get("projectId")
                                or (cache_store.find_task(as_tid) or {}).get("_projectId"))
         st["title"] = _task_title(as_tid, "task")
     # Duration-true record + sweep + today-block note. The focus file
-    # only goes once the record LANDED — a failed stop keeps the timer alive
+    # only goes once the record LANDED - a failed stop keeps the timer alive
     # (stop again to retry, or discard) instead of silently losing the session.
     try:
         frag = _close_session(st)
     except Exception as e:
-        print(f"🎯 log failed ({type(e).__name__}) — timer kept running; "
+        print(f"🎯 log failed ({type(e).__name__}) · timer kept running; "
               "stop again to retry, or discard")
         return
     try:
@@ -356,7 +356,7 @@ def focus_log(pid, tid, minutes):
 # ── Focus session blocks ─────────────────────────────────────────────────────
 # The parse/serialize grammar lives in src/focus_blocks.py (pure, unit-tested).
 # Everything here is the I/O side: LIVE read-modify-write (the sticky/app may
-# have ticked boxes since the last cache sync — TickTick merges concurrent
+# have ticked boxes since the last cache sync - TickTick merges concurrent
 # sticky + API edits (verified against the live app), so RMW is safe even
 # with an open sticky), cache mirroring, and the session-end sweep + note.
 
@@ -370,7 +370,7 @@ def _today():
 
 
 def _task_title(tid, default=None, pid=None):
-    """Cache title, else (with pid) a LIVE GET — freshly-created tasks aren't
+    """Cache title, else (with pid) a LIVE GET - freshly-created tasks aren't
     in the hourly cache yet and a checkbox labeled 'Task' is useless."""
     t = cache_store.find_task(tid)
     if t and t.get("title"):
@@ -387,7 +387,7 @@ def _task_title(tid, default=None, pid=None):
 
 def _patch_content_cache(tid, content):
     """Mirror a content write into all_tasks/project_data AND all_notes
-    (note_save.py pattern — notes render from all_notes)."""
+    (note_save.py pattern - notes render from all_notes)."""
     from dispatch import _patch_task_cache
     _patch_task_cache(tid, content=content)
     try:
@@ -437,7 +437,7 @@ def _sweep_from_doc(doc):
 
     Completes run on a small thread pool (the POSTs are independent and were
     the bulk of the bar-sweep wait) with one API client per call; the cache
-    mirror is ONE batched all_tasks write after the pool drains — the old
+    mirror is ONE batched all_tasks write after the pool drains - the old
     per-task full-cache rewrite multiplied a ~1 MB write by N."""
     targets = fb.sweep_targets(doc)
     if not targets:
@@ -499,7 +499,7 @@ def _log_focus_record(start_iso, secs, tid, note=None):
         api.create_focus(start_iso, end.strftime(TT_FMT), task_id=tid, note=note)
         return False
     except TypeError:
-        # live api.py without the note param (stale sync) — plain retry
+        # live api.py without the note param (stale sync) - plain retry
         api.create_focus(start_iso, end.strftime(TT_FMT), task_id=tid)
         return bool(note)
     except Exception:
@@ -537,7 +537,7 @@ def _close_session(st):
 
 def _ensure_block_if_history(pid, tid):
     """Session start stamps today's block ONLY when the task already has
-    staging history — no '### date/---' noise on plain focuses (carry-over of
+    staging history - no '### date/---' noise on plain focuses (carry-over of
     older unchecked lines rides along). Best-effort."""
     try:
         _fx_rmw(pid, tid, lambda doc, today:
@@ -546,11 +546,11 @@ def _ensure_block_if_history(pid, tid):
         pass
 
 
-# ── Pomo sidecar — TickTick's pomo can't be task-bound in-app, so we
+# ── Pomo sidecar - TickTick's pomo can't be task-bound in-app, so we
 #    remember the task ourselves; self-heals when the app's pomo is idle. ────
 
 def _pomo_timeline_start():
-    """The running pomo segment's startDate (TT_FMT) — sidecar validity tag."""
+    """The running pomo segment's startDate (TT_FMT) - sidecar validity tag."""
     import plistlib
     out = subprocess.run(["defaults", "export", "com.TickTick.task.mac", "-"],
                          capture_output=True, check=False).stdout
@@ -599,7 +599,7 @@ def _pomo_sidecar():
 
 
 def _current_focus_task():
-    """(pid, tid, title) of the running session's task — timer file first,
+    """(pid, tid, title) of the running session's task - timer file first,
     pomo sidecar second, None when nothing task-bound runs."""
     st = _focus_state()
     if st and st.get("tid"):
@@ -610,7 +610,7 @@ def _current_focus_task():
     return None
 
 
-# ── Focus bar lifecycle — the bar itself is Scripts/focus_bar.py ────────────
+# ── Focus bar lifecycle - the bar itself is Scripts/focus_bar.py ────────────
 
 def _bar_read():
     try:
@@ -622,7 +622,7 @@ def _bar_read():
 
 def _bar_write(**patch):
     """Read-merge-atomic-replace: xact only ever touches `visible`; the bar
-    owns origin + everything else — merging keeps both writers safe."""
+    owns origin + everything else - merging keeps both writers safe."""
     st = _bar_read()
     st.update(patch)
     st["updated"] = _now_iso()
@@ -656,14 +656,14 @@ _BAR_PY = None          # resolved once per process
 
 
 def _bar_python():
-    """A python3 that can import PyObjC (`objc`) — the bar's hard dependency.
+    """A python3 that can import PyObjC (`objc`) - the bar's hard dependency.
     Alfred's own python3 ships without PyObjC, so sys.executable won't do:
     probe Homebrew (arm → Intel) then PATH, each with a real import test."""
     global _BAR_PY
     if _BAR_PY:
         return _BAR_PY
     # Cross-process cache: the probe imports AppKit in a fresh python (1-3s),
-    # and every xact invocation is a fresh process — don't re-pay it. Staleness
+    # and every xact invocation is a fresh process - don't re-pay it. Staleness
     # (pyobjc uninstalled later) just means a bar that exits 3 into the log;
     # delete ~/.ticktick_alfred/bar_python to force a re-probe.
     try:
@@ -675,7 +675,7 @@ def _bar_python():
     except OSError:
         pass
     import shutil
-    # Probe EVERYTHING focus_bar imports — pyobjc-core alone (a common partial
+    # Probe EVERYTHING focus_bar imports - pyobjc-core alone (a common partial
     # install) would pass an `import objc` probe and then die in the bar.
     probe = "import objc, AppKit, Quartz, PyObjCTools.AppHelper"
     for c in ("/opt/homebrew/bin/python3", "/usr/local/bin/python3",
@@ -700,7 +700,7 @@ def _bar_python():
 def bar_spawn():
     """Detached spawn of the focus bar (singleton via BAR_LOCK flock inside
     the bar itself; racing spawns exit cleanly). stderr → a logfile, NOT
-    devnull — a faceless AppKit agent that dies silently is undebuggable."""
+    devnull - a faceless AppKit agent that dies silently is undebuggable."""
     if _bar_alive():
         return
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "focus_bar.py")
@@ -709,7 +709,7 @@ def bar_spawn():
     py = _bar_python()
     if not py:
         # Focus keeps working bar-less; hint at most once an hour (bar_spawn
-        # rides many verbs — a banner per keystroke would be noise).
+        # rides many verbs - a banner per keystroke would be noise).
         try:
             import time
             stamp = os.path.getmtime(_PYOBJC_HINT) if os.path.exists(_PYOBJC_HINT) else 0
@@ -718,7 +718,7 @@ def bar_spawn():
                 with open(_PYOBJC_HINT, "w") as f:
                     f.write("")
                 from script_base import notify
-                notify("Focus bar needs PyObjC — run: pip3 install pyobjc")
+                notify("Focus bar needs PyObjC · run: pip3 install pyobjc")
         except Exception:
             pass
         return
@@ -750,7 +750,7 @@ def bar_hide():
 
 def _ask(prompt, title="TickAL", hidden=False, default=""):
     """Module-level dialog helper. Returns None on Cancel, "" on
-    empty-OK — the journal flow assigns those OPPOSITE meanings (cancel =
+    empty-OK - the journal flow assigns those OPPOSITE meanings (cancel =
     stop + save partial; empty = skip this prompt), so the two must be
     distinguishable. v2login keeps its own nested copy untouched."""
     def esc(s):
@@ -766,7 +766,7 @@ def _ask(prompt, title="TickAL", hidden=False, default=""):
 
 def v2login():
     """One-time TickTick sign-in for the internal v2 API (attachments, the
-    Completed view, the tag tree). Two macOS dialogs — the password field is
+    Completed view, the tag tree). Two macOS dialogs - the password field is
     MASKED (hidden answer) and the password goes straight to signon, never to
     disk; only the session token is cached (~/.ticktick_alfred/config.json,
     0600 / Keychain). Sign-in-with-Apple accounts have no password → they
@@ -778,7 +778,7 @@ def v2login():
         r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
         if r.returncode != 0:
             return ""
-        # Passwords may legitimately carry edge whitespace — shave only
+        # Passwords may legitimately carry edge whitespace - shave only
         # osascript's trailing newline. Emails get a full strip.
         return r.stdout.rstrip("\n") if hidden else r.stdout.strip()
     user = _ask("TickTick email:")
@@ -792,14 +792,14 @@ def v2login():
     try:
         import api_v2
         api_v2.TickTickV2().signon(user, pw)
-        print("✓ Signed in — attachments, Completed view and tag tree enabled")
+        print("✓ Signed in · attachments, Completed view and tag tree enabled")
     except Exception as e:
-        print(f"Login failed — {e}")
+        print(f"Login failed · {e}")
 
 
-# ── Periodic notes 💫 — thin delegators to src/periodic_engine ───────────────
+# ── Periodic notes 💫 - thin delegators to src/periodic_engine ───────────────
 def _pn_gate():
-    """Every pn_* verb is externally fireable (Shortcuts) — an unconfigured
+    """Every pn_* verb is externally fireable (Shortcuts) - an unconfigured
     install must get an honest pointer, not a 404 against an empty pid.
     A present-but-BLANK Alfred field means the user turned the feature off:
     clear the config.json mirror too, so the headless agent switches off
@@ -813,7 +813,7 @@ def _pn_gate():
                     cfg.save(data)
             except Exception:
                 pass
-        print("💫 Periodic notes need setup — set periodic_list_id in "
+        print("💫 Periodic notes need setup · set periodic_list_id in "
               "Settings (docs 47)")
         return False
     return True
@@ -830,7 +830,7 @@ _PN_KINDS = {"w": "win", "n": "nag", "t": "thought",
 
 
 def _pn_bg(arg):
-    """Detached background xact run — the instant-open path (opens were slow
+    """Detached background xact run - the instant-open path (opens were slow
     when the full refresh + Tier-2 fetches ran BEFORE the app opened). The
     child inherits env (config gate + Alfred vars ride)."""
     wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -855,7 +855,7 @@ def pn_open(spec):
     if not task:
         print(f"💫 No note for {spec} yet")
         return
-    # open FIRST, refresh in the background — the app-sync nudge redraws the
+    # open FIRST, refresh in the background - the app-sync nudge redraws the
     # open note a few seconds later
     subprocess.run(["open", pe.open_link(task)], check=False)
     if minted or not pe._refresh_fresh(p):
@@ -942,7 +942,7 @@ def pn_income(rest):
         head, _, tail = raw.strip().partition(" ")
         amt = pm.parse_amount(head)
         if amt is None:
-            print("💰 Amount first — e.g. 485 groceries")
+            print("💰 Amount first · e.g. 485 groceries")
             return
         spec = {"amount": amt, "label": tail.strip()}
     print(_pn().append_income(spec.get("amount") or 0, spec.get("label") or ""))
@@ -977,9 +977,9 @@ def _goalseq_save(remaining):
 
 
 def pn_journal(slot):
-    """Dialog run over UNANSWERED prompts. Fixed prompts ROUTE —
+    """Dialog run over UNANSWERED prompts. Fixed prompts ROUTE -
     mood → 💬 Mood line, money → 💰 entry, rating → 💬 Day ★, highlight →
-    ✨ section — and the run hands off to a picker at the end (morning: the
+    ✨ section - and the run hands off to a picker at the end (morning: the
     ☀️ Day-goal picker when no goal is set; weekly: the three-things picker
     into NEXT week's 🎯 Goals)."""
     if not _pn_gate():
@@ -993,21 +993,21 @@ def pn_journal(slot):
     if pairs is None:
         print("💫 No journal section in the note (header renamed?)")
         return
-    day0 = jper.start          # pin the note — dialog runs can cross midnight
+    day0 = jper.start          # pin the note - dialog runs can cross midnight
     emoji, label = _JOURNAL_UI[slot]
     open_pairs = [(n, q) for n, q, a, _i in pairs if not a]
     total = len(pairs)
     answers, cancelled, routed = {}, False, []
     for n, q in open_pairs:
         key = keys[n - 1] if n <= len(keys) else "free"
-        a = _ask(q, title=f"{label} journal — {n}/{total}")
+        a = _ask(q, title=f"{label} journal · {n}/{total}")
         if a is None:                     # Cancel: stop, keep what we have
             cancelled = True
             break
         a = a.strip()
         if not a:                         # empty-OK = skip this prompt
             continue
-        # (?!\d) — "10" must not prefix-match as mood/rating 1
+        # (?!\d) - "10" must not prefix-match as mood/rating 1
         if key == "mood":
             m = _re.match(r"^([1-5])(?!\d)(?:\s*·?\s*(.*))?$", a)
             if m:
@@ -1055,10 +1055,10 @@ def _goal_seq_step(toast):
     remaining = seq.get("remaining", 0) - 1
     _goalseq_save(remaining)
     if remaining > 0:
-        print(f"🎯 {3 - remaining} of 3 — pick the next")
+        print(f"🎯 {3 - remaining} of 3 · pick the next")
         _run_trigger("Search", "pn goal ")
     else:
-        print("🎯 3 of 3 — next week is set")
+        print("🎯 3 of 3 · next week is set")
     return "next"
 
 
@@ -1117,7 +1117,7 @@ def pn_mood(rest):
     if not m:
         print("😊 Mood is 1-5")
         return
-    note = _ask("Optional mood note — ⏎ to skip", title="Mood")
+    note = _ask("Optional mood note · ⏎ to skip", title="Mood")
     if note is None:                      # Cancel = abort, log nothing
         print("😊 Cancelled")
         return
@@ -1125,7 +1125,7 @@ def pn_mood(rest):
 
 
 def pn_highlight(rest):
-    """🗓️ Week highlight — text rides in, or a dialog asks."""
+    """🗓️ Week highlight - text rides in, or a dialog asks."""
     if not _pn_gate():
         return
     spec = _pn_decode(rest) or {"text": rest}
@@ -1139,9 +1139,9 @@ def pn_highlight(rest):
 
 
 def pn_sched(rest):
-    """today|pid|tid[|HH:MM] — the ☀️/🌙 Add-to pickers' AND ⌘ Actions rows'
+    """today|pid|tid[|HH:MM] - the ☀️/🌙 Add-to pickers' AND ⌘ Actions rows'
     commit (the Actions conditional only routes xact:/bare-verb shapes, so
-    attr_date can't ride from there). Plain scheduling —
+    attr_date can't ride from there). Plain scheduling -
     deliberately NOT gated on periodic_list_id; only the trailing note-nudge
     is."""
     parts = (rest or "").split("|")
@@ -1218,7 +1218,7 @@ def _pomo_app_state():
     """(state, remaining_secs) of TickTick's OWN pomodoro. The state key
     flushes LIVE (verified 2026-07-07): 'idle' · 'pomodoroing.1.true' ·
     'pomodoroPaused.1'. Remaining derives from the timeline's startDate +
-    pomodoroDuration — it keeps ticking while paused (freeze would need the
+    pomodoroDuration - it keeps ticking while paused (freeze would need the
     pause segments; good enough for a status row)."""
     r = subprocess.run(["defaults", "read", "com.TickTick.task.mac",
                         "focus__pomodoro_state"],
@@ -1248,10 +1248,10 @@ def _pomo_app_state():
 
 
 # The Pomodoro view's Continue/Pause + End buttons ARE in the AX tree
-# (untitled — the web content around them is opaque, the buttons aren't).
-# Identify by geometry: the centered stacked pair (same x, 40–90 pt apart,
+# (untitled - the web content around them is opaque, the buttons aren't).
+# Identify by geometry: the centered stacked pair (same x, 40-90 pt apart,
 # lower half); bottom = End. After End, the <5-min case raises the
-# "Abandon This Focus?" dialog — its buttons appear as NEW AX buttons;
+# "Abandon This Focus?" dialog - its buttons appear as NEW AX buttons;
 # rightmost = Abandon. Verified live 2026-07-07.
 _POMO_END_OSA = '''
 on run
@@ -1259,7 +1259,7 @@ on run
     set mw to window 1 whose subrole is "AXStandardWindow"
   end tell
   -- NB: `before`/`after` are RESERVED WORDS in AppleScript (insertion
-  -- locators) — using them as variable names kills the whole compile.
+  -- locators) - using them as variable names kills the whole compile.
   set preBtns to my collect(mw, 0, {})
   set endBtn to my stackBottom(preBtns)
   if endBtn is missing value then return "NOEND"
@@ -1345,7 +1345,7 @@ def pomo_abandon():
     Start/Abandon hotkey pauses + drops the app on the End/Continue screen
     (when already paused, navigate there via the List menu instead), then
     AX-click End and auto-confirm the app's <5-min Abandon dialog if raised.
-    The app may keep partial work segments — its own End semantics."""
+    The app may keep partial work segments - its own End semantics."""
     import time
     import tt_shortcut
     state, remaining = _pomo_app_state()
@@ -1353,10 +1353,10 @@ def pomo_abandon():
         print("🍅 No pomodoro running")
         return
     # Bring the app forward FIRST (LaunchServices, no AE): the decision
-    # screen is a web view that may not render off-screen/other-Space —
+    # screen is a web view that may not render off-screen/other-Space -
     # the "stop just pauses it" failure mode. No sdef command exists
     # to end a pomo (checked 2026-07-07: `start pomo` only), so the ⌥F8 →
-    # AXPress-End dance stays — hardened.
+    # AXPress-End dance stays - hardened.
     subprocess.run(["open", "-a", "TickTick"], check=False)
     time.sleep(0.5)
     if state.startswith("pomodoroPaused"):
@@ -1377,7 +1377,7 @@ def pomo_abandon():
     for _retry in range(2):
         if state2 == "idle" or out == "NOEND":
             break
-        # Retries — the first collection can race the render, and the
+        # Retries - the first collection can race the render, and the
         # decision screen may need the Pomodoro view brought up explicitly.
         _view_menu_click("Pomodoro")
         time.sleep(1.8)
@@ -1389,14 +1389,14 @@ def pomo_abandon():
     m = remaining // 60
     if state2 == "idle":
         _drop_pomo()   # the attribution sidecar dies with the pomo
-        print(f"🍅 Pomodoro ended — {m}m was left")
+        print(f"🍅 Pomodoro ended · {m}m was left")
     elif out == "NOEND":
-        print("🍅 Couldn't reach the End button — finish in the Pomodoro view")
+        print("🍅 Couldn't reach the End button · finish in the Pomodoro view")
     elif not out:
-        print(f"🍅 End script failed — finish in the Pomodoro view "
+        print(f"🍅 End script failed · finish in the Pomodoro view "
               f"({(r.stderr or '').strip()[:60]})")
     else:
-        print("🍅 End clicked — check the Pomodoro view")
+        print("🍅 End clicked · check the Pomodoro view")
 
 
 def pomo_toggle():
@@ -1415,9 +1415,9 @@ def pomo_toggle():
         return
     m = remaining // 60
     if state.startswith("pomodoroPaused"):
-        print(f"▶️ Pomodoro resumed — {m}m left")
+        print(f"▶️ Pomodoro resumed · {m}m left")
     else:
-        print(f"⏸ Pomodoro paused — {m}m left")
+        print(f"⏸ Pomodoro paused · {m}m left")
 
 
 def pomo(minutes):
@@ -1426,7 +1426,7 @@ def pomo(minutes):
     else:
         m = max(5, min(180, int(minutes)))
     # Hard timeout: TickTick's Apple-event interface can wedge (seen live
-    # 2026-07-07 — UI + AX fine, every AE times out until app relaunch);
+    # 2026-07-07 - UI + AX fine, every AE times out until app relaunch);
     # without it this call hangs the Alfred run-script indefinitely.
     try:
         r = subprocess.run(
@@ -1435,7 +1435,7 @@ def pomo(minutes):
             capture_output=True, text=True, check=False, timeout=15)
     except subprocess.TimeoutExpired:
         print("Pomo didn't start: TickTick isn't answering Apple events "
-              "— relaunch TickTick and retry")
+              "· relaunch TickTick and retry")
         return False
     if r.returncode != 0:
         print(f"Pomo didn't start: {r.stderr.strip()[:80] or 'already running?'}")
@@ -1461,7 +1461,7 @@ def _view_menu_click(menu):
 
 
 def view_open(which):
-    """Open an app-only TickTick view — ported from the retired ViewPicker
+    """Open an app-only TickTick view - ported from the retired ViewPicker
     case-map runscript (System-Events click on the app's List menu)."""
     menu = VIEW_MENUS.get(which)
     if not menu:
@@ -1488,17 +1488,17 @@ def _sticky_count():
 
 
 # Find the task's row by title in the (native, AX-readable) list outlines and
-# return its FRAME — the caller picks an unoccluded point and clicks it with a
+# return its FRAME - the caller picks an unoccluded point and clicks it with a
 # real CGEvent. The deep link alone only reliably navigates to the LIST;
 # whether it selects the TASK is a race, and the sticky shortcut fires on
 # whatever is selected → wrong-task stickies.
 # Investigated alternatives, all dead: task rows never expose AXSelected, the
 # detail pane + sticky windows are AX-opaque web views (AXManualAccessibility
 # not settable), sticky.displayed.tasks defaults flush lazily. System Events'
-# `click rw` is a COORDINATE click at the row's center — a floating sticky
+# `click rw` is a COORDINATE click at the row's center - a floating sticky
 # panel over that point swallows it (focus → sticky, selection unchanged),
 # which is why the caller does its own occlusion-aware click instead.
-# Outline depth VARIES BY VIEW (project lists nest ≥4 deep, Inbox sits at 2 —
+# Outline depth VARIES BY VIEW (project lists nest ≥4 deep, Inbox sits at 2 -
 # same as the 72-row sidebar), so no depth filter: collect every outline, scan
 # right-to-left by x (content panes sit right of the sidebar; the sidebar only
 # matches if a list shares the exact title, and rightmost still wins).
@@ -1506,11 +1506,11 @@ def _sticky_count():
 # an inline AXTextField, project rows in AXStaticTexts.
 #
 # TWO ENGINES (profiled 2026-07-08 on a 61-row view):
-#   · _ROW_FIND_JXA — the AX C API in-process via the JXA ObjC bridge
+#   · _ROW_FIND_JXA - the AX C API in-process via the JXA ObjC bridge
 #     (same bridge _cg_click already uses). Miss 0.4s / hit 0.2s.
 #     The ObjC.bindFunction lines are LOAD-BEARING: without them the bridge
 #     passes AXUIElementRef wrongly and every call returns -25201.
-#   · _ROW_FIND_OSA — the original System-Events walk, kept ONLY as the
+#   · _ROW_FIND_OSA - the original System-Events walk, kept ONLY as the
 #     fallback when the JXA bridge itself errors. It costs ~6 Apple-Event
 #     round-trips PER ROW ≈ 15-30s on a full miss (the "sticky takes 30s"
 #     bug), so it runs hard-bounded by a subprocess timeout.
@@ -1545,7 +1545,7 @@ function run(argv) {
     try { var n = cfArr.count; for (var i = 0; i < n; i++) fn(cfArr.objectAtIndex(i)); } catch (e) {}
   }
 
-  // window 1 whose subrole is AXStandardWindow — parity with the SE walk
+  // window 1 whose subrole is AXStandardWindow - parity with the SE walk
   var SKIP = {AXRow:1, AXCell:1, AXStaticText:1, AXTextArea:1, AXWebArea:1, AXButton:1, AXImage:1, AXTextField:1};
   var outlines = [], seen = false;
   each(ax(app, 'AXWindows'), function (w) {
@@ -1611,7 +1611,7 @@ def _row_find(needle):
                            text=True, timeout=8, check=False)
         out = (r.stdout or "").strip()
         if r.returncode == 0 and out != "NOAPP":
-            return out              # '' is a CLEAN miss — no fallback
+            return out              # '' is a CLEAN miss - no fallback
     except subprocess.TimeoutExpired:
         pass
     try:
@@ -1737,7 +1737,7 @@ end tell'''], capture_output=True, text=True, check=False)
 
 
 def _cg_click(x, y):
-    """Real left click at global point (x, y) via CGEvent (JXA bridge) —
+    """Real left click at global point (x, y) via CGEvent (JXA bridge) -
     reaches points that System Events element clicks can't target."""
     jxa = f'''
 ObjC.import('CoreGraphics');
@@ -1774,23 +1774,23 @@ def _click_task_row(title):
                    for fx, fy, fw, fh in frames):
             _cg_click(cx, cy)
             return True
-    return False   # the whole row is under stickies right now — let caller retry
+    return False   # the whole row is under stickies right now - let caller retry
 
 
 def _select_task(pid, tid):
     """Find + really CLICK the task's row (the only guaranteed selection).
-    FAST PATH: if the row is already on screen —
-    common when acting on the current list — click it straight away, no
+    FAST PATH: if the row is already on screen -
+    common when acting on the current list - click it straight away, no
     deep-link navigation, no settle sleeps. Slow path: deep-link to the
     list, then retry. Returns (clicked, title)."""
     import time
     from display import _MD_LINK_RE
     raw = (cache_store.find_task(tid) or {}).get("title") or _title()
-    # The AX row renders a markdown link as its TEXT — a raw
+    # The AX row renders a markdown link as its TEXT - a raw
     # '[TickAL • WF](ticktick://…)' needle can never match (the
     # sticky-dead-on-linked-titles bug, root-caused 2026-07-11). An
     # empty strip result must NOT reach _row_find: indexOf('') matches
-    # the first row — the wrong task would get the sticky.
+    # the first row - the wrong task would get the sticky.
     title = _MD_LINK_RE.sub(r"\1", raw).strip() or raw
     if not title.strip():
         return False, raw or "(untitled)"
@@ -1811,17 +1811,17 @@ def sticky(pid, tid):
     to the list, then find + CLICK the task's row (guaranteed selection),
     then fire the app's own 'Open as Sticky Note' shortcut
     (hotkey_id_open_as_sticky). If the row can't be located, fail honestly
-    WITHOUT firing — a missing sticky beats the wrong task's sticky.
+    WITHOUT firing - a missing sticky beats the wrong task's sticky.
 
     Final design (all verified 2026-07-11, content-checked the
     right task's sticky): the DEEP LINK both navigates and selects the task
-    app-side — the synthetic row click stopped registering selection after
+    app-side - the synthetic row click stopped registering selection after
     the Jul-10 reboot, and a keystroke racing it makes the app mint a
     window it never SHOWS (CGWindowList: six phantom stickies,
     onscreen=False, invisible to AX). So: deep link → settle → count →
     raise → fire → VERIFY a new AXSystemDialog exists (AX only enumerates
     actually-shown ones); the click survives only as the retry assist.
-    `before` is counted AFTER the link settles — the link opens the task
+    `before` is counted AFTER the link settles - the link opens the task
     DETAIL pane, itself an AXSystemDialog, which would false-positive the
     appeared-check. Toast is honest either way (the old one claimed
     'opened' off a fragile count and lied)."""
@@ -1834,7 +1834,7 @@ def sticky(pid, tid):
     short = title[:40]
 
     def _fire_and_wait(settle, before):
-        # An open sticky panel HOLDS key-window status — raise the main
+        # An open sticky panel HOLDS key-window status - raise the main
         # window so the keystroke reaches it (root-caused 2026-07-07).
         subprocess.run(["osascript", "-e",
                         'tell application "System Events" to tell process "TickTick" '
@@ -1871,7 +1871,7 @@ def sticky(pid, tid):
     if shown:
         print(f"🗒️ Sticky opened: {short}")
         return True
-    print(f"🗒️ No new sticky — “{short}” may already have one open")
+    print(f"🗒️ No new sticky · “{short}” may already have one open")
     return False
 
 
@@ -1882,15 +1882,15 @@ def focus_sticky(pid, tid):
 
 
 def pomo_task(pid, tid, minutes):
-    """Open + select the task in the app (real row click — _select_task),
+    """Open + select the task in the app (real row click - _select_task),
     then start TickTick's pomodoro. VERIFIED 2026-07-07: `start pomo` does
     NOT bind the session to the selection (the ring stays on "Focus >"), so
-    rows honestly say "Start pomo + open {task}" — the selected task is on
+    rows honestly say "Start pomo + open {task}" - the selected task is on
     screen and one click on Focus > attaches it. Row not found → honest
     failure, no pomo."""
     clicked, title = _select_task(pid, tid)
     if not clicked:
-        print(f"🍅 Couldn't locate “{title[:40]}” in the list — pomo not "
+        print(f"🍅 Couldn't locate “{title[:40]}” in the list · pomo not "
               "started (open TickTick and retry)")
         return
     if pomo(minutes):
@@ -1915,9 +1915,9 @@ def pomo_sticky(pid, tid, minutes):
             _pomo_attribute(pid, tid, _task_title(tid))
 
 
-# ── View/tag collectors — feed view_focus / tag_focus ────────────────────────
+# ── View/tag collectors - feed view_focus / tag_focus ────────────────────────
 def _view_tasks(key):
-    """Ordered open tasks of a smart view → (tasks, label) — used by the
+    """Ordered open tasks of a smart view → (tasks, label) - used by the
     focus-block send."""
     from filtering import smart_filter
     all_tasks = cache_store.get("all_tasks") or []
@@ -1939,7 +1939,7 @@ def _view_tasks(key):
 
 
 def _tag_tasks(pid, tag):
-    """Open tasks carrying a tag — list-scoped when pid set, global when empty.
+    """Open tasks carrying a tag - list-scoped when pid set, global when empty.
     Cache order = the order the tag screen renders."""
     all_tasks = cache_store.get("all_tasks") or []
     tl = tag.lower()
@@ -1957,7 +1957,7 @@ def fx_add(pid, tid, open_sticky=False):
     there)."""
     cur = _current_focus_task()
     if not cur:
-        print("🎯 No task-linked session running — start or link one first")
+        print("🎯 No task-linked session running · start or link one first")
         return
     fpid, ftid, ftitle = cur
     if tid == ftid:
@@ -2037,7 +2037,7 @@ def fx_tick(pid, tid, ctid=None):
 
 
 def fx_sweep(pid=None, tid=None):
-    """Manual sweep — complete every checked+linked+still-open checkbox task
+    """Manual sweep - complete every checked+linked+still-open checkbox task
     across ALL of the task's blocks (the permanent record keeps its lines)."""
     if not (pid and tid):
         cur = _current_focus_task()
@@ -2076,7 +2076,7 @@ def fx_copy(pid=None, tid=None):
     text = "\n".join("- " + fb._display_title(l) for l in lines)
     subprocess.run(["pbcopy"], input=text.encode())
     # _current_block falls back to the newest block (midnight-crossing
-    # sessions) — disclose when what landed isn't actually today's
+    # sessions) - disclose when what landed isn't actually today's
     stale = f" (block {blk.date})" if blk.date != _today() else ""
     print(f"📋 {len(lines)} checkbox{'es' if len(lines) != 1 else ''}"
           f" copied as bullets{stale}")
@@ -2084,7 +2084,7 @@ def fx_copy(pid=None, tid=None):
 
 def convert(pid, tid):
     """⌘ Actions '🔃 Convert': flip the item kind TEXT↔NOTE via the
-    v1 update (the full-object post carries kind — verified both
+    v1 update (the full-object post carries kind - verified both
     ways). Cache mirror: all_tasks/project_data take the new kind;
     all_notes gains or drops the item (note screens render from it)."""
     api = _api()
@@ -2107,21 +2107,21 @@ def convert(pid, tid):
 
 
 def wontdo(pid, tid):
-    """⌘ Actions '🚫 Won't do': abandon the task — TickTick's third
+    """⌘ Actions '🚫 Won't do': abandon the task - TickTick's third
     status. The write is v2-only: batch update with status -1 + a
     client-stamped completedTime (verified 2026-07-11: without the stamp the
-    task never reaches the Won't Do list, and v1 drops the stamp silently —
+    task never reaches the Won't Do list, and v1 drops the stamp silently -
     a v1 fallback would strand the task in NO view once the next sync
     replaced the wontdo cache with server truth). Order: write
-    first, focus-guard after — a failed write must not have killed the
+    first, focus-guard after - a failed write must not have killed the
     running session. Cache mirror is the complete: pattern
-    with the wontdo_tasks log (completed_tasks purged too — abandoning a
+    with the wontdo_tasks log (completed_tasks purged too - abandoning a
     ✅-view row must not dual-list)."""
     api = _api()
     try:
         live = api.get_task(pid, tid)
     except Exception:
-        print("Error: task not found — sync and retry")
+        print("Error: task not found · sync and retry")
         return
     title = (live.get("title") or _title())[:40]
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
@@ -2131,7 +2131,7 @@ def wontdo(pid, tid):
         print("🚫 Won't do needs the Attachment Login token (Settings)")
         return
     if not v2.abandon_task(dict(live, completedTime=stamp)):
-        print(f"Error: TickTick refused to abandon “{title}” — retry")
+        print(f"Error: TickTick refused to abandon “{title}” · retry")
         return
     # complete-guard AFTER the write sticks: abandoning the
     # focused task ends its session (abandoned tasks stay GET-able)
@@ -2165,7 +2165,7 @@ def wontdo(pid, tid):
 
 
 def wontdo_undo(pid, tid):
-    """⇧ on a Won't Do row: back to open (v1 status 0 — verified the
+    """⇧ on a Won't Do row: back to open (v1 status 0 - verified the
     clean revert). Mirror of dispatch's uncomplete: restore, on the
     wontdo_tasks log."""
     api = _api()
@@ -2189,7 +2189,7 @@ def wontdo_undo(pid, tid):
             from dispatch import _patch_project_data
             _patch_project_data(tid, pid_old=pid)
         elif snap is None or cached is None:
-            # no snap to restore from — invalidate so the reopened task
+            # no snap to restore from - invalidate so the reopened task
             # doesn't stay invisible until the hourly sync
             cache_store.invalidate("all_tasks")
     except Exception:
@@ -2222,11 +2222,11 @@ def fx_link(pid, tid):
 
 
 def _fx_send(items, label):
-    """Insert [(pid,tid,title)] into the current focus task's today block —
+    """Insert [(pid,tid,title)] into the current focus task's today block -
     ONE content write. True when the insert happened."""
     cur = _current_focus_task()
     if not cur:
-        print("🎯 No task-linked session running — start or link one first")
+        print("🎯 No task-linked session running · start or link one first")
         return False
     fpid, ftid, ftitle = cur
     items = [(p, t, ti) for p, t, ti in items if t != ftid]
@@ -2296,10 +2296,10 @@ def tag_create(b64spec):
     """➕ Create-tag rows (search g-scope): xact:tag_create:<b64> where
     the payload keeps emoji-bearing names intact: {"label": …, "parent": …?}.
     Rides the xact route because search-⏎ reaches only the modOpen shell case
-    (xact:*|open:*) — a bare tag_create: arg would be open()'d as a URL."""
+    (xact:*|open:*) - a bare tag_create: arg would be open()'d as a URL."""
     import base64
     spec = json.loads(base64.b64decode(b64spec))
-    # , : > never reach TickTick — they'd shred the attr_tags_multi csv,
+    # , : > never reach TickTick - they'd shred the attr_tags_multi csv,
     # change_tag_exec's colon-split, or the '#name>parent' grammar later.
     label = ((spec.get("label") or "").strip().lstrip("#")
              .replace(",", "").replace(":", "").replace(">", ""))
@@ -2320,7 +2320,7 @@ def tag_create(b64spec):
         return
     if v2.create_tag(label, parent):
         cache_store.set("tags", (cache_store.get("tags") or []) + [label])
-        # tags_tree too — else a nested create shows no child until the next
+        # tags_tree too - else a nested create shows no child until the next
         # sync (pre-existing gap, now closed)
         tree = cache_store.get("tags_tree")
         if tree is not None:
@@ -2330,11 +2330,11 @@ def tag_create(b64spec):
         print(f"Tag #{label} created" + (f" under #{parent}" if parent else ""))
     else:
         print(f"TickTick refused #{label}" + (f" under #{parent}" if parent else "")
-              + " — it may already exist there")
+              + " · it may already exist there")
 
 
 def tag_delete(name):
-    """⌘ tag menu '🗑 Delete tag': removes the tag entity via v2 —
+    """⌘ tag menu '🗑 Delete tag': removes the tag entity via v2 -
     the tasks that carried it keep living. Caches scrubbed; task-side tag
     strings clear on the next sync (the server already dropped them)."""
     import cache as cache_store
@@ -2381,14 +2381,14 @@ def tag_create_under(parent):
     # spaces would shred the '#name' token grammar downstream
     name = "".join(name.split())
     if not name:
-        return   # cancelled — silence, not an error toast
+        return   # cancelled - silence, not an error toast
     tag_create(base64.b64encode(
         json.dumps({"label": name, "parent": parent}).encode()).decode())
 
 
 def stage_pick():
     """The Focus menu's 🎯 row: CLEAR any leftover ⌘-handshake, then
-    open the stage flow — it lands on the source picker (S0) cleanly. A verb
+    open the stage flow - it lands on the source picker (S0) cleanly. A verb
     (not an autocomplete token) so no typed search can ever collide with it."""
     try:
         os.remove(STAGE_FILE)
@@ -2401,7 +2401,7 @@ def stage_pick():
 
 def fx_move(tid, direction):
     """Bar ⤒↑↓⤓ reorder: move the checkbox among the
-    unchecked lines of the focus task's today block — up/down one slot,
+    unchecked lines of the focus task's today block - up/down one slot,
     top/bottom to the edge. Silent no-op at the edges / unknown direction."""
     cur = _current_focus_task()
     if not cur:
@@ -2431,13 +2431,13 @@ def section_focus(pid, sid):
 
 
 def stage_open(pid, tid):
-    """⌘ 'Stage for Focus' hop. Silent — the Focus window IS the feedback."""
+    """⌘ 'Stage for Focus' hop. Silent - the Focus window IS the feedback."""
     _focus_prefill("stage ", pid, tid)
 
 
 def focus_open(pid, tid):
     """⌘ '🎯 Focus' hop: the task-bound start flow (⏱ timer / 🍅 pomo, each
-    with a sticky variant) — replaces the three old start rows. Silent."""
+    with a sticky variant) - replaces the three old start rows. Silent."""
     _focus_prefill("for ", pid, tid)
 
 
@@ -2512,7 +2512,7 @@ def main():
         elif verb == "view_open":
             view_open(rest)
         elif verb == "app_sync":
-            _app_sync()   # silent — no stdout, no banner
+            _app_sync()   # silent - no stdout, no banner
         elif verb == "v2login":
             v2login()
         elif verb == "notify":

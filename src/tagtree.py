@@ -1,9 +1,9 @@
-"""tagtree.py — parent→children tag relations from the v2 tags cache.
+"""tagtree.py - parent→children tag relations from the v2 tags cache.
 
 `tags_tree` (cached by sync.py via api_v2.get_tags) is the raw /api/v2/tags
-list: [{name, label, parent, …}] — the open API has no tag endpoint. Parent
-tags (🎩Area, 🔥CRM, 🏁Status…) are organisational — not meant to be assigned to
-tasks directly — so the pickers turn them into drill rows: ⏎ on a parent shows
+list: [{name, label, parent, …}] - the open API has no tag endpoint. Parent
+tags (🎩Area, 🔥CRM, 🏁Status…) are organisational - not meant to be assigned to
+tasks directly - so the pickers turn them into drill rows: ⏎ on a parent shows
 its children.
 """
 import cache as cache_store
@@ -37,7 +37,7 @@ def parent_labels():
 
 
 def top_level_labels(fallback=None):
-    """Labels of tags WITHOUT a parent — the only legal nest targets
+    """Labels of tags WITHOUT a parent - the only legal nest targets
     (TickTick nests one level). Falls back to the given list (or [])
     when no tree is cached."""
     tree = _tree()

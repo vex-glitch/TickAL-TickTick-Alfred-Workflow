@@ -7,7 +7,7 @@ just created). Uses pyobjc's AppKit, already present in the workflow runtime.
 
 
 def has_image():
-    """True if the clipboard holds an image — a cheap type check (no decode), so
+    """True if the clipboard holds an image - a cheap type check (no decode), so
     it's safe to call on every keystroke from the add-task preview."""
     try:
         from AppKit import NSPasteboard

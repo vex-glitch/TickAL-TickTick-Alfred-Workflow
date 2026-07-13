@@ -31,7 +31,7 @@ def save(data):
     with os.fdopen(fd, "w") as f:
         json.dump(data, f, indent=2)
     try:
-        os.chmod(CONFIG_FILE, 0o600)   # holds session tokens — owner-only
+        os.chmod(CONFIG_FILE, 0o600)   # holds session tokens - owner-only
     except OSError:
         pass
 
@@ -69,7 +69,7 @@ def save_v2_token(token):
 
 def get_periodic_list_id():
     """Periodic-notes home list. Under Alfred the field ALWAYS exports
-    an env var — a present-but-blank var means the user turned the feature
+    an env var - a present-but-blank var means the user turned the feature
     OFF, so it must NOT fall through to the config.json mirror (that mirror
     exists solely for the headless launchd agent, which has no Alfred env)."""
     if "periodic_list_id" in os.environ:
@@ -84,7 +84,7 @@ def get_weekly_review_id():
     return load().get("weekly_review_id", "")
 
 def get_folders():
-    """{groupId: folderName} — v2 auto-names (the folder_groups cache, filled
+    """{groupId: folderName} - v2 auto-names (the folder_groups cache, filled
     at sync when an Attachment-Login token exists) overlaid by manual names
     from Settings → Folders. Manual always wins."""
     auto = {}
@@ -101,7 +101,7 @@ def get_folders():
 
 
 def get_manual_folders():
-    """Names the user placed in config.json's `folders` map — a silent,
+    """Names the user placed in config.json's `folders` map - a silent,
     UI-less override on top of the v2 auto-names (the Settings naming flow
     was removed; this stays as the power-user escape hatch)."""
     return load().get("folders", {})

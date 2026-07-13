@@ -1,16 +1,16 @@
-"""periodic_model.py — pure model for periodic notes.
+"""periodic_model.py - pure model for periodic notes.
 
 Everything deterministic lives here: period math, the frozen title/tag lookup
-contracts, section-header constants (the SINGLE source — templates render from
+contracts, section-header constants (the SINGLE source - templates render from
 them and every writer looks anchors up here, never hand-typed twice), line
 grammars, money parsing/roll-ups, journal prompt selection + Q/A merge,
 sparklines, harvest, summary composition.
 
-Locale rule: English day/month names come from the explicit tables below —
+Locale rule: English day/month names come from the explicit tables below -
 NEVER strftime %a/%B (locale-dependent).
 
 Pure module: no I/O, no workflow imports except focus_blocks' regex constants
-(CHECKBOX_RE / LINK_TAIL_RE / make_line — shared line grammar, not the block
+(CHECKBOX_RE / LINK_TAIL_RE / make_line - shared line grammar, not the block
 model).
 """
 import re
@@ -53,7 +53,7 @@ SEC_MONEY      = "💰 Money"
 # weekly
 SEC_GOALS      = "🏆 Goals"
 SEC_HIGHLIGHT  = "✨ Highlight"
-SEC_TOP_LIST   = "🔥 Top list"            # prefix — header carries the data
+SEC_TOP_LIST   = "🔥 Top list"            # prefix - header carries the data
 SEC_TOP_TASKS  = "🚀 Top tasks"           # prefix
 SEC_CREATED    = "➕ Created"             # prefix
 SEC_COMPLETED  = "✅ Completed"           # prefix
@@ -67,7 +67,7 @@ SEC_WEEKLY_JNL = "📔 Weekly journal"
 SEC_REVIEW     = "♻️ Weekly Review"
 SEC_INCOME     = "💰 Income"              # prefix
 SEC_STATS      = "📈 Stats"               # monthly
-# LEGACY names (older notes) — readers fall back to these, writers don't
+# LEGACY names (older notes) - readers fall back to these, writers don't
 LEGACY_NAV     = "🧭 Nav"
 LEGACY_QUOTE   = "💬 Quote & weather"
 LEGACY_TODAY   = "✅ Today"
@@ -90,7 +90,7 @@ SEC_THEME      = "🧭 Theme of the year"
 SEC_ANTI       = "🚫 Anti-goals"
 SEC_DECEMBER   = "🧪 December test"
 
-# Anchors every writer targets, per tier — each must appear as a
+# Anchors every writer targets, per tier - each must appear as a
 # `### <anchor>…` header line in the shipped template (prefix anchors seed
 # bare, the engine appends `: data` on refresh).
 WRITER_ANCHORS = {
@@ -106,7 +106,7 @@ WRITER_ANCHORS = {
     "yearly":    [SEC_MONEY],
 }
 
-# Tab indents — the default layout nests section bodies. Parsers are
+# Tab indents - the default layout nests section bodies. Parsers are
 # whitespace-tolerant; WRITERS use these so generated lines match the
 # shipped look.
 T1, T2, T3 = "\t", "\t\t", "\t\t\t"
@@ -141,7 +141,7 @@ def _last_dom(y, m):
 
 
 def period_for(kind, d):
-    """The period of `kind` containing date d. Weekly = ISO Mon–Sun."""
+    """The period of `kind` containing date d. Weekly = ISO Mon-Sun."""
     if kind == "daily":
         return Period(kind, d, d)
     if kind == "weekly":
@@ -203,7 +203,7 @@ def title(p):
     if p.kind == "daily":
         return f"{s.isoformat()} · {DAY_ABBR[s.weekday()]}"
     if p.kind == "weekly":
-        iso = s.isocalendar()            # ISO year — week-53 safe
+        iso = s.isocalendar()            # ISO year - week-53 safe
         return f"{iso[0]}-W{iso[1]:02d}"
     if p.kind == "monthly":
         return f"{s.year}-{s.month:02d} {MONTH_NAME[s.month]}"
@@ -269,7 +269,7 @@ def set_breadcrumb(doc, line):
 
 # ── Money ────────────────────────────────────────────────────────────────────
 # Whitespace-tolerant + total-as-bullet (the layout indents body lines with
-# tabs and bullets the Total — the old anchored regexes silently zeroed
+# tabs and bullets the Total - the old anchored regexes silently zeroed
 # indented sums).
 MONEY_TOTAL_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*Total = (?P<amt>.+)\*\*\s*$")
 WEEK_DAY_RE = re.compile(
@@ -280,8 +280,8 @@ WEEK_DAY_RE = re.compile(
 
 def parse_amount(s):
     """Currency-symbol/letter tolerant number parse. Rightmost [.,] followed
-    by 1–2 trailing digits = decimal sep; every other [.,] dropped.
-    Unparseable → None (line ignored in sums — never crashes a roll-up)."""
+    by 1-2 trailing digits = decimal sep; every other [.,] dropped.
+    Unparseable → None (line ignored in sums - never crashes a roll-up)."""
     s = (s or "").strip()
     if not s:
         return None
@@ -333,7 +333,7 @@ def money_entry_line(amount, label):
 
 
 def money_day_line(d, total):
-    # EXACT weekly line format: "- Sat 11 Jul 2026 • 485" — no zero-pad day
+    # EXACT weekly line format: "- Sat 11 Jul 2026 • 485" - no zero-pad day
     return (f"- {DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]} "
             f"{d.year} • {fmt_amount(total)}")
 
@@ -348,7 +348,7 @@ def section_money_sum(body_lines):
 
 
 def money_total_line(total, n=2):
-    """Canonical total line — indented bullet."""
+    """Canonical total line - indented bullet."""
     return ("\t" * n) + f"- **Total = {fmt_amount(total)}**"
 
 
@@ -369,7 +369,7 @@ def rollup_money_lines(day_lines, total):
 def sum_in_period(day_sums, p):
     """Σ over {date → amount} entries whose date falls inside p (inclusive).
     THE straddle-week rule: coarser totals always sum DAILY amounts by date,
-    never week lines — a week straddling two months can't double-count."""
+    never week lines - a week straddling two months can't double-count."""
     return sum(v for d, v in day_sums.items() if p.start <= d <= p.end)
 
 
@@ -395,7 +395,7 @@ def harvest_entries(body_lines):
 
 
 def day_mood(body_lines):
-    """Last 😊 entry of the day → (score:int, note) | None. LEGACY reader —
+    """Last 😊 entry of the day → (score:int, note) | None. LEGACY reader -
     mood has since moved to the 💬 Mood: line (quote_mood below); this
     survives for older notes only."""
     best = None
@@ -534,7 +534,7 @@ def checkbox_tids(body_lines):
 
 
 def checked_linked(body_lines):
-    """[(pid, tid)] for checked+linked lines — the sweep targets."""
+    """[(pid, tid)] for checked+linked lines - the sweep targets."""
     out = []
     for ln in body_lines:
         cb = fb.CHECKBOX_RE.match(ln)
@@ -566,7 +566,7 @@ def merge_checkboxes(body_lines, items, indent=""):
 
 
 def mark_swept(body_lines, tids):
-    """Strike nothing, remove nothing — swept lines stay as the day's record.
+    """Strike nothing, remove nothing - swept lines stay as the day's record.
     (Placeholder for symmetry; sweep completes the REAL tasks via API.)"""
     return list(body_lines)
 
@@ -576,7 +576,7 @@ JOURNAL_Q_RE = re.compile(r"^\s*\*\*Q(?P<n>\d+) · (?P<q>.+)\*\*\s*$")
 JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)A: ?(?P<a>.*)$")
 
 
-# Fixed journal prompts — code-owned because they ROUTE: each key
+# Fixed journal prompts - code-owned because they ROUTE: each key
 # tells the merge step where the answer lands (mood → 💬 Mood line, money →
 # 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
 # live day-goal / weekly-goals text baked into the prompt.
@@ -584,7 +584,7 @@ JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5}
 
 
 def journal_fixed(slot, ctx=None):
-    """[(route_key, question)] — the fixed head of each journal, in order."""
+    """[(route_key, question)] - the fixed head of each journal, in order."""
     ctx = ctx or {}
     if slot == "morning":
         return [
@@ -606,7 +606,7 @@ def journal_fixed(slot, ctx=None):
             ("money", "How much money did you earn today? (logs to 💰 Money)"),
             ("rating", "Rate the day — 1-5 stars"),
         ]
-    # weekly — the three-things picker is NOT a seeded question: it runs as
+    # weekly - the three-things picker is NOT a seeded question: it runs as
     # the Alfred goal-picker handoff after the dialogs (phones edit next
     # week's 🎯 Goals directly instead)
     goals = (ctx.get("goals") or "").strip()
@@ -624,7 +624,7 @@ def journal_fixed(slot, ctx=None):
 
 def select_prompts(pool, d, which, k=None):
     """k seeded-random picks from the pool's random section. Deterministic
-    across processes: random.Random(f'{date}:{slot}') — NEVER hash(), which
+    across processes: random.Random(f'{date}:{slot}') - NEVER hash(), which
     is salted per process. Fixed prompts live in journal_fixed, not the
     pool."""
     rnd_pool = list(pool.get("random", []))
@@ -647,7 +647,7 @@ def journal_q_line(n, q, ws=T1):
 
 
 def journal_pairs(body_lines):
-    """[(n, question, answer, a_line_index)] — answer '' == unanswered."""
+    """[(n, question, answer, a_line_index)] - answer '' == unanswered."""
     out = []
     i = 0
     while i < len(body_lines):
@@ -707,7 +707,7 @@ def fmt_delta(cur, prev, kind="count"):
 
 
 def spark(values):
-    """min–max normalized ▁…█; None → '·'; all-equal/all-zero → ▁; single → ▄."""
+    """min-max normalized ▁…█; None → '·'; all-equal/all-zero → ▁; single → ▄."""
     if not values:
         return ""
     real = [v for v in values if v is not None]
@@ -751,7 +751,7 @@ _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 
 
 def strip_md_links(s):
-    """Repeated md-link strip + leftover URL-paren cleanup — titles that
+    """Repeated md-link strip + leftover URL-paren cleanup - titles that
     themselves contain ']' or '](' must not leak raw URLs into prompts."""
     prev = None
     while prev != s:

@@ -4,11 +4,11 @@ import os
 import time
 
 CACHE_DIR = os.path.expanduser("~/.ticktick_alfred/cache")
-TTL = None  # no expiry — cache lives until explicitly invalidated by sync or a write op
+TTL = None  # no expiry - cache lives until explicitly invalidated by sync or a write op
 
 
 def _path(key):
-    # Cache mirrors full TickTick content — keep it private, like config.json (0600).
+    # Cache mirrors full TickTick content - keep it private, like config.json (0600).
     os.makedirs(CACHE_DIR, mode=0o700, exist_ok=True)
     try:
         os.chmod(CACHE_DIR, 0o700)  # tighten pre-existing dirs created 0755

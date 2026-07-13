@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-copy_task_url.py — Alfred Run Script
+copy_task_url.py - Alfred Run Script
 
 Emits `copy:<task deep link>` so the existing modURL → copy_url_action chain
 copies the TASK's URL (not the note body) and shows the "URL Copied" toast.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-change_priority.py — Alfred Script Filter
+change_priority.py - Alfred Script Filter
 Priority picker for a task.
 Reads task_id, task_list_id from env vars.
 Outputs arg: attr_priority:{list_id}:{task_id}:{priority_int}
@@ -51,7 +51,7 @@ def main():
             pass
 
     try:
-        # ⌃⇧ back must work even on invalid rows — a mod-level valid=True
+        # ⌃⇧ back must work even on invalid rows - a mod-level valid=True
         # overrides the row's valid=False (Alfred ignores action chords on
         # invalid rows; that's why back never fired from "No match").
         back_mod = {"ctrl": {"valid": True, "arg": "",

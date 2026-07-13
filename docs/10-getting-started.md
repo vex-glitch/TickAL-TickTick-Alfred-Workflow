@@ -2,7 +2,7 @@
 
 _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-cheatsheet.md)_
 
-> Zero to searching, drilling, scheduling, and adding tasks — the first 15 minutes.
+> Zero to searching, drilling, scheduling, and adding tasks - the first 15 minutes.
 
 **Keywords used:** `tse` · `tad` · `tlogin` · `tsy` (all re-mappable in Configure Workflow)
 
@@ -11,24 +11,24 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 1. Download `TickAL.alfredworkflow` from the [Releases page](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/releases).
 2. Double-click it. Alfred 5 imports the workflow.
 
-Requirements: Alfred 5 with Powerpack, and any `python3` (Homebrew — Apple Silicon or Intel — or the Xcode Command Line Tools). The workflow finds it on its own; on a Mac with no Python at all, macOS itself prompts you to install the Command Line Tools the first time a keyword runs. PyObjC is optional — it powers the floating focus bar and clipboard-image attach; everything else runs without it.
+Requirements: Alfred 5 with Powerpack, and any `python3` (Homebrew - Apple Silicon or Intel - or the Xcode Command Line Tools). The workflow finds it on its own; on a Mac with no Python at all, macOS itself prompts you to install the Command Line Tools the first time a keyword runs. PyObjC is optional - it powers the floating focus bar and clipboard-image attach; everything else runs without it.
 
 ## 2. Connect your account
 
-Compressed version — the full walkthrough with screenshots is in [Setup](30-setup.md).
+Compressed version - the full walkthrough with screenshots is in [Setup](30-setup.md).
 
 1. Open [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`.
 2. Paste the app's Client ID and Client Secret into Configure Workflow.
-3. **Keyword:** `tlogin` — runs the browser OAuth flow; approve and return to Alfred.
-4. **Keyword:** `tsy` — primes the local cache. Run it once now; run it again any time you want a fresh pull.
+3. **Keyword:** `tlogin` - runs the browser OAuth flow; approve and return to Alfred.
+4. **Keyword:** `tsy` - primes the local cache. Run it once now; run it again any time you want a fresh pull.
 
 ## 3. First search
 
-**Keyword:** `tse` (`tse [scope] query`) — fuzzy search across lists, sections, tasks, tags, smart lists, filters, and notes.
+**Keyword:** `tse` (`tse [scope] query`) - fuzzy search across lists, sections, tasks, tags, smart lists, filters, and notes.
 
 1. Type `tse` and a few letters of any task title. Results render with breadcrumbs.
 2. Narrow with a scope letter: `tse t milk` searches top-level tasks only, `tse l work` lists only.
-3. Type `tse /` to open the scope picker — every scope with its letter, one ⏎ to autocomplete.
+3. Type `tse /` to open the scope picker - every scope with its letter, one ⏎ to autocomplete.
 
 | Scope | Searches |
 |-------|----------|
@@ -43,7 +43,7 @@ Compressed version — the full walkthrough with screenshots is in [Setup](30-se
 | `n` | note titles |
 | `nc` | note bodies |
 
-Three more scopes — `fo` folders, `la` last added, `pn` periodic notes — are on the [Search](40-search.md) page.
+Three more scopes - `fo` folders, `la` last added, `pn` periodic notes - are on the [Search](40-search.md) page.
 
 <details><summary>Screenshot</summary>
 
@@ -68,11 +68,11 @@ Try it: `tse l` → pick a list → ⌥⏎ into its sections → ⌥⏎ into a s
 1. Find any task via `tse`.
 2. ⌘⏎ opens its Actions menu.
 3. Pick the **Schedule…** row (it shows the current date, or "📅 Not scheduled").
-4. Choose a date from the picker. Done — the change writes through to TickTick and patches the local cache in place.
+4. Choose a date from the picker. Done - the change writes through to TickTick and patches the local cache in place.
 
 ## 6. First add with tokens
 
-**Keyword:** `tad` — one-line task capture with inline tokens.
+**Keyword:** `tad` - one-line task capture with inline tokens.
 
 Type:
 
@@ -92,9 +92,9 @@ Each token pops a live picker as you type it; `/` opens the full token menu. The
 
 ## What to read next
 
-- Deepen the setup: the v2 token that makes tags, folders and filters configure themselves — [Setup](30-setup.md).
-- One-page key reference — [Cheatsheet](95-cheatsheet.md).
-- Everything else (views, focus sessions, buffer, CRM) — the page tree on [Home](00-index.md).
+- Deepen the setup: the v2 token that makes tags, folders and filters configure themselves - [Setup](30-setup.md).
+- One-page key reference - [Cheatsheet](95-cheatsheet.md).
+- Everything else (views, focus sessions, buffer, CRM) - the page tree on [Home](00-index.md).
 
 ## Related
 

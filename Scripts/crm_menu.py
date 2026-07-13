@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-crm_menu.py — Alfred Script Filter (the 🔥CRM hub)
+crm_menu.py - Alfred Script Filter (the 🔥CRM hub)
 
 The CRM hotkey / "CRM…" main-menu row opens this: two options, both scoped to the
 🔥CRM list (its id rides on as a variable). Type "a" / "s" to pick (fuzzy).
@@ -9,10 +9,10 @@ The CRM hotkey / "CRM…" main-menu row opens this: two options, both scoped to 
              to CRM: auto-attaches a clipboard image, the [[ picker scopes to CRM
              bookings, and a booking tag triggers the "Prepare for …" follow-up.
   • Search → arg "tags" → the browse tag screen (browse.py, ctx:tags) scoped to
-             CRM. "tags" only routes the conditional — the ET call drops it.
+             CRM. "tags" only routes the conditional - the ET call drops it.
 
-Wiring: this filter's output → a Conditional — add → ET "Add", tags → ET
-"Browse" — both passing variables (so list_id and browse_ctx reach the target).
+Wiring: this filter's output → a Conditional - add → ET "Add", tags → ET
+"Browse" - both passing variables (so list_id and browse_ctx reach the target).
 """
 import sys
 import os
@@ -39,7 +39,7 @@ except Exception as e:
 
 CRM_ID   = areas.CRM_ID          # from the Configure panel; empty = dormant
 CRM_NAME = areas.crm_list_name()
-# item_type=list marks this as "adding INTO the CRM list" — so the add window
+# item_type=list marks this as "adding INTO the CRM list" - so the add window
 # shows "Adding to 🔥CRM" (not the generic / create-a-list/note/project hint) and
 # the / menu offers task attributes, not the top-level creation modes.
 CRM_VARS = {"list_id": CRM_ID, "task_list_id": CRM_ID, "list_name": CRM_NAME,
@@ -50,7 +50,7 @@ CRM_VARS = {"list_id": CRM_ID, "task_list_id": CRM_ID, "list_name": CRM_NAME,
 
 def build_items():
     if not areas.crm_configured():
-        # Dormant until crm_list_id is set in Configure Workflow — the one row
+        # Dormant until crm_list_id is set in Configure Workflow - the one row
         # opens the setup guide (arg routes via the ^open conditional branch).
         return [alfred.item(**areas.setup_row("CRM", "45-crm.md"))]
     return [
@@ -71,7 +71,7 @@ def build_items():
     ]
 
 
-# Back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
 _orig_output = alfred.output
 def _output_backstamped(items, **kw):
@@ -89,7 +89,7 @@ def main():
     try:
         items = build_items()
         if query:
-            # Narrow only when a real term actually matches — a 2-row menu should
+            # Narrow only when a real term actually matches - a 2-row menu should
             # never disappear, so an empty filter result falls back to all rows.
             filtered = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
             if filtered:

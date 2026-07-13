@@ -511,7 +511,7 @@ def _parse_task(text):
 
     display_title = title if title else "(type a task title)"
     if meta_parts:
-        display_title = f"{display_title}  —  {', '.join(meta_parts)}"
+        display_title = f"{display_title}  ·  {', '.join(meta_parts)}"
 
     return {
         "payload": payload,

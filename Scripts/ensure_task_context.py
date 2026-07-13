@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ensure_task_context.py — Alfred Run Script
+ensure_task_context.py - Alfred Run Script
 Ensures task_list_id and task_id are set as Alfred variables before
 a List Filter that needs them. Reads from env vars (first run) or
 temp file (second run). Passes the incoming arg through unchanged.

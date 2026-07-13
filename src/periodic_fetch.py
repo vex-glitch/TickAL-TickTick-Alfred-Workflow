@@ -1,4 +1,4 @@
-"""periodic_fetch.py — Tier-2 fetchers for periodic notes.
+"""periodic_fetch.py - Tier-2 fetchers for periodic notes.
 
 Weather + quote (first external HTTP in the repo) and the three v2 readers
 probed live 2026-07-11: GET /api/v2/habits + POST /api/v2/habitCheckins/query,
@@ -6,7 +6,7 @@ GET /api/v2/countdown/list, GET /api/v2/pomodoros/timeline (records carry
 startTime/endTime/pauseDuration).
 
 CONTRACT: every public function returns None on ANY failure (no token, no
-network, unexpected shape) — the engine then leaves that section untouched.
+network, unexpected shape) - the engine then leaves that section untouched.
 This whole module is the Tier-2 cut seam: delete it and the feature still
 ships (the engine imports it inside try/except).
 """
@@ -76,7 +76,7 @@ def _wmo_emoji(code):
 
 
 def get_latlon():
-    """Cached in config.json (periodic_lat/lon — manual override honored);
+    """Cached in config.json (periodic_lat/lon - manual override honored);
     bootstrapped ONCE via IP geolocation. None → retry next run."""
     data = cfg.load()
     if data.get("periodic_lat") is not None and data.get("periodic_lon") is not None:
@@ -95,7 +95,7 @@ def get_latlon():
 
 
 def get_weather():
-    """'☀️ 24–31°C · rain 10%' — Open-Meteo, no key. Cached ≤3 h per date."""
+    """'☀️ 24-31°C · rain 10%' - Open-Meteo, no key. Cached ≤3 h per date."""
     today = date.today().isoformat()
     st = cache_store.get("pn_weather") or {}
     if st.get("date") == today and time.time() - st.get("ts", 0) < 3 * 3600:
@@ -124,7 +124,7 @@ def get_weather():
 
 
 def get_quote():
-    """'> "text" — Author' from zenquotes.io, once per date. Deliberately
+    """'> "text" - Author' from zenquotes.io, once per date. Deliberately
     easy to discard if it proves naggy."""
     today = date.today().isoformat()
     st = cache_store.get("pn_quote") or {}
@@ -286,7 +286,7 @@ def habit_lines_weekly(d0, d1):
     return lines
 
 
-# ── countdowns (v2 countdown/list — probed 2026-07-11) ───────────────────────
+# ── countdowns (v2 countdown/list - probed 2026-07-11) ───────────────────────
 _BYDAY = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
 
 
@@ -298,7 +298,7 @@ def _cd_date(n):
 
 
 def _next_occurrence(cd, today):
-    """(days_delta, suffix) — positive = ahead. Handles the common RRULEs
+    """(days_delta, suffix) - positive = ahead. Handles the common RRULEs
     (WEEKLY/BYDAY, MONTHLY, YEARLY) + ignoreYear anniversaries; past
     non-repeating dates render as '{n}d since' (days-since counters)."""
     target = _cd_date(cd.get("date") or 0)

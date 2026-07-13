@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-focus_picker.py — Alfred Script Filter: the standalone Focus action.
+focus_picker.py - Alfred Script Filter: the standalone Focus action.
 
 ONE script filter running reschedule.py's autocomplete state machine:
 valid=False rows advance by rewriting the query bar, a trailing space is a
@@ -8,11 +8,11 @@ committed token, only dispatch rows are valid=True, and every row carries the
 ⌃ back chord to the main menu (mod-level valid=True fires from prompt rows).
 
   Bar state                     Screen
-  ""                            1 · mode — ⏱ timer / 🍅 pomo (default {D}m)
+  ""                            1 · mode - ⏱ timer / 🍅 pomo (default {D}m)
   "timer " | "pomo "            2 · ▶️ start now (unattributed / default) ·
                                      🔗 link a task…
   "{mode} link {frag}"          3 · fuzzy task search (open, non-NOTE, ≤40)
-  "{mode} link {title} "        4 · dispatch — start on the task (+ sticky)
+  "{mode} link {title} "        4 · dispatch - start on the task (+ sticky)
   focus file EXISTS             R · status + stop / pause⟷resume / discard
                                     + 🎯 add · 📥 buffer · 🧹 sweep · bar
   "add {frag}"   (session+task) A · fuzzy search → ⏎ stage into the focus
@@ -20,26 +20,26 @@ committed token, only dispatch rows are valid=True, and every row carries the
   "link {frag}"  (unattributed) L · fuzzy search → ⏎ fx_link (live attribute)
   "stop "        (unattributed) R2 · log (no task) · link a task…
   "stop link {frag}"            R3 · fuzzy task search
-  "stop link {title} "          R4 · dispatch — log onto the picked task
+  "stop link {title} "          R4 · dispatch - log onto the picked task
   "stage <pid>:<tid> …"         S · Stage-for-Focus (fired via ET prefill from
-                                    ⌘ menus — works in ANY session state):
+                                    ⌘ menus - works in ANY session state):
                                     "" S1 branch picker · "to {frag}" S2 target
                                     search (tasks + NOTES) · "from {t1} | …" S3
                                     multi-pick (tag-picker pattern, " | " sep)
                                     → "Add N checkboxes" → ONE fx_add_multi
   "stage pick {frag}"           S0 · source-task search (the idle menu's 🎯
-                                    row / missing handshake) — ⏎ fires
+                                    row / missing handshake) - ⏎ fires
                                     xact:stage_open → the normal S flow
 
-Unmatched trailing-space text falls back to the search screen — no dead ends.
+Unmatched trailing-space text falls back to the search screen - no dead ends.
 A running TickTick pomo has no focus file → render_pomo; with the sidecar
 (~/.ticktick_alfred/run/tickal_pomo.json) it grows the same add/sweep/bar rows.
 
 Dispatch args (executed by xact.py): focus_start:: · focus_start:p:t ·
 focus_sticky:p:t · pomo:default · pomo_task:p:t:default · pomo_sticky:p:t:default
 · focus_stop · focus_stop_as:p:t · focus_pause · focus_resume · focus_discard.
-Pomo rows say "+ open", not "for" — TickTick's pomo does NOT bind to the
-selection (verified against the app — see xact.pomo_task).
+Pomo rows say "+ open", not "for" - TickTick's pomo does NOT bind to the
+selection (verified against the app - see xact.pomo_task).
 """
 import sys
 import os
@@ -139,7 +139,7 @@ def _stage_pool():
 
 
 def _unpipe(s):
-    """S3 uses ' | ' as its commit separator — titles must never carry it."""
+    """S3 uses ' | ' as its commit separator - titles must never carry it."""
     return " ".join((s or "").replace("|", " ").split())
 
 
@@ -154,7 +154,7 @@ def _find_in_pool(text, pool):
 
 
 def _handshake():
-    """pid:tid of the ⌘ row that fired the stage/for prefill — rides
+    """pid:tid of the ⌘ row that fired the stage/for prefill - rides
     ~/.ticktick_alfred/run/tickal_stage.txt so the bar shows a clean 'stage '/'for ' query
     instead of id soup."""
     try:
@@ -166,7 +166,7 @@ def _handshake():
 
 
 def _staged_tids(tid):
-    """Unchecked tids in the task's CURRENT session block — cache-read (fresh
+    """Unchecked tids in the task's CURRENT session block - cache-read (fresh
     for the workflow's own writes via the content mirror; sticky-side ticks
     lag one sync). Powers the 🎯 already-staged indicator."""
     try:
@@ -175,7 +175,7 @@ def _staged_tids(tid):
         t = cache_store.find_task(tid)
         doc = fbx.parse((t or {}).get("content") or "")
         s = fbx.block_summary(doc, _dt.now().strftime("%Y-%m-%d"))
-        # checked AND unchecked — a ticked task is still "in" the focus
+        # checked AND unchecked - a ticked task is still "in" the focus
         return {it["tid"] for it in s["items"] if it["tid"]}
     except Exception:
         return set()
@@ -198,7 +198,7 @@ def _bar_visible():
 
 
 def _bulk_add_rows(rest):
-    """'add /…' — the bulk scope: a whole tag of a list, a whole
+    """'add /…' - the bulk scope: a whole tag of a list, a whole
     section, or today's tasks → the block in one ⏎. Drill grammar mirrors
     the pickers: list search → ' | ' lock → tag/section search."""
     rest = rest.lstrip()
@@ -220,7 +220,7 @@ def _bulk_add_rows(rest):
             if " | " in body or body.endswith(" |"):
                 if body.endswith(" |"):        # Alfred strips the trailing
                     body += " "                # space off the autocomplete
-                # rpartition: the LAST separator is the lock — list names
+                # rpartition: the LAST separator is the lock - list names
                 # containing " | " survive
                 lname, _, sub = body.rpartition(" | ")
                 lname, sub = lname.strip(), sub.strip()
@@ -290,7 +290,7 @@ def _bulk_add_rows(rest):
 
 def _add_search(frag, focus_tid):
     """Screen A: fuzzy rows that stage straight into the focus task's today
-    block on ⏎ (⌥ also opens the focus task's sticky — the list lives there).
+    block on ⏎ (⌥ also opens the focus task's sticky - the list lives there).
     Tasks already staged unchecked show a 🎯 suffix (like the buffer's 🅿️).
     '/' opens the bulk scope (tag / section / today)."""
     if frag.startswith("/"):
@@ -479,7 +479,7 @@ def render_running(st, raw):
         uid="fp-discard", title="🚮 Discard",
         subtitle="Stop without logging anything  ⌃🔙",
         arg="xact:focus_discard", valid=True, mods=BACK))
-    # Typing filters the toolset — twists were handled above.
+    # Typing filters the toolset - twists were handled above.
     frag = raw.strip().lower()
     if frag:
         hits = [r for r in items if frag in r["title"].lower()]
@@ -571,7 +571,7 @@ def render_idle(raw):
         alfred.item(uid="fp-pomo", title="🍅 Start Pomodoro",
                     subtitle="Link a task, open focus bar, log, pause...",
                     arg="", valid=False, autocomplete="pomo ", mods=BACK),
-        # The ⌘-menu stage flow, reachable without a task —
+        # The ⌘-menu stage flow, reachable without a task -
         # xact:stage_pick clears any leftover handshake, then asks WHICH task.
         alfred.item(uid="fp-stage", title="🎯 Stage for Focus",
                     subtitle="Checkbox-link a task into another task/note…",
@@ -584,7 +584,7 @@ def render_idle(raw):
 
 def render_pomo(state, remaining, raw):
     """TickTick's OWN pomodoro is running (no focus file): status + the
-    controls the app exposes programmatically — pause⟷resume toggle; End /
+    controls the app exposes programmatically - pause⟷resume toggle; End /
     Abandon only exist in the Pomodoro view. With the sidecar the
     session is task-bound → same add/sweep/bar toolset as the timer."""
     paused = state.startswith("pomodoroPaused")
@@ -650,10 +650,10 @@ def render_stage(raw):
     else:   # normal path: ids ride the handshake file, the bar stays clean
         spid, stid = _handshake()
         rest = raw[6:].lstrip(" ") if len(raw) > 5 else ""
-    # S0 — no handshake (the Focus menu's 🎯 row clears it via
+    # S0 - no handshake (the Focus menu's 🎯 row clears it via
     # xact:stage_pick before opening this screen): pick WHICH task to stage
     # first. ⏎ routes through xact:stage_open (fresh handshake, re-fires
-    # "stage ") — from there on it's the exact ⌘-menu flow.
+    # "stage ") - from there on it's the exact ⌘-menu flow.
     if not stid:
         frag = rest.strip()
         hits = filter_and_score(frag, _open_tasks(),
@@ -679,7 +679,7 @@ def render_stage(raw):
     sname = md_links_display(src.get("title") or "this task")[:40]
     prefix = "stage "
 
-    # S2 — "to <frag>": pick the TARGET whose block receives the source
+    # S2 - "to <frag>": pick the TARGET whose block receives the source
     if rest.startswith("to ") or rest == "to":
         frag = rest[3:].strip()
         pool = [t for t in _stage_pool() if t["id"] != stid]
@@ -705,7 +705,7 @@ def render_stage(raw):
         print(alfred.output(items, skipknowledge=True))
         return
 
-    # S3 — "from <t1> | <t2> | frag": accumulate picks INTO the source task
+    # S3 - "from <t1> | <t2> | frag": accumulate picks INTO the source task
     if rest.startswith("from ") or rest == "from":
         body = rest[5:] if len(rest) > 4 else ""
         segments = body.split(" | ")
@@ -768,7 +768,7 @@ def render_stage(raw):
         print(alfred.output(items, skipknowledge=True))
         return
 
-    # S1 — branch picker
+    # S1 - branch picker
     items = [
         alfred.item(uid="fp-st-to",
                     title="⤴️ Out",
@@ -789,7 +789,7 @@ def render_stage(raw):
     print(alfred.output(items, skipknowledge=True))
 
 
-# ── Task-bound start flow ("for" — the ⌘ 🎯 Focus row) ───────────────────────
+# ── Task-bound start flow ("for" - the ⌘ 🎯 Focus row) ───────────────────────
 def render_for(raw):
     """Fired via ET prefill "for " with the task in the handshake file. One
     🎯 Focus row replaces the old Start-focus / sticky+timer / Start-pomo

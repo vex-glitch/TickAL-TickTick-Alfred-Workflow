@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-open_links.py — Alfred Script Filter
+open_links.py - Alfred Script Filter
 
 Lists the web links found in a task's description (and title) so you can open
 one. Reached from the ⌘ Actions menu:
     actions.py emits arg "links" ▸ conditional "LINKS" ▸ ET "attributeLinks"
     ▸ ensure_task_context.py ▸ this filter.
 
-Each row emits  open:<url>  — which rides the existing OPEN routing
+Each row emits  open:<url>  - which rides the existing OPEN routing
 (conditional ▸ modOpen ▸ `open "$URL"`), so no executor script is needed.
 Wire this Script Filter's output to a Call External Trigger "modOpen"
 (passinputasargument ON).
 
 Task descriptions aren't kept in the offline cache (only notes are), so we read
 content from the cache when present and otherwise do a single api.get_task()
-fetch. Links of any scheme — web, app (obsidian://…), file://, ticktick:// — are
+fetch. Links of any scheme - web, app (obsidian://…), file://, ticktick:// - are
 surfaced, since macOS `open` handles them all.
 """
 import sys
@@ -62,7 +62,7 @@ def main():
             pass
 
     # No back chip: this Script Filter has NO ctrl (or any back) edge on the
-    # canvas — the old "⌘⇧ 🔙" advertised a chord that never existed.
+    # canvas - the old "⌘⇧ 🔙" advertised a chord that never existed.
     # Wire a real ⌃ back before re-adding a chip.
     back = ""
 
@@ -97,7 +97,7 @@ def main():
                 variables={"task_list_id": list_id, "task_id": tid,
                            "task_title": task_title},
                 # ⌘⏎ copies the URL instead of opening it. Wire the picker's ⌘
-                # output to a Call External Trigger "modURL" — the same chain
+                # output to a Call External Trigger "modURL" - the same chain
                 # "Copy link" uses (→ copy_url_action.py → End → notification).
                 mods={"cmd": {"arg": f"copy:{url}",
                               "subtitle": f"⌘ Copy  {url}"}},

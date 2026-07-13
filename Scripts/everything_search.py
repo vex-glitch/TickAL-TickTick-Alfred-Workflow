@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-everything_search.py — Alfred Script Filter
+everything_search.py - Alfred Script Filter
 Searches across ALL item types: lists, sections, and tasks at every depth.
 
 Each result carries an item_type variable ("list" / "section" / "task") plus a
@@ -135,7 +135,7 @@ def get_hint_items(raw_query):
             n = 0
         if n:
             rows.insert(0, alfred.item(
-                title=f"🅿️ Buffer — {n} task{'s' if n != 1 else ''}",
+                title=f"🅿️ Buffer · {n} task{'s' if n != 1 else ''}",
                 subtitle="⌥ Open buffer",
                 valid=False,
                 mods={"alt": {"valid": True, "arg": "", "subtitle": "Open buffer",
@@ -181,8 +181,8 @@ _INLINE_TOKENS = {k.strip(): v for k, v in SCOPE_PREFIXES.items()}
 
 
 def _tag_create_parent_rows(fragment):
-    """'g +<name> ' — step 2 of ➕ Create tag: create top-level, or pick
-    a parent to nest under. Rows fire xact:tag_create:<b64> — the xact route
+    """'g +<name> ' - step 2 of ➕ Create tag: create top-level, or pick
+    a parent to nest under. Rows fire xact:tag_create:<b64> - the xact route
     is the only arg shape search-⏎ (modOpen) forwards to a script."""
     import base64
     import tagtree
@@ -227,7 +227,7 @@ def _tag_create_parent_rows(fragment):
 
 # ── G scope tag rows ─────────────────────────────────────────────────────────
 def tag_scope_rows(all_tasks, fragment, only=None):
-    """Every tag on an incomplete item, with counts — the first screen of the
+    """Every tag on an incomplete item, with counts - the first screen of the
     G scope. ⏎ advances the bar to 'g #<tag> ' (exact-tag mode below); ⌘ opens
     the Actions menu for the tag; ⌥⌘ copies the tag's web-app link."""
     if fragment.startswith("+"):
@@ -239,7 +239,7 @@ def tag_scope_rows(all_tasks, fragment, only=None):
         for tag in (t.get("tags") or []):
             counts[tag] = counts.get(tag, 0) + 1
 
-    # Tags with no open items (incl. parent tags like 🔥CRM) still get a row —
+    # Tags with no open items (incl. parent tags like 🔥CRM) still get a row -
     # ⌘ Actions / the web link work for them, and hiding them reads as data loss.
     seen = {t.lower() for t in counts}
     for lbl in (cache_store.get("tags") or []):
@@ -278,7 +278,7 @@ def tag_scope_rows(all_tasks, fragment, only=None):
         # ➕ new tag: the typed name matches no existing tag → offer to
         # coin it; ⏎ opens the top-level / nest-under-parent step. Checked
         # against the FULL cache (not the drill-restricted counts) and never
-        # offered inside a parent drill — `only` hides existing tags there.
+        # offered inside a parent drill - `only` hides existing tags there.
         frag_tag = fragment.strip().lstrip("#")
         full_known = ({tag_match_key(t) for t in counts}
                       | {tag_match_key(t) for t in (cache_store.get("tags") or [])})
@@ -295,7 +295,7 @@ def tag_scope_rows(all_tasks, fragment, only=None):
 # ── V/F scopes: smart lists + filters live in search ─────────────────────────
 # (key, emoji, name, kind, browse ctx, app-open URL). kind "alfred" renders
 # inline on ⏎ (locked scope, G-scope pattern); kind "app" opens the view in
-# TickTick on ⏎ via its deep-link route (ticktick://habit|matrix|focus —
+# TickTick on ⏎ via its deep-link route (ticktick://habit|matrix|focus -
 # verified against the app; the alfred://runtrigger URL scheme does NOT fire
 # from modOpen, don't go back to it).
 VIEWS = [
@@ -309,13 +309,13 @@ VIEWS = [
      "ticktick:///webapp/#p/inbox/tasks"),
     ("summary",   "📈", "Summary",     "app", None, None),
     # Summary has NO working deep link (v1/show?smartlist=summary,
-    # ticktick://summary, webapp/#summary are all dead) — url None routes it
+    # ticktick://summary, webapp/#summary are all dead) - url None routes it
     # through xact:view_open (List-menu click). ⏎ needs the modOpen
     # runscript's xact passthrough; ⌘ → Open always works.
     ("completed", "✅", "Completed",   "alfred", "ctx:completed",
      "ticktick://v1/show?smartlist=completed"),
     # Won't Do has NO app route at all (v1/show + webapp hashes + List menu
-    # all probed dead) — Alfred-inline only, url None.
+    # all probed dead) - Alfred-inline only, url None.
     ("wontdo",    "🚫", "Won't Do",    "alfred", "ctx:wontdo", None),
     ("habits",    "🔄", "Habits",      "app", None, "ticktick://habit"),
     ("matrix",    "🧭", "Matrix",      "app", None, "ticktick://matrix"),
@@ -407,7 +407,7 @@ def filter_rows(fragment):
 
 
 def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
-    """Task row for a locked v/f view — search-convention mods (⏎ open,
+    """Task row for a locked v/f view - search-convention mods (⏎ open,
     ⇧ complete/uncomplete, ⌘ Actions, ⌥ browse subtasks, ⌥⌘ copy).
     completed/wontdo = the two closed states; same row shape, ⇧ reopens."""
     tid  = t.get("id", "")
@@ -477,14 +477,14 @@ def last_added_rows(query, all_tasks):
     rows = [_inline_task_row(t, "Last Added", all_tasks) for t in pool]
     if not rows:
         rows = [alfred.item(
-            title=f'No task matching "{query}"' if query else "No tasks cached — run Sync first",
+            title=f'No task matching "{query}"' if query else "No tasks cached · run Sync first",
             valid=False)]
     return rows
 
 
 def folder_scope_rows(query):
     """FO scope: your TickTick folders (v2 auto-named at sync, manual
-    config.json overrides on top) — ⌥⏎ drills into the folder's lists, same
+    config.json overrides on top) - ⌥⏎ drills into the folder's lists, same
     ordering as browse's folder root."""
     import config as cfg
     import re as _re
@@ -514,7 +514,7 @@ def folder_scope_rows(query):
             mods={
                 "alt":   {"arg": "", "valid": True, "subtitle": "Browse lists",
                           "variables": {"browse_ctx": f"ctx:lists:{gid}"}},
-                # Actions can't handle folder context — dead ⌘ (browse parity)
+                # Actions can't handle folder context - dead ⌘ (browse parity)
                 "cmd":   {"valid": False, "subtitle": ""},
                 "shift": {"valid": False, "subtitle": ""},
             },
@@ -536,7 +536,7 @@ def folder_scope_rows(query):
 
 
 def render_view_inline(entry, query):
-    """Locked 'v <Name> [query]' — the view's tasks inline in search."""
+    """Locked 'v <Name> [query]' - the view's tasks inline in search."""
     key, emoji, name, kind, ctx, url = entry
     items = []
     if url or kind == "app":
@@ -589,7 +589,7 @@ def render_view_inline(entry, query):
 
 
 def render_filter_inline(index, f, query, all_tasks, projects):
-    """Locked 'f <Name> [query]' — the filter's matching tasks inline."""
+    """Locked 'f <Name> [query]' - the filter's matching tasks inline."""
     import filtering
     f_name = f.get("name", f"Filter {index + 1}")
     rows = [_inline_task_row(t, f_name, all_tasks)
@@ -609,7 +609,7 @@ def render_vf_scope(scope, raw_query, all_tasks, projects):
     """Route a v/f-scoped bar: locked '<Name> <query>' (trailing space, name
     matched longest-first case-insensitive) renders the view/filter's tasks
     inline; anything else is a fragment filtering the picker rows."""
-    rest   = raw_query[2:]          # unstripped — the lock needs the trailing space
+    rest   = raw_query[2:]          # unstripped - the lock needs the trailing space
     rest_l = rest.lower()
     if scope == "view":
         by_name = {e[2].lower(): e for e in VIEWS}
@@ -630,7 +630,7 @@ def render_vf_scope(scope, raw_query, all_tasks, projects):
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
-# Back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
 _orig_output = alfred.output
 def _output_backstamped(items, **kw):
@@ -666,7 +666,7 @@ def _periodic_keyword_rows(query):
                 p = pr._period_of(spec, _date.today())
                 rows.append(alfred.item(
                     uid=f"pn-kw-{spec}",
-                    title=f"{emoji} {label} note — {pmm.title(p)}",
+                    title=f"{emoji} {label} note · {pmm.title(p)}",
                     subtitle="⏎↗️ Open  ⌃⇧📌 Sticky",
                     arg=f"xact:pn_open:{spec}", valid=True,
                     # top-tier type rank + a search_name matching the typed
@@ -691,7 +691,7 @@ def main():
 
         # ── Inline /x scope ───────────────────────────────────────────────────
         # A space-preceded /token anywhere in the bar switches the scope
-        # instantly — zero extra keypresses, the token is inert for matching
+        # instantly - zero extra keypresses, the token is inert for matching
         # ("monday /t" ≡ "t monday"). Unknown tokens (e.g. "/support") stay
         # literal text. A LEADING "/" is the scope menu (handled above). The
         # last valid token wins; it is cut out of the matching query.
@@ -709,13 +709,13 @@ def main():
         projects  = cache_store.get("projects") or []
         all_tasks = cache_store.get("all_tasks")
         if all_tasks is None:
-            # Cache was invalidated — re-fetch so search works immediately
+            # Cache was invalidated - re-fetch so search works immediately
             try:
                 import config as cfg
                 from api import TickTickAPI
                 api_client = TickTickAPI(cfg.get_token())
                 all_tasks  = []
-                # Inbox is not returned by /project — fetch it separately
+                # Inbox is not returned by /project - fetch it separately
                 try:
                     inbox_data = api_client.get_project_data("inbox")
                     for t in inbox_data.get("tasks", []):
@@ -770,7 +770,7 @@ def main():
         if scope in ("view", "filter"):
             if inline_hit:
                 # Inline "/v" | "/f": picker rows filtered by the cleaned query
-                # (the locked-name inline grammar stays leading-prefix only —
+                # (the locked-name inline grammar stays leading-prefix only -
                 # render_vf_scope slices the raw bar and can't see cut tokens).
                 rows = view_rows(query) if scope == "view" else filter_rows(query)
             else:
@@ -786,7 +786,7 @@ def main():
         if scope == "folders":
             print(alfred.output(folder_scope_rows(query), skipknowledge=True))
             return
-        # ── PN scope: periodic notes — standalone, config-gated ──────────────
+        # ── PN scope: periodic notes - standalone, config-gated ──────────────
         if scope == "periodic":
             import periodic_rows
             print(alfred.output(periodic_rows.rows(query), skipknowledge=True))
@@ -799,7 +799,7 @@ def main():
         if scope in (None, "note"):
             items += _periodic_keyword_rows(query)
 
-        # Smart lists + filters are searchable like everything else —
+        # Smart lists + filters are searchable like everything else -
         # first in on ties (stable sort), so an exact name beats a task hit.
         # Folders too (their rows only surface when the query matches).
         if scope is None:
@@ -814,7 +814,7 @@ def main():
             pdata = cache_store.get(f"project_data_{pid}") or {}
             sections = pdata.get("columns", []) or []   # section rows below need these
 
-            # Sub-count: distinct TAGS on the list's open tasks — the count must
+            # Sub-count: distinct TAGS on the list's open tasks - the count must
             # match what ⌥ drills into here (⌥ = Browse tags on search list
             # rows; sections live on ⌥⇧).
             list_tags = {tag for t in all_tasks
@@ -852,7 +852,7 @@ def main():
                 for s in sections:
                     sid   = s["id"]
                     sname = s.get("name", "Untitled")
-                    # The "Not Sectioned" pseudo-section never surfaces — same rule as breadcrumbs.
+                    # The "Not Sectioned" pseudo-section never surfaces - same rule as breadcrumbs.
                     if sname.strip().lower() == "not sectioned":
                         continue
 
@@ -909,7 +909,7 @@ def main():
                 tid  = t["id"]
                 pid  = t.get("projectId") or t.get("_projectId", "")
                 name = t.get("title", "Untitled")
-                # In tag scope the query matches the task's tags, not its title —
+                # In tag scope the query matches the task's tags, not its title -
                 # except in exact-tag mode, where the tag is fixed and the query
                 # goes back to filtering titles.
                 ssearch = " ".join(t.get("tags") or []) if scope == "tag" and not exact_tag else name
@@ -966,7 +966,7 @@ def main():
         # nc = search by content (title field = content snippet, subtitle = note name · folder)
         if scope in (None, "note", "note_content", "tag"):
             # Prefer the dedicated all_notes cache (has content for nc search).
-            # Fall back to all_tasks filtered by kind=="NOTE" — covers inbox notes
+            # Fall back to all_tasks filtered by kind=="NOTE" - covers inbox notes
             # and works without a full sync immediately after note creation.
             all_notes = cache_store.get("all_notes") or []
             kind_notes = [t for t in all_tasks if t.get("kind") == "NOTE"]
@@ -1068,10 +1068,10 @@ def main():
             # ── Relevance-first sort ──────────────────────────────────────────
             # Match STRENGTH always beats type: exact name → word-start match
             # ("test" in "test ⌘V…" / "Testo") → inside-a-word ("rest" in
-            # "interests") → letter-scatter (t…e…s…t across a whole row — the
+            # "interests") → letter-scatter (t…e…s…t across a whole row - the
             # junk that outranked real hits). Within a strength class:
             # List → Task (top-level above subtasks) → Note → Tag → Section
-            # (sections are legacy — always last in class). Scatter rows are
+            # (sections are legacy - always last in class). Scatter rows are
             # DROPPED entirely whenever a word-or-better match exists; with no
             # word match they stay (typos still find things). sorted() is
             # stable, so fuzzy order survives within each (strength, type).
@@ -1107,7 +1107,7 @@ def main():
                 msg = f"No open items tagged {fmt_tags([exact_tag]) or '#' + exact_tag}" \
                     + (f' matching "{query}"' if query else "")
             else:
-                msg = f'No results matching "{query}"' if query else "No data — run sync first"
+                msg = f'No results matching "{query}"' if query else "No data · run sync first"
             items.append(alfred.item(title=msg, valid=False))
 
         print(alfred.output(items, skipknowledge=True))

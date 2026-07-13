@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-note_save.py — Alfred Run Script
+note_save.py - Alfred Run Script
 
 Saves the edited description / note body from the Text View back to TickTick.
 $1 = the full (possibly multi-line) text the Text View emitted on ⏎.

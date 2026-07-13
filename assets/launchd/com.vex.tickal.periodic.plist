@@ -17,7 +17,7 @@
         <string>xact:pn_mint</string>
     </array>
     <key>WorkingDirectory</key><string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID</string>
-    <!-- The list id comes from ~/.ticktick_alfred/config.json — written
+    <!-- The list id comes from ~/.ticktick_alfred/config.json - written
          through automatically on the first interactive pn use. No env pin:
          one source of truth, and blanking the Alfred field turns the agent
          off with the rest of the feature. -->

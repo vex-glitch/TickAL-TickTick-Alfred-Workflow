@@ -114,7 +114,7 @@ def parse_date(date_str):
     """Convert natural language date string → UTC ISO 8601 string or None.
 
     All-day dates (parsedatetime status 1) are stored as UTC midnight of the
-    LOCAL calendar date — e.g. "today" on 21 May → "2026-05-21T00:00:00+0000"
+    LOCAL calendar date - e.g. "today" on 21 May → "2026-05-21T00:00:00+0000"
     regardless of timezone.  TickTick reads the date portion directly.
 
     Timed dates (status 2/3) use DST-correct local→UTC conversion via
@@ -157,7 +157,7 @@ def utc_to_local_display(iso_str):
             tzinfo=_tz.utc,
         )
         if dt_utc.hour == 0 and dt_utc.minute == 0 and dt_utc.second == 0:
-            return iso_str[:10]          # "YYYY-MM-DD" — the TickTick calendar date
+            return iso_str[:10]          # "YYYY-MM-DD" - the TickTick calendar date
         local = dt_utc.astimezone()
         return local.strftime("%Y-%m-%d %H:%M")
     except Exception:
@@ -187,7 +187,7 @@ def utc_to_picker_display(iso_str):
 
 
 def utc_to_long_display(iso_str):
-    """'Thu, 21 May 2026' or 'Thu, 21 May 2026  14:30' — includes year for notifications."""
+    """'Thu, 21 May 2026' or 'Thu, 21 May 2026  14:30' - includes year for notifications."""
     if not iso_str:
         return ""
     try:

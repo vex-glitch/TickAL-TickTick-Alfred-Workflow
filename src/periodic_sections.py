@@ -1,11 +1,11 @@
-"""periodic_sections.py — pure generic `###`-section splitter.
+"""periodic_sections.py - pure generic `###`-section splitter.
 
 Periodic notes (daily/weekly/monthly/quarterly/yearly) are NOTE-kind tasks
 whose content is a sequence of `### <name>` sections. Every feature is a
 "filler" that owns one section; this module is the only thing that touches
 the document structure.
 
-    <lead — breadcrumb line + anything above the first header>
+    <lead - breadcrumb line + anything above the first header>
     ### 🧭 Nav
     <body lines>
     ### 💰 Money
@@ -13,7 +13,7 @@ the document structure.
 
 Contracts:
   * serialize_sections(parse_sections(c)) == c for every c (byte-preserving;
-    CRLF-stripped \\r is the ONE normalization — the focus_blocks rule).
+    CRLF-stripped \\r is the ONE normalization - the focus_blocks rule).
   * find() is an EXACT header-name match; a missing/renamed header means the
     filler skips silently and the rest of the note is untouched. That is both
     the disclosed limitation and the universal per-section kill switch.
@@ -60,7 +60,7 @@ class SecDoc:
 def parse_sections(content):
     """content str → SecDoc. Splits on `### ` headers; everything else is
     body/lead verbatim. A trailing run of decor lines (`---`, `# Group`) in a
-    body migrates to the NEXT section's pre — leading blanks of the run stay
+    body migrates to the NEXT section's pre - leading blanks of the run stay
     behind as the body's gap. '' parses to an empty-lead doc."""
     lines = (content or "").replace("\r", "").split("\n")
     doc = SecDoc()
@@ -89,7 +89,7 @@ def parse_sections(content):
             doc.sections[i].pre = run
             del body[j:]
     # lead migration: only the trailing `#`/`##` GROUP header (plus one blank
-    # above it) moves to the first section — the lead itself is engine-
+    # above it) moves to the first section - the lead itself is engine-
     # composed and would wipe a group header parked there; its own ---
     # divider stays put
     if doc.sections:
@@ -106,7 +106,7 @@ def parse_sections(content):
 
 
 def serialize_sections(doc):
-    """Inverse of parse_sections — byte round-trip."""
+    """Inverse of parse_sections - byte round-trip."""
     out = list(doc.lead)
     for sec in doc.sections:
         out.extend(sec.pre)
@@ -124,7 +124,7 @@ def find(doc, name):
 
 
 def find_prefix(doc, prefix):
-    """First section whose name STARTS WITH prefix, else None — the anchor
+    """First section whose name STARTS WITH prefix, else None - the anchor
     form for data-in-header sections ('### ✅ Completed: 121 · 🟢 …')."""
     for sec in doc.sections:
         if sec.name.startswith(prefix):
@@ -143,7 +143,7 @@ def set_header(sec, name):
 
 
 def _canon(lines):
-    """Body content with no trailing blanks — the gap to the next header is
+    """Body content with no trailing blanks - the gap to the next header is
     decided by _gap (--- dividers sit TIGHT against the body; plain
     sections get one blank line)."""
     body = list(lines)
@@ -181,7 +181,7 @@ def set_sec_body(doc, sec, lines):
 
 def append_body(doc, name, lines):
     """Append lines at the section's end, before the trailing gap (APPEND
-    semantics — existing lines are never rewritten). False when the section
+    semantics - existing lines are never rewritten). False when the section
     is absent or lines is empty."""
     sec = find(doc, name)
     if sec is None or not lines:

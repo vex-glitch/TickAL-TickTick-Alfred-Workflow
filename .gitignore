@@ -1,4 +1,4 @@
-# Personal config — copy from *.example.py and fill in your own
+# Personal config - copy from *.example.py and fill in your own
 filters_config.py
 tags_config.py
 
@@ -10,7 +10,7 @@ __pycache__/
 *.py[cod]
 *.so
 
-# Bundled lib — skip package metadata and binaries, keep the actual packages
+# Bundled lib - skip package metadata and binaries, keep the actual packages
 src/lib/*.dist-info/
 src/lib/bin/
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-areas.py — area-tag derivation + CTA / Prepare action building.
+areas.py - area-tag derivation + CTA / Prepare action building.
 
 Shared by Scripts/actions.py (row preview) and src/dispatch.py (execution) so the
 one dynamic "Add CTA / Prepare" Actions row and its handler agree on exactly one
@@ -13,7 +13,7 @@ Area-tag derivation (keycap naming convention):
 Matched by the keycap emoji, so folder-name spacing ("2️⃣ Personal" vs
 "2️⃣Personal") is irrelevant. No keycap anywhere → no tag (never invents one).
 The resolved label is an existing nested tag under 🎩Area; TickTick matches tags
-by a normalised key, so assigning it reuses that tag — no duplicates.
+by a normalised key, so assigning it reuses that tag - no duplicates.
 """
 import os
 import re
@@ -25,18 +25,18 @@ import config as cfg
 # feature is dormant: CRM entry points render setup_row() instead, the CTA row
 # doesn't render, and new projects are created ungrouped.
 CTA_LIST_ID        = os.environ.get("cta_list_id") or ""         # 📌CTA-style list
-CTA_LIST_NAME      = "📌CTA"    # display fallback — live name via cta_list_name()
-CRM_LIST_NAME      = "🔥CRM"    # display fallback — live name via crm_list_name()
+CTA_LIST_NAME      = "📌CTA"    # display fallback - live name via cta_list_name()
+CRM_LIST_NAME      = "🔥CRM"    # display fallback - live name via crm_list_name()
 PROJECTS_FOLDER_ID = os.environ.get("projects_folder_id") or ""  # 💼Projects-style folder
 CRM_ID             = os.environ.get("crm_list_id") or ""         # 🔥CRM-style list
 PERIODIC_LIST_ID   = cfg.get_periodic_list_id()                  # 💫Periodic notes list
 DOCS_BASE = "https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs"
 PREPARE_TAG        = "🔥prepare"                   # normalised (lower) form
-# The 🔥CRM tag group — every CRM-scoped picker offers ONLY these (canonical
+# The 🔥CRM tag group - every CRM-scoped picker offers ONLY these (canonical
 # home; add_task.py/browse.py keep local copies for their own flows)
 CRM_TAGS           = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
 # A new CRM task carrying one of these chains to the Prepare window
-# (dispatch) — add_task suppresses the focus chords for the same set.
+# (dispatch) - add_task suppresses the focus chords for the same set.
 BOOKING_TAGS       = CRM_TAGS - {PREPARE_TAG}
 
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -54,9 +54,9 @@ def _keycap(text):
 
 
 def area_tags():
-    """[(label, keycap)] — entries led by a keycap number, from the synced
+    """[(label, keycap)] - entries led by a keycap number, from the synced
     tags cache (v2 tree order, discovered extras after). Empty before the
-    first sync — the callers all render a friendly pointer row."""
+    first sync - the callers all render a friendly pointer row."""
     try:
         import cache as cache_store
         tags = list(cache_store.get("tags") or [])
@@ -112,7 +112,7 @@ def cta_list_name():
 
 def setup_row(feature, page):
     """The one 'feature dormant' Alfred row: ⏎ opens the setup guide.
-    `arg` rides dispatch's existing open: verb — no extra wiring."""
+    `arg` rides dispatch's existing open: verb - no extra wiring."""
     return {"uid": f"setup-{page}", "title": f"{feature} needs setup",
             "subtitle": "⏎ Setup guide",
             "arg": f"open:{DOCS_BASE}/{page}", "valid": True}
@@ -147,10 +147,10 @@ def _task_link(pid, tid):
 def classify(pid, tid, itype, task):
     """Pick the action mode for the selected item.
 
-    prepare  — a CRM entry (task in 🔥CRM, not itself a 🔥prepare follow-up)
-    project  — a 💼P • … project list
-    list     — any other list
-    task     — a task / subtask / note
+    prepare  - a CRM entry (task in 🔥CRM, not itself a 🔥prepare follow-up)
+    project  - a 💼P • … project list
+    list     - any other list
+    task     - a task / subtask / note
     """
     tags_lc = {str(t).lower() for t in ((task or {}).get("tags") or [])}
     if CRM_ID and pid == CRM_ID and itype in ("task", "subtask", "note") \
@@ -164,7 +164,7 @@ def classify(pid, tid, itype, task):
 
 def build_action(mode, pid, tid, title):
     """Build the dynamic row's behaviour: a prefilled Add-window query (so the
-    CTA/Prepare task can be SCHEDULED before it's created — same flow as CRM
+    CTA/Prepare task can be SCHEDULED before it's created - same flow as CRM
     bookings) plus the row label + preview, and an optional `note` (the parent-list
     body link).
 
@@ -181,7 +181,7 @@ def build_action(mode, pid, tid, title):
         q = f"~l {crm_name} #{PREPARE_TAG} Prepare for [[{title}]]"
         return {"query": q, "note": "", "mode": mode, "tag": PREPARE_TAG,
                 "label": "🔥 Add Prepare",
-                "preview": f"Opens {crm_name} add · Prepare for \"{title}\" — schedule & ⏎"}
+                "preview": f"Opens {crm_name} add · Prepare for \"{title}\" · schedule & ⏎"}
 
     proj    = _project(pid)
     tag     = area_tag_for_list(proj)
@@ -194,10 +194,10 @@ def build_action(mode, pid, tid, title):
                      if mode == "project" else f"[{name}]({link}) 🔗")
         # No ~l token: an untagged item leaves nothing to terminate the ~l
         # capture, so the parser would sit in the list picker forever. The 📌CTA
-        # destination rides as row variables (list_id/list_name) instead —
+        # destination rides as row variables (list_id/list_name) instead -
         # exactly how the CRM Add hub pins its list.
         q = f"{tagpart}{cta_title}"
-    else:  # task / subtask / note — link the task; parent list goes in the body
+    else:  # task / subtask / note - link the task; parent list goes in the body
         q = f"{tagpart}[{title}]({_task_link(pid, tid)}) 🔗"
         list_name = (proj or {}).get("name", "")
         note = f"[{list_name}]({_list_link(pid)})" if list_name else ""

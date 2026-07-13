@@ -1,4 +1,4 @@
-"""focus_blocks.py — pure parse/model/serialize for focus session blocks.
+"""focus_blocks.py - pure parse/model/serialize for focus session blocks.
 
 A "focus task"'s description carries dated session blocks above the original
 description text:
@@ -10,21 +10,21 @@ description text:
     ### 2026-07-05
     - [x] [Task C](…)
     ---
-    <original description — NEVER touched>
+    <original description - NEVER touched>
 
 Contracts:
   * serialize(parse(c)) == c for every well-formed c (byte-preserving:
     trailing spaces, CRLF-stripped \\r is the ONE normalization, blank lines
     between blocks, tail verbatim).
-  * Checked lines are NEVER removed or rewritten — mutations only append new
+  * Checked lines are NEVER removed or rewritten - mutations only append new
     lines, flip "[ ]"→"[x]" once, or move whole unchecked Line objects.
   * Zero-line blocks are never emitted (drops empty headers silently).
 
 Format facts verified against the live app: the app writes "- [x]"
 lowercase, preserves our trailing space after the link, and merges concurrent
-sticky-side + API-side edits (op-based sync — no whole-buffer clobber).
+sticky-side + API-side edits (op-based sync - no whole-buffer clobber).
 
-Pure module: no I/O, no workflow imports — importable by xact.py,
+Pure module: no I/O, no workflow imports - importable by xact.py,
 focus_picker.py and focus_bar.py alike.
 """
 import re
@@ -32,7 +32,7 @@ import re
 DATE_HEADER_RE = re.compile(r'^###\s+(\d{4}-\d{2}-\d{2})\s*$')
 SEPARATOR_RE = re.compile(r'^---\s*$')
 CHECKBOX_RE = re.compile(r'^\s*[-*]\s\[(?P<mark>[ xX])\]\s?(?P<body>.*)$')
-# Match by the TRAILING url group, anchored at end of line — titles contain
+# Match by the TRAILING url group, anchored at end of line - titles contain
 # markdown links in real data, so never anchor on the FIRST "[".
 LINK_TAIL_RE = re.compile(
     r'\]\(https://ticktick\.com/webapp/#p/(?P<pid>[A-Za-z0-9]+)'
@@ -159,7 +159,7 @@ def make_line(pid, tid, title):
 def ensure_today(doc, today):
     """Return today's block, creating it at the front if needed. Creation
     CARRIES OVER every unchecked checkbox line from older blocks (in document
-    order); checked and free lines stay put — permanent record."""
+    order); checked and free lines stay put - permanent record."""
     if doc.blocks and doc.blocks[0].date == today:
         return doc.blocks[0]
     fresh = Block(today)
@@ -175,7 +175,7 @@ def ensure_today(doc, today):
 def insert_checkboxes(doc, today, items):
     """items = [(pid, tid, title)] appended at the BOTTOM of today's block.
     Dedupe: skip a tid already sitting UNCHECKED in today's block (checked
-    occurrences — today or older — don't prevent re-adding).
+    occurrences - today or older - don't prevent re-adding).
     Returns (added, skipped)."""
     blk = ensure_today(doc, today)
     present = {l.tid for l in blk.lines
@@ -224,7 +224,7 @@ def move_item(doc, today, tid, direction):
     current block (the bar's ⤒↑↓⤓ buttons; the bar only shows
     unchecked rows, so moving across checked lines would look dead).
     direction: up/down = one slot, top/bottom = edge. Checked and freehand
-    lines keep their positions — only the unchecked lines permute among
+    lines keep their positions - only the unchecked lines permute among
     their own slots. Returns True when the order changed."""
     blk = _current_block(doc, today)
     if not blk or not tid:
@@ -260,7 +260,7 @@ def sweep_targets(doc):
 
 def today_note(doc, today):
     """The current block verbatim (header + every raw line, checked/unchecked/
-    freehand) — becomes the focus record's note. "" when no blocks."""
+    freehand) - becomes the focus record's note. "" when no blocks."""
     blk = _current_block(doc, today)
     if not blk or not blk.lines:
         return ""
@@ -272,7 +272,7 @@ def _display_title(line):
     cm = CHECKBOX_RE.match(line.raw)
     body = cm.group("body") if cm else line.raw
     if m:
-        # body is "[Title](url) " — cut at the link tail, strip the leading "["
+        # body is "[Title](url) " - cut at the link tail, strip the leading "["
         bm = LINK_TAIL_RE.search(body)
         t = body[:bm.start()] if bm else body
         return t[1:] if t.startswith("[") else t
@@ -281,7 +281,7 @@ def _display_title(line):
 
 def block_summary(doc, today):
     """{done, total, items:[{idx,title,url,tid,pid,checked}]} over the current
-    block's checkbox lines — consumed by the focus bar and fx_tick's JSON."""
+    block's checkbox lines - consumed by the focus bar and fx_tick's JSON."""
     blk = _current_block(doc, today)
     items = []
     if blk:

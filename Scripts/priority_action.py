@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-priority_action.py — Alfred Run Script
+priority_action.py - Alfred Run Script
 Sets the priority on a task.
 $1 = "{task_list_id}:{task_id}:{priority_int}" (Arg-and-Vars node prepends the
 ids to the bare value emitted by change_priority.py). Env vars are a fallback.

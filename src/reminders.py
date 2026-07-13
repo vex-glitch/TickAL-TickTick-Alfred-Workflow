@@ -6,7 +6,7 @@ A "trigger" is what TickTick stores: an RFC5545 string like 'TRIGGER:-PT15M'
 """
 import re
 
-# token, label, hint — the preset rows shown in the pickers. Custom offsets
+# token, label, hint - the preset rows shown in the pickers. Custom offsets
 # (15m, 1h, 2d…) and "at" still work when typed; "7am" = on-the-day at 07:00,
 # which TickTick stores as a positive trigger and only makes sense on all-day
 # tasks (e.g. the 🔥prepare follow-ups).

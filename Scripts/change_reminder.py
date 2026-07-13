@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-change_reminder.py — Alfred Script Filter
+change_reminder.py - Alfred Script Filter
 Reminder picker for an existing task. Reached from the ⌘ Actions / change-attributes
 menu (conditional after actions.py listens for arg "reminder").
 
@@ -67,7 +67,7 @@ def main():
         vars_    = {"task_list_id": list_id, "task_id": tid}
         frag     = query.strip().lower()
 
-        # ⌃⇧ back must work even on invalid rows — a mod-level valid=True
+        # ⌃⇧ back must work even on invalid rows - a mod-level valid=True
         # overrides the row's valid=False (Alfred ignores action chords on
         # invalid rows; that's why back never fired from "No reminder matching").
         back_mod = {"ctrl": {"valid": True, "arg": "",

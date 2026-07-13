@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""periodic_rows.py — the 💫 pn search scope.
+"""periodic_rows.py - the 💫 pn search scope.
 
 Imported by everything_search.py AFTER its bootstrap, so src/ is already on
-sys.path. Renders: the idle action rows and the submodes — `+` entry (with
-the 😢–😁 mood faces), `$` income, `goal` / `day` task pickers, `today` /
+sys.path. Renders: the idle action rows and the submodes - `+` entry (with
+the 😢-😁 mood faces), `$` income, `goal` / `day` task pickers, `today` /
 `tmrw` schedule pickers (two-screen: pick → add-or-time). All state rides
-the query — no handshake files; ⏎ always fires an xact: arg (the only shape
+the query - no handshake files; ⏎ always fires an xact: arg (the only shape
 search-⏎ forwards to a script). Subtitles stay plain: no syntax in
-subtitles, ever — autocomplete rows teach by doing.
+subtitles, ever - autocomplete rows teach by doing.
 
 Chord rule: the search SF has live mod edges (⌘ Actions chain, ⇧, ⌥,
-⌥⇧ X1 router, ⌥⌘ copy, ⌃⇧ modOpen) — a row with NO mods entry fires its
+⌥⇧ X1 router, ⌥⌘ copy, ⌃⇧ modOpen) - a row with NO mods entry fires its
 DEFAULT arg down every one of them. Every row here carries a full mods dict:
 dead chords everywhere, ⌃⇧ = sticky on the six open rows. ⌘ physically
 routes to the Actions chain and can never reach dispatch.
@@ -37,7 +37,7 @@ _DEAD = {"valid": False, "subtitle": ""}
 
 
 def _mods(sticky_spec=None):
-    # alt+cmd included: the search SF has a wired ⌥⌘ (copy-link) edge — without
+    # alt+cmd included: the search SF has a wired ⌥⌘ (copy-link) edge - without
     # an explicit entry the row's DEFAULT xact: arg would ride it into pbcopy.
     # ⌃ is NOT dead: the wired ⌃ edge is the universal 🔙 back-to-main-menu
     # (every other search row gets it via _output_backstamped).
@@ -87,7 +87,7 @@ def idle_rows(frag):
         p = _period_of(spec, today)
         it = alfred.item(
             uid=f"pn-open-{spec}",
-            title=f"{emoji} {label} — {pm.title(p)}",
+            title=f"{emoji} {label} · {pm.title(p)}",
             subtitle="⏎↗️ Open  ⌃⇧📌 Sticky",
             arg=f"xact:pn_open:{spec}", valid=True,
             mods=_mods(spec))
@@ -177,7 +177,7 @@ def entry_rows(rest):
         return _mood_rows()
     if head.lower() in _KINDS and not tail and head.lower() != "l":
         # bare kind letter (fresh from the legend) → prompt, never a valid
-        # "💭 Thought — w" row an accidental ⏎ would log
+        # "💭 Thought - w" row an accidental ⏎ would log
         return [alfred.item(title=f"Type the {_KINDS[head.lower()]} text…",
                             valid=False, mods=_mods())]
     if head.lower() in _KINDS and (tail or head.lower() == "l"):
@@ -193,7 +193,7 @@ def entry_rows(rest):
                             valid=False, mods=_mods())]
     shown = text or "clipboard contents"
     return [alfred.item(
-        title=f"{_GLYPH[kind]} {kind.capitalize()} — {shown[:60]}",
+        title=f"{_GLYPH[kind]} {kind.capitalize()} · {shown[:60]}",
         subtitle="⏎ Log to today's note",
         arg=f"xact:pn_entry:{_b64({'kind': kind, 'text': text})}",
         valid=True, mods=_mods())]
@@ -266,7 +266,7 @@ def day_goal_rows(frag):
         return alfred.item(
             uid=f"pn-dg-{t['id']}",
             title=f"☀️ {(t.get('title') or 'Untitled')[:60]}",
-            subtitle="⏎ The one thing — pinned + scheduled today",
+            subtitle="⏎ The one thing · pinned + scheduled today",
             arg=f"xact:pn_day_goal:{pid}:{t['id']}",
             valid=True, mods=_mods())
     items = _picker_rows(frag, _task_pool(include_notes=True), row,
@@ -292,7 +292,7 @@ def sched_rows(rest, when):
     if rest.startswith("!"):
         spec, _, frag = rest[1:].partition(" ")
         pid, _, tid = spec.partition(":")
-        if not pid or not tid:            # hand-typed '!' junk — no valid row
+        if not pid or not tid:            # hand-typed '!' junk - no valid row
             return [alfred.item(title="Type to pick a task…",
                                 valid=False, mods=_mods())]
         title = next((t.get("title") for t in (cache_store.get("all_tasks") or [])
@@ -316,7 +316,7 @@ def sched_rows(rest, when):
         else:
             rows.append(alfred.item(
                 title="⏰ At a time",
-                subtitle="Keep typing — like 14:30",
+                subtitle="Keep typing · like 14:30",
                 valid=False, mods=_mods()))
         return rows
 

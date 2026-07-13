@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-display.py — Shared display helpers for Alfred task items.
+display.py - Shared display helpers for Alfred task items.
 
 All task-displaying scripts import from here to ensure consistent
 formatting of titles, subtitles, dates, priority, and breadcrumbs.
@@ -14,7 +14,7 @@ _MD_LINK_RE     = re.compile(r'\[([^\]]*)\]\([^)]*\)')  # [text](url) → text
 _URL_RE         = re.compile(r'https?://\S+')
 _TAG_SUFFIX_RE  = re.compile(r'\s+#\s+\S.*$')           # ' # tag1 tag2…' suffix            # bare URLs
 
-# Priority suffix emojis — appended after the task name in the title field
+# Priority suffix emojis - appended after the task name in the title field
 PRIORITY = {0: "⚫️", 1: "🟡", 3: "🟠", 5: "🔴"}
 
 # ── Modifier vocabulary ───────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ PRIORITY = {0: "⚫️", 1: "🟡", 3: "🟠", 5: "🔴"}
 # key+emoji pairs; each item type advertises only the actions it actually wires.
 MOD_OPEN    = "⏎↗️"      # open in TickTick
 MOD_ADD     = "⌘➕"      # add task / subtask
-MOD_DONE    = "⇧✅"      # complete (one glyph everywhere — matches build_subtitle)
+MOD_DONE    = "⇧✅"      # complete (one glyph everywhere - matches build_subtitle)
 MOD_UNDONE  = "⇧↩️"      # uncomplete
 MOD_BROWSE  = "⌥⤵️"      # drill into children (Alfred)
 MOD_URL     = "⌥⌘🔗"     # copy link
@@ -30,9 +30,9 @@ MOD_ACTIONS = "⌘⚡"      # ⌘ Actions menu (all per-item actions)
 MOD_BACK    = "⌃🔙"      # go back
 MOD_BUFFER  = "⌥⇧🅿️"    # add to the buffer (task/subtask rows only)
 
-# Per-type ordered modifier templates. MOD_BROWSE is conditional — it's
+# Per-type ordered modifier templates. MOD_BROWSE is conditional - it's
 # dropped when the item has no children (nothing to drill into).
-# (the ⌃ task-details view was retired — everything lives in the ⌘ Actions
+# (the ⌃ task-details view was retired - everything lives in the ⌘ Actions
 # menu now.)
 _MOD_TEMPLATES = {
     "task":      [MOD_OPEN, MOD_ADD, MOD_DONE, MOD_BROWSE, MOD_URL, MOD_BACK],
@@ -45,7 +45,7 @@ _MOD_TEMPLATES = {
 
 def mods_for(kind="task", has_children=True):
     """Build the modifier hint line for an item kind, omitting the Browse
-    (⤵️) hint when has_children is False — a drill with no destination."""
+    (⤵️) hint when has_children is False - a drill with no destination."""
     parts = _MOD_TEMPLATES.get(kind, _MOD_TEMPLATES["task"])
     if not has_children:
         parts = [p for p in parts if p != MOD_BROWSE]
@@ -143,20 +143,20 @@ def _tag_label(tag):
 
 
 def fmt_tags(tags):
-    """Render tags as '#🔥Active #🔥Lead' — no space after #, proper case."""
+    """Render tags as '#🔥Active #🔥Lead' - no space after #, proper case."""
     return " ".join(f"#{_tag_label(t)}" for t in (tags or []))
 
 
 def tag_match_key(name):
     """Existence-comparison key for tag names: emoji/symbols stripped +
-    lowercased. Users type 'CRM' for '🔥CRM' — a ➕ Create row must not offer
+    lowercased. Users type 'CRM' for '🔥CRM' - a ➕ Create row must not offer
     a bald duplicate of an emoji-prefixed tag."""
     s = re.sub(r"[^\w\s·-]", "", name or "").strip().lower()
     return s or (name or "").strip().lower()
 
 
 def note_snippet(content, limit=48):
-    """First meaningful description line for the 📝 subtitle marker — focus
+    """First meaningful description line for the 📝 subtitle marker - focus
     checkbox blocks (### date headers, - [ ] lines) don't count as a
     description."""
     for ln in (content or "").splitlines():
@@ -176,7 +176,7 @@ def tag_link(tag):
     (empirically derived 2026-07-05 by clicking a sidebar tag: 🔥crm →
     #t/8J-UpWNybQ/tasks). The Mac app's ticktick:// handler IGNORES tag routes
     (#q/all/tag/…, #t/…, v1/show?tag= all tested dead against the real app),
-    so this must stay an https URL — it opens the logged-in web app.
+    so this must stay an https URL - it opens the logged-in web app.
     """
     import base64
     enc = base64.urlsafe_b64encode(tag.encode()).decode().rstrip("=")
@@ -185,7 +185,7 @@ def tag_link(tag):
 
 def md_links_display(text):
     """DISPLAY-ONLY link rendering: '[name](url)' → '[name]🔗'.
-    Never applied to data — raw titles keep round-tripping through
+    Never applied to data - raw titles keep round-tripping through
     add_task's [[ ]] link syntax and actions.py's Open-link URL counting."""
     return _MD_LINK_RE.sub(r'[\1]🔗', text or "")
 
@@ -193,7 +193,7 @@ def md_links_display(text):
 _BUFFERED_IDS = None
 
 def buffered_ids():
-    """Task ids currently in the 🅿️ buffer (~/.ticktick_alfred/run/tickal_buffer.txt) —
+    """Task ids currently in the 🅿️ buffer (~/.ticktick_alfred/run/tickal_buffer.txt) -
     read once per script invocation, cached for every row after."""
     global _BUFFERED_IDS
     if _BUFFERED_IDS is None:
@@ -263,9 +263,9 @@ def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb=
                 parts += ["⇧✅", MOD_BUFFER]
             parts += [MOD_URL, "⌘⇧➕"]
             if item_type == "Task":
-                parts.append("⌃⇧🎯")   # Start focus — search task rows
+                parts.append("⌃⇧🎯")   # Start focus - search task rows
         else:
-            # Compact set — browse rows; buffer_mod=True only on task rows
+            # Compact set - browse rows; buffer_mod=True only on task rows
             # (⌥⇧🅿️ is a task/subtask-only chord)
             parts = ([MOD_OPEN] + ([MOD_BROWSE] if sub_count else [])
                      + [MOD_ACTIONS] + ([MOD_BUFFER] if buffer_mod else [])
@@ -306,7 +306,7 @@ def list_name_for(list_id, projects_cache):
 
 
 def join_breadcrumb(*parts):
-    """Join non-empty parts with '>' — no spaces. The 'Not Sectioned' pseudo-
+    """Join non-empty parts with '>' - no spaces. The 'Not Sectioned' pseudo-
     section never appears in a breadcrumb: a task without a real section
     shows just its list."""
     return ">".join(p for p in parts

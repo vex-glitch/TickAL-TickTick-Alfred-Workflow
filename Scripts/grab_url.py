@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-grab_url.py — Alfred Run Script
+grab_url.py - Alfred Run Script
 
 Grab the front browser tab's URL + title, build a markdown link, and hand it to
 the Add Task flow as the `prefill_note` session variable. The add window then
 opens "as usual" (empty title for you to type) with the link already sitting in
-the task description — and every follow-up action (time / duration / reminder /
+the task description - and every follow-up action (time / duration / reminder /
 list) still works, because the link rides along as a variable, not as typed text.
 
 Two ways in:
   • Hotkey ▸ [Run Script: grab_url.py] ▸ [Call External Trigger "TT"]
-      — the browser is still frontmost, so its tab is read directly.
+      - the browser is still frontmost, so its tab is read directly.
   • Main menu "Save link / URL" ▸ conditional (arg "URL") ▸ same Run Script
-      — here Alfred is frontmost, so we probe running browsers instead.
+      - here Alfred is frontmost, so we probe running browsers instead.
 
 Run Script config: language /bin/bash, no input needed:
     /opt/homebrew/bin/python3 "Scripts/grab_url.py"
@@ -20,7 +20,7 @@ Call External Trigger: id "TT", passinputasargument ON, passvariables ON.
 
 Cross-browser: Safari family + every Chromium browser (Chrome, Brave, Edge,
 Arc, Vivaldi, Opera, …) via AppleScript. Other browsers (e.g. Firefox) report a
-friendly message in the add window rather than failing silently — no clipboard
+friendly message in the add window rather than failing silently - no clipboard
 or keystroke side effects.
 """
 import json
@@ -133,7 +133,7 @@ def main():
     if url:
         emit({"prefill_note": md_link(url, title)})
     elif family(front) is None and front:
-        emit({"prefill_error": "No browser tab to read — open a page in Safari "
+        emit({"prefill_error": "No browser tab to read · open a page in Safari "
                                "or a Chromium browser (Chrome, Brave, Edge, Arc…)"})
     else:
         emit({"prefill_error": f"Couldn't read the current tab's URL from {front}"})

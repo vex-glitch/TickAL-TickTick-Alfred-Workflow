@@ -1,12 +1,12 @@
 """
-filtering.py — shared filter-matching engine.
+filtering.py - shared filter-matching engine.
 
 Home of the filters_config.py matcher so BOTH the search inline view
 (everything_search.py `f ` scope) and browse.py (ctx:filter:<index>) can use
 it. Extracted from filter_view.py, which was unsafe to import: it monkey-
 patches alfred.output at import time and can sys.exit on import failure.
 
-Pure logic — no Alfred I/O here.
+Pure logic - no Alfred I/O here.
 """
 import calendar
 import json
@@ -36,7 +36,7 @@ def task_local_date(task):
     return utc_str_to_local_date(task.get("startDate") or task.get("dueDate") or "")
 
 
-# ── Smart lists (single source — browse.py and everything_search.py import) ──
+# ── Smart lists (single source - browse.py and everything_search.py import) ──
 SMART_LABELS = {
     "today":     "Today",
     "tomorrow":  "Tomorrow",
@@ -65,7 +65,7 @@ def smart_filter(all_tasks, smartlist):
 # ── Config access ─────────────────────────────────────────────────────────────
 def load_filters():
     """Native TickTick filters first (synced + translated → cache key
-    filters_v2 — zero setup), filters_config.py as the tokenless /
+    filters_v2 - zero setup), filters_config.py as the tokenless /
     power-user fallback. [] if neither exists."""
     try:
         import cache as cache_store
@@ -101,7 +101,7 @@ def _translate_clause(cond, out, projects_by_group):
     if not isinstance(cond, dict):
         return False
     name = cond.get("conditionName")
-    # operator matters: "or" = any-of, "and" = all-of — never conflate them
+    # operator matters: "or" = any-of, "and" = all-of - never conflate them
     is_and = False
     vals = cond.get("or")
     if not vals:
@@ -154,7 +154,7 @@ def _translate_clause(cond, out, projects_by_group):
     elif name == "priority":
         mapped = [_PRIO_API_TO_CFG.get(v, v) for v in vals if isinstance(v, int)]
         ok = len(mapped) == len(vals) and bool(mapped)
-        if mapped:                  # never emit [] — it would match nothing
+        if mapped:                  # never emit [] - it would match nothing
             out["priority"] = mapped
     else:
         return False
@@ -174,7 +174,7 @@ def translate_native(raw_filters, projects):
     for rf in sorted(raw_filters or [], key=lambda x: x.get("sortOrder") or 0):
         f = {"name": rf.get("name") or "Filter"}
         # per-filter isolation: ONE odd rule shape must never freeze the
-        # whole filters_v2 refresh — it degrades to _unsupported instead
+        # whole filters_v2 refresh - it degrades to _unsupported instead
         try:
             rule = json.loads(rf.get("rule") or "{}")
             if not isinstance(rule, dict):
@@ -246,7 +246,7 @@ def filter_criteria_summary(f):
 
 # ── Filter matching ───────────────────────────────────────────────────────────
 def _expand_tags(tag_list):
-    """{lowercase tags} with parent tags expanded to their children — TickTick
+    """{lowercase tags} with parent tags expanded to their children - TickTick
     filter semantics (a filter on a parent tag also matches its children). Uses the
     tags_tree cache via tagtree; falls back to the literal tags."""
     out = set()
@@ -262,7 +262,7 @@ def _expand_tags(tag_list):
 
 
 def matches(task, f, project_name_to_id):
-    # A filter whose rule didn't translate must show NOTHING, not everything —
+    # A filter whose rule didn't translate must show NOTHING, not everything -
     # the picker row carries the ⚠ subtitle, the drill stays honest too.
     if f.get("_unsupported"):
         return False
@@ -273,7 +273,7 @@ def matches(task, f, project_name_to_id):
     next7    = (now + timedelta(days=7)).strftime("%Y-%m-%d")
     next14   = (now + timedelta(days=14)).strftime("%Y-%m-%d")
 
-    # Week boundaries (Mon–Sun)
+    # Week boundaries (Mon-Sun)
     wd = now.weekday()
     week_start      = (now - timedelta(days=wd)).strftime("%Y-%m-%d")
     week_end        = (now + timedelta(days=6 - wd)).strftime("%Y-%m-%d")
@@ -290,7 +290,7 @@ def matches(task, f, project_name_to_id):
 
     DATE_MAP = {"today": today, "tomorrow": tomorrow, "next7days": next7, "next14days": next14}
 
-    # Include — title must contain the string; a LIST means any-of (native
+    # Include - title must contain the string; a LIST means any-of (native
     # "keywords" clauses carry multiple values)
     if f.get("include"):
         inc = f["include"]
@@ -299,7 +299,7 @@ def matches(task, f, project_name_to_id):
         if not any(str(k).lower() in title_l for k in inc):
             return False
 
-    # Tags — ALL must match
+    # Tags - ALL must match
     tags_filter = f.get("tags")
     if tags_filter is not None:
         task_tags = [tg.lower() for tg in (task.get("tags") or [])]
@@ -310,20 +310,20 @@ def matches(task, f, project_name_to_id):
             if not task_tags:
                 return False
         elif tags_filter == "any_or_untagged":
-            pass  # no filtering — tagged or untagged both pass
+            pass  # no filtering - tagged or untagged both pass
         elif isinstance(tags_filter, list):
             # each required tag matches itself OR any of its children
             if not all(set(task_tags) & _expand_tags([tag]) for tag in tags_filter):
                 return False
 
-    # Any tags — at least ONE must match (parents expand to children)
+    # Any tags - at least ONE must match (parents expand to children)
     any_tags_filter = f.get("any_tags")
     if any_tags_filter is not None:
         task_tags = [tg.lower() for tg in (task.get("tags") or [])]
         if not (set(task_tags) & _expand_tags(any_tags_filter)):
             return False
 
-    # Priority — config uses 0=none, 1=low, 2=medium, 3=high, "any"=all
+    # Priority - config uses 0=none, 1=low, 2=medium, 3=high, "any"=all
     # mapped to TickTick API values: 0→0, 1→1, 2→3, 3→5
     priority_filter = f.get("priority")
     if priority_filter is not None and priority_filter != "any":
@@ -332,13 +332,13 @@ def matches(task, f, project_name_to_id):
         if task.get("priority", 0) not in api_priorities:
             return False
 
-    # Projects — "any" skips filter, otherwise match by name
+    # Projects - "any" skips filter, otherwise match by name
     if f.get("projects") and f["projects"] != "any":
         project_ids = {project_name_to_id.get(n.lower()) for n in f["projects"]}
         if task.get("_projectId") not in project_ids:
             return False
 
-    # Project ids — direct id match (native "list"/"listOrGroup" clauses;
+    # Project ids - direct id match (native "list"/"listOrGroup" clauses;
     # rename-proof where names are not). Checks BOTH ids: inbox tasks carry
     # the normalized _projectId "inbox" while the rule stores the real
     # "inbox<uid>" projectId.
@@ -361,7 +361,7 @@ def matches(task, f, project_name_to_id):
         if d:
             return False
 
-    # Shorthand due field — a LIST means any-of (native "dueDate"
+    # Shorthand due field - a LIST means any-of (native "dueDate"
     # clauses OR their values, e.g. overdue-or-today)
     due = f.get("due")
     if due and due != "all":

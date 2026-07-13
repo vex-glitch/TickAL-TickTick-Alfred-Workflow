@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-tt_shortcut.py — trigger TickTick's own global shortcuts from Alfred.
+tt_shortcut.py - trigger TickTick's own global shortcuts from Alfred.
 
 Reads the key combination the user assigned in TickTick → Settings →
 Shortcuts directly from TickTick's preferences (MASShortcut archives)
-and sends the same keystroke via System Events. Self-contained — no
+and sends the same keystroke via System Events. Self-contained - no
 third-party tools required.
 
 $1 = tts:<action>   action ∈ quick_add | mini_window | pomo | sticky
@@ -61,7 +61,7 @@ def read_shortcut(pref_key):
 def fire(pref_key, label=None):
     """Decode the MASShortcut blob for pref_key and send its keystroke via
     System Events. Returns None on success, an error string on failure.
-    Importable (xact.py sticky verb) — accepts ANY hotkey_id_* defaults key,
+    Importable (xact.py sticky verb) - accepts ANY hotkey_id_* defaults key,
     not just the PREF_KEYS aliases."""
     label = label or pref_key
     shortcut = read_shortcut(pref_key)

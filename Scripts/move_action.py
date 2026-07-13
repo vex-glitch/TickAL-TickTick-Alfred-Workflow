@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-move_action.py — Alfred Run Script
+move_action.py - Alfred Run Script
 Moves a task to a different list, section, or parent task.
 
 $1 format (built by Arg and Vars node: {task_list_id}:{task_id}:{query}):
@@ -48,7 +48,7 @@ def _update_temp(pid, tid):
         pass
 
 
-# all_tasks + per-list project_data mirror — dispatch's helper also purges the
+# all_tasks + per-list project_data mirror - dispatch's helper also purges the
 # task from the OLD list's cache and injects it into the new one on a move.
 from dispatch import _patch_task_cache
 

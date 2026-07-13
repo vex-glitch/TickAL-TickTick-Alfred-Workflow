@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-change_tag_picker.py — Alfred Script Filter
+change_tag_picker.py - Alfred Script Filter
 Tag picker for adding a tag to a task.
 Reads task_id, task_list_id from env vars.
 Outputs arg: attr_tag:{list_id}:{task_id}:{tag_name}
@@ -48,7 +48,7 @@ def main():
             pass
 
     try:
-        # ⌘⇧ back must work even on invalid rows — a mod-level valid=True
+        # ⌘⇧ back must work even on invalid rows - a mod-level valid=True
         # overrides the row's valid=False (Alfred ignores action chords on
         # invalid rows). This picker's back leads to the tag manager.
         back_mod = {"ctrl": {"valid": True, "arg": "",
@@ -57,7 +57,7 @@ def main():
                                                 "task_id": tid}}}
 
         tags = cache_store.get("tags") or cfg.get_tags()
-        # 🔥CRM: the change picker offers only the booking tags — same scoping
+        # 🔥CRM: the change picker offers only the booking tags - same scoping
         # as the CRM add window's # picker. Truthiness
         # guard: with CRM unconfigured (CRM_ID "") an empty list_id must fall
         # through to the parent-drill branch, not CRM-scope the picker.
@@ -76,10 +76,10 @@ def main():
                 tags = list(tags) + [p for p in tagtree.parent_labels()
                                      if p.lower() not in known]
         if not tags and not query:
-            # a typed query still reaches the ➕ new-tag row below — the empty
+            # a typed query still reaches the ➕ new-tag row below - the empty
             # cache must not dead-end coining the very first tag
             print(alfred.output([alfred.item(
-                title="No tags cached — run sync first",
+                title="No tags cached · run sync first",
                 valid=False,
                 mods=back_mod,
             )], skipknowledge=True))
@@ -93,7 +93,7 @@ def main():
             if tag.lower() == old_tag.lower():
                 continue  # skip replacing with the same tag (cache labels are cased)
             if list_id != areas.CRM_ID and tagtree.is_parent(tag):
-                # drill row: never assignable — bar becomes the parent name,
+                # drill row: never assignable - bar becomes the parent name,
                 # the next render lists its children
                 it = alfred.item(title=f"#{tag}", subtitle="⏎ show child tags  ⌃ 🔙",
                                  arg="", valid=False, mods=back_mod,
@@ -129,7 +129,7 @@ def main():
 
         if not items:
             items.append(alfred.item(
-                title=f'No tags matching "{query}"' if query else "No tags — run Sync first",
+                title=f'No tags matching "{query}"' if query else "No tags · run Sync first",
                 subtitle="⌃ 🔙",
                 arg="",
                 valid=True,

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-add_task.py — Alfred Script Filter
+add_task.py - Alfred Script Filter
 Natural language task creation with live sub-pickers.
 
 Syntax:  Buy milk *tomorrow @08:30 !2 #shopping ~Personal
-  *  → date      (parsedatetime — natural language)
+  *  → date      (parsedatetime - natural language)
   @  → time      (24h dropdown: hour → minute 00/15/30/45)
   !  → priority  1=low  2=medium  3=high
   #  → tag       (sub-picker from cache)
@@ -57,16 +57,16 @@ PRIORITY_OPTIONS = [
 PRIORITY_VAL = {"1": 1, "2": 3, "3": 5}
 PRIORITY_LABEL = {1: "🟡", 3: "🟠", 5: "🔴"}
 
-# 🔥CRM — the bookings list. Adds targeting it auto-attach a clipboard image
+# 🔥CRM - the bookings list. Adds targeting it auto-attach a clipboard image
 # (except 🔥prepare follow-ups) and scope the [[ task-link picker to CRM bookings.
 import areas as _areas
 CRM_ID = _areas.CRM_ID   # Configure panel; empty = CRM scoping never triggers
 PREPARE_TAG = "🔥prepare"
 
-# &repeat presets — token, label, hint, RRULE
+# &repeat presets - token, label, hint, RRULE
 REPEAT_OPTIONS = [
     ("daily",    "Daily",    "every day",                  "RRULE:FREQ=DAILY"),
-    ("weekdays", "Weekdays", "Mon–Fri",                    "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
+    ("weekdays", "Weekdays", "Mon-Fri",                    "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
     ("weekly",   "Weekly",   "same weekday every week",    "RRULE:FREQ=WEEKLY"),
     ("monthly",  "Monthly",  "same day every month",       "RRULE:FREQ=MONTHLY"),
     ("yearly",   "Yearly",   "same date every year",       "RRULE:FREQ=YEARLY"),
@@ -104,12 +104,12 @@ def find_active_trigger(query):
     for *date: always open so user can type multi-word dates).
     ~ is special: bare ~frag is the location menu; ~p / ~l / ~s followed by
     a space stay open for the corresponding sub-picker fragment.
-    Everything after the = note marker is opaque — no triggers inside a note.
+    Everything after the = note marker is opaque - no triggers inside a note.
     Returns (trigger, prefix_before_trigger, fragment_after_trigger) or None.
     """
     m = re.search(r'(?<!\S)=', query)
     scan = query[:m.start()] if m else query
-    # [[ task-link picker — active while an unclosed [[ is being typed (no ]] after
+    # [[ task-link picker - active while an unclosed [[ is being typed (no ]] after
     # the last [[). Takes priority since the user is mid-link; closes once ]] lands.
     idx = scan.rfind('[[')
     if idx != -1 and ']]' not in scan[idx + 2:]:
@@ -126,11 +126,11 @@ def find_active_trigger(query):
         if ch == '~':
             sub = re.match(r'[pls] (.*)$', fragment)
             if sub:
-                # Sub-picker mode (~p / ~l / ~s) — closed once the name is picked
+                # Sub-picker mode (~p / ~l / ~s) - closed once the name is picked
                 if ' ' in sub.group(1):
                     return None
                 return (ch, prefix, fragment)
-            # Location menu — single word filter
+            # Location menu - single word filter
             if ' ' in fragment:
                 return None
             return (ch, prefix, fragment)
@@ -147,8 +147,8 @@ def parse_task(query):
     """Extract structured fields from the raw query string."""
     q = query
 
-    # =note — everything after the marker to end of string (always last).
-    # re.S: a pasted note may contain newlines (⌘V of multi-line text) — without
+    # =note - everything after the marker to end of string (always last).
+    # re.S: a pasted note may contain newlines (⌘V of multi-line text) - without
     # it the match dies on the first \n and the whole bar becomes the title.
     note = None
     m = re.search(r'(?<!\S)=\s*(.*)$', q, re.S)
@@ -156,7 +156,7 @@ def parse_task(query):
         note = m.group(1).strip() or None
         q = q[:m.start()]
 
-    # ^attach-image flag — a standalone marker (no value) set by the / menu's
+    # ^attach-image flag - a standalone marker (no value) set by the / menu's
     # "Add image" row; on create, dispatch uploads the clipboard image to the
     # new task. Stripped from the pre-note text only (a literal ^ inside a =note
     # stays put). All occurrences are removed so re-selecting can't leave a stray.
@@ -164,10 +164,10 @@ def parse_task(query):
     attach_image = n_attach > 0
     q = new_q
 
-    # +stage / +focus — standalone post-create markers set by the / menu:
+    # +stage / +focus - standalone post-create markers set by the / menu:
     # dispatch stages the new task / adds it to the running focus
     # session right after the create lands. Stripped like ^ above.
-    # (?=\s|$) not \b — \b matches before punctuation and would strip a
+    # (?=\s|$) not \b - \b matches before punctuation and would strip a
     # legitimate "+stage:" / "+stage-two" out of a title
     new_q, n_stage = re.subn(r'(?<!\S)\+stage(?=\s|$) ?', '', q)
     q = new_q
@@ -190,7 +190,7 @@ def parse_task(query):
         q = q[:m.start()] + q[m.end():]
 
     # ~l list (multi-word). The capture runs to the next trigger char or end of
-    # string — so when the TITLE follows the list name ("#tag ~l 🔥CRM buy milk",
+    # string - so when the TITLE follows the list name ("#tag ~l 🔥CRM buy milk",
     # tokens-first order) it swallows the title too (the historic "~l trap").
     # Trim the span word-by-word until it resolves to a real list; whatever is
     # left goes back to the title.
@@ -228,35 +228,35 @@ def parse_task(query):
         priority = PRIORITY_VAL[m.group(1)]
         q = q[:m.start()] + q[m.end():]
 
-    # *date — greedily takes everything to next trigger or end (stops at @)
+    # *date - greedily takes everything to next trigger or end (stops at @)
     date_str = None
     m = re.search(r'(?<!\S)\*(.+?)(?=\s*[~#!/>@=&%]|$)', q)
     if m:
         date_str = m.group(1).strip()
         q = q[:m.start()] + q[m.end():]
 
-    # @time — HH:MM explicit time picker result
+    # @time - HH:MM explicit time picker result
     time_str = None
     m = re.search(r'(?<!\S)@(\d{1,2}:\d{2})\b', q)
     if m:
         time_str = m.group(1).strip()
         q = q[:m.start()] + q[m.end():]
 
-    # >end — duration end time (14 or 14:30), set via duration picker
+    # >end - duration end time (14 or 14:30), set via duration picker
     end_str = None
     m = re.search(r'(?<!\S)>(\d{1,2}(?::\d{2})?)(?=\s|$)', q)
     if m:
         end_str = m.group(1)
         q = q[:m.start()] + q[m.end():]
 
-    # &repeat — preset token (daily/weekdays/weekly/monthly/yearly)
+    # &repeat - preset token (daily/weekdays/weekly/monthly/yearly)
     repeat = None
     m = re.search(r'(?<!\S)&(\S+)', q)
     if m:
         repeat = m.group(1).lower()
         q = q[:m.start()] + q[m.end():]
 
-    # %reminder — preset/offset tokens (multiple allowed); resolved to TRIGGER later
+    # %reminder - preset/offset tokens (multiple allowed); resolved to TRIGGER later
     reminders = []
     while True:
         m = re.search(r'(?<!\S)%(\S+)', q)
@@ -335,7 +335,7 @@ def list_picker(fill, fragment, lists=None):
     return items
 
 
-# 🔥CRM tag group — a CRM add's # picker offers only the booking tags
+# 🔥CRM tag group - a CRM add's # picker offers only the booking tags
 CRM_TAGS = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
 
 def tag_picker(prefix, fragment):
@@ -345,10 +345,10 @@ def tag_picker(prefix, fragment):
     crm_scoped = (bool(CRM_ID) and os.environ.get("list_id", "") == CRM_ID) \
         or "🔥CRM" in prefix
 
-    # '#name>pfrag' — parent step of ➕ new tag: pick which existing
+    # '#name>pfrag' - parent step of ➕ new tag: pick which existing
     # tag the new one nests under; the token '#name>parent' rides the query
     # and task_preview splits it into payload tags + _tag_parents. Never on
-    # a locked CRM picker — its tag family is fixed.
+    # a locked CRM picker - its tag family is fixed.
     if ">" in fragment and not crm_scoped:
         base, _, pfrag = fragment.partition(">")
         base = (base.strip().lstrip("#")
@@ -369,7 +369,7 @@ def tag_picker(prefix, fragment):
         return rows or [alfred.item(
             title=f'No parent matching "{pfrag.strip()}"', valid=False)]
     # CRM adds (env list from the CRM window, or a typed ~l 🔥CRM) scope the
-    # picker to the CRM tag group — nothing else belongs on a booking.
+    # picker to the CRM tag group - nothing else belongs on a booking.
     if crm_scoped:
         crm_lc = {c.lower() for c in CRM_TAGS}
         scoped = [t for t in tags if t.lower() in crm_lc]
@@ -400,7 +400,7 @@ def tag_picker(prefix, fragment):
         ))
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
-        # ➕ new tag: no match → two rows, like scheduling — plain,
+        # ➕ new tag: no match → two rows, like scheduling - plain,
         # or pick a parent first. Matching is emoji-stripped (typing CRM must
         # count as existing when 🔥CRM does). Created at save time (v2).
         frag_tag = (fragment.strip().lstrip("#")
@@ -420,7 +420,7 @@ def tag_picker(prefix, fragment):
                 autocomplete=f"{prefix}#{frag_tag}>",
             ))
     if not tags and not fragment:
-        items = [alfred.item(title="No tags cached — run Sync first", valid=False)]
+        items = [alfred.item(title="No tags cached · run Sync first", valid=False)]
     elif not items:
         items = [alfred.item(title=f'No tags matching "{fragment}"', valid=False)]
     return items
@@ -467,7 +467,7 @@ def section_picker(fill, fragment, current_list_id=None):
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     if not items:
-        msg = f'No sections matching "{fragment}"' if fragment else "No sections cached — run Sync first"
+        msg = f'No sections matching "{fragment}"' if fragment else "No sections cached · run Sync first"
         items = [alfred.item(title=msg, valid=False)]
     return items
 
@@ -502,7 +502,7 @@ def task_picker(fill, fragment):
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     if not items:
-        msg = f'No tasks matching "{fragment}"' if fragment else "No tasks cached — run Sync first"
+        msg = f'No tasks matching "{fragment}"' if fragment else "No tasks cached · run Sync first"
         items = [alfred.item(title=msg, valid=False)]
     return items
 
@@ -551,7 +551,7 @@ def link_picker(prefix, fragment, scope_list_id=None):
     if not items:
         what = "CRM bookings" if crm else "tasks"
         msg = (f'No {what} matching "{fragment}"' if fragment
-               else f"No {what} cached — run Sync first")
+               else f"No {what} cached · run Sync first")
         items = [alfred.item(title=msg, valid=False)]
     return items
 
@@ -562,7 +562,7 @@ def date_picker(prefix, fragment):
     frag_lower = fragment.lower().strip() if fragment else ""
     typing     = bool(frag_lower)   # True when user has typed something
 
-    # Custom free-typed date — shown first when typing
+    # Custom free-typed date - shown first when typing
     if fragment and fragment.strip():
         resolved_frag = parse_date(fragment)
         if resolved_frag:
@@ -574,7 +574,7 @@ def date_picker(prefix, fragment):
                 arg="", valid=False, autocomplete=filled,
             ))
 
-    # Shortcut list — filter by fragment against parse string, label, and extra tags
+    # Shortcut list - filter by fragment against parse string, label, and extra tags
     seen_iso = set()
     for shortcut in shortcuts:
         parse_str, label = shortcut[0], shortcut[1]
@@ -585,7 +585,7 @@ def date_picker(prefix, fragment):
         resolved = parse_date(parse_str)
         if not resolved:
             continue
-        # Deduplicate by date — first shortcut for a given date wins
+        # Deduplicate by date - first shortcut for a given date wins
         # (keeps "In 3 Days" and bumps any later entry on the same date)
         if resolved in seen_iso:
             continue
@@ -607,7 +607,7 @@ def date_picker(prefix, fragment):
     return items
 
 def _hour_ampm(h):
-    """Return a 12h AM/PM label for a 0–23 hour integer."""
+    """Return a 12h AM/PM label for a 0-23 hour integer."""
     if h == 0:   return "12 AM"
     if h < 12:   return f"{h} AM"
     if h == 12:  return "12 PM"
@@ -617,7 +617,7 @@ def time_picker(prefix, fragment):
     """Show hour dropdown (no colon in fragment) or minute dropdown (colon present)."""
     items = []
     if ':' not in fragment:
-        # Hour selection — show 00–23, filtered by whatever the user typed so far
+        # Hour selection - show 00-23, filtered by whatever the user typed so far
         frag = fragment.strip()
         frag_int = int(frag) if frag.isdigit() else None
 
@@ -640,7 +640,7 @@ def time_picker(prefix, fragment):
                 autocomplete=filled,
             ))
     else:
-        # Minute selection — always show all four options for the chosen hour
+        # Minute selection - always show all four options for the chosen hour
         hour_part = fragment.split(':')[0]
         try:
             h = int(hour_part)
@@ -660,7 +660,7 @@ def time_picker(prefix, fragment):
     if not items:
         items = [alfred.item(
             title=f'No hours matching "{fragment}"',
-            subtitle="Type 0–23",
+            subtitle="Type 0-23",
             valid=False,
         )]
     return items
@@ -685,7 +685,7 @@ def symbol_legend(has_date=False, note_mode=False):
 
 # ── Container context (Add invoked on a specific list/section/task) ───────────
 def _adding_to_container():
-    """True when Add was invoked on a specific item via ⌘ Actions — the item's
+    """True when Add was invoked on a specific item via ⌘ Actions - the item's
     type rides in as item_type (the master add keyword never sets it). Then we're
     adding INTO that list/section/task, not choosing what to create at top level."""
     return bool(os.environ.get("item_type", "").strip())
@@ -749,14 +749,14 @@ def mode_menu(fragment):
 
 def _fx_running():
     """True when a task-bound focus session runs (timer file, or pomo sidecar
-    validated against the app's LIVE pomo state — a stale sidecar file must
+    validated against the app's LIVE pomo state - a stale sidecar file must
     not fake a session). Gates the / menu's post-create 'Add to focus' row."""
     try:
         import xact
         if xact._current_focus_task():
             return True
         # _pomo_sidecar self-validates against the app's live pomo state and
-        # drops the file when idle — no extra probe needed
+        # drops the file when idle - no extra probe needed
         ps = xact._pomo_sidecar()
         return bool(ps and ps.get("tid"))
     except Exception:
@@ -765,7 +765,7 @@ def _fx_running():
 
 def _fx_probe():
     """Cheap per-keystroke session probe for the preview chords:
-    _fx_running()'s pomo self-validation shells out to `defaults` (~150 ms) —
+    _fx_running()'s pomo self-validation shells out to `defaults` (~150 ms) -
     too hot for a path that re-renders on every character. Timer file first,
     then the RAW sidecar file. A stale sidecar only mislabels the ⌘ chord;
     dispatch's fx_add no-session guard stays honest at ⏎ time."""
@@ -782,7 +782,7 @@ def _fx_probe():
 
 def master_menu(prefix, fragment, note_mode=False):
     """Typing / shows every add-on as a menu row. Selecting one autocompletes
-    its symbol into the query — the menu doubles as a syntax reference. With no
+    its symbol into the query - the menu doubles as a syntax reference. With no
     task name yet (and not in note mode) it instead offers the creation modes."""
     if not note_mode and not prefix.strip() and not _adding_to_container():
         return mode_menu(fragment)
@@ -793,7 +793,7 @@ def master_menu(prefix, fragment, note_mode=False):
     if note_mode:
         rows.append(("*", "📅", "Date", "natural language"))
         if not date_str:
-            # One-pick today/tomorrow — plain *date shortcuts,
+            # One-pick today/tomorrow - plain *date shortcuts,
             # the 💫 daily note pulls them in on its next refresh
             rows.append(("*today ", "☀️", "Today", "due today"))
             rows.append(("*tomorrow ", "🌙", "Tomorrow", "due tomorrow"))
@@ -864,7 +864,7 @@ def location_router(prefix, fragment, lists=None, note_mode=False):
             return task_picker(fill, frag)
         if mode == 'l':
             return list_picker(fill, frag, lists=lists)
-        # mode == 's' — use the already-chosen list to narrow sections
+        # mode == 's' - use the already-chosen list to narrow sections
         ln = parse_task(prefix)[6]
         cur_lid = None
         if ln:
@@ -933,7 +933,7 @@ def duration_picker(prefix, fragment):
     sh, sm = (int(x) for x in time_str.split(":"))
     frag = fragment.strip()
 
-    # Length syntax: 2h, 90m, 1h30 — resolves to an end time
+    # Length syntax: 2h, 90m, 1h30 - resolves to an end time
     m = re.match(r'^(\d+)h(\d+)?m?$|^(\d+)m$', frag)
     if m:
         if m.group(3):                      # pure minutes: 90m
@@ -952,7 +952,7 @@ def duration_picker(prefix, fragment):
 
     items = []
     if ':' not in frag:
-        # End-hour list — same day, from the start hour onward
+        # End-hour list - same day, from the start hour onward
         for h in range(sh, 24):
             hh = f"{h:02d}"
             if frag and not (hh.startswith(frag) or str(h).startswith(frag)):
@@ -1023,8 +1023,8 @@ def reminder_picker(prefix, fragment):
     frag = fragment.strip().lower()
 
     # Any typed token that resolves to a trigger → one direct row (covers free-typed
-    # offsets like 45m/2h AND preset tokens like 2d/7d/7am whose labels — "Two days
-    # before", "Week before", "Day of · 7am" — don't contain the token to fuzzy on).
+    # offsets like 45m/2h AND preset tokens like 2d/7d/7am whose labels - "Two days
+    # before", "Week before", "Day of · 7am" - don't contain the token to fuzzy on).
     if frag and _reminder_trigger(frag):
         return [alfred.item(
             title=f"🔔 {_reminder_human(frag)}",
@@ -1053,10 +1053,10 @@ def reminder_picker(prefix, fragment):
 def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, section_display=None):
     """
     Returns the notification string for a task creation, potentially two lines:
-      Line 1 — action label  ("Subtask added" / "Task added to {Section}" / etc.)
-      Line 2 — breadcrumb path  ("{List} › {Section} › {Parent task} › …")
+      Line 1 - action label  ("Subtask added" / "Task added to {Section}" / etc.)
+      Line 2 - breadcrumb path  ("{List} › {Section} › {Parent task} › …")
     """
-    # Section name — explicit override, then env var, then cache lookup
+    # Section name - explicit override, then env var, then cache lookup
     section_name = section_display or os.environ.get("section_name", "")
     if (not section_name
             and env_section_id
@@ -1116,7 +1116,7 @@ def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, 
 
 
 def _split_tag_parents(tags):
-    """'name>parent' picker tokens → (clean names, {name_lower: parent}) —
+    """'name>parent' picker tokens → (clean names, {name_lower: parent}) -
     the ➕ new-tag parent step rides the query as one token."""
     names, parents = [], {}
     for t in (tags or []):
@@ -1144,7 +1144,7 @@ def task_preview(query):
 
     # A tag pre-applied by the CRM tag-drill (⌘ add-with-tag) rides in like the
     # note prefill; merge it into the parsed tags so the chip + payload include it.
-    # Split BEFORE the prefill merge — dedup must compare clean names, not
+    # Split BEFORE the prefill merge - dedup must compare clean names, not
     # raw 'name>parent' tokens.
     tags, tag_parents = _split_tag_parents(tags)
     pre_tag = os.environ.get("prefill_tag", "").strip()
@@ -1178,7 +1178,7 @@ def task_preview(query):
         else:
             list_display = next((p["name"] for p in lists if p["id"] == env_list_id), "")
 
-    # Resolve >section — search the already-known list first, then all lists
+    # Resolve >section - search the already-known list first, then all lists
     section_id      = None
     section_display = None
     if section_name:
@@ -1201,7 +1201,7 @@ def task_preview(query):
             if section_id:
                 break
 
-    # Resolve /parent_task — explicit choice overrides env task_id
+    # Resolve /parent_task - explicit choice overrides env task_id
     parent_id      = None
     parent_display = None
     if parent_name:
@@ -1228,7 +1228,7 @@ def task_preview(query):
     # Effective parent: explicit /task choice wins over env
     effective_parent_id = parent_id or env_task_id
 
-    # CRM bookings auto-attach the clipboard image (the reference-image step) — but
+    # CRM bookings auto-attach the clipboard image (the reference-image step) - but
     # never the 🔥prepare follow-up. Manual ^ / 🖼️ Add image still works elsewhere.
     if (list_id == CRM_ID and PREPARE_TAG not in {t.lower() for t in tags}
             and not attach_image and clip_util.has_image()):
@@ -1243,7 +1243,7 @@ def task_preview(query):
         combined_date_str = date_str
     due_date = parse_date(combined_date_str)
 
-    # >end — duration: startDate = due_date, dueDate = end of the span
+    # >end - duration: startDate = due_date, dueDate = end of the span
     end_date = None
     end_norm = _normalize_end(end_str) if end_str else None
     if end_norm and time_str and due_date:
@@ -1303,7 +1303,7 @@ def task_preview(query):
     if "[[" in title:
         parts.append("🔗 linked")
     # A CRM booking's post-create slot belongs to the Prepare window
-    # (dispatch's _crm_chained wins) — advertising the focus chords there
+    # (dispatch's _crm_chained wins) - advertising the focus chords there
     # would promise a step that gets silently dropped.
     _crm_book = bool(CRM_ID and list_id == CRM_ID
                      and {t.lower() for t in tags} & _areas.BOOKING_TAGS)
@@ -1371,7 +1371,7 @@ def task_preview(query):
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
 
     # Focus chords on the preview row: ⌘ chains the new task into the
-    # focus world — running session → fx_add, idle → the ⏱/🍅 start flow —
+    # focus world - running session → fx_add, idle → the ⏱/🍅 start flow -
     # and ⇧⌘ stages it. Each chord rides its own payload copy; the typed
     # +stage/+focus markers stay untouched on plain ⏎. Bookings get honest
     # disabled chords instead (the Prepare chain owns the post-create slot).
@@ -1410,7 +1410,7 @@ def task_preview(query):
 
     # Offer the next scheduling step as a selectable row (mirrors reschedule.py
     # Screen 2): once a date is set, surface "Add time"; once a time is set,
-    # "Add duration" — each drops into the existing @ / > picker. Skipped when a
+    # "Add duration" - each drops into the existing @ / > picker. Skipped when a
     # =note is present (the trigger would land after the opaque note text). Date
     # entry stays on the * picker.
     if not note:
@@ -1481,7 +1481,7 @@ def note_preview(query):
                     section_display = col.get("name", section_name)
                     break
 
-    # Resolve /parent — search notes only (tasks in NOTE-type projects)
+    # Resolve /parent - search notes only (tasks in NOTE-type projects)
     parent_id      = None
     parent_display = None
     if parent_name:
@@ -1504,7 +1504,7 @@ def note_preview(query):
 
     effective_parent_id = parent_id or env_task_id
 
-    # Scheduling — notes support dates/duration/repeat/reminders too (verified via
+    # Scheduling - notes support dates/duration/repeat/reminders too (verified via
     # API). Same computation as task_preview.
     if date_str and time_str:
         combined_date_str = f"{date_str} {time_str}"
@@ -1603,7 +1603,7 @@ def note_preview(query):
 
     # Focus chords, note parity: the ⌘ Actions menu already offers
     # 🎯 Focus / Add-to-focus / Stage on notes, so the preview chords mirror
-    # the task path — same payload-copy trick (without the copies, the new
+    # the task path - same payload-copy trick (without the copies, the new
     # canvas edges would fire the plain create silently on a chorded ⏎).
     p_cmd = dict(payload)
     if _fx_probe():
@@ -1661,7 +1661,7 @@ def list_create_items(name):
     payload = {"name": name}
     encoded = base64.b64encode(json.dumps(payload).encode()).decode()
     # Chorded ⏎ must NOT silently fall through the ⌘/⇧⌘ canvas edges
-    # and create the list anyway — the focus chords are a preview-row thing.
+    # and create the list anyway - the focus chords are a preview-row thing.
     _no_chord = {"cmd": {"valid": False, "subtitle": ""},
                  "cmd+shift": {"valid": False, "subtitle": ""}}
     return [alfred.item(
@@ -1675,10 +1675,10 @@ def list_create_items(name):
 
 # ── Tag creation mode (the T scope; two-step like the schedule flow) ────────
 def tag_create_items(fragment):
-    """'T <name>' → exactly TWO rows: ➕ create top-level, or 🪆 nest — ⏎ on
+    """'T <name>' → exactly TWO rows: ➕ create top-level, or 🪆 nest - ⏎ on
     nest autocompletes 'T <name>>' and only THEN the parent list appears,
     text after the '>' filtering it (a flat all-at-once parent list
-    couldn't be filtered). The arg is xact:tag_create:<b64> —
+    couldn't be filtered). The arg is xact:tag_create:<b64> -
     dispatch grew an xact: passthrough for it (its raw-URL fallback would
     open() the arg)."""
     import tagtree
@@ -1762,7 +1762,7 @@ def tag_create_items(fragment):
 AREA_RE = re.compile(r"^([0-9]️?⃣)")
 
 def get_area_tags():
-    """Area tags — entries starting with a keycap number. Delegates to
+    """Area tags - entries starting with a keycap number. Delegates to
     areas.area_tags(): synced tags cache first (v2 tree / config /
     discovered)."""
     return _areas.area_tags()   # [("1️⃣Work", "1️⃣"), …]
@@ -1801,7 +1801,7 @@ def project_create_items(name):
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
-# Back is ⌃ everywhere — stamp the ⌃ back-mod on every emitted row
+# Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
 # Opened on a TASK (add-subtask from ⌘ Actions) → ⌃ returns to that
 # task's Actions menu instead of the main menu. The ⌃ wire is hardcoded to

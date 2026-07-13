@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-main_menu.py — Alfred Script Filter
+main_menu.py - Alfred Script Filter
 Main entry point for the TickTick workflow.
 Replaces the static List Filter to enable modifier key support on Calendar.
 
@@ -13,7 +13,7 @@ Args passed to Alfred (routed by conditional ▷50F14423):
   update   → ET Update
   open:*   → open the URL (Statistics row)
   tts:*    → tt_shortcut.py (TickTick's own global shortcuts)
-(the old View/Filters and Drill entries were retired — search's v / f scopes
+(the old View/Filters and Drill entries were retired - search's v / f scopes
 and ⌥ drilling replaced them.)
 """
 import sys
@@ -109,7 +109,7 @@ def build_items():
             subtitle=_focus_subtitle(),
             arg="focus",
         ),
-        # Periodic below Focus — reachable from the main list.
+        # Periodic below Focus - reachable from the main list.
         # arg "periodic" → conditional branch → runscript fires ET Search
         # prefilled "pn ".
         alfred.item(
@@ -137,7 +137,7 @@ def build_items():
             arg="open:https://ticktick.com/webapp/#statistics/overview",
         ),
         # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) were
-        # retired — they only re-fired TickTick's own global shortcuts, and
+        # retired - they only re-fired TickTick's own global shortcuts, and
         # the task-bound sticky/pomo in ⌘ Actions are better. tt_shortcut.py
         # stays (xact sticky imports its decoder).
         alfred.item(
@@ -156,8 +156,8 @@ def main():
     import re
     query = stripped if re.search(r'[a-zA-Z0-9]', stripped) else ""
 
-    # A picker's ⌃ that should land on a task's ⌘ Actions menu — not
-    # here — rides in as menu_return (the ⌃ canvas wire only knows MainMenu).
+    # A picker's ⌃ that should land on a task's ⌘ Actions menu - not
+    # here - rides in as menu_return (the ⌃ canvas wire only knows MainMenu).
     # Honor it: act-again on the task and get out of the way.
     ret = os.environ.get("menu_return", "")
     if ret and ":" in ret:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-change_tag_exec.py — Alfred Run Script
+change_tag_exec.py - Alfred Run Script
 Replaces one tag with another on a task.
 $1 format: pid:tid:old_tag:new_tag  (built by Arg and Vars node)
 """
@@ -35,7 +35,7 @@ def main():
         api     = TickTickAPI(cfg.get_token())
         current = cache_store.find_task(tid) or api.get_task(pid, tid)
         tags    = current.get("tags") or []
-        # Remove old tag, add new tag, preserve everything else. Lowercase —
+        # Remove old tag, add new tag, preserve everything else. Lowercase -
         # TickTick's server-side tag-name case (labels keep theirs).
         updated = _norm_tags([t for t in tags if t.lower() != old_tag.lower()]
                              + [new_tag])
@@ -48,7 +48,7 @@ def main():
             print(f"{task_title} #{old_tag} → #{new_tag}")
         else:
             print(f"{task_title} tagged #{new_tag}")
-        # Act-again: reopen ⌘ Actions with fresh values — the change path
+        # Act-again: reopen ⌘ Actions with fresh values - the change path
         # bypasses dispatch's ACT_AGAIN tail (it ends on ET End), so the
         # executor loops itself, same as the other *_action.py executors.
         reopen_actions(pid, tid)

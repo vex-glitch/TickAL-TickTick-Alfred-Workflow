@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-delete_action.py — Alfred Run Script
+delete_action.py - Alfred Run Script
 Deletes a task using task_id and task_list_id from env vars.
 Called from the Change Attributes → Delete Task flow.
 """
@@ -40,13 +40,13 @@ if tid == "BUFFER":
             except Exception:
                 pass
         open(run_path("tickal_buffer.txt"), "w").close()
-        print(f"🅿️ {done} tasks deleted — they're in TickTick's Trash")
+        print(f"🅿️ {done} tasks deleted · they're in TickTick's Trash")
     except Exception as e:
         print(f"Delete failed: {e}")
         sys.exit(1)
     sys.exit(0)
 
-# Deleting a LIST — reached only via the typed-confirm row in the
+# Deleting a LIST - reached only via the typed-confirm row in the
 # ⌘ menu ("delete list yes"). Tasks land in TickTick's Trash.
 if os.environ.get("item_type", "") == "list":
     lname = os.environ.get("list_name", "") or task_title
@@ -73,7 +73,7 @@ if os.environ.get("item_type", "") == "list":
             cache_store.invalidate(f"project_data_{pid}")
         except Exception:
             cache_store.invalidate("all_tasks")
-        print(f"{lname} deleted — tasks are in TickTick's Trash")
+        print(f"{lname} deleted · tasks are in TickTick's Trash")
     except Exception as e:
         print(f"Delete failed: {e}")
         sys.exit(1)

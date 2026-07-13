@@ -1,4 +1,4 @@
-"""script_base.py — shared bootstrap + Alfred emitters for Scripts/*.py.
+"""script_base.py - shared bootstrap + Alfred emitters for Scripts/*.py.
 
 Kills the copy-pasted per-script header (fallback emit/emit_error defs plus the
 SCRIPT_DIR/WORKFLOW_DIR/SRC_DIR sys.path block). Every script now opens with a
@@ -17,7 +17,7 @@ Failure property (the whole point of the old inline pattern, preserved here):
 Alfred must receive valid JSON even when src/ imports explode.
 
 * script_base imports NOTHING outside the stdlib, so `from script_base import…`
-  can only fail if src/ itself is missing/unreadable — and the stanza's inline
+  can only fail if src/ itself is missing/unreadable - and the stanza's inline
   `except` covers exactly that case with a hand-rolled JSON print (that print is
   the only fallback code left in each script; Run-Script nodes use a plain-text
   `print(f"Path error: {e}")` variant instead, matching their old channel).
@@ -25,7 +25,7 @@ Alfred must receive valid JSON even when src/ imports explode.
   messages are script-specific ("Import failed: {e}", "| SRC_DIR=…", etc.) and
   by the time they run, script_base's emit_error is safely importable.
 
-sys.path after bootstrap(): [SRC_DIR, SRC_DIR/lib, <Scripts/ auto-entry>, …] —
+sys.path after bootstrap(): [SRC_DIR, SRC_DIR/lib, <Scripts/ auto-entry>, …] -
 the exact order the old per-script header produced (src shadows lib). bootstrap
 is idempotent: it removes any pre-existing entries (including the stanza's own
 src insert) before re-inserting, so repeated calls can't stack duplicates.
@@ -39,7 +39,7 @@ WORKFLOW_DIR = os.path.dirname(SRC_DIR)
 LIB_DIR      = os.path.join(SRC_DIR, "lib")
 
 # Runtime state (buffer, focus session, bar position, …) lives per-user with
-# 0700 perms — a shared /tmp would let any local account read or pre-create it.
+# 0700 perms - a shared /tmp would let any local account read or pre-create it.
 RUN_DIR = os.path.join(os.path.expanduser("~"), ".ticktick_alfred", "run")
 
 
@@ -82,7 +82,7 @@ def emit_error(msg):
 
 def notify(text, title="TickAL"):
     """User-visible notification. Primary route: Alfred's own
-    notification chain — fire ET XAct with the pass-through `notify` verb;
+    notification chain - fire ET XAct with the pass-through `notify` verb;
     Alfred has Notification-Center permission, while bare osascript under
     launchd usually doesn't (the invisible-hourly-sync bug). Fallback: plain
     `display notification` for when Alfred isn't running."""
@@ -103,7 +103,7 @@ def notify(text, title="TickAL"):
 def reopen_actions(pid, tid):
     """Act-again: reopen the ⌘ Actions menu on a task with fresh values.
     Writes the context temp file (single-writer convention) and fires the
-    Actions trigger — Alfred is closed when executors run, so the window opens
+    Actions trigger - Alfred is closed when executors run, so the window opens
     live. No-ops silently without full context."""
     if not pid or not tid:
         return

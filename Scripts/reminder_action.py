@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-reminder_action.py — Alfred Run Script
+reminder_action.py - Alfred Run Script
 Adds a reminder to a task (merge + dedup).
 $1 = "{task_list_id}:{task_id}:{token}" (Arg-and-Vars node prepends the ids to
 the bare token emitted by change_reminder.py). Env vars are a fallback.
 token = at / 5 / 15 / 30 / 1h / 1d / 45m … (resolved to an RFC5545 TRIGGER).
 
-The Open API can't clear reminders to empty, so this only adds — removal of the
+The Open API can't clear reminders to empty, so this only adds - removal of the
 last reminder must be done in the TickTick app.
 """
 import sys

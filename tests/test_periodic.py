@@ -306,7 +306,7 @@ DOC = """crumbs
 		- **Total = 310**
 ---
 
-### 🔥 Top list: old — 1 done
+### 🔥 Top list: old - 1 done
 	body
 """
 d20 = ps.parse_sections(DOC)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Action dispatcher — called by Alfred after item selection.
+Action dispatcher - called by Alfred after item selection.
 
 Arg format (from Script Filter items):
   open:<url>              → open TickTick deep link
@@ -25,7 +25,7 @@ import reminders as rem
 from dateutil import utc_to_local_display, utc_to_long_display
 from script_base import run_path
 
-# CRM booking flow — a new CRM task carrying a booking tag auto-prefills a
+# CRM booking flow - a new CRM task carrying a booking tag auto-prefills a
 # "Prepare for …" follow-up (a 🔥prepare task has no booking tag → never loops).
 CRM_ID       = areas.CRM_ID   # Configure panel; empty = booking flow dormant
 BOOKING_TAGS = areas.BOOKING_TAGS   # single source (add_task gates chords on it)
@@ -45,7 +45,7 @@ def _fire_add_prefill(query):
 
 
 # Act-again: attribute changes reopen the ⌘ Actions menu for the same
-# task — fresh values on every row, esc dismisses. Alfred is closed by the time
+# task - fresh values on every row, esc dismisses. Alfred is closed by the time
 # dispatch runs, so the external-trigger fire opens a live window (same timing
 # pattern as the CRM prepare prefill above).
 ACT_AGAIN = ("attr_date:", "attr_span:", "attr_cleardate:", "attr_priority:",
@@ -70,12 +70,12 @@ def _ensure_tags_exist(tags, parents=None):
     """Tags unknown to the cache become REAL entities before the task write
     (the pickers offer ➕ new-tag rows; `parents` maps lowercase name →
     parent tag for the nest-under-parent flow). NOTE: a plain v1 task write
-    does NOT create the tag entity — without a v2 token the label still
+    does NOT create the tag entity - without a v2 token the label still
     attaches to the task, the entity just waits for the app/token.
     Best-effort, never blocks the write."""
     try:
         from display import tag_match_key
-        # emoji-blind, like the ➕ picker guards — a hand-typed '#logbook'
+        # emoji-blind, like the ➕ picker guards - a hand-typed '#logbook'
         # must not coin a bald twin of '📓Logbook'
         known = {tag_match_key(t) for t in (cache_store.get("tags") or [])}
         fresh, seen_l = [], set()
@@ -98,7 +98,7 @@ def _ensure_tags_exist(tags, parents=None):
 
 def _pd_key(pid):
     """project_data cache key for a pid. The API reports the inbox as
-    'inbox<digits>' but sync stores it under the literal 'inbox' key —
+    'inbox<digits>' but sync stores it under the literal 'inbox' key -
     map it, or every inbox mirror silently misses (fresh inbox adds/changes
     stay invisible in the inbox screens until the hourly sync)."""
     return ("project_data_inbox" if str(pid).startswith("inbox")
@@ -107,14 +107,14 @@ def _pd_key(pid):
 
 def _norm_tags(tags):
     """Deduped lowercase tags. TickTick lowercases tag names server-side
-    (labels keep their case) — caching as-typed case splits the tag screens
+    (labels keep their case) - caching as-typed case splits the tag screens
     into ✅Todo/✅todo duplicate groups until the next sync."""
     return list(dict.fromkeys(str(t).lower() for t in (tags or [])))
 
 
 def _patch_project_data(tid, fields=None, pid_old=None, pid_new=None, remove=False):
     """Mirror a task patch into the project_data_{pid} caches. The per-list
-    browse screens (incl. the CRM drill) read project_data, NOT all_tasks —
+    browse screens (incl. the CRM drill) read project_data, NOT all_tasks -
     without this mirror a fresh change is invisible there until the hourly
     sync. No-op for lists whose project_data was never cached."""
     try:
@@ -273,7 +273,7 @@ def main():
                 pass
 
             # Complete-guard: completing the CURRENT focus task also ends
-            # its session (sweep + note + record) — BEFORE the complete,
+            # its session (sweep + note + record) - BEFORE the complete,
             # while the task is guaranteed still GET-able. A matching pomo
             # sidecar is left alone (the app's pomo keeps running).
             guard_note = ""
@@ -465,7 +465,7 @@ def main():
             api.update_task(tid, pid, current=_cached_task(tid), tags=[])
             _patch_task_cache(tid, tags=[])
             task_title = os.environ.get("task_title", "Task")
-            print(f"{task_title} — all tags removed")
+            print(f"{task_title} · all tags removed")
 
         elif arg.startswith("attr_move:"):
             # attr_move:oldProjectId:taskId:newProjectId
@@ -534,7 +534,7 @@ def main():
                     cache_store.set("all_tasks", cached)
                     _patch_project_data(tid, pid_old=pid)
                 elif snap is None or cached is None:
-                    # no snap to restore — invalidate, or the reopened task
+                    # no snap to restore - invalidate, or the reopened task
                     # stays invisible until the hourly sync
                     cache_store.invalidate("all_tasks")
             except Exception:
@@ -581,7 +581,7 @@ def main():
             pid = proj.get("id") if isinstance(proj, dict) else None
             if not pid:
                 cache_store.invalidate("projects")
-                print("Error: list created but no id returned — CTA skipped")
+                print("Error: list created but no id returned · CTA skipped")
                 return
 
             # Update the projects cache in-place so the new list resolves at once
@@ -596,17 +596,17 @@ def main():
             url = f"ticktick:///webapp/#p/{pid}/tasks"
             cta_title = f"💼 P • [{name}]({url}) 🔗"
             if not cta_list:
-                # No 📌CTA list configured — the project stands alone.
+                # No 📌CTA list configured - the project stands alone.
                 print(f"💼 {name} created")
             elif tag:
                 # Token order (~l … then #tag) keeps the multi-word ~l from
-                # swallowing the title — same trick as the CRM prepare prefill.
+                # swallowing the title - same trick as the CRM prepare prefill.
                 # The CTA itself is created by the normal create: path on ⏎,
                 # which also handles the all_tasks cache.
                 _fire_add_prefill(f"~l {areas.cta_list_name()} #{tag} {cta_title}")
-                print(f"💼 {name} created — schedule its 📌CTA")
+                print(f"💼 {name} created · schedule its 📌CTA")
             else:
-                # No tag to close the ~l token safely — create the CTA directly.
+                # No tag to close the ~l token safely - create the CTA directly.
                 api.create_task(title=cta_title, project_id=cta_list)
                 cache_store.invalidate("all_tasks")
                 print(f"💼 {name} created")
@@ -625,10 +625,10 @@ def main():
             print(f"{name} created")
 
         elif arg.startswith("cta:"):
-            # cta:<base64 {mode, pid, tid, title}> — the one dynamic "Add CTA /
+            # cta:<base64 {mode, pid, tid, title}> - the one dynamic "Add CTA /
             # Prepare" Actions row. Every mode opens the Add window prefilled (via
             # the shared helper) so the CTA/Prepare task can be SCHEDULED before it
-            # is created — same "back in the driver's seat" flow as CRM bookings.
+            # is created - same "back in the driver's seat" flow as CRM bookings.
             spec   = json.loads(base64.b64decode(arg[4:]))
             action = areas.build_action(spec.get("mode"), spec.get("pid", ""),
                                         spec.get("tid", ""), spec.get("title", ""))
@@ -682,7 +682,7 @@ def main():
                     cache_store.set("all_tasks", cached_tasks)
 
                     # Mirror into the per-list cache the browse screens read
-                    # (CRM drill etc.) — else the fresh add is invisible there
+                    # (CRM drill etc.) - else the fresh add is invisible there
                     # until the hourly sync.
                     real_pid = result.get("projectId") or proj_id
                     pd_key = _pd_key(real_pid)
@@ -711,18 +711,18 @@ def main():
                     import api_v2
                     img = clip_util.png_bytes()
                     if not img:
-                        attach_note = "\n🖼️ no image on clipboard — task created without it"
+                        attach_note = "\n🖼️ no image on clipboard · task created without it"
                     else:
                         up_pid = result.get("projectId") or proj_id
                         api_v2.TickTickV2().upload_attachment(
                             up_pid, result["id"], img, "screenshot.png")
                         attach_note = "\n🖼️ image attached"
                 except Exception as e:
-                    attach_note = f"\n🖼️ image not attached — {e}"
+                    attach_note = f"\n🖼️ image not attached · {e}"
 
             # CRM booking → auto-prefill a "Prepare for …" follow-up. Fires only
             # when the new task carries a booking tag, so the 🔥prepare follow-up
-            # itself (and any non-booking CRM add) never re-triggers it — loop-proof.
+            # itself (and any non-booking CRM add) never re-triggers it - loop-proof.
             # Re-opens the Add window pre-typed via osascript (no extra wiring); the
             # booking is already in the all_tasks cache above, so [[title]] resolves
             # to its link on the next ⏎. Token order (~l … then #) keeps the multi-
@@ -771,17 +771,17 @@ def main():
                         _post_done = True
                 except Exception:
                     # _post_done stays False → act-again still runs
-                    print("⚠ post-create focus step failed — task created fine")
+                    print("⚠ post-create focus step failed · task created fine")
 
             # Act-again: a subtask added from the ⌘ Actions menu loops back to
             # the parent's Actions menu (CRM bookings take the Prepare window
-            # instead — the two never overlap).
+            # instead - the two never overlap).
             _parent = payload.get("parentId")
             if _parent and not _crm_chained and not _post_done:
                 _reopen_actions(result.get("projectId") or proj_id, _parent)
 
         elif arg.startswith("xact:"):
-            # Add-window rows can carry xact verbs (the T tag scope) —
+            # Add-window rows can carry xact verbs (the T tag scope) -
             # the raw-URL fallback below would open() them. In-process like
             # the _post_stage chain; stdout still lands in the notification.
             _xdir = os.path.join(os.path.dirname(SCRIPT_DIR), "Scripts")

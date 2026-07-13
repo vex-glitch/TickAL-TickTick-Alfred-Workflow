@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-note_clear.py — Alfred Run Script
+note_clear.py - Alfred Run Script
 
 Clears a task's description (sets content=""). A dedicated "delete the note" node,
 separate from note_save.py. Ignores the input text; acts on the task_list_id /

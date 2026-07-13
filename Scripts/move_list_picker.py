@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-move_list_picker.py — Alfred Script Filter
+move_list_picker.py - Alfred Script Filter
 Multi-mode picker for moving/re-parenting a task.
 
 Mirrors the add-flow ~ location menu:
@@ -40,7 +40,7 @@ except Exception as e:
 
 # ── Back chord ───────────────────────────────────────────────────────────────
 def back_mod(list_id, tid):
-    """⌃⇧ back must work even on invalid rows — a mod-level valid=True
+    """⌃⇧ back must work even on invalid rows - a mod-level valid=True
     overrides the row's valid=False (Alfred ignores action chords on invalid
     rows). Mod variables REPLACE item-level ones, so carry the full context."""
     return {"ctrl": {"valid": True, "arg": "",
@@ -83,7 +83,7 @@ def detect_scope(query):
 def list_picker(query, list_id, task_title, back):
     cached = cache_store.get("projects")
     if not cached:
-        return [alfred.item(title="No lists cached — run sync first", valid=False,
+        return [alfred.item(title="No lists cached · run sync first", valid=False,
                             mods=back)]
 
     projects = sorted(
@@ -142,7 +142,7 @@ def section_picker(query, task_title, back):
         items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
 
     if not items:
-        msg = f'No sections matching "{query}"' if query else "No sections cached — run Sync first"
+        msg = f'No sections matching "{query}"' if query else "No sections cached · run Sync first"
         return [alfred.item(title=msg, valid=False, mods=back)]
     return items
 
@@ -181,7 +181,7 @@ def task_picker(query, current_tid, task_title, back):
         items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
 
     if not items:
-        msg = f'No tasks matching "{query}"' if query else "No tasks cached — run Sync first"
+        msg = f'No tasks matching "{query}"' if query else "No tasks cached · run Sync first"
         return [alfred.item(title=msg, valid=False, mods=back)]
     return items
 

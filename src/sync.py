@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sync.py — called by Alfred (Update → Sync) to refresh all caches from the TickTick API.
+sync.py - called by Alfred (Update → Sync) to refresh all caches from the TickTick API.
 """
 import sys
 import os
@@ -18,13 +18,13 @@ def do_sync():
     """Refresh all caches from TickTick API. Prints a one-line status."""
     api = TickTickAPI(cfg.get_token())
 
-    # Fetch projects first — if API is unreachable/rate-limited, bail before touching cache
+    # Fetch projects first - if API is unreachable/rate-limited, bail before touching cache
     projects = api.get_projects()
 
-    # Overwrite projects — no full cache wipe so search keeps working during sync
+    # Overwrite projects - no full cache wipe so search keeps working during sync
     cache_store.set("projects", projects)
 
-    # Inbox is a special project not returned by /project — fetch it separately
+    # Inbox is a special project not returned by /project - fetch it separately
     all_tasks = []
     try:
         inbox_data = api.get_project_data("inbox")
@@ -58,7 +58,7 @@ def do_sync():
 
     cache_store.set("all_tasks", all_tasks)
 
-    # Notes — two sources:
+    # Notes - two sources:
     # 1. NOTE-kind projects (dedicated note lists)
     # 2. kind==NOTE tasks inside regular task projects (e.g. a note in Shopping list)
     all_notes = []
@@ -85,7 +85,7 @@ def do_sync():
             all_notes.append(t)
             seen_note_ids.add(t["id"])
 
-    # Enrich notes with content — bulk project data doesn't return note bodies.
+    # Enrich notes with content - bulk project data doesn't return note bodies.
     # Fetch each note individually only when content is missing.
     enriched = []
     for n in all_notes:
@@ -103,10 +103,10 @@ def do_sync():
 
     cache_store.set("all_notes", all_notes)
 
-    # Tags — zero setup: the v2 tag tree is the source of truth
+    # Tags - zero setup: the v2 tag tree is the source of truth
     # (TickTick's own list + order, which also drives group-by-tag sections);
     # tags discovered on tasks append after. Tokenless installs run on the
-    # discovered set alone — new tags are creatable from the pickers.
+    # discovered set alone - new tags are creatable from the pickers.
     discovered = {tag for t in all_tasks for tag in (t.get("tags") or [])}
 
     tree, has_v2 = [], False
@@ -138,19 +138,19 @@ def do_sync():
         base = [b for b in base if b]
     else:
         base = []
-    # Case-insensitive dedup — prevents "🔥Ongoing" + "🔥ongoing" duplicates.
+    # Case-insensitive dedup - prevents "🔥Ongoing" + "🔥ongoing" duplicates.
     seen = {t.lower() for t in base}
     extra = sorted(t for t in discovered if t.lower() not in seen)
     all_tags = base + extra
     cache_store.set("tags", all_tags)
 
-    # Folders + native filters via ONE v2 sync-meta call — the open API
+    # Folders + native filters via ONE v2 sync-meta call - the open API
     # returns bare group ids and no filters at all. config.get_folders()
     # overlays manual names on the folder_groups cache; filtering.load_filters
     # prefers the translated filters_v2 cache. Best-effort, never fails sync.
     try:
         # get_sync_meta: dict on success (empty lists ARE the account's
-        # truth — folder-less / filter-less), None on failure (keep the
+        # truth - folder-less / filter-less), None on failure (keep the
         # last-known-good caches).
         meta = _v2.get_sync_meta() if has_v2 else None
         if meta is not None:
@@ -161,7 +161,7 @@ def do_sync():
     except Exception:
         pass
 
-    # Completed list = server truth via the same v2 session — the Open API
+    # Completed list = server truth via the same v2 session - the Open API
     # can't list completed tasks, and the old local snapshots only knew
     # completions made THROUGH the workflow, so counts ran far too low.
     # Best-effort.
@@ -181,7 +181,7 @@ def do_sync():
             done = v2c.get_completed(days=60, limit=200)
             if isinstance(done, list) and done:
                 cache_store.set("completed_tasks", _enrich(done))
-            # Won't Do twin — None = fetch failed (keep last-known-
+            # Won't Do twin - None = fetch failed (keep last-known-
             # good); [] is the account's truth and DOES clear the cache
             wontdo = v2c.get_abandoned(days=60, limit=200)
             if isinstance(wontdo, list):
@@ -198,7 +198,7 @@ def do_sync():
 
 def _notify(text, title="TickAL sync"):
     """macOS notification so the hourly background sync is visible. Routed
-    through Alfred's notification chain — launchd osascript banners were
+    through Alfred's notification chain - launchd osascript banners were
     silently eaten by Notification-Center permissions."""
     from script_base import notify
     notify(text, title=title)

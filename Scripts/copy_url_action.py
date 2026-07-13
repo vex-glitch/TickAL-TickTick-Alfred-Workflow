@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-copy_url_action.py — Alfred Run Script
+copy_url_action.py - Alfred Run Script
 Copies a TickTick deep-link URL to the clipboard and shows a macOS notification.
-$1 is expected in the form "copy:ticktick://..." — the "copy:" prefix is stripped.
+$1 is expected in the form "copy:ticktick://..." - the "copy:" prefix is stripped.
 Prints nothing to stdout so Alfred does not route the text into subsequent nodes.
 """
 import sys

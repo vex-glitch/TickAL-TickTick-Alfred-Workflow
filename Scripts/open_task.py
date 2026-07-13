@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-open_task.py — Alfred Run Script
+open_task.py - Alfred Run Script
 
 Emits `open:<task deep link>` so the existing modOpen ET opens the TASK in
 TickTick. Ignores the input text (a Text View sends its body on ↩, which is not

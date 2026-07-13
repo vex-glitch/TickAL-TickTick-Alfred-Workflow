@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-rename_action.py — Alfred Run Script
+rename_action.py - Alfred Run Script
 Renames a task to the new title provided by rename_task.py.
 $1 = "{task_list_id}:{task_id}:{new_title}" (Arg-and-Vars node prepends the ids
 to the bare title). Titles may contain ':', so parse with maxsplit=2.
@@ -36,7 +36,7 @@ if not new_title:
     print("Error: new title is empty")
     sys.exit(1)
 
-# Renaming a LIST — same input flow, no task id; item_type rides
+# Renaming a LIST - same input flow, no task id; item_type rides
 # the session vars from the ⌘ menu row. No act-again reopen (task-centric).
 if os.environ.get("item_type", "") == "list":
     if not pid:

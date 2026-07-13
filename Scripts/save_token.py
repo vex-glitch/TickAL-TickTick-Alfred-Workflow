@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-save_token.py — Alfred Run Script
+save_token.py - Alfred Run Script
 
 Stores the TickTick v2 session token (the `t` cookie) into the macOS Keychain
 (service `ticktick_v2_token`) so the image-attachment feature can authenticate.
-No password needed — works with Sign-in-with-Apple accounts. Re-run whenever the
+No password needed - works with Sign-in-with-Apple accounts. Re-run whenever the
 attach action says the token has expired.
 
 Usage: copy the token to the clipboard, then run this (e.g. an Update-menu item).
@@ -26,12 +26,12 @@ bootstrap()
 clip = subprocess.run(["pbpaste"], capture_output=True, text=True).stdout.strip()
 
 if not clip:
-    print("Clipboard empty — copy your TickTick `t` cookie value first")
+    print("Clipboard empty · copy your TickTick `t` cookie value first")
     sys.exit(1)
 
 # The `t` cookie is a long hex string; catch obvious wrong-paste mistakes.
 if not re.fullmatch(r"[0-9A-Fa-f]{64,}", clip):
-    print("That doesn't look like a token — copy the `t` cookie value from TickTick")
+    print("That doesn't look like a token · copy the `t` cookie value from TickTick")
     sys.exit(1)
 
 # Verify against TickTick before saving (reject only on an explicit auth failure).
@@ -45,7 +45,7 @@ try:
         cookies={"t": clip}, timeout=15,
     )
     if r.status_code in (401, 403):
-        print("TickTick rejected that token — copy a fresh `t` cookie and try again")
+        print("TickTick rejected that token · copy a fresh `t` cookie and try again")
         sys.exit(1)
     if r.status_code == 200:
         verified = " · verified"

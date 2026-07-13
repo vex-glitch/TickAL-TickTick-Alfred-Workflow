@@ -1,4 +1,4 @@
-"""periodic_journal.py — journal prompt-pool loading.
+"""periodic_journal.py - journal prompt-pool loading.
 
 Pools are markdown files: repo defaults in src/periodic_prompts/, user
 overrides in ~/.ticktick_alfred/periodic_prompts/ (a non-empty override

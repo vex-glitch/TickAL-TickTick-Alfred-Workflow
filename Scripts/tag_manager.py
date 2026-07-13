@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tag_manager.py — Alfred Script Filter
+tag_manager.py - Alfred Script Filter
 Consolidated tag management: view, add, change, remove.
 
 Default (no prefix): lists current tags assigned to the task
@@ -63,7 +63,7 @@ def get_all_tags():
     return cache_store.get("tags") or cfg.get_tags() or []
 
 def back_mod(pid, tid):
-    """⌃⇧ back must work even on invalid rows — a mod-level valid=True
+    """⌃⇧ back must work even on invalid rows - a mod-level valid=True
     overrides the row's valid=False (Alfred ignores action chords on invalid
     rows). Mod variables REPLACE item-level ones, so carry the full context."""
     return {"ctrl": {"valid": True, "arg": "",
@@ -75,13 +75,13 @@ def back_mod(pid, tid):
 def detect_mode(raw_query):
     """
     Returns ('add', fragment) for a # prefix, ('current', query) otherwise.
-    Bare '#' and '#frag' land straight in the add dropdown — the old
+    Bare '#' and '#frag' land straight in the add dropdown - the old
     space-gate hint row ("Space after # to search") made every entry a
     two-step.
     """
     q = raw_query
     if q.startswith("# "):
-        return "add", q[2:]  # preserve trailing space — parse_add_fragment needs it
+        return "add", q[2:]  # preserve trailing space - parse_add_fragment needs it
     if q.startswith("#"):
         return "add", q[1:]
     return "current", q
@@ -192,8 +192,8 @@ def add_tag_view(fragment_str, pid, tid, task_title):
     current_lower = {c.lower() for c in current_set}
     for tag in all_tags:
         if tag in confirmed_set:
-            continue  # already queued — hide it
-        # ci — task tags are stored lowercase, the cache holds cased v2 labels
+            continue  # already queued - hide it
+        # ci - task tags are stored lowercase, the cache holds cased v2 labels
         already = tag.lower() in current_lower
         import tagtree
         # Parent drill stays active when CRM is unconfigured (CRM_ID "").
@@ -230,7 +230,7 @@ def add_tag_view(fragment_str, pid, tid, task_title):
 
     # ➕ new tag: unmatched fragment → queue it anyway; the REAL tag is
     # created at apply time (dispatch._ensure_tags_exist, v2). Not on CRM
-    # tasks — their tag family is fixed.
+    # tasks - their tag family is fixed.
     from display import tag_match_key
     frag_tag = (current_fragment or "").strip().lstrip("#").replace(",", "").replace(":", "")
     if (frag_tag and not (areas.CRM_ID and pid == areas.CRM_ID)
@@ -246,7 +246,7 @@ def add_tag_view(fragment_str, pid, tid, task_title):
 
     if not items:
         msg = (f'No tags matching "{current_fragment}"' if current_fragment
-               else "No tags cached — run Sync first")
+               else "No tags cached · run Sync first")
         items = [alfred.item(title=msg, valid=False, mods=back)]
 
     return items

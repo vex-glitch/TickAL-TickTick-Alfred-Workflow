@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-schedule_prefix.py — Run Script
+schedule_prefix.py - Run Script
 Outputs Alfred JSON with:
   arg       → "Reschedule for " or "Schedule for " (pre-fills script filter)
   has_date  → "1" or "0" (workflow variable available to all downstream nodes)
