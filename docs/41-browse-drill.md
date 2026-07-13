@@ -38,12 +38,6 @@ Folders ─⌥→ Lists ─⌥→ Tags ─⏎→ a tag's tasks
 
 Each row's subtitle advertises exactly the chords it supports (⏎↗️ ⌘⚡ ⌥⤵️ ⌃🔙 …), so the ladder is self-documenting.
 
-<details><summary>Screenshot</summary>
-
-![Drill ladder: list to tasks to subtasks](assets/shots/07-drill-ladder.png)
-
-</details>
-
 ## Typing filters the level
 
 The query bar never carries navigation state - context rides invisibly behind the scenes. Whatever you type fuzzy-filters the current screen; clear it and the full level returns.
