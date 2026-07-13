@@ -8224,29 +8224,29 @@ printf '%s' "$1"</string>
 		</dict>
 	</array>
 	<key>readme</key>
-	<string>**TickAL — TickTick, without opening TickTick.** One hotkey (or `tal`) opens your whole TickTick world in Alfred: browse, search, add, schedule, tag, complete, focus — every change mirrored instantly in a local cache.
-📖 Full docs: [GitHub · TickAL](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow) — or run `tdo`
+	<string>**TickAL - TickTick, without opening TickTick.** One hotkey (or `tal`) opens your whole TickTick world in Alfred: browse, search, add, schedule, tag, complete, focus - every change mirrored instantly in a local cache.
+📖 Full docs: [GitHub · TickAL](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow) - or run `tdo`
 
 ## Dependencies
-- Alfred 5 + Powerpack · Python 3 (Homebrew or Xcode CLT — TickAL finds either)
+- Alfred 5 + Powerpack · Python 3 (Homebrew or Xcode CLT - TickAL finds either)
 - A TickTick account + a free TickTick developer app (2 minutes, steps below)
-- Optional: `pip3 install pyobjc` for the floating focus bar — focus works without it
+- Optional: `pip3 install pyobjc` for the floating focus bar - focus works without it
 
 ## Setup
 1. Go to developer.ticktick.com/manage → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** + **Client Secret** into the fields above
-3. Run `tlogin` — a browser opens; log in and approve
+3. Run `tlogin` - a browser opens; log in and approve
 4. Run `tsy` to prime the cache, and set your main hotkey (top-left node on the canvas)
-5. *Optional but recommended* — one sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `tup` → **Attachment Login** (masked; only a session token is stored) — or paste a token via **Attachment Token** (Sign-in-with-Apple; guide in the docs)
-6. *Optional* — CRM / CTA / Projects features: paste your list &amp; folder ids above (the docs show how to copy an id)
+5. *Optional but recommended* - one sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `tup` → **Attachment Login** (masked; only a session token is stored) - or paste a token via **Attachment Token** (Sign-in-with-Apple; guide in the docs)
+6. *Optional* - CRM / CTA / Projects features: paste your list &amp; folder ids above (the docs show how to copy an id)
 
 ## Usage
 Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**. Type to filter any screen.
 - `tal` main menu · `tse` search · `tad` add · `tup` settings · `tca` calendar
 - Views: `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer
 - `tfo` focus · `tur` save browser tab · `tst` statistics · `tcr` crm · `tsy` sync · `tdo` docs
-- 💫 Periodic notes: `pn` scope in search — daily / weekly / monthly notes, journals, money log
-- Add tokens: `*` date · `@` time · `!` priority · `#` tag · `=` note · `[[` task link — or type `/` for the menu</string>
+- 💫 Periodic notes: `pn` scope in search - daily / weekly / monthly notes, journals, money log
+- Add tokens: `*` date · `@` time · `!` priority · `#` tag · `=` note · `[[` task link - or type `/` for the menu</string>
 	<key>uidata</key>
 	<dict>
 		<key>03330C3C-889F-4E1D-B09F-6365B93C4283</key>
@@ -8788,7 +8788,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>443C59EC-DC33-4036-A263-88EE1D8DD149</key>
 		<dict>
 			<key>note</key>
-			<string>xact.py — buffer/focus/pomo verbs</string>
+			<string>xact.py - buffer/focus/pomo verbs</string>
 			<key>xpos</key>
 			<real>2045</real>
 			<key>ypos</key>
@@ -9674,7 +9674,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>AAC72823-02A8-497F-BB92-8651F4D7A93E</key>
 		<dict>
 			<key>note</key>
-			<string>focus_picker.py — timer/pomo grammar</string>
+			<string>focus_picker.py - timer/pomo grammar</string>
 			<key>xpos</key>
 			<real>1120</real>
 			<key>ypos</key>
@@ -10315,7 +10315,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>Add tasks with tokens: * date · @ time · ! priority · # tag · = note · [[ task link — or type / for the menu.</string>
+			<string>Add tasks with tokens: * date · @ time · ! priority · # tag · = note · [[ task link - or type / for the menu.</string>
 			<key>label</key>
 			<string>[keyword] Add</string>
 			<key>type</key>
@@ -10483,7 +10483,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>The bookings hub — needs 'CRM list id' below.</string>
+			<string>The bookings hub - needs 'CRM list id' below.</string>
 			<key>label</key>
 			<string>[keyword] CRM</string>
 			<key>type</key>
@@ -10525,7 +10525,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>Open the Inbox — drillable, actionable.</string>
+			<string>Open the Inbox - drillable, actionable.</string>
 			<key>label</key>
 			<string>[keyword] Inbox</string>
 			<key>type</key>
@@ -10546,7 +10546,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>Open Today — drillable, actionable.</string>
+			<string>Open Today - drillable, actionable.</string>
 			<key>label</key>
 			<string>[keyword] Today</string>
 			<key>type</key>
@@ -10777,7 +10777,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>The 💫 weekly note mirrors this list (or task with subtasks) in its ♻️ Weekly Review section — tick boxes in the note, real tasks complete. Paste the 24-character id. Leave blank if unused.</string>
+			<string>The 💫 weekly note mirrors this list (or task with subtasks) in its ♻️ Weekly Review section - tick boxes in the note, real tasks complete. Paste the 24-character id. Leave blank if unused.</string>
 			<key>label</key>
 			<string>Weekly review list id (optional)</string>
 			<key>type</key>
@@ -10788,16 +10788,16 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 	</array>
 	<key>variablesdontexport</key>
 	<array>
-		<string>client_id</string>
-		<string>client_secret</string>
-		<string>crm_list_id</string>
-		<string>cta_list_id</string>
-		<string>projects_folder_id</string>
-		<string>periodic_list_id</string>
 		<string>weekly_review_id</string>
+		<string>cta_list_id</string>
+		<string>periodic_list_id</string>
+		<string>crm_list_id</string>
+		<string>client_secret</string>
+		<string>client_id</string>
+		<string>projects_folder_id</string>
 	</array>
 	<key>version</key>
-	<string>2.5</string>
+	<string>52</string>
 	<key>webaddress</key>
 	<string>https://github.com/vex-glitch</string>
 </dict>
