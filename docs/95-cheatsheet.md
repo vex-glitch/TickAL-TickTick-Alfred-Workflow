@@ -6,7 +6,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 ## Keywords
 
-All 20 are defaults - remap any of them in Configure Workflow. Seven hotkey nodes ship unbound (Today, Tomorrow, Next 7 Days, Inbox, Smart Lists, Calendar, Focus) - bind keys on the workflow canvas in Alfred.
+All 35 are defaults - remap any of them in Configure Workflow. 15 actions ship with a default ⌥⌘ global hotkey (see Default hotkeys below); the other 19 hotkey nodes ship unbound - bind or rebind any on the workflow canvas in Alfred.
 
 | Keyword | Opens | Docs |
 |---------|-------|------|
@@ -16,10 +16,10 @@ All 20 are defaults - remap any of them in Configure Workflow. Seven hotkey node
 | `tup` | Settings menu | [Settings & sync](90-settings-sync.md) |
 | `tsy` | Full cache refresh | [Settings & sync](90-settings-sync.md) |
 | `tlogin` | Browser OAuth login | [Setup](30-setup.md) |
-| `tca` | TickTick's Calendar (day/week/month/year views) | - |
+| `tca` | TickTick's Calendar (day/week/month/year views) | [Views](48-views.md) |
 | `tfo` | Focus screen - timer ⏱️ / pomodoro 🍅 | [Focus](44-focus.md) |
 | `tur` | Save the active browser tab as a task | [Notes, links & images](46-notes-links-images.md) |
-| `tst` | TickTick's Statistics | - |
+| `tst` | TickTick's Statistics | [Views](48-views.md) |
 | `tcr` | CRM booking hub | [CRM](45-crm.md) |
 | `tsl` | Search pre-scoped to smart lists (`v `) | [Search](40-search.md) |
 | `tin` | Inbox view | [Browse & drill](41-browse-drill.md) |
@@ -30,6 +30,43 @@ All 20 are defaults - remap any of them in Configure Workflow. Seven hotkey node
 | `tta` | Tags - search locked to the `g` scope | [Browse & drill](41-browse-drill.md) |
 | `tfi` | Search pre-scoped to filters (`f `) | [Search](40-search.md) |
 | `tdo` | These docs on GitHub | [Home](00-index.md) |
+| `tpn` | Periodic notes surface | [Periodic notes](47-periodic.md) |
+| `tdn` | Open today's note | [Periodic notes](47-periodic.md) |
+| `twn` | Open this week's note | [Periodic notes](47-periodic.md) |
+| `tmn` | Open this month's note | [Periodic notes](47-periodic.md) |
+| `tqn` | Open this quarter's note | [Periodic notes](47-periodic.md) |
+| `tyn` | Open this year's note | [Periodic notes](47-periodic.md) |
+| `tmj` | Morning journal | [Periodic notes](47-periodic.md) |
+| `tej` | Evening journal | [Periodic notes](47-periodic.md) |
+| `tmo` | Log income | [Periodic notes](47-periodic.md) |
+| `tdg` | Set today's one thing | [Periodic notes](47-periodic.md) |
+| `tde` | Log an entry to today | [Periodic notes](47-periodic.md) |
+| `tat` | Schedule a task today | [Periodic notes](47-periodic.md) |
+| `tha` | Habits view | [Views](48-views.md) |
+| `tpo` | Pomodoro / Focus view | [Views](48-views.md) |
+| `tmx` | Eisenhower Matrix view | [Views](48-views.md) |
+
+## Default hotkeys
+
+15 actions ship with a global hotkey pre-set - rebind or clear any on the workflow canvas. The other 19 hotkey nodes ship unbound.
+
+| Hotkey | Opens |
+|--------|-------|
+| ⌥⌘T | Main menu |
+| ⌥⌘S | Search |
+| ⌥⌘A | Add |
+| ⌥⌘D | Today |
+| ⌥⌘N | Daily note |
+| ⌥⌘C | Calendar |
+| ⌥⌘F | Focus |
+| ⌥⌘P | Periodic |
+| ⌥⌘I | Inbox |
+| ⌥⌘U | Save URL |
+| ⌥⌘L | Login |
+| ⌥⌘G | Docs |
+| ⌥⌘Y | Sync |
+| ⌥⌘, | Settings |
+| ⌃⌥⇧⌘→ | Filters |
 
 ## Chords
 

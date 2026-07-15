@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Obsidian-style daily, weekly, monthly, quarterly and yearly notes - minted, refreshed and rolled up for you, inside TickTick.
 
-**Keyword:** `pn` - a scope inside search (`tse pn …`, or `/pn` anywhere in the bar), or the **💫 Periodic Notes** row in the main menu (`tal`). Typing `daily note`, `weekly note` (or just `weekly`, `monthly`…) anywhere in search also surfaces the matching note.
+**Keyword:** `pn` - a scope inside search (`tse pn …`, or `/pn` anywhere in the bar), or the **💫 Periodic Notes** row in the main menu (`tal`). Typing `daily note`, `weekly note` (or just `weekly`, `monthly`…) anywhere in search also surfaces the matching note. Or jump straight in with a direct keyword - see [Direct keywords](#direct-keywords).
 
 Each periodic note is a normal TickTick note in one list of your choosing, tagged 💫Daily / 💫Weekly / 💫Monthly / 💫Quarterly / 💫Yearly (nested under 💫Periodic - the tags are created for you). Group that list by **Tag** in TickTick and the kanban columns build themselves.
 
@@ -34,6 +34,22 @@ Each periodic note is a normal TickTick note in one list of your choosing, tagge
 Entry kinds: 🏆 win · 👎 nag · 💭 thought (plain text works) · ☑️ task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · 🔗 link (empty = clipboard) · 😊 mood - five faces 😢 😞 😐 🙂 😁, then an optional note.
 
 The same moves work from a task's **⌘ Actions** menu: ☀️ Add to today, 🌙 Add to tomorrow, ☀️ Make day goal. The add window's `/` menu has ☀️ Today and 🌙 Tomorrow shortcuts too.
+
+## Direct keywords
+
+Every pn row also has its own keyword, so you can jump straight in without opening the surface first:
+
+| Keyword | Does |
+|---------|------|
+| `tpn` | open the periodic surface (all rows) |
+| `tdn` / `twn` / `tmn` / `tqn` / `tyn` | open today / week / month / quarter / year note |
+| `tmj` / `tej` | morning / evening journal |
+| `tde` | log an entry to today |
+| `tmo` | log income |
+| `tdg` | set today's one thing |
+| `tat` | schedule a task today |
+
+Unset until you set `periodic_list_id` - a setup row or message shows until then. Opening or journaling auto-mints the note if it does not exist yet.
 
 ## The daily note
 

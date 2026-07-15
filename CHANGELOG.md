@@ -3,6 +3,37 @@
 All notable user-visible changes to TickAL. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.6] - 2026-07-15
+
+### Added
+
+- **Direct periodic keywords** - every periodic action now has its own
+  keyword: `tpn` (the periodic surface), `tdn` / `twn` / `tmn` / `tqn` /
+  `tyn` (daily to yearly notes), `tmj` / `tej` (morning / evening journal),
+  `tde` (entry), `tmo` (income), `tdg` (day goal), `tat` (add to today).
+- **Native TickTick views** - `tha` Habits, `tpo` Pomodoro / Focus and `tmx`
+  Eisenhower Matrix open TickTick's own screens, documented on a new
+  [Views](docs/48-views.md) page (which also covers `tca` Calendar and `tst`
+  Statistics).
+- **Default hotkeys** - 15 actions now ship with a default ⌥⌘ global hotkey
+  (Main menu, Search, Add, Today, Daily note, Calendar, Focus, Periodic,
+  Inbox, Save URL, Login, Docs, Sync, Settings), plus a leader combo for
+  Filters. The other 19 hotkey nodes ship unbound; rebind or clear any on
+  the workflow canvas.
+
+### Changed
+
+- The keyword surface grew from 20 to **35 keywords**, all re-mappable in
+  Configure Workflow.
+- The `tod` / `tom` / `tne` smart-list keywords now offer an "Open in
+  TickTick" row first, matching search. Search results break ties by
+  priority and note rows show their tag chips.
+
+### Fixed
+
+- Pressing Enter on a row in any Browse view (folders, lists, tags, tasks,
+  smart lists) now opens it. Previously Enter did nothing there.
+
 ## [2.5] - 2026-07-12
 
 ### Added

@@ -1,93 +1,234 @@
 # TickAL
 
-**TickTick, without opening TickTick.** One hotkey opens your whole TickTick world in Alfred: search it, browse it, add to it, schedule, tag, complete, focus. Every change lands in a local cache first, so nothing waits on the network between keystrokes.
+> **TickTick, without opening TickTick**
 
-![Alfred 5](https://img.shields.io/badge/Alfred-5-blueviolet) ![Version 2.5](https://img.shields.io/badge/version-2.5-blue) ![License MIT](https://img.shields.io/badge/license-MIT-green)
+Fast, keyboard-driven command bar for TickTick, inside Alfred. 
+
+[Search](docs/40-search.md), [add](docs/42-add.md), [browse](docs/41-browse-drill.md), [schedule](docs/43-actions.md#schedule), [tags](docs/43-actions.md#tags), complete, [focus](docs/44-focus.md), [edit notes and descriptions](docs/46-notes-links-images.md#edit-a-note-body), open the calendar, [mint periodic notes](docs/47-periodic.md), [save web pages](docs/46-notes-links-images.md#save-a-url), [open sticky notes](docs/46-notes-links-images.md#sticky-notes), organise projects, [run a CRM](docs/45-crm.md), and more... 
+
+Every change lands in a [local cache](docs/90-settings-sync.md#cache-model) first, so nothing waits on the network between keystrokes.
+
+*All without touching the mouse.*
+
+![Alfred 5](https://img.shields.io/badge/Alfred-5-blueviolet) ![Version 2.6](https://img.shields.io/badge/version-2.6-blue) ![License MIT](https://img.shields.io/badge/license-MIT-green)
+
+> [!IMPORTANT]
+> **First run** - keyword `tlogin` after setting credentials in config
 
 ![Search everything from one box](docs/assets/shots/01-hero-search.png)
+> Keyword `tal` OR *Main hotkey* (set in canvas)
 
-Three chords run everything, on every screen: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**. Type to filter. That is the whole learning curve; everything below is detail.
+Four main keys run everything, on every screen:  
+**`⌥⏎` deeper · `⌘⏎` actions · `⌃⏎` back · `/` more**  
+Type to filter. 
 
-## Search
+> [!TIP]
+> **Quick Links**
+> - [Getting started](docs/10-getting-started.md) for impatient, jump straight in
+> - [Setup](docs/30-setup.md) for complete and detailed setup steps 
+> - [Cheatsheet](docs/95-cheatsheet.md) for every activation method of every action
+> - [Official docs](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs/00-index.md) for a detailed breakdown of each function
 
-One box over lists, sections, tasks, subtasks, tags, folders, smart lists, filters, notes and note bodies. Thirteen one-letter scopes narrow it (`tse t buy` searches tasks only), task rows show a `📝` first-line peek of their note, and the 👉 Last Added scope lists what you just created, newest first. Full scope table: [Search](docs/40-search.md).
+## 🔎 Search
+
+> **One search engine for lists, sections, tasks, subtasks, tags, folders, smart lists, filters, notes and note bodies, periodic notes, and last added.**
 
 ![Search scopes](docs/assets/shots/06-search-scopes.png)
+> Keyword `tse` OR Main hotkey > search OR *Search hotkey* (set in canvas)
 
-## Browse
+Thirteen prefixes narrow the scope (e.g. `t` searches tasks only), while `/` lists all the scopes.  
+![Search scopes](docs/assets/shots/17-search-scope-menu.png)
 
-Drill any list → section → task → subtask ladder with ⌥⏎ and walk back up with ⌃⏎. 📋 Show-all flattens a whole list, grouped by your own TickTick tag order with priorities first. Inbox, Today, Tomorrow and Next 7 Days are each one keyword away. More in [Browse & drill](docs/41-browse-drill.md).
+Habits, matrix, pomodoro, today, tomorrow, next 7 day, inbox, summary, completed, won't do, periodic notes are all actionable from search.  
+Just type: `today`, `tomorrow`, `inbox`, `completed`, `daily note` or `weekly note`...
+
+Task rows show:
+- Priority: `🔴 🟠 🟡 ⚫️`
+- Date/time/duration: `📆 2026-07-14 14:15-15:30`
+- Tags: `#💼Project`
+- Type: `Task`
+- Number of subtasks: `3 subtasks`
+- Breadcrumbs: `List › section (if any) › parent task (for subtasks)`
+- Description: `📝 First-line peek of task note`
+
+> [!TIP]
+> More on search scopes/mechanics: [Docs • Search](docs/40-search.md)
+
+## ⌥ Browse
+
+> **Drill into (browse in Alfred) any folder → list → tag OR section → task → subtask ladder with `⌥⏎` and walk back up with `⌃⏎`.**
 
 ![Drill down and back](docs/assets/shots/drill.gif)
+> *`⌥⏎`* on any row
 
-## Add
+- Filters, smart views (Inbox, Today, Tomorrow...), tags included.
+- `📋 Show-all` flattens a whole list, grouped by your own TickTick tag order with priorities first.
+- Habits, Pomodoro and Matrix aren't drawn in Alfred - `tha` / `tpo` / `tmx` jump to TickTick's own screens ([Views](docs/48-views.md))
 
-A whole task in a single line: `tad Call Anna *tomorrow @14 !2 #calls =bring the contract`. Tokens cover date, time, duration, repeat, reminder, priority, tag, list/section/parent, note, task links and clipboard images; `/` opens the token menu whenever you forget one. Unknown `#tags` are created on the fly, and ⌘⏎ chains the new task straight into a running focus session. Every token, with examples: [Add](docs/42-add.md).
+> [!TIP]
+> More on browse & drill: [Docs • Browse](docs/41-browse-drill.md)
+
+## ➕ Add
+
+> **No dialogs, no tab-through - the whole task is one token line:**
+> 
+> `tad Electrocute Yoda *tomorrow @12:00 !3 #⚔️War ~l ⚡️ Sith Secrets =Yell "Unlimited Power" while at it.`
+> 
+> Description field shows assigned attributes live
 
 ![Add tokens](docs/assets/shots/08-add-tokens.png)
+> Keyword `tad` OR Main hotkey > Add OR *Add hotkey* (set in canvas) OR `⌘⇧⏎` on any row
 
-## Actions
+Tokens cover the basics you'd expect - date, time, priority, tag, list, repeat, reminder.
 
-⌘⏎ on any row opens a menu built for that item: schedule, move, rename, priority, tags, convert task ↔ note, copy link, complete, delete and more. Tag rows get their own menu (open, drill, send everything to focus, delete). The full matrix per item type: [Actions](docs/43-actions.md).
+> [!TIP]
+> `/` opens the token menu whenever you forget one
+> ![Add tokens](docs/assets/shots/15-add-slash-menu.png)
+
+Past what TickTick's own quick-add reaches, the same line can:
+- block out a **duration**, not just a time (`>90m`)
+- drop the task into a **section**, or make it a **subtask** (`~s`, `~p`)
+- **link to another task** (`[[`)
+- attach a **clipboard image** as a real file (`^`)
+- create a **list, note, project, or tag** instead of a task (`L / N / P / T`)
+- chain straight into a **running focus session** (`⌘⏎`)
+
+> [!TIP]
+> More on add mechanics: [Docs • Add](docs/42-add.md)
+
+## ⌘ Actions
+
+> **Invoke dynamic list of every action available per item type and conditions with `⌘⏎` on any row** 
 
 ![Actions menu](docs/assets/shots/09-actions-menu.png)
+> *`⌘⏎`* on any row
 
-## Focus
+- [Schedule](docs/43-actions.md#schedule), [move](docs/43-actions.md#move), [rename](docs/43-actions.md#rename), [priority](docs/43-actions.md#priority), [tags](docs/43-actions.md#tags), [convert task ↔ note](docs/43-actions.md#convert-to-note--task), copy link, complete, delete and more. 
+- Tag rows get [their own menu](docs/43-actions.md#tag-smart-list-and-buffer-menus) (open, [drill](docs/41-browse-drill.md#the-drill-ladder), send everything to [focus](docs/44-focus.md), delete). 
 
-Start a timer ⏱️ or pomodoro 🍅 on any task from `tfo` or straight off a search row. Stage checkbox blocks in the focus task (one at a time, a whole tag or section, today's list, or the 🅿️ buffer), tick boxes as you go, then sweep: every ticked box completes its real task. A floating focus bar shows the clock and ticks, reorders and sweeps without opening Alfred. All of it: [Focus](docs/44-focus.md).
+> [!TIP]
+> More on the actions matrix: [Docs • Actions](docs/43-actions.md)
+
+## 🎯 Focus
+
+> **Start a [timer](docs/44-focus.md#start) ⏱️ or [pomodoro](docs/44-focus.md#start) 🍅 on any task. Open a [Focus bar](docs/44-focus.md#the-bar) and a sticky note. One keystroke leads to focus. No clicking around.**
 
 ![Floating focus bar](docs/assets/shots/12-focus-bar.png)
+> Keyword `tfo` OR Main hotkey > Focus OR *Focus hotkey* (set in canvas) OR `⌃⇧` on a task
 
-## Periodic notes
+- *Open the focused task as a [sticky note](docs/46-notes-links-images.md#sticky-notes) - from Alfred, no right mouse clicks.*
+- Stage [checkbox blocks](docs/44-focus.md#checkbox-blocks) in the focus task (one at a time, a whole tag or section, today's list, or act on multiple tasks at once via 🅿️ [buffer](docs/41-browse-drill.md#buffer-))
+- Tick boxes as you go
+- [Sweep](docs/44-focus.md#sweep--the-focus-record): every ticked box completes its real task - and vice versa
+- **[Floating focus bar](docs/44-focus.md#the-bar)** shows the clock and ticks, open sticky note, pause and stop focus, reorders and sweeps without opening Alfred
 
-Obsidian-style daily, weekly, monthly, quarterly and yearly notes minted inside TickTick, new in 2.5 as a preview. Breadcrumbs link the whole pyramid, mornings bring weather, a quote, countdowns and habits, journals ask their questions in prompt dialogs, a money log rolls up from day to year, and the ✅ Today section mirrors real tasks: tick the box in the note and the task completes. The whole system: [Periodic notes](docs/47-periodic.md).
+> [!TIP]
+> More on Focus workflow: [Docs • Focus](docs/44-focus.md)
+
+## 💫 Periodic notes
+
+> **Obsidian-style [daily](docs/47-periodic.md#the-daily-note), [weekly](docs/47-periodic.md#the-weekly-note), monthly, quarterly and yearly notes minted inside TickTick**
+
+> [!IMPORTANT]
+> Requires setup - periodic notes stay dormant until you set the list id; read the [setup](docs/47-periodic.md#setup) before you rely on them
 
 ![Daily note](docs/assets/shots/19-periodic-note.png)
+> Keyword `tpn` OR Main hotkey > Periodic OR Periodic hotkey (set in canvas) OR a direct keyword (`tdn`, `tmj`, ...) OR open periodic notes straight from search
 
-## CRM
+- Auto-mints on open, or every morning at 04:30 via an optional [agent](docs/47-periodic.md#the-0430-agent) that seals the periods that just closed
+- Breadcrumbs link the whole pyramid
+- Mornings bring weather, a quote, countdowns and habits
+- Logs your mood (😊) and rates the day (★)
+- [Journals](docs/47-periodic.md#journals) ask their questions in prompt dialogs
+- Links goals down the pyramid: a daily one-thing, a weekly goal, next week's goals from the [weekly review](docs/47-periodic.md#the-weekly-note)
+- [Income log](docs/47-periodic.md#money---the-roll-up-pyramid) rolls up from day to year
+- The [weekly note](docs/47-periodic.md#the-weekly-note) builds its own stats: completed vs last week, top tasks, focus by day, habit streaks
+- [Today section](docs/47-periodic.md#the-daily-note) mirrors real tasks: tick the box in the note and the task completes. 
+- Direct keywords jump straight to any note or action: `tdn` today, `twn` week, `tmj` morning journal, `tat` add to today ([full list](docs/47-periodic.md#direct-keywords))
 
-An opinionated booking hub: 🔥 group tags for your client lists, automatic "Prepare for [[booking]]" follow-ups, and clipboard-image attach for reference shots. Skip its list id in Configure Workflow and the module stays dormant. Setup and flow: [CRM](docs/45-crm.md).
+> [!TIP]
+> The whole system: [Docs • Periodic notes](docs/47-periodic.md)
+
+## 📈 CRM
+
+> **A simple, automated [booking hub, customer tracker and logbook](docs/45-crm.md#the-hub)**
+
+> [!IMPORTANT]
+> Requires setup - CRM stays dormant until you set its list id; read the [setup and flow](docs/45-crm.md#setup) before you rely on it
 
 ![CRM hub](docs/assets/shots/13-crm-hub.png)
+> Keyword `tcr` OR Main hotkey > CRM OR CRM hotkey (set in canvas)
 
-## Notes, links and images
+- [Group tags](docs/45-crm.md#the--tag-group) for your client lists
+- Automatic "Prepare for `[[booking]]`" [follow-ups](docs/45-crm.md#the-automatic-prepare-follow-up)
+- [Clipboard-image attachments](docs/46-notes-links-images.md#images) for reference 
+- Per customer notes with automated links to separate projects per customer
+- Logbook to keep track of each project
 
-Edit a task's note in a proper text window, link tasks to each other with `[[`, save the active browser tab as a task with `tur`, and paste clipboard images as real attachments. Details: [Notes, links & images](docs/46-notes-links-images.md).
+> [!TIP]
+> The whole system: [Docs • CRM](docs/45-crm.md)
+
+## 📝 Notes, links and images
 
 ![Note editor](docs/assets/shots/14-note-editor.png)
+
+- [Save the active browser tab](docs/46-notes-links-images.md#save-a-url) as a task with `tur` (or hotkey - set in canvas)
+- [Edit a task's note](docs/46-notes-links-images.md#edit-a-note-body) in Alfred text window
+- [Link tasks to each other](docs/46-notes-links-images.md#task-links) with `[[`
+- Paste [clipboard images](docs/46-notes-links-images.md#images) as real attachments
+
+> [!TIP]
+> Read more: [Notes, links & images](docs/46-notes-links-images.md)
 
 ## Requirements
 
 - macOS with [Alfred 5](https://www.alfredapp.com/) + Powerpack
 - Python 3, any install: Homebrew (Apple Silicon or Intel) or Xcode CLT, the workflow finds it itself
 - A TickTick account + your own free TickTick developer app (2 minutes, next section)
-- Optional: `pip3 install pyobjc` for the floating focus bar; every other focus feature works without it
+- Optional: `pip3 install pyobjc` for the [floating focus bar](docs/30-setup.md#focus-bar) and clipboard-image attach; every other feature works without it
 
 ## Setup
 
 1. [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** and **Client Secret** into Configure Workflow
 3. Run `tlogin`: a browser opens, log in and approve
-4. Run `tsy` to prime the cache, and set your main hotkey on the workflow canvas
-5. Recommended: `tup` → **Attachment Login** (password masked, only a session token is stored). One sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your own tag order on every sync
-6. Optional: paste list and folder ids for the CRM / CTA / Projects extras
+4. Run `tsy` to prime the cache
+5. Set your main hotkey on the workflow canvas
+6. Recommended: `tup` → **Attachment Login** (password masked, only a session token is stored) - or **Attachment Token** if you sign in with Apple. One sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your own tag order on every sync
+7. Optional: paste list and folder ids for the CRM / CTA / Projects extras
 
-Step-by-step with screenshots: [Getting started](docs/10-getting-started.md) · every credential detail: [Setup](docs/30-setup.md).
+> [!TIP]
+> Step-by-step with screenshots: [Getting started](docs/10-getting-started.md) · every credential detail: [Setup](docs/30-setup.md).
 
 ## Keywords and keys
 
-| | |
-|---|---|
-| Core | `tal` main menu · `tse` search · `tad` add · `tup` settings · `tca` calendar |
-| Views | `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer |
-| More | `tfo` focus · `tur` save browser tab · `tst` statistics · `tcr` crm · `tsy` sync · `tdo` docs |
-| Periodic | `pn` scope in search: daily to yearly notes, journals, money log |
+> [!TIP]
+> **Modifiers**
+> ⌘ All actions ⌥ Browse ⌥⌘ Copy link ⇧ Complete ⌥⇧ Send to buffer ⌃⇧ Start focus ⌘⇧ Add here
 
-On task rows: ⇧⏎ complete · ⌥⇧⏎ send to the 🅿️ buffer · ⌥⌘⏎ copy link · ⌃⇧⏎ start focus · ⌘⇧⏎ add here. All 20 keywords are re-mappable in Configure Workflow, and 7 hotkey nodes ship unbound, ready to assign. The whole map on one page: [Cheatsheet](docs/95-cheatsheet.md).
+|          |                                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Core     | `tal` main menu · `tse` search · `tad` add · `tup` settings · `tca` calendar                                                   |
+| Views    | `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer |
+| More     | `tfo` focus · `tur` save browser tab · `tst` statistics · `tcr` crm · `tsy` sync · `tdo` docs                                  |
+| Periodic | `tpn` surface · `tdn`/`twn`/`tmn`/`tqn`/`tyn` day-to-year notes · `tmj`/`tej` journals · `tde` entry · `tmo` income · `tdg` day goal · `tat` add to today |
+| Native views | `tha` habits · `tpo` pomodoro · `tmx` matrix (also `tca` calendar · `tst` statistics)                                                               |
+
+All 35 keywords are re-mappable in Configure Workflow. 15 actions ship with a default ⌥⌘ global hotkey; the other 19 ship unbound - rebind or clear any on the workflow canvas. 
+
+> [!TIP]
+> The whole map on one page: [Cheatsheet](docs/95-cheatsheet.md).
 
 ## Cache and sync
 
-Everything reads a local JSON cache that is patched in place on every write, so your own changes show up instantly and only outside edits need a refresh. `tsy` refreshes in full. An optional LaunchAgent syncs hourly in the background: [Settings & sync](docs/90-settings-sync.md).
+![Sync](docs/assets/shots/21-sync.png)
+
+- Everything reads a [local JSON cache](docs/90-settings-sync.md#cache-model) that is patched in place on every write, so your own changes show up instantly and only outside edits need a refresh.
+- `tsy` refreshes in full. 
+- An optional [LaunchAgent syncs hourly](docs/90-settings-sync.md#hourly-background-sync) in the background
+
+> [!TIP]
+> More: [Docs • Settings & sync](docs/90-settings-sync.md)
 
 ## Tests
 
@@ -95,23 +236,24 @@ Everything reads a local JSON cache that is patched in place on every write, so 
 
 ## Limitations
 
-- macOS only, Alfred Powerpack required.
-- You register your own TickTick developer app; API credentials cannot be bundled.
-- Attachments, the Completed list, nested tags, tag creation and the tags/folders/filters auto-config ride TickTick's undocumented v2 API with a session token, so they can break without notice. Everything else uses the official API.
-- The floating focus bar needs PyObjC; focus itself does not.
-- The CRM module is opinionated by design: a dedicated list, 🔥-prefixed group tags, a fixed booking → prepare flow.
+- macOS only, Alfred Powerpack required
+- You register your own TickTick developer app; API credentials cannot be bundled
+- Attachments, the Completed list, nested tags, tag creation and the tags/folders/filters auto-config ride TickTick's undocumented v2 API with a session token, so they can break without notice. Everything else uses the official API
+- The floating focus bar and clipboard-image attach need PyObjC; focus itself does not
 
 ## Docs
 
-| | Page | Covers |
-|---|------|--------|
-| Learn | [Getting started](docs/10-getting-started.md) | Install to first task |
-| | [Concepts](docs/20-concepts.md) | Scopes, drill, tokens, buffer, focus blocks |
-| Do | [Search](docs/40-search.md) · [Browse & drill](docs/41-browse-drill.md) · [Add](docs/42-add.md) · [Actions](docs/43-actions.md) | The daily drivers |
-| | [Focus](docs/44-focus.md) · [CRM](docs/45-crm.md) · [Notes, links & images](docs/46-notes-links-images.md) · [Periodic notes](docs/47-periodic.md) | The deep features |
-| Reference | [Setup](docs/30-setup.md) · [Settings & sync](docs/90-settings-sync.md) · [Cheatsheet](docs/95-cheatsheet.md) · [Troubleshooting](docs/99-troubleshooting.md) | Every option, key and fix |
+|           | Page                                                                                                                                                  | Covers                                      |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Learn     | [Getting started](docs/10-getting-started.md)                                                                                                           | Install to first task                       |
+|           | [Concepts](docs/20-concepts.md)                                                                                                                         | Scopes, drill, tokens, buffer, focus blocks |
+| Do        | [Search](docs/40-search.md) · [Browse & drill](docs/41-browse-drill.md) · [Add](docs/42-add.md) · [Actions](docs/43-actions.md)                               | The daily drivers                           |
+|           | [Focus](docs/44-focus.md) · [Notes, links & images](docs/46-notes-links-images.md)                                                                        | The deep features                           |
+| Workflows | [CRM](docs/45-crm.md) · [Periodic notes](docs/47-periodic.md)                                                                                             | Set up + read first                         |
+| Reference | [Setup](docs/30-setup.md) · [Settings & sync](docs/90-settings-sync.md) · [Cheatsheet](docs/95-cheatsheet.md) · [Troubleshooting](docs/99-troubleshooting.md) | Every option, key and fix                   |
 
-Or run `tdo` from Alfred once installed.
+> [!TIP]
+> Access docs with `tdo` keyword from Alfred once workflow is installed
 
 ## License
 
