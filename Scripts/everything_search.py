@@ -461,7 +461,8 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
             "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
         },
         variables={"item_type": "task", "task_id": tid, "task_title": name,
-                   "task_list_id": pid, "search_name": name, "type_rank": 2},
+                   "task_list_id": pid, "search_name": name, "type_rank": 2,
+                   "_priority": t.get("priority") or 0},
     )
 
 
@@ -958,6 +959,7 @@ def main():
                         "task_list_id": pid,
                         "search_name":  ssearch,
                         "type_rank":    2 + depths.get(tid, 0),
+                        "_priority":    t.get("priority") or 0,
                     },
                 ))
 
@@ -997,12 +999,14 @@ def main():
                 if scope == "tag" and exact_tag:
                     # Tag locked → query filters note titles again
                     title       = ndisp
-                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True)
+                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True,
+                                                 note=note_snippet(ncontent))
                     search_name = ntitle
                 elif scope == "tag":
                     # Tag mode: match the query against the note's tags
                     title       = ndisp
-                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True)
+                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True,
+                                                 note=note_snippet(ncontent))
                     search_name = " ".join(ntags)
                 elif scope == "note_content":
                     # Content mode: content preview in title, name · folder as breadcrumb
@@ -1013,8 +1017,14 @@ def main():
                 else:
                     # Title mode (default): note name in title, folder as breadcrumb
                     title       = ndisp
-                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True)
+                    subtitle    = build_subtitle(0, "Note", breadcrumb=nfolder, actions=True,
+                                                 note=note_snippet(ncontent))
                     search_name = f"{ntitle} {nfolder}"
+
+                # Tag chips on note rows, same as task rows get via build_title
+                ntag_str = fmt_tags(ntags)
+                if ntag_str:
+                    title = f"{title} {ntag_str}"
 
                 items.append(alfred.item(
                     uid=f"note-{nid}",
@@ -1095,7 +1105,7 @@ def main():
                     s = 3
                 itype = v.get("item_type", "task")
                 depth = v.get("type_rank", 2) if itype == "task" else 0
-                return (s, _ORD.get(itype, 1), depth)
+                return (s, _ORD.get(itype, 1), depth, -int(v.get("_priority") or 0))
 
             ann = {id(x): _annot(x) for x in items}
             if any(a[0] <= 1 for a in ann.values()):

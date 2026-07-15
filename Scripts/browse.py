@@ -851,6 +851,21 @@ def render_smart(kind, query):
             valid=False,
         ))
 
+    # ↗️ Open the smart list in TickTick as the FIRST row - parity with search's
+    # inline view. The tod/tom/tne keywords + Today/Tomorrow/Next-7 hotkeys land
+    # here and previously offered no "open in TickTick" action, only the rows.
+    _deeplink = {"today":     "ticktick://v1/show?smartlist=today",
+                 "tomorrow":  "ticktick://v1/show?smartlist=tomorrow",
+                 "next7days": "ticktick://v1/show?smartlist=next_7_days"}.get(kind)
+    if _deeplink:
+        items.insert(0, alfred.item(
+            uid=f"smart-open-{kind}",
+            title=f"↗️ Open {label} in TickTick",
+            subtitle="Smart list  |  ⏎↗️",
+            arg=f"open:{_deeplink}",
+            valid=True,
+        ))
+
     return add_back(items, "")
 
 # ── Level: inbox ─────────────────────────────────────────────────────────────
