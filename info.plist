@@ -23,6 +23,16 @@
 		<array>
 			<dict>
 				<key>destinationuid</key>
+				<string>56151466-748D-4737-985E-DD05C212B5BF</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
 				<string>EDE420E3-AFCE-4509-B279-8333920CA098</string>
 				<key>modifiers</key>
 				<integer>1179648</integer>
@@ -237,6 +247,435 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>0FE7000F-90A1-4B2C-8D3E-00000000000F</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0001-90A1-4B2C-8D3E-000000000001</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0003-90A1-4B2C-8D3E-000000000003</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0002-90A1-4B2C-8D3E-000000000002</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0003-90A1-4B2C-8D3E-000000000003</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0004-90A1-4B2C-8D3E-000000000004</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0005-90A1-4B2C-8D3E-000000000005</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0006-90A1-4B2C-8D3E-000000000006</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0008-90A1-4B2C-8D3E-000000000008</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0007-90A1-4B2C-8D3E-000000000007</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0008-90A1-4B2C-8D3E-000000000008</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0009-90A1-4B2C-8D3E-000000000009</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED000A-90A1-4B2C-8D3E-00000000000A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED000B-90A1-4B2C-8D3E-00000000000B</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED000D-90A1-4B2C-8D3E-00000000000D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED000C-90A1-4B2C-8D3E-00000000000C</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED000D-90A1-4B2C-8D3E-00000000000D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED000E-90A1-4B2C-8D3E-00000000000E</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED000F-90A1-4B2C-8D3E-00000000000F</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0010-90A1-4B2C-8D3E-000000000010</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0012-90A1-4B2C-8D3E-000000000012</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0011-90A1-4B2C-8D3E-000000000011</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0012-90A1-4B2C-8D3E-000000000012</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0013-90A1-4B2C-8D3E-000000000013</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0014-90A1-4B2C-8D3E-000000000014</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0015-90A1-4B2C-8D3E-000000000015</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0017-90A1-4B2C-8D3E-000000000017</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0016-90A1-4B2C-8D3E-000000000016</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0017-90A1-4B2C-8D3E-000000000017</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0018-90A1-4B2C-8D3E-000000000018</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0019-90A1-4B2C-8D3E-000000000019</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED001A-90A1-4B2C-8D3E-00000000001A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED001C-90A1-4B2C-8D3E-00000000001C</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED001B-90A1-4B2C-8D3E-00000000001B</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED001C-90A1-4B2C-8D3E-00000000001C</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED001D-90A1-4B2C-8D3E-00000000001D</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED001E-90A1-4B2C-8D3E-00000000001E</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED001F-90A1-4B2C-8D3E-00000000001F</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0021-90A1-4B2C-8D3E-000000000021</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0020-90A1-4B2C-8D3E-000000000020</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0021-90A1-4B2C-8D3E-000000000021</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0022-90A1-4B2C-8D3E-000000000022</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0023-90A1-4B2C-8D3E-000000000023</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0024-90A1-4B2C-8D3E-000000000024</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0026-90A1-4B2C-8D3E-000000000026</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0025-90A1-4B2C-8D3E-000000000025</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0026-90A1-4B2C-8D3E-000000000026</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0027-90A1-4B2C-8D3E-000000000027</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0028-90A1-4B2C-8D3E-000000000028</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0029-90A1-4B2C-8D3E-000000000029</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED002B-90A1-4B2C-8D3E-00000000002B</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED002A-90A1-4B2C-8D3E-00000000002A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED002B-90A1-4B2C-8D3E-00000000002B</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED002C-90A1-4B2C-8D3E-00000000002C</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED002D-90A1-4B2C-8D3E-00000000002D</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED002E-90A1-4B2C-8D3E-00000000002E</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0030-90A1-4B2C-8D3E-000000000030</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED002F-90A1-4B2C-8D3E-00000000002F</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0030-90A1-4B2C-8D3E-000000000030</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0031-90A1-4B2C-8D3E-000000000031</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0032-90A1-4B2C-8D3E-000000000032</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0033-90A1-4B2C-8D3E-000000000033</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0035-90A1-4B2C-8D3E-000000000035</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0034-90A1-4B2C-8D3E-000000000034</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0035-90A1-4B2C-8D3E-000000000035</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>0FED0036-90A1-4B2C-8D3E-000000000036</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0FED0037-90A1-4B2C-8D3E-000000000037</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -634,6 +1073,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>B2F3C842-CD1B-4BEC-A84B-AAC83E9C2D42</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>2D500B2B-BD2E-45E2-A4FE-5F86441EED6A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>009C2119-7E63-42B3-881E-2D3A4B81780F</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -2457,6 +2909,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>3C0F4E07-7120-4453-918C-D679EF4D873A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>C22397C6-9A6F-4CC7-B9AB-8081FB678E78</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E6CF857B-7087-472E-9077-56F4BA89A91C</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -5084,7 +5549,7 @@ fi</string>
 			<key>config</key>
 			<dict>
 				<key>externaltriggerid</key>
-				<string>HKperiodic</string>
+				<string>WFperiodic</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -6826,6 +7291,29 @@ printf '%s' "$1"</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_open:daily"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED0005-90A1-4B2C-8D3E-000000000005</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
 				<string>KEY=$(echo "$1" | sed 's/^cal//' | sed 's/^_//')
 
 osascript \
@@ -6860,6 +7348,21 @@ fi</string>
 			<string>E21B489A-27E0-4AA1-B720-876B3F1067B5</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnDaily</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED0004-90A1-4B2C-8D3E-000000000004</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7177,6 +7680,29 @@ esac</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_open:weekly"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED000A-90A1-4B2C-8D3E-00000000000A</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
 				<string>open "https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/tree/main/docs"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
@@ -7191,6 +7717,21 @@ esac</string>
 			<string>263D8F17-BD33-47C5-B7A3-8CD9F63D6277</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnWeekly</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED0009-90A1-4B2C-8D3E-000000000009</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7460,6 +8001,29 @@ esac</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_open:monthly"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED000F-90A1-4B2C-8D3E-00000000000F</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
 				<string>bash "Scripts/py.sh" "Scripts/rename_action.py" "$1"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
@@ -7591,6 +8155,21 @@ esac</string>
 			<string>8C64FDCF-5C97-4E2F-8167-B23C177E41F1</string>
 			<key>version</key>
 			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnMonthly</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED000E-90A1-4B2C-8D3E-00000000000E</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -8054,6 +8633,82 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "ticktick://habit"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FE70005-90A1-4B2C-8D3E-000000000005</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_open:quarterly"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED0014-90A1-4B2C-8D3E-000000000014</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>OpenHabits</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FE70004-90A1-4B2C-8D3E-000000000004</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnQuarterly</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED0013-90A1-4B2C-8D3E-000000000013</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
@@ -8283,6 +8938,82 @@ esac</string>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
 			<string>0A07346C-76BC-4642-A897-2DF60381521A</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "ticktick://focus"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FE7000A-90A1-4B2C-8D3E-00000000000A</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_open:yearly"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED0019-90A1-4B2C-8D3E-000000000019</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>OpenPomo</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FE70009-90A1-4B2C-8D3E-000000000009</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnYearly</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED0018-90A1-4B2C-8D3E-000000000018</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -8547,6 +9278,82 @@ esac</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_journal:morning"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED001E-90A1-4B2C-8D3E-00000000001E</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>OpenMatrix</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FE7000E-90A1-4B2C-8D3E-00000000000E</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnMorningJournal</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED001D-90A1-4B2C-8D3E-00000000001D</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "ticktick://matrix"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FE7000F-90A1-4B2C-8D3E-00000000000F</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
 				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "Search" in workflow "com.vex.tickal" with argument "v "'</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
@@ -8774,6 +9581,29 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_journal:evening"'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED0023-90A1-4B2C-8D3E-000000000023</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>action</key>
 				<integer>0</integer>
 				<key>argument</key>
@@ -8801,6 +9631,21 @@ esac</string>
 			<string>D609CC89-CFB7-46D6-85E0-1A63E7FE2123</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnEveningJournal</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED0022-90A1-4B2C-8D3E-000000000022</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -8917,6 +9762,44 @@ esac</string>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
 			<string>6A9F3530-C710-41D1-A911-D3B5753308C7</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "Search" in workflow "com.vex.tickal" with argument "pn $ "'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED0028-90A1-4B2C-8D3E-000000000028</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnIncome</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED0027-90A1-4B2C-8D3E-000000000027</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9269,6 +10152,29 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "Search" in workflow "com.vex.tickal" with argument "pn day "'</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FED002D-90A1-4B2C-8D3E-00000000002D</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>matchmode</key>
 				<integer>0</integer>
 				<key>matchstring</key>
@@ -9297,6 +10203,94 @@ esac</string>
 			<string>alfred.workflow.utility.argument</string>
 			<key>uid</key>
 			<string>48041D49-1871-4C61-BEDD-FE47BF8E4852</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnDayGoal</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED002C-90A1-4B2C-8D3E-00000000002C</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>OpenHabits</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FE70003-90A1-4B2C-8D3E-000000000003</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FE70002-90A1-4B2C-8D3E-000000000002</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:habits_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Habits view</string>
+				<key>text</key>
+				<string>Habits · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FE70001-90A1-4B2C-8D3E-000000000001</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9565,100 +10559,12 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:habits_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Habits view</string>
-				<key>text</key>
-				<string>Habits · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>0FE70001-90A1-4B2C-8D3E-000000000001</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>0FE70002-90A1-4B2C-8D3E-000000000002</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>OpenHabits</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>0FE70003-90A1-4B2C-8D3E-000000000003</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>OpenHabits</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>0FE70004-90A1-4B2C-8D3E-000000000004</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>open "ticktick://habit"</string>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "Search" in workflow "com.vex.tickal" with argument "pn + "'</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -9669,30 +10575,22 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
-			<string>0FE70005-90A1-4B2C-8D3E-000000000005</string>
+			<string>0FED0032-90A1-4B2C-8D3E-000000000032</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:pomo_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Pomodoro / Focus view</string>
-				<key>text</key>
-				<string>Pomodoro · TickAL</string>
-				<key>withspace</key>
+				<key>availableviaurlhandler</key>
 				<false/>
+				<key>triggerid</key>
+				<string>PnEntry</string>
 			</dict>
 			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
+			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
-			<string>0FE70006-90A1-4B2C-8D3E-000000000006</string>
+			<string>0FED0031-90A1-4B2C-8D3E-000000000031</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9730,6 +10628,29 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:pomo_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Pomodoro / Focus view</string>
+				<key>text</key>
+				<string>Pomodoro · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FE70006-90A1-4B2C-8D3E-000000000006</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>externaltriggerid</key>
 				<string>OpenPomo</string>
 				<key>passinputasargument</key>
@@ -9749,27 +10670,12 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>OpenPomo</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>0FE70009-90A1-4B2C-8D3E-000000000009</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>open "ticktick://focus"</string>
+				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "Search" in workflow "com.vex.tickal" with argument "pn today "'</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -9780,30 +10686,22 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
-			<string>0FE7000A-90A1-4B2C-8D3E-00000000000A</string>
+			<string>0FED0037-90A1-4B2C-8D3E-000000000037</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:matrix_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Eisenhower matrix</string>
-				<key>text</key>
-				<string>Matrix · TickAL</string>
-				<key>withspace</key>
+				<key>availableviaurlhandler</key>
 				<false/>
+				<key>triggerid</key>
+				<string>PnAddToday</string>
 			</dict>
 			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
+			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
-			<string>0FE7000B-90A1-4B2C-8D3E-00000000000B</string>
+			<string>0FED0036-90A1-4B2C-8D3E-000000000036</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9841,6 +10739,29 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:matrix_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Eisenhower matrix</string>
+				<key>text</key>
+				<string>Matrix · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FE7000B-90A1-4B2C-8D3E-00000000000B</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>externaltriggerid</key>
 				<string>OpenMatrix</string>
 				<key>passinputasargument</key>
@@ -9860,38 +10781,803 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>availableviaurlhandler</key>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:daily_note_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open today note</string>
+				<key>text</key>
+				<string>Daily note · TickAL</string>
+				<key>withspace</key>
 				<false/>
-				<key>triggerid</key>
-				<string>OpenMatrix</string>
 			</dict>
 			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
+			<string>alfred.workflow.input.keyword</string>
 			<key>uid</key>
-			<string>0FE7000E-90A1-4B2C-8D3E-00000000000E</string>
+			<string>0FED0001-90A1-4B2C-8D3E-000000000001</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>concurrently</key>
+				<key>externaltriggerid</key>
+				<string>PnDaily</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0003-90A1-4B2C-8D3E-000000000003</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
 				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>open "ticktick://matrix"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
+				<key>focusedappvariablename</key>
 				<string></string>
-				<key>type</key>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
 				<integer>0</integer>
 			</dict>
 			<key>type</key>
-			<string>alfred.workflow.action.script</string>
+			<string>alfred.workflow.trigger.hotkey</string>
 			<key>uid</key>
-			<string>0FE7000F-90A1-4B2C-8D3E-00000000000F</string>
+			<string>0FED0002-90A1-4B2C-8D3E-000000000002</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnWeekly</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0008-90A1-4B2C-8D3E-000000000008</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED0007-90A1-4B2C-8D3E-000000000007</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:weekly_note_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open week note</string>
+				<key>text</key>
+				<string>Weekly note · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED0006-90A1-4B2C-8D3E-000000000006</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED000C-90A1-4B2C-8D3E-00000000000C</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:monthly_note_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open month note</string>
+				<key>text</key>
+				<string>Monthly note · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED000B-90A1-4B2C-8D3E-00000000000B</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnMonthly</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED000D-90A1-4B2C-8D3E-00000000000D</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:quarterly_note_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open quarter note</string>
+				<key>text</key>
+				<string>Quarterly note · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED0010-90A1-4B2C-8D3E-000000000010</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnQuarterly</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0012-90A1-4B2C-8D3E-000000000012</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED0011-90A1-4B2C-8D3E-000000000011</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnYearly</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0017-90A1-4B2C-8D3E-000000000017</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED0016-90A1-4B2C-8D3E-000000000016</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:yearly_note_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open year note</string>
+				<key>text</key>
+				<string>Yearly note · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED0015-90A1-4B2C-8D3E-000000000015</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED001B-90A1-4B2C-8D3E-00000000001B</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:morning_journal_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Answer morning</string>
+				<key>text</key>
+				<string>Morning journal · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED001A-90A1-4B2C-8D3E-00000000001A</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnMorningJournal</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED001C-90A1-4B2C-8D3E-00000000001C</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnEveningJournal</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0021-90A1-4B2C-8D3E-000000000021</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:evening_journal_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Answer evening</string>
+				<key>text</key>
+				<string>Evening journal · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED001F-90A1-4B2C-8D3E-00000000001F</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED0020-90A1-4B2C-8D3E-000000000020</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnIncome</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0026-90A1-4B2C-8D3E-000000000026</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED0025-90A1-4B2C-8D3E-000000000025</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:income_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Log money made</string>
+				<key>text</key>
+				<string>Income · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED0024-90A1-4B2C-8D3E-000000000024</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED002A-90A1-4B2C-8D3E-00000000002A</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:daygoal_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Pick today one thing</string>
+				<key>text</key>
+				<string>Day goal · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED0029-90A1-4B2C-8D3E-000000000029</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnDayGoal</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED002B-90A1-4B2C-8D3E-00000000002B</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED002F-90A1-4B2C-8D3E-00000000002F</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnEntry</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0030-90A1-4B2C-8D3E-000000000030</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:entry_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Log win nag thought</string>
+				<key>text</key>
+				<string>Add entry · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED002E-90A1-4B2C-8D3E-00000000002E</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:addtoday_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Task to today</string>
+				<key>text</key>
+				<string>Add to today · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FED0033-90A1-4B2C-8D3E-000000000033</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>PnAddToday</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FED0035-90A1-4B2C-8D3E-000000000035</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FED0034-90A1-4B2C-8D3E-000000000034</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -9909,8 +11595,9 @@ esac</string>
 1. Go to [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** + **Client Secret** into the fields above
 3. Run `tlogin` - a browser opens; log in and approve
-4. Run `tsy` to prime the cache, and set your main hotkey (top-left node on the canvas)
-5. *Optional but recommended* - one sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `tup` → **Attachment Login** (masked; only a session token is stored) - or paste a token via **Attachment Token** (Sign-in-with-Apple; guide in the docs)
+4. Run `tsy` to prime the cache
+5. Set your main hotkey (top-left node on the canvas)
+6. Sign-in to unlock attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `tup` → **Attachment Login** (masked; only a session token is stored) - or paste a token via **Attachment Token** (Sign-in-with-Apple; guide in the docs)
 6. *Optional* - CRM / CTA / Projects features: paste your list &amp; folder ids above (the docs show how to copy an id)
 
 ## Usage
@@ -9919,7 +11606,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 - Views: `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer
 - `tfo` focus · `tur` save browser tab · `tst` statistics · `tcr` crm · `tsy` sync · `tdo` docs
 - 💫 Periodic notes: `pn` scope in search - daily / weekly / monthly notes, journals, money log
-- Add tokens: `*` date · `@` time · `!` priority · `#` tag · `=` note · `[[` task link - or type `/` for the menu</string>
+- Add tokens: `*` date · `@` time · `!` priority · `#` tag · `=` note · `[[` task link - or type `/` for the menu
+
+Please consult the docs for all features, how tos and explanations, there is too much to fit in this about. 
+[Docs • TickAL](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs/00-index.md)</string>
 	<key>uidata</key>
 	<dict>
 		<key>009C2119-7E63-42B3-881E-2D3A4B81780F</key>
@@ -9956,9 +11646,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>BROWSE (unified)</string>
 			<key>xpos</key>
-			<real>2225.0</real>
+			<real>2220.0</real>
 			<key>ypos</key>
-			<real>610.0</real>
+			<real>620.0</real>
 		</dict>
 		<key>0A07346C-76BC-4642-A897-2DF60381521A</key>
 		<dict>
@@ -10040,17 +11730,21 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>0FE70004-90A1-4B2C-8D3E-000000000004</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>2910.0</real>
+			<real>2155.0</real>
 		</dict>
 		<key>0FE70005-90A1-4B2C-8D3E-000000000005</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
 			<key>xpos</key>
-			<real>3215.0</real>
+			<real>3165.0</real>
 			<key>ypos</key>
-			<real>2910.0</real>
+			<real>2155.0</real>
 		</dict>
 		<key>0FE70006-90A1-4B2C-8D3E-000000000006</key>
 		<dict>
@@ -10085,17 +11779,21 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>0FE70009-90A1-4B2C-8D3E-000000000009</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>3040.0</real>
+			<real>2265.0</real>
 		</dict>
 		<key>0FE7000A-90A1-4B2C-8D3E-00000000000A</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
 			<key>xpos</key>
-			<real>3215.0</real>
+			<real>3165.0</real>
 			<key>ypos</key>
-			<real>3040.0</real>
+			<real>2265.0</real>
 		</dict>
 		<key>0FE7000B-90A1-4B2C-8D3E-00000000000B</key>
 		<dict>
@@ -10130,17 +11828,560 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>0FE7000E-90A1-4B2C-8D3E-00000000000E</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>3170.0</real>
+			<real>2375.0</real>
 		</dict>
 		<key>0FE7000F-90A1-4B2C-8D3E-00000000000F</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
 			<key>xpos</key>
-			<real>3215.0</real>
+			<real>3165.0</real>
 			<key>ypos</key>
-			<real>3170.0</real>
+			<real>2375.0</real>
+		</dict>
+		<key>0FED0001-90A1-4B2C-8D3E-000000000001</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>DAILY NOTE</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>3135.0</real>
+		</dict>
+		<key>0FED0002-90A1-4B2C-8D3E-000000000002</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>DAILY NOTE</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>3135.0</real>
+		</dict>
+		<key>0FED0003-90A1-4B2C-8D3E-000000000003</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>3135.0</real>
+		</dict>
+		<key>0FED0004-90A1-4B2C-8D3E-000000000004</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>1825.0</real>
+		</dict>
+		<key>0FED0005-90A1-4B2C-8D3E-000000000005</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>1825.0</real>
+		</dict>
+		<key>0FED0006-90A1-4B2C-8D3E-000000000006</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>WEEKLY NOTE</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>3265.0</real>
+		</dict>
+		<key>0FED0007-90A1-4B2C-8D3E-000000000007</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>WEEKLY NOTE</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>3265.0</real>
+		</dict>
+		<key>0FED0008-90A1-4B2C-8D3E-000000000008</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>3265.0</real>
+		</dict>
+		<key>0FED0009-90A1-4B2C-8D3E-000000000009</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>1935.0</real>
+		</dict>
+		<key>0FED000A-90A1-4B2C-8D3E-00000000000A</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>1935.0</real>
+		</dict>
+		<key>0FED000B-90A1-4B2C-8D3E-00000000000B</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>MONTHLY NOTE</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>3395.0</real>
+		</dict>
+		<key>0FED000C-90A1-4B2C-8D3E-00000000000C</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>MONTHLY NOTE</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>3395.0</real>
+		</dict>
+		<key>0FED000D-90A1-4B2C-8D3E-00000000000D</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>3395.0</real>
+		</dict>
+		<key>0FED000E-90A1-4B2C-8D3E-00000000000E</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2045.0</real>
+		</dict>
+		<key>0FED000F-90A1-4B2C-8D3E-00000000000F</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2045.0</real>
+		</dict>
+		<key>0FED0010-90A1-4B2C-8D3E-000000000010</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>QUARTERLY NOTE</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>3525.0</real>
+		</dict>
+		<key>0FED0011-90A1-4B2C-8D3E-000000000011</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>QUARTERLY NOTE</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>3525.0</real>
+		</dict>
+		<key>0FED0012-90A1-4B2C-8D3E-000000000012</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>3525.0</real>
+		</dict>
+		<key>0FED0013-90A1-4B2C-8D3E-000000000013</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2155.0</real>
+		</dict>
+		<key>0FED0014-90A1-4B2C-8D3E-000000000014</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2155.0</real>
+		</dict>
+		<key>0FED0015-90A1-4B2C-8D3E-000000000015</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>YEARLY NOTE</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>3655.0</real>
+		</dict>
+		<key>0FED0016-90A1-4B2C-8D3E-000000000016</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>YEARLY NOTE</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>3655.0</real>
+		</dict>
+		<key>0FED0017-90A1-4B2C-8D3E-000000000017</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>3655.0</real>
+		</dict>
+		<key>0FED0018-90A1-4B2C-8D3E-000000000018</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2265.0</real>
+		</dict>
+		<key>0FED0019-90A1-4B2C-8D3E-000000000019</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2265.0</real>
+		</dict>
+		<key>0FED001A-90A1-4B2C-8D3E-00000000001A</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>MORNING JOURNAL</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>3785.0</real>
+		</dict>
+		<key>0FED001B-90A1-4B2C-8D3E-00000000001B</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>MORNING JOURNAL</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>3785.0</real>
+		</dict>
+		<key>0FED001C-90A1-4B2C-8D3E-00000000001C</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>3785.0</real>
+		</dict>
+		<key>0FED001D-90A1-4B2C-8D3E-00000000001D</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2375.0</real>
+		</dict>
+		<key>0FED001E-90A1-4B2C-8D3E-00000000001E</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2375.0</real>
+		</dict>
+		<key>0FED001F-90A1-4B2C-8D3E-00000000001F</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>EVENING JOURNAL</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>3915.0</real>
+		</dict>
+		<key>0FED0020-90A1-4B2C-8D3E-000000000020</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>EVENING JOURNAL</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>3915.0</real>
+		</dict>
+		<key>0FED0021-90A1-4B2C-8D3E-000000000021</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>3915.0</real>
+		</dict>
+		<key>0FED0022-90A1-4B2C-8D3E-000000000022</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2485.0</real>
+		</dict>
+		<key>0FED0023-90A1-4B2C-8D3E-000000000023</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2485.0</real>
+		</dict>
+		<key>0FED0024-90A1-4B2C-8D3E-000000000024</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>INCOME</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>4045.0</real>
+		</dict>
+		<key>0FED0025-90A1-4B2C-8D3E-000000000025</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>INCOME</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>4045.0</real>
+		</dict>
+		<key>0FED0026-90A1-4B2C-8D3E-000000000026</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>4045.0</real>
+		</dict>
+		<key>0FED0027-90A1-4B2C-8D3E-000000000027</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2595.0</real>
+		</dict>
+		<key>0FED0028-90A1-4B2C-8D3E-000000000028</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2595.0</real>
+		</dict>
+		<key>0FED0029-90A1-4B2C-8D3E-000000000029</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>DAY GOAL</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>4175.0</real>
+		</dict>
+		<key>0FED002A-90A1-4B2C-8D3E-00000000002A</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>DAY GOAL</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>4175.0</real>
+		</dict>
+		<key>0FED002B-90A1-4B2C-8D3E-00000000002B</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>4175.0</real>
+		</dict>
+		<key>0FED002C-90A1-4B2C-8D3E-00000000002C</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2705.0</real>
+		</dict>
+		<key>0FED002D-90A1-4B2C-8D3E-00000000002D</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2705.0</real>
+		</dict>
+		<key>0FED002E-90A1-4B2C-8D3E-00000000002E</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>ADD ENTRY</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>4305.0</real>
+		</dict>
+		<key>0FED002F-90A1-4B2C-8D3E-00000000002F</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>ADD ENTRY</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>4305.0</real>
+		</dict>
+		<key>0FED0030-90A1-4B2C-8D3E-000000000030</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>4305.0</real>
+		</dict>
+		<key>0FED0031-90A1-4B2C-8D3E-000000000031</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2815.0</real>
+		</dict>
+		<key>0FED0032-90A1-4B2C-8D3E-000000000032</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2815.0</real>
+		</dict>
+		<key>0FED0033-90A1-4B2C-8D3E-000000000033</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>6</integer>
+			<key>note</key>
+			<string>ADD TO TODAY</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>4435.0</real>
+		</dict>
+		<key>0FED0034-90A1-4B2C-8D3E-000000000034</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>ADD TO TODAY</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>4435.0</real>
+		</dict>
+		<key>0FED0035-90A1-4B2C-8D3E-000000000035</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>4435.0</real>
+		</dict>
+		<key>0FED0036-90A1-4B2C-8D3E-000000000036</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>xpos</key>
+			<real>3390.0</real>
+			<key>ypos</key>
+			<real>2925.0</real>
+		</dict>
+		<key>0FED0037-90A1-4B2C-8D3E-000000000037</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>3565.0</real>
+			<key>ypos</key>
+			<real>2925.0</real>
 		</dict>
 		<key>1009D9A3-3070-4F97-AD6F-4B6D4C98FF04</key>
 		<dict>
@@ -10234,7 +12475,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>3815.0</real>
+			<real>4115.0</real>
 			<key>ypos</key>
 			<real>1820.0</real>
 		</dict>
@@ -10364,7 +12605,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>3495.0</real>
+			<real>3795.0</real>
 			<key>ypos</key>
 			<real>2100.0</real>
 		</dict>
@@ -10413,7 +12654,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>3215.0</real>
+			<real>3165.0</real>
 			<key>ypos</key>
 			<real>1935.0</real>
 		</dict>
@@ -10754,7 +12995,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>xact.py - buffer/focus/pomo verbs</string>
 			<key>xpos</key>
-			<real>3660.0</real>
+			<real>3960.0</real>
 			<key>ypos</key>
 			<real>1955.0</real>
 		</dict>
@@ -10940,7 +13181,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>3215.0</real>
+			<real>3165.0</real>
 			<key>ypos</key>
 			<real>2045.0</real>
 		</dict>
@@ -11127,7 +13368,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>Periodic → Search "pn "</string>
 			<key>xpos</key>
-			<real>3660.0</real>
+			<real>3960.0</real>
 			<key>ypos</key>
 			<real>2100.0</real>
 		</dict>
@@ -11165,7 +13406,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>5FDE0A83-300F-49F3-AD7F-DDF3974DFD78</key>
 		<dict>
 			<key>xpos</key>
-			<real>3105.0</real>
+			<real>3090.0</real>
 			<key>ypos</key>
 			<real>1855.0</real>
 		</dict>
@@ -11216,7 +13457,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>End</string>
 			<key>xpos</key>
-			<real>3815.0</real>
+			<real>4115.0</real>
 			<key>ypos</key>
 			<real>1955.0</real>
 		</dict>
@@ -11558,7 +13799,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>415.0</real>
+			<real>410.0</real>
 			<key>ypos</key>
 			<real>2615.0</real>
 		</dict>
@@ -11924,7 +14165,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>3495.0</real>
+			<real>3795.0</real>
 			<key>ypos</key>
 			<real>1820.0</real>
 		</dict>
@@ -12360,7 +14601,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>note</key>
 			<string>ET XAct</string>
 			<key>xpos</key>
-			<real>3495.0</real>
+			<real>3795.0</real>
 			<key>ypos</key>
 			<real>1955.0</real>
 		</dict>
@@ -12369,7 +14610,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>3215.0</real>
+			<real>3165.0</real>
 			<key>ypos</key>
 			<real>1825.0</real>
 		</dict>
@@ -12501,7 +14742,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>3660.0</real>
+			<real>3960.0</real>
 			<key>ypos</key>
 			<real>1820.0</real>
 		</dict>
@@ -12623,7 +14864,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<key>placeholder</key>
 				<string></string>
 				<key>required</key>
-				<false/>
+				<true/>
 				<key>trim</key>
 				<true/>
 			</dict>
@@ -12644,7 +14885,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<key>placeholder</key>
 				<string></string>
 				<key>required</key>
-				<false/>
+				<true/>
 				<key>trim</key>
 				<true/>
 			</dict>
@@ -12661,6 +14902,48 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>config</key>
 			<dict>
 				<key>default</key>
+				<string>tlogin</string>
+				<key>placeholder</key>
+				<string>tlogin</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>One-time OAuth connect (after pasting Client ID + Secret).</string>
+			<key>label</key>
+			<string>[keyword] Login</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>login_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tup</string>
+				<key>placeholder</key>
+				<string>tup</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Login, sync, refresh, docs, attachment token.</string>
+			<key>label</key>
+			<string>[keyword] Settings</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>update_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
 				<string>tal</string>
 				<key>placeholder</key>
 				<string>tal</string>
@@ -12670,7 +14953,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>The whole workflow from one list. For the smoothest ride, also set the main hotkey on the canvas.</string>
+			<string>The whole workflow from one list.
+Don't forget to set the keystroke on canvas.</string>
 			<key>label</key>
 			<string>[keyword] Main menu</string>
 			<key>type</key>
@@ -12724,27 +15008,6 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>config</key>
 			<dict>
 				<key>default</key>
-				<string>tup</string>
-				<key>placeholder</key>
-				<string>tup</string>
-				<key>required</key>
-				<false/>
-				<key>trim</key>
-				<true/>
-			</dict>
-			<key>description</key>
-			<string>Login, sync, refresh, docs, attachment token.</string>
-			<key>label</key>
-			<string>[keyword] Settings</string>
-			<key>type</key>
-			<string>textfield</string>
-			<key>variable</key>
-			<string>update_kw</string>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>default</key>
 				<string>tsy</string>
 				<key>placeholder</key>
 				<string>tsy</string>
@@ -12761,27 +15024,6 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<string>textfield</string>
 			<key>variable</key>
 			<string>sync_kw</string>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>default</key>
-				<string>tlogin</string>
-				<key>placeholder</key>
-				<string>tlogin</string>
-				<key>required</key>
-				<false/>
-				<key>trim</key>
-				<true/>
-			</dict>
-			<key>description</key>
-			<string>One-time OAuth connect (after pasting Client ID + Secret).</string>
-			<key>label</key>
-			<string>[keyword] Login</string>
-			<key>type</key>
-			<string>textfield</string>
-			<key>variable</key>
-			<string>login_kw</string>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -13165,6 +15407,237 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>config</key>
 			<dict>
 				<key>default</key>
+				<string>tdn</string>
+				<key>placeholder</key>
+				<string>tdn</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Open the daily periodic note.</string>
+			<key>label</key>
+			<string>[keyword] Daily note</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>daily_note_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>twn</string>
+				<key>placeholder</key>
+				<string>twn</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Open the weekly periodic note.</string>
+			<key>label</key>
+			<string>[keyword] Weekly note</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>weekly_note_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tmn</string>
+				<key>placeholder</key>
+				<string>tmn</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Open the monthly periodic note.</string>
+			<key>label</key>
+			<string>[keyword] Monthly note</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>monthly_note_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tqn</string>
+				<key>placeholder</key>
+				<string>tqn</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Open the quarterly periodic note.</string>
+			<key>label</key>
+			<string>[keyword] Quarterly note</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>quarterly_note_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tyn</string>
+				<key>placeholder</key>
+				<string>tyn</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Open the yearly periodic note.</string>
+			<key>label</key>
+			<string>[keyword] Yearly note</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>yearly_note_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tmj</string>
+				<key>placeholder</key>
+				<string>tmj</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Launch the morning journal.</string>
+			<key>label</key>
+			<string>[keyword] Morning journal</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>morning_journal_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tej</string>
+				<key>placeholder</key>
+				<string>tej</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Launch the evening journal.</string>
+			<key>label</key>
+			<string>[keyword] Evening journal</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>evening_journal_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tmo</string>
+				<key>placeholder</key>
+				<string>tmo</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Log money you made.</string>
+			<key>label</key>
+			<string>[keyword] Income</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>income_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tdg</string>
+				<key>placeholder</key>
+				<string>tdg</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Pick the one thing for today.</string>
+			<key>label</key>
+			<string>[keyword] Day goal</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>daygoal_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tde</string>
+				<key>placeholder</key>
+				<string>tde</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Log a win, nag, thought, or link to today.</string>
+			<key>label</key>
+			<string>[keyword] Add entry</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>entry_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tat</string>
+				<key>placeholder</key>
+				<string>tat</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Pick any task, schedule it today.</string>
+			<key>label</key>
+			<string>[keyword] Add to today</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>addtoday_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
 				<string></string>
 				<key>placeholder</key>
 				<string>leave blank if unused</string>
@@ -13174,7 +15647,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 				<true/>
 			</dict>
 			<key>description</key>
-			<string>Enables the CRM booking features: paste the 24-character id of your bookings list. The docs (tdo) show how to copy an id. Leave blank if unused.</string>
+			<string>Enables the CRM booking features: Easiest way is searching for list with `tse`, then pressing `⌥⌘` to copy URL, manually trim everything but 24-character id of your bookings list. The docs (tdo) show how to copy an id. Leave blank if unused.</string>
 			<key>label</key>
 			<string>CRM list id (optional)</string>
 			<key>type</key>
@@ -13268,7 +15741,7 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 	</array>
 	<key>version</key>
-	<string>52</string>
+	<string>2.5</string>
 	<key>webaddress</key>
 	<string>https://github.com/vex-glitch</string>
 </dict>
