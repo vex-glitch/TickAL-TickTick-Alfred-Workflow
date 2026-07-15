@@ -8042,6 +8042,29 @@ printf '%s' "$1"</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:periodic_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Daily, weekly, journal, money</string>
+				<key>text</key>
+				<string>Periodic · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>7B9A2C41-5E3D-4F82-A1B6-9C0D3E4F5A6B</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>action</key>
 				<integer>0</integer>
 				<key>argument</key>
@@ -8228,52 +8251,6 @@ printf '%s' "$1"</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:v2login"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>07936603-BC94-4FE4-8007-D7AC0AEA8FB8</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:periodic_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Daily, weekly, journal, money</string>
-				<key>text</key>
-				<string>Periodic · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>7B9A2C41-5E3D-4F82-A1B6-9C0D3E4F5A6B</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>action</key>
 				<integer>0</integer>
 				<key>argument</key>
@@ -8302,6 +8279,29 @@ printf '%s' "$1"</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:v2login"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>07936603-BC94-4FE4-8007-D7AC0AEA8FB8</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** One hotkey (or `tal`) opens your whole TickTick world in Alfred: browse, search, add, schedule, tag, complete, focus - every change mirrored instantly in a local cache.
@@ -8313,7 +8313,7 @@ printf '%s' "$1"</string>
 - Optional: `pip3 install pyobjc` for the floating focus bar - focus works without it
 
 ## Setup
-1. Go to developer.ticktick.com/manage → **Create App** → set the redirect URI to `http://localhost:8080`
+1. Go to [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** + **Client Secret** into the fields above
 3. Run `tlogin` - a browser opens; log in and approve
 4. Run `tsy` to prime the cache, and set your main hotkey (top-left node on the canvas)
@@ -8366,9 +8366,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>0BAEF960-1A61-4EB6-A988-352C9B7E67E7</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>9</integer>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → SAVE URL</string>
+			<string>SAVE URL</string>
 			<key>xpos</key>
 			<real>30.0</real>
 			<key>ypos</key>
@@ -8394,8 +8394,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>1009D9A3-3070-4F97-AD6F-4B6D4C98FF04</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → CALENDAR</string>
+			<string>CALENDAR</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -8450,6 +8452,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
+			<key>note</key>
+			<string>SETTINGS</string>
 			<key>xpos</key>
 			<real>1640.0</real>
 			<key>ypos</key>
@@ -8469,9 +8473,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>1C0E0641-0983-47E1-A120-7D54111DB139</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>9</integer>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → MAIN MENU 🏁</string>
+			<string>MAIN MENU 🏁</string>
 			<key>xpos</key>
 			<real>30.0</real>
 			<key>ypos</key>
@@ -8544,8 +8548,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>20763FC8-608A-4375-8829-AF741445D817</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → INBOX</string>
+			<string>INBOX</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -8555,6 +8561,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
+			<key>note</key>
+			<string>SEARCH</string>
 			<key>xpos</key>
 			<real>2840.0</real>
 			<key>ypos</key>
@@ -8571,6 +8579,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>211BDA0D-E717-49C5-98D0-CC51100BEFE3</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>CRM</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -8623,6 +8635,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>262FDF11-B59B-4BBA-9D7A-4BBD12232291</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>BUFFER</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -8664,8 +8680,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>29A4F7B6-1F33-4BE1-A0D4-557C27D80399</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → FOCUS</string>
+			<string>FOCUS</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -8675,6 +8693,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
+			<key>note</key>
+			<string>TODAY</string>
 			<key>xpos</key>
 			<real>3480.0</real>
 			<key>ypos</key>
@@ -8684,6 +8704,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
+			<key>note</key>
+			<string>SYNC</string>
 			<key>xpos</key>
 			<real>1640.0</real>
 			<key>ypos</key>
@@ -8700,8 +8722,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>2D46367F-3DE6-4EDD-B26E-CCECFA7795DD</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → TODAY</string>
+			<string>TODAY</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -8745,6 +8769,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>32E76899-5125-4F94-A359-1306EAA587F2</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>DOCS</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -8770,6 +8798,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>35A6A310-A4FE-4853-BBFB-EE4BDFB20257</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>SAVE URL</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -8860,8 +8892,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>3F8E1D72-6A4B-4C93-B2E5-8D1F0A2C3B4E</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → PERIODIC</string>
+			<string>PERIODIC</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -8898,6 +8932,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
+			<key>note</key>
+			<string>MAIN MENU 🏁</string>
 			<key>xpos</key>
 			<real>30.0</real>
 			<key>ypos</key>
@@ -9060,8 +9096,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>4EFEA313-A75F-46A5-8556-67EE852AE0B5</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → SMART LISTS</string>
+			<string>SMART LISTS</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -9156,6 +9194,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
+			<key>note</key>
+			<string>INBOX</string>
 			<key>xpos</key>
 			<real>3480.0</real>
 			<key>ypos</key>
@@ -9232,6 +9272,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>60C1372F-9FBD-4140-9731-23C83B26EB88</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>FOCUS</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -9259,8 +9303,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>6405F860-1CE7-4630-8E05-176576F92949</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → TOMORROW</string>
+			<string>TOMORROW</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -9340,6 +9386,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>70C446B1-996B-4FCA-BBE2-A71C136DEA93</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>NEXT 7 DAYS</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -9440,7 +9490,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>76667082-C514-4C0E-BD2F-3C750743DED6</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>10</integer>
+			<integer>9</integer>
+			<key>note</key>
+			<string>ADD</string>
 			<key>xpos</key>
 			<real>2155.0</real>
 			<key>ypos</key>
@@ -9459,6 +9511,8 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
+			<key>note</key>
+			<string>LOGIN</string>
 			<key>xpos</key>
 			<real>1640.0</real>
 			<key>ypos</key>
@@ -9475,8 +9529,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>7B9A2C41-5E3D-4F82-A1B6-9C0D3E4F5A6B</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
 			<key>note</key>
-			<string>Periodic keyword (tpn) → Search "pn "</string>
+			<string>PERIODIC</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -9494,9 +9550,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>7DEE972E-9AD6-44E8-8919-7B033F2099F4</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>9</integer>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → FILTERS</string>
+			<string>FILTERS</string>
 			<key>xpos</key>
 			<real>2840.0</real>
 			<key>ypos</key>
@@ -9654,6 +9710,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>96DEE019-3296-434C-8F69-344D78F15D28</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>TOMORROW</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -9693,9 +9753,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>9BFC1C46-76D3-4986-93B4-F1962AEEC39D</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>9</integer>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → SEARCH</string>
+			<string>SEARCH</string>
 			<key>xpos</key>
 			<real>2840.0</real>
 			<key>ypos</key>
@@ -9703,8 +9763,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>9E5D6DBD-EDA8-4142-830D-BF7B50BF38AD</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → NEXT 7 DAYS</string>
+			<string>NEXT 7 DAYS</string>
 			<key>xpos</key>
 			<real>580.0</real>
 			<key>ypos</key>
@@ -9731,9 +9793,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>A18FBDF4-AF02-4287-AEC3-72488678C9F9</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>10</integer>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → ADD</string>
+			<string>ADD</string>
 			<key>xpos</key>
 			<real>2155.0</real>
 			<key>ypos</key>
@@ -9789,9 +9851,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>AAE96E42-B547-46DC-A255-DDFB39608820</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>9</integer>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → SETTINGS</string>
+			<string>SETTINGS</string>
 			<key>xpos</key>
 			<real>1640.0</real>
 			<key>ypos</key>
@@ -9808,6 +9870,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>AE2A8A94-30F4-41AE-B239-B6331D200B44</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>TAGS</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -9834,9 +9900,9 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		<key>B6476841-6258-4E03-8DE8-F5BE30FBC1ED</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>9</integer>
+			<integer>5</integer>
 			<key>note</key>
-			<string>HOTKEY → CRM</string>
+			<string>CRM</string>
 			<key>xpos</key>
 			<real>2155.0</real>
 			<key>ypos</key>
@@ -10064,6 +10130,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>D2FAD236-C478-479F-A74A-29110965FD84</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>SMART LISTS</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -10144,6 +10214,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>DEAA60D1-0AA6-4B51-93A2-E98A82255D10</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>FILTERS</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -10275,6 +10349,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>F07AE399-2723-47C5-8264-4B09ADC2F318</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>STATISTICS</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -10291,6 +10369,10 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 		</dict>
 		<key>F140642C-C4F7-46FB-933A-AE1D228CB3B7</key>
 		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>CALENDAR</string>
 			<key>xpos</key>
 			<real>60.0</real>
 			<key>ypos</key>
@@ -10916,16 +10998,6 @@ Three chords run everything: **⌥⏎ deeper · ⌘⏎ actions · ⌃⏎ back**.
 			<key>variable</key>
 			<string>weekly_review_id</string>
 		</dict>
-	</array>
-	<key>variablesdontexport</key>
-	<array>
-		<string>weekly_review_id</string>
-		<string>cta_list_id</string>
-		<string>periodic_list_id</string>
-		<string>crm_list_id</string>
-		<string>client_secret</string>
-		<string>client_id</string>
-		<string>projects_folder_id</string>
 	</array>
 	<key>version</key>
 	<string>52</string>
