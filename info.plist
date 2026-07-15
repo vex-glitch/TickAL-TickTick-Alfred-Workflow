@@ -4112,7 +4112,7 @@ fi</string>
 			<key>config</key>
 			<dict>
 				<key>externaltriggerid</key>
-				<string>HKcal</string>
+				<string>OpenCalendar</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -4697,7 +4697,7 @@ fi</string>
 			<key>config</key>
 			<dict>
 				<key>externaltriggerid</key>
-				<string>HKperiodic</string>
+				<string>WFperiodic</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -8822,7 +8822,7 @@ esac</string>
 			<key>config</key>
 			<dict>
 				<key>externaltriggerid</key>
-				<string>buffer</string>
+				<string>Buffer</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
