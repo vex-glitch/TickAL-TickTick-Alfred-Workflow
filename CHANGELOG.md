@@ -20,6 +20,19 @@ All notable user-visible changes to TickAL. Format follows
   the row instead of a terminal command.
 - **[Projects](docs/49-projects.md) docs page** - the `P ` bootstrap flow,
   the 📌 Create CTA row, and the keycap area-tag convention, all on one page.
+- **📜 Docs browser** - `tdo` (and a new main-menu Docs row) opens every doc
+  page from inside Alfred; typing filters the pages AND live-builds a GitHub
+  search over the whole repo.
+- **Periodic Agent** settings row - the 04:30 note-mint LaunchAgent installs,
+  repairs, and removes itself from one dialog, like Hourly Sync. The manual
+  template dance is gone.
+- **Main menu reordered** - CRM sits below Periodic Notes, then Docs,
+  Settings, Save URL, Statistics.
+
+### Changed
+
+- **Docs renumbered** - Notes 44, Views 45, Focus 46, CRM 47, Periodic 48,
+  Projects 49: the four workflow pages now sit together with room to grow.
 
 ## [2.6] - 2026-07-15
 
@@ -31,7 +44,7 @@ All notable user-visible changes to TickAL. Format follows
   `tde` (entry), `tmo` (income), `tdg` (day goal), `tat` (add to today).
 - **Native TickTick views** - `tha` Habits, `tpo` Pomodoro / Focus and `tmx`
   Eisenhower Matrix open TickTick's own screens, documented on a new
-  [Views](docs/48-views.md) page (which also covers `tca` Calendar and `tst`
+  [Views](docs/45-views.md) page (which also covers `tca` Calendar and `tst`
   Statistics).
 - **Hotkey nodes** for every major action - all ship unbound (Alfred clears
   hotkey combos on import); bind your own on the workflow canvas.

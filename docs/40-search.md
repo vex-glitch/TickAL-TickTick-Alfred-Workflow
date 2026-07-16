@@ -29,7 +29,7 @@ Type to search everything at once. Prefix the query with a scope letter to narro
 | `f` | Filters | Your TickTick filters, synced with the v2 token - rules included |
 | `fo` | Folders | Your folders in TickTick order; ⌥⏎ drills into a folder's lists |
 | `la` | Last added | Incomplete tasks, newest first; typing filters, recency keeps ruling |
-| `pn` | Periodic notes | Daily → yearly notes: open, entries, income, goals, journals - see [Periodic notes](47-periodic.md) |
+| `pn` | Periodic notes | Daily → yearly notes: open, entries, income, goals, journals - see [Periodic notes](48-periodic.md) |
 | `n` | Note titles | |
 | `nc` | Note bodies | Title shows a content snippet; note name · folder as breadcrumb |
 

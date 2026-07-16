@@ -70,5 +70,5 @@ Five more ride alongside on task rows:
 
 ## Related
 
-- [Search](40-search.md) · [Browse & drill](41-browse-drill.md) · [Add](42-add.md) · [Actions](43-actions.md) · [Focus](44-focus.md)
+- [Search](40-search.md) · [Browse & drill](41-browse-drill.md) · [Add](42-add.md) · [Actions](43-actions.md) · [Focus](46-focus.md)
 - [Cheatsheet](95-cheatsheet.md) - every keyword and keystroke on one page

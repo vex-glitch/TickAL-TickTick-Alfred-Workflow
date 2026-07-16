@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Connect TickAL to your TickTick account, then switch on the optional extras.
 
-**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu (Sync · Hourly Sync · Install PyObjC · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
+**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu (Sync · Hourly Sync · Install PyObjC · Periodic Agent · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
 
 ## Requirements
 
@@ -91,7 +91,7 @@ Three fields in Configure Workflow take 24-character TickTick ids. Leave blank i
 
 | Field | Enables |
 |---|---|
-| `crm_list_id` | The CRM booking hub via the `tcr` keyword - see [CRM](45-crm.md) |
+| `crm_list_id` | The CRM booking hub via the `tcr` keyword - see [CRM](47-crm.md) |
 | `cta_list_id` | The 📌 Create CTA action (the list where CTA tasks are created) - see [Projects](49-projects.md) |
 | `projects_folder_id` | New 💼 projects land inside this folder; blank = created ungrouped - see [Projects](49-projects.md) |
 
@@ -113,7 +113,7 @@ pip3 install pyobjc                                             # no Homebrew (X
 
 </details>
 
-Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC · Settings → Install PyObjC"), at most once an hour. Clipboard-image attach shares the PyObjC dependency - see [Notes, links & images](46-notes-links-images.md).
+Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC · Settings → Install PyObjC"), at most once an hour. Clipboard-image attach shares the PyObjC dependency - see [Notes, links & images](44-notes-links-images.md).
 
 ## Hourly background sync
 
@@ -127,5 +127,5 @@ Two self-care details: after updating TickAL (importing a new release), run the 
 
 - [Getting started](10-getting-started.md) - the same journey as a guided walkthrough
 - [Settings & sync](90-settings-sync.md) - the Settings menu and cache behavior
-- [CRM](45-crm.md) - what `crm_list_id` unlocks
+- [CRM](47-crm.md) - what `crm_list_id` unlocks
 - [Troubleshooting](99-troubleshooting.md) - login, token, and cache errors

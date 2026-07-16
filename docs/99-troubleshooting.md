@@ -60,7 +60,7 @@ Every other focus feature - timer, pomodoro, staging blocks, sweep - works witho
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `tcr` renders one row: "CRM needs setup" | `crm_list_id` is empty | ⌘⏎ on your CRM list's row → **🆔 Copy id**, paste it into Configure Workflow - see [CRM](45-crm.md) (screenshot of the pointer row there) |
+| `tcr` renders one row: "CRM needs setup" | `crm_list_id` is empty | ⌘⏎ on your CRM list's row → **🆔 Copy id**, paste it into Configure Workflow - see [CRM](47-crm.md) (screenshot of the pointer row there) |
 
 ## "python3 not found"
 

@@ -104,4 +104,4 @@ Each token pops a live picker as you type it; `/` opens the full token menu. The
 - [Home](00-index.md)
 - [Setup](30-setup.md)
 - [Cheatsheet](95-cheatsheet.md)
-- [CRM](45-crm.md)
+- [CRM](47-crm.md)

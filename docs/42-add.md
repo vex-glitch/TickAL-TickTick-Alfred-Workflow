@@ -68,7 +68,7 @@ Prefixes are case-insensitive (`l `, `n `, `p `, `t ` work). Area tags for `P` a
 
 ## Task links: `[[`
 
-Typing `[[` opens a picker over all cached open tasks and notes; ⏎ inserts the readable `[[Title]]` form. On create, each `[[Title]]` in the title resolves to a real TickTick task link (name collisions prefer the current list); unresolved names stay literal. In a CRM add the picker scopes to bookings - see [CRM](45-crm.md).
+Typing `[[` opens a picker over all cached open tasks and notes; ⏎ inserts the readable `[[Title]]` form. On create, each `[[Title]]` in the title resolves to a real TickTick task link (name collisions prefer the current list); unresolved names stay literal. In a CRM add the picker scopes to bookings - see [CRM](47-crm.md).
 
 ## Clipboard image: `^`
 
@@ -79,7 +79,7 @@ Add `^` (or pick 🖼️ Add image from the `/` menu) to upload the clipboard im
 Hold a chord on the **Create** row itself - the preview subtitle advertises them as `⌘🎯 ⇧⌘📍`:
 
 - **⌘⏎** - create, then 🎯: while a task-bound session runs, the new task lands straight in its checkbox block ("Add to the running focus"); otherwise the ⏱/🍅 start flow opens on it ("Start Focus").
-- **⇧⌘⏎** - create, then 📍 stage it: the stage screen opens on the new task (checkbox-link it into another task/note - staging mechanics on [Focus](44-focus.md#staging)).
+- **⇧⌘⏎** - create, then 📍 stage it: the stage screen opens on the new task (checkbox-link it into another task/note - staging mechanics on [Focus](46-focus.md#staging)).
 
 The same chains exist as typed markers via two `/` menu rows, like `^`:
 
@@ -97,5 +97,5 @@ Type `#name` for a tag that doesn't exist yet and the picker offers two rows: **
 - [Search](40-search.md) - find what you just added
 - [Browse & drill](41-browse-drill.md) - walk into the list it landed in
 - [Actions](43-actions.md) - the ⌘⏎ menu, including Add-into-container
-- [Notes, links & images](46-notes-links-images.md) - editing notes and attachments later
+- [Notes, links & images](44-notes-links-images.md) - editing notes and attachments later
 - [Setup](30-setup.md) - the v2 token for image attachments

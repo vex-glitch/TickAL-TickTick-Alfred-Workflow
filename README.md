@@ -4,7 +4,7 @@
 
 Fast, keyboard-driven command bar for TickTick, inside Alfred. 
 
-[Search](docs/40-search.md), [add](docs/42-add.md), [browse](docs/41-browse-drill.md), [schedule](docs/43-actions.md#schedule), [tags](docs/43-actions.md#tags), complete, [focus](docs/44-focus.md), [edit notes and descriptions](docs/46-notes-links-images.md#edit-a-note-body), open the calendar, [mint periodic notes](docs/47-periodic.md), [save web pages](docs/46-notes-links-images.md#save-a-url), [open sticky notes](docs/46-notes-links-images.md#sticky-notes), [organise projects](docs/49-projects.md), [run a CRM](docs/45-crm.md), and more... 
+[Search](docs/40-search.md), [add](docs/42-add.md), [browse](docs/41-browse-drill.md), [schedule](docs/43-actions.md#schedule), [tags](docs/43-actions.md#tags), complete, [focus](docs/46-focus.md), [edit notes and descriptions](docs/44-notes-links-images.md#edit-a-note-body), open the calendar, [mint periodic notes](docs/48-periodic.md), [save web pages](docs/44-notes-links-images.md#save-a-url), [open sticky notes](docs/44-notes-links-images.md#sticky-notes), [organise projects](docs/49-projects.md), [run a CRM](docs/47-crm.md), and more... 
 
 Every change lands in a [local cache](docs/90-settings-sync.md#cache-model) first, so nothing waits on the network between keystrokes.
 
@@ -67,7 +67,7 @@ Task rows show:
 
 - Filters, smart views (Inbox, Today, Tomorrow...), tags included.
 - `📋 Show-all` flattens a whole list, grouped by your own TickTick tag order with priorities first.
-- Habits, Pomodoro and Matrix aren't drawn in Alfred - `tha` / `tpo` / `tmx` jump to TickTick's own screens ([Views](docs/48-views.md))
+- Habits, Pomodoro and Matrix aren't drawn in Alfred - `tha` / `tpo` / `tmx` jump to TickTick's own screens ([Views](docs/45-views.md))
 
 > [!TIP]
 > More on browse & drill: [Docs • Browse](docs/41-browse-drill.md)
@@ -111,72 +111,72 @@ Past what TickTick's own quick-add reaches, the same line can:
 > *`⌘⏎`* on any row
 
 - [Schedule](docs/43-actions.md#schedule), [move](docs/43-actions.md#move), [rename](docs/43-actions.md#rename), [priority](docs/43-actions.md#priority), [tags](docs/43-actions.md#tags), [convert task ↔ note](docs/43-actions.md#convert-to-note--task), copy link, complete, delete and more. 
-- Tag rows get [their own menu](docs/43-actions.md#tag-smart-list-and-buffer-menus) (open, [drill](docs/41-browse-drill.md#the-drill-ladder), send everything to [focus](docs/44-focus.md), delete). 
+- Tag rows get [their own menu](docs/43-actions.md#tag-smart-list-and-buffer-menus) (open, [drill](docs/41-browse-drill.md#the-drill-ladder), send everything to [focus](docs/46-focus.md), delete). 
 
 > [!TIP]
 > More on the actions matrix: [Docs • Actions](docs/43-actions.md)
 
 ## 🎯 Focus
 
-> **Start a [timer](docs/44-focus.md#start) ⏱️ or [pomodoro](docs/44-focus.md#start) 🍅 on any task. Open a [Focus bar](docs/44-focus.md#the-bar) and a sticky note. One keystroke leads to focus. No clicking around.**
+> **Start a [timer](docs/46-focus.md#start) ⏱️ or [pomodoro](docs/46-focus.md#start) 🍅 on any task. Open a [Focus bar](docs/46-focus.md#the-bar) and a sticky note. One keystroke leads to focus. No clicking around.**
 
 > [!IMPORTANT]
-> A workflow with many moving parts - sessions, staging, sweep, the bar - read [Docs • Focus](docs/44-focus.md) before using. The floating bar needs PyObjC - [one Settings row](docs/30-setup.md#focus-bar) installs it.
+> A workflow with many moving parts - sessions, staging, sweep, the bar - read [Docs • Focus](docs/46-focus.md) before using. The floating bar needs PyObjC - [one Settings row](docs/30-setup.md#focus-bar) installs it.
 
 ![Floating focus bar](docs/assets/shots/12-focus-bar.png)
 > Keyword `tfo` OR hotkey (set in canvas) OR Main menu > Focus OR `⌃⇧` on a task
 
-- *Open the focused task as a [sticky note](docs/46-notes-links-images.md#sticky-notes) - from Alfred, no right mouse clicks.*
-- Stage [checkbox blocks](docs/44-focus.md#checkbox-blocks) in the focus task (one at a time, a whole tag or section, today's list, or act on multiple tasks at once via 🅿️ [buffer](docs/41-browse-drill.md#buffer-))
+- *Open the focused task as a [sticky note](docs/44-notes-links-images.md#sticky-notes) - from Alfred, no right mouse clicks.*
+- Stage [checkbox blocks](docs/46-focus.md#checkbox-blocks) in the focus task (one at a time, a whole tag or section, today's list, or act on multiple tasks at once via 🅿️ [buffer](docs/41-browse-drill.md#buffer-))
 - Tick boxes as you go
-- [Sweep](docs/44-focus.md#sweep--the-focus-record): every ticked box completes its real task - and vice versa
-- **[Floating focus bar](docs/44-focus.md#the-bar)** shows the clock and ticks, open sticky note, pause and stop focus, reorders and sweeps without opening Alfred
+- [Sweep](docs/46-focus.md#sweep--the-focus-record): every ticked box completes its real task - and vice versa
+- **[Floating focus bar](docs/46-focus.md#the-bar)** shows the clock and ticks, open sticky note, pause and stop focus, reorders and sweeps without opening Alfred
 
 > [!TIP]
-> More on Focus workflow: [Docs • Focus](docs/44-focus.md)
+> More on Focus workflow: [Docs • Focus](docs/46-focus.md)
 
 ## 💫 Periodic notes
 
-> **Obsidian-style [daily](docs/47-periodic.md#the-daily-note), [weekly](docs/47-periodic.md#the-weekly-note), monthly, quarterly and yearly notes minted inside TickTick**
+> **Obsidian-style [daily](docs/48-periodic.md#the-daily-note), [weekly](docs/48-periodic.md#the-weekly-note), monthly, quarterly and yearly notes minted inside TickTick**
 
 > [!IMPORTANT]
-> A workflow with many moving parts - read [Docs • Periodic notes](docs/47-periodic.md) before using. Stays dormant until you set the list id ([setup](docs/47-periodic.md#set-it-up-once)).
+> A workflow with many moving parts - read [Docs • Periodic notes](docs/48-periodic.md) before using. Stays dormant until you set the list id ([setup](docs/48-periodic.md#set-it-up-once)).
 
 ![Daily note](docs/assets/shots/19-periodic-note.png)
 > Keyword `tpn` OR direct keywords (`tdn`, `tmj`, ...) OR hotkey (set in canvas) OR Main menu > Periodic OR straight from search
 
-- Auto-mints on open, or every morning at 04:30 via an optional [agent](docs/47-periodic.md#the-0430-agent) that seals the periods that just closed
+- Auto-mints on open, or every morning at 04:30 via an optional [agent](docs/48-periodic.md#the-0430-agent) that seals the periods that just closed
 - Breadcrumbs link the whole pyramid
 - Mornings bring weather, a quote, countdowns and habits
 - Logs your mood (😊) and rates the day (★)
-- [Journals](docs/47-periodic.md#journals) ask their questions in prompt dialogs
-- Links goals down the pyramid: a daily one-thing, a weekly goal, next week's goals from the [weekly review](docs/47-periodic.md#the-weekly-note)
-- [Income log](docs/47-periodic.md#money---the-roll-up-pyramid) rolls up from day to year
-- The [weekly note](docs/47-periodic.md#the-weekly-note) builds its own stats: completed vs last week, top tasks, focus by day, habit streaks
-- [Today section](docs/47-periodic.md#the-daily-note) mirrors real tasks: tick the box in the note and the task completes. 
-- Direct keywords jump straight to any note or action: `tdn` today, `twn` week, `tmj` morning journal, `tat` add to today ([full list](docs/47-periodic.md#direct-keywords))
+- [Journals](docs/48-periodic.md#journals) ask their questions in prompt dialogs
+- Links goals down the pyramid: a daily one-thing, a weekly goal, next week's goals from the [weekly review](docs/48-periodic.md#the-weekly-note)
+- [Income log](docs/48-periodic.md#money---the-roll-up-pyramid) rolls up from day to year
+- The [weekly note](docs/48-periodic.md#the-weekly-note) builds its own stats: completed vs last week, top tasks, focus by day, habit streaks
+- [Today section](docs/48-periodic.md#the-daily-note) mirrors real tasks: tick the box in the note and the task completes. 
+- Direct keywords jump straight to any note or action: `tdn` today, `twn` week, `tmj` morning journal, `tat` add to today ([full list](docs/48-periodic.md#direct-keywords))
 
 > [!TIP]
-> The whole system: [Docs • Periodic notes](docs/47-periodic.md)
+> The whole system: [Docs • Periodic notes](docs/48-periodic.md)
 
 ## 📈 CRM
 
-> **A simple, automated [booking hub, customer tracker and logbook](docs/45-crm.md#the-hub)**
+> **A simple, automated [booking hub, customer tracker and logbook](docs/47-crm.md#the-hub)**
 
 > [!IMPORTANT]
-> A workflow with many moving parts - read [Docs • CRM](docs/45-crm.md) before using. Stays dormant until you set its list id ([setup](docs/45-crm.md#set-it-up-once)).
+> A workflow with many moving parts - read [Docs • CRM](docs/47-crm.md) before using. Stays dormant until you set its list id ([setup](docs/47-crm.md#set-it-up-once)).
 
 ![CRM hub](docs/assets/shots/13-crm-hub.png)
 > Keyword `tcr` OR hotkey (set in canvas) OR Main menu > CRM
 
-- [Group tags](docs/45-crm.md#the--tag-group) for your client lists
-- Automatic "Prepare for `[[booking]]`" [follow-ups](docs/45-crm.md#the-automatic-prepare-follow-up)
-- [Clipboard-image attachments](docs/46-notes-links-images.md#images) for reference 
+- [Group tags](docs/47-crm.md#the--tag-group) for your client lists
+- Automatic "Prepare for `[[booking]]`" [follow-ups](docs/47-crm.md#the-automatic-prepare-follow-up)
+- [Clipboard-image attachments](docs/44-notes-links-images.md#images) for reference 
 - Per customer notes with automated links to separate projects per customer
 - Logbook to keep track of each project
 
 > [!TIP]
-> The whole system: [Docs • CRM](docs/45-crm.md)
+> The whole system: [Docs • CRM](docs/47-crm.md)
 
 ## 💼 Projects
 
@@ -199,13 +199,13 @@ Past what TickTick's own quick-add reaches, the same line can:
 
 ![Note editor](docs/assets/shots/14-note-editor.png)
 
-- [Save the active browser tab](docs/46-notes-links-images.md#save-a-url) as a task with `tur` (or hotkey - set in canvas)
-- [Edit a task's note](docs/46-notes-links-images.md#edit-a-note-body) in Alfred text window
-- [Link tasks to each other](docs/46-notes-links-images.md#task-links) with `[[`
-- Paste [clipboard images](docs/46-notes-links-images.md#images) as real attachments
+- [Save the active browser tab](docs/44-notes-links-images.md#save-a-url) as a task with `tur` (or hotkey - set in canvas)
+- [Edit a task's note](docs/44-notes-links-images.md#edit-a-note-body) in Alfred text window
+- [Link tasks to each other](docs/44-notes-links-images.md#task-links) with `[[`
+- Paste [clipboard images](docs/44-notes-links-images.md#images) as real attachments
 
 > [!TIP]
-> Read more: [Notes, links & images](docs/46-notes-links-images.md)
+> Read more: [Notes, links & images](docs/44-notes-links-images.md)
 
 ## Requirements
 
@@ -275,8 +275,8 @@ All 35 keywords are re-mappable in Configure Workflow. Hotkey nodes ship unbound
 | Learn     | [Getting started](docs/10-getting-started.md)                                                                                                           | Install to first task                       |
 |           | [Concepts](docs/20-concepts.md)                                                                                                                         | Scopes, drill, tokens, buffer, focus blocks |
 | Do        | [Search](docs/40-search.md) · [Browse & drill](docs/41-browse-drill.md) · [Add](docs/42-add.md) · [Actions](docs/43-actions.md)                               | The daily drivers                           |
-|           | [Notes, links & images](docs/46-notes-links-images.md) · [Views](docs/48-views.md)                                                                        | The deep features                           |
-| Workflows | [Focus](docs/44-focus.md) · [CRM](docs/45-crm.md) · [Periodic notes](docs/47-periodic.md) · [Projects](docs/49-projects.md)                                   | Moving parts - read first                   |
+|           | [Notes, links & images](docs/44-notes-links-images.md) · [Views](docs/45-views.md)                                                                        | The deep features                           |
+| Workflows | [Focus](docs/46-focus.md) · [CRM](docs/47-crm.md) · [Periodic notes](docs/48-periodic.md) · [Projects](docs/49-projects.md)                                   | Moving parts - read first                   |
 | Reference | [Setup](docs/30-setup.md) · [Settings & sync](docs/90-settings-sync.md) · [Cheatsheet](docs/95-cheatsheet.md) · [Troubleshooting](docs/99-troubleshooting.md) | Every option, key and fix                   |
 
 > [!TIP]

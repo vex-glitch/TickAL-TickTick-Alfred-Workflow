@@ -12,7 +12,7 @@ TickAL is a keyboard-driven TickTick front end for Alfred 5. It covers search, b
 | ⌘⏎ | Open the Actions menu for the selected item |
 | ⌃⏎ | Go back one level |
 
-**Install:** download the `.alfredworkflow` from [GitHub Releases](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/releases), double-click, then follow [Setup](30-setup.md). Start Alfred with the `tal` keyword for the main menu; the `tdo` keyword opens these docs.
+**Install:** download the `.alfredworkflow` from [GitHub Releases](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/releases), double-click, then follow [Setup](30-setup.md). Start Alfred with the `tal` keyword for the main menu; the `tdo` keyword (or the main menu's 📜 Docs row) opens the docs browser - every page one ⏎ away, and typing searches this whole repo on GitHub.
 
 ## Docs map
 
@@ -24,11 +24,11 @@ TickAL is a keyboard-driven TickTick front end for Alfred 5. It covers search, b
 | | [Browse & drill](41-browse-drill.md) | Walk lists → sections → tasks → subtasks with ⌥⏎/⌃⏎ (animated drill GIF inside) |
 | | [Add](42-add.md) | Create tasks, lists, and notes with the `tad` token grammar |
 | | [Actions](43-actions.md) | The ⌘⏎ menu: schedule, move, tag, priority, and more per item |
-| | [Notes, links & images](46-notes-links-images.md) | Note editing, task links, clipboard image attachments |
-| | [Views](48-views.md) | Native TickTick screens: Habits, Pomodoro, Matrix, Calendar, Statistics |
-| **Workflows** | [Focus](44-focus.md) | Timer/pomodoro sessions, staging blocks, sweep, floating bar - read first |
-| | [CRM](45-crm.md) | Booking hub with 🔥 group tags and auto Prepare follow-ups - set up + read first |
-| | [Periodic notes](47-periodic.md) | Daily → yearly notes: auto-mint, journals, money roll-ups, reviews - set up + read first |
+| | [Notes, links & images](44-notes-links-images.md) | Note editing, task links, clipboard image attachments |
+| | [Views](45-views.md) | Native TickTick screens: Habits, Pomodoro, Matrix, Calendar, Statistics |
+| **Workflows** | [Focus](46-focus.md) | Timer/pomodoro sessions, staging blocks, sweep, floating bar - read first |
+| | [CRM](47-crm.md) | Booking hub with 🔥 group tags and auto Prepare follow-ups - set up + read first |
+| | [Periodic notes](48-periodic.md) | Daily → yearly notes: auto-mint, journals, money roll-ups, reviews - set up + read first |
 | | [Projects](49-projects.md) | 💼 project lists with one scheduled call-to-action task each - set up + read first |
 | **Reference** | [Setup](30-setup.md) | TickTick app credentials, OAuth login, first sync, optional extras |
 | | [Settings & sync](90-settings-sync.md) | Configure Workflow options, cache, optional hourly background sync |

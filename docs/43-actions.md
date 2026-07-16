@@ -32,7 +32,7 @@ Task / subtask / note share one row set; lists and sections get the container su
 | 📅 _current date_ | Schedule… (date/time/duration picker) | ✓ | ✓ | ✓ | | |
 | 🔔 Reminder | Set a reminder… | ✓ | ✓ | ✓ | | |
 | 🏷️ _current tags_ | Tags… (view/add/remove/change) | ✓ | ✓ | ✓ | | |
-| 📌 Create CTA / 🔥 Add Prepare | Dynamic follow-up row - see [Projects](49-projects.md) (CTA) and [CRM](45-crm.md) (Prepare); needs its id set in Configure Workflow | ✓ | ✓ | ✓ | ✓ | |
+| 📌 Create CTA / 🔥 Add Prepare | Dynamic follow-up row - see [Projects](49-projects.md) (CTA) and [CRM](47-crm.md) (Prepare); needs its id set in Configure Workflow | ✓ | ✓ | ✓ | ✓ | |
 | ⚫️/🟡/🟠/🔴 _current_ | Priority… | ✓ | ✓ | | | |
 | _list>section_ | Move… (list / section / re-parent) | ✓ | ✓ | ✓ | | |
 | ➕ Add task | Add a subtask (task-like) or a task into the container | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -43,7 +43,7 @@ Task / subtask / note share one row set; lists and sections get the container su
 | 📝 Note | View/edit the description in a text editor | ✓ | ✓ | ✓ | | |
 | 🖼️ Add image | Attach the clipboard image (needs the [v2 token](30-setup.md)) | ✓ | ✓ | ✓ | | |
 | 🔃 Convert to note / task | Flip the item's kind - title, dates and tags survive | ✓ | ✓ | ✓ | | |
-| 🎯 Focus | Timer or pomodoro on this task - see [Focus](44-focus.md) | ✓ | ✓ | ✓ | | |
+| 🎯 Focus | Timer or pomodoro on this task - see [Focus](46-focus.md) | ✓ | ✓ | ✓ | | |
 | 🗒️ Sticky note | Pin the task to the desktop as a TickTick sticky | ✓ | ✓ | ✓ | | |
 | 🅿️ Add to buffer | Queue for batch actions (same as ⌥⇧⏎ on the row) | ✓ | ✓ | ✓ | | |
 | 🎯 Add to focus (…) | → checkbox in the running focus task's today block (only while a task-bound session runs; hidden on the focus task itself) | ✓ | ✓ | ✓ | | |
@@ -174,13 +174,13 @@ If the title holds exactly one link and the description none, ⏎ opens it direc
 
 ## Act again
 
-Attribute changes loop back: after schedule, reminder, tags, priority, move, rename, or copy link, the Actions menu reopens on the same task with fresh values on every row - chain edits without re-searching. A move follows the task to its destination list; a subtask added from the menu reopens the parent's menu (a CRM booking opens the Prepare window instead - see [CRM](45-crm.md)). Esc dismisses. Open, complete, delete, note edits, image attach, and list renames end the loop.
+Attribute changes loop back: after schedule, reminder, tags, priority, move, rename, or copy link, the Actions menu reopens on the same task with fresh values on every row - chain edits without re-searching. A move follows the task to its destination list; a subtask added from the menu reopens the parent's menu (a CRM booking opens the Prepare window instead - see [CRM](47-crm.md)). Esc dismisses. Open, complete, delete, note edits, image attach, and list renames end the loop.
 
 ## Related
 
 - [Search](40-search.md) - where you press ⌘⏎
 - [Browse & drill](41-browse-drill.md) - ⌥⏎ / ⌃⏎ navigation
-- [Focus](44-focus.md) - the 🎯 rows in depth
+- [Focus](46-focus.md) - the 🎯 rows in depth
 - [Projects](49-projects.md) - the 📌 Create CTA row in full
-- [CRM](45-crm.md) - the 🔥 Prepare variant of the same row
+- [CRM](47-crm.md) - the 🔥 Prepare variant of the same row
 - [Cheatsheet](95-cheatsheet.md) - everything on one page

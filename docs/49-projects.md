@@ -7,7 +7,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 **Entry points:** `P ` prefix in the Add window (keyword `tad`) · **📌 Create CTA** on the ⌘⏎ Actions menu. No keyword of its own.
 
 > [!IMPORTANT]
-> Like the [CRM](45-crm.md), Projects is a workflow, not a single action - 💼 lists, keycap [area tags](#area-tags-the-keycap-rule), one rule: **a project is only alive if exactly one scheduled task points at it**. Give this page a full read before first use.
+> Like the [CRM](47-crm.md), Projects is a workflow, not a single action - 💼 lists, keycap [area tags](#area-tags-the-keycap-rule), one rule: **a project is only alive if exactly one scheduled task points at it**. Give this page a full read before first use.
 
 If that shape fits how you work, TickAL automates all of its bookkeeping. If not, skip this page; nothing else depends on it.
 
@@ -48,7 +48,7 @@ In the `tad` Add window type `P name` (case-insensitive; also on the empty field
 
 1. **Pick an area** - the picker lists your area tags; ⏎ on one fires the whole chain.
 2. **The list is created** - `💼P • name 4️⃣` (your area's keycap), inside the projects folder, ready to use immediately.
-3. **Its CTA opens for scheduling** - the Add window re-opens prefilled and pinned to the 📌CTA list: the area tag plus a `💼 P • name 🔗` title that deep-links to the new list. Add a date (`*` `@` - every token works) and ⏎ - nothing is saved until that final ⏎, so the CTA arrives already scheduled (the [CRM](45-crm.md) uses the same trick for its Prepare follow-ups).
+3. **Its CTA opens for scheduling** - the Add window re-opens prefilled and pinned to the 📌CTA list: the area tag plus a `💼 P • name 🔗` title that deep-links to the new list. Add a date (`*` `@` - every token works) and ⏎ - nothing is saved until that final ⏎, so the CTA arrives already scheduled (the [CRM](47-crm.md) uses the same trick for its Prepare follow-ups).
 
 ## The 📌 Create CTA row
 
@@ -62,7 +62,7 @@ In the `tad` Add window type `P name` (case-insensitive; also on the empty field
 
 Every mode re-opens the Add window prefilled and pinned to the 📌CTA list - schedule, ⏎. Task-mode CTAs also carry a link to the parent list in the description. No keycap found anywhere → the CTA is simply untagged; the row never invents a tag.
 
-On a CRM booking the same row slot reads **🔥 Add Prepare** instead - see [CRM](45-crm.md).
+On a CRM booking the same row slot reads **🔥 Add Prepare** instead - see [CRM](47-crm.md).
 
 ## Area tags: the keycap rule
 
@@ -79,4 +79,4 @@ Matching is by the keycap emoji alone, so folder spelling and spacing never matt
 - [Add](42-add.md) - the `L / N / P / T` creation modes and the token grammar
 - [Actions](43-actions.md) - the ⌘⏎ menu the CTA row lives on
 - [Setup](30-setup.md) - copying the two ids into Configure Workflow
-- [CRM](45-crm.md) - the 🔥 Add Prepare sibling of the CTA row
+- [CRM](47-crm.md) - the 🔥 Add Prepare sibling of the CTA row

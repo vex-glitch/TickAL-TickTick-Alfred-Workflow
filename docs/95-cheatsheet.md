@@ -16,11 +16,11 @@ All 35 are defaults - remap any of them in Configure Workflow. Hotkey nodes ship
 | `tup` | Settings menu | [Settings & sync](90-settings-sync.md) |
 | `tsy` | Full cache refresh | [Settings & sync](90-settings-sync.md) |
 | `tlogin` | Browser OAuth login | [Setup](30-setup.md) |
-| `tca` | TickTick's Calendar (day/week/month/year views) | [Views](48-views.md) |
-| `tfo` | Focus screen - timer ⏱️ / pomodoro 🍅 | [Focus](44-focus.md) |
-| `tur` | Save the active browser tab as a task | [Notes, links & images](46-notes-links-images.md) |
-| `tst` | TickTick's Statistics | [Views](48-views.md) |
-| `tcr` | CRM booking hub | [CRM](45-crm.md) |
+| `tca` | TickTick's Calendar (day/week/month/year views) | [Views](45-views.md) |
+| `tfo` | Focus screen - timer ⏱️ / pomodoro 🍅 | [Focus](46-focus.md) |
+| `tur` | Save the active browser tab as a task | [Notes, links & images](44-notes-links-images.md) |
+| `tst` | TickTick's Statistics | [Views](45-views.md) |
+| `tcr` | CRM booking hub | [CRM](47-crm.md) |
 | `tsl` | Search pre-scoped to smart lists (`v `) | [Search](40-search.md) |
 | `tin` | Inbox view | [Browse & drill](41-browse-drill.md) |
 | `tod` | Today view | [Browse & drill](41-browse-drill.md) |
@@ -30,21 +30,21 @@ All 35 are defaults - remap any of them in Configure Workflow. Hotkey nodes ship
 | `tta` | Tags - search locked to the `g` scope | [Browse & drill](41-browse-drill.md) |
 | `tfi` | Search pre-scoped to filters (`f `) | [Search](40-search.md) |
 | `tdo` | These docs on GitHub | [Home](00-index.md) |
-| `tpn` | Periodic notes surface | [Periodic notes](47-periodic.md) |
-| `tdn` | Open today's note | [Periodic notes](47-periodic.md) |
-| `twn` | Open this week's note | [Periodic notes](47-periodic.md) |
-| `tmn` | Open this month's note | [Periodic notes](47-periodic.md) |
-| `tqn` | Open this quarter's note | [Periodic notes](47-periodic.md) |
-| `tyn` | Open this year's note | [Periodic notes](47-periodic.md) |
-| `tmj` | Morning journal | [Periodic notes](47-periodic.md) |
-| `tej` | Evening journal | [Periodic notes](47-periodic.md) |
-| `tmo` | Log income | [Periodic notes](47-periodic.md) |
-| `tdg` | Set today's one thing | [Periodic notes](47-periodic.md) |
-| `tde` | Log an entry to today | [Periodic notes](47-periodic.md) |
-| `tat` | Schedule a task today | [Periodic notes](47-periodic.md) |
-| `tha` | Habits view | [Views](48-views.md) |
-| `tpo` | Pomodoro / Focus view | [Views](48-views.md) |
-| `tmx` | Eisenhower Matrix view | [Views](48-views.md) |
+| `tpn` | Periodic notes surface | [Periodic notes](48-periodic.md) |
+| `tdn` | Open today's note | [Periodic notes](48-periodic.md) |
+| `twn` | Open this week's note | [Periodic notes](48-periodic.md) |
+| `tmn` | Open this month's note | [Periodic notes](48-periodic.md) |
+| `tqn` | Open this quarter's note | [Periodic notes](48-periodic.md) |
+| `tyn` | Open this year's note | [Periodic notes](48-periodic.md) |
+| `tmj` | Morning journal | [Periodic notes](48-periodic.md) |
+| `tej` | Evening journal | [Periodic notes](48-periodic.md) |
+| `tmo` | Log income | [Periodic notes](48-periodic.md) |
+| `tdg` | Set today's one thing | [Periodic notes](48-periodic.md) |
+| `tde` | Log an entry to today | [Periodic notes](48-periodic.md) |
+| `tat` | Schedule a task today | [Periodic notes](48-periodic.md) |
+| `tha` | Habits view | [Views](45-views.md) |
+| `tpo` | Pomodoro / Focus view | [Views](45-views.md) |
+| `tmx` | Eisenhower Matrix view | [Views](45-views.md) |
 
 ## Chords
 
@@ -120,7 +120,7 @@ Via the `tse` keyword (grammar: `tse [scope] query`). `/` opens the scope menu.
 | `f` | Filters |
 | `fo` | Folders |
 | `la` | Last added (newest first) |
-| `pn` | 💫 Periodic notes - open daily…yearly, `+` entry, `$` income, `day` / `goal` pickers, `today` / `tmrw` scheduling, journals ([docs](47-periodic.md)) |
+| `pn` | 💫 Periodic notes - open daily…yearly, `+` entry, `$` income, `day` / `goal` pickers, `today` / `tmrw` scheduling, journals ([docs](48-periodic.md)) |
 | `n` | Note titles |
 | `nc` | Note bodies |
 
