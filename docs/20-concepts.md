@@ -60,7 +60,7 @@ Three more ride alongside on task rows:
 
 **Local cache** - every screen reads from JSON files under `~/.ticktick_alfred/cache/`, and every write patches the cache in place, so rows update instantly without a round-trip. The `tsy` keyword forces a full refresh; an optional LaunchAgent refreshes hourly (see [Settings & sync](90-settings-sync.md)).
 
-**Keyword vs hotkey** - a keyword is what you type into Alfred (`tal`, `tse`, `tad`, …); all thirty-five are re-mappable in Configure Workflow. A hotkey is a global key combo you bind on the workflow canvas in Alfred; 15 ship pre-set (⌥⌘-based) and 19 ship unbound, all rebindable on the canvas.
+**Keyword vs hotkey** - a keyword is what you type into Alfred (`tal`, `tse`, `tad`, …); all thirty-five are re-mappable in Configure Workflow. A hotkey is a global key combo you bind on the workflow canvas in Alfred; 9 ship pre-set (⌥⌘-based) and 25 ship unbound, all rebindable on the canvas.
 
 ## Related
 

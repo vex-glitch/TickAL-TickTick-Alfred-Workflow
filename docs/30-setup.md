@@ -42,7 +42,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 </details>
 
 4. Run `tsy` to prime the local cache.
-5. Bind the main hotkey - the 🏁 MAIN TRIGGER node on the canvas (Alfred strips hotkey combos on import, so it arrives unset). Seven more hotkeys ship unbound - Today, Tomorrow, Next 7 Days, Inbox, Smart Lists, Calendar, Focus - bind any you want in Alfred.
+5. Check the hotkeys - 9 actions ship with a default ⌥⌘ combo (the [Default hotkeys](95-cheatsheet.md#default-hotkeys) table lists them); the other 25 hotkey nodes ship unbound. Bind, rebind or clear any on the workflow canvas in Alfred.
 
 All 35 keywords are re-mappable in Configure Workflow.
 

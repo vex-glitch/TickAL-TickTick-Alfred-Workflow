@@ -19,7 +19,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 | `tbu` | 🅿️ Buffer |
 | `tta` | Tags - search pre-scoped to `g` |
 
-Every task view is a plain list: typing filters it, and every row carries the full chord set below (Tags opens on tag rows first - see [Tags](#tags)). Unbound hotkeys ship for Today, Tomorrow, Next 7 Days, and Inbox - assign keys in Alfred's workflow editor. The full smart-list family (Completed, Habits, Summary, …) lives in [Search](40-search.md) under the `v` scope, via the `tsl` keyword.
+Every task view is a plain list: typing filters it, and every row carries the full chord set below (Tags opens on tag rows first - see [Tags](#tags)). Today ships with the ⌥⌘D global hotkey; Tomorrow, Next 7 Days, and Inbox ship unbound - assign keys in Alfred's workflow editor. The full smart-list family (Completed, Habits, Summary, …) lives in [Search](40-search.md) under the `v` scope, via the `tsl` keyword.
 
 ## The drill ladder
 

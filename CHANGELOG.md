@@ -15,11 +15,10 @@ All notable user-visible changes to TickAL. Format follows
   Eisenhower Matrix open TickTick's own screens, documented on a new
   [Views](docs/48-views.md) page (which also covers `tca` Calendar and `tst`
   Statistics).
-- **Default hotkeys** - 15 actions now ship with a default ⌥⌘ global hotkey
-  (Main menu, Search, Add, Today, Daily note, Calendar, Focus, Periodic,
-  Inbox, Save URL, Login, Docs, Sync, Settings), plus a leader combo for
-  Filters. The other 19 hotkey nodes ship unbound; rebind or clear any on
-  the workflow canvas.
+- **Default hotkeys** - 9 actions now ship with a default ⌥⌘ global hotkey
+  (Main menu, Search, Add, Today, Save URL, Login, Docs, Sync, Settings).
+  The other 25 hotkey nodes ship unbound; rebind or clear any on the
+  workflow canvas.
 
 ### Changed
 

@@ -16,7 +16,7 @@ Every change lands in a [local cache](docs/90-settings-sync.md#cache-model) firs
 > **First run** - keyword `tlogin` after setting credentials in config
 
 ![Search everything from one box](docs/assets/shots/01-hero-search.png)
-> Keyword `tal` OR *Main hotkey* (set in canvas)
+> Keyword `tal` OR hotkey `⌥⌘T`
 
 Four main keys run everything, on every screen:  
 **`⌥⏎` deeper · `⌘⏎` actions · `⌃⏎` back · `/` more**  
@@ -34,7 +34,7 @@ Type to filter.
 > **One search engine for lists, sections, tasks, subtasks, tags, folders, smart lists, filters, notes and note bodies, periodic notes, and last added.**
 
 ![Search scopes](docs/assets/shots/06-search-scopes.png)
-> Keyword `tse` OR Main hotkey > search OR *Search hotkey* (set in canvas)
+> Keyword `tse` OR Main hotkey > search OR hotkey `⌥⌘S`
 
 Thirteen prefixes narrow the scope (e.g. `t` searches tasks only), while `/` lists all the scopes.  
 ![Search scopes](docs/assets/shots/17-search-scope-menu.png)
@@ -77,7 +77,7 @@ Task rows show:
 > Description field shows assigned attributes live
 
 ![Add tokens](docs/assets/shots/08-add-tokens.png)
-> Keyword `tad` OR Main hotkey > Add OR *Add hotkey* (set in canvas) OR `⌘⇧⏎` on any row
+> Keyword `tad` OR Main hotkey > Add OR hotkey `⌥⌘A` OR `⌘⇧⏎` on any row
 
 Tokens cover the basics you'd expect - date, time, priority, tag, list, repeat, reminder.
 
@@ -172,7 +172,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 
 ![Note editor](docs/assets/shots/14-note-editor.png)
 
-- [Save the active browser tab](docs/46-notes-links-images.md#save-a-url) as a task with `tur` (or hotkey - set in canvas)
+- [Save the active browser tab](docs/46-notes-links-images.md#save-a-url) as a task with `tur` (or hotkey `⌥⌘U`)
 - [Edit a task's note](docs/46-notes-links-images.md#edit-a-note-body) in Alfred text window
 - [Link tasks to each other](docs/46-notes-links-images.md#task-links) with `[[`
 - Paste [clipboard images](docs/46-notes-links-images.md#images) as real attachments
@@ -191,9 +191,9 @@ Past what TickTick's own quick-add reaches, the same line can:
 
 1. [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** and **Client Secret** into Configure Workflow
-3. Run `tlogin`: a browser opens, log in and approve
-4. Run `tsy` to prime the cache
-5. Set your main hotkey on the workflow canvas
+3. Run `tlogin` or `⌥⌘L`: a browser opens, log in and approve
+4. Run `tsy` or `⌥⌘Y` to prime the cache
+5. The main hotkey ships as `⌥⌘T` - rebind it (or any of the others) on the workflow canvas
 6. Recommended: `tup` → **Attachment Login** (password masked, only a session token is stored) - or **Attachment Token** if you sign in with Apple. One sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your own tag order on every sync
 7. Optional: paste list and folder ids for the CRM / CTA / Projects extras
 
@@ -214,7 +214,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 | Periodic | `tpn` surface · `tdn`/`twn`/`tmn`/`tqn`/`tyn` day-to-year notes · `tmj`/`tej` journals · `tde` entry · `tmo` income · `tdg` day goal · `tat` add to today |
 | Native views | `tha` habits · `tpo` pomodoro · `tmx` matrix (also `tca` calendar · `tst` statistics)                                                               |
 
-All 35 keywords are re-mappable in Configure Workflow. 15 actions ship with a default ⌥⌘ global hotkey; the other 19 ship unbound - rebind or clear any on the workflow canvas. 
+All 35 keywords are re-mappable in Configure Workflow. 9 actions ship with a default ⌥⌘ global hotkey; the other 25 ship unbound - rebind or clear any on the workflow canvas. 
 
 > [!TIP]
 > The whole map on one page: [Cheatsheet](docs/95-cheatsheet.md).
