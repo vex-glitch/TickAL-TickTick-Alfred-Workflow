@@ -161,7 +161,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 
 ## 📈 CRM
 
-> **A simple, automated [booking hub, customer tracker and logbook](docs/47-crm.md#the-hub)**
+> **A simple, automated [booking hub](docs/47-crm.md#the-hub): tagged bookings, reference images, prepare-before-the-appointment follow-ups**
 
 > [!IMPORTANT]
 > A workflow with many moving parts - read [Docs • CRM](docs/47-crm.md) before using. Stays dormant until you set its list id ([setup](docs/47-crm.md#set-it-up-once)).
@@ -172,8 +172,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 - [Group tags](docs/47-crm.md#the--tag-group) for your client lists
 - Automatic "Prepare for `[[booking]]`" [follow-ups](docs/47-crm.md#the-automatic-prepare-follow-up)
 - [Clipboard-image attachments](docs/44-notes-links-images.md#images) for reference 
-- Per customer notes with automated links to separate projects per customer
-- Logbook to keep track of each project
+- *Coming next: per-customer notes and a per-project logbook*
 
 > [!TIP]
 > The whole system: [Docs • CRM](docs/47-crm.md)
