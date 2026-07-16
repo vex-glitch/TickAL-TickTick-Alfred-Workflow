@@ -42,8 +42,11 @@ Compressed version - the full walkthrough with screenshots is in [Setup](30-setu
 | `f` | your filters |
 | `n` | note titles |
 | `nc` | note bodies |
+| `fo` | folders |
+| `la` | last added |
+| `pn` | periodic notes |
 
-Three more scopes - `fo` folders, `la` last added, `pn` periodic notes - are on the [Search](40-search.md) page.
+More on `fo`, `la` and `pn` - and every scope's tricks - on the [Search](40-search.md) page.
 
 <details><summary>Screenshot</summary>
 
@@ -61,7 +64,7 @@ Three chords do all the navigation, everywhere:
 | ⌘⏎ | open the Actions menu for the selected row |
 | ⌃⏎ | go back one level |
 
-Try it: `tse l` → pick a list → ⌥⏎ into its sections → ⌥⏎ into a section's tasks → ⌃⏎ twice to climb back out. There's an animation of the full ladder on the [Browse & drill page](41-browse-drill.md). Bonus chords on task rows: ⇧⏎ completes, ⌥⌘⏎ copies the task link, ⌥⇧⏎ queues the task in the 🅿️ buffer.
+Try it: `tse l` → pick a list → ⌥⏎ into its sections → ⌥⏎ into a section's tasks → ⌃⏎ twice to climb back out. There's an animation of the full ladder on the [Browse & drill page](41-browse-drill.md). Bonus chords on task rows: ⇧⏎ completes, ⌥⌘⏎ copies the task link, ⌥⇧⏎ queues the task in the 🅿️ buffer, ⌃⇧⏎ starts a focus session on it, ⌘⇧⏎ adds a task right there (Add here).
 
 ## 5. First action: schedule a task
 
@@ -94,7 +97,7 @@ Each token pops a live picker as you type it; `/` opens the full token menu. The
 
 - Deepen the setup: the v2 token that makes tags, folders and filters configure themselves - [Setup](30-setup.md).
 - One-page key reference - [Cheatsheet](95-cheatsheet.md).
-- Everything else (views, focus sessions, buffer, CRM) - the page tree on [Home](00-index.md).
+- Everything else (views, focus sessions, buffer, projects, CRM) - the docs map table on [Home](00-index.md) lists every page.
 
 ## Related
 
