@@ -4,7 +4,7 @@
 
 Fast, keyboard-driven command bar for TickTick, inside Alfred. 
 
-[Search](docs/40-search.md), [add](docs/42-add.md), [browse](docs/41-browse-drill.md), [schedule](docs/43-actions.md#schedule), [tags](docs/43-actions.md#tags), complete, [focus](docs/44-focus.md), [edit notes and descriptions](docs/46-notes-links-images.md#edit-a-note-body), open the calendar, [mint periodic notes](docs/47-periodic.md), [save web pages](docs/46-notes-links-images.md#save-a-url), [open sticky notes](docs/46-notes-links-images.md#sticky-notes), organise projects, [run a CRM](docs/45-crm.md), and more... 
+[Search](docs/40-search.md), [add](docs/42-add.md), [browse](docs/41-browse-drill.md), [schedule](docs/43-actions.md#schedule), [tags](docs/43-actions.md#tags), complete, [focus](docs/44-focus.md), [edit notes and descriptions](docs/46-notes-links-images.md#edit-a-note-body), open the calendar, [mint periodic notes](docs/47-periodic.md), [save web pages](docs/46-notes-links-images.md#save-a-url), [open sticky notes](docs/46-notes-links-images.md#sticky-notes), [organise projects](docs/49-projects.md), [run a CRM](docs/45-crm.md), and more... 
 
 Every change lands in a [local cache](docs/90-settings-sync.md#cache-model) first, so nothing waits on the network between keystrokes.
 
