@@ -3063,6 +3063,18 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>E0CBFB31-1C19-44BC-9A5B-F14764C45C56</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>8F4D0B55-DCA5-4B44-BE06-68E9910338FF</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>CD050B59-74DF-4DA4-B12B-8421590F3BCA</key>
 		<array>
@@ -3250,6 +3262,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>122DC22C-099E-4070-B2F8-708ACEE899EC</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>E0CBFB31-1C19-44BC-9A5B-F14764C45C56</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>38EECB9D-1B7A-4C1F-983F-29F514A85C88</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -3666,11 +3691,9 @@
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>17</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>T</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -3862,11 +3885,9 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>1</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>S</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -4299,9 +4320,7 @@ fi</string>
 				<key>hotkey</key>
 				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>A</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5299,8 +5318,6 @@ fi</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5479,8 +5496,6 @@ fi</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5692,11 +5707,9 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>32</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>U</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5750,11 +5763,9 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>43</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>,</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -6083,11 +6094,9 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>16</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>Y</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -6179,6 +6188,20 @@ fi</string>
 						<string>Sync</string>
 						<key>uid</key>
 						<string>0D71E9A8-A9D4-4E15-84DC-E0CAB3A589F8</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>2-</string>
+						<key>outputlabel</key>
+						<string>HourlySync</string>
+						<key>uid</key>
+						<string>8F4D0B55-DCA5-4B44-BE06-68E9910338FF</string>
 					</dict>
 					<dict>
 						<key>inputstring</key>
@@ -6452,11 +6475,9 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>37</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>L</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -6540,7 +6561,7 @@ fi</string>
 				<key>fixedorder</key>
 				<true/>
 				<key>items</key>
-				<string>[{"title": "Sync", "arg": "1-", "subtitle": "Refresh cache  ⌃ 🔙"}, {"title": "Login", "arg": "5-", "subtitle": "Get token  ⌃ 🔙"}, {"title": "Refresh TickTick", "arg": "6-", "subtitle": "Refresh app  ⌃ 🔙"}, {"title": "Help • TickAL Docs", "arg": "7-", "subtitle": "GitHub · TickAL  ⌃ 🔙"}, {"title": "Attachment Token", "arg": "8-", "subtitle": "Save v2 token from clipboard  ⌃ 🔙"}, {"title": "Attachment Login", "arg": "9-", "subtitle": "One-time sign-in for attachments &amp; auto-config  ⌃ 🔙"}]</string>
+				<string>[{"title": "Sync", "arg": "1-", "subtitle": "Refresh cache  \u2303 \ud83d\udd19"}, {"title": "Hourly Sync", "arg": "2-", "subtitle": "Hourly cache auto-refresh \u00b7 install / remove  \u2303 \ud83d\udd19"}, {"title": "Login", "arg": "5-", "subtitle": "Get token  \u2303 \ud83d\udd19"}, {"title": "Refresh TickTick", "arg": "6-", "subtitle": "Refresh app  \u2303 \ud83d\udd19"}, {"title": "Help \u2022 TickAL Docs", "arg": "7-", "subtitle": "GitHub \u00b7 TickAL  \u2303 \ud83d\udd19"}, {"title": "Attachment Token", "arg": "8-", "subtitle": "Save v2 token from clipboard  \u2303 \ud83d\udd19"}, {"title": "Attachment Login", "arg": "9-", "subtitle": "One-time sign-in for attachments &amp; auto-config  \u2303 \ud83d\udd19"}]</string>
 				<key>matchmode</key>
 				<integer>0</integer>
 				<key>runningsubtext</key>
@@ -7022,11 +7043,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>2</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
+				<integer>0</integer>
 				<key>hotstring</key>
-				<string>D</string>
+				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -8357,8 +8378,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -8786,8 +8805,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -9055,11 +9072,9 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>5</integer>
+				<integer>0</integer>
 				<key>hotmod</key>
-				<integer>1572864</integer>
-				<key>hotstring</key>
-				<string>G</string>
+				<integer>0</integer>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -9587,8 +9602,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -10226,8 +10239,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -10580,8 +10591,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -10691,8 +10700,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -10806,8 +10813,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -10856,8 +10861,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -10910,8 +10913,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11025,8 +11026,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11075,8 +11074,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11129,8 +11126,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11244,8 +11239,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11294,8 +11287,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11348,8 +11339,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11421,8 +11410,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11536,8 +11523,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11549,6 +11534,29 @@ esac</string>
 			<string>alfred.workflow.trigger.hotkey</string>
 			<key>uid</key>
 			<string>0FED0034-90A1-4B2C-8D3E-000000000034</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:cachesync"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>E0CBFB31-1C19-44BC-9A5B-F14764C45C56</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -14563,6 +14571,15 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<real>885.0</real>
 			<key>ypos</key>
 			<real>2570.0</real>
+		</dict>
+		<key>E0CBFB31-1C19-44BC-9A5B-F14764C45C56</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>1050.0</real>
+			<key>ypos</key>
+			<real>1685.0</real>
 		</dict>
 		<key>E124F0E6-914A-41E3-9BBF-B14D6F724AD3</key>
 		<dict>

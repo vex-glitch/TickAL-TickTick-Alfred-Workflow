@@ -764,6 +764,160 @@ def _ask(prompt, title="TickAL", hidden=False, default=""):
     return r.stdout.rstrip("\n") if hidden else r.stdout.strip()
 
 
+# ── Hourly cache-sync LaunchAgent (Settings → Hourly Sync) ───────────────────
+# One toggle verb: a dialog states the current state and offers the valid
+# moves. The agent runs src/sync.py THROUGH Scripts/py.sh (never a baked
+# interpreter path - sys.executable is version-pinned under Homebrew and rots
+# on upgrade), plists are emitted via plistlib (path escaping for free), and
+# load success is verified via `launchctl list <label>` because launchctl
+# load/unload exit 0 even when they fail. A plist that survives a workflow
+# re-import points at the deleted old UUID folder - the ON branch detects
+# that and offers Repair.
+SYNC_AGENT_LABEL = "com.tickal.cachesync"
+SYNC_AGENT_PLIST = os.path.expanduser(
+    f"~/Library/LaunchAgents/{SYNC_AGENT_LABEL}.plist")
+SYNC_AGENT_LOG = "/tmp/tickal_cachesync.log"
+
+
+def _dialog(prompt, buttons, default):
+    """display-dialog wrapper; returns the clicked button ('' on Esc)."""
+    def esc(s):
+        return (s or "").replace("\\", "\\\\").replace('"', '\\"')
+    blist = ", ".join(f'"{esc(b)}"' for b in buttons)
+    osa = ('button returned of (display dialog "{}" with title "TickAL" '
+           'buttons {{{}}} default button "{}")').format(
+               esc(prompt), blist, esc(default))
+    r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def _sync_agent_dict(wf):
+    return {
+        "Label": SYNC_AGENT_LABEL,
+        "ProgramArguments": ["/bin/bash",
+                             os.path.join(wf, "Scripts", "py.sh"),
+                             os.path.join(wf, "src", "sync.py"), "sync"],
+        "WorkingDirectory": wf,
+        "StartInterval": 3600,
+        "RunAtLoad": True,
+        "StandardOutPath": SYNC_AGENT_LOG,
+        "StandardErrorPath": SYNC_AGENT_LOG,
+    }
+
+
+def _sync_agent_loaded():
+    return subprocess.run(["launchctl", "list", SYNC_AGENT_LABEL],
+                          capture_output=True).returncode == 0
+
+
+def _twin_sync_agent():
+    """A DIFFERENT user-authored TickAL/TickTick hourly-sync agent (e.g. a
+    hand-rolled pre-2.7 one). Returns its label, or None."""
+    import glob
+    import plistlib
+    for path in glob.glob(os.path.expanduser("~/Library/LaunchAgents/*.plist")):
+        if os.path.basename(path) == f"{SYNC_AGENT_LABEL}.plist":
+            continue
+        try:
+            with open(path, "rb") as f:
+                d = plistlib.load(f)
+        except Exception:
+            continue
+        label = str(d.get("Label", ""))
+        args = " ".join(str(a) for a in d.get("ProgramArguments", []))
+        if "sync.py" in args and ("tickal" in (label + args).lower()
+                                  or "ticktick" in (label + args).lower()):
+            return label or os.path.basename(path)[:-len(".plist")]
+    return None
+
+
+def _sync_agent_install(wf):
+    """Write + (re)load the agent; True when launchd confirms it's loaded."""
+    import plistlib
+    os.makedirs(os.path.dirname(SYNC_AGENT_PLIST), exist_ok=True)
+    with open(SYNC_AGENT_PLIST, "wb") as f:
+        plistlib.dump(_sync_agent_dict(wf), f)
+    subprocess.run(["launchctl", "unload", SYNC_AGENT_PLIST],
+                   capture_output=True)
+    subprocess.run(["launchctl", "load", SYNC_AGENT_PLIST],
+                   capture_output=True)
+    return _sync_agent_loaded()
+
+
+def _sync_agent_state(wf):
+    """'' = healthy; otherwise a short reason the install is stale."""
+    import plistlib
+    try:
+        with open(SYNC_AGENT_PLIST, "rb") as f:
+            cur = plistlib.load(f)
+    except Exception:
+        return "its file is unreadable"
+    args = [str(a) for a in cur.get("ProgramArguments", [])] or [""]
+    if os.path.basename(args[0]) != "bash" or len(args) < 3:
+        return "it predates this workflow version"
+    py_sh = args[1]
+    if not os.path.exists(py_sh):
+        return "it points at a deleted workflow copy"
+    if os.path.dirname(os.path.dirname(py_sh)) != wf:
+        return "it points at a previous workflow copy"
+    if not _sync_agent_loaded():
+        return "launchd does not have it loaded"
+    return ""
+
+
+def cachesync_toggle():
+    wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    if not os.path.exists(SYNC_AGENT_PLIST):
+        twin = _twin_sync_agent()
+        if twin:
+            _dialog(f"Hourly sync already runs on this Mac via {twin} - "
+                    "nothing to install.", ["OK"], "OK")
+            return
+        if _dialog("Hourly background sync is OFF.\n\nInstall it? A "
+                   "LaunchAgent refreshes the cache every hour in the "
+                   f"background (logs: {SYNC_AGENT_LOG}).",
+                   ["Cancel", "Install"], "Install") != "Install":
+            return
+        if _sync_agent_install(wf):
+            print("Hourly sync on · first refresh running now")
+        else:
+            try:
+                os.remove(SYNC_AGENT_PLIST)
+            except OSError:
+                pass
+            print("Install failed · launchctl would not load the agent")
+        return
+
+    stale = _sync_agent_state(wf)
+    if stale:
+        btn = _dialog(f"Hourly background sync is installed, but {stale}."
+                      "\n\nRepair reinstalls it for this workflow copy; "
+                      "Remove deletes it.",
+                      ["Cancel", "Remove", "Repair"], "Repair")
+        if btn == "Repair":
+            print("Hourly sync repaired · running now"
+                  if _sync_agent_install(wf)
+                  else "Repair failed · launchctl would not load the agent")
+            return
+        if btn != "Remove":
+            return
+    elif _dialog("Hourly background sync is ON.\n\nRemove it? (tsy and "
+                 "in-place cache updates keep working - this only stops "
+                 "the hourly refresh.)",
+                 ["Cancel", "Remove"], "Remove") != "Remove":
+        return
+
+    subprocess.run(["launchctl", "unload", SYNC_AGENT_PLIST],
+                   capture_output=True)
+    try:
+        os.remove(SYNC_AGENT_PLIST)
+    except OSError as e:
+        print(f"Remove failed · {e}")
+        return
+    print("Hourly sync removed")
+
+
 def v2login():
     """One-time TickTick sign-in for the internal v2 API (attachments, the
     Completed view, the tag tree). Two macOS dialogs - the password field is
@@ -2515,6 +2669,8 @@ def main():
             _app_sync()   # silent - no stdout, no banner
         elif verb == "v2login":
             v2login()
+        elif verb == "cachesync":
+            cachesync_toggle()
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's

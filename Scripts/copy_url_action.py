@@ -19,7 +19,9 @@ if not url:
 
 subprocess.run("pbcopy", input=url.encode(), check=True)
 
-title = f"{task_title} · URL Copied" if task_title else "URL Copied"
+# Bare TickTick ids ride the same verb as URLs (the 🆔 Copy id rows)
+what = "URL" if "://" in url else "id"
+title = f"{task_title} · {what} Copied" if task_title else f"{what} Copied"
 print(f"{title}\n{url}")
 
 # Act-again: reopen the ⌘ Actions menu on the task after copying (loop UX).

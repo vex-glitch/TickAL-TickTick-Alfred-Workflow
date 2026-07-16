@@ -455,6 +455,7 @@ def main():
             (crumb,                "Move…",                "move",          "move list section", is_task_like),
             ("➕ Add task",        add_sub,                "add",           "add new task",      True),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
+            ("🆔 Copy id",         "List id → clipboard",  f"copy:{pid}",   "id copy identifier configure", itype == "list"),
             ("📂 Go to list",      f"Open {lname or 'this list'} in TickTick",
              f"open:{list_link}",  "go to list open project folder",        is_task_like and bool(pid)),
             ("🌐 Open link",       open_link_sub,          open_link_arg, "link url web open", has_links),

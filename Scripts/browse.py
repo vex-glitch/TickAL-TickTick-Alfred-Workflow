@@ -403,6 +403,8 @@ def render_folders(query):
                     # Actions can't handle folder context yet - dead ⌘ here
                     # would otherwise fire the junction and crash actions.py.
                     "cmd": {"valid": False, "subtitle": ""},
+                    "alt+cmd": {"arg": f"copy:{group_id}",
+                                "subtitle": "Copy folder id"},
                 },
                 variables={"folder_id": group_id, "folder_name": clean,
                            "item_type": "folder"},

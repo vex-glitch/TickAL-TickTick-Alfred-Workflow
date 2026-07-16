@@ -238,11 +238,14 @@ def main():
             # no output → notification node shows nothing
 
         elif arg.startswith("copy:"):
-            url = arg[5:]
-            subprocess.run(["pbcopy"], input=url.encode(), check=False)
+            payload = arg[5:]
+            subprocess.run(["pbcopy"], input=payload.encode(), check=False)
             task_title = os.environ.get("task_title", "")
-            title = f"{task_title} · URL Copied" if task_title else "URL Copied"
-            print(f"{title}\n{url}")
+            # Bare TickTick ids ride the same verb as URLs (Copy id rows)
+            what = "URL" if "://" in payload else "id"
+            title = (f"{task_title} · {what} Copied" if task_title
+                     else f"{what} Copied")
+            print(f"{title}\n{payload}")
 
         elif arg.startswith("complete:"):
             # complete:projectId:taskId:title
