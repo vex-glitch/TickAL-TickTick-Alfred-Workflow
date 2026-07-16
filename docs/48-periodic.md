@@ -34,14 +34,18 @@ Try it tomorrow: `tmj` fills the morning journal, `tdn` opens the daily note. Se
 4. **Optional - the [04:30 agent](#the-0430-agent):** the day's note exists before you wake. Without it, notes are minted the moment you open them.
 5. **Optional - the [v2 token](30-setup.md#attachments--completed-v2-token):** fills the 🔄 Habits, ⏳ Countdowns and 🎯 Focus sections in the notes.
 
+## Your first open
+
+Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and section skeletons already in place - and the generated sections fill in a few seconds later as the background refresh lands. That two-step draw is normal: open is instant, the refresh follows. The 💫 tags appear with that first mint too, so the group-by-Tag kanban columns show up from note one.
+
 ## The `pn` rows
 
 ![The pn scope](assets/shots/20-periodic-scope.png)
 
 | Row | Does |
 |-----|------|
-| 💫 Today / ◀ Yesterday / 📆 Week / 🗓 Month / 🧭 Quarter / 📅 Year | ⏎ open instantly (refresh catches up in the background) - **⌃⇧⏎ opens as a sticky** |
-| ➕ Entry | log a win, nag, thought, link or task to today's note |
+| 💫 Today / ◀ Yesterday / 📆 Week / 🗓 Month / 🧭 Quarter / 📅 Year | ⏎ open instantly (refresh catches up in the background) - **⌃⇧⏎ opens as a [sticky note](44-notes-links-images.md#sticky-notes)** |
+| ➕ Entry | log a win, nag, thought, link or task to today's note - ⏎ shows the kind legend, or type straight: `+ w Shipped the thing` |
 | 💰 Income | log money you made |
 | ☀️ Day goal | pick (or create) today's one thing - pinned + scheduled today |
 | ☀️ Add to today / 🌙 Add to tomorrow | pick any task or note → ⏎ schedules it (type `14:30` for a time) |
@@ -50,7 +54,7 @@ Try it tomorrow: `tmj` fills the morning journal, `tdn` opens the daily note. Se
 | 🗓️ Week highlight | one thing that stands out - lands in ✨ Highlight |
 | 🔄 Refresh today | complete ticked boxes + rebuild the generated sections |
 
-Entry kinds: 🏆 win · 👎 nag · 💭 thought (plain text works) · ☑️ task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · 🔗 link (empty = clipboard) · 😊 mood - five faces 😢 😞 😐 🙂 😁, then an optional note.
+Entry kinds, each with a one-letter prefix: 🏆 `w` win · 👎 `n` nag · 💭 `t` thought (also the default - plain text works) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · 🔗 `l` link (empty = clipboard) · 😊 `m` mood - five faces 😢 😞 😐 🙂 😁, then an optional note. ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
 
 The same moves work from a task's **⌘ Actions** menu: ☀️ Add to today, 🌙 Add to tomorrow, ☀️ Make day goal. The add window's `/` menu has ☀️ Today and 🌙 Tomorrow shortcuts too.
 
@@ -68,7 +72,7 @@ Every pn row also has its own keyword, so you can jump straight in without openi
 | `tdg` | set today's one thing |
 | `tat` | schedule a task today |
 
-Unset until you set `periodic_list_id` - a setup row or message shows until then. Opening or journaling auto-mints the note if it does not exist yet.
+Without `periodic_list_id`, every one of these shows a setup pointer instead. Opening or journaling auto-mints the note if it does not exist yet.
 
 ## The daily note
 
@@ -82,7 +86,7 @@ The head of the note (breadcrumbs, nav links, weather, the quote, your `Mood:` a
 
 All three journals seed their questions into the note at mint, so you can answer from any device by typing after `A:`. Running them from Alfred asks each **unanswered** question in a dialog - ⏎ saves and advances, empty ⏎ skips, Cancel stops and keeps what you answered. Phone answers are never overwritten.
 
-- **Morning** (3 fixed + 3 drawn): mood (1-5), what's on your mind, the one thing - then, if no day goal is set, the ☀️ picker opens by itself.
+- **Morning** (3 fixed + 3 drawn from an editable pool, below): mood (1-5), what's on your mind, the one thing - then, if no day goal is set, the ☀️ picker opens by itself.
 - **Evening** (4 fixed + 5 drawn): on your mind, *did you achieve your daily goal - {your goal}?*, money earned (auto-logs to 💰), rate the day (★ lands next to the quote).
 - **Weekly** (2 fixed + 5 drawn): the week's highlight (lands in ✨), *did you achieve your weekly goals?* - then a picker asks for **three things that would make next week a success**, written into next week's 🎯 Goals.
 
@@ -90,19 +94,25 @@ Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly}.md` to `~/.t
 
 ## Money - the roll-up pyramid
 
-Log on the daily (`pn $ 485 tattoo` → `- 485 · tattoo`, day **Total** recomputed). The weekly's 📌 This Week section shows one line per day - `- Sat 11 Jul 2026 • 485` - with the total; monthly shows week sums; quarterly shows months; yearly shows quarters. Roll-ups always recompute from the daily notes, so a week straddling two months never double-counts.
+Log from the `pn` bar (`tpn`, or `tse pn`): type `$ 485 tattoo` → the daily gains `- 485 · tattoo` and the day **Total** recomputes (the `tmo` keyword jumps straight to the `$`). The weekly's 📌 This Week section shows one line per day - `- Sat 11 Jul 2026 • 485` - with the total; monthly shows week sums; quarterly shows months; yearly shows quarters. Roll-ups always recompute from the daily notes, so a week straddling two months never double-counts.
 
 ## The weekly note
 
-Minted Sunday for the week ahead. 🏆 Goals → ✨ Highlight → **📌 This Week**, where the numbers live in the section headers themselves, each with a vs-last-week chip: `### ✅ Completed: 121 · 🟢 25 ahead of last week (+26%)` - 🔥 Top list, 🚀 Top tasks, ➕ Created, ✅ Completed, 📈 Stats (per-day bars), 🎯 Focus (by day, with the day's top task), **📨 Entries** (every win/nag/thought/link, grouped, newest first), 😊 Moods (by day + average), 🔄 Habit consistency, 💰 Income (day lines) → 📔 Weekly journal → **♻️ Weekly Review** - a live mirror of your review list, sections preserved, both directions: tick in the note and the real task completes; the source re-mirrors on every refresh → ⏪ Last week.
+Minted Sunday for the week ahead - and opening it midweek mints it on the spot, like every note. Top to bottom:
+
+- **🏆 Goals** → **✨ Highlight** - yours to write.
+- **📌 This Week** - the numbers live in the section headers themselves, each with a vs-last-week chip (`### ✅ Completed: 121 · 🟢 25 ahead of last week (+26%)`): 🔥 Top list · 🚀 Top tasks · ➕ Created · ✅ Completed · 📈 Stats (per-day bars) · 🎯 Focus (by day, with the day's top task) · **📨 Entries** (every win/nag/thought/link, grouped, newest first) · 😊 Moods (by day + average) · 🔄 Habit consistency · 💰 Income (day lines).
+- **📔 Weekly journal**.
+- **♻️ Weekly Review** - a live mirror of your review list, sections preserved, both directions: tick in the note and the real task completes; the source re-mirrors on every refresh.
+- **⏪ Last week**.
 
 **Monthly** adds sparklines and top wins; **quarterly** and **yearly** ship as templates + money roll-ups for now - their review sections land in a later release (the first real quarterly mint is Sep 30).
 
 ## The 04:30 agent
 
-One row installs it. Use any `pn` action once first (that mirrors your ids into the config the agent reads), then `tup` → **Periodic Agent** - a dialog shows the current state and offers **Install**, **Remove**, or **Repair** after a workflow update. No files to edit, no terminal.
+One row installs it. Use any `pn` action once first (that mirrors your ids into the config the agent reads), then `tup` (Settings) → **Periodic Agent** - a dialog shows the current state and offers **Install**, **Remove**, or **Repair** after a workflow update. No files to edit, no terminal.
 
-Every morning at 04:30 (or on wake/login if the Mac slept through it) it mints **the day that just started** - plus the coming week's weekly on Sundays - refreshes today, seals the periods that just closed and recomputes the roll-ups. Log: `/tmp/tickal_periodic.log`. Missed everything? Opening any note via `pn` creates and refreshes it on the spot.
+Every morning at 04:30 (or on wake/login if the Mac slept through it) it mints **the day that just started** - plus the coming week's weekly on Sundays - refreshes today, seals the periods that just closed (one last refresh, then the note rests as a record) and recomputes the roll-ups. Log: `/tmp/tickal_periodic.log`. Missed everything? Opening any note via `pn` creates and refreshes it on the spot.
 
 ## macOS Shortcuts
 
@@ -116,7 +126,7 @@ Same shape for `xact:pn_income:485 tattoo deposit`, `xact:pn_journal:evening`, `
 
 ## Limitations
 
-- The `###` section headers are the machine's anchors - rename one inside a note and its filler goes quietly blind (the rest of the note is untouched). Deleting a section from your template override turns that feature off: that's the intended kill switch.
+- The `###` section headers are the machine's anchors - rename one inside a note and its filler goes quietly blind (the rest of the note is untouched). Deleting a section from your note-template override turns that feature off: that's the intended kill switch. (Power users: copy `src/periodic_templates/` into `~/.ticktick_alfred/periodic_templates/` and edit - the same override mechanism as the journal pools.)
 - Opening via `pn` is instant; the refresh lands a few seconds later and the open note redraws. Watch it happen, or use 🔄 to refresh in the foreground.
 - Ticked boxes complete their real tasks for about a day after the note's period ends; older ticks in stale notes are left alone on purpose (a note is a record - re-completing a long-reopened task would be worse).
 - Don't complete a periodic note itself; if you did, uncomplete it - a completed note drops out of the index and a blank twin gets minted.
