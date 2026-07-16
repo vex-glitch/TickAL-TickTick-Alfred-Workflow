@@ -32,7 +32,7 @@ Task / subtask / note share one row set; lists and sections get the container su
 | 📅 _current date_ | Schedule… (date/time/duration picker) | ✓ | ✓ | ✓ | | |
 | 🔔 Reminder | Set a reminder… | ✓ | ✓ | ✓ | | |
 | 🏷️ _current tags_ | Tags… (view/add/remove/change) | ✓ | ✓ | ✓ | | |
-| 📌 Create CTA / 🔥 Add Prepare | Dynamic follow-up row - see [CRM](45-crm.md); needs its id set in Configure Workflow | ✓ | ✓ | ✓ | ✓ | |
+| 📌 Create CTA / 🔥 Add Prepare | Dynamic follow-up row - see [Projects](49-projects.md) (CTA) and [CRM](45-crm.md) (Prepare); needs its id set in Configure Workflow | ✓ | ✓ | ✓ | ✓ | |
 | ⚫️/🟡/🟠/🔴 _current_ | Priority… | ✓ | ✓ | | | |
 | _list>section_ | Move… (list / section / re-parent) | ✓ | ✓ | ✓ | | |
 | ➕ Add task | Add a subtask (task-like) or a task into the container | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -180,5 +180,6 @@ Attribute changes loop back: after schedule, reminder, tags, priority, move, ren
 - [Search](40-search.md) - where you press ⌘⏎
 - [Browse & drill](41-browse-drill.md) - ⌥⏎ / ⌃⏎ navigation
 - [Focus](44-focus.md) - the 🎯 rows in depth
-- [CRM](45-crm.md) - the 📌 CTA / 🔥 Prepare row
+- [Projects](49-projects.md) - the 📌 Create CTA row in full
+- [CRM](45-crm.md) - the 🔥 Prepare variant of the same row
 - [Cheatsheet](95-cheatsheet.md) - everything on one page

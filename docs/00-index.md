@@ -29,6 +29,7 @@ TickAL is a keyboard-driven TickTick front end for Alfred 5. It covers search, b
 | | [Notes, links & images](46-notes-links-images.md) | Note editing, task links, clipboard image attachments |
 | | [Periodic notes](47-periodic.md) | Daily → yearly notes: auto-mint, journals, money roll-ups, reviews |
 | | [Views](48-views.md) | Native TickTick screens: Habits, Pomodoro, Matrix, Calendar, Statistics |
+| | [Projects](49-projects.md) | 💼 project lists with one scheduled call-to-action task each, minted automatically |
 | **Reference** | [Setup](30-setup.md) | TickTick app credentials, OAuth login, first sync, optional extras |
 | | [Settings & sync](90-settings-sync.md) | Configure Workflow options, cache, optional hourly background sync |
 | | [Cheatsheet](95-cheatsheet.md) | Every keyword and keystroke on one page |

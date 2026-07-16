@@ -57,10 +57,10 @@ On an empty field, `/` picks what to create - Task, List, Note, Project, or Tag.
 |--------|---------|---------|
 | `L name` | List | One ⏎, done |
 | `N title` | Note | Notes take `*` `@` `>` `&` `%` `#` `~` `=` too; `~l` includes note lists |
-| `P name` | Project | Pick an area tag → creates a `💼P • name` list plus its scheduled meta task |
+| `P name` | Project | Pick an area tag → creates a `💼P • name` list plus its scheduled 📌CTA task - full flow on [Projects](49-projects.md) |
 | `T name` | Tag | Two rows: **➕** creates it top-level, **🪆 under parent…** opens the parent list (typing filters it). Needs the [v2 token](30-setup.md) |
 
-Prefixes are case-insensitive (`l `, `n `, `p `, `t ` work). Area tags for `P` are your tags starting with a keycap number (1️⃣…) - they arrive with the tag sync, no setup.
+Prefixes are case-insensitive (`l `, `n `, `p `, `t ` work). Area tags for `P` are your tags starting with a keycap number (1️⃣…) - they arrive with the tag sync, no setup; the whole convention is on [Projects](49-projects.md).
 
 ## Adding into a list, section, or task
 

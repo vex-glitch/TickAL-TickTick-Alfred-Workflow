@@ -100,7 +100,7 @@ Leading prefixes switch what gets created:
 |--------|---------|
 | `L ` | List |
 | `N ` | Note |
-| `P ` | Project (list + meta task) |
+| `P ` | Project (list + scheduled 📌CTA task - [Projects](49-projects.md)) |
 | `T ` | Tag (top-level, or nested under a parent) |
 
 ## Search scopes

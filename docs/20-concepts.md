@@ -44,6 +44,8 @@ Three more ride alongside on task rows:
 
 **Tag** - TickTick's cross-list label. Browse a list's tags from its ⌘ Actions menu, or search all tags via the `g` scope - the `tta` keyword jumps straight into it; nested tags need the optional v2 token.
 
+**Project / CTA / Area** - a project is a `💼P • name` list; its presence in your day is a **CTA** (call-to-action) task in the 📌CTA list, deep-linked to the project and scheduled; the **area** is a keycap-led tag (`1️⃣Work`) the CTA inherits automatically. The whole convention: [Projects](49-projects.md).
+
 **🅿️ Buffer** - a disposable local parking lot for tasks. ⌥⇧⏎ queues any task row; the `tbu` keyword opens the buffer, where you can tag, move, prioritize, or complete everything at once - or send the whole set into today's focus block. Clearing the buffer never touches the tasks themselves.
 
 ## Focusing

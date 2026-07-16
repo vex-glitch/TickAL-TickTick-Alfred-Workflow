@@ -94,8 +94,8 @@ Three fields in Configure Workflow take 24-character TickTick ids. Leave blank i
 | Field | Enables |
 |---|---|
 | `crm_list_id` | The CRM booking hub via the `tcr` keyword - see [CRM](45-crm.md) |
-| `cta_list_id` | The 📌 Create CTA action (the list where CTA tasks are created) |
-| `projects_folder_id` | New 💼 projects land inside this folder; blank = created ungrouped |
+| `cta_list_id` | The 📌 Create CTA action (the list where CTA tasks are created) - see [Projects](49-projects.md) |
+| `projects_folder_id` | New 💼 projects land inside this folder; blank = created ungrouped - see [Projects](49-projects.md) |
 
 To copy an id: open the list (or click the folder) in the TickTick **web** app and take the 24-character segment from the URL - for a list it reads `ticktick.com/webapp/#p/<id>/tasks`.
 

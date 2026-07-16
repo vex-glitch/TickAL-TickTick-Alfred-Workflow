@@ -99,3 +99,4 @@ Booking rows inside the drill behave like every other task list: ⏎ open, ⌘�
 - [Setup](30-setup.md) - Configure Workflow, the v2 token for image attachments
 - [Add](42-add.md) - the token grammar behind the booking window
 - [Browse & drill](41-browse-drill.md) - the drill ladder the Search row lands in
+- [Projects](49-projects.md) - the 📌 Create CTA sibling of the Prepare row
