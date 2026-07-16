@@ -11,24 +11,27 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 It was built for a real booking business; if that shape fits your work, it is the fastest surface in the workflow. If not, skip this page; nothing else depends on it.
 
-## Setup
+## The moving parts
 
-The CRM is dormant until `crm_list_id` is set in Configure Workflow. Until then, every CRM entry point renders a single **CRM needs setup** row - ⏎ on it opens this page.
+| Part | What it is | Who makes it |
+|---|---|---|
+| **The bookings list** | One TickTick list holds every booking (`crm_list_id`) | You, once |
+| **The 🔥 tag group** | 🔥lead · 🔥consultation · 🔥tattoo · 🔥ongoing (booking statuses) + 🔥prepare (the follow-up marker) - plain TickTick tags ([below](#the--tag-group)) | You, once |
+| **The Prepare follow-up** | Every booking-tagged add re-opens the Add window with a linked prep task prefilled | The automation |
+| **Image auto-attach** | The clipboard image lands on the new booking as a real attachment | The automation - needs the [v2 token](30-setup.md#attachments--completed-v2-token) |
+| **Scoped pickers** | Inside CRM adds, `#` offers only the 🔥 tags and `[[` only open bookings | The automation |
+
+## Set it up once
+
+1. **Create the bookings list** - any name works. Copy its id: `tse l <name>` → ⌘⏎ → **🆔 Copy id**, then paste it into `crm_list_id` in Configure Workflow. Until then, every CRM entry point renders a single **CRM needs setup** row - ⏎ on it opens this page.
+2. **Create the 🔥 tags** in TickTick - the five in [the 🔥 tag group](#the--tag-group); the CRM pickers offer only those.
+3. **Optional - the [v2 token](30-setup.md#attachments--completed-v2-token)** for image auto-attach.
 
 <details><summary>Screenshot</summary>
 
 ![CRM needs setup pointer row](assets/shots/18-crm-needs-setup.png)
 
 </details>
-
-To configure it:
-
-1. Create (or pick) the TickTick list that will hold bookings.
-2. Copy its id without leaving Alfred: find the list (`tse l <name>`) → ⌘⏎ → **🆔 Copy id**.
-3. Paste it into `crm_list_id` in Configure Workflow.
-4. Create the 🔥 tags in TickTick (see [the 🔥 tag group](#the--tag-group)) - CRM pickers offer only those.
-
-Image auto-attach additionally needs the one-time v2 session token - see [Setup](30-setup.md).
 
 ## The hub
 

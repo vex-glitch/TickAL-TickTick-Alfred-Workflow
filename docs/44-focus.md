@@ -13,6 +13,24 @@ The thought "I should work on this NOW" has a shelf life of about a minute. A ta
 > [!IMPORTANT]
 > Focus is a workflow, not a single action - sessions, staging blocks, sweep, the bar - moving parts that click together. Give this page a full read before the first session.
 
+## The moving parts
+
+| Part | What it is | Who makes it |
+|---|---|---|
+| **Session** ⏱️/🍅 | TickAL's own timer (logs a real TickTick focus record on stop), or the app's pomodoro driven for you | Built in |
+| **The focus task** | The task a session runs on - its description hosts the day's staged worklist | You pick one per session |
+| **Checkbox block** | That worklist: dated `- [ ] [Task](link)` lines in the description - carry-over, dedupe, permanent record | The automation |
+| **Sweep** | Completes the real task behind every ticked box | The automation - on 🧹, on ⏹ stop, or from the bar |
+| **The bar** | The floating pill: clock, current checkbox, tick, reorder, sweep | The automation - once PyObjC is installed |
+
+## Set it up once
+
+1. **Install PyObjC** - `tup` → **Install PyObjC**, one dialog ([Setup](30-setup.md#focus-bar)). The bar is the face of the whole workflow - a session runs fine without it, but blind.
+2. **Sticky variants** (optional) - assign TickTick → Settings → Shortcuts → *Open as Sticky Note*, and enable Alfred under System Settings → Privacy & Security → Accessibility.
+3. **Pomodoro mode** (optional) - the TickTick desktop app runs the actual pomodoro, so keep it installed; session length follows the app's own pomo setting.
+
+The timer itself needs none of it - `tfo` works the second the workflow is connected.
+
 ## Start
 
 The idle screen offers two modes plus the stage flow:

@@ -140,7 +140,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > **Obsidian-style [daily](docs/47-periodic.md#the-daily-note), [weekly](docs/47-periodic.md#the-weekly-note), monthly, quarterly and yearly notes minted inside TickTick**
 
 > [!IMPORTANT]
-> A workflow with many moving parts - read [Docs • Periodic notes](docs/47-periodic.md) before using. Stays dormant until you set the list id ([setup](docs/47-periodic.md#setup)).
+> A workflow with many moving parts - read [Docs • Periodic notes](docs/47-periodic.md) before using. Stays dormant until you set the list id ([setup](docs/47-periodic.md#set-it-up-once)).
 
 ![Daily note](docs/assets/shots/19-periodic-note.png)
 > Keyword `tpn` OR direct keywords (`tdn`, `tmj`, ...) OR hotkey (set in canvas) OR Main menu > Periodic OR straight from search
@@ -164,7 +164,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > **A simple, automated [booking hub, customer tracker and logbook](docs/45-crm.md#the-hub)**
 
 > [!IMPORTANT]
-> A workflow with many moving parts - read [Docs • CRM](docs/45-crm.md) before using. Stays dormant until you set its list id ([setup](docs/45-crm.md#setup)).
+> A workflow with many moving parts - read [Docs • CRM](docs/45-crm.md) before using. Stays dormant until you set its list id ([setup](docs/45-crm.md#set-it-up-once)).
 
 ![CRM hub](docs/assets/shots/13-crm-hub.png)
 > Keyword `tcr` OR hotkey (set in canvas) OR Main menu > CRM

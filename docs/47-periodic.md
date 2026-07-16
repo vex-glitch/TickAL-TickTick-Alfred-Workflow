@@ -15,14 +15,24 @@ Try it tomorrow: `tmj` fills the morning journal, `tdn` opens the daily note. Se
 > [!IMPORTANT]
 > Periodic notes are a workflow with many moving parts - minting, refresh, roll-ups, journals, reviews. Give this page a full read before diving in.
 
-Each periodic note is a normal TickTick note in one list of your choosing, tagged 💫Daily / 💫Weekly / 💫Monthly / 💫Quarterly / 💫Yearly (nested under 💫Periodic - the tags are created for you). Group that list by **Tag** in TickTick and the kanban columns build themselves.
+## The moving parts
 
-## Setup
+| Part | What it is | Who makes it |
+|---|---|---|
+| **💫 Notes list** | One TickTick list of your choosing holds every periodic note (`periodic_list_id`) | You, once |
+| **The notes** | Daily / weekly / monthly / quarterly / yearly - normal TickTick notes with generated sections | The automation - minted when you open them, or by the agent |
+| **💫 tag family** | 💫Daily … 💫Yearly, nested under 💫Periodic - group the list by Tag and they become kanban columns | The automation |
+| **Refresh** | Rebuilds the generated sections, completes ticked boxes, recomputes roll-ups | The automation - on open, on 🔄, or by the agent |
+| **♻️ Weekly review mirror** | A list (or a task with subtasks) the weekly note mirrors both ways (`weekly_review_id`) | You, optional |
+| **The 04:30 agent** | Mints the new day before you wake and seals closed periods | You, optional install ([below](#the-0430-agent)) |
 
-1. In TickTick, create (or pick) a list to hold the notes; copy its id without leaving Alfred - ⌘⏎ on the list row → **🆔 Copy id**.
-2. Paste it into **Configure Workflow → Periodic notes list id**. Empty = the feature stays off; every `pn` surface shows a setup pointer instead.
-3. Optional: paste a second id into **Weekly review list id** - a list (or a task with subtasks) the weekly note mirrors in its ♻️ Weekly Review section.
-4. Optional: install the 04:30 auto-mint agent (below). Without it, notes are still created the moment you open them.
+## Set it up once
+
+1. **Create the notes list** in TickTick - any name works. Copy its id: `tse l <name>` → ⌘⏎ → **🆔 Copy id**, then paste it into **Configure Workflow → Periodic notes list id**. Empty = the whole feature stays off; every `pn` surface shows a setup pointer instead.
+2. **Group the list by Tag** in TickTick - one manual click (the API can't set views) - and the kanban columns build themselves.
+3. **Optional - weekly review mirror:** paste a second id into **Weekly review list id** - a list (or a task with subtasks) the weekly note mirrors in its ♻️ Weekly Review section.
+4. **Optional - the [04:30 agent](#the-0430-agent):** the day's note exists before you wake. Without it, notes are minted the moment you open them.
+5. **Optional - the [v2 token](30-setup.md#attachments--completed-v2-token):** fills the 🔄 Habits, ⏳ Countdowns and 🎯 Focus sections in the notes.
 
 ## The `pn` rows
 
