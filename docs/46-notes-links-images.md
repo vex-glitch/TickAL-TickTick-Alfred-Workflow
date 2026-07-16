@@ -73,7 +73,7 @@ In a CRM add, the `[[` picker scopes to bookings - see [CRM](45-crm.md).
 | `^` token | In a `tad` add | Uploads the clipboard image to the new task on create. Also available as the `/` menu's **Add image** row. |
 | ⌘⏎ → **🖼️ Add image** | Actions menu | Uploads the clipboard image to the selected task as a real attachment - renders inline, syncs to every device |
 
-Both need the one-time v2 session token - see [Setup](30-setup.md). Without it, the attach reports a message pointing at the Settings rows that store one. CRM booking adds attach the clipboard image automatically - see [CRM](45-crm.md).
+Both need PyObjC (it reads the clipboard - install command in [Setup](30-setup.md#focus-bar)) and the one-time v2 session token - see [Setup](30-setup.md). Without the token, the attach reports a message pointing at the Settings rows that store one. CRM booking adds attach the clipboard image automatically - see [CRM](45-crm.md).
 
 ## Related
 

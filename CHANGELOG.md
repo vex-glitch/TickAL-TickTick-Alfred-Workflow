@@ -64,8 +64,9 @@ All notable user-visible changes to TickAL. Format follows
   that completes the real tasks behind ticked boxes; the day's block saved as
   the focus record's note; a floating focus bar showing the running
   timer/pomo and current checkbox, with tick-with-confetti, expandable task
-  list and hide/show. The bar needs PyObjC (`pip3 install pyobjc`) - a hint
-  fires if it is missing; every other focus feature works without it.
+  list and hide/show. The bar needs PyObjC (install command in
+  [Setup](docs/30-setup.md#focus-bar)) - a hint fires if it is missing; every
+  other focus feature works without it.
 - **🅿️ Buffer** - ⌥⇧⏎ on any task row queues it; the `tbu` keyword opens the
   buffer view for batch actions; the buffer feeds focus staging via "Add
   buffer to focus".

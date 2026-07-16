@@ -13,7 +13,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 | Alfred 5 + Powerpack | Workflows need the Powerpack license |
 | Python 3 | Homebrew (Apple Silicon or Intel) or the Xcode Command Line Tools. `Scripts/py.sh` resolves whichever is installed - no hardcoded interpreter. No python3 at all → an error with an install hint instead of results |
 | TickTick account | Plus a free TickTick developer app (two minutes, next section) |
-| PyObjC (optional) | Floating focus bar only - see [Focus bar](#focus-bar) |
+| PyObjC (optional) | Floating focus bar + clipboard-image attach - see [Focus bar](#focus-bar) |
 
 ## Connect
 
@@ -109,7 +109,7 @@ The floating focus bar requires PyObjC. Install it with the workflow's own Pytho
 pip3 install pyobjc                                             # no Homebrew (Xcode CLT Python)
 ```
 
-Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC - run: pip3 install pyobjc"), at most once an hour.
+Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC"), at most once an hour. Clipboard-image attach shares the PyObjC dependency - see [Notes, links & images](46-notes-links-images.md).
 
 ## Hourly background sync
 

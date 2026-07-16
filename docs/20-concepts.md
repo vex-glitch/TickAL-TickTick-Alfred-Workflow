@@ -54,7 +54,7 @@ Three more ride alongside on task rows:
 
 **Sweep** - one action that completes the real TickTick task behind every ticked checkbox, across all blocks. Ticking a box is just staging; nothing completes until you sweep.
 
-**Focus bar** - the floating pill showing the running timer/pomodoro and the current checkbox, with tick, expand, and hide controls. It is the one feature that needs PyObjC (install with the workflow's own Python - see [Setup](30-setup.md#focus-bar)); every other focus feature works without it.
+**Focus bar** - the floating pill showing the running timer/pomodoro and the current checkbox, with tick, expand, and hide controls. It and clipboard-image attach are the only features that need PyObjC (install with the workflow's own Python - see [Setup](30-setup.md#focus-bar)); every other focus feature works without it.
 
 ## Plumbing
 
