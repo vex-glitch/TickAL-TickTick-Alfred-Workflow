@@ -54,13 +54,13 @@ Three more ride alongside on task rows:
 
 **Sweep** - one action that completes the real TickTick task behind every ticked checkbox, across all blocks. Ticking a box is just staging; nothing completes until you sweep.
 
-**Focus bar** - the floating pill showing the running timer/pomodoro and the current checkbox, with tick, expand, and hide controls. It is the one feature that needs PyObjC (`pip3 install pyobjc`); every other focus feature works without it.
+**Focus bar** - the floating pill showing the running timer/pomodoro and the current checkbox, with tick, expand, and hide controls. It is the one feature that needs PyObjC (install with the workflow's own Python - see [Setup](30-setup.md#focus-bar)); every other focus feature works without it.
 
 ## Plumbing
 
 **Local cache** - every screen reads from JSON files under `~/.ticktick_alfred/cache/`, and every write patches the cache in place, so rows update instantly without a round-trip. The `tsy` keyword forces a full refresh; an optional LaunchAgent refreshes hourly (see [Settings & sync](90-settings-sync.md)).
 
-**Keyword vs hotkey** - a keyword is what you type into Alfred (`tal`, `tse`, `tad`, …); all thirty-five are re-mappable in Configure Workflow. A hotkey is a global key combo you bind on the workflow canvas in Alfred; 9 ship pre-set (⌥⌘-based) and 25 ship unbound, all rebindable on the canvas.
+**Keyword vs hotkey** - a keyword is what you type into Alfred (`tal`, `tse`, `tad`, …); all thirty-five are re-mappable in Configure Workflow. A hotkey is a global key combo you bind on the workflow canvas in Alfred; every hotkey node ships unbound (Alfred clears combos on import), so set your own.
 
 ## Related
 

@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Maintain the workflow from one menu: refresh the cache, re-authenticate, and store the optional v2 token.
 
-**Keyword:** `tup` · **Hotkey:** `⌥⌘,` - opens the Settings menu. ⌃⏎ on any row returns to the main menu.
+**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu. ⌃⏎ on any row returns to the main menu.
 
 ## Settings rows
 

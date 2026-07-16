@@ -50,8 +50,8 @@ Writes made through TickAL patch the cache in place, so your own adds/edits appe
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Session starts but no floating bar; a "Focus bar needs PyObjC" notification fires (at most hourly) | PyObjC not installed - the bar is the only feature that needs it | `pip3 install pyobjc`, start a new session - see [Focus](44-focus.md) |
-| No bar and no notification | Bar crashed at launch | Read `/tmp/tickal_focus_bar.log` - a `PyObjC missing` exit-code-3 line means PyObjC is absent or partial (`pip3 install pyobjc` installs the full set) |
+| Session starts but no floating bar; a "Focus bar needs PyObjC" notification fires (at most hourly) | PyObjC not installed - the bar is the only feature that needs it | `/opt/homebrew/bin/pip3 install pyobjc` (the workflow's own Python; Intel: `/usr/local/bin/pip3`), start a new session - see [Setup](30-setup.md#focus-bar) |
+| No bar and no notification | Bar crashed at launch | Read `/tmp/tickal_focus_bar.log` - a `PyObjC missing` exit-code-3 line means PyObjC is absent or partial - install the full set with the workflow's own Python (see [Setup](30-setup.md#focus-bar)) |
 | Bar vanished mid-session | It was hidden, or the session ended (the bar exits ~10 s after going idle) | Via the `tfo` keyword: **👁 Show bar** to unhide, or start a new session |
 
 Every other focus feature - timer, pomodoro, staging blocks, sweep - works without PyObjC.

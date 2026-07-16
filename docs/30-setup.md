@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Connect TickAL to your TickTick account, then switch on the optional extras.
 
-**Keyword:** `tup` · **Hotkey:** `⌥⌘,` - opens the Settings menu (Sync · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
+**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu (Sync · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
 
 ## Requirements
 
@@ -42,7 +42,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 </details>
 
 4. Run `tsy` to prime the local cache.
-5. Check the hotkeys - 9 actions ship with a default ⌥⌘ combo (the [Default hotkeys](95-cheatsheet.md#default-hotkeys) table lists them); the other 25 hotkey nodes ship unbound. Bind, rebind or clear any on the workflow canvas in Alfred.
+5. Hotkeys - every hotkey node ships unbound (Alfred clears hotkey combos on import). Bind any you want on the workflow canvas in Alfred.
 
 All 35 keywords are re-mappable in Configure Workflow.
 
@@ -101,10 +101,12 @@ To copy an id: open the list (or click the folder) in the TickTick **web** app a
 
 ## Focus bar
 
-The floating focus bar requires PyObjC:
+The floating focus bar requires PyObjC. Install it with the workflow's own Python - a plain `pip3` may target a different Python and the bar will not appear:
 
 ```
-pip3 install pyobjc
+/opt/homebrew/bin/pip3 install pyobjc   # Apple Silicon Homebrew
+/usr/local/bin/pip3 install pyobjc      # Intel Homebrew
+pip3 install pyobjc                     # no Homebrew (Xcode CLT Python)
 ```
 
 Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC - run: pip3 install pyobjc"), at most once an hour.

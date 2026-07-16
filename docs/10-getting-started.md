@@ -4,14 +4,14 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Zero to searching, drilling, scheduling, and adding tasks - the first 15 minutes.
 
-**Keywords used:** `tse` · `tad` · `tlogin` · `tsy` (all re-mappable in Configure Workflow; default hotkeys `⌥⌘S` · `⌥⌘A` · `⌥⌘L` · `⌥⌘Y`)
+**Keywords used:** `tse` · `tad` · `tlogin` · `tsy` (all re-mappable in Configure Workflow)
 
 ## 1. Install
 
 1. Download `TickAL.alfredworkflow` from the [Releases page](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/releases).
 2. Double-click it. Alfred 5 imports the workflow.
 
-Requirements: Alfred 5 with Powerpack, and any `python3` (Homebrew - Apple Silicon or Intel - or the Xcode Command Line Tools). The workflow finds it on its own; on a Mac with no Python at all, macOS itself prompts you to install the Command Line Tools the first time a keyword runs. PyObjC is optional - it powers the floating focus bar and clipboard-image attach; everything else runs without it.
+Requirements: Alfred 5 with Powerpack, and any `python3` (Homebrew - Apple Silicon or Intel - or the Xcode Command Line Tools). The workflow finds it on its own; on a Mac with no Python at all, macOS itself prompts you to install the Command Line Tools the first time a keyword runs. PyObjC is optional - it powers the floating focus bar and clipboard-image attach; everything else runs without it. Install it with the workflow's own Python: `/opt/homebrew/bin/pip3 install pyobjc` (Apple Silicon) or `/usr/local/bin/pip3 install pyobjc` (Intel) - a plain `pip3` may target a different Python and the bar will not appear.
 
 ## 2. Connect your account
 
@@ -19,12 +19,12 @@ Compressed version - the full walkthrough with screenshots is in [Setup](30-setu
 
 1. Open [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`.
 2. Paste the app's Client ID and Client Secret into Configure Workflow.
-3. **Keyword:** `tlogin` (or `⌥⌘L`) - runs the browser OAuth flow; approve and return to Alfred.
-4. **Keyword:** `tsy` (or `⌥⌘Y`) - primes the local cache. Run it once now; run it again any time you want a fresh pull.
+3. **Keyword:** `tlogin` - runs the browser OAuth flow; approve and return to Alfred.
+4. **Keyword:** `tsy` - primes the local cache. Run it once now; run it again any time you want a fresh pull.
 
 ## 3. First search
 
-**Keyword:** `tse` (or `⌥⌘S`; `tse [scope] query`) - fuzzy search across lists, sections, tasks, tags, smart lists, filters, and notes.
+**Keyword:** `tse` (`tse [scope] query`) - fuzzy search across lists, sections, tasks, tags, smart lists, filters, and notes.
 
 1. Type `tse` and a few letters of any task title. Results render with breadcrumbs.
 2. Narrow with a scope letter: `tse t milk` searches top-level tasks only, `tse l work` lists only.
@@ -72,7 +72,7 @@ Try it: `tse l` → pick a list → ⌥⏎ into its sections → ⌥⏎ into a s
 
 ## 6. First add with tokens
 
-**Keyword:** `tad` (or `⌥⌘A`) - one-line task capture with inline tokens.
+**Keyword:** `tad` - one-line task capture with inline tokens.
 
 Type:
 

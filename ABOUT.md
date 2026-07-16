@@ -1,22 +1,22 @@
 # TickAL - TickTick, without opening TickTick
 
-One hotkey `⌥⌘T` (or `tal`) opens your whole TickTick world in Alfred: browse, search, add, schedule, tag, complete, focus, periodic notes, CRM - every change mirrored instantly in a local cache.
+One keyword `tal` (or a hotkey you set) opens your whole TickTick world in Alfred: browse, search, add, schedule, tag, complete, focus, periodic notes, CRM - every change mirrored instantly in a local cache.
 
-📖 Full docs: [docs/00-index.md](docs/00-index.md) - or via `⌥⌘G` / the `tdo` keyword.
+📖 Full docs: [docs/00-index.md](docs/00-index.md) - or via the `tdo` keyword.
 
 ## Dependencies
 
 - Alfred 5 + Powerpack · Python 3 (Homebrew or Xcode CLT - TickAL finds either)
 - A TickTick account + a free TickTick developer app (2 minutes, steps below)
-- Optional: `pip3 install pyobjc` for the floating focus bar - focus works without it
+- Optional: PyObjC for the floating focus bar (`/opt/homebrew/bin/pip3 install pyobjc` - use the workflow's own Python) - focus works without it
 
 ## Setup
 
 1. Go to [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** + **Client Secret** in Configure Workflow
-3. Run `⌥⌘L` or `tlogin` - a browser opens; log in and approve
-4. Run `⌥⌘Y` or `tsy` to prime the cache
-5. *Optional but recommended* - one sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `⌥⌘,` or `tup` → **Attachment Login** (masked; only a session token is stored) - or paste a token via **Attachment Token** (Sign-in-with-Apple; guide in [docs/30-setup.md](docs/30-setup.md))
+3. Run `tlogin` - a browser opens; log in and approve
+4. Run `tsy` to prime the cache
+5. *Optional but recommended* - one sign-in unlocks attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `tup` → **Attachment Login** (masked; only a session token is stored) - or paste a token via **Attachment Token** (Sign-in-with-Apple; guide in [docs/30-setup.md](docs/30-setup.md))
 6. *Optional* - CRM / CTA / Projects features: paste your list and folder ids in Configure Workflow ([docs/45-crm.md](docs/45-crm.md) shows how to copy an id)
 
 ## Usage
@@ -25,12 +25,12 @@ Four keys run everything: **⌥⏎ browse · ⌘⏎ actions · ⌃⏎ back · `/
 
 | | |
 |---|---|
-| Core | `⌥⌘T` or `tal` main menu · `⌥⌘S` or `tse` search · `⌥⌘A` or `tad` add · `⌥⌘,` or `tup` settings · `tca` calendar |
-| Views | `⌥⌘D` or `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer |
+| Core | `tal` main menu · `tse` search · `tad` add · `tup` settings · `tca` calendar |
+| Views | `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer |
 | Native views | `tha` habits · `tpo` pomodoro · `tmx` matrix · `tst` statistics |
-| More | `tfo` focus · `⌥⌘U` or `tur` save browser tab · `tcr` crm · `⌥⌘Y` or `tsy` sync · `⌥⌘G` or `tdo` docs |
+| More | `tfo` focus · `tur` save browser tab · `tcr` crm · `tsy` sync · `tdo` docs |
 | Periodic | `tpn` or `pn` scope in search · direct: `tdn` daily · `twn` weekly · `tmn` monthly · `tqn` quarterly · `tyn` yearly · `tmj`/`tej` journals · `tmo` income · `tdg` day goal · `tde` entry · `tat` add to today |
 
 Add tokens: `*` date · `@` time · `!` priority · `#` tag · `=` note · `[[` task link - or type `/` for the menu.
 
-All 35 keywords are re-mappable in Configure Workflow; 9 actions ship with a default ⌥⌘ hotkey - rebind or clear any on the workflow canvas.
+All 35 keywords are re-mappable in Configure Workflow; hotkey nodes ship unbound (Alfred clears combos on import) - bind your own on the canvas.

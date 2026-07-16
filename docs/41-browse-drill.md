@@ -6,7 +6,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 ![Drill: type, hold option to drill twice, hold control to back out](assets/shots/drill.gif)
 
-**Keywords:** `tod` (hotkey `⌥⌘D`) · `tom` · `tne` · `tin` · `tbu` · `tta` - remap any of them in Configure Workflow.
+**Keywords:** `tod` · `tom` · `tne` · `tin` · `tbu` · `tta` - remap any of them in Configure Workflow.
 
 ## View keywords
 
@@ -19,7 +19,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 | `tbu` | 🅿️ Buffer |
 | `tta` | Tags - search pre-scoped to `g` |
 
-Every task view is a plain list: typing filters it, and every row carries the full chord set below (Tags opens on tag rows first - see [Tags](#tags)). Today ships with the ⌥⌘D global hotkey; Tomorrow, Next 7 Days, and Inbox ship unbound - assign keys in Alfred's workflow editor. The full smart-list family (Completed, Habits, Summary, …) lives in [Search](40-search.md) under the `v` scope, via the `tsl` keyword.
+Every task view is a plain list: typing filters it, and every row carries the full chord set below (Tags opens on tag rows first - see [Tags](#tags)). Hotkeys for these views ship unbound - assign keys in Alfred's workflow editor. The full smart-list family (Completed, Habits, Summary, …) lives in [Search](40-search.md) under the `v` scope, via the `tsl` keyword.
 
 ## The drill ladder
 

@@ -6,7 +6,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 ## Keywords
 
-All 35 are defaults - remap any of them in Configure Workflow. 9 actions ship with a default ⌥⌘ global hotkey (see Default hotkeys below); the other 25 hotkey nodes ship unbound - bind or rebind any on the workflow canvas in Alfred.
+All 35 are defaults - remap any of them in Configure Workflow. Hotkey nodes ship unbound (Alfred clears hotkey combos on import) - bind any on the workflow canvas in Alfred.
 
 | Keyword | Opens | Docs |
 |---------|-------|------|
@@ -45,22 +45,6 @@ All 35 are defaults - remap any of them in Configure Workflow. 9 actions ship wi
 | `tha` | Habits view | [Views](48-views.md) |
 | `tpo` | Pomodoro / Focus view | [Views](48-views.md) |
 | `tmx` | Eisenhower Matrix view | [Views](48-views.md) |
-
-## Default hotkeys
-
-9 actions ship with a global hotkey pre-set - rebind or clear any on the workflow canvas. The other 25 hotkey nodes ship unbound.
-
-| Hotkey | Opens |
-|--------|-------|
-| ⌥⌘T | Main menu |
-| ⌥⌘S | Search |
-| ⌥⌘A | Add |
-| ⌥⌘D | Today |
-| ⌥⌘U | Save URL |
-| ⌥⌘L | Login |
-| ⌥⌘G | Docs |
-| ⌥⌘Y | Sync |
-| ⌥⌘, | Settings |
 
 ## Chords
 

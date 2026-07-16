@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Create tasks, lists, notes, and projects from one input line with a token grammar and live sub-pickers.
 
-**Keyword:** `tad` (grammar: `tad Title *date @time !1-3 #tag ~l List =note`) · **Hotkey:** `⌥⌘A`
+**Keyword:** `tad` (grammar: `tad Title *date @time !1-3 #tag ~l List =note`) · **Hotkey:** (set in canvas)
 
 Type a title, then add tokens in any order. Each token opens a live sub-picker; ⏎ on a picker row fills the value back into the query. ⏎ on the **Create:** preview row creates the task - the subtitle shows every parsed field before you commit. Once a date or time is set, the preview offers follow-up rows (⏰ Add time, ⏳ Add duration, 🔔 Add reminder); ⏎ drops you into the matching picker.
 
