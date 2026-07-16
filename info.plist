@@ -11565,7 +11565,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 ## Dependencies
 - Alfred 5 + Powerpack · Python 3 (Homebrew or Xcode CLT - TickAL finds either)
 - A TickTick account + a free TickTick developer app (2 minutes, steps below)
-- Optional: PyObjC for the floating focus bar - install it with the workflow's own Python: `/opt/homebrew/bin/pip3 install pyobjc` (Apple Silicon) / `/usr/local/bin/pip3` (Intel) / plain `pip3` only without Homebrew. Focus works without it
+- Optional: PyObjC for the floating focus bar - Homebrew Pythons refuse plain installs, use: `/opt/homebrew/bin/pip3 install --break-system-packages pyobjc` (Intel: `/usr/local/bin/pip3`); plain `pip3 install pyobjc` without Homebrew. Focus works without it
 
 ## Setup
 1. Go to [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
