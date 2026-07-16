@@ -13,7 +13,7 @@ Every change lands in a [local cache](docs/90-settings-sync.md#cache-model) firs
 ![Alfred 5](https://img.shields.io/badge/Alfred-5-blueviolet) ![Version 2.6](https://img.shields.io/badge/version-2.6-blue) ![License MIT](https://img.shields.io/badge/license-MIT-green)
 
 > [!IMPORTANT]
-> **First run** - keyword `tlogin` after setting credentials in config
+> **First run** - keyword `tlogin` or `⌥⌘L` after setting credentials in config
 
 ![Search everything from one box](docs/assets/shots/01-hero-search.png)
 > Keyword `tal` OR hotkey `⌥⌘T`
