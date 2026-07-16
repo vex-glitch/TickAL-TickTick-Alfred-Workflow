@@ -123,6 +123,9 @@ Past what TickTick's own quick-add reaches, the same line can:
 ![Floating focus bar](docs/assets/shots/12-focus-bar.png)
 > Keyword `tfo` OR hotkey (set in canvas) OR Main menu > Focus OR `⌃⇧` on a task
 
+> [!IMPORTANT]
+> A workflow with many moving parts - sessions, staging, sweep, the bar - read [Docs • Focus](docs/44-focus.md) before using. No setup needed; only the floating bar wants PyObjC ([one Settings row](docs/30-setup.md#focus-bar)).
+
 - *Open the focused task as a [sticky note](docs/46-notes-links-images.md#sticky-notes) - from Alfred, no right mouse clicks.*
 - Stage [checkbox blocks](docs/44-focus.md#checkbox-blocks) in the focus task (one at a time, a whole tag or section, today's list, or act on multiple tasks at once via 🅿️ [buffer](docs/41-browse-drill.md#buffer-))
 - Tick boxes as you go
@@ -137,7 +140,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > **Obsidian-style [daily](docs/47-periodic.md#the-daily-note), [weekly](docs/47-periodic.md#the-weekly-note), monthly, quarterly and yearly notes minted inside TickTick**
 
 > [!IMPORTANT]
-> Requires setup - periodic notes stay dormant until you set the list id; read the [setup](docs/47-periodic.md#setup) before you rely on them
+> A workflow with many moving parts - read [Docs • Periodic notes](docs/47-periodic.md) before using. Stays dormant until you set the list id ([setup](docs/47-periodic.md#setup)).
 
 ![Daily note](docs/assets/shots/19-periodic-note.png)
 > Keyword `tpn` OR direct keywords (`tdn`, `tmj`, ...) OR hotkey (set in canvas) OR Main menu > Periodic OR straight from search
@@ -161,7 +164,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > **A simple, automated [booking hub, customer tracker and logbook](docs/45-crm.md#the-hub)**
 
 > [!IMPORTANT]
-> Requires setup - CRM stays dormant until you set its list id; read the [setup and flow](docs/45-crm.md#setup) before you rely on it
+> A workflow with many moving parts - read [Docs • CRM](docs/45-crm.md) before using. Stays dormant until you set its list id ([setup](docs/45-crm.md#setup)).
 
 ![CRM hub](docs/assets/shots/13-crm-hub.png)
 > Keyword `tcr` OR hotkey (set in canvas) OR Main menu > CRM
@@ -255,8 +258,8 @@ All 35 keywords are re-mappable in Configure Workflow. Hotkey nodes ship unbound
 | Learn     | [Getting started](docs/10-getting-started.md)                                                                                                           | Install to first task                       |
 |           | [Concepts](docs/20-concepts.md)                                                                                                                         | Scopes, drill, tokens, buffer, focus blocks |
 | Do        | [Search](docs/40-search.md) · [Browse & drill](docs/41-browse-drill.md) · [Add](docs/42-add.md) · [Actions](docs/43-actions.md)                               | The daily drivers                           |
-|           | [Focus](docs/44-focus.md) · [Notes, links & images](docs/46-notes-links-images.md)                                                                        | The deep features                           |
-| Workflows | [CRM](docs/45-crm.md) · [Periodic notes](docs/47-periodic.md)                                                                                             | Set up + read first                         |
+|           | [Notes, links & images](docs/46-notes-links-images.md) · [Views](docs/48-views.md)                                                                        | The deep features                           |
+| Workflows | [Focus](docs/44-focus.md) · [CRM](docs/45-crm.md) · [Periodic notes](docs/47-periodic.md) · [Projects](docs/49-projects.md)                                   | Moving parts - read first                   |
 | Reference | [Setup](docs/30-setup.md) · [Settings & sync](docs/90-settings-sync.md) · [Cheatsheet](docs/95-cheatsheet.md) · [Troubleshooting](docs/99-troubleshooting.md) | Every option, key and fix                   |
 
 > [!TIP]
