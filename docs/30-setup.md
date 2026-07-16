@@ -101,12 +101,12 @@ To copy an id: open the list (or click the folder) in the TickTick **web** app a
 
 ## Focus bar
 
-The floating focus bar requires PyObjC. Install it with the workflow's own Python - a plain `pip3` may target a different Python and the bar will not appear:
+The floating focus bar requires PyObjC. Install it with the workflow's own Python - a plain `pip3` may target a different Python and the bar will not appear. Homebrew Pythons are "externally managed" (PEP 668) and refuse installs without the `--break-system-packages` flag; PyObjC has no Homebrew formula, and nothing Homebrew manages depends on it, so the flag is safe here:
 
 ```
-/opt/homebrew/bin/pip3 install pyobjc   # Apple Silicon Homebrew
-/usr/local/bin/pip3 install pyobjc      # Intel Homebrew
-pip3 install pyobjc                     # no Homebrew (Xcode CLT Python)
+/opt/homebrew/bin/pip3 install --break-system-packages pyobjc   # Apple Silicon Homebrew
+/usr/local/bin/pip3 install --break-system-packages pyobjc      # Intel Homebrew
+pip3 install pyobjc                                             # no Homebrew (Xcode CLT Python)
 ```
 
 Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC - run: pip3 install pyobjc"), at most once an hour.

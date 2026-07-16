@@ -192,7 +192,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 - macOS with [Alfred 5](https://www.alfredapp.com/) + Powerpack
 - Python 3, any install: Homebrew (Apple Silicon or Intel) or Xcode CLT, the workflow finds it itself
 - A TickTick account + your own free TickTick developer app (2 minutes, next section)
-- Optional: PyObjC for the [floating focus bar](docs/30-setup.md#focus-bar) and clipboard-image attach - install it with the workflow's own Python: `/opt/homebrew/bin/pip3 install pyobjc` (Apple Silicon) or `/usr/local/bin/pip3 install pyobjc` (Intel); every other feature works without it
+- Optional: PyObjC for the [floating focus bar](docs/30-setup.md#focus-bar) and clipboard-image attach: `/opt/homebrew/bin/pip3 install --break-system-packages pyobjc` (Apple Silicon Homebrew; Intel and no-Homebrew variants in [Setup](docs/30-setup.md#focus-bar)); every other feature works without it
 
 ## Setup
 

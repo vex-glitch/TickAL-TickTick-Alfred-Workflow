@@ -11,7 +11,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 1. Download `TickAL.alfredworkflow` from the [Releases page](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/releases).
 2. Double-click it. Alfred 5 imports the workflow.
 
-Requirements: Alfred 5 with Powerpack, and any `python3` (Homebrew - Apple Silicon or Intel - or the Xcode Command Line Tools). The workflow finds it on its own; on a Mac with no Python at all, macOS itself prompts you to install the Command Line Tools the first time a keyword runs. PyObjC is optional - it powers the floating focus bar and clipboard-image attach; everything else runs without it. Install it with the workflow's own Python: `/opt/homebrew/bin/pip3 install pyobjc` (Apple Silicon) or `/usr/local/bin/pip3 install pyobjc` (Intel) - a plain `pip3` may target a different Python and the bar will not appear.
+Requirements: Alfred 5 with Powerpack, and any `python3` (Homebrew - Apple Silicon or Intel - or the Xcode Command Line Tools). The workflow finds it on its own; on a Mac with no Python at all, macOS itself prompts you to install the Command Line Tools the first time a keyword runs. PyObjC is optional - it powers the floating focus bar and clipboard-image attach; everything else runs without it. Install it with the workflow's own Python - Homebrew Pythons need a flag: `/opt/homebrew/bin/pip3 install --break-system-packages pyobjc` (Intel: `/usr/local/bin/pip3`); plain `pip3 install pyobjc` only without Homebrew. Details in [Setup](30-setup.md#focus-bar).
 
 ## 2. Connect your account
 
