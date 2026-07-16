@@ -21,7 +21,7 @@ The CRM is dormant until `crm_list_id` is set in Configure Workflow. Until then,
 To configure it:
 
 1. Create (or pick) the TickTick list that will hold bookings.
-2. Open that list in the TickTick **web app** - the URL is `ticktick.com/webapp/#p/<id>/tasks`. Copy the 24-character `<id>` segment (e.g. `5f3a9b2c1d0e8f7a6b5c4d3e`).
+2. Copy its id without leaving Alfred: find the list (`tse l <name>`) → ⌘⏎ → **🆔 Copy id**.
 3. Paste it into `crm_list_id` in Configure Workflow.
 4. Create the 🔥 tags in TickTick (see [the 🔥 tag group](#the--tag-group)) - CRM pickers offer only those.
 

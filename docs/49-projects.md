@@ -21,6 +21,8 @@ Two ids in Configure Workflow (both under [Optional ids](30-setup.md#optional-id
 | `cta_list_id` | The list where CTA tasks are created - the heart of the feature | No CTA row on Actions menus; the `P ` flow creates the bare list only |
 | `projects_folder_id` | The folder new 💼 project lists land in | New projects created ungrouped |
 
+Copying the ids never leaves Alfred: ⌘⏎ on the CTA list's row → **🆔 Copy id**; ⌥⌘⏎ on the projects folder's row copies the folder id.
+
 Plus **area tags**: any TickTick tag that starts with a keycap number (`1️⃣Work`, `2️⃣Personal`, …) is an area. They arrive with the normal tag sync - nothing to register. With none, the `P ` picker shows a pointer row instead.
 
 ## Creating a project: the `P ` flow

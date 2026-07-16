@@ -34,6 +34,7 @@ Folders ─⌥→ Lists ─⌥→ Tags ─⏎→ a tag's tasks
 - **📋 Show all tasks** tops both pickers - ⏎ shows the whole list flat, grouped by tag in your TickTick tag order (the same order that drives the app's group-by-tag sections), priority first. Typing filters it like any level.
 - **Priority floats up.** Every list, section, and tag view sorts 🔴 high → 🟠 → 🟡 first, keeping your TickTick order within each band.
 - **The 📥 Inbox row** on the folder screen drills straight to its tasks.
+- **⌥⌘⏎ on a folder row** copies the folder id - for `projects_folder_id` in Configure Workflow ([Setup](30-setup.md#optional-ids)).
 - **Entry points:** the view keywords above, or ⌥⏎ on any list, section, task, or smart-list row in search via the `tse` keyword.
 
 Each row's subtitle advertises exactly the chords it supports (⏎↗️ ⌘⚡ ⌥⤵️ ⌃🔙 …), so the ladder is self-documenting.

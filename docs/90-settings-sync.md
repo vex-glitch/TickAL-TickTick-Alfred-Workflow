@@ -11,6 +11,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 | Row | Effect |
 |---|---|
 | Sync | Refreshes the entire workflow cache from the TickTick API (same as the `tsy` keyword). With the v2 token this also pulls your tag list + order, folder names + order, and your filters - there is no separate tags/folders/filters setup. |
+| Hourly Sync | Installs / removes the hourly background-refresh LaunchAgent - a dialog shows the current state and offers the one valid move. See [below](#hourly-background-sync). |
 | Login | Starts the browser OAuth flow and stores the API token. |
 | Refresh TickTick | Clicks File → Sync in the TickTick desktop app (background, no focus steal) - refreshes the app, not the workflow cache. |
 | Help • TickAL Docs | Opens the TickAL GitHub page. |
@@ -29,24 +30,12 @@ TickAL reads from a local JSON cache (`~/.ticktick_alfred/cache/`), not the API,
 
 ## Hourly background sync
 
-Optional. The repo ships `assets/launchd/com.vex.tickal.cachesync.plist` (not in the workflow bundle):
+Optional, and one row away: `tup` → **Hourly Sync**. It installs a LaunchAgent (`com.tickal.cachesync`) that runs a full sync every hour, plus once on install; logs go to `/tmp/tickal_cachesync.log`. When the agent is already installed, the same row removes it - and after a workflow update it detects the stale install and offers **Repair** instead. No files to edit, no terminal.
 
-```sh
-# From the repo checkout (or anywhere you unpacked it):
-cp assets/launchd/com.vex.tickal.cachesync.plist ~/Library/LaunchAgents/
-
-# Edit ~/Library/LaunchAgents/com.vex.tickal.cachesync.plist:
-#   ProgramArguments → your python3 and your installed workflow folder's src/sync.py
-#   WorkingDirectory → the installed workflow folder
-#   (Alfred: right-click the workflow → Open in Finder to find that folder)
-
-launchctl load ~/Library/LaunchAgents/com.vex.tickal.cachesync.plist
-```
-
-It runs a full sync every hour and logs to `/tmp/tickal_cachesync.log`. Full walkthrough in [Setup](30-setup.md).
+Deleting the workflow itself? Toggle Hourly Sync off first - Alfred has no uninstall hook, so a leftover agent must otherwise be cleared by hand (see [Troubleshooting](99-troubleshooting.md#hourly-sync-stale-or-orphaned)).
 
 ## Related
 
-- [Setup](30-setup.md) - first-run chain: app credentials, `tlogin`, first sync, LaunchAgent details
+- [Setup](30-setup.md) - first-run chain: app credentials, `tlogin`, first sync
 - [Notes, links & images](46-notes-links-images.md) - what the v2 token enables
 - [Cheatsheet](95-cheatsheet.md) - all keywords and chords on one page

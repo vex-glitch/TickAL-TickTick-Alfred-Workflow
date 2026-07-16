@@ -3,6 +3,20 @@
 All notable user-visible changes to TickAL. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **🆔 Copy id** - ⌘⏎ on any list row copies its TickTick id; ⌥⌘⏎ on a
+  folder row copies the folder id. The Configure Workflow id fields no longer
+  need a trip to the web app.
+- **Hourly Sync** settings row - installs (or removes) the hourly
+  background-refresh LaunchAgent from inside Alfred: `tup` → Hourly Sync,
+  one dialog, done. Detects installs left stale by a workflow update and
+  offers Repair. No more hand-editing plist templates.
+- **[Projects](docs/49-projects.md) docs page** - the `P ` bootstrap flow,
+  the 📌 Create CTA row, and the keycap area-tag convention, all on one page.
+
 ## [2.6] - 2026-07-15
 
 ### Added

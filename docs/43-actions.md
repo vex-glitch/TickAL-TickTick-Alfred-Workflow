@@ -37,6 +37,7 @@ Task / subtask / note share one row set; lists and sections get the container su
 | _list>section_ | Move… (list / section / re-parent) | ✓ | ✓ | ✓ | | |
 | ➕ Add task | Add a subtask (task-like) or a task into the container | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 🔗 Copy link | Copy the item URL | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 🆔 Copy id | Copy the list's TickTick id (for the Configure Workflow id fields) | | | | ✓ | |
 | 📂 Go to list | Open the parent list in TickTick | ✓ | ✓ | ✓ | | |
 | 🌐 Open link | Open a link found in the title/description (only if any) | ✓ | ✓ | ✓ | | |
 | 📝 Note | View/edit the description in a text editor | ✓ | ✓ | ✓ | | |

@@ -36,7 +36,7 @@ Writes made through TickAL patch the cache in place, so your own adds/edits appe
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `tfi` / the `f` search scope shows nothing | No v2 token, or never synced since login | Run `tsy` after Settings → **Attachment Login** - your TickTick filters sync over, rules included. Tokenless fallback: hand-write `filters_config.py` in the workflow folder - see [Setup](30-setup.md#filters) |
+| `tfi` / the `f` search scope shows nothing | No v2 token, or never synced since login | Run `tsy` after Settings → **Attachment Login** - your TickTick filters sync over, rules included - see [Setup](30-setup.md#filters) |
 
 ## Attachments fail / Completed list sparse
 
@@ -60,7 +60,7 @@ Every other focus feature - timer, pomodoro, staging blocks, sweep - works witho
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `tcr` renders one row: "CRM needs setup" | `crm_list_id` is empty | Copy the 24-char id from your CRM list's URL in the TickTick **web** app (`ticktick.com/webapp/#p/<id>/tasks`) and set it in Configure Workflow - see [CRM](45-crm.md) (screenshot of the pointer row there) |
+| `tcr` renders one row: "CRM needs setup" | `crm_list_id` is empty | ⌘⏎ on your CRM list's row → **🆔 Copy id**, paste it into Configure Workflow - see [CRM](45-crm.md) (screenshot of the pointer row there) |
 
 ## "python3 not found"
 
@@ -69,6 +69,13 @@ Every other focus feature - timer, pomodoro, staging blocks, sweep - works witho
 | Every keyword errors with `TickAL: python3 not found - install Python 3` | No usable Python 3 on the machine | Install one: `brew install python` or `xcode-select --install` |
 
 The workflow resolves Python via `Scripts/py.sh`: Apple-Silicon Homebrew → Intel Homebrew → `PATH`. Any of those works; no configuration needed. Install PyObjC (focus bar + clipboard-image attach) into whichever one wins.
+
+## Hourly sync stale or orphaned
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Cache stopped refreshing hourly after a workflow update | Alfred's import replaced the workflow folder; the agent points at the old one | `tup` → **Hourly Sync** - it detects the stale install and offers **Repair** |
+| Workflow deleted, agent left behind | Alfred has no uninstall hook; the removal row lived in the deleted workflow | `launchctl remove com.tickal.cachesync && rm ~/Library/LaunchAgents/com.tickal.cachesync.plist` |
 
 ## Sticky note opens the wrong task, nothing, or slowly
 
@@ -86,7 +93,7 @@ Sticky actions drive the TickTick desktop app itself, so the app's state matters
 | Path | What it is |
 |------|-----------|
 | `/tmp/tickal_focus_bar.log` | Focus bar stderr - launch failures, PyObjC import errors |
-| `/tmp/tickal_cachesync.log` | Optional hourly LaunchAgent output - see [Settings & sync](90-settings-sync.md) |
+| `/tmp/tickal_cachesync.log` | The optional Hourly Sync agent's output - see [Settings & sync](90-settings-sync.md) |
 | `~/.ticktick_alfred/run/tickal_focus.json`, `…/tickal_pomo.json`, `…/tickal_focus_bar.json`, `…/tickal_stage.txt` | Focus/pomodoro session and staging state; safe to delete when no session is running |
 | `~/.ticktick_alfred/run/tickal_buffer.txt` | The 🅿️ buffer queue |
 | Alfred debug (🐞) | Live stderr/stdout of every script - the fastest diagnosis of all |

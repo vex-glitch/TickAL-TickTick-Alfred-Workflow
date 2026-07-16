@@ -1,10 +1,10 @@
-L# Setup
+# Setup
 
 _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-cheatsheet.md)_
 
 > Connect TickAL to your TickTick account, then switch on the optional extras.
 
-**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu (Sync · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
+**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu (Sync · Hourly Sync · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
 
 ## Requirements
 
@@ -41,25 +41,10 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 </details>
 
-4. Run `tsy` to prime the local cache.
+4. Run `tsy` to prime the local cache - wait for the "Synced …" notification before searching (no notification? Enable Alfred's notifications in System Settings → Notifications).
 5. Hotkeys - every hotkey node ships unbound (Alfred clears hotkey combos on import). Bind any you want on the workflow canvas in Alfred.
 
-All 35 keywords are re-mappable in Configure Workflow.
-
-## Tags & folders
-
-There is nothing to set up. The open TickTick API never returns your tag list (tags are only discovered from tasks that carry them) and returns folders as bare group ids with no names - but with the one-time v2 token ([Attachments & Completed](#attachments--completed-v2-token) below) both heal automatically at every sync:
-
-- **Tags** - the full list in your TickTick sidebar order (the same order that drives the app's group-by-tag sections). New tags are created right from the pickers: type a name that matches nothing and a ➕ row appears - in the `tta` tag search it can even nest the new tag under a parent.
-- **Folders** - named and ordered exactly as in TickTick. (Power users: a `folders` map in `~/.ticktick_alfred/config.json` silently overrides any auto-name.)
-
-Without the token, tags are discovered from your tasks at every sync - new tags still attach to tasks, they just won't exist as real TickTick tag entities until the app itself materialises them - and folders stay unnamed.
-
-## Filters
-
-Zero setup as well: your TickTick filters sync over with the token - names, sidebar order, and rules. The rules are translated into the workflow's own matcher (tags incl. parent expansion, lists and folders, keywords, due dates, priority); the rare untranslatable clause is dropped honestly, with a ⚠ note in the filter's subtitle. Browse them via the `tfi` keyword or the `f` search scope.
-
-Tokenless (or on top of the synced ones - the cache wins when both exist): define filters by hand in a `filters_config.py` in the workflow folder - a `FILTERS` list of dicts with criteria `include`, `tags`, `any_tags`, `priority`, `projects`, `due`, plus `due_before` / `due_after` / `no_date`.
+All 35 keywords are re-mappable in Configure Workflow, and all 34 hotkey nodes are bindable on the canvas.
 
 ## Attachments & Completed (v2 token)
 
@@ -87,6 +72,19 @@ Re-run either path when an attachment action reports the token expired.
 
 </details>
 
+## Tags & folders
+
+No setup of their own - but they need the v2 token above to work fully. The open TickTick API never returns your tag list (tags are only discovered from tasks that carry them) and returns folders as bare group ids with no names; with the token stored, both heal automatically at every sync:
+
+- **Tags** - the full list in your TickTick sidebar order (the same order that drives the app's group-by-tag sections). New tags are created right from the pickers: type a name that matches nothing and a ➕ row appears - in the `tta` tag search it can even nest the new tag under a parent.
+- **Folders** - named and ordered exactly as in TickTick. (Power users: a `folders` map in `~/.ticktick_alfred/config.json` silently overrides any auto-name.)
+
+Without the token, tags are discovered from your tasks at every sync - new tags still attach to tasks, they just won't exist as real TickTick tag entities until the app itself materialises them - and folders stay unnamed.
+
+## Filters
+
+Same story: with the token stored, your TickTick filters sync over - names, sidebar order, and rules. The rules are translated into the workflow's own matcher (tags incl. parent expansion, lists and folders, keywords, due dates, priority); the rare untranslatable clause is dropped honestly, with a ⚠ note in the filter's subtitle. Browse them via the `tfi` keyword or the `f` search scope. Without the token, filters stay empty.
+
 ## Optional ids
 
 Three fields in Configure Workflow take 24-character TickTick ids. Leave blank if unused - the features stay dormant (CRM entry points show a single "CRM needs setup" row that opens the guide).
@@ -97,7 +95,7 @@ Three fields in Configure Workflow take 24-character TickTick ids. Leave blank i
 | `cta_list_id` | The 📌 Create CTA action (the list where CTA tasks are created) - see [Projects](49-projects.md) |
 | `projects_folder_id` | New 💼 projects land inside this folder; blank = created ungrouped - see [Projects](49-projects.md) |
 
-To copy an id: open the list (or click the folder) in the TickTick **web** app and take the 24-character segment from the URL - for a list it reads `ticktick.com/webapp/#p/<id>/tasks`.
+To copy an id, never leave Alfred: ⌘⏎ on any list row → **🆔 Copy id**; on a folder row, ⌥⌘⏎ copies the folder id. Paste it into the field.
 
 ## Focus bar
 
@@ -113,21 +111,11 @@ Every other focus feature - timer, pomodoro, staging blocks, sweep - works witho
 
 ## Hourly background sync
 
-Optional. Writes already patch the cache in place and `tsy` does a full refresh any time; a LaunchAgent adds an hourly refresh on top. The template ships in the repo at `assets/launchd/com.vex.tickal.cachesync.plist` (repo only, not in the workflow bundle):
+Optional. Writes already patch the cache in place and `tsy` does a full refresh any time; the hourly agent just keeps things fresh hands-off.
 
-1. Copy it to `~/Library/LaunchAgents/`.
-2. Edit the paths inside - the python3 in `ProgramArguments`, plus the script path and `WorkingDirectory` - to point at your installed workflow folder (Alfred → Workflows → right-click TickAL → Open in Finder).
-3. Load it: `launchctl load ~/Library/LaunchAgents/com.vex.tickal.cachesync.plist`
+`tup` → **Hourly Sync**. A dialog shows the current state and offers the valid moves - **Install** or **Remove**. Install registers a LaunchAgent (`~/Library/LaunchAgents/com.tickal.cachesync.plist`) that runs the workflow's own sync every hour, plus once immediately; logs land in `/tmp/tickal_cachesync.log`. Run the row again any time to remove it.
 
-It runs `src/sync.py sync` hourly and at load; logs go to `/tmp/tickal_cachesync.log`.
-
-```sh
-cp assets/launchd/com.vex.tickal.cachesync.plist ~/Library/LaunchAgents/
-# Edit ~/Library/LaunchAgents/com.vex.tickal.cachesync.plist:
-#   point the python3, sync.py and WorkingDirectory paths at YOUR
-#   installed workflow folder (Alfred → Workflows → right-click → Open in Finder)
-launchctl load ~/Library/LaunchAgents/com.vex.tickal.cachesync.plist
-```
+Two self-care details: after updating TickAL (importing a new release), run the row once more - it detects that the agent points at the old copy and offers **Repair**. And if you ever delete the workflow entirely, remove the agent first (or afterwards by hand - see [Troubleshooting](99-troubleshooting.md#hourly-sync-stale-or-orphaned)).
 
 ## Related
 
