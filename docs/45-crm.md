@@ -6,7 +6,10 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 **Keyword:** `tcr` · **Hotkey:** (set in canvas) - opens the CRM hub (two rows: Add / Search; type `a` or `s` to pick).
 
-A note before the mechanics: the CRM is a full workflow, not a single action - one bookings list, the 🔥 tag group, a prepare-before-the-appointment ritual, several moving parts designed to click together. Give this page a full read before first use. It was built for a real booking business; if that shape fits your work, it is the fastest surface in the workflow. If not, skip this page; nothing else depends on it.
+> [!IMPORTANT]
+> The CRM is a full workflow, not a single action - one bookings list, the 🔥 tag group, a prepare-before-the-appointment ritual - moving parts designed to click together. Give this page a full read before first use.
+
+It was built for a real booking business; if that shape fits your work, it is the fastest surface in the workflow. If not, skip this page; nothing else depends on it.
 
 ## Setup
 

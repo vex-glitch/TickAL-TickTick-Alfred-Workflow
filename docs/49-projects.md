@@ -6,9 +6,12 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 **Entry points:** `P ` prefix in the `tad` Add window · **📌 Create CTA** on the ⌘⏎ Actions menu. No keyword of its own.
 
-Like the [CRM](45-crm.md), Projects is a workflow, not a single action: 💼 project lists, keycap area tags, and one rule - **a project is only alive if exactly one scheduled task points at it** - moving parts that click together, so give this page a full read before first use. If that shape fits how you work, TickAL automates all of its bookkeeping. If not, skip this page; nothing else depends on it.
+> [!IMPORTANT]
+> Like the [CRM](45-crm.md), Projects is a workflow, not a single action - 💼 lists, keycap area tags, one rule: **a project is only alive if exactly one scheduled task points at it**. Give this page a full read before first use.
 
-## The shape
+If that shape fits how you work, TickAL automates all of its bookkeeping. If not, skip this page; nothing else depends on it.
+
+## Why
 
 TickTick lists never appear on Today - so a project's list is its *home*, not its *presence*. The presence is a **CTA** (call to action): one task in your 📌CTA list, deep-linked to the project, tagged with the project's area, and scheduled. Your day views show CTAs; the project lists hold the material. Complete a CTA, mint the next one - a project with no open CTA is by definition stalled, and one glance at the 📌CTA list shows every live project ranked by date.
 
