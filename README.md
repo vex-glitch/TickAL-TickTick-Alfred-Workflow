@@ -120,11 +120,11 @@ Past what TickTick's own quick-add reaches, the same line can:
 
 > **Start a [timer](docs/44-focus.md#start) ⏱️ or [pomodoro](docs/44-focus.md#start) 🍅 on any task. Open a [Focus bar](docs/44-focus.md#the-bar) and a sticky note. One keystroke leads to focus. No clicking around.**
 
+> [!IMPORTANT]
+> A workflow with many moving parts - sessions, staging, sweep, the bar - read [Docs • Focus](docs/44-focus.md) before using. The floating bar needs PyObjC - [one Settings row](docs/30-setup.md#focus-bar) installs it.
+
 ![Floating focus bar](docs/assets/shots/12-focus-bar.png)
 > Keyword `tfo` OR hotkey (set in canvas) OR Main menu > Focus OR `⌃⇧` on a task
-
-> [!IMPORTANT]
-> A workflow with many moving parts - sessions, staging, sweep, the bar - read [Docs • Focus](docs/44-focus.md) before using. No setup needed; only the floating bar wants PyObjC ([one Settings row](docs/30-setup.md#focus-bar)).
 
 - *Open the focused task as a [sticky note](docs/46-notes-links-images.md#sticky-notes) - from Alfred, no right mouse clicks.*
 - Stage [checkbox blocks](docs/44-focus.md#checkbox-blocks) in the focus task (one at a time, a whole tag or section, today's list, or act on multiple tasks at once via 🅿️ [buffer](docs/41-browse-drill.md#buffer-))
@@ -177,6 +177,23 @@ Past what TickTick's own quick-add reaches, the same line can:
 
 > [!TIP]
 > The whole system: [Docs • CRM](docs/45-crm.md)
+
+## 💼 Projects
+
+> **One line bootstraps a whole project: a 💼 list, filed and area-tagged, with its call-to-action task scheduled before the list even has content. No project without a next step.**
+
+> [!IMPORTANT]
+> A workflow with many moving parts - read [Docs • Projects](docs/49-projects.md) before using. The automation kicks in once its two ids are set ([setup](docs/49-projects.md#setup)).
+
+> `P name` in the Add window OR ⌘⏎ > 📌 Create CTA on any task or list row
+
+- *Type `P name`, pick an area - the `💼P • name` list is created, filed in your projects folder, keycap-tagged*
+- The Add window re-opens with the project's 📌CTA prefilled and deep-linked - schedule it, ⏎
+- [📌 Create CTA](docs/49-projects.md#the--create-cta-row) on any list or task mints its next action - linked, tagged, scheduled
+- Day views show CTAs, project lists hold the material - no open CTA means the project stalled, and the 📌CTA list shows every live project at a glance
+
+> [!TIP]
+> The whole system: [Docs • Projects](docs/49-projects.md)
 
 ## 📝 Notes, links and images
 
