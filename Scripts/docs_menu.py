@@ -58,20 +58,21 @@ def main():
     query = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
 
     if query:
-        q = urllib.parse.quote_plus(f"repo:{REPO} {query}")
+        # path:*.md keeps hits on the written pages (README + docs) - never code
+        q = urllib.parse.quote_plus(f"repo:{REPO} path:*.md {query}")
         search_url = f"https://github.com/search?q={q}&type=code"
         search = alfred.item(
             uid="docs-search",
             title=f'🔎 Search docs for "{query}"',
-            subtitle="⏎ GitHub search across the whole repo",
-            arg=f"open:{search_url}",
+            subtitle="⏎ GitHub search over the docs + README",
+            arg=f'docsopen:Docs • Searching for "{query}"|{search_url}',
             mods=BACK,
         )
     else:
         search = alfred.item(
             uid="docs-search",
             title="🔎 Search docs for…",
-            subtitle="Type, then ⏎ searches the repo on GitHub",
+            subtitle="Type, then ⏎ searches the docs + README on GitHub",
             valid=False,
             mods=BACK,
         )
@@ -80,7 +81,7 @@ def main():
         uid=f"doc-{path}",
         title=f"{emoji} {name}",
         subtitle=sub,
-        arg=f"open:{BLOB}/{path}",
+        arg=f"docsopen:Docs • {name} Opened|{BLOB}/{path}",
         mods=BACK,
     ) for emoji, name, path, sub in PAGES]
 

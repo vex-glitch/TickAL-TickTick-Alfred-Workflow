@@ -237,6 +237,14 @@ def main():
             subprocess.run(["open", url], check=False)
             # no output → notification node shows nothing
 
+        elif arg.startswith("docsopen:"):
+            # docsopen:<notification text>|<url> - like open:, but tells the
+            # user what just opened (the docs browser rows ride this).
+            text, _, url = arg[9:].partition("|")
+            if url:
+                subprocess.run(["open", url], check=False)
+            print(text)
+
         elif arg.startswith("copy:"):
             payload = arg[5:]
             subprocess.run(["pbcopy"], input=payload.encode(), check=False)
