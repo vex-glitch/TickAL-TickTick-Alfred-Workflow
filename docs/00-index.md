@@ -24,12 +24,12 @@ TickAL is a keyboard-driven TickTick front end for Alfred 5. It covers search, b
 | | [Browse & drill](41-browse-drill.md) | Walk lists → sections → tasks → subtasks with ⌥⏎/⌃⏎ (animated drill GIF inside) |
 | | [Add](42-add.md) | Create tasks, lists, and notes with the `tad` token grammar |
 | | [Actions](43-actions.md) | The ⌘⏎ menu: schedule, move, tag, priority, and more per item |
-| | [Focus](44-focus.md) | Timer/pomodoro sessions, staging blocks, buffer, floating bar |
-| | [CRM](45-crm.md) | Booking hub with 🔥 group tags and auto Prepare follow-ups |
 | | [Notes, links & images](46-notes-links-images.md) | Note editing, task links, clipboard image attachments |
-| | [Periodic notes](47-periodic.md) | Daily → yearly notes: auto-mint, journals, money roll-ups, reviews |
 | | [Views](48-views.md) | Native TickTick screens: Habits, Pomodoro, Matrix, Calendar, Statistics |
-| | [Projects](49-projects.md) | 💼 project lists with one scheduled call-to-action task each, minted automatically |
+| **Workflows** | [Focus](44-focus.md) | Timer/pomodoro sessions, staging blocks, sweep, floating bar - read first |
+| | [CRM](45-crm.md) | Booking hub with 🔥 group tags and auto Prepare follow-ups - set up + read first |
+| | [Periodic notes](47-periodic.md) | Daily → yearly notes: auto-mint, journals, money roll-ups, reviews - set up + read first |
+| | [Projects](49-projects.md) | 💼 project lists with one scheduled call-to-action task each - set up + read first |
 | **Reference** | [Setup](30-setup.md) | TickTick app credentials, OAuth login, first sync, optional extras |
 | | [Settings & sync](90-settings-sync.md) | Configure Workflow options, cache, optional hourly background sync |
 | | [Cheatsheet](95-cheatsheet.md) | Every keyword and keystroke on one page |
