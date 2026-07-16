@@ -2696,16 +2696,6 @@
 		<array>
 			<dict>
 				<key>destinationuid</key>
-				<string>498FFED9-2012-44F6-BD52-B963FA5A23EB</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-			<dict>
-				<key>destinationuid</key>
 				<string>29E1E28B-751B-4AFE-8F0C-66B798A991A1</string>
 				<key>modifiers</key>
 				<integer>0</integer>
@@ -6600,25 +6590,6 @@ fi</string>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
 			<string>29E1E28B-751B-4AFE-8F0C-66B798A991A1</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>CTA</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>498FFED9-2012-44F6-BD52-B963FA5A23EB</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -11584,12 +11555,12 @@ esac</string>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
-&gt;One hotkey `⌥⌘T` or keyword `tal` opens your whole TickTick world in Alfred: 
+&gt;One keyword `tal` (or a hotkey you set) opens your whole TickTick world in Alfred: 
 Search, add, browse, schedule, tags, complete, focus, edit notes and descriptions, open the calendar, mint periodic notes, save
 web pages, open sticky notes, organise projects, run a CRM, and more...
 *Every change lands in a local cache first*, so nothing waits on the network between keystrokes.
 
-📖 Full docs: [GitHub · TickAL](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow) (kw `tdo` ks `⌥⌘G`)
+📖 Full docs: [GitHub · TickAL](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow) (kw `tdo`)
 
 ## Dependencies
 - Alfred 5 + Powerpack · Python 3 (Homebrew or Xcode CLT - TickAL finds either)
@@ -11599,22 +11570,22 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 ## Setup
 1. Go to [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** + **Client Secret** into the fields above
-3. Run `⌥⌘L` or `tlogin` - a browser opens; log in and approve
-4. Run `⌥⌘Y` or `tsy` to prime the cache
-5. Sign-in to unlock attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `⌥⌘,` or `tup` → `Attachment Login` (masked; only a session token is stored) - or paste a token via `Attachment Token` (Sign-in-with-Apple; guide in the docs)
+3. Run `tlogin` - a browser opens; log in and approve
+4. Run `tsy` to prime the cache
+5. Sign-in to unlock attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `tup` → `Attachment Login` (masked; only a session token is stored) - or paste a token via `Attachment Token` (Sign-in-with-Apple; guide in the docs)
 6. *Optional* - CRM / CTA / Projects features: paste your list &amp; folder ids above (the docs show how to copy an id)
 
 ## Usage
 &gt; 📌 [Cheatsheet - Every keyword, chord, add token, and search scope on one page](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs/95-cheatsheet.md)
 *Four keys run everything*: `⌥⏎` browse · `⌘⏎` actions · `⌃⏎` back · `/` more. Type to filter any screen.
-- ***All of the actions can be accessed from the main workflow screen with keystroke*** `⌥⌘T` or keyword `tal`
-- `⌥⌘T` or `tal` main menu · `⌥⌘S` or `tse` search · `⌥⌘A` or `tad` add · `⌥⌘,` or `tup` settings · `tca` calendar
-- Views: `⌥⌘D` or `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer
+- ***All of the actions can be accessed from the main workflow screen with keyword*** `tal`
+- `tal` main menu · `tse` search · `tad` add · `tup` settings · `tca` calendar
+- Views: `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer
 - Native views: `tha` habits · `tpo` pomodoro · `tmx` matrix · `tst` statistics
-- `tfo` focus · `⌥⌘U` or `tur` save browser tab · `tcr` crm · `⌥⌘Y` or `tsy` sync · `⌥⌘G` or `tdo` docs
+- `tfo` focus · `tur` save browser tab · `tcr` crm · `tsy` sync · `tdo` docs
 - Periodic notes: `tpn` or `pn` scope in search · direct: `tdn` daily · `twn` weekly · `tmn` monthly · `tqn` quarterly · `tyn` yearly · `tmj`/`tej` journals · `tmo` income · `tdg` day goal · `tde` entry · `tat` add to today
 - Add tokens: `*` date · `@` time · `!` priority · `#` tag · `=` note · `[[` task link - or type `/` for the menu
-- *Hotkeys for ~35 functions are easily accessible on canvas and can be changed*
+- *Hotkey nodes for ~35 functions sit on the canvas - Alfred clears hotkeys on import, so set your own*
 - *Keywords are changed in config*
 
 &gt; 💡 Please consult the docs for all features, debugging or how tos. [Docs • TickAL](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs/00-index.md)</string>
@@ -13137,15 +13108,6 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>ypos</key>
 			<real>1500.0</real>
 		</dict>
-		<key>498FFED9-2012-44F6-BD52-B963FA5A23EB</key>
-		<dict>
-			<key>colorindex</key>
-			<integer>9</integer>
-			<key>xpos</key>
-			<real>1910.0</real>
-			<key>ypos</key>
-			<real>1390.0</real>
-		</dict>
 		<key>49BFE032-4FC3-4D7A-ADCE-20958B1E2B20</key>
 		<dict>
 			<key>colorindex</key>
@@ -14560,7 +14522,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>note</key>
 			<string>Focus ⌃ → MainMenu</string>
 			<key>xpos</key>
-			<real>2035.0</real>
+			<real>2040.0</real>
 			<key>ypos</key>
 			<real>1390.0</real>
 		</dict>
