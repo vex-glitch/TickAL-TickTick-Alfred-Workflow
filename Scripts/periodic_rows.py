@@ -349,7 +349,7 @@ def _after(q, prefix):
 def rows(query):
     """Entry point for the pn scope. query = bar text after 'pn '."""
     if not areas.periodic_configured():
-        row = areas.setup_row("Periodic notes", "47-periodic.md")
+        row = areas.setup_row("Periodic notes", "48-periodic.md")
         row["mods"] = _mods()
         return [row]
     q = (query or "").strip()

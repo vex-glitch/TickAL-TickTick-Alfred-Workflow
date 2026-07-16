@@ -52,7 +52,7 @@ def build_items():
     if not areas.crm_configured():
         # Dormant until crm_list_id is set in Configure Workflow - the one row
         # opens the setup guide (arg routes via the ^open conditional branch).
-        return [alfred.item(**areas.setup_row("CRM", "45-crm.md"))]
+        return [alfred.item(**areas.setup_row("CRM", "47-crm.md"))]
     return [
         alfred.item(
             uid="crm-add",

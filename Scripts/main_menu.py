@@ -10,6 +10,7 @@ Args passed to Alfred (routed by conditional ▷50F14423):
   add      → ET Add
   URL      → ET SaveURL
   crm      → ET CRM
+  docs     → ET OpenDocs (the docs_menu.py surface)
   update   → ET Update
   open:*   → open the URL (Statistics row)
   tts:*    → tt_shortcut.py (TickTick's own global shortcuts)
@@ -118,24 +119,6 @@ def build_items():
             subtitle="Daily, weekly, journal, money",
             arg="periodic",
         ),
-        alfred.item(
-            uid="url",
-            title="🔗 Save URL...",
-            subtitle="Save browser tab as task",
-            arg="URL",
-        ),
-        alfred.item(
-            uid="update",
-            title="⚙️ Settings",
-            subtitle="Login, sync, attachment token, refresh",
-            arg="update",
-        ),
-        alfred.item(
-            uid="statistics",
-            title="📊 Statistics",
-            subtitle="TickTick stats overview (web)",
-            arg="open:https://ticktick.com/webapp/#statistics/overview",
-        ),
         # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) were
         # retired - they only re-fired TickTick's own global shortcuts, and
         # the task-bound sticky/pomo in ⌘ Actions are better. tt_shortcut.py
@@ -145,6 +128,32 @@ def build_items():
             title="📈 CRM...",
             subtitle="Search or add a booking",
             arg="crm",
+        ),
+        # arg "docs" → conditional branch → Call-ET OpenDocs → docs_menu.py
+        # (the same surface the tdo keyword opens).
+        alfred.item(
+            uid="docs",
+            title="📜 Docs",
+            subtitle="Every page · type to search the repo",
+            arg="docs",
+        ),
+        alfred.item(
+            uid="update",
+            title="⚙️ Settings",
+            subtitle="Login, sync, attachment token, refresh",
+            arg="update",
+        ),
+        alfred.item(
+            uid="url",
+            title="🔗 Save URL...",
+            subtitle="Save browser tab as task",
+            arg="URL",
+        ),
+        alfred.item(
+            uid="statistics",
+            title="📊 Statistics",
+            subtitle="TickTick stats overview (web)",
+            arg="open:https://ticktick.com/webapp/#statistics/overview",
         ),
     ]
 

@@ -836,6 +836,157 @@ def pyobjc_install():
               "see Troubleshooting in the docs")
 
 
+# ── Periodic 04:30 mint agent (Settings → Periodic Agent) ────────────────────
+# Same toggle shape as Hourly Sync below: plistlib-emitted plist, py.sh as the
+# interpreter resolver, launchctl-list verification, twin detection, stale
+# Repair. Runs xact:pn_mint at 04:30 (launchd fires missed runs on wake;
+# RunAtLoad + the pn_last_mint stamp catch up after a powered-off night).
+PN_AGENT_LABEL = "com.tickal.periodic"
+PN_AGENT_PLIST = os.path.expanduser(
+    f"~/Library/LaunchAgents/{PN_AGENT_LABEL}.plist")
+PN_AGENT_LOG = "/tmp/tickal_periodic.log"
+
+
+def _pn_agent_dict(wf):
+    return {
+        "Label": PN_AGENT_LABEL,
+        "ProgramArguments": ["/bin/bash",
+                             os.path.join(wf, "Scripts", "py.sh"),
+                             os.path.join(wf, "Scripts", "xact.py"),
+                             "xact:pn_mint"],
+        "WorkingDirectory": wf,
+        "StartCalendarInterval": {"Hour": 4, "Minute": 30},
+        "RunAtLoad": True,
+        "StandardOutPath": PN_AGENT_LOG,
+        "StandardErrorPath": PN_AGENT_LOG,
+    }
+
+
+def _pn_agent_loaded():
+    return subprocess.run(["launchctl", "list", PN_AGENT_LABEL],
+                          capture_output=True).returncode == 0
+
+
+def _twin_pn_agent():
+    """A DIFFERENT user-authored periodic-mint agent (e.g. the hand-installed
+    pre-2.7 template). Returns its label, or None."""
+    import glob
+    import plistlib
+    for path in glob.glob(os.path.expanduser("~/Library/LaunchAgents/*.plist")):
+        if os.path.basename(path) == f"{PN_AGENT_LABEL}.plist":
+            continue
+        try:
+            with open(path, "rb") as f:
+                d = plistlib.load(f)
+        except Exception:
+            continue
+        label = str(d.get("Label", ""))
+        args = " ".join(str(a) for a in d.get("ProgramArguments", []))
+        if "pn_mint" in args or ("periodic" in label.lower()
+                                 and "tickal" in label.lower()):
+            return label or os.path.basename(path)[:-len(".plist")]
+    return None
+
+
+def _pn_agent_install(wf):
+    import plistlib
+    os.makedirs(os.path.dirname(PN_AGENT_PLIST), exist_ok=True)
+    with open(PN_AGENT_PLIST, "wb") as f:
+        plistlib.dump(_pn_agent_dict(wf), f)
+    subprocess.run(["launchctl", "unload", PN_AGENT_PLIST],
+                   capture_output=True)
+    subprocess.run(["launchctl", "load", PN_AGENT_PLIST],
+                   capture_output=True)
+    return _pn_agent_loaded()
+
+
+def _pn_agent_state(wf):
+    """'' = healthy; otherwise a short reason the install is stale."""
+    import plistlib
+    try:
+        with open(PN_AGENT_PLIST, "rb") as f:
+            cur = plistlib.load(f)
+    except Exception:
+        return "its file is unreadable"
+    args = [str(a) for a in cur.get("ProgramArguments", [])] or [""]
+    if os.path.basename(args[0]) != "bash" or len(args) < 3:
+        return "it predates this workflow version"
+    py_sh = args[1]
+    if not os.path.exists(py_sh):
+        return "it points at a deleted workflow copy"
+    if os.path.dirname(os.path.dirname(py_sh)) != wf:
+        return "it points at a previous workflow copy"
+    if not _pn_agent_loaded():
+        return "launchd does not have it loaded"
+    return ""
+
+
+def pn_agent_toggle():
+    wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    if not os.path.exists(PN_AGENT_PLIST):
+        # The agent reads periodic_list_id from ~/.ticktick_alfred/config.json,
+        # mirrored there by the first interactive pn use - gate on that.
+        try:
+            mirrored = bool(cfg.load().get("periodic_list_id"))
+        except Exception:
+            mirrored = False
+        if not mirrored:
+            _dialog("Periodic notes need a first run before the agent can "
+                    "work: set the list id in Configure Workflow, then use "
+                    "any pn action once (e.g. open today's note). Then come "
+                    "back here.", ["OK"], "OK")
+            return
+        twin = _twin_pn_agent()
+        if twin:
+            _dialog(f"A periodic mint agent already runs on this Mac via "
+                    f"{twin} - nothing to install.", ["OK"], "OK")
+            return
+        if _dialog("The periodic agent is OFF.\n\nInstall it? Every morning "
+                   "at 04:30 (or on wake, if the Mac slept through it) it "
+                   "mints the new day's note, refreshes today and recomputes "
+                   f"the roll-ups (logs: {PN_AGENT_LOG}).",
+                   ["Cancel", "Install"], "Install") != "Install":
+            return
+        if _pn_agent_install(wf):
+            print("Periodic agent on · next mint 04:30")
+        else:
+            try:
+                os.remove(PN_AGENT_PLIST)
+            except OSError:
+                pass
+            print("Install failed · launchctl would not load the agent")
+        return
+
+    stale = _pn_agent_state(wf)
+    if stale:
+        btn = _dialog(f"The periodic agent is installed, but {stale}."
+                      "\n\nRepair reinstalls it for this workflow copy; "
+                      "Remove deletes it.",
+                      ["Cancel", "Remove", "Repair"], "Repair")
+        if btn == "Repair":
+            print("Periodic agent repaired · next mint 04:30"
+                  if _pn_agent_install(wf)
+                  else "Repair failed · launchctl would not load the agent")
+            return
+        if btn != "Remove":
+            return
+    elif _dialog("The periodic agent is ON.\n\nRemove it? (Notes are still "
+                 "minted the moment you open them - this only stops the "
+                 "04:30 pre-mint.)",
+                 ["Cancel", "Remove"], "Remove") != "Remove":
+        return
+
+    subprocess.run(["launchctl", "unload", PN_AGENT_PLIST],
+                   capture_output=True)
+    try:
+        os.remove(PN_AGENT_PLIST)
+    except OSError as e:
+        print(f"Remove failed · {e}")
+        return
+    print("Periodic agent removed")
+
+
 # ── Hourly cache-sync LaunchAgent (Settings → Hourly Sync) ───────────────────
 # One toggle verb: a dialog states the current state and offers the valid
 # moves. The agent runs src/sync.py THROUGH Scripts/py.sh (never a baked
@@ -2745,6 +2896,8 @@ def main():
             cachesync_toggle()
         elif verb == "pyobjc_install":
             pyobjc_install()
+        elif verb == "pn_agent":
+            pn_agent_toggle()
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's
