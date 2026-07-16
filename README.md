@@ -85,9 +85,12 @@ Task rows show:
 
 Tokens cover the basics you'd expect - date, time, priority, tag, list, repeat, reminder.
 
-> [!TIP]
-> `/` opens the token menu whenever you forget one
-> ![Add tokens](docs/assets/shots/15-add-slash-menu.png)
+<details>
+<summary><code>/</code> opens the token menu whenever you forget one 🖼️</summary>
+
+![Add tokens](docs/assets/shots/15-add-slash-menu.png)
+
+</details>
 
 Past what TickTick's own quick-add reaches, the same line can:
 - block out a **duration**, not just a time (`>90m`)
