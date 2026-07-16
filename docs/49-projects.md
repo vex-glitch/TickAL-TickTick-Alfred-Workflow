@@ -13,7 +13,12 @@ If that shape fits how you work, TickAL automates all of its bookkeeping. If not
 
 ## Why
 
-TickTick lists never appear on Today - so a project's list is its *home*, not its *presence*. The presence is a **CTA** (call to action): one task in your 📌CTA list, deep-linked to the project, tagged with the project's area, and scheduled. Your day views show CTAs; the project lists hold the material. Complete a CTA, mint the next one - a project with no open CTA is by definition stalled, and one glance at the 📌CTA list shows every live project ranked by date.
+TickTick lists never appear on Today - so a project's list is its *home*, not its *presence*. The presence is a **CTA** (call to action): one task in your 📌CTA list, deep-linked to the project, tagged with the project's area, and scheduled.
+
+Sometimes the honest next step is simply "work on project XY". A CTA is exactly that, minus the friction: the task names the project and carries a link straight to its list in its own title, so scheduling time with a project is one row and one date. Your day views show CTAs; the project lists hold the material. Complete a CTA, mint the next one - a project with no open CTA is by definition stalled, and one glance at the 📌CTA list shows every live project ranked by date. That is the whole concept of projects and CTAs.
+
+> [!TIP]
+> One TickTick filter turns this into a board: tasks containing `💼`, in the 📌CTA list, carrying any area tag - grouped by Area tag. A kanban of every project you're giving time to, one column per area.
 
 ## Setup
 
