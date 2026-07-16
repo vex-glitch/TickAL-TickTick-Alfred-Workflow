@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Obsidian-style daily, weekly, monthly, quarterly and yearly notes - minted, refreshed and rolled up for you, inside TickTick.
 
-**Keyword:** `pn` - a scope inside search (`tse pn …`, or `/pn` anywhere in the bar), or the **💫 Periodic Notes** row in the main menu (`tal`). Typing `daily note`, `weekly note` (or just `weekly`, `monthly`…) anywhere in search also surfaces the matching note. Or jump straight in with a direct keyword - see [Direct keywords](#direct-keywords).
+**Keyword:** `tpn` · **Hotkey:** (set in canvas) - or the `pn` scope inside search (`tse pn …`, or `/pn` anywhere in the bar), or the **💫 Periodic Notes** row in the main menu (`tal`). Typing `daily note`, `weekly note` (or just `weekly`, `monthly`…) anywhere in search also surfaces the matching note. Or jump straight in with a direct keyword - see [Direct keywords](#direct-keywords).
 
 Each periodic note is a normal TickTick note in one list of your choosing, tagged 💫Daily / 💫Weekly / 💫Monthly / 💫Quarterly / 💫Yearly (nested under 💫Periodic - the tags are created for you). Group that list by **Tag** in TickTick and the kanban columns build themselves.
 

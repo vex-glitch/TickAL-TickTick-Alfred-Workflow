@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Fuzzy-search everything in your TickTick account - lists, sections, tasks, subtasks, tags, notes, smart lists, and filters - from one bar.
 
-**Keyword:** `tse` (`tse [scope] query`)
+**Keyword:** `tse` (`tse [scope] query`) · **Hotkey:** `⌥⌘S`
 
 Type to search everything at once. Prefix the query with a scope letter to narrow the type, or drop a `/token` anywhere in the bar (`tse monday /t` ≡ `tse t monday`). Typing `/` alone opens the [scope menu](#scope-menu). Re-map the keyword in Configure Workflow.
 

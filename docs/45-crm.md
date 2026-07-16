@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Run a bookings pipeline out of one TickTick list: tagged bookings, auto-attached reference images, and an automatic "Prepare" follow-up per booking.
 
-**Keyword:** `tcr` - opens the CRM hub (two rows: Add / Search; type `a` or `s` to pick).
+**Keyword:** `tcr` · **Hotkey:** (set in canvas) - opens the CRM hub (two rows: Add / Search; type `a` or `s` to pick).
 
 An honest note first: the CRM is the most opinionated part of TickAL. It was built for a real booking business and hard-codes that shape - one bookings list, the 🔥 tag group, a prepare-before-the-appointment ritual. If your work fits that shape, it is the fastest surface in the workflow. If not, skip this page; nothing else depends on it.
 

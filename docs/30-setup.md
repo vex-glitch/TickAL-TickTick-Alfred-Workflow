@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Connect TickAL to your TickTick account, then switch on the optional extras.
 
-**Keyword:** `tup` - opens the Settings menu (Sync · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
+**Keyword:** `tup` · **Hotkey:** `⌥⌘,` - opens the Settings menu (Sync · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
 
 ## Requirements
 

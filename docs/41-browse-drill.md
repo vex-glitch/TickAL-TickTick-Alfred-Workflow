@@ -6,7 +6,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 ![Drill: type, hold option to drill twice, hold control to back out](assets/shots/drill.gif)
 
-**Keywords:** `tod` · `tom` · `tne` · `tin` · `tbu` · `tta` - remap any of them in Configure Workflow.
+**Keywords:** `tod` (hotkey `⌥⌘D`) · `tom` · `tne` · `tin` · `tbu` · `tta` - remap any of them in Configure Workflow.
 
 ## View keywords
 

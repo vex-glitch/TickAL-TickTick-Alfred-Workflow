@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Run timers and Pomodoros on TickTick tasks, stage a day's checkbox worklist inside the focused task, and drive the session from a floating desktop bar.
 
-**Keyword:** `tfo` (`tfo [timer|pomo] [link <task>]` - every row advances the query bar itself; ⌃⏎ backs out to the main menu)
+**Keyword:** `tfo` (`tfo [timer|pomo] [link <task>]` - every row advances the query bar itself; ⌃⏎ backs out to the main menu) · **Hotkey:** (set in canvas)
 
 ## Start
 

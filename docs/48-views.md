@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Views TickAL does not re-render - one keyword jumps you straight into the native screen inside TickTick
 
-**Keywords:** `tha` · `tpo` · `tmx` · `tca` · `tst`
+**Keywords:** `tha` · `tpo` · `tmx` · `tca` · `tst` · **Hotkeys:** (set in canvas)
 
 ## View keywords
 

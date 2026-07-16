@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Zero to searching, drilling, scheduling, and adding tasks - the first 15 minutes.
 
-**Keywords used:** `tse` · `tad` · `tlogin` · `tsy` (all re-mappable in Configure Workflow)
+**Keywords used:** `tse` · `tad` · `tlogin` · `tsy` (all re-mappable in Configure Workflow; default hotkeys `⌥⌘S` · `⌥⌘A` · `⌥⌘L` · `⌥⌘Y`)
 
 ## 1. Install
 
@@ -19,12 +19,12 @@ Compressed version - the full walkthrough with screenshots is in [Setup](30-setu
 
 1. Open [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`.
 2. Paste the app's Client ID and Client Secret into Configure Workflow.
-3. **Keyword:** `tlogin` - runs the browser OAuth flow; approve and return to Alfred.
-4. **Keyword:** `tsy` - primes the local cache. Run it once now; run it again any time you want a fresh pull.
+3. **Keyword:** `tlogin` (or `⌥⌘L`) - runs the browser OAuth flow; approve and return to Alfred.
+4. **Keyword:** `tsy` (or `⌥⌘Y`) - primes the local cache. Run it once now; run it again any time you want a fresh pull.
 
 ## 3. First search
 
-**Keyword:** `tse` (`tse [scope] query`) - fuzzy search across lists, sections, tasks, tags, smart lists, filters, and notes.
+**Keyword:** `tse` (or `⌥⌘S`; `tse [scope] query`) - fuzzy search across lists, sections, tasks, tags, smart lists, filters, and notes.
 
 1. Type `tse` and a few letters of any task title. Results render with breadcrumbs.
 2. Narrow with a scope letter: `tse t milk` searches top-level tasks only, `tse l work` lists only.
@@ -72,7 +72,7 @@ Try it: `tse l` → pick a list → ⌥⏎ into its sections → ⌥⏎ into a s
 
 ## 6. First add with tokens
 
-**Keyword:** `tad` - one-line task capture with inline tokens.
+**Keyword:** `tad` (or `⌥⌘A`) - one-line task capture with inline tokens.
 
 Type:
 

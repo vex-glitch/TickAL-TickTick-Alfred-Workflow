@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Find and edit TickTick notes, pin tasks as desktop stickies, save browser tabs as tasks, wire tasks together with links, and attach clipboard images.
 
-**Keyword:** `tur` - saves the active browser tab as a task. Notes, links, and images otherwise live inside the `tse`, `tad`, and ⌘⏎ flows below.
+**Keyword:** `tur` · **Hotkey:** `⌥⌘U` - saves the active browser tab as a task. Notes, links, and images otherwise live inside the `tse`, `tad`, and ⌘⏎ flows below.
 
 ## Notes
 
@@ -49,7 +49,7 @@ The focus picker pairs stickies with sessions: **🗒️ Start + sticky note** (
 
 ## Save a URL
 
-**Keyword:** `tur` - grabs the front browser tab's URL and title, then opens the Add window with a markdown link already riding in the task description. Type the title as usual; every add token still works, and a typed `=` note stays above the link. Also reachable from the main menu's **🔗 Save URL...** row - there Alfred is frontmost, so running browsers are probed instead.
+**Keyword:** `tur` · **Hotkey:** `⌥⌘U` - grabs the front browser tab's URL and title, then opens the Add window with a markdown link already riding in the task description. Type the title as usual; every add token still works, and a typed `=` note stays above the link. Also reachable from the main menu's **🔗 Save URL...** row - there Alfred is frontmost, so running browsers are probed instead.
 
 Supported browsers: the Safari family and every Chromium browser (Chrome, Brave, Edge, Arc, Vivaldi, Opera, …). Others get a friendly message in the add window instead of a silent failure.
 

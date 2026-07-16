@@ -18,8 +18,8 @@ Every change lands in a [local cache](docs/90-settings-sync.md#cache-model) firs
 ![Search everything from one box](docs/assets/shots/01-hero-search.png)
 > Keyword `tal` OR hotkey `⌥⌘T`
 
-Four main keys run everything, on every screen:  
-**`⌥⏎` deeper · `⌘⏎` actions · `⌃⏎` back · `/` more**  
+Four main keys run everything, on every screen:
+**`⌥⏎` deeper · `⌘⏎` actions · `⌃⏎` back · `/` more** 
 Type to filter. 
 
 > [!TIP]
