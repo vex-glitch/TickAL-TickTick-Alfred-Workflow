@@ -718,7 +718,7 @@ def bar_spawn():
                 with open(_PYOBJC_HINT, "w") as f:
                     f.write("")
                 from script_base import notify
-                notify("Focus bar needs PyObjC · run: pip3 install pyobjc")
+                notify("Focus bar needs PyObjC · Settings → Install PyObjC")
         except Exception:
             pass
         return
@@ -762,6 +762,78 @@ def _ask(prompt, title="TickAL", hidden=False, default=""):
     if r.returncode != 0:
         return None
     return r.stdout.rstrip("\n") if hidden else r.stdout.strip()
+
+
+# ── PyObjC installer (Settings → Install PyObjC) ─────────────────────────────
+# Installs PyObjC into THIS interpreter - the one py.sh resolved for every
+# keyword - so the focus bar and clipboard-image attach can't land in a python
+# the workflow never uses (the classic "plain pip3 hit the wrong python"
+# failure from the clean-machine test). Homebrew Pythons are PEP-668
+# externally managed: plain install fails, the retry adds
+# --break-system-packages (pyobjc has no brew formula and nothing brew
+# manages depends on it, so the flag is safe).
+def _pyobjc_probe(py):
+    """True when the FULL set focus_bar imports is present - pyobjc-core
+    alone (a common partial install) must not pass."""
+    try:
+        return subprocess.run(
+            [py, "-c", "import objc, AppKit, Quartz, PyObjCTools.AppHelper"],
+            capture_output=True, timeout=30).returncode == 0
+    except Exception:
+        return False
+
+
+def pyobjc_install():
+    py = sys.executable
+    if _pyobjc_probe(py):
+        # Clear the bar-python cache anyway: a stale entry naming a DIFFERENT
+        # python that lost pyobjc would keep killing the bar even though this
+        # interpreter is fine - and this row is the designated remedy.
+        try:
+            os.remove(_BAR_PY_CACHE)
+        except OSError:
+            pass
+        _dialog("PyObjC is already installed - the focus bar and "
+                "clipboard-image attach are ready.", ["OK"], "OK")
+        return
+    if _dialog("PyObjC is missing. It powers the floating focus bar and "
+               "clipboard-image attach - everything else works without it."
+               "\n\nInstall it now? (A ~100 MB download - takes a minute "
+               "or two; a banner confirms when done.)",
+               ["Cancel", "Install"], "Install") != "Install":
+        return
+    subprocess.run(["osascript", "-e",
+                    'display notification "Takes a minute or two - a banner '
+                    'will confirm" with title "TickAL · installing PyObjC"'],
+                   capture_output=True)
+    cmd = [py, "-m", "pip", "install", "pyobjc"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        if r.returncode != 0 and "externally-managed" in (r.stderr + r.stdout):
+            r = subprocess.run(cmd + ["--break-system-packages"],
+                               capture_output=True, text=True, timeout=900)
+    except subprocess.TimeoutExpired:
+        print("PyObjC install timed out · slow connection, or pip is "
+              "building from source (no wheels for this Python yet)")
+        return
+    if r.returncode != 0:
+        # pip appends [notice] self-update nags AFTER the real error - skip them
+        lines = [l for l in (r.stderr or r.stdout).strip().splitlines()
+                 if l.strip() and not l.lstrip().startswith("[notice]")]
+        tail = lines[-1][:200] if lines else "unknown error"
+        print(f"PyObjC install failed · {tail}")
+        return
+    # The bar launcher caches its probed python across processes - clear it
+    # so the next focus session re-probes and finds the fresh install.
+    try:
+        os.remove(_BAR_PY_CACHE)
+    except OSError:
+        pass
+    if _pyobjc_probe(py):
+        print("PyObjC installed · focus bar ready from the next session")
+    else:
+        print("PyObjC installed but the import probe still fails - "
+              "see Troubleshooting in the docs")
 
 
 # ── Hourly cache-sync LaunchAgent (Settings → Hourly Sync) ───────────────────
@@ -2671,6 +2743,8 @@ def main():
             v2login()
         elif verb == "cachesync":
             cachesync_toggle()
+        elif verb == "pyobjc_install":
+            pyobjc_install()
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's
