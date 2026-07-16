@@ -4,7 +4,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 > Connect TickAL to your TickTick account, then switch on the optional extras.
 
-**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu (Sync · Hourly Sync · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
+**Keyword:** `tup` · **Hotkey:** (set in canvas) - opens the Settings menu (Sync · Hourly Sync · Install PyObjC · Login · Refresh TickTick · Help • TickAL Docs · Attachment Token · Attachment Login). Every "Settings → …" step below lives there.
 
 ## Requirements
 
@@ -13,7 +13,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 | Alfred 5 + Powerpack | Workflows need the Powerpack license |
 | Python 3 | Homebrew (Apple Silicon or Intel) or the Xcode Command Line Tools. `Scripts/py.sh` resolves whichever is installed - no hardcoded interpreter. No python3 at all → an error with an install hint instead of results |
 | TickTick account | Plus a free TickTick developer app (two minutes, next section) |
-| PyObjC (optional) | Floating focus bar + clipboard-image attach - see [Focus bar](#focus-bar) |
+| PyObjC (optional) | Floating focus bar + clipboard-image attach - one Settings row installs it, see [Focus bar](#focus-bar) |
 
 ## Connect
 
@@ -99,7 +99,11 @@ To copy an id, never leave Alfred: ⌘⏎ on any list row → **🆔 Copy id**; 
 
 ## Focus bar
 
-The floating focus bar requires PyObjC. Install it with the workflow's own Python - a plain `pip3` may target a different Python and the bar will not appear. Homebrew Pythons are "externally managed" (PEP 668) and refuse installs without the `--break-system-packages` flag; PyObjC has no Homebrew formula, and nothing Homebrew manages depends on it, so the flag is safe here:
+The floating focus bar requires PyObjC. One row installs it: `tup` → **Install PyObjC**. It targets the workflow's own Python (a plain `pip3` in a terminal may hit a different one and the bar would never appear), handles Homebrew's PEP-668 "externally managed" refusal automatically, and a banner confirms when it's done. Already installed? The row just says so.
+
+<details><summary>Terminal variants (what the row runs for you)</summary>
+
+Homebrew Pythons refuse plain installs (PEP 668) and need the `--break-system-packages` flag - safe here, since PyObjC has no Homebrew formula and nothing Homebrew manages depends on it:
 
 ```
 /opt/homebrew/bin/pip3 install --break-system-packages pyobjc   # Apple Silicon Homebrew
@@ -107,7 +111,9 @@ The floating focus bar requires PyObjC. Install it with the workflow's own Pytho
 pip3 install pyobjc                                             # no Homebrew (Xcode CLT Python)
 ```
 
-Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC"), at most once an hour. Clipboard-image attach shares the PyObjC dependency - see [Notes, links & images](46-notes-links-images.md).
+</details>
+
+Every other focus feature - timer, pomodoro, staging blocks, sweep - works without it. If PyObjC is missing when a focus session runs, a reminder notification fires ("Focus bar needs PyObjC · Settings → Install PyObjC"), at most once an hour. Clipboard-image attach shares the PyObjC dependency - see [Notes, links & images](46-notes-links-images.md).
 
 ## Hourly background sync
 

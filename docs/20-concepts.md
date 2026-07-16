@@ -56,7 +56,7 @@ Five more ride alongside on task rows:
 
 **Focus session** - a timer ⏱️ or a pomodoro 🍅, started via the `tfo` keyword or from a task's ⌘ Actions. Both log real TickTick focus records: the timer logs on stop (pauses compressed out), the pomodoro runs through the app itself.
 
-**Focus bar** - the floating pill that follows a session: the running timer/pomodoro and the current checkbox from today's staging list, with tick, expand, and hide controls. It and clipboard-image attach are the only features that need PyObjC (install with the workflow's own Python - see [Setup](30-setup.md#focus-bar)); every other focus feature works without it.
+**Focus bar** - the floating pill that follows a session: the running timer/pomodoro and the current checkbox from today's staging list, with tick, expand, and hide controls. It and clipboard-image attach are the only features that need PyObjC (one Settings row installs it - see [Setup](30-setup.md#focus-bar)); every other focus feature works without it.
 
 **Checkbox block** - where those checkboxes live: the day's staging list, stored inside a focus task's description as `- [ ] [Title](url)` lines under a `### YYYY-MM-DD` header, blocks separated by `---`. When a new day's block is created, unchecked lines carry over to it; checked lines stay put as a permanent record, and the day's block rides along as the focus record's note.
 

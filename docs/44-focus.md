@@ -32,7 +32,7 @@ While a session runs, `tfo` shows the session screen: status + elapsed time, **â
 
 ## The bar
 
-A floating always-on-top pill follows every session. It is the one focus feature that needs PyObjC (install with the workflow's own Python - see [Setup](30-setup.md#focus-bar)) - everything else works without it, and a hint notification fires (at most hourly) if it is missing.
+A floating always-on-top pill follows every session. It is the one focus feature that needs PyObjC (`tup` â†’ **Install PyObjC** - see [Setup](30-setup.md#focus-bar)) - everything else works without it, and a hint notification fires (at most hourly) if it is missing.
 
 | Control | Action |
 |---|---|

@@ -12,6 +12,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 |---|---|
 | Sync | Refreshes the entire workflow cache from the TickTick API (same as the `tsy` keyword). With the v2 token this also pulls your tag list + order, folder names + order, and your filters - there is no separate tags/folders/filters setup. |
 | Hourly Sync | Installs / removes the hourly background-refresh LaunchAgent - a dialog shows the current state and offers the one valid move. See [below](#hourly-background-sync). |
+| Install PyObjC | Installs the focus-bar / image-attach dependency into the workflow's own Python - no terminal, PEP-668 handled, a banner confirms. Says so if already installed. |
 | Login | Starts the browser OAuth flow and stores the API token. |
 | Refresh TickTick | Clicks File → Sync in the TickTick desktop app (background, no focus steal) - refreshes the app, not the workflow cache. |
 | Help • TickAL Docs | Opens the TickAL GitHub page. |

@@ -14,6 +14,10 @@ All notable user-visible changes to TickAL. Format follows
   background-refresh LaunchAgent from inside Alfred: `tup` → Hourly Sync,
   one dialog, done. Detects installs left stale by a workflow update and
   offers Repair. No more hand-editing plist templates.
+- **Install PyObjC** settings row - the focus-bar / image-attach dependency
+  installs into the workflow's own Python from inside Alfred, PEP-668
+  handled automatically. The missing-PyObjC hint notification now points at
+  the row instead of a terminal command.
 - **[Projects](docs/49-projects.md) docs page** - the `P ` bootstrap flow,
   the 📌 Create CTA row, and the keycap area-tag convention, all on one page.
 

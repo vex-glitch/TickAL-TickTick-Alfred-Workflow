@@ -50,8 +50,8 @@ Writes made through TickAL patch the cache in place, so your own adds/edits appe
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Session starts but no floating bar; a "Focus bar needs PyObjC" notification fires (at most hourly) | PyObjC not installed - only the bar and clipboard-image attach need it | `/opt/homebrew/bin/pip3 install --break-system-packages pyobjc` (the workflow's own Python; Intel: `/usr/local/bin/pip3`), start a new session - see [Setup](30-setup.md#focus-bar) |
-| No bar and no notification | Bar crashed at launch | Read `/tmp/tickal_focus_bar.log` - a `PyObjC missing` exit-code-3 line means PyObjC is absent or partial - install the full set with the workflow's own Python (see [Setup](30-setup.md#focus-bar)) |
+| Session starts but no floating bar; a "Focus bar needs PyObjC" notification fires (at most hourly) | PyObjC not installed - only the bar and clipboard-image attach need it | `tup` → **Install PyObjC**, then start a new session - see [Setup](30-setup.md#focus-bar) |
+| No bar and no notification | Bar crashed at launch | Read `/tmp/tickal_focus_bar.log` - a `PyObjC missing` exit-code-3 line means PyObjC is absent or partial - `tup` → **Install PyObjC** installs the full set into the right Python |
 | Bar vanished mid-session | It was hidden, or the session ended (the bar exits ~10 s after going idle) | Via the `tfo` keyword: **👁 Show bar** to unhide, or start a new session |
 
 Every other focus feature - timer, pomodoro, staging blocks, sweep - works without PyObjC.
@@ -68,7 +68,7 @@ Every other focus feature - timer, pomodoro, staging blocks, sweep - works witho
 |---------|-------|-----|
 | Every keyword errors with `TickAL: python3 not found - install Python 3` | No usable Python 3 on the machine | Install one: `brew install python` or `xcode-select --install` |
 
-The workflow resolves Python via `Scripts/py.sh`: Apple-Silicon Homebrew → Intel Homebrew → `PATH`. Any of those works; no configuration needed. Install PyObjC (focus bar + clipboard-image attach) into whichever one wins.
+The workflow resolves Python via `Scripts/py.sh`: Apple-Silicon Homebrew → Intel Homebrew → `PATH`. Any of those works; no configuration needed. PyObjC (focus bar + clipboard-image attach) must land in whichever one wins - `tup` → **Install PyObjC** does exactly that.
 
 ## Hourly sync stale or orphaned
 

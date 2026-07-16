@@ -8,7 +8,7 @@ One keyword `tal` (or a hotkey you set) opens your whole TickTick world in Alfre
 
 - Alfred 5 + Powerpack · Python 3 (Homebrew or Xcode CLT - TickAL finds either)
 - A TickTick account + a free TickTick developer app (2 minutes, steps below)
-- Optional: PyObjC for the floating focus bar and clipboard-image attach (`/opt/homebrew/bin/pip3 install --break-system-packages pyobjc` - the workflow's own Python; variants in [docs/30-setup.md](docs/30-setup.md)) - focus works without it
+- Optional: PyObjC for the floating focus bar and clipboard-image attach - install from inside Alfred: `tup` → **Install PyObjC** (terminal variants in [docs/30-setup.md](docs/30-setup.md)) - focus works without it
 
 ## Setup
 
