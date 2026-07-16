@@ -2586,6 +2586,19 @@
 				<false/>
 			</dict>
 		</array>
+		<key>972C47F3-2998-45EB-871D-3D8B0D7CB56C</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>38EECB9D-1B7A-4C1F-983F-29F514A85C88</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>98578A19-1E4B-4A8A-82D7-3BC5EBC6173F</key>
 		<array>
 			<dict>
@@ -3072,6 +3085,18 @@
 				<string></string>
 				<key>sourceoutputuid</key>
 				<string>8F4D0B55-DCA5-4B44-BE06-68E9910338FF</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>972C47F3-2998-45EB-871D-3D8B0D7CB56C</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>DDC7B55A-2B65-4148-A033-0392DEB362BD</string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -6211,6 +6236,20 @@ fi</string>
 						<key>matchmode</key>
 						<integer>0</integer>
 						<key>matchstring</key>
+						<string>3-</string>
+						<key>outputlabel</key>
+						<string>PyObjC</string>
+						<key>uid</key>
+						<string>DDC7B55A-2B65-4148-A033-0392DEB362BD</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
 						<string>5-</string>
 						<key>outputlabel</key>
 						<string>OAUTH</string>
@@ -6561,7 +6600,7 @@ fi</string>
 				<key>fixedorder</key>
 				<true/>
 				<key>items</key>
-				<string>[{"title": "Sync", "arg": "1-", "subtitle": "Refresh cache  \u2303 \ud83d\udd19"}, {"title": "Hourly Sync", "arg": "2-", "subtitle": "Hourly cache auto-refresh \u00b7 install / remove  \u2303 \ud83d\udd19"}, {"title": "Login", "arg": "5-", "subtitle": "Get token  \u2303 \ud83d\udd19"}, {"title": "Refresh TickTick", "arg": "6-", "subtitle": "Refresh app  \u2303 \ud83d\udd19"}, {"title": "Help \u2022 TickAL Docs", "arg": "7-", "subtitle": "GitHub \u00b7 TickAL  \u2303 \ud83d\udd19"}, {"title": "Attachment Token", "arg": "8-", "subtitle": "Save v2 token from clipboard  \u2303 \ud83d\udd19"}, {"title": "Attachment Login", "arg": "9-", "subtitle": "One-time sign-in for attachments &amp; auto-config  \u2303 \ud83d\udd19"}]</string>
+				<string>[{"title": "Sync", "arg": "1-", "subtitle": "Refresh cache  \u2303 \ud83d\udd19"}, {"title": "Hourly Sync", "arg": "2-", "subtitle": "Hourly cache auto-refresh \u00b7 install / remove  \u2303 \ud83d\udd19"}, {"title": "Install PyObjC", "arg": "3-", "subtitle": "Focus bar + image attach dependency  \u2303 \ud83d\udd19"}, {"title": "Login", "arg": "5-", "subtitle": "Get token  \u2303 \ud83d\udd19"}, {"title": "Refresh TickTick", "arg": "6-", "subtitle": "Refresh app  \u2303 \ud83d\udd19"}, {"title": "Help \u2022 TickAL Docs", "arg": "7-", "subtitle": "GitHub \u00b7 TickAL  \u2303 \ud83d\udd19"}, {"title": "Attachment Token", "arg": "8-", "subtitle": "Save v2 token from clipboard  \u2303 \ud83d\udd19"}, {"title": "Attachment Login", "arg": "9-", "subtitle": "One-time sign-in for attachments &amp; auto-config  \u2303 \ud83d\udd19"}]</string>
 				<key>matchmode</key>
 				<integer>0</integer>
 				<key>runningsubtext</key>
@@ -11560,6 +11599,29 @@ esac</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:pyobjc_install"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>972C47F3-2998-45EB-871D-3D8B0D7CB56C</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -13900,6 +13962,15 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<real>30.0</real>
 			<key>ypos</key>
 			<real>1705.0</real>
+		</dict>
+		<key>972C47F3-2998-45EB-871D-3D8B0D7CB56C</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>1050.0</real>
+			<key>ypos</key>
+			<real>1785.0</real>
 		</dict>
 		<key>9818E252-053D-4564-BDD5-4781F30247FC</key>
 		<dict>
