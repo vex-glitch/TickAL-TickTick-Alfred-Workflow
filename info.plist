@@ -3719,6 +3719,25 @@
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>externaltriggerid</key>
+				<string>Search</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>44A7DDC3-4ADD-4E73-AE8B-9B4D314C3900</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>argumenttype</key>
 				<integer>2</integer>
 				<key>keyword</key>
@@ -3805,25 +3824,6 @@
 			<string>DAB4E5A5-2C4C-4C4E-BFB0-69F16B936F73</string>
 			<key>version</key>
 			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>Search</string>
-				<key>passinputasargument</key>
-				<false/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>44A7DDC3-4ADD-4E73-AE8B-9B4D314C3900</string>
-			<key>version</key>
-			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -4735,6 +4735,21 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>MainMenu</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>6613B30E-773B-402F-9DDA-D42D49E769E2</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>alfredfiltersresults</key>
 				<false/>
 				<key>alfredfiltersresultsmatchmode</key>
@@ -4780,21 +4795,6 @@ fi</string>
 			<string>E86FBD12-4202-4205-A6B9-E63851E8A01A</string>
 			<key>version</key>
 			<integer>3</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>MainMenu</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>6613B30E-773B-402F-9DDA-D42D49E769E2</string>
-			<key>version</key>
-			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -5024,29 +5024,6 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/ensure_task_context.py" "$1"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>4B4D2267-5F21-4655-914B-E9507F37D9F3</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>alfredfiltersresults</key>
 				<false/>
 				<key>alfredfiltersresultsmatchmode</key>
@@ -5092,6 +5069,29 @@ fi</string>
 			<string>22D8CBAE-17B1-4F54-827B-D3E7253663A7</string>
 			<key>version</key>
 			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/ensure_task_context.py" "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>4B4D2267-5F21-4655-914B-E9507F37D9F3</string>
+			<key>version</key>
+			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -5866,6 +5866,25 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>externaltriggerid</key>
+				<string>OpenDocs</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>652396DC-4052-438E-AC1F-A239A5D01DBC</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>action</key>
 				<integer>0</integer>
 				<key>argument</key>
@@ -6085,6 +6104,77 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>2D500B2B-BD2E-45E2-A4FE-5F86441EED6A</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:sync_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Sync</string>
+				<key>text</key>
+				<string>Sync · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>16D71D09-B326-4EA4-A747-EF7A89DE0694</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>sync</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>009C2119-7E63-42B3-881E-2D3A4B81780F</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -6165,6 +6255,29 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:login_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Get OAuth token</string>
+				<key>text</key>
+				<string>Log in · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>CDB65E8D-BA49-4347-8749-AF3EB48CB8D8</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>action</key>
 				<integer>0</integer>
 				<key>argument</key>
@@ -6187,38 +6300,15 @@ fi</string>
 			<key>type</key>
 			<string>alfred.workflow.trigger.hotkey</string>
 			<key>uid</key>
-			<string>2D500B2B-BD2E-45E2-A4FE-5F86441EED6A</string>
+			<string>C22397C6-9A6F-4CC7-B9AB-8081FB678E78</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:sync_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Sync</string>
-				<key>text</key>
-				<string>Sync · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>16D71D09-B326-4EA4-A747-EF7A89DE0694</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
-				<string>sync</string>
+				<string>login</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -6229,7 +6319,7 @@ fi</string>
 			<key>type</key>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
-			<string>009C2119-7E63-42B3-881E-2D3A4B81780F</string>
+			<string>E6CF857B-7087-472E-9077-56F4BA89A91C</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -6365,77 +6455,6 @@ fi</string>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
 			<string>43DB75C1-31F7-405C-B0E5-7F03661B22E1</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:login_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Get OAuth token</string>
-				<key>text</key>
-				<string>Log in · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>CDB65E8D-BA49-4347-8749-AF3EB48CB8D8</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>C22397C6-9A6F-4CC7-B9AB-8081FB678E78</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>login</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>E6CF857B-7087-472E-9077-56F4BA89A91C</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -6643,6 +6662,79 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>externaltriggerid</key>
+				<string>BrowseSmart</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>B2F3C8C1-B870-4B06-AA82-A4AFD2353BEB</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:smart_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Today, Tomorrow, Completed…</string>
+				<key>text</key>
+				<string>Smart Lists · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>D2FAD236-C478-479F-A74A-29110965FD84</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>4EFEA313-A75F-46A5-8556-67EE852AE0B5</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
@@ -6756,79 +6848,6 @@ fi</string>
 			<string>6B859668-344A-496F-839C-35C2957E6604</string>
 			<key>version</key>
 			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>BrowseSmart</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>B2F3C8C1-B870-4B06-AA82-A4AFD2353BEB</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:smart_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Today, Tomorrow, Completed…</string>
-				<key>text</key>
-				<string>Smart Lists · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>D2FAD236-C478-479F-A74A-29110965FD84</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>4EFEA313-A75F-46A5-8556-67EE852AE0B5</string>
-			<key>version</key>
-			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7241,31 +7260,14 @@ fi</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>login</string>
+				<string>OpenDocs</string>
 			</dict>
 			<key>type</key>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
-			<string>A062AB2E-3C5A-4C34-BA96-993573A7B36C</string>
+			<string>EEB3DB75-1B9F-4A23-BC5E-30AC79628FD2</string>
 			<key>version</key>
 			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>matchmode</key>
-				<integer>0</integer>
-				<key>matchstring</key>
-				<string>8-</string>
-				<key>replacestring</key>
-				<string></string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.utility.replace</string>
-			<key>uid</key>
-			<string>7F059654-32A8-42D1-A038-A7130A96FD9F</string>
-			<key>version</key>
-			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7275,20 +7277,105 @@ fi</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:cachesync"</string>
+				<string>bash "Scripts/py.sh" "src/dispatch.py" "$1"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
 				<string></string>
 				<key>type</key>
-				<integer>0</integer>
+				<integer>5</integer>
 			</dict>
 			<key>type</key>
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
-			<string>E0CBFB31-1C19-44BC-9A5B-F14764C45C56</string>
+			<string>94D0753D-215F-443B-849A-A134495FFDEA</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<true/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>keyword</key>
+				<string></string>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string>Loading docs...</string>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/docs_menu.py" "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open or search the docs</string>
+				<key>title</key>
+				<string>TickAL Docs</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>A3DBA92B-E9DA-4C95-96F4-8577D4F9E211</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>MainMenu</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>1D1B1FED-5DAF-4184-B823-B03E4729D5E5</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>login</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>A062AB2E-3C5A-4C34-BA96-993573A7B36C</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7366,12 +7453,29 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>matchmode</key>
+				<integer>0</integer>
+				<key>matchstring</key>
+				<string>8-</string>
+				<key>replacestring</key>
+				<string></string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.replace</string>
+			<key>uid</key>
+			<string>7F059654-32A8-42D1-A038-A7130A96FD9F</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:pyobjc_install"</string>
+				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:cachesync"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -7382,7 +7486,7 @@ fi</string>
 			<key>type</key>
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
-			<string>972C47F3-2998-45EB-871D-3D8B0D7CB56C</string>
+			<string>E0CBFB31-1C19-44BC-9A5B-F14764C45C56</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -7462,6 +7566,196 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:pyobjc_install"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>972C47F3-2998-45EB-871D-3D8B0D7CB56C</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:pn_agent"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>6232025D-654C-4738-949F-B65659830F68</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>BrowseInbox</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>601300C2-8778-4A94-BF17-2C3342F7719D</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>20763FC8-608A-4375-8829-AF741445D817</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:inbox_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Browse and action the Inbox</string>
+				<key>text</key>
+				<string>Inbox · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>5372EC75-136A-4E5C-A96C-E81990D1467F</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>BrowseTags</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0F8277D0-7DC9-48D9-A163-B50796393913</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>254A9AD6-9E00-47E5-9CEA-254AAABBC6FF</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:tags_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Browse your tags</string>
+				<key>text</key>
+				<string>Tags · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>AE2A8A94-30F4-41AE-B239-B6331D200B44</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
@@ -7522,21 +7816,6 @@ printf '%s' "$1"</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>OpenCalendar</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>1E2EF830-FC21-4D57-A856-8511340B35E3</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -7556,6 +7835,51 @@ printf '%s' "$1"</string>
 			<string>0FED0005-90A1-4B2C-8D3E-000000000005</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>PnDaily</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FED0004-90A1-4B2C-8D3E-000000000004</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>OpenCalendar</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>1E2EF830-FC21-4D57-A856-8511340B35E3</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>BrowseToday</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>4982DFB2-8052-4492-AA25-CCD247AFB567</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7599,36 +7923,6 @@ fi</string>
 			<string>E21B489A-27E0-4AA1-B720-876B3F1067B5</string>
 			<key>version</key>
 			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>PnDaily</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>0FED0004-90A1-4B2C-8D3E-000000000004</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>BrowseToday</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>4982DFB2-8052-4492-AA25-CCD247AFB567</string>
-			<key>version</key>
-			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -7839,7 +8133,7 @@ esac</string>
 			<key>config</key>
 			<dict>
 				<key>externaltriggerid</key>
-				<string>BrowseInbox</string>
+				<string>BrowseFilters</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -7850,7 +8144,30 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
-			<string>601300C2-8778-4A94-BF17-2C3342F7719D</string>
+			<string>2989BD0F-C858-497C-8F2D-59E3A2A0C89D</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:filters_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Your custom filters</string>
+				<key>text</key>
+				<string>Filters · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>DEAA60D1-0AA6-4B51-93A2-E98A82255D10</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -7869,8 +8186,6 @@ esac</string>
 				<integer>0</integer>
 				<key>hotmod</key>
 				<integer>0</integer>
-				<key>hotstring</key>
-				<string></string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -7881,47 +8196,9 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.trigger.hotkey</string>
 			<key>uid</key>
-			<string>20763FC8-608A-4375-8829-AF741445D817</string>
+			<string>822DEBA4-21CC-48BD-AFB0-412A88A740E0</string>
 			<key>version</key>
 			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:inbox_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Browse and action the Inbox</string>
-				<key>text</key>
-				<string>Inbox · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>5372EC75-136A-4E5C-A96C-E81990D1467F</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>OpenDocs</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>EEB3DB75-1B9F-4A23-BC5E-30AC79628FD2</string>
-			<key>version</key>
-			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -8013,6 +8290,21 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>OpenStatistics</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>DE9DF463-29C8-4048-8964-11E260A0D6FB</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -8070,6 +8362,29 @@ esac</string>
 			<string>2E8E2D6E-FF47-434B-B275-936665674633</string>
 			<key>version</key>
 			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "https://ticktick.com/webapp/#statistics/overview"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>4DD4A413-C3B7-4BA5-A679-898773EB60E9</string>
+			<key>version</key>
+			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -8145,77 +8460,6 @@ esac</string>
 			<string>alfred.workflow.utility.argument</string>
 			<key>uid</key>
 			<string>2065AAE2-336A-4D99-BACB-597BA76F69CE</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>BrowseTags</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>0F8277D0-7DC9-48D9-A163-B50796393913</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>254A9AD6-9E00-47E5-9CEA-254AAABBC6FF</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:tags_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Browse your tags</string>
-				<key>text</key>
-				<string>Tags · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>AE2A8A94-30F4-41AE-B239-B6331D200B44</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -8426,21 +8670,6 @@ esac</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>OpenStatistics</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>DE9DF463-29C8-4048-8964-11E260A0D6FB</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
 				<string>modAdd</string>
 			</dict>
 			<key>type</key>
@@ -8492,7 +8721,7 @@ esac</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>open "https://ticktick.com/webapp/#statistics/overview"</string>
+				<string>open "ticktick://habit"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -8503,7 +8732,7 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
-			<string>4DD4A413-C3B7-4BA5-A679-898773EB60E9</string>
+			<string>0FE70005-90A1-4B2C-8D3E-000000000005</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -8525,6 +8754,21 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>OpenHabits</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>0FE70004-90A1-4B2C-8D3E-000000000004</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>externaltriggerid</key>
 				<string>Browse</string>
 				<key>passinputasargument</key>
@@ -8538,6 +8782,77 @@ esac</string>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
 			<string>0CD3CE18-7E6F-4F6A-B384-29DB797F3BF0</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>3C3F5939-B5AB-4D59-ABE7-0EF107CE8938</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>OpenDocs</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>DB86E591-54E0-4F37-8249-1F8F163C7ECC</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:docs_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open TickAL docs</string>
+				<key>text</key>
+				<string>Docs · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>32E76899-5125-4F94-A359-1306EAA587F2</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -8613,77 +8928,6 @@ esac</string>
 			<string>alfred.workflow.action.script</string>
 			<key>uid</key>
 			<string>5D1A547A-19CF-4718-BC4D-88676622047E</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>BrowseFilters</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>2989BD0F-C858-497C-8F2D-59E3A2A0C89D</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:filters_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Your custom filters</string>
-				<key>text</key>
-				<string>Filters · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>DEAA60D1-0AA6-4B51-93A2-E98A82255D10</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>822DEBA4-21CC-48BD-AFB0-412A88A740E0</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
@@ -8862,29 +9106,6 @@ esac</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>open "ticktick://habit"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>0FE70005-90A1-4B2C-8D3E-000000000005</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
 				<string>osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_open:quarterly"'</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
@@ -8906,14 +9127,37 @@ esac</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>OpenHabits</string>
+				<string>PnQuarterly</string>
 			</dict>
 			<key>type</key>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
-			<string>0FE70004-90A1-4B2C-8D3E-000000000004</string>
+			<string>0FED0013-90A1-4B2C-8D3E-000000000013</string>
 			<key>version</key>
 			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "ticktick://focus"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FE7000A-90A1-4B2C-8D3E-00000000000A</string>
+			<key>version</key>
+			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -8921,12 +9165,12 @@ esac</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>PnQuarterly</string>
+				<string>OpenPomo</string>
 			</dict>
 			<key>type</key>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
-			<string>0FED0013-90A1-4B2C-8D3E-000000000013</string>
+			<string>0FE70009-90A1-4B2C-8D3E-000000000009</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -8965,20 +9209,42 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argument</key>
-				<string></string>
-				<key>passthroughargument</key>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:stats_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>TickTick stats overview (web)</string>
+				<key>text</key>
+				<string>Statistics · TickAL</string>
+				<key>withspace</key>
 				<false/>
-				<key>variables</key>
-				<dict>
-					<key>browse_ctx</key>
-					<string>ctx:inbox</string>
-				</dict>
 			</dict>
 			<key>type</key>
-			<string>alfred.workflow.utility.argument</string>
+			<string>alfred.workflow.input.keyword</string>
 			<key>uid</key>
-			<string>3C0F4E07-7120-4453-918C-D679EF4D873A</string>
+			<string>F07AE399-2723-47C5-8264-4B09ADC2F318</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>OpenStatistics</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>AF631206-0734-4F9C-9D6F-A753CDD7EEC1</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9007,9 +9273,29 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.trigger.hotkey</string>
 			<key>uid</key>
-			<string>3C3F5939-B5AB-4D59-ABE7-0EF107CE8938</string>
+			<string>D609CC89-CFB7-46D6-85E0-1A63E7FE2123</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argument</key>
+				<string></string>
+				<key>passthroughargument</key>
+				<false/>
+				<key>variables</key>
+				<dict>
+					<key>browse_ctx</key>
+					<string>ctx:inbox</string>
+				</dict>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.argument</string>
+			<key>uid</key>
+			<string>3C0F4E07-7120-4453-918C-D679EF4D873A</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -9086,25 +9372,6 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>externaltriggerid</key>
-				<string>OpenDocs</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>DB86E591-54E0-4F37-8249-1F8F163C7ECC</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -9143,52 +9410,6 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:docs_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Open TickAL docs</string>
-				<key>text</key>
-				<string>Docs · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>32E76899-5125-4F94-A359-1306EAA587F2</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>open "ticktick://focus"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>0FE7000A-90A1-4B2C-8D3E-00000000000A</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -9215,12 +9436,12 @@ esac</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>OpenPomo</string>
+				<string>PnYearly</string>
 			</dict>
 			<key>type</key>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
-			<string>0FE70009-90A1-4B2C-8D3E-000000000009</string>
+			<string>0FED0018-90A1-4B2C-8D3E-000000000018</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9230,12 +9451,12 @@ esac</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>PnYearly</string>
+				<string>OpenMatrix</string>
 			</dict>
 			<key>type</key>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
-			<string>0FED0018-90A1-4B2C-8D3E-000000000018</string>
+			<string>0FE7000E-90A1-4B2C-8D3E-00000000000E</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9280,6 +9501,29 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "ticktick://matrix"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0FE7000F-90A1-4B2C-8D3E-00000000000F</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>argument</key>
 				<string>{var:task_list_id}:{var:task_id}:{query}</string>
 				<key>passthroughargument</key>
@@ -9291,6 +9535,48 @@ esac</string>
 			<string>alfred.workflow.utility.argument</string>
 			<key>uid</key>
 			<string>273A2CD8-6DDA-4A7B-9F04-EF92D0784964</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Buffer</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>88D926D5-464E-42DF-BBC4-716B2FC75A55</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:buffer_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Open the 🅿️ buffer</string>
+				<key>text</key>
+				<string>Buffer · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>262FDF11-B59B-4BBA-9D7A-4BBD12232291</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9448,21 +9734,6 @@ esac</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>OpenMatrix</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>0FE7000E-90A1-4B2C-8D3E-00000000000E</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
 				<string>PnMorningJournal</string>
 			</dict>
 			<key>type</key>
@@ -9471,29 +9742,6 @@ esac</string>
 			<string>0FED001D-90A1-4B2C-8D3E-00000000001D</string>
 			<key>version</key>
 			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>open "ticktick://matrix"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>0FE7000F-90A1-4B2C-8D3E-00000000000F</string>
-			<key>version</key>
-			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -9536,31 +9784,8 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:stats_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>TickTick stats overview (web)</string>
-				<key>text</key>
-				<string>Statistics · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>F07AE399-2723-47C5-8264-4B09ADC2F318</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
-				<string>OpenStatistics</string>
+				<string>OpenHabits</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -9571,7 +9796,7 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
-			<string>AF631206-0734-4F9C-9D6F-A753CDD7EEC1</string>
+			<string>0FE70003-90A1-4B2C-8D3E-000000000003</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -9600,9 +9825,32 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.trigger.hotkey</string>
 			<key>uid</key>
-			<string>D609CC89-CFB7-46D6-85E0-1A63E7FE2123</string>
+			<string>0FE70002-90A1-4B2C-8D3E-000000000002</string>
 			<key>version</key>
 			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:habits_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Habits view</string>
+				<key>text</key>
+				<string>Habits · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FE70001-90A1-4B2C-8D3E-000000000001</string>
+			<key>version</key>
+			<integer>1</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -9835,48 +10083,6 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>externaltriggerid</key>
-				<string>Buffer</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>88D926D5-464E-42DF-BBC4-716B2FC75A55</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:buffer_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Open the 🅿️ buffer</string>
-				<key>text</key>
-				<string>Buffer · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>262FDF11-B59B-4BBA-9D7A-4BBD12232291</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -9957,6 +10163,77 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FE70007-90A1-4B2C-8D3E-000000000007</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:pomo_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Pomodoro / Focus view</string>
+				<key>text</key>
+				<string>Pomodoro · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FE70006-90A1-4B2C-8D3E-000000000006</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>OpenPomo</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>0FE70008-90A1-4B2C-8D3E-000000000008</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -10024,77 +10301,6 @@ esac</string>
 			<string>alfred.workflow.utility.argument</string>
 			<key>uid</key>
 			<string>D731F280-3D51-43DB-B19E-F777959B1E54</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>OpenHabits</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>0FE70003-90A1-4B2C-8D3E-000000000003</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>0FE70002-90A1-4B2C-8D3E-000000000002</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:habits_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Habits view</string>
-				<key>text</key>
-				<string>Habits · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>0FE70001-90A1-4B2C-8D3E-000000000001</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -10370,6 +10576,35 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>0FE7000C-90A1-4B2C-8D3E-00000000000C</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -10427,6 +10662,29 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:matrix_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Eisenhower matrix</string>
+				<key>text</key>
+				<string>Matrix · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>0FE7000B-90A1-4B2C-8D3E-00000000000B</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
@@ -10442,60 +10700,8 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>0FE70007-90A1-4B2C-8D3E-000000000007</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:pomo_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Pomodoro / Focus view</string>
-				<key>text</key>
-				<string>Pomodoro · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>0FE70006-90A1-4B2C-8D3E-000000000006</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
-				<string>OpenPomo</string>
+				<string>OpenMatrix</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -10506,7 +10712,7 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
-			<string>0FE70008-90A1-4B2C-8D3E-000000000008</string>
+			<string>0FE7000D-90A1-4B2C-8D3E-00000000000D</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -10845,77 +11051,6 @@ esac</string>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
 			<string>0FED0036-90A1-4B2C-8D3E-000000000036</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>0FE7000C-90A1-4B2C-8D3E-00000000000C</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:matrix_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Eisenhower matrix</string>
-				<key>text</key>
-				<string>Matrix · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>0FE7000B-90A1-4B2C-8D3E-00000000000B</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>OpenMatrix</string>
-				<key>passinputasargument</key>
-				<true/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>0FE7000D-90A1-4B2C-8D3E-00000000000D</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -11700,141 +11835,6 @@ esac</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:pn_agent"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>6232025D-654C-4738-949F-B65659830F68</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>alfredfiltersresults</key>
-				<false/>
-				<key>alfredfiltersresultsmatchmode</key>
-				<integer>0</integer>
-				<key>argumenttreatemptyqueryasnil</key>
-				<true/>
-				<key>argumenttrimmode</key>
-				<integer>0</integer>
-				<key>argumenttype</key>
-				<integer>1</integer>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>keyword</key>
-				<string></string>
-				<key>queuedelaycustom</key>
-				<integer>3</integer>
-				<key>queuedelayimmediatelyinitially</key>
-				<true/>
-				<key>queuedelaymode</key>
-				<integer>0</integer>
-				<key>queuemode</key>
-				<integer>1</integer>
-				<key>runningsubtext</key>
-				<string>Loading docs...</string>
-				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/docs_menu.py" "$1"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>Open or search the docs</string>
-				<key>title</key>
-				<string>TickAL Docs</string>
-				<key>type</key>
-				<integer>0</integer>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.scriptfilter</string>
-			<key>uid</key>
-			<string>A3DBA92B-E9DA-4C95-96F4-8577D4F9E211</string>
-			<key>version</key>
-			<integer>3</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>bash "Scripts/py.sh" "src/dispatch.py" "$1"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>5</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>94D0753D-215F-443B-849A-A134495FFDEA</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>MainMenu</string>
-				<key>passinputasargument</key>
-				<false/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>1D1B1FED-5DAF-4184-B823-B03E4729D5E5</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>OpenDocs</string>
-				<key>passinputasargument</key>
-				<false/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>652396DC-4052-438E-AC1F-A239A5D01DBC</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -11848,15 +11848,16 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 ## Dependencies
 - Alfred 5 + Powerpack · Python 3 (Homebrew or Xcode CLT - TickAL finds either)
 - A TickTick account + a free TickTick developer app (2 minutes, steps below)
-- Optional: PyObjC for the floating focus bar - Homebrew Pythons refuse plain installs, use: `/opt/homebrew/bin/pip3 install --break-system-packages pyobjc` (Intel: `/usr/local/bin/pip3`); plain `pip3 install pyobjc` without Homebrew. Focus works without it
+- Optional: PyObjC for the floating focus bar and clipboard-image attach - one Settings row installs it: `tup` → `Install PyObjC`, no terminal needed. Focus works without it
 
 ## Setup
 1. Go to [developer.ticktick.com/manage](https://developer.ticktick.com/manage) → **Create App** → set the redirect URI to `http://localhost:8080`
 2. Paste the **Client ID** + **Client Secret** into the fields above
 3. Run `tlogin` - a browser opens; log in and approve
-4. Run `tsy` to prime the cache
+4. Run `tsy` to prime the cache - wait for the "Synced …" notification (none? enable Alfred notifications in System Settings)
 5. Sign-in to unlock attachments, the Completed view, nested tags, your filters, auto-named folders and your TickTick tag order: `tup` → `Attachment Login` (masked; only a session token is stored) - or paste a token via `Attachment Token` (Sign-in-with-Apple; guide in the docs)
-6. *Optional* - CRM / CTA / Projects features: paste your list &amp; folder ids above (the docs show how to copy an id)
+6. *Optional* - CRM / CTA / Projects features: paste your list &amp; folder ids above (⌘⏎ on a list row → 🆔 Copy id · ⌥⌘⏎ on a folder row)
+7. *Optional* - hands-off extras, one dialog each: `tup` → `Hourly Sync` (hourly cache refresh) · `Periodic Agent` (04:30 note pre-mint)
 
 ## Usage
 &gt; 📌 [Cheatsheet - Every keyword, chord, add token, and search scope on one page](https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs/95-cheatsheet.md)
@@ -11899,7 +11900,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1585.0</real>
+			<real>1645.0</real>
 		</dict>
 		<key>0871794A-C9F4-4284-A7D9-11D89F55013F</key>
 		<dict>
@@ -11919,18 +11920,18 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2355.0</real>
+			<real>2555.0</real>
 		</dict>
 		<key>0CD3CE18-7E6F-4F6A-B384-29DB797F3BF0</key>
 		<dict>
 			<key>colorindex</key>
-			<integer>2</integer>
+			<integer>9</integer>
 			<key>note</key>
 			<string>loop → Browse</string>
 			<key>xpos</key>
 			<real>2675.0</real>
 			<key>ypos</key>
-			<real>2150.0</real>
+			<real>2350.0</real>
 		</dict>
 		<key>0E34EE05-DE5E-4F58-A36E-77D0D8938B4A</key>
 		<dict>
@@ -11997,7 +11998,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>2255.0</real>
+			<real>2350.0</real>
 		</dict>
 		<key>0FE70005-90A1-4B2C-8D3E-000000000005</key>
 		<dict>
@@ -12006,7 +12007,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3165.0</real>
 			<key>ypos</key>
-			<real>2255.0</real>
+			<real>2350.0</real>
 		</dict>
 		<key>0FE70006-90A1-4B2C-8D3E-000000000006</key>
 		<dict>
@@ -12046,7 +12047,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>2365.0</real>
+			<real>2460.0</real>
 		</dict>
 		<key>0FE7000A-90A1-4B2C-8D3E-00000000000A</key>
 		<dict>
@@ -12055,7 +12056,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3165.0</real>
 			<key>ypos</key>
-			<real>2365.0</real>
+			<real>2460.0</real>
 		</dict>
 		<key>0FE7000B-90A1-4B2C-8D3E-00000000000B</key>
 		<dict>
@@ -12095,7 +12096,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>2475.0</real>
+			<real>2570.0</real>
 		</dict>
 		<key>0FE7000F-90A1-4B2C-8D3E-00000000000F</key>
 		<dict>
@@ -12104,7 +12105,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3165.0</real>
 			<key>ypos</key>
-			<real>2475.0</real>
+			<real>2570.0</real>
 		</dict>
 		<key>0FED0001-90A1-4B2C-8D3E-000000000001</key>
 		<dict>
@@ -12144,7 +12145,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>1925.0</real>
+			<real>2125.0</real>
 		</dict>
 		<key>0FED0005-90A1-4B2C-8D3E-000000000005</key>
 		<dict>
@@ -12153,7 +12154,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>1925.0</real>
+			<real>2125.0</real>
 		</dict>
 		<key>0FED0006-90A1-4B2C-8D3E-000000000006</key>
 		<dict>
@@ -12193,7 +12194,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2035.0</real>
+			<real>2235.0</real>
 		</dict>
 		<key>0FED000A-90A1-4B2C-8D3E-00000000000A</key>
 		<dict>
@@ -12202,7 +12203,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2035.0</real>
+			<real>2235.0</real>
 		</dict>
 		<key>0FED000B-90A1-4B2C-8D3E-00000000000B</key>
 		<dict>
@@ -12242,7 +12243,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>0FED000F-90A1-4B2C-8D3E-00000000000F</key>
 		<dict>
@@ -12251,7 +12252,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>0FED0010-90A1-4B2C-8D3E-000000000010</key>
 		<dict>
@@ -12291,7 +12292,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2255.0</real>
+			<real>2455.0</real>
 		</dict>
 		<key>0FED0014-90A1-4B2C-8D3E-000000000014</key>
 		<dict>
@@ -12300,7 +12301,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2255.0</real>
+			<real>2455.0</real>
 		</dict>
 		<key>0FED0015-90A1-4B2C-8D3E-000000000015</key>
 		<dict>
@@ -12340,7 +12341,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2365.0</real>
+			<real>2565.0</real>
 		</dict>
 		<key>0FED0019-90A1-4B2C-8D3E-000000000019</key>
 		<dict>
@@ -12349,7 +12350,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2365.0</real>
+			<real>2565.0</real>
 		</dict>
 		<key>0FED001A-90A1-4B2C-8D3E-00000000001A</key>
 		<dict>
@@ -12389,7 +12390,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2475.0</real>
+			<real>2675.0</real>
 		</dict>
 		<key>0FED001E-90A1-4B2C-8D3E-00000000001E</key>
 		<dict>
@@ -12398,7 +12399,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2475.0</real>
+			<real>2675.0</real>
 		</dict>
 		<key>0FED001F-90A1-4B2C-8D3E-00000000001F</key>
 		<dict>
@@ -12438,7 +12439,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2585.0</real>
+			<real>2785.0</real>
 		</dict>
 		<key>0FED0023-90A1-4B2C-8D3E-000000000023</key>
 		<dict>
@@ -12447,7 +12448,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2585.0</real>
+			<real>2785.0</real>
 		</dict>
 		<key>0FED0024-90A1-4B2C-8D3E-000000000024</key>
 		<dict>
@@ -12487,7 +12488,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2695.0</real>
+			<real>2895.0</real>
 		</dict>
 		<key>0FED0028-90A1-4B2C-8D3E-000000000028</key>
 		<dict>
@@ -12496,7 +12497,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2695.0</real>
+			<real>2895.0</real>
 		</dict>
 		<key>0FED0029-90A1-4B2C-8D3E-000000000029</key>
 		<dict>
@@ -12536,7 +12537,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2805.0</real>
+			<real>3005.0</real>
 		</dict>
 		<key>0FED002D-90A1-4B2C-8D3E-00000000002D</key>
 		<dict>
@@ -12545,7 +12546,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2805.0</real>
+			<real>3005.0</real>
 		</dict>
 		<key>0FED002E-90A1-4B2C-8D3E-00000000002E</key>
 		<dict>
@@ -12585,7 +12586,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2915.0</real>
+			<real>3115.0</real>
 		</dict>
 		<key>0FED0032-90A1-4B2C-8D3E-000000000032</key>
 		<dict>
@@ -12594,7 +12595,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2915.0</real>
+			<real>3115.0</real>
 		</dict>
 		<key>0FED0033-90A1-4B2C-8D3E-000000000033</key>
 		<dict>
@@ -12634,7 +12635,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3390.0</real>
 			<key>ypos</key>
-			<real>2925.0</real>
+			<real>3125.0</real>
 		</dict>
 		<key>0FED0037-90A1-4B2C-8D3E-000000000037</key>
 		<dict>
@@ -12643,7 +12644,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3565.0</real>
 			<key>ypos</key>
-			<real>2925.0</real>
+			<real>3125.0</real>
 		</dict>
 		<key>1009D9A3-3070-4F97-AD6F-4B6D4C98FF04</key>
 		<dict>
@@ -12663,7 +12664,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1660.0</real>
 			<key>ypos</key>
-			<real>1060.0</real>
+			<real>1120.0</real>
 		</dict>
 		<key>122DC22C-099E-4070-B2F8-708ACEE899EC</key>
 		<dict>
@@ -12672,7 +12673,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2670.0</real>
+			<real>2870.0</real>
 		</dict>
 		<key>12B34F9C-A192-4408-8F26-16EE8DBBCB72</key>
 		<dict>
@@ -12690,7 +12691,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>230.0</real>
+			<real>225.0</real>
 		</dict>
 		<key>16D71D09-B326-4EA4-A747-EF7A89DE0694</key>
 		<dict>
@@ -12710,7 +12711,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>990.0</real>
 			<key>ypos</key>
-			<real>1580.0</real>
+			<real>1640.0</real>
 		</dict>
 		<key>185C30C1-5AD9-41DB-B0A7-62C248181C0F</key>
 		<dict>
@@ -12730,16 +12731,16 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1165.0</real>
 			<key>ypos</key>
-			<real>2460.0</real>
+			<real>2660.0</real>
 		</dict>
 		<key>1D1B1FED-5DAF-4184-B823-B03E4729D5E5</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>3390.0</real>
+			<real>1910.0</real>
 			<key>ypos</key>
-			<real>2035.0</real>
+			<real>1670.0</real>
 		</dict>
 		<key>1D315252-0DDD-4633-BE8C-2D4DEA1BCDEC</key>
 		<dict>
@@ -12748,7 +12749,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>4115.0</real>
 			<key>ypos</key>
-			<real>1920.0</real>
+			<real>2120.0</real>
 		</dict>
 		<key>1DC6C6B2-E967-4BF5-93C6-8D4656A49E7D</key>
 		<dict>
@@ -12757,7 +12758,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2040.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>1DE74713-9BB7-40D1-ADB0-A6CBB915C7FB</key>
 		<dict>
@@ -12768,7 +12769,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1235.0</real>
 			<key>ypos</key>
-			<real>1485.0</real>
+			<real>1545.0</real>
 		</dict>
 		<key>1E09DAC4-F274-4478-A03B-226B84508CDD</key>
 		<dict>
@@ -12777,7 +12778,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>2250.0</real>
+			<real>2450.0</real>
 		</dict>
 		<key>1E2EF830-FC21-4D57-A856-8511340B35E3</key>
 		<dict>
@@ -12786,7 +12787,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>1925.0</real>
+			<real>2130.0</real>
 		</dict>
 		<key>1E8F9211-D5F4-4E95-96A6-F7FF83BF0172</key>
 		<dict>
@@ -12795,7 +12796,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1270.0</real>
+			<real>1330.0</real>
 		</dict>
 		<key>1F345368-6001-4504-B5C4-BA6654DD2399</key>
 		<dict>
@@ -12804,14 +12805,14 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1910.0</real>
 			<key>ypos</key>
-			<real>1280.0</real>
+			<real>1340.0</real>
 		</dict>
 		<key>2065AAE2-336A-4D99-BACB-597BA76F69CE</key>
 		<dict>
 			<key>xpos</key>
 			<real>2560.0</real>
 			<key>ypos</key>
-			<real>2070.0</real>
+			<real>2270.0</real>
 		</dict>
 		<key>20763FC8-608A-4375-8829-AF741445D817</key>
 		<dict>
@@ -12831,7 +12832,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>2135.0</real>
 		</dict>
 		<key>211BDA0D-E717-49C5-98D0-CC51100BEFE3</key>
 		<dict>
@@ -12860,7 +12861,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1420.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>22D8CBAE-17B1-4F54-827B-D3E7253663A7</key>
 		<dict>
@@ -12869,7 +12870,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>505.0</real>
+			<real>500.0</real>
 		</dict>
 		<key>23E18587-492C-431F-8B71-7C3F95F9BE48</key>
 		<dict>
@@ -12878,7 +12879,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3795.0</real>
 			<key>ypos</key>
-			<real>2200.0</real>
+			<real>2400.0</real>
 		</dict>
 		<key>24B6CB64-82DD-4C0E-AD1B-8C9E8156F38B</key>
 		<dict>
@@ -12887,7 +12888,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1900.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>24F42E69-25AF-4599-B397-F66C5BC3231C</key>
 		<dict>
@@ -12896,7 +12897,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1505.0</real>
 			<key>ypos</key>
-			<real>1390.0</real>
+			<real>1450.0</real>
 		</dict>
 		<key>254A9AD6-9E00-47E5-9CEA-254AAABBC6FF</key>
 		<dict>
@@ -12927,7 +12928,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1205.0</real>
 			<key>ypos</key>
-			<real>2385.0</real>
+			<real>2585.0</real>
 		</dict>
 		<key>27B96C34-FE0C-467D-A08B-0D8097032255</key>
 		<dict>
@@ -12945,7 +12946,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1160.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>296A7346-3AF9-4B9D-8A4F-2B12D7F98EB0</key>
 		<dict>
@@ -12974,7 +12975,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1205.0</real>
 			<key>ypos</key>
-			<real>1965.0</real>
+			<real>2165.0</real>
 		</dict>
 		<key>29A4F7B6-1F33-4BE1-A0D4-557C27D80399</key>
 		<dict>
@@ -12994,7 +12995,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1785.0</real>
 			<key>ypos</key>
-			<real>1390.0</real>
+			<real>1450.0</real>
 		</dict>
 		<key>2C2FC5EE-1ABF-49D5-BD04-513703B710B5</key>
 		<dict>
@@ -13034,7 +13035,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>2590.0</real>
+			<real>2790.0</real>
 		</dict>
 		<key>2E0C573C-CDAA-42CD-9723-46812B369BEA</key>
 		<dict>
@@ -13043,7 +13044,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2035.0</real>
 			<key>ypos</key>
-			<real>1500.0</real>
+			<real>1560.0</real>
 		</dict>
 		<key>2E8E2D6E-FF47-434B-B275-936665674633</key>
 		<dict>
@@ -13052,7 +13053,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1765.0</real>
 			<key>ypos</key>
-			<real>2040.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>301711DE-458E-4900-974D-C0F5FD98073A</key>
 		<dict>
@@ -13061,7 +13062,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2355.0</real>
+			<real>2555.0</real>
 		</dict>
 		<key>30500A05-F472-4848-B535-76CA085442FD</key>
 		<dict>
@@ -13090,7 +13091,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2250.0</real>
+			<real>2450.0</real>
 		</dict>
 		<key>34985C1E-0342-4F87-929B-E3C7A2DA2302</key>
 		<dict>
@@ -13099,7 +13100,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1505.0</real>
 			<key>ypos</key>
-			<real>1060.0</real>
+			<real>1120.0</real>
 		</dict>
 		<key>35A6A310-A4FE-4853-BBFB-EE4BDFB20257</key>
 		<dict>
@@ -13121,7 +13122,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1060.0</real>
+			<real>1120.0</real>
 		</dict>
 		<key>38EECB9D-1B7A-4C1F-983F-29F514A85C88</key>
 		<dict>
@@ -13130,7 +13131,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1235.0</real>
 			<key>ypos</key>
-			<real>1380.0</real>
+			<real>1440.0</real>
 		</dict>
 		<key>3A018EA5-992F-4FC5-8133-A3844A093149</key>
 		<dict>
@@ -13141,7 +13142,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>3ABED849-0550-4774-BF06-9841567C4B01</key>
 		<dict>
@@ -13150,7 +13151,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>3B04F032-C7FD-4513-9F08-7D396DC636BF</key>
 		<dict>
@@ -13159,7 +13160,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1765.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>2135.0</real>
 		</dict>
 		<key>3B586275-5A45-4999-9905-23E9A9A2E57B</key>
 		<dict>
@@ -13168,7 +13169,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>3C0F4E07-7120-4453-918C-D679EF4D873A</key>
 		<dict>
@@ -13177,7 +13178,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2560.0</real>
 			<key>ypos</key>
-			<real>2290.0</real>
+			<real>2490.0</real>
 		</dict>
 		<key>3C3F5939-B5AB-4D59-ABE7-0EF107CE8938</key>
 		<dict>
@@ -13208,7 +13209,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>2700.0</real>
+			<real>2900.0</real>
 		</dict>
 		<key>3E85A690-3763-44A9-9883-DA10117B3259</key>
 		<dict>
@@ -13217,7 +13218,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1165.0</real>
 			<key>ypos</key>
-			<real>2565.0</real>
+			<real>2765.0</real>
 		</dict>
 		<key>3F8E1D72-6A4B-4C93-B2E5-8D1F0A2C3B4E</key>
 		<dict>
@@ -13248,7 +13249,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>1300.0</real>
+			<real>1360.0</real>
 		</dict>
 		<key>443C59EC-DC33-4036-A263-88EE1D8DD149</key>
 		<dict>
@@ -13259,7 +13260,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3960.0</real>
 			<key>ypos</key>
-			<real>2055.0</real>
+			<real>2255.0</real>
 		</dict>
 		<key>44A7DDC3-4ADD-4E73-AE8B-9B4D314C3900</key>
 		<dict>
@@ -13268,7 +13269,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>20.0</real>
+			<real>15.0</real>
 		</dict>
 		<key>460B7BA3-A702-4CC8-8287-4016E54E8175</key>
 		<dict>
@@ -13288,7 +13289,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>469188A5-BD73-4B34-9944-503AE6BF9743</key>
 		<dict>
@@ -13297,7 +13298,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>2565.0</real>
+			<real>2765.0</real>
 		</dict>
 		<key>46991866-509D-4C5F-BB88-A1ABEE37A5B8</key>
 		<dict>
@@ -13306,7 +13307,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>990.0</real>
 			<key>ypos</key>
-			<real>1370.0</real>
+			<real>1430.0</real>
 		</dict>
 		<key>4756DC4F-1B5F-4D18-AD4C-E4B34BE324CE</key>
 		<dict>
@@ -13315,7 +13316,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2250.0</real>
+			<real>2450.0</real>
 		</dict>
 		<key>47801D61-518E-4F41-B7C5-ED984DE4CF50</key>
 		<dict>
@@ -13326,7 +13327,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2035.0</real>
 			<key>ypos</key>
-			<real>1060.0</real>
+			<real>1120.0</real>
 		</dict>
 		<key>48041D49-1871-4C61-BEDD-FE47BF8E4852</key>
 		<dict>
@@ -13335,7 +13336,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1605.0</real>
 			<key>ypos</key>
-			<real>2805.0</real>
+			<real>3005.0</real>
 		</dict>
 		<key>484F263E-70C2-4EAA-9D62-29291F04E88A</key>
 		<dict>
@@ -13344,7 +13345,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1900.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>48D69398-EFE1-4108-BDA3-F443C7885EDE</key>
 		<dict>
@@ -13371,7 +13372,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1480.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>4982DFB2-8052-4492-AA25-CCD247AFB567</key>
 		<dict>
@@ -13380,7 +13381,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>1930.0</real>
+			<real>2130.0</real>
 		</dict>
 		<key>498DF111-7830-4660-B1D2-2C4FB6AFF9BC</key>
 		<dict>
@@ -13389,7 +13390,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1505.0</real>
 			<key>ypos</key>
-			<real>1500.0</real>
+			<real>1560.0</real>
 		</dict>
 		<key>49BFE032-4FC3-4D7A-ADCE-20958B1E2B20</key>
 		<dict>
@@ -13398,7 +13399,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1930.0</real>
 			<key>ypos</key>
-			<real>2040.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>4B4D2267-5F21-4655-914B-E9507F37D9F3</key>
 		<dict>
@@ -13418,7 +13419,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>4BC81709-6EC7-4A74-92B4-1A78BD23CEE0</key>
 		<dict>
@@ -13436,7 +13437,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3165.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>4EC0A0B7-5095-4A0C-862B-F6D21D79F902</key>
 		<dict>
@@ -13445,7 +13446,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1785.0</real>
 			<key>ypos</key>
-			<real>1060.0</real>
+			<real>1120.0</real>
 		</dict>
 		<key>4EFEA313-A75F-46A5-8556-67EE852AE0B5</key>
 		<dict>
@@ -13465,7 +13466,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>895.0</real>
 			<key>ypos</key>
-			<real>355.0</real>
+			<real>350.0</real>
 		</dict>
 		<key>51B8E7A2-78CF-41E3-81B0-7821A94A9DEC</key>
 		<dict>
@@ -13494,7 +13495,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1165.0</real>
+			<real>1225.0</real>
 		</dict>
 		<key>5343DA08-CC8E-4614-94BB-84FAE124B09F</key>
 		<dict>
@@ -13525,7 +13526,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>2135.0</real>
 		</dict>
 		<key>544B3103-7B99-441A-A4E5-17411215D6B9</key>
 		<dict>
@@ -13543,7 +13544,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1375.0</real>
+			<real>1435.0</real>
 		</dict>
 		<key>55BB7660-02DC-481A-A662-7B1CE72E8207</key>
 		<dict>
@@ -13572,7 +13573,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>990.0</real>
 			<key>ypos</key>
-			<real>1475.0</real>
+			<real>1535.0</real>
 		</dict>
 		<key>581BB8A1-AF10-4100-B559-67B9EF71C7F4</key>
 		<dict>
@@ -13603,7 +13604,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2565.0</real>
+			<real>2765.0</real>
 		</dict>
 		<key>5B2DC84C-B972-4BC4-875D-9FC678DBEDD3</key>
 		<dict>
@@ -13623,7 +13624,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3960.0</real>
 			<key>ypos</key>
-			<real>2200.0</real>
+			<real>2400.0</real>
 		</dict>
 		<key>5DA59B9D-3C8A-4BD9-B406-88B48F23D5E7</key>
 		<dict>
@@ -13645,7 +13646,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>755.0</real>
+			<real>750.0</real>
 		</dict>
 		<key>5F30E4DF-AE1E-4F75-8972-03FE2237DF60</key>
 		<dict>
@@ -13661,7 +13662,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3090.0</real>
 			<key>ypos</key>
-			<real>1955.0</real>
+			<real>2160.0</real>
 		</dict>
 		<key>601300C2-8778-4A94-BF17-2C3342F7719D</key>
 		<dict>
@@ -13692,7 +13693,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1660.0</real>
 			<key>ypos</key>
-			<real>1500.0</real>
+			<real>1560.0</real>
 		</dict>
 		<key>6232025D-654C-4738-949F-B65659830F68</key>
 		<dict>
@@ -13701,7 +13702,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1885.0</real>
+			<real>1945.0</real>
 		</dict>
 		<key>62419CFA-AA88-4A3E-9650-8EAA09792659</key>
 		<dict>
@@ -13721,7 +13722,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>4115.0</real>
 			<key>ypos</key>
-			<real>2055.0</real>
+			<real>2255.0</real>
 		</dict>
 		<key>6405F860-1CE7-4630-8E05-176576F92949</key>
 		<dict>
@@ -13741,16 +13742,16 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1245.0</real>
 			<key>ypos</key>
-			<real>2805.0</real>
+			<real>3005.0</real>
 		</dict>
 		<key>652396DC-4052-438E-AC1F-A239A5D01DBC</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1120.0</real>
+			<real>1050.0</real>
 			<key>ypos</key>
-			<real>700.0</real>
+			<real>960.0</real>
 		</dict>
 		<key>6613B30E-773B-402F-9DDA-D42D49E769E2</key>
 		<dict>
@@ -13759,7 +13760,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>395.0</real>
+			<real>390.0</real>
 		</dict>
 		<key>67F8F58D-C8AB-41F0-A12E-D8E9EA1A537F</key>
 		<dict>
@@ -13768,7 +13769,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1205.0</real>
 			<key>ypos</key>
-			<real>2280.0</real>
+			<real>2480.0</real>
 		</dict>
 		<key>68878D5E-EF46-4FEA-B80A-64C79D3A0931</key>
 		<dict>
@@ -13777,7 +13778,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>68E8E269-32C0-40D2-B0A0-514BB81F9D57</key>
 		<dict>
@@ -13786,7 +13787,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2460.0</real>
+			<real>2660.0</real>
 		</dict>
 		<key>69F60F74-22C0-4DA3-8C83-4A29BF362B02</key>
 		<dict>
@@ -13817,7 +13818,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2670.0</real>
+			<real>2870.0</real>
 		</dict>
 		<key>6B859668-344A-496F-839C-35C2957E6604</key>
 		<dict>
@@ -13826,7 +13827,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>1405.0</real>
+			<real>1465.0</real>
 		</dict>
 		<key>6F562108-2122-497B-84ED-8B6399D1D8BE</key>
 		<dict>
@@ -13835,7 +13836,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1660.0</real>
 			<key>ypos</key>
-			<real>1280.0</real>
+			<real>1340.0</real>
 		</dict>
 		<key>703CE41C-9C9A-4CE9-A860-647876F25CE2</key>
 		<dict>
@@ -13893,7 +13894,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2460.0</real>
+			<real>2660.0</real>
 		</dict>
 		<key>72CC3D8E-BDE8-4014-BA6F-97235C8ABE3B</key>
 		<dict>
@@ -13902,7 +13903,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1765.0</real>
 			<key>ypos</key>
-			<real>2250.0</real>
+			<real>2450.0</real>
 		</dict>
 		<key>73254623-88C8-40AD-A328-B14C8266609E</key>
 		<dict>
@@ -13911,7 +13912,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1660.0</real>
 			<key>ypos</key>
-			<real>1170.0</real>
+			<real>1230.0</real>
 		</dict>
 		<key>746B1DD7-A465-487C-866F-910F2B75D64D</key>
 		<dict>
@@ -13920,7 +13921,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>2135.0</real>
 		</dict>
 		<key>755818E2-1D84-4546-818A-3DA3E93D6C31</key>
 		<dict>
@@ -13929,7 +13930,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2040.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>755D7A2D-D3FB-4665-A213-3703EAA23312</key>
 		<dict>
@@ -13938,7 +13939,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1505.0</real>
 			<key>ypos</key>
-			<real>1170.0</real>
+			<real>1230.0</real>
 		</dict>
 		<key>75CD7665-F41F-432F-9C5C-424567EFE5F1</key>
 		<dict>
@@ -13947,7 +13948,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>77461EBD-0E2E-497C-8B91-A3A939DBD075</key>
 		<dict>
@@ -13956,7 +13957,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>125.0</real>
+			<real>120.0</real>
 		</dict>
 		<key>7B9A2C41-5E3D-4F82-A1B6-9C0D3E4F5A6B</key>
 		<dict>
@@ -13976,7 +13977,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1475.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>7F059654-32A8-42D1-A038-A7130A96FD9F</key>
 		<dict>
@@ -13985,7 +13986,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>990.0</real>
 			<key>ypos</key>
-			<real>1685.0</real>
+			<real>1745.0</real>
 		</dict>
 		<key>7F679FCE-659F-45BD-A6E0-6A029BBBCA5B</key>
 		<dict>
@@ -14005,7 +14006,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>545.0</real>
+			<real>540.0</real>
 		</dict>
 		<key>82076720-C27C-4E9C-94E8-B4B69F578EBF</key>
 		<dict>
@@ -14014,7 +14015,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1480.0</real>
+			<real>1540.0</real>
 		</dict>
 		<key>822DEBA4-21CC-48BD-AFB0-412A88A740E0</key>
 		<dict>
@@ -14054,7 +14055,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>335.0</real>
+			<real>330.0</real>
 		</dict>
 		<key>88B993CA-2CFB-494D-B7E6-00243003CB94</key>
 		<dict>
@@ -14063,7 +14064,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1165.0</real>
 			<key>ypos</key>
-			<real>2670.0</real>
+			<real>2870.0</real>
 		</dict>
 		<key>88D926D5-464E-42DF-BBC4-716B2FC75A55</key>
 		<dict>
@@ -14103,7 +14104,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2250.0</real>
+			<real>2450.0</real>
 		</dict>
 		<key>8C64FDCF-5C97-4E2F-8167-B23C177E41F1</key>
 		<dict>
@@ -14112,7 +14113,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>8DA855CD-D97F-4EBC-A335-9EF685747D48</key>
 		<dict>
@@ -14132,7 +14133,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>2135.0</real>
 		</dict>
 		<key>8E7DA6CB-0474-4300-9986-F455631BC3A8</key>
 		<dict>
@@ -14143,7 +14144,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1780.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>8F737DE6-F891-41A5-AD0A-CFFAFBDA836A</key>
 		<dict>
@@ -14152,7 +14153,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1785.0</real>
 			<key>ypos</key>
-			<real>1170.0</real>
+			<real>1230.0</real>
 		</dict>
 		<key>92EF7CBA-D74D-4975-B995-D96E7DB05239</key>
 		<dict>
@@ -14163,7 +14164,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1480.0</real>
 			<key>ypos</key>
-			<real>2250.0</real>
+			<real>2450.0</real>
 		</dict>
 		<key>94227A21-5200-4698-8433-1522BD44D267</key>
 		<dict>
@@ -14172,16 +14173,16 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2020.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>94D0753D-215F-443B-849A-A134495FFDEA</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>3390.0</real>
+			<real>1785.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>1670.0</real>
 		</dict>
 		<key>95B04880-2BA8-4612-AB80-655F867E0F9C</key>
 		<dict>
@@ -14190,7 +14191,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1780.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>96DEE019-3296-434C-8F69-344D78F15D28</key>
 		<dict>
@@ -14210,7 +14211,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1785.0</real>
+			<real>1845.0</real>
 		</dict>
 		<key>9818E252-053D-4564-BDD5-4781F30247FC</key>
 		<dict>
@@ -14221,7 +14222,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2160.0</real>
 			<key>ypos</key>
-			<real>1500.0</real>
+			<real>1560.0</real>
 		</dict>
 		<key>98578A19-1E4B-4A8A-82D7-3BC5EBC6173F</key>
 		<dict>
@@ -14230,7 +14231,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>2355.0</real>
+			<real>2555.0</real>
 		</dict>
 		<key>9AE72B5A-4E5E-46A3-9313-A55D2EC5F195</key>
 		<dict>
@@ -14259,7 +14260,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>2040.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>9D52BFF6-3868-4579-92F3-C73AD43D71EA</key>
 		<dict>
@@ -14290,7 +14291,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>865.0</real>
+			<real>855.0</real>
 		</dict>
 		<key>9EE68F98-2ED7-484F-A0FD-FCC6DD212147</key>
 		<dict>
@@ -14299,7 +14300,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1205.0</real>
 			<key>ypos</key>
-			<real>2175.0</real>
+			<real>2375.0</real>
 		</dict>
 		<key>9F7C564A-41AB-4B75-8913-6E7721E0A2F2</key>
 		<dict>
@@ -14308,7 +14309,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1540.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>A062AB2E-3C5A-4C34-BA96-993573A7B36C</key>
 		<dict>
@@ -14317,7 +14318,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>1615.0</real>
+			<real>1675.0</real>
 		</dict>
 		<key>A1B32A75-1B8A-4A3E-AE2A-D978D84F2C76</key>
 		<dict>
@@ -14342,9 +14343,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>3165.0</real>
+			<real>1660.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>1670.0</real>
 		</dict>
 		<key>A65445A5-5D56-4DAC-9050-215EBBEDD1EE</key>
 		<dict>
@@ -14355,7 +14356,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2105.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>AA5348C1-43C9-4710-9B2C-3302B70361E5</key>
 		<dict>
@@ -14364,7 +14365,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2675.0</real>
 			<key>ypos</key>
-			<real>2480.0</real>
+			<real>2680.0</real>
 		</dict>
 		<key>AA713892-6071-4507-9FAB-CA187E163EF0</key>
 		<dict>
@@ -14382,7 +14383,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1660.0</real>
 			<key>ypos</key>
-			<real>1390.0</real>
+			<real>1450.0</real>
 		</dict>
 		<key>ABD31D58-6B8E-4842-81A8-9AB98221285D</key>
 		<dict>
@@ -14391,7 +14392,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1805.0</real>
 			<key>ypos</key>
-			<real>1505.0</real>
+			<real>1565.0</real>
 		</dict>
 		<key>AE2A8A94-30F4-41AE-B239-B6331D200B44</key>
 		<dict>
@@ -14411,7 +14412,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>1510.0</real>
+			<real>1570.0</real>
 		</dict>
 		<key>AF631206-0734-4F9C-9D6F-A753CDD7EEC1</key>
 		<dict>
@@ -14429,7 +14430,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>2480.0</real>
+			<real>2680.0</real>
 		</dict>
 		<key>B2F3C842-CD1B-4BEC-A84B-AAC83E9C2D42</key>
 		<dict>
@@ -14456,7 +14457,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>990.0</real>
 			<key>ypos</key>
-			<real>1265.0</real>
+			<real>1325.0</real>
 		</dict>
 		<key>B68EE3B3-9727-4507-89C9-8102727E9893</key>
 		<dict>
@@ -14465,7 +14466,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3795.0</real>
 			<key>ypos</key>
-			<real>1920.0</real>
+			<real>2120.0</real>
 		</dict>
 		<key>B6AEFD9D-ECCC-4685-8B91-B6C8FAB79992</key>
 		<dict>
@@ -14483,7 +14484,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1660.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>B7C69A9C-CC9F-4D69-85E1-FB6C8174DBF6</key>
 		<dict>
@@ -14492,7 +14493,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2565.0</real>
+			<real>2765.0</real>
 		</dict>
 		<key>B853011E-B74C-4F8F-ACA2-8FFF22A7102D</key>
 		<dict>
@@ -14530,7 +14531,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1910.0</real>
 			<key>ypos</key>
-			<real>1060.0</real>
+			<real>1120.0</real>
 		</dict>
 		<key>BD6C7FB3-2EA4-495D-A7A9-6C397D5D544C</key>
 		<dict>
@@ -14539,7 +14540,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2560.0</real>
 			<key>ypos</key>
-			<real>1960.0</real>
+			<real>2160.0</real>
 		</dict>
 		<key>BDF4A7B4-3413-41D5-AE7C-6BD077B51242</key>
 		<dict>
@@ -14548,7 +14549,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1430.0</real>
 			<key>ypos</key>
-			<real>2805.0</real>
+			<real>3005.0</real>
 		</dict>
 		<key>BDFC3AF2-4472-4DAF-93FB-B738697F6A3F</key>
 		<dict>
@@ -14566,7 +14567,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>2260.0</real>
+			<real>2460.0</real>
 		</dict>
 		<key>C22397C6-9A6F-4CC7-B9AB-8081FB678E78</key>
 		<dict>
@@ -14586,7 +14587,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1930.0</real>
 			<key>ypos</key>
-			<real>1935.0</real>
+			<real>2135.0</real>
 		</dict>
 		<key>C6195991-054E-4C72-AD55-B8DE20876B92</key>
 		<dict>
@@ -14604,7 +14605,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1930.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>C67163F0-1C1B-430A-B5AF-20E1479942D6</key>
 		<dict>
@@ -14613,7 +14614,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>C6BA86CF-C897-4A52-890B-3A3F0F3DDCF0</key>
 		<dict>
@@ -14622,7 +14623,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1785.0</real>
 			<key>ypos</key>
-			<real>1280.0</real>
+			<real>1340.0</real>
 		</dict>
 		<key>C75F058A-228F-46A2-AF0B-53B72FA04924</key>
 		<dict>
@@ -14640,7 +14641,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2140.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>C930C3E2-6F10-4317-B1C0-5F2746626D55</key>
 		<dict>
@@ -14649,7 +14650,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2675.0</real>
 			<key>ypos</key>
-			<real>2590.0</real>
+			<real>2790.0</real>
 		</dict>
 		<key>CB5F6864-C4F4-4FA8-8EF0-F80837CA8EDC</key>
 		<dict>
@@ -14658,7 +14659,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>870.0</real>
 			<key>ypos</key>
-			<real>1360.0</real>
+			<real>1420.0</real>
 		</dict>
 		<key>CC04E2DF-C2D4-4899-AB46-C9C391CB6A60</key>
 		<dict>
@@ -14667,7 +14668,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>440.0</real>
+			<real>435.0</real>
 		</dict>
 		<key>CD050B59-74DF-4DA4-B12B-8421590F3BCA</key>
 		<dict>
@@ -14676,7 +14677,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1170.0</real>
 			<key>ypos</key>
-			<real>2795.0</real>
+			<real>2995.0</real>
 		</dict>
 		<key>CD0C4152-B888-4009-B830-F6DDE4B46BC4</key>
 		<dict>
@@ -14687,7 +14688,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>650.0</real>
+			<real>645.0</real>
 		</dict>
 		<key>CD8FFEC9-E671-46EC-8B1E-EFE70EB99C89</key>
 		<dict>
@@ -14696,7 +14697,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>2150.0</real>
+			<real>2350.0</real>
 		</dict>
 		<key>CDB65E8D-BA49-4347-8749-AF3EB48CB8D8</key>
 		<dict>
@@ -14725,7 +14726,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1910.0</real>
 			<key>ypos</key>
-			<real>1500.0</real>
+			<real>1560.0</real>
 		</dict>
 		<key>D07180DE-EC6F-46FE-AFD9-F0AE32DE67E6</key>
 		<dict>
@@ -14734,7 +14735,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2105.0</real>
 			<key>ypos</key>
-			<real>2040.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>D17D4DC1-5A17-4AB9-867F-ECEA13D14FC5</key>
 		<dict>
@@ -14745,7 +14746,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1930.0</real>
 			<key>ypos</key>
-			<real>2250.0</real>
+			<real>2450.0</real>
 		</dict>
 		<key>D2FAD236-C478-479F-A74A-29110965FD84</key>
 		<dict>
@@ -14785,14 +14786,14 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1765.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>D731F280-3D51-43DB-B19E-F777959B1E54</key>
 		<dict>
 			<key>xpos</key>
 			<real>2560.0</real>
 			<key>ypos</key>
-			<real>2730.0</real>
+			<real>2930.0</real>
 		</dict>
 		<key>D8E536D6-F702-4DD2-9CBF-053E5A92822D</key>
 		<dict>
@@ -14803,7 +14804,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2675.0</real>
 			<key>ypos</key>
-			<real>2370.0</real>
+			<real>2570.0</real>
 		</dict>
 		<key>DA03CCC1-579C-40F6-849D-6DA5262E0FB1</key>
 		<dict>
@@ -14812,7 +14813,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1505.0</real>
 			<key>ypos</key>
-			<real>1280.0</real>
+			<real>1340.0</real>
 		</dict>
 		<key>DAB4E5A5-2C4C-4C4E-BFB0-69F16B936F73</key>
 		<dict>
@@ -14832,7 +14833,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1435.0</real>
 			<key>ypos</key>
-			<real>2565.0</real>
+			<real>2765.0</real>
 		</dict>
 		<key>DB86E591-54E0-4F37-8249-1F8F163C7ECC</key>
 		<dict>
@@ -14852,7 +14853,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1910.0</real>
 			<key>ypos</key>
-			<real>1390.0</real>
+			<real>1450.0</real>
 		</dict>
 		<key>DE9DF463-29C8-4048-8964-11E260A0D6FB</key>
 		<dict>
@@ -14861,7 +14862,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2240.0</real>
 		</dict>
 		<key>DEAA60D1-0AA6-4B51-93A2-E98A82255D10</key>
 		<dict>
@@ -14881,7 +14882,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>E0941691-035E-457B-9181-1C45BE6DA88A</key>
 		<dict>
@@ -14890,7 +14891,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2670.0</real>
+			<real>2870.0</real>
 		</dict>
 		<key>E0CBFB31-1C19-44BC-9A5B-F14764C45C56</key>
 		<dict>
@@ -14899,7 +14900,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1050.0</real>
 			<key>ypos</key>
-			<real>1685.0</real>
+			<real>1745.0</real>
 		</dict>
 		<key>E124F0E6-914A-41E3-9BBF-B14D6F724AD3</key>
 		<dict>
@@ -14910,7 +14911,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3795.0</real>
 			<key>ypos</key>
-			<real>2055.0</real>
+			<real>2255.0</real>
 		</dict>
 		<key>E21B489A-27E0-4AA1-B720-876B3F1067B5</key>
 		<dict>
@@ -14919,7 +14920,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3165.0</real>
 			<key>ypos</key>
-			<real>1925.0</real>
+			<real>2130.0</real>
 		</dict>
 		<key>E48E5384-D8CD-47FA-9ED0-4E1B41C0AD09</key>
 		<dict>
@@ -14928,7 +14929,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1655.0</real>
 			<key>ypos</key>
-			<real>2775.0</real>
+			<real>2975.0</real>
 		</dict>
 		<key>E4A4F37D-41A8-45BD-B0CD-D6879646E7C8</key>
 		<dict>
@@ -14937,7 +14938,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2355.0</real>
+			<real>2555.0</real>
 		</dict>
 		<key>E6CF857B-7087-472E-9077-56F4BA89A91C</key>
 		<dict>
@@ -14964,7 +14965,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>715.0</real>
 			<key>ypos</key>
-			<real>2565.0</real>
+			<real>2765.0</real>
 		</dict>
 		<key>EB20AFED-ED23-42E8-9D8F-AB800F3BD677</key>
 		<dict>
@@ -14973,7 +14974,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2880.0</real>
+			<real>3080.0</real>
 		</dict>
 		<key>EDE420E3-AFCE-4509-B279-8333920CA098</key>
 		<dict>
@@ -15002,16 +15003,16 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1300.0</real>
 			<key>ypos</key>
-			<real>2460.0</real>
+			<real>2660.0</real>
 		</dict>
 		<key>EEB3DB75-1B9F-4A23-BC5E-30AC79628FD2</key>
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>2940.0</real>
+			<real>1505.0</real>
 			<key>ypos</key>
-			<real>2035.0</real>
+			<real>1670.0</real>
 		</dict>
 		<key>EF2C8B49-9B42-472C-95D6-7251657A98C4</key>
 		<dict>
@@ -15020,7 +15021,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>1030.0</real>
 			<key>ypos</key>
-			<real>2460.0</real>
+			<real>2660.0</real>
 		</dict>
 		<key>EF59C8E9-12BF-4F7F-9069-1C1E2957CAA8</key>
 		<dict>
@@ -15051,7 +15052,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>3960.0</real>
 			<key>ypos</key>
-			<real>1920.0</real>
+			<real>2120.0</real>
 		</dict>
 		<key>F10CD239-7729-4B93-8699-4B7A1BE774C4</key>
 		<dict>
@@ -15060,7 +15061,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2400.0</real>
 			<key>ypos</key>
-			<real>2370.0</real>
+			<real>2570.0</real>
 		</dict>
 		<key>F140642C-C4F7-46FB-933A-AE1D228CB3B7</key>
 		<dict>
@@ -15089,7 +15090,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2560.0</real>
 			<key>ypos</key>
-			<real>2180.0</real>
+			<real>2380.0</real>
 		</dict>
 		<key>F74F7EDC-BD25-4434-951F-470A21901B93</key>
 		<dict>
@@ -15109,7 +15110,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>885.0</real>
 			<key>ypos</key>
-			<real>2145.0</real>
+			<real>2345.0</real>
 		</dict>
 		<key>F855BE76-FE26-4D93-90E9-87F79B129658</key>
 		<dict>
@@ -15158,7 +15159,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>xpos</key>
 			<real>2285.0</real>
 			<key>ypos</key>
-			<real>1500.0</real>
+			<real>1560.0</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
