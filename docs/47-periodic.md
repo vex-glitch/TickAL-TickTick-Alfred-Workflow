@@ -6,11 +6,17 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 **Keyword:** `tpn` · **Hotkey:** (set in canvas) - or the `pn` scope inside search (`tse pn …`, or `/pn` anywhere in the bar), or the **💫 Periodic Notes** row in the main menu (`tal`). Typing `daily note`, `weekly note` (or just `weekly`, `monthly`…) anywhere in search also surfaces the matching note. Or jump straight in with a direct keyword - see [Direct keywords](#direct-keywords).
 
+If you keep periodic notes in Obsidian, you know the concept. Now put them where the tasks already live: everything time-bound in one place, one keyword away - fully automated daily, weekly, monthly, quarterly and yearly notes inside TickTick. The notes feed each other: yearly goals surface in the quarterly, quarterly in the monthly and weekly, weekly in the daily - a pyramid that keeps the big picture in view while you pick the daily work that actually moves the needle. Journals log moods and day ratings. Every note lists the period's scheduled tasks, a recap of the period before, and what is coming. The weekly compares itself to the last one, number by number, so you can watch yourself get 1% better. A daily income log rolls up week → month → quarter → year. Thoughts, wins, nags - logged in seconds, each action one keyword away.
+
+Try it tomorrow: `tmj` fills the morning journal, `tdn` opens the daily note. Set the week's goal in the weekly note, pick the day's one thing in the daily - and today's work visibly pushes the week.
+
+Periodic notes are a workflow with many moving parts - minting, refresh, roll-ups, journals, reviews - so give this page a full read before diving in.
+
 Each periodic note is a normal TickTick note in one list of your choosing, tagged 💫Daily / 💫Weekly / 💫Monthly / 💫Quarterly / 💫Yearly (nested under 💫Periodic - the tags are created for you). Group that list by **Tag** in TickTick and the kanban columns build themselves.
 
 ## Setup
 
-1. In TickTick, create (or pick) a list to hold the notes and copy its 24-character id from the web app URL.
+1. In TickTick, create (or pick) a list to hold the notes; copy its id without leaving Alfred - ⌘⏎ on the list row → **🆔 Copy id**.
 2. Paste it into **Configure Workflow → Periodic notes list id**. Empty = the feature stays off; every `pn` surface shows a setup pointer instead.
 3. Optional: paste a second id into **Weekly review list id** - a list (or a task with subtasks) the weekly note mirrors in its ♻️ Weekly Review section.
 4. Optional: install the 04:30 auto-mint agent (below). Without it, notes are still created the moment you open them.

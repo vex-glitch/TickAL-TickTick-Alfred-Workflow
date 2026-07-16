@@ -6,7 +6,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 **Keyword:** `tse` (`tse [scope] query`) · **Hotkey:** (set in canvas)
 
-Type to search everything at once. Prefix the query with a scope letter to narrow the type, or drop a `/token` anywhere in the bar (`tse monday /t` ≡ `tse t monday`). Typing `/` alone opens the [scope menu](#scope-menu). Re-map the keyword in Configure Workflow.
+Type to search everything at once. Prefix the query with a scope letter to narrow the type, or drop a `/token` anywhere in the bar (`tse monday /t` ≡ `tse t monday`). Typing `/` alone opens the [scope menu](#scope-menu). The `tse` keyword itself is re-mappable in Configure Workflow.
 
 <details><summary>Screenshot</summary>
 

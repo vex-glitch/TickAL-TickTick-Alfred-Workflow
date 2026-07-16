@@ -79,7 +79,7 @@ Add `^` (or pick 🖼️ Add image from the `/` menu) to upload the clipboard im
 Hold a chord on the **Create** row itself - the preview subtitle advertises them as `⌘🎯 ⇧⌘📍`:
 
 - **⌘⏎** - create, then 🎯: while a task-bound session runs, the new task lands straight in its checkbox block ("Add to the running focus"); otherwise the ⏱/🍅 start flow opens on it ("Start Focus").
-- **⇧⌘⏎** - create, then 📍 stage it: the stage screen opens on the new task (checkbox-link it into another task/note).
+- **⇧⌘⏎** - create, then 📍 stage it: the stage screen opens on the new task (checkbox-link it into another task/note - staging mechanics on [Focus](44-focus.md#staging)).
 
 The same chains exist as typed markers via two `/` menu rows, like `^`:
 

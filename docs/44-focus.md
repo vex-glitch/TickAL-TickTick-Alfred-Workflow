@@ -6,6 +6,10 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 **Keyword:** `tfo` (`tfo [timer|pomo] [link <task>]` - every row advances the query bar itself; ⌃⏎ backs out to the main menu) · **Hotkey:** (set in canvas)
 
+The thought "I should work on this NOW" has a shelf life of about a minute. A task manager spends that minute making you open the app, find the task, click around to pin it somewhere visible, start a timer somewhere else, and remember to log the time afterwards. Focus is that whole ritual in one keyword: pick the task, the timer starts, a sticky note lands on the desktop if you asked for one, and the floating bar keeps what's-on-deck and time-spent at the corner of your eye. List not ready? [Staging](#staging) preps a day's worklist in under a minute. Focus now - not half an hour later, if you even still remember.
+
+Focus is a workflow with several moving parts that click together - sessions, staging blocks, sweep, the bar - so give this page a full read before the first session.
+
 ## Start
 
 The idle screen offers two modes plus the stage flow:

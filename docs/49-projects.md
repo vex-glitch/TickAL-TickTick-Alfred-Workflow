@@ -6,7 +6,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 **Entry points:** `P ` prefix in the `tad` Add window · **📌 Create CTA** on the ⌘⏎ Actions menu. No keyword of its own.
 
-Like the [CRM](45-crm.md), this is an opinionated convention: 💼 project lists, keycap area tags, and one rule - **a project is only alive if exactly one scheduled task points at it**. If that shape fits how you work, TickAL automates all of its bookkeeping. If not, skip this page; nothing else depends on it.
+Like the [CRM](45-crm.md), Projects is a workflow, not a single action: 💼 project lists, keycap area tags, and one rule - **a project is only alive if exactly one scheduled task points at it** - moving parts that click together, so give this page a full read before first use. If that shape fits how you work, TickAL automates all of its bookkeeping. If not, skip this page; nothing else depends on it.
 
 ## The shape
 
