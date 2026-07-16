@@ -183,7 +183,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > **One line bootstraps a whole project: a 💼 list, filed and area-tagged, with its call-to-action task scheduled before the list even has content. No project without a next step.**
 
 > [!IMPORTANT]
-> A workflow with many moving parts - read [Docs • Projects](docs/49-projects.md) before using. The automation kicks in once its two ids are set ([setup](docs/49-projects.md#setup)).
+> A workflow with many moving parts - read [Docs • Projects](docs/49-projects.md) before using. The automation kicks in once its two ids are set ([setup](docs/49-projects.md#set-it-up-once)).
 
 > `P name` in the Add window OR ⌘⏎ > 📌 Create CTA on any task or list row
 
