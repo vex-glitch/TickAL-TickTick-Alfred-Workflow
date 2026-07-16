@@ -34,7 +34,7 @@ Type to filter.
 > **One search engine for lists, sections, tasks, subtasks, tags, folders, smart lists, filters, notes and note bodies, periodic notes, and last added.**
 
 ![Search scopes](docs/assets/shots/06-search-scopes.png)
-> Keyword `tse` OR Main hotkey > search OR hotkey `⌥⌘S`
+> Keyword `tse` OR hotkey `⌥⌘S` OR `⌥⌘T` > Search
 
 <details>
 <summary>Thirteen prefixes narrow the scope (e.g. <code>t</code> searches tasks only), while <code>/</code> lists all the scopes 🖼️</summary>
@@ -81,7 +81,7 @@ Task rows show:
 > Description field shows assigned attributes live
 
 ![Add tokens](docs/assets/shots/08-add-tokens.png)
-> Keyword `tad` OR Main hotkey > Add OR hotkey `⌥⌘A` OR `⌘⇧⏎` on any row
+> Keyword `tad` OR hotkey `⌥⌘A` OR `⌥⌘T` > Add OR `⌘⇧⏎` on any row
 
 Tokens cover the basics you'd expect - date, time, priority, tag, list, repeat, reminder.
 
@@ -121,7 +121,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > **Start a [timer](docs/44-focus.md#start) ⏱️ or [pomodoro](docs/44-focus.md#start) 🍅 on any task. Open a [Focus bar](docs/44-focus.md#the-bar) and a sticky note. One keystroke leads to focus. No clicking around.**
 
 ![Floating focus bar](docs/assets/shots/12-focus-bar.png)
-> Keyword `tfo` OR Main hotkey > Focus OR *Focus hotkey* (set in canvas) OR `⌃⇧` on a task
+> Keyword `tfo` OR hotkey (set in canvas) OR `⌥⌘T` > Focus OR `⌃⇧` on a task
 
 - *Open the focused task as a [sticky note](docs/46-notes-links-images.md#sticky-notes) - from Alfred, no right mouse clicks.*
 - Stage [checkbox blocks](docs/44-focus.md#checkbox-blocks) in the focus task (one at a time, a whole tag or section, today's list, or act on multiple tasks at once via 🅿️ [buffer](docs/41-browse-drill.md#buffer-))
@@ -140,7 +140,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > Requires setup - periodic notes stay dormant until you set the list id; read the [setup](docs/47-periodic.md#setup) before you rely on them
 
 ![Daily note](docs/assets/shots/19-periodic-note.png)
-> Keyword `tpn` OR Main hotkey > Periodic OR Periodic hotkey (set in canvas) OR a direct keyword (`tdn`, `tmj`, ...) OR open periodic notes straight from search
+> Keyword `tpn` OR direct keywords (`tdn`, `tmj`, ...) OR hotkey (set in canvas) OR `⌥⌘T` > Periodic OR straight from search
 
 - Auto-mints on open, or every morning at 04:30 via an optional [agent](docs/47-periodic.md#the-0430-agent) that seals the periods that just closed
 - Breadcrumbs link the whole pyramid
@@ -164,7 +164,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 > Requires setup - CRM stays dormant until you set its list id; read the [setup and flow](docs/45-crm.md#setup) before you rely on it
 
 ![CRM hub](docs/assets/shots/13-crm-hub.png)
-> Keyword `tcr` OR Main hotkey > CRM OR CRM hotkey (set in canvas)
+> Keyword `tcr` OR hotkey (set in canvas) OR `⌥⌘T` > CRM
 
 - [Group tags](docs/45-crm.md#the--tag-group) for your client lists
 - Automatic "Prepare for `[[booking]]`" [follow-ups](docs/45-crm.md#the-automatic-prepare-follow-up)
@@ -260,7 +260,7 @@ All 35 keywords are re-mappable in Configure Workflow. 9 actions ship with a def
 | Reference | [Setup](docs/30-setup.md) · [Settings & sync](docs/90-settings-sync.md) · [Cheatsheet](docs/95-cheatsheet.md) · [Troubleshooting](docs/99-troubleshooting.md) | Every option, key and fix                   |
 
 > [!TIP]
-> Access docs with `tdo` keyword from Alfred once workflow is installed
+> Access docs with `tdo` or `⌥⌘G` from Alfred once workflow is installed
 
 ## License
 
