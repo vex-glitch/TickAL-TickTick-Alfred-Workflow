@@ -36,8 +36,12 @@ Type to filter.
 ![Search scopes](docs/assets/shots/06-search-scopes.png)
 > Keyword `tse` OR Main hotkey > search OR hotkey `⌥⌘S`
 
-Thirteen prefixes narrow the scope (e.g. `t` searches tasks only), while `/` lists all the scopes.  
+<details>
+<summary>Thirteen prefixes narrow the scope (e.g. <code>t</code> searches tasks only), while <code>/</code> lists all the scopes 🖼️</summary>
+
 ![Search scopes](docs/assets/shots/17-search-scope-menu.png)
+
+</details>
 
 Habits, matrix, pomodoro, today, tomorrow, next 7 day, inbox, summary, completed, won't do, periodic notes are all actionable from search.  
 Just type: `today`, `tomorrow`, `inbox`, `completed`, `daily note` or `weekly note`...
