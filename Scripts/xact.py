@@ -1204,10 +1204,11 @@ def _crm_session_prefill(lb_title, marker):
     """Open the Add window prefilled for this logbook's next task. Token order:
     ~l before # (the tag terminates the multi-word list capture, trap #8);
     [[title]] resolves to the logbook link at create time - a literal URL here
-    would trip the # tag trigger on its '#p/' fragment."""
+    would trip the # tag trigger on its '#p/' fragment. The S<n>/Consult
+    marker is a SUFFIX (Vex ruling): the calendar reads '🎨 Marko • Sleeve S2'."""
     import areas
     tag = areas.CONSULT_TAG if marker == "Consult" else areas.SESSION_TAG
-    _run_trigger("Add", f"~l {areas.crm_list_name()} #{tag} {marker} [[{lb_title}]] ")
+    _run_trigger("Add", f"~l {areas.crm_list_name()} #{tag} [[{lb_title}]] {marker} ")
 
 
 def _crmnew_continue(kind, cust):
@@ -1253,9 +1254,18 @@ def crmnew_newcust(kind):
     if not (name or "").strip():
         _crm_say("Cancelled")
         return
-    phone = _ask(f"{name} - phone? (Esc skips)") or ""
-    mail  = _ask(f"{name} - mail? (Esc skips)") or ""
-    bday  = _ask(f"{name} - birthday? (Esc skips)") or ""
+    # Esc = ABORT the whole flow (smoke ruling: nothing half-made);
+    # plain OK on an empty field = skip it.
+    fields = []
+    for prompt in (f"{name} - phone? (OK skips · Esc cancels)",
+                   f"{name} - mail? (OK skips · Esc cancels)",
+                   f"{name} - birthday? (OK skips · Esc cancels)"):
+        v = _ask(prompt)
+        if v is None:
+            _crm_say("Cancelled · nothing created")
+            return
+        fields.append(v)
+    phone, mail, bday = fields
     cust = cr.create_customer(name, phone, mail, bday)
     _crmnew_continue(kind, cust)
 
@@ -1291,7 +1301,6 @@ def sessiondone(pid, tid):
     attach a clipboard photo, then archive or chain the next session."""
     if not _records_ready():
         return
-    import re as _re
     import areas
     import crm_records as cr
     t = cache_store.find_task(tid) or {}
@@ -1308,16 +1317,29 @@ def sessiondone(pid, tid):
         _crm_say("Not a session task · only S<n> / Consult tasks log here")
         return
     lb_title, log_pid, log_tid = cr.parse_first_link(title)
-    m = _re.match(r"S(\d+)\s", title)
-    marker = f"S{m.group(1)}" if m else "consultation"
-    word   = "session" if m else "consultation"
+    mk = cr.title_marker(title)
+    is_s = bool(mk and mk.startswith("S"))
+    marker = mk if is_s else "consultation"
+    word   = "session" if is_s else "consultation"
 
-    dur     = _ask(f"How long was the {word}? (Esc skips)") or ""
-    charged = _ask("Charged? (Esc skips)") or ""
-    did     = _ask("What did you do? (Esc skips)") or ""
-    final   = _dialog("Final session - archive the logbook?",
-                      ["Cancel", "Archive", "More to come"],
-                      "More to come") == "Archive"
+    # Esc = ABORT before anything is completed or written; OK skips a field.
+    answers = []
+    for prompt in (f"How long was the {word}? (OK skips · Esc cancels)",
+                   "Charged? (OK skips · Esc cancels)",
+                   "What did you do? (OK skips · Esc cancels)"):
+        v = _ask(prompt)
+        if v is None:
+            _crm_say("Cancelled · task NOT completed, nothing logged")
+            return
+        answers.append(v)
+    dur, charged, did = answers
+    final = _dialog("Final session - archive the logbook?",
+                    ["Cancel", "Archive", "More to come"],
+                    "More to come")
+    if final == "":
+        _crm_say("Cancelled · task NOT completed, nothing logged")
+        return
+    final = final == "Archive"
 
     try:
         _api().complete_task(pid, tid)

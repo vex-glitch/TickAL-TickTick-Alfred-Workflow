@@ -562,9 +562,14 @@ def main():
             api = TickTickAPI(cfg.get_token())
             api.delete_task(pid, tid)
             try:
-                cached = cache_store.get("all_tasks")
-                if cached is not None:
-                    cache_store.set("all_tasks", [t for t in cached if t.get("id") != tid])
+                # all_notes too - the CRM records pickers read it, and a
+                # deleted customer/logbook otherwise haunts them until the
+                # next sync (smoke finding 2026-07-17).
+                for key in ("all_tasks", "all_notes"):
+                    cached = cache_store.get(key)
+                    if cached is not None:
+                        cache_store.set(key, [t for t in cached
+                                              if t.get("id") != tid])
                 _patch_project_data(tid, pid_old=pid, remove=True)
             except Exception:
                 cache_store.invalidate("all_tasks")
@@ -741,10 +746,11 @@ def main():
             # word ~l from swallowing the title and lands on the preview, not a picker.
             tags_lc = {str(t).lower() for t in (payload.get("tags") or [])}
             # S2+ titles are session-done-chained continuation sessions
-            # (records flow) - session 5 of a sleeve needs no fresh Prepare.
-            # S1 / unnumbered bookings keep the follow-up.
-            _s = re.match(r"S(\d+)\s", title or "")
-            _continuation = bool(_s and int(_s.group(1)) >= 2)
+            # (records flow; marker is a SUFFIX, legacy prefix tolerated) -
+            # session 5 of a sleeve needs no fresh Prepare. S1 / unnumbered
+            # bookings keep the follow-up.
+            _s = re.search(r"^S(\d+)\s|\bS(\d+)\s*$", title or "")
+            _continuation = bool(_s and int(_s.group(1) or _s.group(2)) >= 2)
             if (CRM_ID and proj_id == CRM_ID and result and result.get("id")
                     and (tags_lc & BOOKING_TAGS) and not _continuation):
                 # Link-bearing titles (records S1/Consult bookings) must NOT

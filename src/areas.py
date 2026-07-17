@@ -31,35 +31,57 @@ PROJECTS_FOLDER_ID = os.environ.get("projects_folder_id") or ""  # 💼Projects-
 CRM_ID             = os.environ.get("crm_list_id") or ""         # 🔥CRM-style list
 PERIODIC_LIST_ID   = cfg.get_periodic_list_id()                  # 💫Periodic notes list
 DOCS_BASE = "https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs"
-# The CRM tag family - Configure fields since 2026-07-17 (crm_tags /
-# crm_prepare_tag, space-separated; blank = the defaults below). This is the
-# ONLY home - every consumer (add_task, browse, tag pickers, dispatch) reads
-# these names. All normalised to the lower form TickTick stores tag names in.
-PREPARE_TAG        = ((os.environ.get("crm_prepare_tag") or "").strip()
-                      or "🔥prepare").lower()
-# Order matters: position 2 = the consultation tag, LAST = the needle-session
-# tag (what S<n> session tasks carry) - the records flows build their Add
-# prefills from these two roles.
-_BOOK              = ((os.environ.get("crm_tags") or "").split()
-                      or ["🔥lead", "🔥consultation", "🔥tattoo"])
-CONSULT_TAG        = (_BOOK[1] if len(_BOOK) > 1 else _BOOK[0]).lower()
-SESSION_TAG        = _BOOK[-1].lower()
+# The CRM tag family - Configure fields since 2026-07-17. This is the ONLY
+# home - every consumer (add_task, browse, tag pickers, dispatch) reads these
+# names. All normalised to the lower form TickTick stores tag names in.
+# Fields accept SPACES OR COMMAS ("a, b" == "a b" - the comma form silently
+# broke every picker once), and roles are matched by KEYWORD in the tag name
+# first (consult/tattoo/customer/…), so the order users type them in doesn't
+# matter; only role-less custom names fall back to position.
+
+def _split_tags(raw):
+    return [t.lower() for t in re.split(r"[,\s]+", (raw or "").strip()) if t]
+
+
+def _role(tokens, *words):
+    """First token whose name contains one of the role keywords, else ''."""
+    for t in tokens:
+        if any(w in t for w in words):
+            return t
+    return ""
+
+
+PREPARE_TAG        = (_split_tags(os.environ.get("crm_prepare_tag"))
+                      or ["🔥prepare"])[0]
+# Booking tags (calendar tasks). Roles: the consultation tag and the
+# needle-session tag (what S<n> tasks carry). Lead is NOT a booking tag -
+# leads live in the records list, never on the calendar.
+_BOOK              = (_split_tags(os.environ.get("crm_tags"))
+                      or ["🔥consultation", "🔥tattoo"])
+CONSULT_TAG        = _role(_BOOK, "consult") \
+    or (_BOOK[1] if len(_BOOK) > 2 else _BOOK[0])
+SESSION_TAG        = _role(_BOOK, "tattoo", "session") or _BOOK[-1]
 # A new CRM task carrying one of these chains to the Prepare window
 # (dispatch) - add_task suppresses the focus chords for the same set.
-BOOKING_TAGS       = {t.lower() for t in _BOOK}
+BOOKING_TAGS       = set(_BOOK)
 # Every CRM-scoped picker offers ONLY these.
 CRM_TAGS           = BOOKING_TAGS | {PREPARE_TAG}
 
 # ── CRM Records (per-customer notes + per-tattoo logbooks) ───────────────────
 RECORDS_ID         = os.environ.get("crm_records_list_id") or ""  # 🗂️CRM • Records-style list
 RECORDS_LIST_NAME  = "🗂️CRM • Records"   # display fallback - live name via records_list_name()
-# Three fixed roles, in this order: customer notes / active logbooks /
-# finished logbooks. Configure field crm_records_tags (space-separated,
-# order matters); blank = the defaults.
-_REC_DEFAULTS      = ["🔥customer", "🔥logbook", "🔥archive"]
-_rec               = (os.environ.get("crm_records_tags") or "").split()
-CUSTOMER_TAG, LOGBOOK_TAG, ARCHIVE_TAG = [
-    (_rec[i] if i < len(_rec) else _REC_DEFAULTS[i]).lower() for i in range(3)]
+# Four roles: customer notes / active logbooks / leads (unscheduled
+# potential customers - a lead note converts to customer on its first
+# booking) / finished logbooks. Configure field crm_records_tags.
+_REC_DEFAULTS      = ["🔥customer", "🔥logbook", "🔥lead", "🔥archive"]
+_rec               = _split_tags(os.environ.get("crm_records_tags")) or _REC_DEFAULTS
+CUSTOMER_TAG       = _role(_rec, "customer", "client") or _rec[0]
+LOGBOOK_TAG        = _role(_rec, "logbook", "book") \
+    or (_rec[1] if len(_rec) > 1 else _REC_DEFAULTS[1])
+ARCHIVE_TAG        = _role(_rec, "archive", "finish", "done") \
+    or (_rec[-1] if len(_rec) > 2 else _REC_DEFAULTS[3])
+LEAD_TAG           = _role(_rec, "lead") \
+    or (_rec[2] if len(_rec) > 3 else _REC_DEFAULTS[2])
 
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

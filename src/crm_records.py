@@ -20,9 +20,10 @@ MODEL (agreed with Vex 2026-07-17):
   count counts S-entries only (consultations aren't needle sessions).
 - Links are native TickTick task links (how the app stores [[ ]] backlinks):
       [Title](https://ticktick.com/webapp/#p/<pid>/tasks/<tid>)
-- Session tasks in the CRM calendar list are titled "S<n> <logbook link>" /
-  "Consult <logbook link>" - sessiondone parses the link back to its logbook,
-  and dispatch suppresses the Prepare follow-up for S2+ titles.
+- Session tasks in the CRM calendar list are titled "<logbook link> S<n>" /
+  "<logbook link> Consult" (marker is a SUFFIX; legacy prefix tolerated) -
+  sessiondone parses the link back to its logbook, and dispatch suppresses
+  the Prepare follow-up for S2+ titles.
 
 Every write patches the caches the pickers read (all_notes / all_tasks /
 project_data_{records}) so a fresh note is immediately pickable.
@@ -38,9 +39,23 @@ from api import TickTickAPI
 
 LINK_RE = re.compile(
     r"\[([^\]]*)\]\(https://ticktick\.com/webapp/#p/(\w+)/tasks/(\w+)\)")
-SNUM_RE  = re.compile(r"^S(\d+)\s")
 ENTRY_RE = re.compile(r"^### (\d{4}-\d{2}-\d{2}[^\n]*)$", re.M)
-SESSION_TITLE_RE = re.compile(r"(?:S\d+|Consult)\s")
+# Session tasks carry their marker as a SUFFIX ("<logbook link> S2",
+# Vex ruling 2026-07-17); the prefix form is tolerated as legacy.
+SESSION_MARKER_RE = re.compile(r"^(S\d+|Consult)\s|\b(S\d+|Consult)\s*$")
+
+
+def title_marker(title):
+    """'S3' / 'Consult' from a session-task title (suffix, or legacy
+    prefix), else None."""
+    m = SESSION_MARKER_RE.search(title or "")
+    return (m.group(1) or m.group(2)) if m else None
+
+
+def title_snum(title):
+    """The S-number of a session-task title, else None."""
+    m = re.fullmatch(r"S(\d+)", title_marker(title) or "")
+    return int(m.group(1)) if m else None
 
 _API = None
 
@@ -67,15 +82,15 @@ def parse_first_link(text):
 
 
 def is_session_task(title):
-    """True ONLY for tasks the records flow minted: an S<n>/Consult prefix
+    """True ONLY for tasks the records flow minted: an S<n>/Consult marker
     AND a PARSEABLE records-list link (the same parse sessiondone unpacks -
     gate and consumer share one shape definition, so nothing that passes here
-    can crash the unpack). Prepare follow-ups fail the prefix (their titles
+    can crash the unpack). Prepare follow-ups fail the marker (their titles
     start 'Prepare for …') - without this shape check they passed every
     session-task gate and sessiondone would complete them and write phantom
     entries into the logbook."""
     t = title or ""
-    if not SESSION_TITLE_RE.match(t):
+    if not title_marker(t):
         return False
     hit = parse_first_link(t)
     return bool(hit) and hit[1] == areas.RECORDS_ID
@@ -235,13 +250,17 @@ def _entries(content):
 def totals(content):
     """(money_str, session_count) recomputed from the session headers.
     Money sums segment 4 of every entry (consultation charges count);
-    the count counts S-entries only. Currency symbol: only a SHORT pre/suffix
-    of a clean number segment counts ('$300', '250€', '250 EUR') - free text
-    ('cash maybe 50', '250,-') falls back to €, never absorbed into the chip."""
-    total, n, sym, pre = 0.0, 0, "", False
+    the count = max(highest S-number, number of S-entries) - sessions are
+    numbered, so a single backlog-import entry marked S5 honestly reads
+    '5 sessions'. Currency symbol: only a SHORT pre/suffix of a clean number
+    segment counts ('$300', '250€', '250 EUR') - free text ('cash maybe 50',
+    '250,-') falls back to €, never absorbed into the chip."""
+    total, n, top, sym, pre = 0.0, 0, 0, "", False
     for segs in _entries(content):
-        if len(segs) > 1 and re.fullmatch(r"S\d+", segs[1] or ""):
+        m_s = re.fullmatch(r"S(\d+)", (segs[1] if len(segs) > 1 else "") or "")
+        if m_s:
             n += 1
+            top = max(top, int(m_s.group(1)))
         if len(segs) > 3:
             v = _num(segs[3])
             if v is not None:
@@ -253,6 +272,7 @@ def totals(content):
                     if m and (m.group(1) or m.group(2)):
                         sym, pre = ((m.group(1), True) if m.group(1)
                                     else (m.group(2), False))
+    n = max(n, top)
     if total == 0 and n == 0:
         return "-", 0
     num = f"{int(total)}" if total == int(total) else f"{total:.2f}"
@@ -294,9 +314,9 @@ def next_snum(log_content, log_tid):
         if ((t.get("_projectId") or t.get("projectId")) == areas.CRM_ID
                 and t.get("status", 0) == 0
                 and f"/tasks/{log_tid})" in (t.get("title") or "")):
-            m = SNUM_RE.match(t.get("title") or "")
-            if m:
-                top = max(top, int(m.group(1)))
+            sn = title_snum(t.get("title") or "")
+            if sn:
+                top = max(top, sn)
     return top + 1
 
 
