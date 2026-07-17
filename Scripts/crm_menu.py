@@ -48,12 +48,20 @@ CRM_VARS = {"list_id": CRM_ID, "task_list_id": CRM_ID, "list_name": CRM_NAME,
 
 
 
+def _records_row(uid, title, subtitle, ctx):
+    """Records rows ride the conditional's BROWSE branch (arg 'tags') with the
+    real destination in browse_ctx - zero canvas. The picker's ⏎ args are
+    xact:* verbs (dialog chains); see browse.py ctx:crmnew/crmdone/crmlog."""
+    return alfred.item(uid=uid, title=title, subtitle=subtitle, arg="tags",
+                       variables={**CRM_VARS, "browse_ctx": ctx})
+
+
 def build_items():
     if not areas.crm_configured():
         # Dormant until crm_list_id is set in Configure Workflow - the one row
         # opens the setup guide (arg routes via the ^open conditional branch).
         return [alfred.item(**areas.setup_row("CRM", "47-crm.md"))]
-    return [
+    items = [
         alfred.item(
             uid="crm-add",
             title="Add",
@@ -61,14 +69,30 @@ def build_items():
             arg="add",
             variables=CRM_VARS,
         ),
-        alfred.item(
-            uid="crm-search",
-            title="Search",
-            subtitle=f"Drill {CRM_NAME} by tag",
-            arg="tags",
-            variables={**CRM_VARS, "browse_ctx": f"ctx:tags:{CRM_ID}"},
-        ),
     ]
+    if areas.records_configured():
+        items += [
+            _records_row("crm-new-consult", "➕ New consultation",
+                         "Customer → logbook → schedule", "ctx:crmnew:consult"),
+            _records_row("crm-new-tattoo", "➕ New tattoo",
+                         "Customer → logbook → S1", "ctx:crmnew:tattoo"),
+            _records_row("crm-next-session", "▶️ Next session",
+                         "Pick logbook → S<n>", "ctx:crmnew:session"),
+            _records_row("crm-session-done", "✅ Session done",
+                         "Tick off · log · schedule next", "ctx:crmdone"),
+            _records_row("crm-log", "📝 Log",
+                         "Line into a customer / logbook note", "ctx:crmlog"),
+        ]
+    else:
+        items.append(alfred.item(**areas.setup_row("CRM records", "47-crm.md")))
+    items.append(alfred.item(
+        uid="crm-search",
+        title="Search",
+        subtitle=f"Drill {CRM_NAME} by tag",
+        arg="tags",
+        variables={**CRM_VARS, "browse_ctx": f"ctx:tags:{CRM_ID}"},
+    ))
+    return items
 
 
 # Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row

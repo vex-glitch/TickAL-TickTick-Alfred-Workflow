@@ -33,6 +33,18 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
                                     (deep link + in-app ⌘⌥⇧S shortcut)
     xact:focus_sticky:<pid>:<tid>   sticky + start the focus timer
 
+CRM records (customer notes + tattoo logbooks - src/crm_records.py):
+    xact:crmnew_newcust:<kind>      dialogs: name/phone/mail/bday → customer
+                                    note, then continue per kind
+    xact:crmnew_go:<kind>:<custTid> consult/tattoo: pick-or-create the
+                                    logbook (dialogs) → Add window prefilled
+    xact:crmnew_go:session::<logTid>  next session → Add prefilled S<n>
+    xact:sessiondone:<pid>:<tid>    complete the session task (calendar keeps
+                                    the record), dialogs log the entry,
+                                    Paid recomputed, clipboard 📷 attached,
+                                    archive or chain S<n+1>
+    xact:crmlog:<tid>               dialog → timestamped line under ## Notes
+
 Focus session blocks (checkbox staging):
     xact:fx_add:<pid>:<tid>         insert the task as a "- [ ] [title](link)"
                                     checkbox into the CURRENT focus task's
@@ -99,7 +111,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from script_base import bootstrap, reopen_actions, run_path
+from script_base import bootstrap, reopen_actions, run_path, notify as _notify_banner
 bootstrap()
 
 import config as cfg
@@ -1139,6 +1151,234 @@ def cachesync_toggle():
         print(f"Remove failed · {e}")
         return
     print("Hourly sync removed")
+
+
+# ── CRM records (customer notes + tattoo logbooks) ────────────────────────────
+# Dialog chains behind the tcr pickers (browse ctx:crmnew/crmdone/crmlog) and
+# the ⌘ Actions "✅ Session done" row. Engine + data model: src/crm_records.py.
+# Every prompt is Esc-skippable except the two names (Esc there = cancel).
+# Feedback goes through _crm_say (script_base.notify → Alfred's XAct chain),
+# NEVER print: the picker route (browse ⏎ → modOpen runscript) has no
+# downstream, so stdout is silently discarded there.
+
+def _crm_say(msg):
+    _notify_banner(msg, title="")
+
+
+def _choose(prompt, options, title="TickAL"):
+    """osascript choose-from-list; the picked string, or None on Cancel."""
+    def esc(s):
+        return (s or "").replace("\\", "\\\\").replace('"', '\\"')
+    olist = ", ".join(f'"{esc(o)}"' for o in options)
+    osa = ('choose from list {{{}}} with prompt "{}" with title "{}"'
+           .format(olist, esc(prompt), esc(title)))
+    r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
+    out = r.stdout.strip()
+    return None if (r.returncode != 0 or out in ("false", "")) else out
+
+
+def _records_ready():
+    import areas
+    if not areas.crm_configured():
+        _crm_say("CRM needs setup · Configure Workflow → CRM list id")
+        return False
+    if not areas.records_configured():
+        _crm_say("CRM records need setup · Configure Workflow → CRM records list id")
+        return False
+    return True
+
+
+def _record_by_id(tid):
+    import areas
+    import crm_records as cr
+    for n in cr.records_notes():
+        if n.get("id") == tid:
+            return n
+    try:   # cache can lag behind a hand-created note - fall back to live
+        return cr._api().get_task(areas.RECORDS_ID, tid)
+    except Exception:
+        return None
+
+
+def _crm_session_prefill(lb_title, marker):
+    """Open the Add window prefilled for this logbook's next task. Token order:
+    ~l before # (the tag terminates the multi-word list capture, trap #8);
+    [[title]] resolves to the logbook link at create time - a literal URL here
+    would trip the # tag trigger on its '#p/' fragment."""
+    import areas
+    tag = areas.CONSULT_TAG if marker == "Consult" else areas.SESSION_TAG
+    _run_trigger("Add", f"~l {areas.crm_list_name()} #{tag} {marker} [[{lb_title}]] ")
+
+
+def _crmnew_continue(kind, cust):
+    """Customer chosen (or just created) - pick/create the logbook, then hand
+    off to the Add window so the session task gets scheduled the normal way."""
+    import areas
+    import crm_records as cr
+    disp = cr.customer_display(cust) or "customer"
+    lb = None
+    if kind == "tattoo":
+        mine = [l for l in cr.records_notes(areas.LOGBOOK_TAG)
+                if (cr.parse_first_link(l.get("content") or "") or ("",) * 3)[2]
+                == cust.get("id")]
+        if mine:   # a consultation logbook may already exist - convert in place
+            NEW = "🆕 New logbook"
+            pick = _choose(f"{disp} - which logbook?",
+                           [NEW] + [l.get("title") or "" for l in mine])
+            if pick is None:
+                _crm_say("Cancelled")
+                return
+            if pick != NEW:
+                lb = next((l for l in mine if (l.get("title") or "") == pick), None)
+    if lb is None:
+        tattoo = _ask(f"{disp} - tattoo / project name?")
+        if not (tattoo or "").strip():
+            _crm_say("Cancelled")
+            return
+        lb = cr.create_logbook(cust, tattoo)
+    if kind == "consult":
+        _crm_session_prefill(lb.get("title") or "", "Consult")
+        _crm_say("🗂️ Logbook ready · schedule the consultation")
+    else:
+        n = cr.next_snum(lb.get("content") or "", lb["id"])
+        _crm_session_prefill(lb.get("title") or "", f"S{n}")
+        _crm_say(f"🗂️ Logbook ready · schedule S{n}")
+
+
+def crmnew_newcust(kind):
+    if not _records_ready():
+        return
+    import crm_records as cr
+    name = _ask("New customer - name?")
+    if not (name or "").strip():
+        _crm_say("Cancelled")
+        return
+    phone = _ask(f"{name} - phone? (Esc skips)") or ""
+    mail  = _ask(f"{name} - mail? (Esc skips)") or ""
+    bday  = _ask(f"{name} - birthday? (Esc skips)") or ""
+    cust = cr.create_customer(name, phone, mail, bday)
+    _crmnew_continue(kind, cust)
+
+
+def crmnew_go(rest):
+    """Picker ⏎ lands here. Shapes: consult:<custTid> · tattoo:<custTid> ·
+    session::<logTid>."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    parts = (rest or "").split(":")
+    kind = parts[0] if parts else ""
+    cust_tid = parts[1] if len(parts) > 1 else ""
+    log_tid  = parts[2] if len(parts) > 2 else ""
+    if kind == "session":
+        lb = _record_by_id(log_tid)
+        if not lb:
+            _crm_say("Logbook not found · run tsy")
+            return
+        n = cr.next_snum(lb.get("content") or "", log_tid)
+        _crm_session_prefill(lb.get("title") or "", f"S{n}")
+        return
+    cust = _record_by_id(cust_tid)
+    if not cust:
+        _crm_say("Customer not found · run tsy")
+        return
+    _crmnew_continue(kind, cust)
+
+
+def sessiondone(pid, tid):
+    """The heart of the records flow: complete today's task (the calendar
+    keeps the record - never reschedule), log the entry, recompute Paid,
+    attach a clipboard photo, then archive or chain the next session."""
+    if not _records_ready():
+        return
+    import re as _re
+    import areas
+    import crm_records as cr
+    t = cache_store.find_task(tid) or {}
+    title = t.get("title") or ""
+    if not title:
+        try:
+            title = (cr._api().get_task(pid, tid) or {}).get("title") or ""
+        except Exception:
+            pass
+    # Shape gate: S<n>/Consult prefix AND a records link. Prepare follow-ups
+    # carry the logbook link too - the prefix keeps them (and any hand-made
+    # task) from being completed + phantom-logged here.
+    if not cr.is_session_task(title):
+        _crm_say("Not a session task · only S<n> / Consult tasks log here")
+        return
+    lb_title, log_pid, log_tid = cr.parse_first_link(title)
+    m = _re.match(r"S(\d+)\s", title)
+    marker = f"S{m.group(1)}" if m else "consultation"
+    word   = "session" if m else "consultation"
+
+    dur     = _ask(f"How long was the {word}? (Esc skips)") or ""
+    charged = _ask("Charged? (Esc skips)") or ""
+    did     = _ask("What did you do? (Esc skips)") or ""
+    final   = _dialog("Final session - archive the logbook?",
+                      ["Cancel", "Archive", "More to come"],
+                      "More to come") == "Archive"
+
+    try:
+        _api().complete_task(pid, tid)
+        _complete_cache_patch(pid, tid)
+    except Exception as e:
+        _crm_say(f"Complete failed: {type(e).__name__}: {e}")
+        return
+    try:
+        content, money, n, live_title = cr.append_session(
+            log_pid, log_tid, marker, dur, charged, did)
+        lb_title = live_title or lb_title   # renamed logbook → fresh title
+    except Exception as e:
+        _crm_say(f"✅ done · logbook update FAILED: {type(e).__name__}: {e}")
+        return
+
+    photo = ""
+    try:   # no PyObjC / empty clipboard = simply no photo, not an error
+        import clipboard as clip_util
+        img = clip_util.png_bytes()
+    except Exception:
+        img = None
+    if img:
+        try:
+            import api_v2
+            api_v2.TickTickV2().upload_attachment(log_pid, log_tid, img,
+                                                  "session.png")
+            photo = " · 📷 attached"
+        except Exception:
+            photo = " · 📷 upload failed"
+
+    if final:
+        try:
+            cr.finish_logbook(log_pid, log_tid)
+            _crm_say(f"✅ {marker} done · {money} / {n} total · archived{photo}")
+        except Exception as e:
+            _crm_say(f"✅ {marker} done · archive FAILED: {type(e).__name__}{photo}")
+        return
+    nxt = cr.next_snum(content, log_tid)
+    label = f"Schedule S{nxt}"
+    if _dialog(f"{lb_title} - schedule S{nxt} now?",
+               ["Cancel", "Later", label], label) == label:
+        _crm_session_prefill(lb_title, f"S{nxt}")
+    _crm_say(f"✅ {marker} done · {money} / {n} total{photo}")
+
+
+def crmlog(tid):
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    note = _record_by_id(tid)
+    disp = (note or {}).get("title") or "note"
+    text = _ask(f"{disp} - log line?")
+    if not (text or "").strip():
+        _crm_say("Cancelled")
+        return
+    try:
+        cr.append_note_line(areas.RECORDS_ID, tid, text)
+        _crm_say(f"📝 Logged to {disp}")
+    except Exception as e:
+        _crm_say(f"📝 Log failed: {type(e).__name__}: {e}")
 
 
 def v2login():
@@ -2898,6 +3138,15 @@ def main():
             pyobjc_install()
         elif verb == "pn_agent":
             pn_agent_toggle()
+        elif verb == "crmnew_newcust":
+            crmnew_newcust(rest)
+        elif verb == "crmnew_go":
+            crmnew_go(rest)
+        elif verb == "sessiondone":
+            pid, tid = rest.split(":", 1)
+            sessiondone(pid, tid)
+        elif verb == "crmlog":
+            crmlog(rest)
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's

@@ -435,8 +435,25 @@ def main():
         except Exception:
             _pn_on = False
 
+        # ✅ Session done - CRM calendar tasks the crmnew flow minted
+        # (S<n>/Consult prefix + records-logbook link; the shape check keeps
+        # Prepare follow-ups out - their titles carry the link too).
+        # Completes the task + dialog-logs the session into the logbook.
+        # Cheap gates FIRST: the crm_records import pulls the api module
+        # (~75ms) and this is the hottest render in the workflow.
+        _sess_done = False
+        if (pid and areas.crm_configured() and areas.records_configured()
+                and pid == areas.CRM_ID and is_task_like and bool(tid)):
+            try:
+                import crm_records as _cr
+                _sess_done = _cr.is_session_task(name)
+            except Exception:
+                _sess_done = False
+
         rows = [
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
+            ("✅ Session done",    "Tick off · log · schedule next",
+             f"xact:sessiondone:{pid}:{tid}", "session done log crm tattoo", _sess_done),
             ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and has_kids),
             ("⤵️ Browse sections", "Drill into sections",  "browse",        "browse sections drill", itype == "list"),
             ("🏷️ Browse tags",     "Drill into this list's tags", "browse", "browse tags drill", itype == "list"),

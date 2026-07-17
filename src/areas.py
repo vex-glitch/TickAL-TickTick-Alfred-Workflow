@@ -31,13 +31,35 @@ PROJECTS_FOLDER_ID = os.environ.get("projects_folder_id") or ""  # 💼Projects-
 CRM_ID             = os.environ.get("crm_list_id") or ""         # 🔥CRM-style list
 PERIODIC_LIST_ID   = cfg.get_periodic_list_id()                  # 💫Periodic notes list
 DOCS_BASE = "https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs"
-PREPARE_TAG        = "🔥prepare"                   # normalised (lower) form
-# The 🔥CRM tag group - every CRM-scoped picker offers ONLY these (canonical
-# home; add_task.py/browse.py keep local copies for their own flows)
-CRM_TAGS           = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
+# The CRM tag family - Configure fields since 2026-07-17 (crm_tags /
+# crm_prepare_tag, space-separated; blank = the defaults below). This is the
+# ONLY home - every consumer (add_task, browse, tag pickers, dispatch) reads
+# these names. All normalised to the lower form TickTick stores tag names in.
+PREPARE_TAG        = ((os.environ.get("crm_prepare_tag") or "").strip()
+                      or "🔥prepare").lower()
+# Order matters: position 2 = the consultation tag, LAST = the needle-session
+# tag (what S<n> session tasks carry) - the records flows build their Add
+# prefills from these two roles.
+_BOOK              = ((os.environ.get("crm_tags") or "").split()
+                      or ["🔥lead", "🔥consultation", "🔥tattoo"])
+CONSULT_TAG        = (_BOOK[1] if len(_BOOK) > 1 else _BOOK[0]).lower()
+SESSION_TAG        = _BOOK[-1].lower()
 # A new CRM task carrying one of these chains to the Prepare window
 # (dispatch) - add_task suppresses the focus chords for the same set.
-BOOKING_TAGS       = CRM_TAGS - {PREPARE_TAG}
+BOOKING_TAGS       = {t.lower() for t in _BOOK}
+# Every CRM-scoped picker offers ONLY these.
+CRM_TAGS           = BOOKING_TAGS | {PREPARE_TAG}
+
+# ── CRM Records (per-customer notes + per-tattoo logbooks) ───────────────────
+RECORDS_ID         = os.environ.get("crm_records_list_id") or ""  # 🗂️CRM • Records-style list
+RECORDS_LIST_NAME  = "🗂️CRM • Records"   # display fallback - live name via records_list_name()
+# Three fixed roles, in this order: customer notes / active logbooks /
+# finished logbooks. Configure field crm_records_tags (space-separated,
+# order matters); blank = the defaults.
+_REC_DEFAULTS      = ["🔥customer", "🔥logbook", "🔥archive"]
+_rec               = (os.environ.get("crm_records_tags") or "").split()
+CUSTOMER_TAG, LOGBOOK_TAG, ARCHIVE_TAG = [
+    (_rec[i] if i < len(_rec) else _REC_DEFAULTS[i]).lower() for i in range(3)]
 
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -93,6 +115,15 @@ def crm_configured():
     return bool(CRM_ID)
 
 
+def records_configured():
+    return bool(RECORDS_ID)
+
+
+def records_list_name():
+    """The user's actual records list name (falls back to the display constant)."""
+    return (_project(RECORDS_ID) or {}).get("name") or RECORDS_LIST_NAME
+
+
 def cta_configured():
     return bool(CTA_LIST_ID)
 
@@ -144,6 +175,28 @@ def _task_link(pid, tid):
     return f"https://ticktick.com/webapp/#p/{pid}/tasks/{tid}"
 
 
+# A native task link as it sits inside a title/content: [text](webapp url).
+TASK_LINK_RE = re.compile(
+    r"\[([^\]]*)\]\(https://ticktick\.com/webapp/#p/(\w+)/tasks/(\w+)\)")
+
+
+def prepare_wikilink_target(title):
+    """(target, wikilink?) for a 'Prepare for …' prefill built from a booking
+    title. Records-flow bookings ('S1 [logbook](url)') embed a records link
+    whose TEXT is the logbook title - point the Prepare at the LOGBOOK
+    (resolvable and stable; wrapping the raw link-bearing title in [[ ]]
+    minted nested-link garbage that then passed the session-task gates).
+    Other link-bearing titles fall back to link-stripped PLAIN text (an
+    unresolvable [[..]] would stay literal in the title). Plain titles keep
+    the classic [[title]] behaviour."""
+    m = TASK_LINK_RE.search(title or "")
+    if not m:
+        return title, True
+    if RECORDS_ID and m.group(2) == RECORDS_ID and m.group(1).strip():
+        return m.group(1).strip(), True
+    return TASK_LINK_RE.sub(r"\1", title).strip(), False
+
+
 def classify(pid, tid, itype, task):
     """Pick the action mode for the selected item.
 
@@ -176,12 +229,16 @@ def build_action(mode, pid, tid, title):
     Returns {"query", "note", "mode", "tag", "label", "preview"}.
     """
     if mode == "prepare":
-        # The working CRM auto-flow prefill verbatim ([[title]] resolves on ⏎).
+        # The working CRM auto-flow prefill verbatim ([[target]] resolves on ⏎;
+        # link-bearing records titles reference the logbook instead - see
+        # prepare_wikilink_target).
         crm_name = crm_list_name()
-        q = f"~l {crm_name} #{PREPARE_TAG} Prepare for [[{title}]]"
+        tgt, wl = prepare_wikilink_target(title)
+        ref = f"[[{tgt}]]" if wl else tgt
+        q = f"~l {crm_name} #{PREPARE_TAG} Prepare for {ref}"
         return {"query": q, "note": "", "mode": mode, "tag": PREPARE_TAG,
                 "label": "🔥 Add Prepare",
-                "preview": f"Opens {crm_name} add · Prepare for \"{title}\" · schedule & ⏎"}
+                "preview": f"Opens {crm_name} add · Prepare for \"{tgt}\" · schedule & ⏎"}
 
     proj    = _project(pid)
     tag     = area_tag_for_list(proj)

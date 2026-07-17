@@ -10,6 +10,7 @@ Arg format (from Script Filter items):
 """
 import sys
 import os
+import re
 import json
 import base64
 import subprocess
@@ -739,10 +740,21 @@ def main():
             # to its link on the next ⏎. Token order (~l … then #) keeps the multi-
             # word ~l from swallowing the title and lands on the preview, not a picker.
             tags_lc = {str(t).lower() for t in (payload.get("tags") or [])}
+            # S2+ titles are session-done-chained continuation sessions
+            # (records flow) - session 5 of a sleeve needs no fresh Prepare.
+            # S1 / unnumbered bookings keep the follow-up.
+            _s = re.match(r"S(\d+)\s", title or "")
+            _continuation = bool(_s and int(_s.group(1)) >= 2)
             if (CRM_ID and proj_id == CRM_ID and result and result.get("id")
-                    and (tags_lc & BOOKING_TAGS)):
+                    and (tags_lc & BOOKING_TAGS) and not _continuation):
+                # Link-bearing titles (records S1/Consult bookings) must NOT
+                # be wrapped raw in [[ ]] - the Prepare gets the LOGBOOK as
+                # its reference instead (see areas.prepare_wikilink_target).
+                _tgt, _wl = areas.prepare_wikilink_target(title)
+                _ref = f"[[{_tgt}]]" if _wl else _tgt
                 _fire_add_prefill(
-                    f"~l {areas.crm_list_name()} #🔥prepare Prepare for [[{title}]]")
+                    f"~l {areas.crm_list_name()} #{areas.PREPARE_TAG} "
+                    f"Prepare for {_ref}")
 
             notif = payload.get("_notif_text") or f"Task added to {payload.get('listName') or 'Inbox'}"
             print(notif + attach_note)
@@ -753,7 +765,8 @@ def main():
             # ⏱/🍅 start flow on it, so add → search → stage collapses into
             # one flow. CRM's Prepare window keeps priority; act-again yields
             # to an explicit chain.
-            _crm_chained = bool(CRM_ID and proj_id == CRM_ID and tags_lc & BOOKING_TAGS)
+            _crm_chained = bool(CRM_ID and proj_id == CRM_ID
+                                and tags_lc & BOOKING_TAGS and not _continuation)
             _post_done = False
             if (result and result.get("id") and not _crm_chained
                     and (payload.get("_post_stage") or payload.get("_post_fx")

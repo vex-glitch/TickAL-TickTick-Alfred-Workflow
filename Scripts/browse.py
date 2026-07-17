@@ -20,6 +20,10 @@ Levels:
     ctx:inbox                           inbox tasks
     ctx:completed                       locally-tracked completed tasks
     ctx:wontdo                          Won't Do (abandoned) tasks
+    ctx:crmnew:consult|tattoo|session   CRM records: customer / logbook picker
+                                        (⏎ args are xact:crmnew_* dialog verbs)
+    ctx:crmdone                         open session tasks - ⏎ complete + log
+    ctx:crmlog                          records notes - ⏎ log a line
 
 Anything after the ctx token is the fuzzy filter query. `ctx:subtasks:<taskId>`
 (single id) is also accepted - the list is then
@@ -83,7 +87,7 @@ INBOX_API_ID = "inbox"   # literal string accepted by the TickTick API
 # group.
 import areas as _areas
 CRM_ID   = _areas.CRM_ID   # Configure panel; empty = CRM branches never match
-CRM_TAGS = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
+CRM_TAGS = _areas.CRM_TAGS  # canonical home (Configure-driven, lower form)
 
 
 # ── ctx parsing ──────────────────────────────────────────────────────────────
@@ -801,6 +805,158 @@ def render_tagitems(list_id, tag, query):
 
     return add_back(items, f"ctx:tags:{list_id}")
 
+# ── Levels: crmnew / crmdone / crmlog (CRM records pickers) ──────────────────
+# The tcr rows route here with arg "tags" + a browse_ctx variable (riding the
+# CRM conditional's BROWSE branch - zero canvas). Row ⏎ args are xact:* verbs:
+# the Open ⏎ junction's modOpen runscript passes any xact:* through to xact.py,
+# where the dialog chains live (see crm_records.py for the data model).
+def _records_gate():
+    """Setup row when crm_records_list_id is unset - or None when good to go."""
+    if not _areas.records_configured():
+        return [alfred.item(**_areas.setup_row("CRM records", "47-crm.md"))]
+    return None
+
+
+def _record_vars(note):
+    return {"task_id": note["id"], "task_list_id": _areas.RECORDS_ID,
+            "list_id": _areas.RECORDS_ID, "task_title": note.get("title") or "",
+            "item_type": "note"}
+
+
+def _picker_mods(subtitle="⏎ picks here"):
+    """Explicit mod stamps for picker rows: ⌘ Actions stays live (item vars
+    carry the note/task context), the other chords are pinned dead so a
+    stray ⇧/⌥ press can't fire the row's xact arg down the wrong canvas edge."""
+    return {
+        "cmd":     {"arg": "", "valid": True,  "subtitle": "⌘ Actions"},
+        "shift":   {"arg": "", "valid": False, "subtitle": subtitle},
+        "alt":     {"arg": "", "valid": False, "subtitle": subtitle},
+        "alt+cmd": {"arg": "", "valid": False, "subtitle": subtitle},
+    }
+
+
+def render_crmnew(kind, query):
+    """Customer picker for a new consultation/tattoo entry (kind=consult|
+    tattoo), or the open-logbook picker for the next session (kind=session)."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "")
+    import crm_records as cr
+
+    if kind == "session":
+        rows = []
+        for lb in cr.records_notes(_areas.LOGBOOK_TAG):
+            n = cr.next_snum(lb.get("content") or "", lb["id"])
+            rows.append(alfred.item(
+                uid=f"crmnew-s-{lb['id']}",
+                title=lb.get("title") or "Untitled",
+                subtitle=f"⏎ Schedule S{n}",
+                arg=f"xact:crmnew_go:session::{lb['id']}",
+                mods=_picker_mods(),
+                variables=_record_vars(lb),
+            ))
+        if query:
+            rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title="No open logbooks",
+                                subtitle="➕ New tattoo starts one", valid=False)]
+        return add_back(rows, "")
+
+    label = "consultation" if kind == "consult" else "tattoo"
+    new_row = alfred.item(
+        uid="crmnew-newcust",
+        title="➕ New customer",
+        subtitle=f"Dialogs ask name + contact, then the {label}",
+        arg=f"xact:crmnew_newcust:{kind}",
+    )
+    rows = [new_row]
+    for c in cr.records_notes(_areas.CUSTOMER_TAG):
+        rows.append(alfred.item(
+            uid=f"crmnew-c-{c['id']}",
+            title=c.get("title") or "Untitled",
+            subtitle=f"⏎ New {label} for this customer",
+            arg=f"xact:crmnew_go:{kind}:{c['id']}",
+            mods=_picker_mods(),
+            variables=_record_vars(c),
+        ))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"]) \
+            or [new_row]   # no matching customer → they're new
+    return add_back(rows, "")
+
+
+def render_crmdone(query):
+    """Open calendar tasks that link a logbook - ⏎ completes + logs (dialogs)."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "")
+    import crm_records as cr
+
+    def _day(t):
+        due = t.get("dueDate") or t.get("startDate") or ""
+        return utc_str_to_local_date(due) if due else ""
+
+    pool = []
+    for t in cache_store.get("all_tasks") or []:
+        if ((t.get("_projectId") or t.get("projectId")) == CRM_ID
+                and t.get("status", 0) == 0
+                and cr.is_session_task(t.get("title") or "")):
+            pool.append(t)
+    pool.sort(key=lambda t: _day(t) or "9999")   # soonest first, dateless last
+
+    rows = []
+    for t in pool:
+        disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+        rows.append(alfred.item(
+            uid=f"crmdone-{t['id']}",
+            title=f"✅ {disp}",
+            subtitle=f"📅 {_day(t) or 'Not scheduled'} · ⏎ Complete + log",
+            arg=f"xact:sessiondone:{CRM_ID}:{t['id']}",
+            mods=_picker_mods("⏎ completes + logs it properly"),
+            variables={"task_id": t["id"], "task_list_id": CRM_ID,
+                       "list_id": CRM_ID, "task_title": t.get("title") or "",
+                       "item_type": "task"},
+        ))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    if not rows:
+        rows = [alfred.item(title="No open session tasks",
+                            subtitle="➕ New consultation / tattoo creates them",
+                            valid=False)]
+    return add_back(rows, "")
+
+
+def render_crmlog(query):
+    """Every records note (customers, logbooks, archive) - ⏎ logs a line."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "")
+    import crm_records as cr
+
+    rows, seen = [], set()
+    for tag in (_areas.CUSTOMER_TAG, _areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
+        for n in cr.records_notes(tag):
+            if n["id"] in seen:
+                continue
+            seen.add(n["id"])
+            chip = " · archived" if tag == _areas.ARCHIVE_TAG else ""
+            rows.append(alfred.item(
+                uid=f"crmlog-{n['id']}",
+                title=n.get("title") or "Untitled",
+                subtitle=f"⏎ Log a line{chip}",
+                arg=f"xact:crmlog:{n['id']}",
+                mods=_picker_mods(),
+                variables=_record_vars(n),
+            ))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    if not rows:
+        rows = [alfred.item(title="No records notes yet",
+                            subtitle="➕ New consultation / tattoo creates them",
+                            valid=False)]
+    return add_back(rows, "")
+
+
 # ── Level: buffer (🅿️ - tasks collected via ⌘/⌥⇧) ───────────────────────────
 def render_buffer(query):
     try:
@@ -1122,11 +1278,21 @@ def main():
         elif level == "filter":
             items = render_filter(ids[0], query) if ids else _missing(level, "<index>")
 
+        elif level == "crmnew":
+            items = render_crmnew(ids[0] if ids else "", query)
+
+        elif level == "crmdone":
+            items = render_crmdone(query)
+
+        elif level == "crmlog":
+            items = render_crmlog(query)
+
         else:
             items = [alfred.item(
                 title=f"Unknown browse context “{level}”",
                 subtitle="Levels: folders lists sections tasks subtasks subsubtasks "
-                         "tags tagitems smart inbox completed wontdo filter buffer",
+                         "tags tagitems smart inbox completed wontdo filter buffer "
+                         "crmnew crmdone crmlog",
                 valid=False,
             )]
 

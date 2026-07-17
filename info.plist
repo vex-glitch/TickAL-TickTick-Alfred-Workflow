@@ -6175,6 +6175,210 @@ fi</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>externaltriggerid</key>
+				<string>Browse</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>CFF9A653-308A-4236-8F39-F4A38BF4C6D7</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>CRM</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>498DF111-7830-4660-B1D2-2C4FB6AFF9BC</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "${1#open:}"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>FFBC0E8E-8E8A-4EEA-8D9E-F27FD725F35A</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<true/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string></string>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/crm_menu.py" "{query}"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string></string>
+				<key>title</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>61A9E48B-C99E-493A-BC9C-986429F616F0</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Add</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>2E0C573C-CDAA-42CD-9723-46812B369BEA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>MainMenu</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>9818E252-053D-4564-BDD5-4781F30247FC</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>conditions</key>
+				<array>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>add</string>
+						<key>outputlabel</key>
+						<string>ADD</string>
+						<key>uid</key>
+						<string>8AF3CDAC-DEE3-4C64-9BD0-D89C5C53652A</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>tags</string>
+						<key>outputlabel</key>
+						<string>BROWSE</string>
+						<key>uid</key>
+						<string>DB5F300F-2E83-4274-BD63-1D3B4CD3DABC</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^open</string>
+						<key>outputlabel</key>
+						<string>Docs</string>
+						<key>uid</key>
+						<string>09220BD8-15EF-476F-9CA1-2FA169B70DC6</string>
+					</dict>
+				</array>
+				<key>elselabel</key>
+				<string>else</string>
+				<key>hideelse</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.conditional</string>
+			<key>uid</key>
+			<string>ABD31D58-6B8E-4842-81A8-9AB98221285D</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>concurrently</key>
 				<false/>
 				<key>escaping</key>
@@ -6905,210 +7109,6 @@ fi</string>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
 			<string>1DE74713-9BB7-40D1-ADB0-A6CBB915C7FB</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>Browse</string>
-				<key>passinputasargument</key>
-				<false/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>CFF9A653-308A-4236-8F39-F4A38BF4C6D7</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>availableviaurlhandler</key>
-				<false/>
-				<key>triggerid</key>
-				<string>CRM</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.external</string>
-			<key>uid</key>
-			<string>498DF111-7830-4660-B1D2-2C4FB6AFF9BC</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>open "${1#open:}"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>FFBC0E8E-8E8A-4EEA-8D9E-F27FD725F35A</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>alfredfiltersresults</key>
-				<false/>
-				<key>alfredfiltersresultsmatchmode</key>
-				<integer>0</integer>
-				<key>argumenttreatemptyqueryasnil</key>
-				<true/>
-				<key>argumenttrimmode</key>
-				<integer>0</integer>
-				<key>argumenttype</key>
-				<integer>1</integer>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>queuedelaycustom</key>
-				<integer>3</integer>
-				<key>queuedelayimmediatelyinitially</key>
-				<true/>
-				<key>queuedelaymode</key>
-				<integer>0</integer>
-				<key>queuemode</key>
-				<integer>1</integer>
-				<key>runningsubtext</key>
-				<string></string>
-				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/crm_menu.py" "{query}"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string></string>
-				<key>title</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-				<key>withspace</key>
-				<true/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.scriptfilter</string>
-			<key>uid</key>
-			<string>61A9E48B-C99E-493A-BC9C-986429F616F0</string>
-			<key>version</key>
-			<integer>3</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>Add</string>
-				<key>passinputasargument</key>
-				<false/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>2E0C573C-CDAA-42CD-9723-46812B369BEA</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>externaltriggerid</key>
-				<string>MainMenu</string>
-				<key>passinputasargument</key>
-				<false/>
-				<key>passvariables</key>
-				<true/>
-				<key>workflowbundleid</key>
-				<string>self</string>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.output.callexternaltrigger</string>
-			<key>uid</key>
-			<string>9818E252-053D-4564-BDD5-4781F30247FC</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>conditions</key>
-				<array>
-					<dict>
-						<key>inputstring</key>
-						<string></string>
-						<key>matchcasesensitive</key>
-						<false/>
-						<key>matchmode</key>
-						<integer>0</integer>
-						<key>matchstring</key>
-						<string>add</string>
-						<key>outputlabel</key>
-						<string>ADD</string>
-						<key>uid</key>
-						<string>8AF3CDAC-DEE3-4C64-9BD0-D89C5C53652A</string>
-					</dict>
-					<dict>
-						<key>inputstring</key>
-						<string></string>
-						<key>matchcasesensitive</key>
-						<false/>
-						<key>matchmode</key>
-						<integer>0</integer>
-						<key>matchstring</key>
-						<string>tags</string>
-						<key>outputlabel</key>
-						<string>BROWSE</string>
-						<key>uid</key>
-						<string>DB5F300F-2E83-4274-BD63-1D3B4CD3DABC</string>
-					</dict>
-					<dict>
-						<key>inputstring</key>
-						<string></string>
-						<key>matchcasesensitive</key>
-						<false/>
-						<key>matchmode</key>
-						<integer>4</integer>
-						<key>matchstring</key>
-						<string>^open</string>
-						<key>outputlabel</key>
-						<string>Docs</string>
-						<key>uid</key>
-						<string>09220BD8-15EF-476F-9CA1-2FA169B70DC6</string>
-					</dict>
-				</array>
-				<key>elselabel</key>
-				<string>else</string>
-				<key>hideelse</key>
-				<true/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.utility.conditional</string>
-			<key>uid</key>
-			<string>ABD31D58-6B8E-4842-81A8-9AB98221285D</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -13042,9 +13042,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>2035.0</real>
+			<real>4400.0</real>
 			<key>ypos</key>
-			<real>1560.0</real>
+			<real>1205.0</real>
 		</dict>
 		<key>2E8E2D6E-FF47-434B-B275-936665674633</key>
 		<dict>
@@ -13388,9 +13388,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>colorindex</key>
 			<integer>3</integer>
 			<key>xpos</key>
-			<real>1505.0</real>
+			<real>3870.0</real>
 			<key>ypos</key>
-			<real>1560.0</real>
+			<real>1205.0</real>
 		</dict>
 		<key>49BFE032-4FC3-4D7A-ADCE-20958B1E2B20</key>
 		<dict>
@@ -13691,9 +13691,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>note</key>
 			<string>CRM</string>
 			<key>xpos</key>
-			<real>1660.0</real>
+			<real>4025.0</real>
 			<key>ypos</key>
-			<real>1560.0</real>
+			<real>1205.0</real>
 		</dict>
 		<key>6232025D-654C-4738-949F-B65659830F68</key>
 		<dict>
@@ -14220,9 +14220,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>note</key>
 			<string>Go Back</string>
 			<key>xpos</key>
-			<real>2160.0</real>
+			<real>4525.0</real>
 			<key>ypos</key>
-			<real>1560.0</real>
+			<real>1205.0</real>
 		</dict>
 		<key>98578A19-1E4B-4A8A-82D7-3BC5EBC6173F</key>
 		<dict>
@@ -14390,9 +14390,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>colorindex</key>
 			<integer>4</integer>
 			<key>xpos</key>
-			<real>1805.0</real>
+			<real>4170.0</real>
 			<key>ypos</key>
-			<real>1565.0</real>
+			<real>1210.0</real>
 		</dict>
 		<key>AE2A8A94-30F4-41AE-B239-B6331D200B44</key>
 		<dict>
@@ -14724,9 +14724,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>1910.0</real>
+			<real>4275.0</real>
 			<key>ypos</key>
-			<real>1560.0</real>
+			<real>1205.0</real>
 		</dict>
 		<key>D07180DE-EC6F-46FE-AFD9-F0AE32DE67E6</key>
 		<dict>
@@ -15157,9 +15157,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>colorindex</key>
 			<integer>1</integer>
 			<key>xpos</key>
-			<real>2285.0</real>
+			<real>4650.0</real>
 			<key>ypos</key>
-			<real>1560.0</real>
+			<real>1205.0</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
@@ -15961,6 +15961,90 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<string>textfield</string>
 			<key>variable</key>
 			<string>crm_list_id</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>placeholder</key>
+				<string>leave blank if unused</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Enables customer notes + tattoo logbooks: the id of a notes list (e.g. 🗂️CRM • Records). Copy an id with ⌘⏎ 🆔 Copy id on any list row. Leave blank if unused.</string>
+			<key>label</key>
+			<string>CRM records list id (optional)</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>crm_records_list_id</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>placeholder</key>
+				<string>🔥lead 🔥consultation 🔥tattoo</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Space-separated CRM booking tags. Order matters: 2nd = the consultation tag, LAST = the session tag that S1/S2 tasks carry. Blank = 🔥lead 🔥consultation 🔥tattoo.</string>
+			<key>label</key>
+			<string>CRM tags (optional)</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>crm_tags</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>placeholder</key>
+				<string>🔥prepare</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>The follow-up tag the auto-opened Prepare window uses. Blank = 🔥prepare.</string>
+			<key>label</key>
+			<string>CRM prepare tag (optional)</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>crm_prepare_tag</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>placeholder</key>
+				<string>🔥customer 🔥logbook 🔥archive</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Three space-separated records tags, in this order: customer notes · active logbooks · finished logbooks. Blank = 🔥customer 🔥logbook 🔥archive.</string>
+			<key>label</key>
+			<string>CRM records tags (optional)</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>crm_records_tags</string>
 		</dict>
 		<dict>
 			<key>config</key>

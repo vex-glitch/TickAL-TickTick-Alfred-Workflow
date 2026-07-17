@@ -61,7 +61,7 @@ PRIORITY_LABEL = {1: "🟡", 3: "🟠", 5: "🔴"}
 # (except 🔥prepare follow-ups) and scope the [[ task-link picker to CRM bookings.
 import areas as _areas
 CRM_ID = _areas.CRM_ID   # Configure panel; empty = CRM scoping never triggers
-PREPARE_TAG = "🔥prepare"
+PREPARE_TAG = _areas.PREPARE_TAG   # canonical home (Configure field)
 
 # &repeat presets - token, label, hint, RRULE
 REPEAT_OPTIONS = [
@@ -335,15 +335,31 @@ def list_picker(fill, fragment, lists=None):
     return items
 
 
-# 🔥CRM tag group - a CRM add's # picker offers only the booking tags
-CRM_TAGS = {"🔥lead", "🔥consultation", "🔥ongoing", "🔥tattoo", "🔥prepare"}
+# CRM tag group - a CRM add's # picker offers only the booking tags
+# (canonical home: areas.py, Configure-driven since 2026-07-17)
+CRM_TAGS = _areas.CRM_TAGS
 
 def tag_picker(prefix, fragment):
     import tagtree
     from display import tag_match_key
     tags = get_tags()
-    crm_scoped = (bool(CRM_ID) and os.environ.get("list_id", "") == CRM_ID) \
-        or "🔥CRM" in prefix
+    # CRM scoping for a typed ~l prefix must mirror what the PARSER will do:
+    # resolve the fragment via resolve_list_id over ALL lists (exact →
+    # startswith → contains) - a fragment that resolves elsewhere ("~l c" →
+    # Chores) must NOT lock the picker to CRM tags. The fragment may have
+    # swallowed title words ("~l crm task #…") - trim words off the right
+    # until something resolves, exactly like the parser's resolve-and-trim.
+    _m = re.search(r"~l\s+([^#!*=&%>]+)", prefix.lower())
+    _frag = _m.group(1).strip() if _m else ""
+    _frag_rid = None
+    if _frag and CRM_ID:
+        _ls = get_lists()
+        while _frag and not _frag_rid:
+            _frag_rid = resolve_list_id(_frag, _ls)[0]
+            if not _frag_rid:
+                _frag = _frag.rsplit(None, 1)[0] if " " in _frag else ""
+    crm_scoped = bool(CRM_ID) and (
+        os.environ.get("list_id", "") == CRM_ID or _frag_rid == CRM_ID)
 
     # '#name>pfrag' - parent step of ➕ new tag: pick which existing
     # tag the new one nests under; the token '#name>parent' rides the query
