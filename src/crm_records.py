@@ -120,6 +120,94 @@ def customer_display(cust):
     return re.sub(r"^👤\s*", "", (cust or {}).get("title") or "").strip()
 
 
+def contact_of(cust):
+    """(phone, mail, bday) parsed from the 📞 header line ('-' → '')."""
+    line = ((cust or {}).get("content") or "").split("\n", 1)[0]
+    def seg(emoji):
+        m = re.search(emoji + r"\s*([^·\n]*)", line)
+        v = (m.group(1).strip() if m else "")
+        return "" if v == "-" else v
+    return seg("📞"), seg("✉️"), seg("🎂")
+
+
+def is_lead(note):
+    return areas.LEAD_TAG in {str(t).lower() for t in ((note or {}).get("tags") or [])}
+
+
+def customer_logbooks(cust_tid, include_archived=True):
+    """This customer's logbooks (first content link points at them),
+    open first."""
+    tags = ([areas.LOGBOOK_TAG, areas.ARCHIVE_TAG] if include_archived
+            else [areas.LOGBOOK_TAG])
+    out, seen = [], set()
+    for tag in tags:
+        for lb in records_notes(tag):
+            if lb["id"] in seen:
+                continue
+            hit = parse_first_link(lb.get("content") or "")
+            if hit and hit[2] == cust_tid:
+                seen.add(lb["id"])
+                out.append(lb)
+    return out
+
+
+def lifetime(cust_tid):
+    """(money_str, tattoo_count, session_count) across ALL the customer's
+    logbooks - recomputed, like every money figure here."""
+    total, sessions, sym, pre, k = 0.0, 0, "", False, 0
+    for lb in customer_logbooks(cust_tid):
+        k += 1
+        t, n, s, p = _totals_raw(lb.get("content") or "")
+        total += t
+        sessions += n
+        if not sym and s:
+            sym, pre = s, p
+    if k == 0 or (total == 0 and sessions == 0):
+        return "-", k, sessions
+    return _fmt_money(total, sym or "€", pre), k, sessions
+
+
+def next_session_task(log_tid):
+    """(local_date_str_or_'', marker, task) of the EARLIEST open calendar
+    task linking this logbook, or None."""
+    best = None
+    for t in cache_store.get("all_tasks") or []:
+        if ((t.get("_projectId") or t.get("projectId")) != areas.CRM_ID
+                or t.get("status", 0) != 0
+                or f"/tasks/{log_tid})" not in (t.get("title") or "")):
+            continue
+        due = t.get("dueDate") or t.get("startDate") or ""
+        key = due or "9999"
+        if best is None or key < best[0]:
+            best = (key, due, t)
+    if best is None:
+        return None
+    _, due, t = best
+    day = ""
+    if due:
+        try:
+            from filtering import utc_str_to_local_date
+            day = utc_str_to_local_date(due)
+        except Exception:
+            day = due[:10]
+    return day, (title_marker(t.get("title") or "") or ""), t
+
+
+def convert_lead(cust):
+    """Lead → customer (first booking, or explicit). RMW retag + mirrors."""
+    if not is_lead(cust):
+        return cust
+    api = _api()
+    live = api.get_task(areas.RECORDS_ID, cust["id"])
+    tags = [t for t in (live.get("tags") or [])
+            if str(t).lower() not in (areas.LEAD_TAG, areas.CUSTOMER_TAG)] \
+        + [areas.CUSTOMER_TAG]
+    _ensure_tag(areas.CUSTOMER_TAG)
+    api.update_task(cust["id"], areas.RECORDS_ID, current=live, tags=tags)
+    _patch_cache(cust["id"], tags=tags)
+    return {**cust, "tags": tags}
+
+
 # ── cache mirrors (same pattern as dispatch.py's create path) ───────────────
 
 def _inject_cache(task):
@@ -247,10 +335,10 @@ def _entries(content):
             for m in ENTRY_RE.finditer(content or "")]
 
 
-def totals(content):
-    """(money_str, session_count) recomputed from the session headers.
-    Money sums segment 4 of every entry (consultation charges count);
-    the count = max(highest S-number, number of S-entries) - sessions are
+def _totals_raw(content):
+    """(total_float, session_count, sym, sym_is_prefix) - the numeric core.
+    Money sums segment 4 of every entry (consultation charges count); the
+    count = max(highest S-number, number of S-entries) - sessions are
     numbered, so a single backlog-import entry marked S5 honestly reads
     '5 sessions'. Currency symbol: only a SHORT pre/suffix of a clean number
     segment counts ('$300', '250€', '250 EUR') - free text ('cash maybe 50',
@@ -272,12 +360,20 @@ def totals(content):
                     if m and (m.group(1) or m.group(2)):
                         sym, pre = ((m.group(1), True) if m.group(1)
                                     else (m.group(2), False))
-    n = max(n, top)
+    return total, max(n, top), sym, pre
+
+
+def _fmt_money(total, sym, pre):
+    num = f"{int(total)}" if total == int(total) else f"{total:.2f}"
+    return f"{sym}{num}" if pre else f"{num}{sym}"
+
+
+def totals(content):
+    """(money_str, session_count) recomputed from the session headers."""
+    total, n, sym, pre = _totals_raw(content)
     if total == 0 and n == 0:
         return "-", 0
-    num = f"{int(total)}" if total == int(total) else f"{total:.2f}"
-    sym = sym or "€"
-    return (f"{sym}{num}" if pre else f"{num}{sym}"), n
+    return _fmt_money(total, sym or "€", pre), n
 
 
 def _sessions_word(n):
@@ -327,25 +423,27 @@ def _seg(v):
     return v if v else "-"
 
 
-def create_customer(name, phone="", mail="", bday=""):
-    """New 👤 customer note in the records list. Returns the created task."""
+def create_customer(name, phone="", mail="", bday="", tag=None):
+    """New 👤 customer note in the records list (tag=areas.LEAD_TAG mints a
+    lead - same note, different kanban group). Returns the created task."""
+    tag = tag or areas.CUSTOMER_TAG
     content = (f"📞 {_seg(phone)} · ✉️ {_seg(mail)} · 🎂 {_seg(bday)}\n\n"
                "## Fun facts\n\n## Tattoos\n\n## Notes\n")
-    _ensure_tag(areas.CUSTOMER_TAG)
+    _ensure_tag(tag)
     t = _api().create_task(title=f"👤 {_safe_name(name)}",
                            project_id=areas.RECORDS_ID, content=content,
-                           tags=[areas.CUSTOMER_TAG], kind="NOTE")
+                           tags=[tag], kind="NOTE")
     _inject_cache(t)
     return t
 
 
-def create_logbook(cust, tattoo):
+def create_logbook(cust, tattoo, started=None):
     """New 🎨 logbook note for a customer + its bullet in the customer note.
-    Returns the created task."""
+    started overrides the Started date (backlog imports). Returns the task."""
     cust_pid = cust.get("_projectId") or cust.get("projectId") or areas.RECORDS_ID
     title = f"🎨 {_safe_name(customer_display(cust))} • {_safe_name(tattoo)}"
     content = (f"👤 {task_link(cust_pid, cust['id'], (cust.get('title') or '').strip())}"
-               f" · Started {_today()} · Finished -\n"
+               f" · Started {started or _today()} · Finished -\n"
                f"Paid: - · 0 sessions\n\n"
                "## Sessions\n\n## Notes\n")
     _ensure_tag(areas.LOGBOOK_TAG)
@@ -393,7 +491,8 @@ def sync_customer_bullet(logbook):
     _patch_cache(cust_tid, content=new)
 
 
-def append_session(log_pid, log_tid, marker, duration="", charged="", text=""):
+def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
+                   when=None):
     """Log one entry: append under ## Sessions, recompute Paid, sync the
     customer bullet. marker = 'S<n>' or 'consultation'.
     Returns (updated_content, money_str, session_count, live_logbook_title) -
@@ -401,7 +500,7 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text=""):
     holding the stale link text frozen in the completed task's title)."""
     api = _api()
     lb = api.get_task(log_pid, log_tid)   # live - dialogs are slow, cache lags
-    entry = f"### {_today()} · {marker} · {_seg(duration)} · {_seg(charged)}"
+    entry = f"### {when or _today()} · {marker} · {_seg(duration)} · {_seg(charged)}"
     if (text or "").strip():
         entry += f"\n{text.strip()}"
     content = _append_under(lb.get("content") or "", "## Sessions", entry)

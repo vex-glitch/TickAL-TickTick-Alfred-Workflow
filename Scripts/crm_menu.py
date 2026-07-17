@@ -61,38 +61,38 @@ def build_items():
         # Dormant until crm_list_id is set in Configure Workflow - the one row
         # opens the setup guide (arg routes via the ^open conditional branch).
         return [alfred.item(**areas.setup_row("CRM", "47-crm.md"))]
-    items = [
+    # The raw "Add" row is RETIRED (smoke ruling 2026-07-17): an unlinked CRM
+    # task is an orphan - everything enters through a records flow now, and
+    # dormant hand-adds get scheduled + linked via 📅 Schedule.
+    if not areas.records_configured():
+        return [alfred.item(**areas.setup_row("CRM records", "47-crm.md"))]
+    return [
+        _records_row("crm-session-done", "✅ Session done",
+                     "Tick off · log · schedule next", "ctx:crmdone"),
+        _records_row("crm-next-session", "▶️ Next session",
+                     "Pick logbook → S<n>", "ctx:crmnew:session"),
+        _records_row("crm-new-tattoo", "➕ New tattoo",
+                     "Customer → logbook → S1", "ctx:crmnew:tattoo"),
+        _records_row("crm-new-consult", "➕ New consultation",
+                     "Customer → logbook → schedule", "ctx:crmnew:consult"),
         alfred.item(
-            uid="crm-add",
-            title="Add",
-            subtitle='New entry in CRM + "prepare" follow up',
-            arg="add",
+            uid="crm-person",
+            title="➕ New lead / customer",
+            subtitle="Dialogs · lead lands in Records, never the calendar",
+            arg="xact:crmperson",
             variables=CRM_VARS,
         ),
+        _records_row("crm-backlog", "📕 Backlog",
+                     "Import finished tattoo · log past session",
+                     "ctx:crmback"),
+        _records_row("crm-sched", "📅 Schedule",
+                     "Dormant tasks → schedule + link", "ctx:crmsched"),
+        _records_row("crm-search", "🔍 Search",
+                     "Everything CRM · / scopes calendar, logbooks, customers",
+                     "ctx:crmsearch"),
+        _records_row("crm-log", "📝 Log",
+                     "Line into a customer / logbook note", "ctx:crmlog"),
     ]
-    if areas.records_configured():
-        items += [
-            _records_row("crm-new-consult", "➕ New consultation",
-                         "Customer → logbook → schedule", "ctx:crmnew:consult"),
-            _records_row("crm-new-tattoo", "➕ New tattoo",
-                         "Customer → logbook → S1", "ctx:crmnew:tattoo"),
-            _records_row("crm-next-session", "▶️ Next session",
-                         "Pick logbook → S<n>", "ctx:crmnew:session"),
-            _records_row("crm-session-done", "✅ Session done",
-                         "Tick off · log · schedule next", "ctx:crmdone"),
-            _records_row("crm-log", "📝 Log",
-                         "Line into a customer / logbook note", "ctx:crmlog"),
-        ]
-    else:
-        items.append(alfred.item(**areas.setup_row("CRM records", "47-crm.md")))
-    items.append(alfred.item(
-        uid="crm-search",
-        title="Search",
-        subtitle=f"Drill {CRM_NAME} by tag",
-        arg="tags",
-        variables={**CRM_VARS, "browse_ctx": f"ctx:tags:{CRM_ID}"},
-    ))
-    return items
 
 
 # Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row

@@ -436,24 +436,31 @@ def main():
             _pn_on = False
 
         # ✅ Session done - CRM calendar tasks the crmnew flow minted
-        # (S<n>/Consult prefix + records-logbook link; the shape check keeps
+        # (S<n>/Consult marker + records-logbook link; the shape check keeps
         # Prepare follow-ups out - their titles carry the link too).
-        # Completes the task + dialog-logs the session into the logbook.
+        # 🔗 Link to logbook - the complement: CRM tasks WITHOUT a records
+        # link (hand-adds, dormant backlog) get linked + marker-suffixed.
         # Cheap gates FIRST: the crm_records import pulls the api module
         # (~75ms) and this is the hottest render in the workflow.
-        _sess_done = False
+        _sess_done = _link_row = False
         if (pid and areas.crm_configured() and areas.records_configured()
                 and pid == areas.CRM_ID and is_task_like and bool(tid)):
             try:
                 import crm_records as _cr
                 _sess_done = _cr.is_session_task(name)
+                _tags_lc = {str(t).lower()
+                            for t in ((task or {}).get("tags") or [])}
+                _link_row = (not _sess_done
+                             and areas.PREPARE_TAG not in _tags_lc)
             except Exception:
-                _sess_done = False
+                _sess_done = _link_row = False
 
         rows = [
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
             ("✅ Session done",    "Tick off · log · schedule next",
              f"xact:sessiondone:{pid}:{tid}", "session done log crm tattoo", _sess_done),
+            ("🔗 Link to logbook", "Pick logbook · title gains link + S<n>",
+             f"xact:crmlink:{pid}:{tid}", "link logbook customer records crm", _link_row),
             ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and has_kids),
             ("⤵️ Browse sections", "Drill into sections",  "browse",        "browse sections drill", itype == "list"),
             ("🏷️ Browse tags",     "Drill into this list's tags", "browse", "browse tags drill", itype == "list"),

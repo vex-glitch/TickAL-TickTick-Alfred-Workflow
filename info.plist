@@ -2827,6 +2827,18 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>C530603D-D2C6-41C4-90F5-50EA70D29F13</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>E400AE0D-0F61-49A5-A749-9D1452AE4FE7</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>AE2A8A94-30F4-41AE-B239-B6331D200B44</key>
 		<array>
@@ -3808,9 +3820,11 @@
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>17</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>T</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -3983,9 +3997,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>5</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>G</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -4416,9 +4432,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>38</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>J</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -4865,11 +4883,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>50</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
 				<key>hotstring</key>
-				<string></string>
+				<string>`</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5143,11 +5161,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>124</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>12320768</integer>
 				<key>hotstring</key>
-				<string></string>
+				<string>→</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5427,9 +5445,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>28</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>8</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5605,9 +5625,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>18</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>1</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5819,9 +5841,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>20</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>3</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -5894,9 +5918,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>21</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>4</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -6113,9 +6139,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>22</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>6</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -6362,6 +6390,20 @@ fi</string>
 						<string>Docs</string>
 						<key>uid</key>
 						<string>09220BD8-15EF-476F-9CA1-2FA169B70DC6</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^xact</string>
+						<key>outputlabel</key>
+						<string>XACT</string>
+						<key>uid</key>
+						<string>E400AE0D-0F61-49A5-A749-9D1452AE4FE7</string>
 					</dict>
 				</array>
 				<key>elselabel</key>
@@ -6917,11 +6959,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>26</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
 				<key>hotstring</key>
-				<string></string>
+				<string>7</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -7153,11 +7195,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>28</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
 				<key>hotstring</key>
-				<string></string>
+				<string>8</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -7408,11 +7450,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>25</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
 				<key>hotstring</key>
-				<string></string>
+				<string>9</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -7640,11 +7682,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>50</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
 				<key>hotstring</key>
-				<string></string>
+				<string>`</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -7713,9 +7755,11 @@ fi</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>1</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>S</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -8183,9 +8227,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>5</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>G</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -8797,9 +8843,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>2</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>D</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11108,9 +11156,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>39</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>'</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11156,9 +11206,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>123</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>12320768</integer>
+				<key>hotstring</key>
+				<string>←</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11208,9 +11260,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>125</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>12320768</integer>
+				<key>hotstring</key>
+				<string>↓</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11321,9 +11375,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>126</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>12320768</integer>
+				<key>hotstring</key>
+				<string>↑</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11369,9 +11425,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>49</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>Space</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11421,9 +11479,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>44</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>/</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11534,9 +11594,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>47</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1835008</integer>
+				<key>hotstring</key>
+				<string>.</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11705,9 +11767,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>29</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>0</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>
@@ -11818,9 +11882,11 @@ esac</string>
 				<key>focusedappvariablename</key>
 				<string></string>
 				<key>hotkey</key>
-				<integer>0</integer>
+				<integer>19</integer>
 				<key>hotmod</key>
-				<integer>0</integer>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>2</string>
 				<key>leftcursor</key>
 				<false/>
 				<key>modsmode</key>

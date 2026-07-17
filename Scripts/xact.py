@@ -1213,9 +1213,14 @@ def _crm_session_prefill(lb_title, marker):
 
 def _crmnew_continue(kind, cust):
     """Customer chosen (or just created) - pick/create the logbook, then hand
-    off to the Add window so the session task gets scheduled the normal way."""
+    off to the Add window so the session task gets scheduled the normal way.
+    A lead converts to customer here - its first booking is the promotion."""
     import areas
     import crm_records as cr
+    try:
+        cust = cr.convert_lead(cust)
+    except Exception:
+        pass
     disp = cr.customer_display(cust) or "customer"
     lb = None
     if kind == "tattoo":
@@ -1256,17 +1261,11 @@ def crmnew_newcust(kind):
         return
     # Esc = ABORT the whole flow (smoke ruling: nothing half-made);
     # plain OK on an empty field = skip it.
-    fields = []
-    for prompt in (f"{name} - phone? (OK skips · Esc cancels)",
-                   f"{name} - mail? (OK skips · Esc cancels)",
-                   f"{name} - birthday? (OK skips · Esc cancels)"):
-        v = _ask(prompt)
-        if v is None:
-            _crm_say("Cancelled · nothing created")
-            return
-        fields.append(v)
-    phone, mail, bday = fields
-    cust = cr.create_customer(name, phone, mail, bday)
+    contact = _ask_contact_chain(name)
+    if contact is None:
+        _crm_say("Cancelled · nothing created")
+        return
+    cust = cr.create_customer(name, *contact)
     _crmnew_continue(kind, cust)
 
 
@@ -1401,6 +1400,235 @@ def crmlog(tid):
         _crm_say(f"📝 Logged to {disp}")
     except Exception as e:
         _crm_say(f"📝 Log failed: {type(e).__name__}: {e}")
+
+
+def _ask_contact_chain(name):
+    """phone/mail/bday dialogs. None = user cancelled (abort the flow)."""
+    fields = []
+    for prompt in (f"{name} - phone? (OK skips · Esc cancels)",
+                   f"{name} - mail? (OK skips · Esc cancels)",
+                   f"{name} - birthday? (OK skips · Esc cancels)"):
+        v = _ask(prompt)
+        if v is None:
+            return None
+        fields.append(v)
+    return fields
+
+
+def crmperson():
+    """➕ New lead / customer - standalone (backlog entry, CRM setup, walk-in
+    who hasn't booked). Leads live in RECORDS, never on the calendar."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    name = _ask("Name?")
+    if not (name or "").strip():
+        _crm_say("Cancelled")
+        return
+    contact = _ask_contact_chain(name)
+    if contact is None:
+        _crm_say("Cancelled · nothing created")
+        return
+    kind = _dialog(f"{name} - lead or customer?",
+                   ["Cancel", "Lead", "Customer"], "Customer")
+    if kind == "":
+        _crm_say("Cancelled · nothing created")
+        return
+    tag = areas.LEAD_TAG if kind == "Lead" else areas.CUSTOMER_TAG
+    cr.create_customer(name, *contact, tag=tag)
+    _crm_say(f"{'🌱 Lead' if kind == 'Lead' else '👤 Customer'} {name} created")
+
+
+def _choose_customer(prompt="Which customer?"):
+    """choose-from-list over customers + leads, with a 🆕 New customer path.
+    Returns the customer dict, or None on cancel."""
+    import areas
+    import crm_records as cr
+    NEW = "🆕 New customer"
+    pool = cr.records_notes(areas.CUSTOMER_TAG) + cr.records_notes(areas.LEAD_TAG)
+    pick = _choose(prompt, [NEW] + [c.get("title") or "" for c in pool])
+    if pick is None:
+        return None
+    if pick != NEW:
+        return next((c for c in pool if (c.get("title") or "") == pick), None)
+    name = _ask("New customer - name?")
+    if not (name or "").strip():
+        return None
+    contact = _ask_contact_chain(name)
+    if contact is None:
+        return None
+    return cr.create_customer(name, *contact)
+
+
+def crmimport():
+    """📕 Backlog: import an already-finished tattoo - archived logbook with
+    one summary entry, NO calendar task. Sessions count rides the S<k> marker
+    (totals read count = max S-number)."""
+    if not _records_ready():
+        return
+    import re as _re
+    import areas
+    import crm_records as cr
+    cust = _choose_customer("Backlog tattoo - which customer?")
+    if cust is None:
+        _crm_say("Cancelled")
+        return
+    tattoo = _ask(f"{cr.customer_display(cust)} - tattoo / project name?")
+    if not (tattoo or "").strip():
+        _crm_say("Cancelled")
+        return
+    total = _ask("Total paid? (OK skips · Esc cancels)")
+    if total is None:
+        _crm_say("Cancelled · nothing created")
+        return
+    k_raw = _ask("How many sessions? (OK = 1 · Esc cancels)")
+    if k_raw is None:
+        _crm_say("Cancelled · nothing created")
+        return
+    m = _re.search(r"\d+", k_raw or "")
+    k = max(1, int(m.group(0))) if m else 1
+    when_raw = _ask("When was it? YYYY-MM-DD or YYYY (OK = today · Esc cancels)")
+    if when_raw is None:
+        _crm_say("Cancelled · nothing created")
+        return
+    when = None
+    w = (when_raw or "").strip()
+    if _re.fullmatch(r"\d{4}", w):
+        when = f"{w}-01-01"
+    elif _re.fullmatch(r"\d{4}-\d{2}-\d{2}", w):
+        when = w
+    state = _dialog("Tattoo state?", ["Cancel", "Still active", "Finished"],
+                    "Finished")
+    if state == "":
+        _crm_say("Cancelled · nothing created")
+        return
+    lb = cr.create_logbook(cust, tattoo, started=when)
+    cr.append_session(areas.RECORDS_ID, lb["id"], f"S{k}",
+                      charged=total, text="Backlog import.", when=when)
+    if state == "Finished":
+        cr.finish_logbook(areas.RECORDS_ID, lb["id"])
+    _crm_say(f"📕 {lb.get('title')} imported · {k} sessions"
+             + (" · archived" if state == "Finished" else ""))
+
+
+def crmpast(log_tid):
+    """📕 Backlog: log a PAST session into a logbook - dated entry, no task."""
+    if not _records_ready():
+        return
+    import re as _re
+    import areas
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    when_raw = _ask("When? YYYY-MM-DD (OK = today · Esc cancels)")
+    if when_raw is None:
+        _crm_say("Cancelled")
+        return
+    w = (when_raw or "").strip()
+    when = w if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", w) else None
+    n = cr.next_snum(lb.get("content") or "", log_tid)
+    marker = _dialog("Log as?", ["Cancel", "Consultation", f"S{n}"], f"S{n}")
+    if marker == "":
+        _crm_say("Cancelled")
+        return
+    marker = "consultation" if marker == "Consultation" else f"S{n}"
+    answers = []
+    for prompt in ("How long? (OK skips · Esc cancels)",
+                   "Charged? (OK skips · Esc cancels)",
+                   "What did you do? (OK skips · Esc cancels)"):
+        v = _ask(prompt)
+        if v is None:
+            _crm_say("Cancelled · nothing logged")
+            return
+        answers.append(v)
+    dur, charged, did = answers
+    _, money, n_total, _t = cr.append_session(
+        areas.RECORDS_ID, log_tid, marker, dur, charged, did, when=when)
+    _crm_say(f"📕 {marker} logged · {money} / {n_total} total")
+
+
+def crmsched(pid, tid):
+    """📅 Schedule a dormant task: reopen the ⌘ Actions menu on it (act-again
+    mechanism) - Schedule and Link to logbook both live there."""
+    reopen_actions(pid, tid)
+
+
+def crmcopy(text):
+    """Copy a contact value from a hub row (browse ⏎ can't ride the copy:
+    chain - it lives on the ⌥⌘ canvas edge)."""
+    subprocess.run(["pbcopy"], input=(text or "").encode())
+    _crm_say(f"📋 Copied {text}")
+
+
+def crmconvert(tid):
+    """🌱 Lead → 👤 customer, explicitly (bookings convert automatically)."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    cust = _record_by_id(tid)
+    if not cust:
+        _crm_say("Not found · run tsy")
+        return
+    cr.convert_lead(cust)
+    _crm_say(f"👤 {cr.customer_display(cust)} is a customer now")
+
+
+def crmlink(pid, tid):
+    """🔗 Link an existing calendar task to a logbook: the title gains the
+    logbook link + S<n>/Consult suffix, making it a records session task."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    NEW = "🆕 New logbook…"
+    lbs = cr.records_notes(areas.LOGBOOK_TAG)
+    pick = _choose("Link to which logbook?",
+                   [NEW] + [l.get("title") or "" for l in lbs])
+    if pick is None:
+        _crm_say("Cancelled")
+        return
+    if pick == NEW:
+        cust = _choose_customer()
+        if cust is None:
+            _crm_say("Cancelled")
+            return
+        tattoo = _ask(f"{cr.customer_display(cust)} - tattoo / project name?")
+        if not (tattoo or "").strip():
+            _crm_say("Cancelled")
+            return
+        lb = cr.create_logbook(cust, tattoo)
+    else:
+        lb = next((l for l in lbs if (l.get("title") or "") == pick), None)
+        if lb is None:
+            _crm_say("Logbook not found")
+            return
+    n = cr.next_snum(lb.get("content") or "", lb["id"])
+    mk = _dialog("Link as?", ["Cancel", "Consult", f"S{n}"], f"S{n}")
+    if mk == "":
+        _crm_say("Cancelled")
+        return
+    api = cr._api()
+    live = api.get_task(pid, tid)
+    old = cr.LINK_RE.sub("", live.get("title") or "").strip()
+    link = cr.task_link(areas.RECORDS_ID, lb["id"], lb.get("title") or "")
+    new_title = f"{old} {link} {mk}".strip() if old else f"{link} {mk}"
+    api.update_task(tid, pid, current=live, title=new_title)
+    try:   # mirror into the task caches so gates/pickers see it immediately
+        for key in ("all_tasks",):
+            pool = cache_store.get(key) or []
+            for t in pool:
+                if t.get("id") == tid:
+                    t["title"] = new_title
+            cache_store.set(key, pool)
+        import dispatch as _disp
+        _disp._patch_project_data(tid, fields={"title": new_title},
+                                  pid_old=pid, pid_new=pid)
+    except Exception:
+        pass
+    _crm_say(f"🔗 Linked · {lb.get('title')} {mk}")
 
 
 def v2login():
@@ -3169,6 +3397,22 @@ def main():
             sessiondone(pid, tid)
         elif verb == "crmlog":
             crmlog(rest)
+        elif verb == "crmperson":
+            crmperson()
+        elif verb == "crmimport":
+            crmimport()
+        elif verb == "crmpast":
+            crmpast(rest)
+        elif verb == "crmsched":
+            pid, tid = rest.split(":", 1)
+            crmsched(pid, tid)
+        elif verb == "crmlink":
+            pid, tid = rest.split(":", 1)
+            crmlink(pid, tid)
+        elif verb == "crmconvert":
+            crmconvert(rest)
+        elif verb == "crmcopy":
+            crmcopy(rest)
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's
