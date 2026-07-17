@@ -193,6 +193,50 @@ def next_session_task(log_tid):
     return day, (title_marker(t.get("title") or "") or ""), t
 
 
+def dur_minutes(s):
+    """Duration text → minutes: '3h'→180, '2h30'→150, '2.5h'→150, '90m'→90,
+    '1:30'→90, bare '3'→180 (≤12 reads as hours, artists say '3'), bare
+    '90'→90. None when unparseable."""
+    s = (s or "").strip().lower().replace(",", ".")
+    if not s or s == "-":
+        return None
+    m = re.fullmatch(r"(\d+):(\d{1,2})", s)
+    if m:
+        return int(m.group(1)) * 60 + int(m.group(2))
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*h(?:ours?)?\s*(\d{1,2})?", s)
+    if m:
+        return int(float(m.group(1)) * 60) + (int(m.group(2)) if m.group(2) else 0)
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:m|min|mins|minutes)", s)
+    if m:
+        return int(float(m.group(1)))
+    m = re.fullmatch(r"\d+(?:\.\d+)?", s)
+    if m:
+        v = float(s)
+        return int(v * 60) if v <= 12 else int(v)
+    return None
+
+
+def payments_sum(content):
+    """(money_str_or_'', total_float) of 'payment'-marker entries only -
+    the deposit-on-file chip."""
+    total, sym, pre = 0.0, "", False
+    for segs in _entries(content):
+        if len(segs) > 1 and (segs[1] or "").lower() == "payment" and len(segs) > 3:
+            v = _num(segs[3])
+            if v is not None:
+                total += v
+                if not sym:
+                    m = re.fullmatch(
+                        r"\s*([^\d\s.,\-]{1,3})?\s*-?[\d.,]+\s*([^\d\s.,\-]{1,3})?\s*",
+                        segs[3])
+                    if m and (m.group(1) or m.group(2)):
+                        sym, pre = ((m.group(1), True) if m.group(1)
+                                    else (m.group(2), False))
+    if not total:
+        return "", 0.0
+    return _fmt_money(total, sym or "€", pre), total
+
+
 def note_age_days(note):
     """Days since the note was created - TickTick ids embed the unix time in
     their first 8 hex chars, so this needs no extra field."""
@@ -281,26 +325,30 @@ def all_entries():
                         if s2 and (s2.group(1) or s2.group(2)):
                             sym, pre = ((s2.group(1), True) if s2.group(1)
                                         else (s2.group(2), False))
-                out.append((segs[0], is_s, amt, sym, pre))
+                mins = dur_minutes(segs[2]) if len(segs) > 2 else None
+                out.append((segs[0], is_s, amt, sym, pre, mins))
     return out
 
 
 def sum_entries(entries, start=None, end=None):
-    """(money_str, session_count) over entries whose date is in
+    """(money_str, session_count, hours_float) over entries whose date is in
     [start, end] (ISO date strings, inclusive; None = unbounded)."""
-    total, n, sym, pre = 0.0, 0, "", False
-    for date, is_s, amt, s, p in entries:
+    total, n, sym, pre, mins = 0.0, 0, "", False, 0
+    for date, is_s, amt, s, p, mm in entries:
         if (start and date < start) or (end and date > end):
             continue
         if is_s:
             n += 1
+            if mm:
+                mins += mm
         if amt is not None:
             total += amt
             if not sym and s:
                 sym, pre = s, p
+    hours = round(mins / 60.0, 1)
     if total == 0 and n == 0:
-        return "-", 0
-    return _fmt_money(total, sym or "€", pre), n
+        return "-", 0, hours
+    return _fmt_money(total, sym or "€", pre), n, hours
 
 
 def lifetime_raw(cust_tid):
@@ -310,6 +358,93 @@ def lifetime_raw(cust_tid):
         t, _n, _s, _p = _totals_raw(lb.get("content") or "")
         total += t
     return total
+
+
+def _link_text_pat(target_tid):
+    return re.compile(r"\[([^\]]*)\](\(https://ticktick\.com/webapp/#p/\w+/tasks/"
+                      + re.escape(target_tid) + r"\))")
+
+
+def _ripple_task_link_text(target_tid, new_text):
+    """Open CRM task titles linking target_tid get their link TEXT swapped
+    (links resolve by id - this is display consistency, best-effort)."""
+    api = _api()
+    pat = _link_text_pat(target_tid)
+    pool = cache_store.get("all_tasks") or []
+    for t in pool:
+        if ((t.get("_projectId") or t.get("projectId")) == areas.CRM_ID
+                and t.get("status", 0) == 0
+                and f"/tasks/{target_tid})" in (t.get("title") or "")):
+            new_t = pat.sub(lambda m: f"[{new_text}]{m.group(2)}",
+                            t.get("title") or "")
+            if new_t != t.get("title"):
+                try:
+                    live = api.get_task(areas.CRM_ID, t["id"])
+                    api.update_task(t["id"], areas.CRM_ID, current=live,
+                                    title=new_t)
+                    t["title"] = new_t
+                except Exception:
+                    pass
+    cache_store.set("all_tasks", pool)
+
+
+def _swap_link_text_in_note(note_tid, target_tid, new_text):
+    """Same swap inside a records note's content."""
+    try:
+        api = _api()
+        live = api.get_task(areas.RECORDS_ID, note_tid)
+        pat = _link_text_pat(target_tid)
+        new_c = pat.sub(lambda m: f"[{new_text}]{m.group(2)}",
+                        live.get("content") or "")
+        if new_c != (live.get("content") or ""):
+            api.update_task(note_tid, areas.RECORDS_ID, current=live,
+                            content=new_c)
+            _patch_cache(note_tid, content=new_c)
+    except Exception:
+        pass
+
+
+def rename_logbook(log_tid, new_tattoo):
+    """Rename the tattoo with full ripple: note title, customer bullet,
+    every open task's link text."""
+    api = _api()
+    lb = api.get_task(areas.RECORDS_ID, log_tid)
+    old = lb.get("title") or ""
+    m = re.match(r"^(🎨 .*? • )", old)
+    new_title = (m.group(1) if m else "🎨 ") + _safe_name(new_tattoo)
+    api.update_task(log_tid, areas.RECORDS_ID, current=lb, title=new_title)
+    _patch_cache(log_tid, title=new_title)
+    _ripple_task_link_text(log_tid, new_title)
+    sync_customer_bullet({**lb, "title": new_title})
+    return new_title
+
+
+def rename_customer(cust_tid, new_name):
+    """Rename the human with full ripple: customer note, every logbook title
+    carrying the old name, the links inside them, open task link texts."""
+    api = _api()
+    cust = api.get_task(areas.RECORDS_ID, cust_tid)
+    old_disp = customer_display(cust)
+    new_disp = _safe_name(new_name)
+    new_title = f"👤 {new_disp}"
+    api.update_task(cust_tid, areas.RECORDS_ID, current=cust, title=new_title)
+    _patch_cache(cust_tid, title=new_title)
+    for lb in customer_logbooks(cust_tid):
+        _swap_link_text_in_note(lb["id"], cust_tid, new_title)
+        lt = lb.get("title") or ""
+        if old_disp and lt.startswith(f"🎨 {old_disp} • "):
+            tattoo_part = lt[len(f"🎨 {old_disp} • "):]
+            new_lt = f"🎨 {new_disp} • {tattoo_part}"
+            try:
+                live_lb = api.get_task(areas.RECORDS_ID, lb["id"])
+                api.update_task(lb["id"], areas.RECORDS_ID, current=live_lb,
+                                title=new_lt)
+                _patch_cache(lb["id"], title=new_lt)
+                _ripple_task_link_text(lb["id"], new_lt)
+                sync_customer_bullet({**live_lb, "title": new_lt})
+            except Exception:
+                pass
+    return new_title
 
 
 def reopen_logbook(log_pid, log_tid):
@@ -603,17 +738,43 @@ def create_customer(name, phone="", mail="", bday="", insta="", tag=None):
     return t
 
 
-def create_logbook(cust, tattoo, started=None, quoted=""):
+CONSULT_PREP_FILE = os.path.expanduser("~/.ticktick_alfred/consult_prep.txt")
+CONSULT_PREP_DEFAULT = """- Placement:
+- Size:
+- Style / references:
+- Budget:
+- Timeline / availability:
+- Health notes (allergies, skin, meds):"""
+
+
+def _consult_prep_lines():
+    """The consult question sheet - user-editable file, default on first use."""
+    try:
+        with open(CONSULT_PREP_FILE) as f:
+            return f.read().strip()
+    except OSError:
+        try:
+            with open(CONSULT_PREP_FILE, "w") as f:
+                f.write(CONSULT_PREP_DEFAULT)
+        except OSError:
+            pass
+        return CONSULT_PREP_DEFAULT
+
+
+def create_logbook(cust, tattoo, started=None, quoted="", prep=False):
     """New 🎨 logbook note for a customer + its bullet in the customer note.
     started overrides the Started date (backlog imports); quoted adds the
     'Quoted:' header line the Paid math renders progress against."""
     cust_pid = cust.get("_projectId") or cust.get("projectId") or areas.RECORDS_ID
     title = f"🎨 {_safe_name(customer_display(cust))} • {_safe_name(tattoo)}"
     q_line = f"Quoted: {quoted.strip()}\n" if (quoted or "").strip() else ""
+    prep_block = ""
+    if prep:
+        prep_block = "## Consult prep\n" + _consult_prep_lines() + "\n\n"
     content = (f"👤 {task_link(cust_pid, cust['id'], (cust.get('title') or '').strip())}"
                f" · Started {started or _today()} · Finished -\n"
                f"Paid: - · 0 sessions\n{q_line}\n"
-               "## Sessions\n\n## Notes\n")
+               f"{prep_block}## Sessions\n\n## Notes\n")
     _ensure_tag(areas.LOGBOOK_TAG)
     t = _api().create_task(title=title, project_id=areas.RECORDS_ID,
                            content=content, tags=[areas.LOGBOOK_TAG], kind="NOTE")
@@ -699,13 +860,18 @@ def finish_logbook(log_pid, log_tid):
     sync_customer_bullet({**lb, "content": content})
 
 
-def append_note_line(pid, tid, text):
-    """Timestamped free-text line under ## Notes (customer OR logbook)."""
+def append_note_line(pid, tid, text, section="## Notes", stamp=True):
+    """Free-text line under a section (## Notes timestamped by default;
+    ## Fun facts takes bare bullets - facts don't age)."""
     api = _api()
     note = api.get_task(pid, tid)
-    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    content = _append_under(note.get("content") or "", "## Notes",
-                            f"- {stamp} - {text.strip()}", blank=False)
+    if stamp:
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        line = f"- {ts} - {text.strip()}"
+    else:
+        line = f"- {text.strip()}"
+    content = _append_under(note.get("content") or "", section, line,
+                            blank=False)
     api.update_task(tid, pid, current=note, content=content)
     _patch_cache(tid, content=content)
     return content

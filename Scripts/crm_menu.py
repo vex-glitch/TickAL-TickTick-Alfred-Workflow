@@ -67,6 +67,8 @@ def build_items():
     if not areas.records_configured():
         return [alfred.item(**areas.setup_row("CRM records", "47-crm.md"))]
     return [
+        _records_row("crm-week", "📆 Week",
+                     "Who's coming + needs-booking radar", "ctx:crmweek"),
         _records_row("crm-session-done", "✅ Session done",
                      "Tick off · log · schedule next", "ctx:crmdone"),
         _records_row("crm-next-session", "▶️ Next session",

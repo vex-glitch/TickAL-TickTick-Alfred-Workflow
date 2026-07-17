@@ -1243,7 +1243,8 @@ def _crmnew_continue(kind, cust):
             return
         # The logbook is real from here - these two are skippable, not aborts.
         quoted = _ask(f"{tattoo} - quoted price? (OK or Esc skips)") or ""
-        lb = cr.create_logbook(cust, tattoo, quoted=quoted)
+        lb = cr.create_logbook(cust, tattoo, quoted=quoted,
+                               prep=(kind == "consult"))
         deposit = _ask("Deposit taken? (OK or Esc skips)") or ""
         if deposit.strip():
             cr.append_session(areas.RECORDS_ID, lb["id"], "payment",
@@ -1496,9 +1497,20 @@ def crmlog(tid):
     if not (text or "").strip():
         _crm_say("Cancelled")
         return
+    section, stamp = "## Notes", True
+    tags_lc = {str(t).lower() for t in ((note or {}).get("tags") or [])}
+    if tags_lc & {areas.CUSTOMER_TAG, areas.LEAD_TAG}:
+        pick = _dialog("Where does it go?",
+                       ["Cancel", "Fun fact", "Note"], "Note")
+        if pick == "":
+            _crm_say("Cancelled")
+            return
+        if pick == "Fun fact":
+            section, stamp = "## Fun facts", False
     try:
-        cr.append_note_line(areas.RECORDS_ID, tid, text)
-        _crm_say(f"📝 Logged to {disp}")
+        cr.append_note_line(areas.RECORDS_ID, tid, text,
+                            section=section, stamp=stamp)
+        _crm_say(f"{'💡' if section == '## Fun facts' else '📝'} Logged to {disp}")
     except Exception as e:
         _crm_say(f"📝 Log failed: {type(e).__name__}: {e}")
 
@@ -1799,6 +1811,58 @@ def crmcold(tid):
         _crm_say(f"🥶 {cr.customer_display(cust)} archived")
     except Exception as e:
         _crm_say(f"🥶 Failed: {type(e).__name__}: {e}")
+
+
+def crmrename(tid):
+    """✏️ Rename a customer (👤) or tattoo (🎨) with the full ripple: titles,
+    link texts, bullets - everywhere."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    note = _record_by_id(tid)
+    if not note:
+        _crm_say("Not found · run tsy")
+        return
+    title = note.get("title") or ""
+    if title.startswith("👤"):
+        new = _ask(f"{title} - new name?")
+        if not (new or "").strip():
+            _crm_say("Cancelled")
+            return
+        nt = cr.rename_customer(tid, new)
+        _crm_say(f"✏️ Renamed → {nt} (everywhere)")
+    else:
+        new = _ask(f"{title} - new tattoo / project name?")
+        if not (new or "").strip():
+            _crm_say("Cancelled")
+            return
+        nt = cr.rename_logbook(tid, new)
+        _crm_say(f"✏️ Renamed → {nt} (everywhere)")
+
+
+def crmsummary(log_tid):
+    """🧾 The logbook's money story as paste-ready text (invoice, where-we-
+    stand DM): sessions, amounts, the Paid/Quoted line."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    lines = [lb.get("title") or "Logbook", ""]
+    for m in cr.ENTRY_RE.finditer(lb.get("content") or ""):
+        segs = [s.strip() for s in m.group(1).split("·")]
+        date = segs[0]
+        mk = segs[1] if len(segs) > 1 else ""
+        amt = segs[3] if len(segs) > 3 else "-"
+        if amt and amt != "-":
+            lines.append(f"{date} · {mk} · {amt}")
+        else:
+            lines.append(f"{date} · {mk}")
+    lines += ["", cr.paid_summary(lb.get("content") or "")]
+    subprocess.run(["pbcopy"], input="\n".join(lines).encode())
+    _crm_say(f"🧾 Summary copied · {lb.get('title')}")
 
 
 def crmclose(log_tid):
@@ -3683,6 +3747,10 @@ def main():
             crmcold(rest)
         elif verb == "crmclose":
             crmclose(rest)
+        elif verb == "crmrename":
+            crmrename(rest)
+        elif verb == "crmsummary":
+            crmsummary(rest)
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's

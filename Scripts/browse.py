@@ -941,10 +941,18 @@ def render_crmdone(query):
                 mods["alt"] = {"arg": "", "valid": True,
                                "subtitle": "Customer hub",
                                "variables": {"browse_ctx": f"ctx:crmcust:{_c[2]}"}}
+        dep = ""
+        if _l:
+            _lb2 = next((x for x in cr.records_notes()
+                         if x.get("id") == _l[2]), None)
+            if _lb2:
+                dep_s, _dv = cr.payments_sum(_lb2.get("content") or "")
+                if dep_s:
+                    dep = f" · 💶 {dep_s} on file"
         rows.append(alfred.item(
             uid=f"crmdone-{t['id']}",
             title=f"✅ {disp}",
-            subtitle=f"📅 {_day(t) or 'Not scheduled'} · ⏎ Complete + log",
+            subtitle=f"📅 {_day(t) or 'Not scheduled'}{dep} · ⏎ Complete + log",
             arg=f"xact:sessiondone:{CRM_ID}:{t['id']}",
             mods=mods,
             variables={"task_id": t["id"], "task_list_id": CRM_ID,
@@ -1087,6 +1095,152 @@ def _crm_open_tasks():
             and t.get("status", 0) == 0]
 
 
+def render_crmweek(query):
+    """📆 The morning glance: today's + this week's sessions in date order,
+    then the 🔔 needs-booking radar (active logbooks with nothing scheduled
+    and no entry in 14 days - the pipeline leak)."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    import crm_records as cr
+    from datetime import date as _date, datetime as _dt, timedelta as _td
+
+    def _local_dt(t):
+        due = t.get("dueDate") or t.get("startDate") or ""
+        if not due:
+            return None
+        try:
+            clean = due[:19]
+            d = _dt(int(clean[0:4]), int(clean[5:7]), int(clean[8:10]),
+                    int(clean[11:13]), int(clean[14:16]),
+                    tzinfo=__import__("datetime").timezone.utc)
+            return d.astimezone()
+        except Exception:
+            return None
+
+    today = _date.today()
+    horizon = today + _td(days=7)
+    rows = []
+    pool = []
+    for t in _crm_open_tasks():
+        d = _local_dt(t)
+        if d and today <= d.date() <= horizon:
+            pool.append((d, t))
+    pool.sort(key=lambda x: x[0])
+    for d, t in pool:
+        disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+        when = ("Today" if d.date() == today else
+                ("Tomorrow" if d.date() == today + _td(days=1)
+                 else d.strftime("%a %d")))
+        clock = d.strftime(" %H:%M") if d.strftime("%H:%M") != "00:00" else ""
+        mods = _picker_mods()
+        _l = cr.parse_first_link(t.get("title") or "")
+        if _l:
+            _lb = next((x for x in cr.records_notes()
+                        if x.get("id") == _l[2]), None)
+            _c = cr.parse_first_link((_lb or {}).get("content") or "")
+            if _c:
+                mods["alt"] = {"arg": "", "valid": True,
+                               "subtitle": "Customer hub",
+                               "variables": {"browse_ctx": f"ctx:crmcust:{_c[2]}"}}
+        rows.append(alfred.item(
+            uid=f"wk-{t['id']}",
+            title=f"📆 {when}{clock} · {disp}",
+            subtitle="⏎ Open · ⌘ Actions (Session done lives there)",
+            arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
+            mods=mods,
+            variables={"task_id": t["id"], "task_list_id": CRM_ID,
+                       "list_id": CRM_ID, "task_title": t.get("title") or "",
+                       "item_type": "task"}))
+    if not rows:
+        rows = [alfred.item(title="📆 Nothing this week",
+                            subtitle="The radar below is your move",
+                            valid=False)]
+
+    # 🔔 radar: active logbook + nothing scheduled + last entry > 14d ago
+    cutoff = (today - _td(days=14)).isoformat()
+    for lb in cr.records_notes(_areas.LOGBOOK_TAG):
+        if cr.next_session_task(lb["id"]):
+            continue
+        dates = [m.group(1)[:10] for m in
+                 cr.ENTRY_RE.finditer(lb.get("content") or "")]
+        last = max(dates) if dates else None
+        age_ref = last or (today - _td(days=(cr.note_age_days(lb) or 0))).isoformat()
+        if age_ref <= cutoff:
+            chip = f"last entry {last}" if last else "no entries yet"
+            rows.append(alfred.item(
+                uid=f"wk-radar-{lb['id']}",
+                title=f"🔔 {lb.get('title') or ''}",
+                subtitle=f"Nothing scheduled · {chip} · ⏎ Schedule next session",
+                arg=f"xact:crmnew_go:session::{lb['id']}",
+                mods=_picker_mods(),
+                variables=_record_vars(lb)))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    return add_back(rows, "ctx:crmhub")
+
+
+def render_crmbook(log_tid, query):
+    """🎨 The logbook hub - everything about ONE tattoo on one screen."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    import crm_records as cr
+    lb = next((l for l in cr.records_notes() if l.get("id") == log_tid), None)
+    if lb is None:
+        return add_back([alfred.item(title="Logbook not found",
+                                     subtitle="Run tsy", valid=False)],
+                        "ctx:crmhub")
+    archived = _areas.ARCHIVE_TAG in {str(t).lower()
+                                      for t in (lb.get("tags") or [])}
+    hit = cr.parse_first_link(lb.get("content") or "")
+    back = f"ctx:crmcust:{hit[2]}" if hit else "ctx:crmhub"
+    n = cr.next_snum(lb.get("content") or "", log_tid)
+    rows = [alfred.item(
+        uid="bk-open", title=lb.get("title") or "Logbook",
+        subtitle=cr.paid_summary(lb.get("content") or "")
+                 + (" · 📁 archived" if archived else "") + " · ⏎ Open note",
+        arg=_open_note_arg(log_tid), mods=_picker_mods(),
+        variables=_record_vars(lb))]
+    if not archived:
+        rows.append(alfred.item(
+            uid="bk-next", title=f"▶️ Schedule S{n}",
+            subtitle="Add window · prefilled",
+            arg=f"xact:crmnew_go:session::{log_tid}", mods=_picker_mods()))
+    rows += [
+        alfred.item(uid="bk-photo", title="🖼 Attach photo",
+                    subtitle="Clipboard → logbook (reference · session · healed)",
+                    arg=f"xact:crmphoto:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-pay", title="💶 Log payment",
+                    subtitle="Deposit · remainder · minus = refund",
+                    arg=f"xact:crmpay:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-past", title="🕰 Log past session",
+                    subtitle="Dated entry, no task",
+                    arg=f"xact:crmpast:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-summary", title="🧾 Copy money summary",
+                    subtitle="Sessions + amounts + total → clipboard",
+                    arg=f"xact:crmsummary:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-rename", title="✏️ Rename tattoo",
+                    subtitle="Ripples through titles, links, bullets",
+                    arg=f"xact:crmrename:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-log", title="📝 Log a line",
+                    subtitle="Timestamped · lands under ## Notes",
+                    arg=f"xact:crmlog:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-edit", title="✏️ Edit note",
+                    subtitle="Alfred text view",
+                    arg=f"xact:crmedit:{log_tid}", mods=_picker_mods()),
+    ]
+    if not archived:
+        rows.append(alfred.item(
+            uid="bk-close", title="📁 Archive",
+            subtitle="Close without a session",
+            arg=f"xact:crmclose:{log_tid}", mods=_picker_mods()))
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, back)
+
+
 def render_crmmoney(sub, query):
     """💰 Vex's money screen: all-time totals first, customers second,
     open logbooks below; archived behind one row (typing searches them too).
@@ -1107,9 +1261,11 @@ def render_crmmoney(sub, query):
         q0 = _date(today.year, ((today.month - 1) // 3) * 3 + 1, 1)
         y0 = _date(today.year, 1, 1)
         def row(uid, label, a, b):
-            money, n = cr.sum_entries(e, a and a.isoformat(), b and b.isoformat())
+            money, n, hours = cr.sum_entries(e, a and a.isoformat(),
+                                             b and b.isoformat())
+            extra = f" · {hours:g}h" if hours else ""
             return alfred.item(
-                uid=uid, title=f"{label} · {money} · {n} session{'s' if n != 1 else ''}",
+                uid=uid, title=f"{label} · {money} · {n} session{'s' if n != 1 else ''}{extra}",
                 subtitle=f"{a.isoformat() if a else '…'} → {b.isoformat() if b else 'today'}",
                 valid=False)
         rows = [
@@ -1157,11 +1313,19 @@ def render_crmmoney(sub, query):
     # root: totals + customers pinned, open logbooks below; typing also
     # searches the archived ones (chipped) so history stays reachable.
     e = cr.all_entries()
-    money, n = cr.sum_entries(e)
+    money, n, hours = cr.sum_entries(e)
     arch = cr.records_notes(_areas.ARCHIVE_TAG)
+    rate = ""
+    if hours:
+        import re as _re2
+        mnum = _re2.search(r"-?[\d.]+", money.replace(",", ""))
+        if mnum:
+            r = float(mnum.group(0)) / hours
+            symm = _re2.sub(r"[-\d.,\s]", "", money) or "€"
+            rate = f" · {hours:g}h · ~{int(r)}{symm}/h"
     pinned = [
         alfred.item(uid="mo-total",
-                    title=f"💰 All time · {money} · {n} session{'s' if n != 1 else ''}",
+                    title=f"💰 All time · {money} · {n} session{'s' if n != 1 else ''}{rate}",
                     subtitle="⏎ Weekly · monthly · quarterly · yearly",
                     arg="xact:crmbrowse:ctx:crmmoney:periods",
                     mods=_picker_mods()),
@@ -1270,6 +1434,8 @@ def render_crmhub(query):
             "ctx:crmstats"),
         hop("hub-money", "💰 Money", "Totals · periods · per customer",
             "ctx:crmmoney"),
+        hop("hub-week", "📆 Week", "Who's coming + the needs-booking radar",
+            "ctx:crmweek"),
     ]
     if query:
         rows = fuzz.filter_and_score(query, rows,
@@ -1291,7 +1457,8 @@ def render_crmsearch(query):
         frag = q[1:].strip()
         scopes = [("ca", "📅 Calendar", "Session + dormant tasks"),
                   ("lo", "🎨 Logbooks", "Active + archived"),
-                  ("cu", "👥 Customers", "Customers + leads")]
+                  ("cu", "👥 Customers", "Customers + leads"),
+                  ("ar", "📁 Archived", "Finished logbooks only")]
         rows = [alfred.item(uid=f"crms-scope-{k}", title=t, subtitle=s,
                             arg="", valid=False, autocomplete=f"{k} ")
                 for k, t, s in scopes]
@@ -1301,7 +1468,7 @@ def render_crmsearch(query):
         return add_back(rows, "ctx:crmhub")
 
     scope, term = "", q
-    m = re.match(r"(ca|lo|cu)\s+(.*)$", q) or re.fullmatch(r"(ca|lo|cu)\s*", q)
+    m = re.match(r"(ca|lo|cu|ar)\s+(.*)$", q) or re.fullmatch(r"(ca|lo|cu|ar)\s*", q)
     if m:
         scope = m.group(1)
         term = (m.group(2) if m.lastindex and m.lastindex > 1 else "").strip()
@@ -1316,9 +1483,11 @@ def render_crmsearch(query):
             if c["id"] not in seen:
                 seen.add(c["id"])
                 rows.append(("cust", c))
-    if scope in ("", "lo"):
+    if scope in ("", "lo", "ar"):
         seen = set()
-        for tag in (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
+        tags = ((_areas.ARCHIVE_TAG,) if scope == "ar"
+                else (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG))
+        for tag in tags:
             for lb in cr.records_notes(tag):
                 if lb["id"] not in seen:
                     seen.add(lb["id"])
@@ -1400,10 +1569,23 @@ def render_crmcust(cust_tid, query):
                                 subtitle="⏎ Open profile (DMs live here)",
                                 arg=f"open:https://instagram.com/{handle}",
                                 mods=_picker_mods()))
+    if phone:
+        digits = re.sub(r"[^\d]", "", phone)
+        if digits:
+            rows.append(alfred.item(
+                uid="hub-wa", title="💬 WhatsApp",
+                subtitle=f"⏎ Chat with {phone}",
+                arg=f"open:https://wa.me/{digits.lstrip('0')}",
+                mods=_picker_mods()))
     lbs = cr.customer_logbooks(cust_tid)
     lb_ids = {lb["id"] for lb in lbs}
     for lb in lbs:
-        rows.append(_logbook_row(cr, lb, uid_prefix="hub"))
+        r = _logbook_row(cr, lb, uid_prefix="hub")
+        # ⏎ opens the LOGBOOK HUB (photo/payment/summary/rename/archive all
+        # live there) - the note itself is one more ⏎ inside.
+        r["arg"] = f"xact:crmbrowse:ctx:crmbook:{lb['id']}"
+        r["subtitle"] = (r.get("subtitle") or "") + " · ⏎ Logbook hub"
+        rows.append(r)
     for t in _crm_open_tasks():
         if any(f"/tasks/{lid})" in (t.get("title") or "") for lid in lb_ids):
             rows.append(_crm_task_row(cr, t, uid_prefix="hub"))
@@ -1411,26 +1593,6 @@ def render_crmcust(cust_tid, query):
         uid="hub-newtattoo", title=f"➕ New tattoo for {name}",
         subtitle="Logbook + S1 → scheduling",
         arg=f"xact:crmnew_go:tattoo:{cust_tid}", mods=_picker_mods()))
-    for lb in lbs:
-        arch = _areas.ARCHIVE_TAG in {str(t).lower()
-                                      for t in (lb.get("tags") or [])}
-        rows.append(alfred.item(
-            uid=f"hub-photo-{lb['id']}",
-            title=f"🖼 Attach photo · {lb.get('title') or ''}",
-            subtitle="Clipboard → logbook (reference · session · healed)",
-            arg=f"xact:crmphoto:{lb['id']}", mods=_picker_mods()))
-        if arch:
-            continue
-        rows.append(alfred.item(
-            uid=f"hub-pay-{lb['id']}",
-            title=f"💶 Log payment · {lb.get('title') or ''}",
-            subtitle="Deposit · remainder · minus = refund",
-            arg=f"xact:crmpay:{lb['id']}", mods=_picker_mods()))
-        rows.append(alfred.item(
-            uid=f"hub-close-{lb['id']}",
-            title=f"📁 Archive · {lb.get('title') or ''}",
-            subtitle="Close without a session",
-            arg=f"xact:crmclose:{lb['id']}", mods=_picker_mods()))
     rows.append(alfred.item(
         uid="hub-log", title="📝 Log a line",
         subtitle="Timestamped · lands under ## Notes",
@@ -1439,6 +1601,10 @@ def render_crmcust(cust_tid, query):
         uid="hub-edit", title="✏️ Edit note",
         subtitle="Alfred text view · contact line is line 1",
         arg=f"xact:crmedit:{cust_tid}", mods=_picker_mods()))
+    rows.append(alfred.item(
+        uid="hub-rename", title=f"✏️ Rename {name}",
+        subtitle="Ripples through logbooks, links, bullets",
+        arg=f"xact:crmrename:{cust_tid}", mods=_picker_mods()))
     rows.append(alfred.item(
         uid="hub-aftercare", title="🩹 Copy aftercare",
         subtitle="Template + name → clipboard",
@@ -1874,6 +2040,13 @@ def main():
 
         elif level == "crmmoney":
             items = render_crmmoney(ids[0] if ids else "", query)
+
+        elif level == "crmweek":
+            items = render_crmweek(query)
+
+        elif level == "crmbook":
+            items = render_crmbook(ids[0], query) if ids \
+                else _missing(level, "<logbookTid>")
 
         elif level == "crmsearch":
             items = render_crmsearch(query)
