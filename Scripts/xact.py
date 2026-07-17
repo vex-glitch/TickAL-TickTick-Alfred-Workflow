@@ -1290,6 +1290,13 @@ def crmnew_go(rest):
         if not lb:
             _crm_say("Logbook not found · run tsy")
             return
+        if areas.ARCHIVE_TAG in {str(t).lower() for t in (lb.get("tags") or [])}:
+            # Touch-up on a finished tattoo: reopen the logbook first.
+            if _dialog(f"{lb.get('title')} is archived - reopen for a touch-up?",
+                       ["Cancel", "Reopen"], "Reopen") != "Reopen":
+                _crm_say("Cancelled")
+                return
+            lb = cr.reopen_logbook(areas.RECORDS_ID, log_tid)
         n = cr.next_snum(lb.get("content") or "", log_tid)
         _crm_session_prefill(lb.get("title") or "", f"S{n}")
         return
@@ -1455,9 +1462,15 @@ def sessiondone(pid, tid):
     if final:
         try:
             cr.finish_logbook(log_pid, log_tid)
-            if _dialog(f"✅ {marker} done · {money} total · archived{photo}",
-                       ["Done", "Open logbook"], "Done") == "Open logbook":
+            pick = _dialog(f"✅ {marker} done · {money} total · archived{photo}",
+                           ["Healing check", "Open logbook", "Done"], "Done")
+            if pick == "Open logbook":
                 subprocess.run(["open", lb_deeplink], check=False)
+            elif pick == "Healing check":
+                # Follow-up task, prepare-tagged (never a session shape) -
+                # schedule it ~2 weeks out in the Add window.
+                _run_trigger("Add", f"~l {areas.crm_list_name()} "
+                             f"#{areas.PREPARE_TAG} [[{lb_title}]] Healing check ")
         except Exception as e:
             _crm_say(f"✅ {marker} done · archive FAILED: {type(e).__name__}{photo}")
         return
@@ -1731,6 +1744,79 @@ def crmbrowse(ctx):
     """Trampoline: reopen the Browse window at a CRM ctx - the crmhub rows
     navigate with this (plain browse rows can't switch ctx on ⏎)."""
     _run_trigger("Browse", ctx)
+
+
+def crmphoto(log_tid):
+    """🖼 Clipboard image → logbook attachment, anytime (reference sketch,
+    session result, healed shot - same mechanism as Session done's photo)."""
+    if not _records_ready():
+        return
+    import areas
+    lb = _record_by_id(log_tid)
+    try:
+        import clipboard as clip_util
+        img = clip_util.png_bytes()
+    except Exception:
+        img = None
+    if not img:
+        _crm_say("🖼 No image on the clipboard")
+        return
+    try:
+        import api_v2
+        api_v2.TickTickV2().upload_attachment(areas.RECORDS_ID, log_tid, img,
+                                              "photo.png")
+        _crm_say(f"🖼 Photo attached to {(lb or {}).get('title') or 'logbook'}")
+    except Exception as e:
+        _crm_say(f"🖼 Upload failed: {type(e).__name__}: {e}")
+
+
+def crmcold(tid):
+    """🥶 A lead went cold: one-line reason into ## Notes, retag → archive
+    (out of every picker, kanban keeps the corpse)."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    cust = _record_by_id(tid)
+    if not cust:
+        _crm_say("Not found · run tsy")
+        return
+    reason = _ask(f"{cr.customer_display(cust)} - why cold? (OK skips · Esc cancels)")
+    if reason is None:
+        _crm_say("Cancelled")
+        return
+    try:
+        cr.append_note_line(areas.RECORDS_ID, tid,
+                            f"cold: {reason.strip() or 'no reason given'}")
+        api = cr._api()
+        live = api.get_task(areas.RECORDS_ID, tid)
+        tags = [t for t in (live.get("tags") or [])
+                if str(t).lower() not in (areas.LEAD_TAG, areas.CUSTOMER_TAG,
+                                          areas.ARCHIVE_TAG)] \
+            + [areas.ARCHIVE_TAG]
+        api.update_task(tid, areas.RECORDS_ID, current=live, tags=tags)
+        cr._patch_cache(tid, tags=tags)
+        _crm_say(f"🥶 {cr.customer_display(cust)} archived")
+    except Exception as e:
+        _crm_say(f"🥶 Failed: {type(e).__name__}: {e}")
+
+
+def crmclose(log_tid):
+    """📁 Archive a logbook directly - no fake session required."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    title = (lb or {}).get("title") or "logbook"
+    if _dialog(f"Archive {title}?", ["Cancel", "Archive"], "Archive") != "Archive":
+        _crm_say("Cancelled")
+        return
+    try:
+        cr.finish_logbook(areas.RECORDS_ID, log_tid)
+        _crm_say(f"📁 {title} archived")
+    except Exception as e:
+        _crm_say(f"📁 Archive failed: {type(e).__name__}: {e}")
 
 
 def crmconvert(tid):
@@ -3591,6 +3677,12 @@ def main():
             crmaftercare(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
+        elif verb == "crmphoto":
+            crmphoto(rest)
+        elif verb == "crmcold":
+            crmcold(rest)
+        elif verb == "crmclose":
+            crmclose(rest)
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's

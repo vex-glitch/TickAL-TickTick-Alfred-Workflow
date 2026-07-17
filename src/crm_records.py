@@ -193,6 +193,88 @@ def next_session_task(log_tid):
     return day, (title_marker(t.get("title") or "") or ""), t
 
 
+def note_age_days(note):
+    """Days since the note was created - TickTick ids embed the unix time in
+    their first 8 hex chars, so this needs no extra field."""
+    try:
+        born = int(str(note.get("id"))[:8], 16)
+        return max(0, int((datetime.datetime.now().timestamp() - born) // 86400))
+    except Exception:
+        return None
+
+
+def bday_next(bday_str):
+    """Days until the next birthday, parsed leniently ('1990-01-05',
+    '01-05', '5.1.', '5.1.1990'). None when unparseable."""
+    s = (bday_str or "").strip()
+    m = (re.fullmatch(r"(?:\d{4}-)?(\d{1,2})-(\d{1,2})", s)
+         or re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(?:\d{4})?", s))
+    if not m:
+        return None
+    if "." in s:
+        day, month = int(m.group(1)), int(m.group(2))
+    else:
+        month, day = int(m.group(1)), int(m.group(2))
+    try:
+        today = datetime.date.today()
+        nxt = datetime.date(today.year, month, day)
+        if nxt < today:
+            nxt = datetime.date(today.year + 1, month, day)
+        return (nxt - today).days
+    except ValueError:
+        return None
+
+
+def monthly_stats():
+    """{ 'YYYY-MM': (total_float, session_count, sym, pre) } across EVERY
+    records logbook (open + archived) - the stats screen's data."""
+    out = {}
+    seen = set()
+    for tag in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG):
+        for lb in records_notes(tag):
+            if lb["id"] in seen:
+                continue
+            seen.add(lb["id"])
+            for m in ENTRY_RE.finditer(lb.get("content") or ""):
+                segs = [s.strip() for s in m.group(1).split("·")]
+                month = segs[0][:7]
+                total, n, sym, pre = out.get(month, (0.0, 0, "", False))
+                if len(segs) > 1 and re.fullmatch(r"S\d+", segs[1] or ""):
+                    n += 1
+                if len(segs) > 3:
+                    v = _num(segs[3])
+                    if v is not None:
+                        total += v
+                        if not sym:
+                            s2 = re.fullmatch(
+                                r"\s*([^\d\s.,\-]{1,3})?\s*-?[\d.,]+\s*([^\d\s.,\-]{1,3})?\s*",
+                                segs[3])
+                            if s2 and (s2.group(1) or s2.group(2)):
+                                sym, pre = ((s2.group(1), True) if s2.group(1)
+                                            else (s2.group(2), False))
+                out[month] = (total, n, sym, pre)
+    return out
+
+
+def reopen_logbook(log_pid, log_tid):
+    """Touch-up: archived → active again (Finished cleared, retagged), with a
+    dated trace line. The next Session-done final archives it back."""
+    api = _api()
+    lb = api.get_task(log_pid, log_tid)
+    content = re.sub(r"Finished \S+", "Finished -",
+                     lb.get("content") or "", count=1)
+    content = _append_under(content, "## Notes",
+                            f"- {_today()} - reopened (touch-up)", blank=False)
+    _ensure_tag(areas.LOGBOOK_TAG)
+    tags = [t for t in (lb.get("tags") or [])
+            if str(t).lower() not in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG)] \
+        + [areas.LOGBOOK_TAG]
+    api.update_task(log_tid, log_pid, current=lb, content=content, tags=tags)
+    _patch_cache(log_tid, content=content, tags=tags)
+    sync_customer_bullet({**lb, "content": content})
+    return {**lb, "content": content, "tags": tags}
+
+
 def convert_lead(cust):
     """Lead → customer (first booking, or explicit). RMW retag + mirrors."""
     if not is_lead(cust):

@@ -455,6 +455,18 @@ def main():
             except Exception:
                 _sess_done = _link_row = False
 
+        # 📇 Contact copy - customer notes get their phone/mail/insta as
+        # copy rows on EVERY surface that reaches ⌘ Actions, not just the
+        # hub. Same cheap-gate-first rule as above.
+        _phone = _mail = _insta = ""
+        if (pid and areas.records_configured() and pid == areas.RECORDS_ID
+                and is_note and bool(tid)):
+            try:
+                import crm_records as _cr2
+                _phone, _mail, _bd, _insta = _cr2.contact_of(task or {})
+            except Exception:
+                pass
+
         rows = [
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
             ("✅ Session done",    "Tick off · log · schedule next",
@@ -480,6 +492,10 @@ def main():
             ("➕ Add task",        add_sub,                "add",           "add new task",      True),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
             ("🆔 Copy id",         "List id → clipboard",  f"copy:{pid}",   "id copy identifier configure", itype == "list"),
+            (f"📞 Copy {_phone}",  "Number → clipboard",   f"copy:{_phone}", "phone copy number contact call", bool(_phone)),
+            (f"✉️ Copy {_mail}",   "Mail → clipboard",     f"copy:{_mail}",  "mail copy email contact", bool(_mail)),
+            (f"📸 Open {_insta}",  "Instagram profile (DMs)",
+             f"open:https://instagram.com/{_insta.lstrip('@')}", "instagram insta dm profile contact", bool(_insta)),
             ("📂 Go to list",      f"Open {lname or 'this list'} in TickTick",
              f"open:{list_link}",  "go to list open project folder",        is_task_like and bool(pid)),
             ("🌐 Open link",       open_link_sub,          open_link_arg, "link url web open", has_links),
