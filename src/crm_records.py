@@ -309,7 +309,7 @@ def _num(s):
     1.250,50 / 1,250.50 / 250,50 / 1.250 / 250.50 all parse right - with
     both separators present the LAST one is the decimal; a lone separator
     grouping exact 3-digit blocks is a thousands separator."""
-    m = re.search(r"\d[\d.,]*", s or "")
+    m = re.search(r"-?\d[\d.,]*", s or "")
     if not m:
         return None
     v = m.group(0).rstrip(".,")
