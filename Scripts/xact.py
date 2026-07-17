@@ -1165,13 +1165,15 @@ def _crm_say(msg):
     _notify_banner(msg, title="")
 
 
-def _choose(prompt, options, title="TickAL"):
-    """osascript choose-from-list; the picked string, or None on Cancel."""
+def _choose(prompt, options, title="TickAL", default=None):
+    """osascript choose-from-list; the picked string, or None on Cancel.
+    default preselects a row - Enter-through for the common case."""
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace('"', '\\"')
     olist = ", ".join(f'"{esc(o)}"' for o in options)
-    osa = ('choose from list {{{}}} with prompt "{}" with title "{}"'
-           .format(olist, esc(prompt), esc(title)))
+    dflt = f' default items {{"{esc(default)}"}}' if default else ""
+    osa = ('choose from list {{{}}} with prompt "{}" with title "{}"{}'
+           .format(olist, esc(prompt), esc(title), dflt))
     r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
     out = r.stdout.strip()
     return None if (r.returncode != 0 or out in ("false", "")) else out
@@ -1339,7 +1341,7 @@ def sessiondone(pid, tid):
     # What happened? Esc = abort with nothing touched.
     outcome = _choose(f"{lb_title} - what happened?",
                       ["✅ Happened", "👻 No-show", "🚫 Cancelled",
-                       "🔁 Rescheduled"])
+                       "🔁 Rescheduled"], default="✅ Happened")
     if outcome is None:
         _crm_say("Cancelled · task untouched")
         return
@@ -1354,7 +1356,14 @@ def sessiondone(pid, tid):
             _crm_say(f"Trace failed: {type(e).__name__}: {e}")
             return
         _crm_say(f"🔁 {marker} rescheduled · pick the new date")
-        reopen_actions(pid, tid)
+        # Straight onto the DATE picker (attributeScheduling recovers the ids
+        # from the act-again context file) - not the full ⌘ menu.
+        try:
+            with open("/tmp/ticktick_reattribute.txt", "w") as f:
+                f.write(f"{pid}:{tid}")
+            _run_trigger("attributeScheduling")
+        except OSError:
+            reopen_actions(pid, tid)
         return
 
     if outcome in ("👻 No-show", "🚫 Cancelled"):
@@ -1394,16 +1403,27 @@ def sessiondone(pid, tid):
         return
 
     # ✅ Happened - Esc aborts before anything is completed or written.
+    # Smart defaults make the daily close Enter-Enter-Enter: duration =
+    # last session's, charged = the open quote remainder.
+    lb_cached = _record_by_id(log_tid) or {}
+    d_dur = cr.last_duration(lb_cached.get("content") or "")
+    d_chg = cr.quote_remainder(lb_cached.get("content") or "")
+    d_setup = cr.last_setup(lb_cached.get("content") or "")
     answers = []
-    for prompt in (f"How long was the {word}? (OK skips · Esc cancels)",
-                   "Charged? (OK skips · Esc cancels)",
-                   "What did you do? (OK skips · Esc cancels)"):
-        v = _ask(prompt)
+    for prompt, dflt in (
+            (f"How long was the {word}? (OK skips · Esc cancels)", d_dur),
+            ("Charged? (OK skips · Esc cancels)", d_chg),
+            ("What did you do? (OK skips · Esc cancels)", ""),
+            ("Setup? needles · inks · machine (OK skips)", d_setup)):
+        v = _ask(prompt, default=dflt)
         if v is None:
             _crm_say("Cancelled · task NOT completed, nothing logged")
             return
         answers.append(v)
-    dur, charged, did = answers
+    dur, charged, did, setup = answers
+    if (setup or "").strip():
+        did = (did.strip() + ("\n" if did.strip() else "")
+               + f"Setup: {setup.strip()}")
     final = False
     if is_s:   # the archive question belongs to needle sessions only
         f_ans = _dialog("Final session - archive the logbook?",
@@ -1516,17 +1536,26 @@ def crmlog(tid):
 
 
 def _ask_contact_chain(name):
-    """phone/mail/bday/instagram dialogs. None = user cancelled (abort)."""
-    fields = []
-    for prompt in (f"{name} - phone? (OK skips · Esc cancels)",
-                   f"{name} - mail? (OK skips · Esc cancels)",
-                   f"{name} - birthday? (OK skips · Esc cancels)",
-                   f"{name} - instagram? (OK skips · Esc cancels)"):
-        v = _ask(prompt)
-        if v is None:
-            return None
-        fields.append(v)
-    return fields
+    """TWO prompts (was four): one shape-detecting contact line - @handle =
+    instagram, has @ and a dot = mail, digits = phone, space-separate any
+    subset - then birthday. None = user cancelled (abort)."""
+    import re as _re
+    raw = _ask(f"{name} - contact? phone · mail · @instagram "
+               "(space-separate · OK skips)")
+    if raw is None:
+        return None
+    phone = mail = insta = ""
+    for tok in (raw or "").replace(",", " ").split():
+        if tok.startswith("@"):
+            insta = tok
+        elif "@" in tok and "." in tok:
+            mail = tok
+        elif _re.sub(r"[+()\-./]", "", tok).isdigit():
+            phone = f"{phone} {tok}".strip()
+    bday = _ask(f"{name} - birthday? (OK skips · Esc cancels)")
+    if bday is None:
+        return None
+    return [phone, mail, bday, insta]
 
 
 def crmperson():
@@ -1881,6 +1910,56 @@ def crmsummary(log_tid):
     lines += ["", cr.paid_summary(lb.get("content") or "")]
     subprocess.run(["pbcopy"], input="\n".join(lines).encode())
     _crm_say(f"🧾 Summary copied · {lb.get('title')}")
+
+
+def crmcsv():
+    """🧾 Accountant export: every dated charge/deposit/refund of a period as
+    CSV rows in ~/Downloads, revealed in Finder."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    from datetime import date as _date
+    today = _date.today()
+    pick = _choose("Export which period?",
+                   ["This month", "Last month", "This year", "Last year",
+                    "All time"], default="This year")
+    if pick is None:
+        _crm_say("Cancelled")
+        return
+    m0 = today.replace(day=1)
+    if pick == "This month":
+        start, end = m0.isoformat(), None
+    elif pick == "Last month":
+        from datetime import timedelta as _td
+        lm_end = m0 - _td(days=1)
+        start, end = lm_end.replace(day=1).isoformat(), lm_end.isoformat()
+    elif pick == "This year":
+        start, end = f"{today.year}-01-01", None
+    elif pick == "Last year":
+        start, end = f"{today.year - 1}-01-01", f"{today.year - 1}-12-31"
+    else:
+        start = end = None
+    import csv
+    slug = pick.lower().replace(" ", "-")
+    path = os.path.expanduser(
+        f"~/Downloads/tickal-crm-{slug}-{today.isoformat()}.csv")
+    n = 0
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["date", "customer", "tattoo", "entry", "duration_min",
+                    "amount", "currency"])
+        for e in sorted(cr.entries_detailed(), key=lambda x: x["date"]):
+            if (start and e["date"] < start) or (end and e["date"] > end):
+                continue
+            if e["amount"] is None and not e["is_s"]:
+                continue
+            w.writerow([e["date"], e["cust_title"],
+                        (e["lb"].get("title") or ""), e["marker"],
+                        e["minutes"] or "", e["amount"] if e["amount"] is not None else "",
+                        e["sym"] or "€"])
+            n += 1
+    subprocess.run(["open", "-R", path], check=False)
+    _crm_say(f"🧾 {n} rows → {os.path.basename(path)}")
 
 
 def crmclose(log_tid):
@@ -3769,6 +3848,8 @@ def main():
             crmrename(rest)
         elif verb == "crmsummary":
             crmsummary(rest)
+        elif verb == "crmcsv":
+            crmcsv()
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's

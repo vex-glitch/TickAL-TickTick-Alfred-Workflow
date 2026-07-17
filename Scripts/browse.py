@@ -1207,6 +1207,12 @@ def render_crmbook(log_tid, query):
             uid="bk-next", title=f"▶️ Schedule S{n}",
             subtitle="Add window · prefilled",
             arg=f"xact:crmnew_go:session::{log_tid}", mods=_picker_mods()))
+    setup = cr.last_setup(lb.get("content") or "")
+    if setup:
+        rows.append(alfred.item(
+            uid="bk-setup", title=f"🧰 Last setup · {setup}",
+            subtitle="From the previous session · prefilled at the next one",
+            valid=False))
     rows += [
         alfred.item(uid="bk-photo", title="🖼 Attach photo",
                     subtitle="Clipboard → logbook (reference · session · healed)",
@@ -1341,6 +1347,10 @@ def render_crmmoney(sub, query):
         lbs = fuzz.filter_and_score(query, lbs, key_fn=lambda x: x["title"])
         return add_back(pinned + lbs, "ctx:crmhub")
     rows = pinned + lbs
+    rows.append(alfred.item(
+        uid="mo-csv", title="🧾 CSV export",
+        subtitle="Every dated charge / deposit / refund → ~/Downloads",
+        arg="xact:crmcsv", mods=_picker_mods()))
     if arch:
         rows.append(alfred.item(
             uid="mo-arch",
@@ -1351,49 +1361,116 @@ def render_crmmoney(sub, query):
     return add_back(rows, "ctx:crmhub")
 
 
-def render_crmstats(query):
-    """📊 Earnings + session counts per month, straight from the logbook
-    entries (open + archived) - recomputed like every money figure."""
+def _stat_periods():
+    from datetime import date as _date, timedelta as _td
+    t = _date.today()
+    m0 = t.replace(day=1)
+    lm_end = m0 - _td(days=1)
+    lm0 = lm_end.replace(day=1)
+    q0 = _date(t.year, ((t.month - 1) // 3) * 3 + 1, 1)
+    lq_end = q0 - _td(days=1)
+    lq0 = _date(lq_end.year, ((lq_end.month - 1) // 3) * 3 + 1, 1)
+    y0 = _date(t.year, 1, 1)
+    iso = lambda d: d.isoformat() if d else None
+    return {
+        "thism":  ("This month",  iso(m0), None, iso(lm0), iso(lm_end)),
+        "lastm":  ("Last month",  iso(lm0), iso(lm_end),
+                   iso((lm0 - _td(days=1)).replace(day=1)), iso(lm0 - _td(days=1))),
+        "quarter": ("This quarter", iso(q0), None, iso(lq0), iso(lq_end)),
+        "year":   ("This year",   iso(y0), None,
+                   f"{t.year - 1}-01-01", f"{t.year - 1}-12-31"),
+        "all":    ("All time",    None, None, None, None),
+    }
+
+
+def _delta_chip(cur, prev):
+    if prev in (0, None) or cur is None:
+        return ""
+    if prev == 0:
+        return ""
+    pct = round((cur - prev) / abs(prev) * 100)
+    if pct > 0:
+        return f" · ▲ {pct}%"
+    if pct < 0:
+        return f" · ▼ {abs(pct)}%"
+    return " · ="
+
+
+def render_crmstats(sub, query):
+    """📊 The KPI dashboard Vex asked for: pick a period, get the numbers a
+    real CRM would show - money/hours/rate, sessions, new vs returning
+    customers, tattoos started/finished, top customer - every one computed
+    live from the logbook entries (there are NO stat notes; the logbooks are
+    the database) with vs-previous-period deltas."""
     gate = _records_gate()
     if gate:
         return add_back(gate, "ctx:crmhub")
     import crm_records as cr
-    from datetime import date as _date
-    stats = cr.monthly_stats()
-    def fmt(month):
-        total, n, sym, pre = stats.get(month, (0.0, 0, "", False))
-        if not total and not n:
-            return "nothing logged"
-        money = cr._fmt_money(total, sym or "€", pre)
-        return f"{money} · {n} session{'s' if n != 1 else ''}"
-    today = _date.today()
-    this_m = today.strftime("%Y-%m")
-    last_m = (_date(today.year - 1, 12, 1) if today.month == 1
-              else _date(today.year, today.month - 1, 1)).strftime("%Y-%m")
-    y_total, y_n, y_sym, y_pre = 0.0, 0, "", False
-    for m, (t, n, s, p) in stats.items():
-        if m.startswith(str(today.year)):
-            y_total += t; y_n += n
-            if not y_sym and s:
-                y_sym, y_pre = s, p
-    y_money = cr._fmt_money(y_total, y_sym or "€", y_pre) if (y_total or y_n)         else "nothing logged"
-    rows = [
-        alfred.item(uid="st-this", title=f"📊 This month · {fmt(this_m)}",
-                    subtitle=this_m, valid=False),
-        alfred.item(uid="st-last", title=f"📊 Last month · {fmt(last_m)}",
-                    subtitle=last_m, valid=False),
-        alfred.item(uid="st-year",
-                    title=f"📊 {today.year} · {y_money}"
-                          + (f" · {y_n} session{'s' if y_n != 1 else ''}"
-                             if y_n else ""),
-                    subtitle="Year to date", valid=False),
-    ]
-    for month in sorted(stats, reverse=True)[:12]:
-        if month in (this_m,):
-            continue
-        rows.append(alfred.item(uid=f"st-{month}",
-                                title=f"{month} · {fmt(month)}",
-                                subtitle="", valid=False))
+    periods = _stat_periods()
+
+    if sub in periods:
+        label, a, b, pa, pb = periods[sub]
+        k = cr.period_kpis(a, b)
+        p = cr.period_kpis(pa, pb) if (pa or pb) else None
+        fm = lambda v: cr._fmt_money(v, k["sym"], k["pre"])
+        rows = [alfred.item(uid="kp-money",
+                            title=f"💰 {fm(k['money'])}"
+                                  + _delta_chip(k["money"], p and p["money"]),
+                            subtitle=f"{label} · money made", valid=False)]
+        if k["hours"]:
+            rate = f" · ~{int(k['rate'])}{k['sym']}/h" if k["rate"] else ""
+            rows.append(alfred.item(
+                uid="kp-hours", title=f"🧮 {k['hours']:g}h{rate}"
+                + _delta_chip(k["hours"], p and p["hours"]),
+                subtitle="Hours in the chair · effective rate", valid=False))
+        rows.append(alfred.item(
+            uid="kp-sess", title=f"🪡 {k['sessions']} session"
+            + ("s" if k["sessions"] != 1 else "")
+            + _delta_chip(k["sessions"], p and p["sessions"]),
+            subtitle="Needle sessions logged", valid=False))
+        rows.append(alfred.item(
+            uid="kp-new", title=f"✨ {k['new_customers']} new customer"
+            + ("s" if k["new_customers"] != 1 else "")
+            + _delta_chip(k["new_customers"], p and p["new_customers"]),
+            subtitle="Customer notes created in the period", valid=False))
+        rows.append(alfred.item(
+            uid="kp-ret",
+            title=f"🔁 {k['returning']} returning · "
+                  f"{k['active_customers']} active",
+            subtitle="Returning = tattooed before this period too",
+            valid=False))
+        rows.append(alfred.item(
+            uid="kp-fin", title=f"🎨 {k['finished']} finished · "
+            f"{k['started']} started"
+            + _delta_chip(k["finished"], p and p["finished"]),
+            subtitle="Tattoos (logbooks) in the period", valid=False))
+        if k["top"]:
+            rows.append(alfred.item(
+                uid="kp-top",
+                title=f"👑 {k['top']['name'] or 'Top customer'} · "
+                      f"{fm(k['top']['money'])}",
+                subtitle="Top customer of the period · ⏎ their hub",
+                arg=f"xact:crmbrowse:ctx:crmcust:{k['top']['tid']}",
+                mods=_picker_mods()))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        return add_back(rows, "ctx:crmstats")
+
+    # root: period picker with headline subtitles
+    rows = []
+    for key in ("thism", "lastm", "quarter", "year", "all"):
+        label, a, b, _pa, _pb = periods[key]
+        k = cr.period_kpis(a, b)
+        head = (f"{cr._fmt_money(k['money'], k['sym'], k['pre'])} · "
+                f"{k['sessions']} session{'s' if k['sessions'] != 1 else ''}")
+        if k["hours"]:
+            head += f" · {k['hours']:g}h"
+        rows.append(alfred.item(
+            uid=f"st-{key}", title=f"📊 {label}",
+            subtitle=f"{head} · ⏎ Full dashboard",
+            arg=f"xact:crmbrowse:ctx:crmstats:{key}",
+            mods=_picker_mods()))
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
@@ -2036,7 +2113,7 @@ def main():
             items = render_crmhub(query)
 
         elif level == "crmstats":
-            items = render_crmstats(query)
+            items = render_crmstats(ids[0] if ids else "", query)
 
         elif level == "crmmoney":
             items = render_crmmoney(ids[0] if ids else "", query)

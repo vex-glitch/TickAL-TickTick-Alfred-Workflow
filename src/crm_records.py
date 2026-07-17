@@ -360,6 +360,155 @@ def lifetime_raw(cust_tid):
     return total
 
 
+def note_created_date(note):
+    """ISO creation date from the id-embedded timestamp."""
+    try:
+        return datetime.date.fromtimestamp(
+            int(str(note.get("id"))[:8], 16)).isoformat()
+    except Exception:
+        return None
+
+
+def _amount_of(segs):
+    """(amount_float_or_None, sym, pre) from an entry's charged segment."""
+    if len(segs) < 4:
+        return None, "", False
+    v = _num(segs[3])
+    if v is None:
+        return None, "", False
+    m = re.fullmatch(
+        r"\s*([^\d\s.,\-]{1,3})?\s*-?[\d.,]+\s*([^\d\s.,\-]{1,3})?\s*",
+        segs[3])
+    if m and (m.group(1) or m.group(2)):
+        return v, (m.group(1) or m.group(2)), bool(m.group(1))
+    return v, "", False
+
+
+def entries_detailed():
+    """Every entry with its logbook + customer attribution - the stats/CSV
+    feed. [{date, marker, is_s, amount, sym, pre, minutes, lb, cust_tid,
+    cust_title}]"""
+    out, seen = [], set()
+    for tag in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG):
+        for lb in records_notes(tag):
+            if lb["id"] in seen:
+                continue
+            seen.add(lb["id"])
+            hit = parse_first_link(lb.get("content") or "")
+            cust_tid = hit[2] if hit else ""
+            cust_title = re.sub(r"^👤\s*", "", hit[0]).strip() if hit else ""
+            for m in ENTRY_RE.finditer(lb.get("content") or ""):
+                segs = [s.strip() for s in m.group(1).split("·")]
+                marker = segs[1] if len(segs) > 1 else ""
+                amt, sym, pre = _amount_of(segs)
+                out.append({
+                    "date": segs[0][:10], "marker": marker,
+                    "is_s": bool(re.fullmatch(r"S\d+", marker or "")),
+                    "amount": amt, "sym": sym, "pre": pre,
+                    "minutes": dur_minutes(segs[2]) if len(segs) > 2 else None,
+                    "lb": lb, "cust_tid": cust_tid, "cust_title": cust_title,
+                })
+    return out
+
+
+def period_kpis(start, end):
+    """The dashboard numbers for [start, end] (ISO inclusive, None = open):
+    money/hours/rate/sessions, new + returning + active customers, tattoos
+    started/finished, top customer. Everything recomputed from the logbook
+    entries - there is no ledger to drift."""
+    ents = entries_detailed()
+    def in_p(d):
+        return d and (not start or d >= start) and (not end or d <= end)
+    money, mins, sessions = 0.0, 0, 0
+    sym, pre = "", False
+    per_cust, active, first_s = {}, set(), {}
+    for e in ents:
+        if e["is_s"] and e["cust_tid"]:
+            f = first_s.get(e["cust_tid"])
+            if f is None or e["date"] < f:
+                first_s[e["cust_tid"]] = e["date"]
+    for e in ents:
+        if not in_p(e["date"]):
+            continue
+        if e["amount"] is not None:
+            money += e["amount"]
+            if not sym and e["sym"]:
+                sym, pre = e["sym"], e["pre"]
+            if e["cust_tid"]:
+                prev = per_cust.get(e["cust_tid"], (0.0, e["cust_title"]))
+                per_cust[e["cust_tid"]] = (prev[0] + e["amount"],
+                                           e["cust_title"] or prev[1])
+        if e["is_s"]:
+            sessions += 1
+            mins += e["minutes"] or 0
+            if e["cust_tid"]:
+                active.add(e["cust_tid"])
+    returning = sum(1 for c in active
+                    if (first_s.get(c) or "9999") < (start or "0000"))
+    new_cust = 0
+    seen_c = set()
+    for c in records_notes(areas.CUSTOMER_TAG) + records_notes(areas.LEAD_TAG):
+        if c["id"] in seen_c:
+            continue
+        seen_c.add(c["id"])
+        if in_p(note_created_date(c)):
+            new_cust += 1
+    finished = started = 0
+    seen_l = set()
+    for tag in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG):
+        for lb in records_notes(tag):
+            if lb["id"] in seen_l:
+                continue
+            seen_l.add(lb["id"])
+            c = lb.get("content") or ""
+            mf = re.search(r"Finished (\d{4}-\d{2}-\d{2})", c)
+            ms = re.search(r"Started (\d{4}-\d{2}-\d{2})", c)
+            if mf and in_p(mf.group(1)):
+                finished += 1
+            if ms and in_p(ms.group(1)):
+                started += 1
+    hours = round(mins / 60.0, 1)
+    top = max(per_cust.items(), key=lambda kv: kv[1][0]) if per_cust else None
+    return {
+        "money": money, "sym": sym or "€", "pre": pre, "hours": hours,
+        "sessions": sessions, "rate": (money / hours) if hours else None,
+        "new_customers": new_cust, "returning": returning,
+        "active_customers": len(active), "finished": finished,
+        "started": started,
+        "top": ({"tid": top[0], "money": top[1][0], "name": top[1][1]}
+                if top else None),
+    }
+
+
+def last_duration(content):
+    """The most recent S-entry's duration text ('' when none) - the
+    Session-done duration default."""
+    out = ""
+    for segs in _entries(content):
+        if (len(segs) > 2 and segs[2] and segs[2] != "-"
+                and re.fullmatch(r"S\d+", (segs[1] if len(segs) > 1 else "") or "")):
+            out = segs[2]
+    return out
+
+
+def last_setup(content):
+    """The most recent 'Setup:' line from the session entries ('' when none)
+    - needles/inks/machine memory surfaced before the next session."""
+    hits = re.findall(r"^Setup: (.+)$", content or "", re.M)
+    return hits[-1].strip() if hits else ""
+
+
+def quote_remainder(content):
+    """Open remainder against the quote as display text ('' when no quote or
+    settled) - the Session-done charged default."""
+    q = quoted_of(content)
+    if q is None:
+        return ""
+    total, _n, sym, pre = _totals_raw(content)
+    rem = q[0] - total
+    return _fmt_money(rem, sym or "€", pre) if rem > 0 else ""
+
+
 def _link_text_pat(target_tid):
     return re.compile(r"\[([^\]]*)\](\(https://ticktick\.com/webapp/#p/\w+/tasks/"
                       + re.escape(target_tid) + r"\))")
