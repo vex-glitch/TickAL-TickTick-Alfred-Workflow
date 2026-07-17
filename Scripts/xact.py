@@ -1602,16 +1602,10 @@ def crmimport():
         return
     m = _re.search(r"\d+", k_raw or "")
     k = max(1, int(m.group(0))) if m else 1
-    when_raw = _ask("When was it? YYYY-MM-DD or YYYY (OK = today · Esc cancels)")
-    if when_raw is None:
+    when = _ask_date("When was it? Date or year (OK = today · Esc cancels)")
+    if when == "CANCEL":
         _crm_say("Cancelled · nothing created")
         return
-    when = None
-    w = (when_raw or "").strip()
-    if _re.fullmatch(r"\d{4}", w):
-        when = f"{w}-01-01"
-    elif _re.fullmatch(r"\d{4}-\d{2}-\d{2}", w):
-        when = w
     state = _dialog("Tattoo state?", ["Cancel", "Still active", "Finished"],
                     "Finished")
     if state == "":
@@ -1626,6 +1620,32 @@ def crmimport():
              + (" · archived" if state == "Finished" else ""))
 
 
+def _ask_date(prompt):
+    """Lenient date dialog: 2026-7-3 / 3.7.2026 / 3.7. / 2025 all parse;
+    empty OK = today (returns None); garbage gets ONE re-prompt then cancels.
+    Returns ISO date, None (today), or "CANCEL"."""
+    import re as _re
+    import datetime as _dt
+    for _ in range(2):
+        raw = _ask(prompt)
+        if raw is None:
+            return "CANCEL"
+        w = raw.strip()
+        if not w:
+            return None
+        m = _re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", w)
+        if m:
+            return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+        m = _re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{4})?", w)
+        if m:
+            y = m.group(3) or str(_dt.date.today().year)
+            return f"{y}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+        if _re.fullmatch(r"\d{4}", w):
+            return f"{w}-01-01"
+        prompt = f"'{w}' is not a date · YYYY-MM-DD or D.M.YYYY (OK = today)"
+    return "CANCEL"
+
+
 def crmpast(log_tid):
     """📕 Backlog: log a PAST session into a logbook - dated entry, no task."""
     if not _records_ready():
@@ -1637,12 +1657,10 @@ def crmpast(log_tid):
     if not lb:
         _crm_say("Logbook not found · run tsy")
         return
-    when_raw = _ask("When? YYYY-MM-DD (OK = today · Esc cancels)")
-    if when_raw is None:
+    when = _ask_date("When? (OK = today · Esc cancels)")
+    if when == "CANCEL":
         _crm_say("Cancelled")
         return
-    w = (when_raw or "").strip()
-    when = w if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", w) else None
     n = cr.next_snum(lb.get("content") or "", log_tid)
     marker = _dialog("Log as?", ["Cancel", "Consultation", f"S{n}"], f"S{n}")
     if marker == "":
