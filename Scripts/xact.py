@@ -1241,7 +1241,13 @@ def _crmnew_continue(kind, cust):
         if not (tattoo or "").strip():
             _crm_say("Cancelled")
             return
-        lb = cr.create_logbook(cust, tattoo)
+        # The logbook is real from here - these two are skippable, not aborts.
+        quoted = _ask(f"{tattoo} - quoted price? (OK or Esc skips)") or ""
+        lb = cr.create_logbook(cust, tattoo, quoted=quoted)
+        deposit = _ask("Deposit taken? (OK or Esc skips)") or ""
+        if deposit.strip():
+            cr.append_session(areas.RECORDS_ID, lb["id"], "payment",
+                              charged=deposit, text="Deposit.")
     if kind == "consult":
         _crm_session_prefill(lb.get("title") or "", "Consult")
         _crm_say("🗂️ Logbook ready · schedule the consultation")
@@ -1320,8 +1326,66 @@ def sessiondone(pid, tid):
     is_s = bool(mk and mk.startswith("S"))
     marker = mk if is_s else "consultation"
     word   = "session" if is_s else "consultation"
+    lb_deeplink = f"ticktick:///webapp/#p/{log_pid}/tasks/{log_tid}"
 
-    # Esc = ABORT before anything is completed or written; OK skips a field.
+    # What happened? Esc = abort with nothing touched.
+    outcome = _choose(f"{lb_title} - what happened?",
+                      ["✅ Happened", "👻 No-show", "🚫 Cancelled",
+                       "🔁 Rescheduled"])
+    if outcome is None:
+        _crm_say("Cancelled · task untouched")
+        return
+
+    if outcome == "🔁 Rescheduled":
+        # Task stays OPEN and keeps its S<n>; a dated trace lands in the
+        # logbook, then the ⌘ menu opens on the task to pick the new date.
+        try:
+            cr.append_session(log_pid, log_tid, "rescheduled",
+                              text=f"{marker} rescheduled.")
+        except Exception as e:
+            _crm_say(f"Trace failed: {type(e).__name__}: {e}")
+            return
+        _crm_say(f"🔁 {marker} rescheduled · pick the new date")
+        reopen_actions(pid, tid)
+        return
+
+    if outcome in ("👻 No-show", "🚫 Cancelled"):
+        kind_word = "no-show" if outcome == "👻 No-show" else "cancelled"
+        kept = _ask("Kept deposit / charged anything? (OK skips · Esc cancels)")
+        if kept is None:
+            _crm_say("Cancelled · task untouched")
+            return
+        note = _ask("Note? (OK skips · Esc cancels)")
+        if note is None:
+            _crm_say("Cancelled · task untouched")
+            return
+        try:
+            _api().complete_task(pid, tid)
+            _complete_cache_patch(pid, tid)
+        except Exception as e:
+            _crm_say(f"Complete failed: {type(e).__name__}: {e}")
+            return
+        try:
+            text = f"{marker} {kind_word}." + (f" {note.strip()}" if note.strip() else "")
+            content, money, n, live_title = cr.append_session(
+                log_pid, log_tid, kind_word, charged=kept, text=text)
+            lb_title = live_title or lb_title
+        except Exception as e:
+            _crm_say(f"Logged FAILED: {type(e).__name__}: {e}")
+            return
+        # S<n> stays reserved (non-S entry) - offer the rebook straight away.
+        label = f"Rebook {marker}"
+        pick = _dialog(f"{lb_title} - rebook {marker}?",
+                       ["Open logbook", "Later", label], label)
+        if pick == label:
+            _crm_session_prefill(lb_title, marker if is_s else "Consult")
+        elif pick == "Open logbook":
+            subprocess.run(["open", lb_deeplink], check=False)
+        _crm_say(f"{'👻' if kind_word == 'no-show' else '🚫'} {marker} "
+                 f"{kind_word} logged · {money} / {n} total")
+        return
+
+    # ✅ Happened - Esc aborts before anything is completed or written.
     answers = []
     for prompt in (f"How long was the {word}? (OK skips · Esc cancels)",
                    "Charged? (OK skips · Esc cancels)",
@@ -1332,13 +1396,14 @@ def sessiondone(pid, tid):
             return
         answers.append(v)
     dur, charged, did = answers
-    final = _dialog("Final session - archive the logbook?",
-                    ["Cancel", "Archive", "More to come"],
-                    "More to come")
-    if final == "":
-        _crm_say("Cancelled · task NOT completed, nothing logged")
-        return
-    final = final == "Archive"
+    final = False
+    if is_s:   # the archive question belongs to needle sessions only
+        f_ans = _dialog("Final session - archive the logbook?",
+                        ["Cancel", "Archive", "More to come"], "More to come")
+        if f_ans == "":
+            _crm_say("Cancelled · task NOT completed, nothing logged")
+            return
+        final = f_ans == "Archive"
 
     try:
         _api().complete_task(pid, tid)
@@ -1369,18 +1434,41 @@ def sessiondone(pid, tid):
         except Exception:
             photo = " · 📷 upload failed"
 
+    if not is_s:
+        # Consultation outcome: book / wait / didn't-book (lead lost).
+        pick = _choose(f"{lb_title} - consultation outcome?",
+                       ["📅 Book the tattoo S1", "⏳ Not yet",
+                        "📁 Didn't book · archive"])
+        if pick == "📅 Book the tattoo S1":
+            _crm_session_prefill(lb_title, "S1")
+        elif pick == "📁 Didn't book · archive":
+            try:
+                cr.finish_logbook(log_pid, log_tid)
+                _crm_say(f"📁 Consultation logged · logbook archived{photo}")
+                return
+            except Exception as e:
+                _crm_say(f"Archive FAILED: {type(e).__name__}{photo}")
+                return
+        _crm_say(f"✅ consultation done · {money} / {n} total{photo}")
+        return
+
     if final:
         try:
             cr.finish_logbook(log_pid, log_tid)
-            _crm_say(f"✅ {marker} done · {money} / {n} total · archived{photo}")
+            if _dialog(f"✅ {marker} done · {money} total · archived{photo}",
+                       ["Done", "Open logbook"], "Done") == "Open logbook":
+                subprocess.run(["open", lb_deeplink], check=False)
         except Exception as e:
             _crm_say(f"✅ {marker} done · archive FAILED: {type(e).__name__}{photo}")
         return
     nxt = cr.next_snum(content, log_tid)
     label = f"Schedule S{nxt}"
-    if _dialog(f"{lb_title} - schedule S{nxt} now?",
-               ["Cancel", "Later", label], label) == label:
+    pick = _dialog(f"{lb_title} - schedule S{nxt} now?",
+                   ["Open logbook", "Later", label], label)
+    if pick == label:
         _crm_session_prefill(lb_title, f"S{nxt}")
+    elif pick == "Open logbook":
+        subprocess.run(["open", lb_deeplink], check=False)
     _crm_say(f"✅ {marker} done · {money} / {n} total{photo}")
 
 
@@ -1403,11 +1491,12 @@ def crmlog(tid):
 
 
 def _ask_contact_chain(name):
-    """phone/mail/bday dialogs. None = user cancelled (abort the flow)."""
+    """phone/mail/bday/instagram dialogs. None = user cancelled (abort)."""
     fields = []
     for prompt in (f"{name} - phone? (OK skips · Esc cancels)",
                    f"{name} - mail? (OK skips · Esc cancels)",
-                   f"{name} - birthday? (OK skips · Esc cancels)"):
+                   f"{name} - birthday? (OK skips · Esc cancels)",
+                   f"{name} - instagram? (OK skips · Esc cancels)"):
         v = _ask(prompt)
         if v is None:
             return None
@@ -1561,6 +1650,87 @@ def crmcopy(text):
     chain - it lives on the ⌥⌘ canvas edge)."""
     subprocess.run(["pbcopy"], input=(text or "").encode())
     _crm_say(f"📋 Copied {text}")
+
+
+def crmpay(log_tid):
+    """💶 Log a payment outside a session (deposit, remainder, refund with a
+    minus). A 'payment' entry sums into Paid without touching the session
+    count."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    amount = _ask(f"{lb.get('title')} - amount? (minus = refund)")
+    if not (amount or "").strip():
+        _crm_say("Cancelled")
+        return
+    note = _ask("Note? (OK skips · Esc cancels)")
+    if note is None:
+        _crm_say("Cancelled · nothing logged")
+        return
+    _c, money, n, _t = cr.append_session(
+        areas.RECORDS_ID, log_tid, "payment", charged=amount,
+        text=(note.strip() or "Payment."))
+    _crm_say(f"💶 {amount} logged · {money} / {n} total")
+
+
+def crmedit(tid):
+    """✏️ Open the note in Alfred's text view - the SAME editor as the ⌘
+    Actions 📝 Note row, fired directly: write the act-again context file,
+    fire ET attributeNote, ensure_task_context recovers the ids."""
+    import areas
+    try:
+        with open("/tmp/ticktick_reattribute.txt", "w") as f:
+            f.write(f"{areas.RECORDS_ID}:{tid}")
+    except OSError as e:
+        _crm_say(f"Edit failed: {e}")
+        return
+    _run_trigger("attributeNote")
+
+
+AFTERCARE_FILE = os.path.expanduser("~/.ticktick_alfred/aftercare.txt")
+AFTERCARE_DEFAULT = """Hey {name}! Quick aftercare guide for your fresh tattoo:
+- keep the wrap on for 3-4 hours
+- wash gently with lukewarm water + unscented soap, pat dry
+- thin layer of aftercare cream 2-3x a day
+- no sun, pool, sauna or gym sweat for 2 weeks
+- itching is normal - do NOT scratch or pick
+
+Any questions, message me anytime! 🖤"""
+
+
+def crmaftercare(cust_tid):
+    """🩹 Aftercare text → clipboard, {name} substituted. The template lives
+    in ~/.ticktick_alfred/aftercare.txt (created on first use - edit it)."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    cust = _record_by_id(cust_tid)
+    name = cr.customer_display(cust) if cust else ""
+    try:
+        with open(AFTERCARE_FILE) as f:
+            tpl = f.read()
+    except OSError:
+        tpl = AFTERCARE_DEFAULT
+        try:
+            with open(AFTERCARE_FILE, "w") as f:
+                f.write(tpl)
+        except OSError:
+            pass
+    text = tpl.replace("{name}", name or "there")
+    subprocess.run(["pbcopy"], input=text.encode())
+    _crm_say(f"🩹 Aftercare for {name or 'customer'} copied · template: "
+             f"~/.ticktick_alfred/aftercare.txt")
+
+
+def crmbrowse(ctx):
+    """Trampoline: reopen the Browse window at a CRM ctx - the crmhub rows
+    navigate with this (plain browse rows can't switch ctx on ⏎)."""
+    _run_trigger("Browse", ctx)
 
 
 def crmconvert(tid):
@@ -3413,6 +3583,14 @@ def main():
             crmconvert(rest)
         elif verb == "crmcopy":
             crmcopy(rest)
+        elif verb == "crmpay":
+            crmpay(rest)
+        elif verb == "crmedit":
+            crmedit(rest)
+        elif verb == "crmaftercare":
+            crmaftercare(rest)
+        elif verb == "crmbrowse":
+            crmbrowse(rest)
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's

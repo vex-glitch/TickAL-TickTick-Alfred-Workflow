@@ -840,17 +840,20 @@ def render_crmnew(kind, query):
     tattoo), or the open-logbook picker for the next session (kind=session)."""
     gate = _records_gate()
     if gate:
-        return add_back(gate, "")
+        return add_back(gate, "ctx:crmhub")
     import crm_records as cr
 
     if kind == "session":
         rows = []
         for lb in cr.records_notes(_areas.LOGBOOK_TAG):
             n = cr.next_snum(lb.get("content") or "", lb["id"])
+            nxt = cr.next_session_task(lb["id"])
+            state = (f"{nxt[1] or 'session'} scheduled 📅 {nxt[0] or '?'}"
+                     if nxt else "nothing scheduled")
             rows.append(alfred.item(
                 uid=f"crmnew-s-{lb['id']}",
                 title=lb.get("title") or "Untitled",
-                subtitle=f"⏎ Schedule S{n}",
+                subtitle=f"⏎ Schedule S{n} · {state}",
                 arg=f"xact:crmnew_go:session::{lb['id']}",
                 mods=_picker_mods(),
                 variables=_record_vars(lb),
@@ -860,7 +863,7 @@ def render_crmnew(kind, query):
         if not rows:
             rows = [alfred.item(title="No open logbooks",
                                 subtitle="➕ New tattoo starts one", valid=False)]
-        return add_back(rows, "")
+        return add_back(rows, "ctx:crmhub")
 
     label = "consultation" if kind == "consult" else "tattoo"
     new_row = alfred.item(
@@ -890,14 +893,14 @@ def render_crmnew(kind, query):
     if query:
         rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"]) \
             or [new_row]   # no matching customer → they're new
-    return add_back(rows, "")
+    return add_back(rows, "ctx:crmhub")
 
 
 def render_crmdone(query):
     """Open calendar tasks that link a logbook - ⏎ completes + logs (dialogs)."""
     gate = _records_gate()
     if gate:
-        return add_back(gate, "")
+        return add_back(gate, "ctx:crmhub")
     import crm_records as cr
 
     def _day(t):
@@ -931,14 +934,14 @@ def render_crmdone(query):
         rows = [alfred.item(title="No open session tasks",
                             subtitle="➕ New consultation / tattoo creates them",
                             valid=False)]
-    return add_back(rows, "")
+    return add_back(rows, "ctx:crmhub")
 
 
 def render_crmlog(query):
     """Every records note (customers, logbooks, archive) - ⏎ logs a line."""
     gate = _records_gate()
     if gate:
-        return add_back(gate, "")
+        return add_back(gate, "ctx:crmhub")
     import crm_records as cr
 
     rows, seen = [], set()
@@ -962,7 +965,7 @@ def render_crmlog(query):
         rows = [alfred.item(title="No records notes yet",
                             subtitle="➕ New consultation / tattoo creates them",
                             valid=False)]
-    return add_back(rows, "")
+    return add_back(rows, "ctx:crmhub")
 
 
 # ── Levels: crmsearch / crmcust / crmback / crmsched (round-2 surfaces) ──────
@@ -974,10 +977,10 @@ def _open_note_arg(tid):
 def _cust_row(cr, c, uid_prefix="crms"):
     """Customer search row: contact + lifetime in the subtitle, ⌥ drills into
     the customer hub, ⏎ opens the note."""
-    phone, mail, _b = cr.contact_of(c)
+    phone, mail, _b, insta = cr.contact_of(c)
     money, k, n = cr.lifetime(c["id"])
     bits = [b for b in (
-        f"📞 {phone}" if phone else "",
+        f"📞 {phone}" if phone else (f"📸 {insta}" if insta else ""),
         f"{k} tattoo{'s' if k != 1 else ''}" if k else "",
         money if money != "-" else "",
         "🌱 lead" if cr.is_lead(c) else "",
@@ -997,7 +1000,7 @@ def _cust_row(cr, c, uid_prefix="crms"):
 def _logbook_row(cr, lb, uid_prefix="crms"):
     """Logbook search row: customer + paid + next session in the subtitle,
     ⌥ hops to the customer hub, ⏎ opens the note."""
-    money, n = cr.totals(lb.get("content") or "")
+    paid = cr.paid_summary(lb.get("content") or "")
     hit = cr.parse_first_link(lb.get("content") or "")
     cust_name = re.sub(r"^👤\s*", "", hit[0]) if hit else ""
     archived = _areas.ARCHIVE_TAG in {str(t).lower()
@@ -1008,7 +1011,8 @@ def _logbook_row(cr, lb, uid_prefix="crms"):
         nxt = cr.next_session_task(lb["id"])
         state = (f"next {nxt[1] or 'session'} 📅 {nxt[0] or 'unscheduled'}"
                  if nxt else "▶️ nothing scheduled")
-    bits = [b for b in (cust_name, f"{money} / {n}" if money != "-" else "",
+    bits = [b for b in (cust_name,
+                        "" if paid.startswith("-") else paid,
                         state) if b]
     mods = _picker_mods()
     if hit:
@@ -1053,13 +1057,50 @@ def _crm_open_tasks():
             and t.get("status", 0) == 0]
 
 
+def render_crmhub(query):
+    """🏠 The CRM home inside browse - every verb one row away. ⌃ from any
+    CRM screen lands here (the two-key Session-done → Next-session loop).
+    Rows trampoline via xact:crmbrowse (plain rows can't switch ctx on ⏎)."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    def hop(uid, title, subtitle, ctx):
+        return alfred.item(uid=uid, title=title, subtitle=subtitle,
+                           arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
+    rows = [
+        hop("hub-done", "✅ Session done", "Tick off · log · schedule next",
+            "ctx:crmdone"),
+        hop("hub-next", "▶️ Next session", "Pick logbook → S<n>",
+            "ctx:crmnew:session"),
+        hop("hub-tattoo", "➕ New tattoo", "Customer → logbook → S1",
+            "ctx:crmnew:tattoo"),
+        hop("hub-consult", "➕ New consultation", "Customer → logbook → schedule",
+            "ctx:crmnew:consult"),
+        alfred.item(uid="hub-person", title="➕ New lead / customer",
+                    subtitle="Dialogs · lead lands in Records",
+                    arg="xact:crmperson", mods=_picker_mods()),
+        hop("hub-backlog", "📕 Backlog", "Import finished tattoo · past session",
+            "ctx:crmback"),
+        hop("hub-sched", "📅 Schedule", "Dormant tasks → schedule + link",
+            "ctx:crmsched"),
+        hop("hub-search", "🔍 Search", "Everything CRM · / scopes",
+            "ctx:crmsearch"),
+        hop("hub-log", "📝 Log", "Line into a customer / logbook note",
+            "ctx:crmlog"),
+    ]
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:crmhub")
+
+
 def render_crmsearch(query):
     """ONE search over the whole CRM (Vex ruling): customers + logbooks +
     calendar. '/' opens the scope menu; 'ca ' / 'lo ' / 'cu ' scope the pool.
     Content matching included - typing a phone number finds its customer."""
     gate = _records_gate()
     if gate:
-        return add_back(gate, "")
+        return add_back(gate, "ctx:crmhub")
     import crm_records as cr
 
     q = (query or "").strip()
@@ -1074,7 +1115,7 @@ def render_crmsearch(query):
         if frag:
             rows = fuzz.filter_and_score(frag, rows,
                                          key_fn=lambda x: x["title"]) or rows
-        return add_back(rows, "")
+        return add_back(rows, "ctx:crmhub")
 
     scope, term = "", q
     m = re.match(r"(ca|lo|cu)\s+(.*)$", q) or re.fullmatch(r"(ca|lo|cu)\s*", q)
@@ -1127,7 +1168,7 @@ def render_crmsearch(query):
         out = [alfred.item(title=f'Nothing matching "{term}"' if term
                            else "CRM is empty",
                            subtitle="/ scopes · ca lo cu", valid=False)]
-    return add_back(out, "")
+    return add_back(out, "ctx:crmhub")
 
 
 def render_crmcust(cust_tid, query):
@@ -1135,7 +1176,7 @@ def render_crmcust(cust_tid, query):
     sessions, and the next-action rows - the one screen per human."""
     gate = _records_gate()
     if gate:
-        return add_back(gate, "")
+        return add_back(gate, "ctx:crmhub")
     import crm_records as cr
 
     cust = next((c for c in cr.records_notes()
@@ -1144,7 +1185,7 @@ def render_crmcust(cust_tid, query):
         return add_back([alfred.item(title="Customer not found",
                                      subtitle="Run tsy", valid=False)], "")
     name = cr.customer_display(cust)
-    phone, mail, bday = cr.contact_of(cust)
+    phone, mail, bday, insta = cr.contact_of(cust)
     money, k, n = cr.lifetime(cust_tid)
     rows = []
     info = " · ".join(b for b in (
@@ -1169,6 +1210,12 @@ def render_crmcust(cust_tid, query):
                                 subtitle="⏎ Copy mail",
                                 arg=f"xact:crmcopy:{mail}",
                                 mods=_picker_mods()))
+    if insta:
+        handle = insta.lstrip("@")
+        rows.append(alfred.item(uid="hub-insta", title=f"📸 @{handle}",
+                                subtitle="⏎ Open profile (DMs live here)",
+                                arg=f"open:https://instagram.com/{handle}",
+                                mods=_picker_mods()))
     lbs = cr.customer_logbooks(cust_tid)
     lb_ids = {lb["id"] for lb in lbs}
     for lb in lbs:
@@ -1180,10 +1227,26 @@ def render_crmcust(cust_tid, query):
         uid="hub-newtattoo", title=f"➕ New tattoo for {name}",
         subtitle="Logbook + S1 → scheduling",
         arg=f"xact:crmnew_go:tattoo:{cust_tid}", mods=_picker_mods()))
+    for lb in lbs:
+        if _areas.ARCHIVE_TAG in {str(t).lower() for t in (lb.get("tags") or [])}:
+            continue
+        rows.append(alfred.item(
+            uid=f"hub-pay-{lb['id']}",
+            title=f"💶 Log payment · {lb.get('title') or ''}",
+            subtitle="Deposit · remainder · minus = refund",
+            arg=f"xact:crmpay:{lb['id']}", mods=_picker_mods()))
     rows.append(alfred.item(
         uid="hub-log", title="📝 Log a line",
         subtitle="Timestamped · lands under ## Notes",
         arg=f"xact:crmlog:{cust_tid}", mods=_picker_mods()))
+    rows.append(alfred.item(
+        uid="hub-edit", title="✏️ Edit note",
+        subtitle="Alfred text view · contact line is line 1",
+        arg=f"xact:crmedit:{cust_tid}", mods=_picker_mods()))
+    rows.append(alfred.item(
+        uid="hub-aftercare", title="🩹 Copy aftercare",
+        subtitle="Template + name → clipboard",
+        arg=f"xact:crmaftercare:{cust_tid}", mods=_picker_mods()))
     if cr.is_lead(cust):
         rows.append(alfred.item(
             uid="hub-convert", title="👤 Make customer",
@@ -1200,7 +1263,7 @@ def render_crmback(query):
     session into an existing logbook."""
     gate = _records_gate()
     if gate:
-        return add_back(gate, "")
+        return add_back(gate, "ctx:crmhub")
     rows = [
         alfred.item(uid="back-import", title="📕 Import finished tattoo",
                     subtitle="Customer → name → total → sessions → archived",
@@ -1240,7 +1303,7 @@ def render_crmback(query):
     elif q:
         rows = fuzz.filter_and_score(q, rows,
                                      key_fn=lambda x: x["title"]) or rows
-    return add_back(rows, "")
+    return add_back(rows, "ctx:crmhub")
 
 
 def render_crmsched(query):
@@ -1270,7 +1333,7 @@ def render_crmsched(query):
         rows = [alfred.item(title="Nothing dormant",
                             subtitle="Every CRM task is scheduled 💪",
                             valid=False)]
-    return add_back(rows, "")
+    return add_back(rows, "ctx:crmhub")
 
 
 # ── Level: buffer (🅿️ - tasks collected via ⌘/⌥⇧) ───────────────────────────
@@ -1340,7 +1403,7 @@ def render_smart(kind, query):
             valid=True,
         ))
 
-    return add_back(items, "")
+    return add_back(items, "ctx:crmhub")
 
 # ── Level: inbox ─────────────────────────────────────────────────────────────
 def render_inbox(query):
@@ -1370,7 +1433,7 @@ def render_inbox(query):
             valid=False,
         ))
 
-    return add_back(items, "")
+    return add_back(items, "ctx:crmhub")
 
 # ── Level: completed ─────────────────────────────────────────────────────────
 def render_completed(query):
@@ -1425,7 +1488,7 @@ def render_completed(query):
                 valid=False,
             )]
 
-    return add_back(items, "")
+    return add_back(items, "ctx:crmhub")
 
 
 # ── Level: wontdo (the third status; twin of render_completed) ──────────────
@@ -1481,7 +1544,7 @@ def render_wontdo(query):
                 valid=False,
             )]
 
-    return add_back(items, "")
+    return add_back(items, "ctx:crmhub")
 
 
 # ── Level: filter (custom filters from filters_config.py) ───────────────────
@@ -1522,7 +1585,7 @@ def render_filter(index, query):
             valid=False,
         ))
 
-    return add_back(items, "")
+    return add_back(items, "ctx:crmhub")
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 def _missing(level, want):
@@ -1602,6 +1665,9 @@ def main():
 
         elif level == "crmlog":
             items = render_crmlog(query)
+
+        elif level == "crmhub":
+            items = render_crmhub(query)
 
         elif level == "crmsearch":
             items = render_crmsearch(query)

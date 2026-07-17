@@ -121,13 +121,13 @@ def customer_display(cust):
 
 
 def contact_of(cust):
-    """(phone, mail, bday) parsed from the 📞 header line ('-' → '')."""
+    """(phone, mail, bday, insta) parsed from the 📞 header line ('-' → '')."""
     line = ((cust or {}).get("content") or "").split("\n", 1)[0]
     def seg(emoji):
         m = re.search(emoji + r"\s*([^·\n]*)", line)
         v = (m.group(1).strip() if m else "")
         return "" if v == "-" else v
-    return seg("📞"), seg("✉️"), seg("🎂")
+    return seg("📞"), seg("✉️"), seg("🎂"), seg("📸")
 
 
 def is_lead(note):
@@ -376,6 +376,33 @@ def totals(content):
     return _fmt_money(total, sym or "€", pre), n
 
 
+def quoted_of(content):
+    """(value_float, display_str) from the header 'Quoted:' line, or None."""
+    head = (content or "").partition("\n## ")[0]
+    m = re.search(r"^Quoted: (.+)$", head, re.M)
+    if not m:
+        return None
+    v = _num(m.group(1))
+    return (v, m.group(1).strip()) if v is not None else None
+
+
+def paid_summary(content):
+    """The one Paid display everyone renders: '750€ · 1 session', or with a
+    quote: '550€ of 800€ · 250€ open · 3 sessions'. Recomputed always."""
+    total, n, sym, pre = _totals_raw(content)
+    q = quoted_of(content)
+    word = _sessions_word(n)
+    if q is None:
+        if total == 0 and n == 0:
+            return f"- · 0 sessions"
+        return f"{_fmt_money(total, sym or '€', pre)} · {n} {word}"
+    remaining = q[0] - total
+    money = _fmt_money(total, sym or "€", pre) if (total or n) else "-"
+    open_s = (_fmt_money(remaining, sym or "€", pre) + " open"
+              if remaining > 0 else "settled")
+    return f"{money} of {q[1]} · {open_s} · {n} {word}"
+
+
 def _sessions_word(n):
     return "session" if n == 1 else "sessions"
 
@@ -385,8 +412,7 @@ def _set_paid_line(content):
     Scoped to the HEADER region (before the first '## ') so a body line that
     happens to start with 'Paid:' is never clobbered; lambda replacement so
     user text (currency residue, backslashes) is never a regex template."""
-    money, n = totals(content)
-    line = f"Paid: {money} · {n} {_sessions_word(n)}"
+    line = f"Paid: {paid_summary(content)}"
     head, sep, tail = (content or "").partition("\n## ")
     if re.search(r"^Paid: .*$", head, re.M):
         head = re.sub(r"^Paid: .*$", lambda _m: line, head, count=1, flags=re.M)
@@ -423,11 +449,13 @@ def _seg(v):
     return v if v else "-"
 
 
-def create_customer(name, phone="", mail="", bday="", tag=None):
+def create_customer(name, phone="", mail="", bday="", insta="", tag=None):
     """New 👤 customer note in the records list (tag=areas.LEAD_TAG mints a
     lead - same note, different kanban group). Returns the created task."""
     tag = tag or areas.CUSTOMER_TAG
-    content = (f"📞 {_seg(phone)} · ✉️ {_seg(mail)} · 🎂 {_seg(bday)}\n\n"
+    insta = ("@" + insta.lstrip("@")) if (insta or "").strip() else ""
+    content = (f"📞 {_seg(phone)} · ✉️ {_seg(mail)} · 🎂 {_seg(bday)}"
+               f" · 📸 {_seg(insta)}\n\n"
                "## Fun facts\n\n## Tattoos\n\n## Notes\n")
     _ensure_tag(tag)
     t = _api().create_task(title=f"👤 {_safe_name(name)}",
@@ -437,14 +465,16 @@ def create_customer(name, phone="", mail="", bday="", tag=None):
     return t
 
 
-def create_logbook(cust, tattoo, started=None):
+def create_logbook(cust, tattoo, started=None, quoted=""):
     """New 🎨 logbook note for a customer + its bullet in the customer note.
-    started overrides the Started date (backlog imports). Returns the task."""
+    started overrides the Started date (backlog imports); quoted adds the
+    'Quoted:' header line the Paid math renders progress against."""
     cust_pid = cust.get("_projectId") or cust.get("projectId") or areas.RECORDS_ID
     title = f"🎨 {_safe_name(customer_display(cust))} • {_safe_name(tattoo)}"
+    q_line = f"Quoted: {quoted.strip()}\n" if (quoted or "").strip() else ""
     content = (f"👤 {task_link(cust_pid, cust['id'], (cust.get('title') or '').strip())}"
                f" · Started {started or _today()} · Finished -\n"
-               f"Paid: - · 0 sessions\n\n"
+               f"Paid: - · 0 sessions\n{q_line}\n"
                "## Sessions\n\n## Notes\n")
     _ensure_tag(areas.LOGBOOK_TAG)
     t = _api().create_task(title=title, project_id=areas.RECORDS_ID,
@@ -460,10 +490,9 @@ def _bullet_for(logbook):
     pid = logbook.get("_projectId") or logbook.get("projectId") or areas.RECORDS_ID
     started  = (re.search(r"Started (\S+)", content) or [None, "-"])[1]
     finished = (re.search(r"Finished (\S+)", content) or [None, "-"])[1]
-    money, n = totals(content)
     link = task_link(pid, logbook["id"], logbook.get("title") or "")
     return (f"- {link} - started {started} · finished {finished}"
-            f" · {money} / {n} {_sessions_word(n)}")
+            f" · {paid_summary(content)}")
 
 
 def sync_customer_bullet(logbook):
