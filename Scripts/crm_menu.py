@@ -90,6 +90,10 @@ def build_items():
         _records_row("crm-search", "🔍 Search",
                      "Everything CRM · / scopes calendar, logbooks, customers",
                      "ctx:crmsearch"),
+        _records_row("crm-money", "💰 Money",
+                     "Totals · periods · per customer", "ctx:crmmoney"),
+        _records_row("crm-stats", "📊 Stats",
+                     "Earnings + sessions per month", "ctx:crmstats"),
         _records_row("crm-log", "📝 Log",
                      "Line into a customer / logbook note", "ctx:crmlog"),
     ]

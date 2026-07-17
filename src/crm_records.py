@@ -256,6 +256,62 @@ def monthly_stats():
     return out
 
 
+def all_entries():
+    """Every session-entry across every logbook (open + archived), flat:
+    [(date_str, is_needle_session, amount_or_None, sym, pre)] - the money
+    screens aggregate date ranges over this."""
+    out = []
+    seen = set()
+    for tag in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG):
+        for lb in records_notes(tag):
+            if lb["id"] in seen:
+                continue
+            seen.add(lb["id"])
+            for m in ENTRY_RE.finditer(lb.get("content") or ""):
+                segs = [s.strip() for s in m.group(1).split("·")]
+                is_s = bool(len(segs) > 1
+                            and re.fullmatch(r"S\d+", segs[1] or ""))
+                amt, sym, pre = None, "", False
+                if len(segs) > 3:
+                    amt = _num(segs[3])
+                    if amt is not None:
+                        s2 = re.fullmatch(
+                            r"\s*([^\d\s.,\-]{1,3})?\s*-?[\d.,]+\s*([^\d\s.,\-]{1,3})?\s*",
+                            segs[3])
+                        if s2 and (s2.group(1) or s2.group(2)):
+                            sym, pre = ((s2.group(1), True) if s2.group(1)
+                                        else (s2.group(2), False))
+                out.append((segs[0], is_s, amt, sym, pre))
+    return out
+
+
+def sum_entries(entries, start=None, end=None):
+    """(money_str, session_count) over entries whose date is in
+    [start, end] (ISO date strings, inclusive; None = unbounded)."""
+    total, n, sym, pre = 0.0, 0, "", False
+    for date, is_s, amt, s, p in entries:
+        if (start and date < start) or (end and date > end):
+            continue
+        if is_s:
+            n += 1
+        if amt is not None:
+            total += amt
+            if not sym and s:
+                sym, pre = s, p
+    if total == 0 and n == 0:
+        return "-", 0
+    return _fmt_money(total, sym or "€", pre), n
+
+
+def lifetime_raw(cust_tid):
+    """Numeric lifetime total for sorting the money-per-customer view."""
+    total = 0.0
+    for lb in customer_logbooks(cust_tid):
+        t, _n, _s, _p = _totals_raw(lb.get("content") or "")
+        total += t
+    return total
+
+
 def reopen_logbook(log_pid, log_tid):
     """Touch-up: archived → active again (Finished cleared, retagged), with a
     dated trace line. The next Session-done final archives it back."""

@@ -1087,6 +1087,106 @@ def _crm_open_tasks():
             and t.get("status", 0) == 0]
 
 
+def render_crmmoney(sub, query):
+    """💰 Vex's money screen: all-time totals first, customers second,
+    open logbooks below; archived behind one row (typing searches them too).
+    Sub-screens: periods (week/month/quarter/year sums) · cust (totals per
+    customer, richest first) · arch (archived logbooks)."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    import crm_records as cr
+    from datetime import date as _date, timedelta as _td
+
+    if sub == "periods":
+        e = cr.all_entries()
+        today = _date.today()
+        monday = today - _td(days=today.weekday())
+        m0 = today.replace(day=1)
+        lm_end = m0 - _td(days=1)
+        q0 = _date(today.year, ((today.month - 1) // 3) * 3 + 1, 1)
+        y0 = _date(today.year, 1, 1)
+        def row(uid, label, a, b):
+            money, n = cr.sum_entries(e, a and a.isoformat(), b and b.isoformat())
+            return alfred.item(
+                uid=uid, title=f"{label} · {money} · {n} session{'s' if n != 1 else ''}",
+                subtitle=f"{a.isoformat() if a else '…'} → {b.isoformat() if b else 'today'}",
+                valid=False)
+        rows = [
+            row("mo-w",  "📆 This week",    monday, None),
+            row("mo-lw", "📆 Last week",    monday - _td(days=7), monday - _td(days=1)),
+            row("mo-m",  "📆 This month",   m0, None),
+            row("mo-lm", "📆 Last month",   lm_end.replace(day=1), lm_end),
+            row("mo-q",  "📆 This quarter", q0, None),
+            row("mo-y",  "📆 This year",    y0, None),
+            row("mo-ly", "📆 Last year",    _date(today.year - 1, 1, 1),
+                _date(today.year - 1, 12, 31)),
+        ]
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        return add_back(rows, "ctx:crmmoney")
+
+    if sub == "cust":
+        pool = (cr.records_notes(_areas.CUSTOMER_TAG)
+                + cr.records_notes(_areas.LEAD_TAG))
+        seen, custs = set(), []
+        for c in pool:
+            if c["id"] not in seen:
+                seen.add(c["id"])
+                custs.append(c)
+        custs.sort(key=lambda c: -cr.lifetime_raw(c["id"]))
+        rows = [_cust_row(cr, c, uid_prefix="mo") for c in custs]
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title="No customers yet", valid=False)]
+        return add_back(rows, "ctx:crmmoney")
+
+    if sub == "arch":
+        rows = [_logbook_row(cr, lb, uid_prefix="mo")
+                for lb in cr.records_notes(_areas.ARCHIVE_TAG)]
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title="Nothing archived yet", valid=False)]
+        return add_back(rows, "ctx:crmmoney")
+
+    # root: totals + customers pinned, open logbooks below; typing also
+    # searches the archived ones (chipped) so history stays reachable.
+    e = cr.all_entries()
+    money, n = cr.sum_entries(e)
+    arch = cr.records_notes(_areas.ARCHIVE_TAG)
+    pinned = [
+        alfred.item(uid="mo-total",
+                    title=f"💰 All time · {money} · {n} session{'s' if n != 1 else ''}",
+                    subtitle="⏎ Weekly · monthly · quarterly · yearly",
+                    arg="xact:crmbrowse:ctx:crmmoney:periods",
+                    mods=_picker_mods()),
+        alfred.item(uid="mo-cust", title="👥 Customers",
+                    subtitle="⏎ Totals per customer · richest first",
+                    arg="xact:crmbrowse:ctx:crmmoney:cust",
+                    mods=_picker_mods()),
+    ]
+    lbs = [_logbook_row(cr, lb, uid_prefix="mo")
+           for lb in cr.records_notes(_areas.LOGBOOK_TAG)]
+    if query:
+        lbs += [_logbook_row(cr, lb, uid_prefix="mo-a") for lb in arch]
+        lbs = fuzz.filter_and_score(query, lbs, key_fn=lambda x: x["title"])
+        return add_back(pinned + lbs, "ctx:crmhub")
+    rows = pinned + lbs
+    if arch:
+        rows.append(alfred.item(
+            uid="mo-arch",
+            title=f"📁 Archived · {len(arch)} logbook{'s' if len(arch) != 1 else ''}",
+            subtitle="⏎ Show them (typing up here searches them too)",
+            arg="xact:crmbrowse:ctx:crmmoney:arch",
+            mods=_picker_mods()))
+    return add_back(rows, "ctx:crmhub")
+
+
 def render_crmstats(query):
     """📊 Earnings + session counts per month, straight from the logbook
     entries (open + archived) - recomputed like every money figure."""
@@ -1168,6 +1268,8 @@ def render_crmhub(query):
             "ctx:crmlog"),
         hop("hub-stats", "📊 Stats", "Earnings + sessions per month",
             "ctx:crmstats"),
+        hop("hub-money", "💰 Money", "Totals · periods · per customer",
+            "ctx:crmmoney"),
     ]
     if query:
         rows = fuzz.filter_and_score(query, rows,
@@ -1769,6 +1871,9 @@ def main():
 
         elif level == "crmstats":
             items = render_crmstats(query)
+
+        elif level == "crmmoney":
+            items = render_crmmoney(ids[0] if ids else "", query)
 
         elif level == "crmsearch":
             items = render_crmsearch(query)
