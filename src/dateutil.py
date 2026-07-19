@@ -34,10 +34,14 @@ def _normalise_date(date_str):
     """
     s = date_str.strip()
 
-    # 1. Weekend aliases
+    # 1. Weekend aliases. Mid-weekend (Sat/Sun) "this weekend" means NOW -
+    # "this saturday" would resolve to the PAST on a Sunday.
+    _mid_wknd = datetime.now().weekday() >= 5
     s = re.sub(r'\bnext\s+weekend\b', 'next saturday', s, flags=re.IGNORECASE)
-    s = re.sub(r'\bthis\s+weekend\b', 'this saturday', s, flags=re.IGNORECASE)
-    s = re.sub(r'\bweekend\b',        'saturday',      s, flags=re.IGNORECASE)
+    s = re.sub(r'\bthis\s+weekend\b',
+               'today' if _mid_wknd else 'this saturday', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bweekend\b',
+               'today' if _mid_wknd else 'saturday', s, flags=re.IGNORECASE)
 
     # 2. "Xth of Month [...]" → "X Month [...]"
     s = re.sub(r'\b(\d{1,2})(?:st|nd|rd|th)\s+of\s+', r'\1 ', s, flags=re.IGNORECASE)
