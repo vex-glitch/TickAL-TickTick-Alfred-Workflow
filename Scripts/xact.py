@@ -1801,8 +1801,11 @@ def crmaftercare(cust_tid):
 
 def crmbrowse(ctx):
     """Trampoline: reopen the Browse window at a CRM ctx - the crmhub rows
-    navigate with this (plain browse rows can't switch ctx on ⏎)."""
-    _run_trigger("Browse", ctx)
+    navigate with this (plain browse rows can't switch ctx on ⏎). Fires
+    BrowseCtx, whose Arg&Vars node turns the argument into the browse_ctx
+    SESSION variable - firing Browse directly would dump the raw ctx string
+    into the search bar as query text (bug, 2026-07-19)."""
+    _run_trigger("BrowseCtx", ctx)
 
 
 def crmphoto(log_tid):

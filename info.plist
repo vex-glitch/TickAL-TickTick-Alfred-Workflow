@@ -2395,6 +2395,32 @@
 				<false/>
 			</dict>
 		</array>
+		<key>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A11</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A12</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A12</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A13</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>7CC1797C-FA5C-44BE-B425-B4C9A9E11AAD</key>
 		<array>
 			<dict>
@@ -6283,7 +6309,7 @@ fi</string>
 				<key>runningsubtext</key>
 				<string></string>
 				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/crm_menu.py" "{query}"</string>
+				<string>bash "Scripts/py.sh" "Scripts/crm_menu.py" "$1"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -11901,6 +11927,60 @@ esac</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>BrowseCtx</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A11</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argument</key>
+				<string></string>
+				<key>passthroughargument</key>
+				<false/>
+				<key>variables</key>
+				<dict>
+					<key>browse_ctx</key>
+					<string>{query}</string>
+				</dict>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.argument</string>
+			<key>uid</key>
+			<string>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A12</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Browse</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A13</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -14035,6 +14115,33 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<real>30.0</real>
 			<key>ypos</key>
 			<real>665.0</real>
+		</dict>
+		<key>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A11</key>
+		<dict>
+			<key>note</key>
+			<string>BrowseCtx (arg→browse_ctx var)</string>
+			<key>xpos</key>
+			<real>2225.0</real>
+			<key>ypos</key>
+			<real>635.0</real>
+		</dict>
+		<key>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A12</key>
+		<dict>
+			<key>note</key>
+			<string>browse_ctx := {query}</string>
+			<key>xpos</key>
+			<real>2385.0</real>
+			<key>ypos</key>
+			<real>635.0</real>
+		</dict>
+		<key>7C1A4E90-5B2D-4F81-9E3A-BC0D8F624A13</key>
+		<dict>
+			<key>note</key>
+			<string>→ Browse (clean bar)</string>
+			<key>xpos</key>
+			<real>2545.0</real>
+			<key>ypos</key>
+			<real>635.0</real>
 		</dict>
 		<key>7CC1797C-FA5C-44BE-B425-B4C9A9E11AAD</key>
 		<dict>

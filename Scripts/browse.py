@@ -1520,10 +1520,21 @@ def render_crmhub(query):
     return add_back(rows, "ctx:crmhub")
 
 
+_CRM_SCOPES = [("ca", "Calendar",  "📅", "Session + dormant tasks"),
+               ("lo", "Logbooks",  "🎨", "Active + archived"),
+               ("cu", "Customers", "👥", "Customers + leads"),
+               ("ar", "Archived",  "📁", "Finished logbooks only")]
+# Locked-scope bar reads as a word ('Calendar smith'), everything-search style;
+# the short codes stay valid for muscle memory.
+_CRM_SCOPE_RE = re.compile(r"(?i)(calendar|logbooks|customers|archived"
+                           r"|ca|lo|cu|ar)(?:\s+(.*))?$")
+
+
 def render_crmsearch(query):
     """ONE search over the whole CRM (Vex ruling): customers + logbooks +
-    calendar. '/' opens the scope menu; 'ca ' / 'lo ' / 'cu ' scope the pool.
-    Content matching included - typing a phone number finds its customer."""
+    calendar. '/' opens the scope menu; picking one locks the bar to
+    '<Scope> <term>' (short codes 'ca ' etc. also work). Content matching
+    included - typing a phone number finds its customer."""
     gate = _records_gate()
     if gate:
         return add_back(gate, "ctx:crmhub")
@@ -1532,23 +1543,20 @@ def render_crmsearch(query):
     q = (query or "").strip()
     if q.startswith("/"):
         frag = q[1:].strip()
-        scopes = [("ca", "📅 Calendar", "Session + dormant tasks"),
-                  ("lo", "🎨 Logbooks", "Active + archived"),
-                  ("cu", "👥 Customers", "Customers + leads"),
-                  ("ar", "📁 Archived", "Finished logbooks only")]
-        rows = [alfred.item(uid=f"crms-scope-{k}", title=t, subtitle=s,
-                            arg="", valid=False, autocomplete=f"{k} ")
-                for k, t, s in scopes]
+        rows = [alfred.item(uid=f"crms-scope-{k}", title=f"{e} {name}",
+                            subtitle=s, arg="", valid=False,
+                            autocomplete=f"{name} ")
+                for k, name, e, s in _CRM_SCOPES]
         if frag:
             rows = fuzz.filter_and_score(frag, rows,
                                          key_fn=lambda x: x["title"]) or rows
         return add_back(rows, "ctx:crmhub")
 
     scope, term = "", q
-    m = re.match(r"(ca|lo|cu|ar)\s+(.*)$", q) or re.fullmatch(r"(ca|lo|cu|ar)\s*", q)
+    m = _CRM_SCOPE_RE.fullmatch(q)
     if m:
-        scope = m.group(1)
-        term = (m.group(2) if m.lastindex and m.lastindex > 1 else "").strip()
+        scope = m.group(1).lower()[:2]
+        term = (m.group(2) or "").strip()
 
     rows = []
     if scope in ("", "cu"):
@@ -1598,6 +1606,10 @@ def render_crmsearch(query):
         out = [alfred.item(title=f'Nothing matching "{term}"' if term
                            else "CRM is empty",
                            subtitle="/ scopes · ca lo cu", valid=False)]
+    elif not q:
+        # Scope indicator on the empty bar - everything-search parity.
+        out.insert(0, alfred.item(title="Type to search the CRM…",
+                                  subtitle="Type / for scope", valid=False))
     return add_back(out, "ctx:crmhub")
 
 
