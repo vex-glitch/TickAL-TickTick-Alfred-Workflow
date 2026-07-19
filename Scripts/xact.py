@@ -1283,6 +1283,7 @@ def crmnew_go(rest):
     session::<logTid>."""
     if not _records_ready():
         return
+    import areas
     import crm_records as cr
     parts = (rest or "").split(":")
     kind = parts[0] if parts else ""
@@ -3951,7 +3952,15 @@ def main():
         else:
             print(f"Error: unknown xact verb {verb!r}")
     except Exception as e:
-        print(f"{verb} failed: {type(e).__name__}: {e}")
+        msg = f"{verb} failed: {type(e).__name__}: {e}"
+        print(msg)
+        # stdout is DISCARDED on the picker route (browse ⏎ → modOpen) - a
+        # crash there was pure silence (the 2026-07-19 "nothing on enter"
+        # bug). Banner it too; rare enough that double-notice is fine.
+        try:
+            _crm_say(msg)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
