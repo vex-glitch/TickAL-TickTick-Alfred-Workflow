@@ -1207,10 +1207,12 @@ def _crm_session_prefill(lb_title, marker):
     ~l before # (the tag terminates the multi-word list capture, trap #8);
     [[title]] resolves to the logbook link at create time - a literal URL here
     would trip the # tag trigger on its '#p/' fragment. The S<n>/Consult
-    marker is a SUFFIX (Vex ruling): the calendar reads '🎨 Marko • Sleeve S2'."""
+    marker is a SUFFIX (Vex ruling): the calendar reads '🎨 Marko • Sleeve S2'.
+    Trailing bare '*' auto-opens the schedule picker (Vex ruling 2026-07-19:
+    every CRM handoff is a scheduling - don't make him type the star)."""
     import areas
     tag = areas.CONSULT_TAG if marker == "Consult" else areas.SESSION_TAG
-    _run_trigger("Add", f"~l {areas.crm_list_name()} #{tag} [[{lb_title}]] {marker} ")
+    _run_trigger("Add", f"~l {areas.crm_list_name()} #{tag} [[{lb_title}]] {marker} *")
 
 
 def _crmnew_continue(kind, cust):
