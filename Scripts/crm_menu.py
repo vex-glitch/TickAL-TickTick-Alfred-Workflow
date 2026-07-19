@@ -67,6 +67,16 @@ def build_items():
     if not areas.records_configured():
         return [alfred.item(**areas.setup_row("CRM records", "47-crm.md"))]
     return [
+        # The two lists themselves, top of the menu (Vex ruling 2026-07-19):
+        # ⏎ opens the list in the TickTick app - args ride the ^open branch.
+        alfred.item(uid="crm-open-cal", title="📅 Calendar",
+                    subtitle="Open list in TickTick",
+                    arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks",
+                    variables=CRM_VARS),
+        alfred.item(uid="crm-open-rec", title="🗂️ Logs",
+                    subtitle="Open list in TickTick",
+                    arg=f"open:ticktick:///webapp/#p/{areas.RECORDS_ID}/tasks",
+                    variables=CRM_VARS),
         _records_row("crm-week", "📆 Week",
                      "Who's coming + needs-booking radar", "ctx:crmweek"),
         _records_row("crm-session-done", "✅ Session done",
