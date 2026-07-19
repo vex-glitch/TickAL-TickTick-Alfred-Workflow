@@ -1654,28 +1654,37 @@ def crmimport():
 
 
 def _ask_date(prompt):
-    """Lenient date dialog: 2026-7-3 / 3.7.2026 / 3.7. / 2025 all parse;
-    empty OK = today (returns None); garbage gets ONE re-prompt then cancels.
+    """Lenient date dialog. Day-first with ANY separator (8/7, 08-07, 3.7.,
+    08/07/2026, 8-7-26), year-first ISO (2026-7-3), bare year (2025 → Jan 1);
+    a missing year means THIS year, 2-digit years get +2000. Empty OK = today
+    (returns None); garbage gets re-prompted twice then cancels.
     Returns ISO date, None (today), or "CANCEL"."""
     import re as _re
     import datetime as _dt
-    for _ in range(2):
+    for _ in range(3):
         raw = _ask(prompt)
         if raw is None:
             return "CANCEL"
         w = raw.strip()
         if not w:
             return None
-        m = _re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", w)
-        if m:
-            return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
-        m = _re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{4})?", w)
-        if m:
-            y = m.group(3) or str(_dt.date.today().year)
-            return f"{y}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
         if _re.fullmatch(r"\d{4}", w):
             return f"{w}-01-01"
-        prompt = f"'{w}' is not a date · YYYY-MM-DD or D.M.YYYY (OK = today)"
+        parts = [p for p in _re.split(r"[./\-\s]+", w) if p]
+        if 2 <= len(parts) <= 3 and all(p.isdigit() for p in parts):
+            if len(parts[0]) == 4:      # year-first: YYYY M [D]
+                y, m = parts[0], parts[1]
+                d = parts[2] if len(parts) > 2 else "1"
+            else:                       # day-first: D M [Y]
+                d, m = parts[0], parts[1]
+                y = parts[2] if len(parts) > 2 else str(_dt.date.today().year)
+            try:
+                yi = int(y)
+                yi += 2000 if yi < 100 else 0
+                return _dt.date(yi, int(m), int(d)).isoformat()
+            except ValueError:
+                pass                    # month 13, day 32… → re-prompt
+        prompt = f"'{w}' is not a date · try 8/7 · 08.07.2026 · 2026-07-08 (OK = today)"
     return "CANCEL"
 
 

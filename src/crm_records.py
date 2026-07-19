@@ -977,11 +977,17 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
     holding the stale link text frozen in the completed task's title)."""
     api = _api()
     lb = api.get_task(log_pid, log_tid)   # live - dialogs are slow, cache lags
-    entry = f"### {when or _today()} · {marker} · {_seg(duration)} · {_seg(charged)}"
+    day = when or _today()
+    entry = f"### {day} · {marker} · {_seg(duration)} · {_seg(charged)}"
     if (text or "").strip():
         entry += f"\n{text.strip()}"
     content = _append_under(lb.get("content") or "", "## Sessions", entry)
     content = _set_paid_line(content)
+    # Backdated entry BEFORE the Started date → the Started stamp was wrong
+    # (adopted mid-project logbooks get created "today"): pull it back.
+    ms = re.search(r"Started (\d{4}-\d{2}-\d{2})", content)
+    if ms and day < ms.group(1):
+        content = content[:ms.start(1)] + day + content[ms.end(1):]
     api.update_task(log_tid, log_pid, current=lb, content=content)
     # Mirror the LIVE title too: the S<n+1> prefill's [[title]] resolves
     # against the cache - an app-side rename otherwise leaves it literal.
