@@ -41,7 +41,7 @@ try:
     import api_v2
     r = requests.get(
         "https://api.ticktick.com/api/v1/attachment/isUnderQuota",
-        headers={"x-device": api_v2.X_DEVICE, "user-agent": api_v2.USER_AGENT},
+        headers=api_v2._base_headers(),
         cookies={"t": clip}, timeout=15,
     )
     if r.status_code in (401, 403):
@@ -52,17 +52,10 @@ try:
 except Exception:
     pass  # offline / transient → save anyway
 
-try:
-    # Feed the token on stdin (`-w` with no value makes `security` prompt twice)
-    # so it never appears in the process table via ps.
-    subprocess.run(
-        ["security", "add-generic-password", "-U",
-         "-s", "ticktick_v2_token", "-a", os.environ.get("USER", "ticktick"),
-         "-w"],
-        input=f"{clip}\n{clip}\n".encode(),
-        check=True, capture_output=True,
-    )
+# _store_token writes Keychain (via `security -i` - value stays out of ps and,
+# unlike the stdin-fed `-w` prompt, isn't truncated at 128 chars) + config.json.
+import api_v2 as _v2
+if _v2._store_token(clip):
     print(f"TickTick attachment token saved ✓{verified}")
-except subprocess.CalledProcessError:
-    print("Couldn't save the token to Keychain")
-    sys.exit(1)
+else:
+    print(f"Keychain write failed · saved to config.json only{verified}")

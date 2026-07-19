@@ -86,6 +86,28 @@ def _keychain(service):
     return ""
 
 
+def _store_token(token):
+    """Persist the session token to BOTH stores. The Keychain is read FIRST
+    (see __init__), so a signon that only refreshed config.json left any stale
+    Keychain entry shadowing the fresh token forever (bit us 2026-07-19).
+    Write via `security -i` - the whole command arrives on stdin, so the value
+    never hits argv/ps AND avoids the interactive `-w` prompt reader, which
+    truncates stdin-fed values at 128 chars. Returns True when the Keychain
+    write took; config.json is written regardless."""
+    ok = False
+    try:
+        cmd = ('add-generic-password -U -s ticktick_v2_token -a "{}" -w "{}"\n'
+               .format(os.environ.get("USER", "ticktick"), token))
+        r = subprocess.run(["security", "-i"], input=cmd.encode(),
+                           capture_output=True)
+        ok = (r.returncode == 0
+              and _keychain("ticktick_v2_token") == token)
+    except Exception:
+        pass
+    cfg.save_v2_token(token)
+    return ok
+
+
 class TickTickV2:
     def __init__(self):
         # Token sources, in order: env (testing) → Keychain (recommended, off
@@ -122,7 +144,7 @@ class TickTickV2:
                 pass
             raise V2AuthError(f"TickTick login failed ({r.status_code}{': '+msg if msg else ''})")
         self.token = token
-        cfg.save_v2_token(token)
+        _store_token(token)
         return token
 
     def _upload(self, project_id, task_id, file_bytes, file_name, mime):
