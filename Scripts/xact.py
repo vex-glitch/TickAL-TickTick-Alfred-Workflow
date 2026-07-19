@@ -1313,10 +1313,11 @@ def crmnew_go(rest):
     _crmnew_continue(kind, cust)
 
 
-def sessiondone(pid, tid):
+def sessiondone(pid, tid, when=None):
     """The heart of the records flow: complete today's task (the calendar
     keeps the record - never reschedule), log the entry, recompute Paid,
-    attach a clipboard photo, then archive or chain the next session."""
+    attach a clipboard photo, then archive or chain the next session.
+    when = ISO date for backdated entries (the adopt chain asks); None = today."""
     if not _records_ready():
         return
     import areas
@@ -1354,7 +1355,7 @@ def sessiondone(pid, tid):
         # logbook, then the ⌘ menu opens on the task to pick the new date.
         try:
             cr.append_session(log_pid, log_tid, "rescheduled",
-                              text=f"{marker} rescheduled.")
+                              text=f"{marker} rescheduled.", when=when)
         except Exception as e:
             _crm_say(f"Trace failed: {type(e).__name__}: {e}")
             return
@@ -1388,7 +1389,7 @@ def sessiondone(pid, tid):
         try:
             text = f"{marker} {kind_word}." + (f" {note.strip()}" if note.strip() else "")
             content, money, n, live_title = cr.append_session(
-                log_pid, log_tid, kind_word, charged=kept, text=text)
+                log_pid, log_tid, kind_word, charged=kept, text=text, when=when)
             lb_title = live_title or lb_title
         except Exception as e:
             _crm_say(f"Logged FAILED: {type(e).__name__}: {e}")
@@ -1444,7 +1445,7 @@ def sessiondone(pid, tid):
         return
     try:
         content, money, n, live_title = cr.append_session(
-            log_pid, log_tid, marker, dur, charged, did)
+            log_pid, log_tid, marker, dur, charged, did, when=when)
         lb_title = live_title or lb_title   # renamed logbook → fresh title
     except Exception as e:
         _crm_say(f"✅ done · logbook update FAILED: {type(e).__name__}: {e}")
@@ -2058,7 +2059,11 @@ def crmlink(pid, tid):
     # link stands, nothing else happens.
     if _dialog(f"🔗 Linked · {lb.get('title')} {mk} - session already "
                "happened?", ["Done", "Log it now"], "Done") == "Log it now":
-        sessiondone(pid, tid)
+        when = _ask_date("When was it? (OK = today)")
+        if when == "CANCEL":
+            _crm_say(f"🔗 Linked · {lb.get('title')} {mk} · logging skipped")
+            return
+        sessiondone(pid, tid, when=when)
         return
     _crm_say(f"🔗 Linked · {lb.get('title')} {mk}")
 
