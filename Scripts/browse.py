@@ -1714,8 +1714,8 @@ def render_crmcust(cust_tid, query):
 
 
 def render_crmback(query):
-    """📕 Backlog chooser: import a finished tattoo, or date-log a past
-    session into an existing logbook."""
+    """📕 Backlog chooser: import a finished tattoo, date-log a past session
+    into an existing logbook, or adopt a pre-automation calendar task."""
     gate = _records_gate()
     if gate:
         return add_back(gate, "ctx:crmhub")
@@ -1726,8 +1726,41 @@ def render_crmback(query):
         alfred.item(uid="back-past", title="🕰 Log past session",
                     subtitle="Pick logbook → date + the usual questions",
                     arg="", valid=False, autocomplete="past "),
+        alfred.item(uid="back-adopt", title="🔗 Adopt task",
+                    subtitle="Old task → customer + logbook → log done",
+                    arg="", valid=False, autocomplete="adopt "),
     ]
     q = (query or "").strip()
+    if q.startswith("adopt"):
+        import crm_records as cr
+        frag = q[5:].strip()
+        rows = []
+        prep = (_areas.PREPARE_TAG or "").lower()
+        for t in _crm_open_tasks():
+            title = t.get("title") or ""
+            if cr.is_session_task(title):
+                continue          # already linked - Session done handles it
+            if prep and prep in {str(x).lower() for x in (t.get("tags") or [])}:
+                continue
+            due = t.get("dueDate") or t.get("startDate")
+            rows.append(alfred.item(
+                uid=f"back-a-{t['id']}",
+                title=title or "Untitled",
+                subtitle="⏎ Customer → logbook → link"
+                         + ("" if due else " · dormant"),
+                arg=f"xact:crmlink:{CRM_ID}:{t['id']}",
+                mods=_picker_mods(),
+                variables={"task_id": t["id"], "task_list_id": CRM_ID,
+                           "list_id": CRM_ID, "task_title": title,
+                           "item_type": "task"}))
+        if frag:
+            rows = fuzz.filter_and_score(frag, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title="Nothing to adopt",
+                                subtitle="Every calendar task is linked 💪",
+                                valid=False)]
+        return add_back(rows, "ctx:crmback")
     if q.startswith("past"):
         import crm_records as cr
         frag = q[4:].strip()

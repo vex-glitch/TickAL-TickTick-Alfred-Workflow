@@ -85,7 +85,7 @@ def build_items():
             variables=CRM_VARS,
         ),
         _records_row("crm-backlog", "📕 Backlog",
-                     "Import finished tattoo · log past session",
+                     "Import finished · past session · adopt task",
                      "ctx:crmback"),
         _records_row("crm-sched", "📅 Schedule",
                      "Dormant tasks → schedule + link", "ctx:crmsched"),

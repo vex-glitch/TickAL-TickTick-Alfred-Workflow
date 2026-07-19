@@ -2022,7 +2022,8 @@ def crmlink(pid, tid):
         if not (tattoo or "").strip():
             _crm_say("Cancelled")
             return
-        lb = cr.create_logbook(cust, tattoo)
+        quoted = _ask(f"{tattoo} - quoted price? (OK or Esc skips)") or ""
+        lb = cr.create_logbook(cust, tattoo, quoted=quoted)
     else:
         lb = next((l for l in lbs if (l.get("title") or "") == pick), None)
         if lb is None:
@@ -2051,6 +2052,14 @@ def crmlink(pid, tid):
                                   pid_old=pid, pid_new=pid)
     except Exception:
         pass
+    # Adopting an old task often means the session already happened (the
+    # backlog case): chain straight into Session done - it logs the entry,
+    # completes the task and offers scheduling the next one. Esc/Done = the
+    # link stands, nothing else happens.
+    if _dialog(f"🔗 Linked · {lb.get('title')} {mk} - session already "
+               "happened?", ["Done", "Log it now"], "Done") == "Log it now":
+        sessiondone(pid, tid)
+        return
     _crm_say(f"🔗 Linked · {lb.get('title')} {mk}")
 
 
