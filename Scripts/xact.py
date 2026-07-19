@@ -1703,7 +1703,7 @@ def crmpast(log_tid):
     if when == "CANCEL":
         _crm_say("Cancelled")
         return
-    n = cr.next_snum(lb.get("content") or "", log_tid)
+    n = cr.next_snum(lb.get("content") or "", log_tid, include_tasks=False)
     marker = _dialog("Log as?", ["Cancel", "Consultation", f"S{n}"], f"S{n}")
     if marker == "":
         _crm_say("Cancelled")

@@ -844,16 +844,21 @@ def _set_paid_line(content):
     return head + sep + tail
 
 
-def next_snum(log_content, log_tid):
+def next_snum(log_content, log_tid, include_tasks=True):
     """Next session number: max(S in logged entries, S in OPEN calendar tasks
     linking this logbook) + 1 - so a scheduled-but-not-yet-done S1 makes the
-    next one S2, and entry-less fresh logbooks start at S1."""
+    next one S2, and entry-less fresh logbooks start at S1.
+    include_tasks=False = entries only - LOGGING history (past sessions) must
+    not be renumbered by a task that's merely scheduled (the Bruno case: open
+    S1 task pushed the first past-session offer to S2)."""
     top = 0
     for segs in _entries(log_content):
         if len(segs) > 1:
             m = re.fullmatch(r"S(\d+)", segs[1] or "")
             if m:
                 top = max(top, int(m.group(1)))
+    if not include_tasks:
+        return top + 1
     for t in cache_store.get("all_tasks") or []:
         if ((t.get("_projectId") or t.get("projectId")) == areas.CRM_ID
                 and t.get("status", 0) == 0
