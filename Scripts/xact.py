@@ -1719,9 +1719,17 @@ def crmpast(log_tid):
             return
         answers.append(v)
     dur, charged, did = answers
-    _, money, n_total, _t = cr.append_session(
+    content, money, n_total, live_title = cr.append_session(
         areas.RECORDS_ID, log_tid, marker, dur, charged, did, when=when)
     _crm_say(f"📕 {marker} logged · {money} / {n_total} total")
+    # Same close as Session done: offer the next booking (scheduling
+    # semantics - open tasks count). Esc/Later = logged, nothing else.
+    lb_title = live_title or lb.get("title") or ""
+    nxt = cr.next_snum(content, log_tid)
+    label = f"Schedule S{nxt}"
+    if _dialog(f"{lb_title} - schedule S{nxt} now?",
+               ["Later", label], label) == label:
+        _crm_session_prefill(lb_title, f"S{nxt}")
 
 
 def crmsched(pid, tid):
