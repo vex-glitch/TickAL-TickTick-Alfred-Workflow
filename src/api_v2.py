@@ -95,6 +95,11 @@ def _store_token(token):
     truncates stdin-fed values at 128 chars. Returns True when the Keychain
     write took; config.json is written regardless."""
     ok = False
+    # The value gets embedded in a `security -i` command line - refuse anything
+    # that could break out of the quoting (real `t` cookies are url-safe).
+    if not re.fullmatch(r"[A-Za-z0-9._\-]+", token or ""):
+        cfg.save_v2_token(token)
+        return False
     try:
         cmd = ('add-generic-password -U -s ticktick_v2_token -a "{}" -w "{}"\n'
                .format(os.environ.get("USER", "ticktick"), token))
