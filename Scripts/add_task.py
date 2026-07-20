@@ -370,8 +370,13 @@ def parse_task(query):
         q = q[:m.start()] + q[m.end():]
 
     title = _unmask(' '.join(q.split()))
+    note = _unmask(note)
+    if note:
+        # '/n' as a standalone word = newline (typed notes have no ⏎ key);
+        # never inside words, so paths like a/b or url/new stay intact.
+        note = re.sub(r'(?:(?<=\s)|^)/n(?=\s|$)', '\n', note)
     return (title, date_str, time_str, end_str, priority, tags,
-            list_name, parent_name, section_name, _unmask(note), repeat,
+            list_name, parent_name, section_name, note, repeat,
             reminders, attach_image, post_stage, post_focus)
 
 def resolve_list_id(list_name, lists):
@@ -968,6 +973,15 @@ def master_menu(prefix, fragment, note_mode=False):
             rows.append(("=", "📝", "Note", "add note text"))
         rows += [
             ("^", "🖼️", "Add image", "Add screenshot from clipboard"),
+        ]
+        _cta = ""
+        try:
+            _cta = _areas.cta_list_name()
+        except Exception:
+            pass
+        if _cta:
+            rows.append((f"~l {_cta} ", "📌", "CTA", "into the CTA list"))
+        rows += [
             ("+stage ", "🎯", "Stage for Focus", "Stage after create"),
         ]
         if _fx_running():

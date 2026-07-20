@@ -690,23 +690,36 @@ def main():
             print(alfred.output(hint_items, skipknowledge=True))
             return
 
-        # ── Inline /x scope ───────────────────────────────────────────────────
-        # A space-preceded /token anywhere in the bar switches the scope
-        # instantly - zero extra keypresses, the token is inert for matching
-        # ("monday /t" ≡ "t monday"). Unknown tokens (e.g. "/support") stay
-        # literal text. A LEADING "/" is the scope menu (handled above). The
-        # last valid token wins; it is cut out of the matching query.
-        import re as _re
-        inline_hit = None
-        for _m in _re.finditer(r'(?<!\S)/(\S+)', raw_query):
-            if _m.start() > 0 and _m.group(1).lower() in _INLINE_TOKENS:
-                inline_hit = _m
-        if inline_hit:
-            scope = _INLINE_TOKENS[inline_hit.group(1).lower()]
-            query = (raw_query[:inline_hit.start()]
-                     + raw_query[inline_hit.end():]).strip()
+        # ── Instant tag dropdown ──────────────────────────────────────────────
+        # A leading '#' IS the tag scope - no 'g' + space dance. '#' alone
+        # lists every tag, '#fra' filters, a known tag + space rides the
+        # exact-tag / parent-drill machinery unchanged.
+        if raw_query.startswith("#"):
+            _head = raw_query[1:].split(" ", 1)[0].lower()
+            _known = {lbl.lower() for lbl in (cache_store.get("tags") or [])}
+            if _head and _head in _known:
+                scope, query = "tag", raw_query
+            else:
+                scope, query = "tag", raw_query[1:]
         else:
-            scope, query = detect_scope(raw_query)
+            # ── Inline /x scope ──────────────────────────────────────────────
+            # A space-preceded /token anywhere in the bar switches the scope
+            # instantly - zero extra keypresses, the token is inert for
+            # matching ("monday /t" ≡ "t monday"). Unknown tokens
+            # (e.g. "/support") stay literal text. A LEADING "/" is the scope
+            # menu (handled above). The last valid token wins; it is cut out
+            # of the matching query.
+            import re as _re
+            inline_hit = None
+            for _m in _re.finditer(r'(?<!\S)/(\S+)', raw_query):
+                if _m.start() > 0 and _m.group(1).lower() in _INLINE_TOKENS:
+                    inline_hit = _m
+            if inline_hit:
+                scope = _INLINE_TOKENS[inline_hit.group(1).lower()]
+                query = (raw_query[:inline_hit.start()]
+                         + raw_query[inline_hit.end():]).strip()
+            else:
+                scope, query = detect_scope(raw_query)
         projects  = cache_store.get("projects") or []
         all_tasks = cache_store.get("all_tasks")
         if all_tasks is None:

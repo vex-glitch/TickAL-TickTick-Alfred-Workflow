@@ -2409,7 +2409,13 @@ def pn_income(rest):
             print("💰 Amount first · e.g. 485 groceries")
             return
         spec = {"amount": amt, "label": tail.strip()}
-    print(_pn().append_income(spec.get("amount") or 0, spec.get("label") or ""))
+    msg = _pn().append_income(spec.get("amount") or 0, spec.get("label") or "")
+    print(msg)
+    # The add-to-today route discards stdout - banner or the log is silent.
+    try:
+        _notify_banner(msg)
+    except Exception:
+        pass
 
 
 _JOURNAL_UI = {"morning": ("🌅", "Morning"), "evening": ("🌙", "Evening"),

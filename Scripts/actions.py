@@ -274,7 +274,7 @@ def main():
                 ("🎯 Add buffer to focus", f"All {_n} → the focus block, clears buffer",
                  "xact:buffer_focus", "focus add all stage checkbox",
                  _n > 0 and (fx_session() or ("",))[0] == "task", sent),
-                ("🗑️ Remove this",  "Drop this task from the buffer",
+                ("❌ Remove this",  "Drop this task from the buffer",
                  f"xact:buffer_remove:{pid}:{tid}", "remove drop", bool(tid), real),
                 ("🧹 Clear buffer", "Empty the buffer",    "xact:buffer_clear",
                  "clear empty",      True, sent),
