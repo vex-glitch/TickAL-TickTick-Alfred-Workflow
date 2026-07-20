@@ -1032,11 +1032,12 @@ def insert_session_image(log_pid, log_tid, heading, occurrence, ref):
     return content
 
 
-def finish_logbook(log_pid, log_tid):
-    """Stamp Finished, retag logbook → archive, sync the customer bullet."""
+def finish_logbook(log_pid, log_tid, when=None):
+    """Stamp Finished, retag logbook → archive, sync the customer bullet.
+    when = ISO date for backlog imports (the last session's day); None = today."""
     api = _api()
     lb = api.get_task(log_pid, log_tid)
-    content = re.sub(r"Finished \S+", f"Finished {_today()}",
+    content = re.sub(r"Finished \S+", f"Finished {when or _today()}",
                      lb.get("content") or "", count=1)
     _ensure_tag(areas.ARCHIVE_TAG)
     tags = [t for t in (lb.get("tags") or [])
