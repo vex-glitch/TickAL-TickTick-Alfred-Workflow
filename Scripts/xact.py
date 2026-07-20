@@ -1721,7 +1721,21 @@ def crmpast(log_tid):
     dur, charged, did = answers
     content, money, n_total, live_title = cr.append_session(
         areas.RECORDS_ID, log_tid, marker, dur, charged, did, when=when)
-    _crm_say(f"📕 {marker} logged · {money} / {n_total} total")
+    photo = ""
+    try:   # clipboard photo → logbook attachment, same as Session done
+        import clipboard as clip_util
+        img = clip_util.png_bytes()
+    except Exception:
+        img = None
+    if img:
+        try:
+            import api_v2
+            api_v2.TickTickV2().upload_attachment(areas.RECORDS_ID, log_tid,
+                                                  img, "session.png")
+            photo = " · 📷 attached"
+        except Exception:
+            photo = " · 📷 upload failed"
+    _crm_say(f"📕 {marker} logged · {money} / {n_total} total{photo}")
     # A linked OPEN task wearing this exact marker is now history (the Bruno
     # strand: adopted as S1, logged here as past S1, task left open forever).
     # Offer the tick before the schedule question so next_snum stays honest.
