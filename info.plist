@@ -8721,7 +8721,7 @@ esac</string>
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>bash "Scripts/py.sh" "Scripts/ensure_task_context.py" "$1"</string>
+				<string>bash "Scripts/py.sh" "Scripts/ensure_task_context.py" "$1" prefill_title</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
