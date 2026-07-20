@@ -1416,7 +1416,7 @@ def sessiondone(pid, tid, when=None):
     answers = []
     for prompt, dflt in (
             (f"How long was the {word}? (OK skips · Esc cancels)", d_dur),
-            ("Charged? (OK skips · Esc cancels)", d_chg),
+            ("Charged? (gift = free friend · OK skips · Esc cancels)", d_chg),
             ("What did you do? (OK skips · Esc cancels)", ""),
             ("Setup? needles · inks · machine (OK skips)", d_setup)):
         v = _ask(prompt, default=dflt)
@@ -1711,7 +1711,7 @@ def crmpast(log_tid):
     marker = "consultation" if marker == "Consultation" else f"S{n}"
     answers = []
     for prompt in ("How long? (OK skips · Esc cancels)",
-                   "Charged? (OK skips · Esc cancels)",
+                   "Charged? (gift = free friend · OK skips · Esc cancels)",
                    "What did you do? (OK skips · Esc cancels)"):
         v = _ask(prompt)
         if v is None:

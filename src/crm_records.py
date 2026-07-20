@@ -326,6 +326,8 @@ def all_entries():
                             sym, pre = ((s2.group(1), True) if s2.group(1)
                                         else (s2.group(2), False))
                 mins = dur_minutes(segs[2]) if len(segs) > 2 else None
+                if len(segs) > 3 and is_gratis(segs[3]):
+                    mins = None   # gratis: hours invisible to rate math
                 out.append((segs[0], is_s, amt, sym, pre, mins))
     return out
 
@@ -406,6 +408,7 @@ def entries_detailed():
                     "is_s": bool(re.fullmatch(r"S\d+", marker or "")),
                     "amount": amt, "sym": sym, "pre": pre,
                     "minutes": dur_minutes(segs[2]) if len(segs) > 2 else None,
+                    "gratis": len(segs) > 3 and is_gratis(segs[3]),
                     "lb": lb, "cust_tid": cust_tid, "cust_title": cust_title,
                 })
     return out
@@ -440,7 +443,8 @@ def period_kpis(start, end):
                                            e["cust_title"] or prev[1])
         if e["is_s"]:
             sessions += 1
-            mins += e["minutes"] or 0
+            if not e.get("gratis"):   # gratis hours don't dilute the rate
+                mins += e["minutes"] or 0
             if e["cust_tid"]:
                 active.add(e["cust_tid"])
     returning = sum(1 for c in active
@@ -766,6 +770,16 @@ def _entries(content):
     """Session headers as segment lists: ['2026-07-17', 'S1', '3h', '250€']."""
     return [[s.strip() for s in m.group(1).split("·")]
             for m in ENTRY_RE.finditer(content or "")]
+
+
+GRATIS_RE = re.compile(r"(?i)^(free|gift|gratis|friend|friends|🖤)$")
+
+
+def is_gratis(seg):
+    """A gratis charge segment ('gift', 'free', …): the session is logged and
+    counted, but its hours stay OUT of the money-per-hour math (Vex ruling
+    2026-07-20 - a friend tattoo must not drag the rate)."""
+    return bool(seg and GRATIS_RE.fullmatch(seg.strip()))
 
 
 def _totals_raw(content):
