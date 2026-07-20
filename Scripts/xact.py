@@ -2063,8 +2063,10 @@ def crmconvert(tid):
 
 
 def crmlink(pid, tid):
-    """🔗 Link an existing calendar task to a logbook: the title gains the
-    logbook link + S<n>/Consult suffix, making it a records session task."""
+    """🔗 Link an existing calendar task to a logbook: the title is REPLACED
+    by the convention - [logbook](link) S<n>/Consult - making it a records
+    session task. The old hand-title is dropped (Vex ruling 2026-07-20); the
+    logbook name carries the identity, task content/images stay untouched."""
     if not _records_ready():
         return
     import areas
@@ -2108,9 +2110,8 @@ def crmlink(pid, tid):
         mk = f"S{int(num)}"
     api = cr._api()
     live = api.get_task(pid, tid)
-    old = cr.LINK_RE.sub("", live.get("title") or "").strip()
     link = cr.task_link(areas.RECORDS_ID, lb["id"], lb.get("title") or "")
-    new_title = f"{old} {link} {mk}".strip() if old else f"{link} {mk}"
+    new_title = f"{link} {mk}"
     api.update_task(tid, pid, current=live, title=new_title)
     try:   # mirror into the task caches so gates/pickers see it immediately
         for key in ("all_tasks",):
