@@ -1746,6 +1746,24 @@ def crmsched(pid, tid):
     _run_trigger("attributeScheduling")
 
 
+def crmprep(pid, tid):
+    """🔥 Prepare for an existing booking: open the Add window prefilled with
+    the proven Prepare query (same shape as the booking auto-flow and the ⌘
+    Add-Prepare row). Trailing '*' auto-opens the schedule picker (Vex ruling
+    2026-07-19: every CRM handoff is a scheduling)."""
+    import areas
+    t = cache_store.find_task(tid)
+    title = (t or {}).get("title") or ""
+    if not title:
+        _crm_say("Task not in cache · run tsy")
+        return
+    tgt, wl = areas.prepare_wikilink_target(title)
+    ref = f"[[{tgt}]]" if wl else tgt
+    _run_trigger("Add",
+                 f"~l {areas.crm_list_name()} #{areas.PREPARE_TAG} "
+                 f"Prepare for {ref} *")
+
+
 def crmcopy(text):
     """Copy a contact value from a hub row (browse ⏎ can't ride the copy:
     chain - it lives on the ⌥⌘ canvas edge)."""
@@ -3869,6 +3887,9 @@ def main():
         elif verb == "crmsched":
             pid, tid = rest.split(":", 1)
             crmsched(pid, tid)
+        elif verb == "crmprep":
+            pid, tid = rest.split(":", 1)
+            crmprep(pid, tid)
         elif verb == "crmlink":
             pid, tid = rest.split(":", 1)
             crmlink(pid, tid)

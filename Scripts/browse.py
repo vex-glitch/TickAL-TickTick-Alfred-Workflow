@@ -1824,6 +1824,72 @@ def render_crmsched(query):
     return add_back(rows, "ctx:crmhub")
 
 
+def render_crmprep(query):
+    """🔥 Prepare picker: every open CRM booking (🔥prepare tasks excluded),
+    scheduled first in date order, dormant after - ⏎ opens the Add window
+    prefilled "Prepare for [[…]]" (xact:crmprep)."""
+    import crm_records as cr
+    from datetime import date as _date, datetime as _dt, timedelta as _td, \
+        timezone as _tz
+
+    def _local_dt(t):
+        due = t.get("dueDate") or t.get("startDate") or ""
+        if not due:
+            return None
+        try:
+            c = due[:19]
+            return _dt(int(c[0:4]), int(c[5:7]), int(c[8:10]),
+                       int(c[11:13]), int(c[14:16]),
+                       tzinfo=_tz.utc).astimezone()
+        except Exception:
+            return None
+
+    today = _date.today()
+    sched, dormant = [], []
+    for t in _crm_open_tasks():
+        tags_lc = {str(x).lower() for x in (t.get("tags") or [])}
+        # Tag is the real gate; the title check catches untagged strays.
+        if _areas.PREPARE_TAG in tags_lc \
+                or (t.get("title") or "").lstrip().startswith("Prepare for "):
+            continue
+        d = _local_dt(t)
+        (sched if d else dormant).append((d, t))
+    sched.sort(key=lambda x: x[0])
+    rows = []
+    for d, t in sched + dormant:
+        disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+        if d:
+            dd = d.date()
+            if dd == today:
+                when = "Today"
+            elif dd == today + _td(days=1):
+                when = "Tomorrow"
+            elif today < dd <= today + _td(days=6):
+                when = d.strftime("%a %d")
+            else:   # beyond this week (or overdue) - weekday alone misleads
+                when = d.strftime("%d %b")
+            clock = d.strftime(" %H:%M") if d.strftime("%H:%M") != "00:00" else ""
+            sub = f"{when}{clock} · ⏎ Prepare"
+        else:
+            sub = "Dormant · ⏎ Prepare"
+        rows.append(alfred.item(
+            uid=f"prep-{t['id']}",
+            title=disp,
+            subtitle=sub,
+            arg=f"xact:crmprep:{CRM_ID}:{t['id']}",
+            mods=_picker_mods(),
+            variables={"task_id": t["id"], "task_list_id": CRM_ID,
+                       "list_id": CRM_ID, "task_title": t.get("title") or "",
+                       "item_type": "task"},
+        ))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    if not rows:
+        rows = [alfred.item(title="Nothing to prepare for",
+                            subtitle="No open bookings", valid=False)]
+    return add_back(rows, "ctx:crmhub")
+
+
 # ── Level: buffer (🅿️ - tasks collected via ⌘/⌥⇧) ───────────────────────────
 def render_buffer(query):
     try:
@@ -2182,6 +2248,9 @@ def main():
 
         elif level == "crmsched":
             items = render_crmsched(query)
+
+        elif level == "crmprep":
+            items = render_crmprep(query)
 
         else:
             items = [alfred.item(

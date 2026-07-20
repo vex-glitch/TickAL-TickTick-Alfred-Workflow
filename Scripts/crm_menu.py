@@ -99,6 +99,8 @@ def build_items():
                      "ctx:crmback"),
         _records_row("crm-sched", "📅 Schedule",
                      "Dormant tasks → schedule + link", "ctx:crmsched"),
+        _records_row("crm-prep", "🔥 Prepare",
+                     "Pick booking → prep task", "ctx:crmprep"),
         _records_row("crm-search", "🔍 Search",
                      "Everything CRM · / scopes calendar, logbooks, customers",
                      "ctx:crmsearch"),
