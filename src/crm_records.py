@@ -998,6 +998,21 @@ def sync_customer_bullet(logbook):
     _patch_cache(cust_tid, content=new)
 
 
+def _fresher_content(log_tid, live_content):
+    """Stale-read guard: TickTick reads can lag a just-written update (burst
+    imports LOST two logbooks' entries this way, 2026-07-20). The cache is
+    patched after every successful write - when the cached copy holds MORE
+    session entries than the live read, the cache is the fresher truth."""
+    for key in ("all_notes", "all_tasks"):
+        for c in cache_store.get(key) or []:
+            if c.get("id") == log_tid:
+                cc = c.get("content") or ""
+                if cc.count("### ") > (live_content or "").count("### "):
+                    return cc
+                return live_content
+    return live_content
+
+
 def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
                    when=None):
     """Log one entry: append under ## Sessions, recompute Paid, sync the
@@ -1011,7 +1026,8 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
     entry = f"### {day} · {marker} · {_seg(duration)} · {_seg(charged)}"
     if (text or "").strip():
         entry += f"\n{text.strip()}"
-    content = _append_under(lb.get("content") or "", "## Sessions", entry)
+    base = _fresher_content(log_tid, lb.get("content") or "")
+    content = _append_under(base, "## Sessions", entry)
     content = _set_paid_line(content)
     # Backdated entry BEFORE the Started date → the Started stamp was wrong
     # (adopted mid-project logbooks get created "today"): pull it back.
@@ -1064,7 +1080,7 @@ def finish_logbook(log_pid, log_tid, when=None):
     api = _api()
     lb = api.get_task(log_pid, log_tid)
     content = re.sub(r"Finished \S+", f"Finished {when or _today()}",
-                     lb.get("content") or "", count=1)
+                     _fresher_content(log_tid, lb.get("content") or ""), count=1)
     _ensure_tag(areas.ARCHIVE_TAG)
     tags = [t for t in (lb.get("tags") or [])
             if str(t).lower() not in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG)] \
