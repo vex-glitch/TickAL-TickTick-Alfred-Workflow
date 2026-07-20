@@ -1795,8 +1795,8 @@ def render_crmback(query):
 
 
 def render_crmsched(query):
-    """📅 Dormant calendar tasks (no date) - ⏎ reopens ⌘ Actions on the task
-    (Schedule + Link to logbook live there)."""
+    """📅 Dormant calendar tasks (no date) - ⏎ jumps straight into the
+    schedule picker; Link to logbook lives on ⌘ Actions."""
     import crm_records as cr
     rows = []
     for t in _crm_open_tasks():
@@ -1807,8 +1807,8 @@ def render_crmsched(query):
         rows.append(alfred.item(
             uid=f"sched-{t['id']}",
             title=disp,
-            subtitle="⏎ Schedule / Link"
-                     + ("" if linked else " · 🔗 unlinked"),
+            subtitle="⏎ Schedule"
+                     + ("" if linked else " · 🔗 unlinked · ⌘ link"),
             arg=f"xact:crmsched:{CRM_ID}:{t['id']}",
             mods=_picker_mods(),
             variables={"task_id": t["id"], "task_list_id": CRM_ID,

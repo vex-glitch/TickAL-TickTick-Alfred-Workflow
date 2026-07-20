@@ -1733,9 +1733,17 @@ def crmpast(log_tid):
 
 
 def crmsched(pid, tid):
-    """📅 Schedule a dormant task: reopen the ⌘ Actions menu on it (act-again
-    mechanism) - Schedule and Link to logbook both live there."""
-    reopen_actions(pid, tid)
+    """📅 Schedule a dormant task: jump straight into the schedule picker
+    (attributeScheduling ET; ensure_task_context re-reads the temp file for
+    pid/tid). Link to logbook stays one ⌘ away - Actions menu on the row."""
+    if not pid or not tid:
+        return
+    try:
+        with open("/tmp/ticktick_reattribute.txt", "w") as f:
+            f.write(f"{pid}:{tid}")
+    except OSError:
+        return
+    _run_trigger("attributeScheduling")
 
 
 def crmcopy(text):

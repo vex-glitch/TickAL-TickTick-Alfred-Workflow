@@ -23,6 +23,19 @@ if itype not in ("list", "section") and (not pid or not tid):
     except Exception:
         pass
 
+# Temp-file entries carry no title - recover it from cache so downstream
+# pickers say the real task name, not the "task" placeholder.
+if itype not in ("list", "section") and tid and not task_title:
+    try:
+        sys.path.insert(0, os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+        import cache
+        t = cache.find_task(tid)
+        if t:
+            task_title = t.get("title") or ""
+    except Exception:
+        pass
+
 print(json.dumps({
     "alfredworkflow": {
         "arg": sys.argv[1] if len(sys.argv) > 1 else "",
