@@ -107,15 +107,22 @@ def find_active_trigger(query):
     Everything after the = note marker is opaque - no triggers inside a note.
     Returns (trigger, prefix_before_trigger, fragment_after_trigger) or None.
     """
-    m = re.search(r'(?<!\S)=', query)
+    # Closed [[links]] are opaque here too: their text carries real-world
+    # trigger chars (an '=' inside a picked title re-opened the picker
+    # forever). Same-length filler keeps every index valid for slicing the
+    # REAL query below.
+    masked = re.sub(r'\[\[[^\[\]]*\]\]', lambda mm: '·' * len(mm.group(0)),
+                    query)
+    m = re.search(r'(?<!\S)=', masked)
     scan = query[:m.start()] if m else query
+    masked = masked[:len(scan)]
     # [[ task-link picker - active while an unclosed [[ is being typed (no ]] after
     # the last [[). Takes priority since the user is mid-link; closes once ]] lands.
-    idx = scan.rfind('[[')
-    if idx != -1 and ']]' not in scan[idx + 2:]:
+    idx = masked.rfind('[[')
+    if idx != -1 and ']]' not in masked[idx + 2:]:
         return ('[[', scan[:idx], scan[idx + 2:])
     for i in range(len(scan) - 1, -1, -1):
-        ch = scan[i]
+        ch = masked[i]
         if ch not in ('~', '#', '!', '*', '/', '>', '@', '&', '%'):
             continue
         # Must be at start or preceded by a space
@@ -137,15 +144,49 @@ def find_active_trigger(query):
         # Single-word triggers: if fragment contains a space the token is done
         if ch in ('#', '!', '/', '>', '&', '%') and ' ' in fragment:
             return None
-        # Date / time triggers: if fragment ends with a space the token is done
+        # @time is ONE token (H / HH:MM): an internal space means the user
+        # typed on - close it (it used to hold the whole UI hostage in the
+        # hour picker while a title followed). *date stays open for
+        # multi-word dates until the trailing space.
+        if ch == '@' and ' ' in fragment.strip():
+            return None
         if ch in ('*', '@') and fragment.endswith(' '):
             return None
         return (ch, prefix, fragment)
     return None
 
+# Words that can be part of a *date phrase - the date span in parse_task
+# extends over these and stops at the first title word.
+_DATE_WORD = re.compile(
+    r'(?i)^(?:\d{1,4}(?:[:./\-]\d{1,4}){0,2}h?|\d{1,2}(?:st|nd|rd|th|am|pm)'
+    r'|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?'
+    r'|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?'
+    r'|mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:rs(?:day)?)?'
+    r'|fri(?:day)?|sat(?:urday)?|sun(?:day)?'
+    r'|today|tomorrow|tonight|yesterday|next|this|in|at|on|of|the|am|pm'
+    r'|noon|midnight|morning|afternoon|evening|night|weekend'
+    r'|day|days|week|weeks|month|months|year|years'
+    r'|hour|hours|minute|minutes|min|eod|eow|eom'
+    r')$')
+
+
 def parse_task(query):
     """Extract structured fields from the raw query string."""
     q = query
+
+    # Closed [[wikilinks]] are OPAQUE - picked task titles carry real-world
+    # token chars (#, !, *, =, @…) that must not be re-tokenized (they minted
+    # bogus tags and mangled links). Mask before any token scan, unmask at
+    # the end in both title and note.
+    _links = []
+    def _mask_link(m):
+        _links.append(m.group(0))
+        return f"\x00L{len(_links) - 1}\x00"
+    q = re.sub(r'\[\[[^\[\]]*\]\]', _mask_link, q)
+    def _unmask(s):
+        if s is None or not _links:
+            return s
+        return re.sub(r'\x00L(\d+)\x00', lambda m: _links[int(m.group(1))], s)
 
     # =note - everything after the marker to end of string (always last).
     # re.S: a pasted note may contain newlines (⌘V of multi-line text) - without
@@ -160,7 +201,9 @@ def parse_task(query):
     # "Add image" row; on create, dispatch uploads the clipboard image to the
     # new task. Stripped from the pre-note text only (a literal ^ inside a =note
     # stays put). All occurrences are removed so re-selecting can't leave a stray.
-    new_q, n_attach = re.subn(r'(?<!\S)\^ ?', '', q)
+    # Standalone ONLY - '^word' in a title must stay title text, not silently
+    # flip on the clipboard-image attach.
+    new_q, n_attach = re.subn(r'(?<!\S)\^(?=\s|$) ?', '', q)
     attach_image = n_attach > 0
     q = new_q
 
@@ -175,19 +218,48 @@ def parse_task(query):
     post_stage, post_focus = n_stage > 0, n_fx > 0
     q = new_q
 
-    # ~p parent_task (multi-word, ends at next trigger or end of string)
+    # ~p parent_task (multi-word, ends at next trigger or end of string).
+    # Resolve-and-trim like ~l: title typed AFTER the picked parent used to be
+    # swallowed into parent_name, killing both the parent link and the words.
     parent_name = None
     m = re.search(r'(?<!\S)~p\s+(.+?)(?=\s+[~#!*@/>=&%]|\s*$)', q)
     if m:
-        parent_name = m.group(1)
-        q = q[:m.start()] + q[m.end():]
+        span, leftover = m.group(1), ""
+        _pool = [t.get("title", "") for t in (cache_store.get("all_tasks") or [])
+                 if t.get("status", 0) == 0]
+        def _pmatch(name):
+            nl = name.lower()
+            return any(nl == t.lower() for t in _pool) \
+                or any(nl in t.lower() for t in _pool)
+        if _pool and span.strip() and not _pmatch(span):
+            words = span.split(" ")
+            for cut in range(len(words) - 1, 0, -1):
+                cand = " ".join(words[:cut])
+                if _pmatch(cand):
+                    span, leftover = cand, " ".join(words[cut:])
+                    break
+        parent_name = span
+        q = q[:m.start()] + (leftover + " " if leftover else "") + q[m.end():]
 
-    # ~s section (multi-word)
+    # ~s section (multi-word) - same trim against the cached section names.
     section_name = None
     m = re.search(r'(?<!\S)~s\s+(.+?)(?=\s+[~#!*@/>=&%]|\s*$)', q)
     if m:
-        section_name = m.group(1)
-        q = q[:m.start()] + q[m.end():]
+        span, leftover = m.group(1), ""
+        _sects = set()
+        for p in (cache_store.get("projects") or []):
+            pd = cache_store.get(f"project_data_{p.get('id')}") or {}
+            for col in pd.get("columns", []):
+                if col.get("name"):
+                    _sects.add(col["name"].strip().lower())
+        if _sects and span.strip() and span.strip().lower() not in _sects:
+            words = span.split(" ")
+            for cut in range(len(words) - 1, 0, -1):
+                if " ".join(words[:cut]).strip().lower() in _sects:
+                    span, leftover = " ".join(words[:cut]), " ".join(words[cut:])
+                    break
+        section_name = span
+        q = q[:m.start()] + (leftover + " " if leftover else "") + q[m.end():]
 
     # ~l list (multi-word). The capture runs to the next trigger char or end of
     # string - so when the TITLE follows the list name ("#tag ~l 🔥CRM buy milk",
@@ -221,9 +293,9 @@ def parse_task(query):
         tags.append(m.group(1))
         q = q[:m.start()] + q[m.end():]
 
-    # !priority (1/2/3)
+    # !priority (1/2/3) - standalone token only ("!1abc" stays title text)
     priority = 0
-    m = re.search(r'(?<!\S)!([123])', q)
+    m = re.search(r'(?<!\S)!([123])(?=\s|$)', q)
     if m:
         priority = PRIORITY_VAL[m.group(1)]
         q = q[:m.start()] + q[m.end():]
@@ -235,26 +307,46 @@ def parse_task(query):
     date_str = None
     m = re.search(r'(?<!\S)\*(.+?)(?=\s+[~#!/>@=&%]|\s*$)', q)
     if m:
-        date_str = m.group(1).strip()
-        q = q[:m.start()] + q[m.end():]
+        # Trim-back: the greedy span eats any title typed after a closed date
+        # ("* tomorrow buy milk" → title lost). parsedatetime parses fuzzily
+        # (junk words don't fail it, they SHIFT the result), so equality
+        # games don't work - instead the date runs only as far as
+        # date-vocabulary words do, then must actually resolve.
+        words = m.group(1).strip().split()
+        k = 0
+        while k < len(words) and _DATE_WORD.match(words[k]):
+            k += 1
+        span, leftover = " ".join(words[:k]), " ".join(words[k:])
+        while span and parse_date(span) is None:
+            cut = span.rsplit(None, 1)
+            leftover = ((cut[1] if len(cut) == 2 else cut[0])
+                        + (" " + leftover if leftover else "")).strip()
+            span = cut[0] if len(cut) == 2 else ""
+        date_str = span or None
+        q = q[:m.start()] + (leftover + " " if leftover else "") + q[m.end():]
 
-    # @time - HH:MM explicit time picker result
+    # @time - explicit time token. Accepts @HH:MM and bare @H / @HH (14 →
+    # 14:00); out-of-range values stay in the title instead of vanishing.
     time_str = None
-    m = re.search(r'(?<!\S)@(\d{1,2}:\d{2})\b', q)
+    m = re.search(r'(?<!\S)@(\d{1,2})(?::(\d{1,2}))?(?=\s|$)', q)
     if m:
-        time_str = m.group(1).strip()
-        q = q[:m.start()] + q[m.end():]
+        _h, _mm = int(m.group(1)), int(m.group(2) or 0)
+        if _h <= 23 and _mm <= 59:
+            time_str = f"{_h}:{_mm:02d}"
+            q = q[:m.start()] + q[m.end():]
 
-    # >end - duration end time (14 or 14:30), set via duration picker
+    # >end - duration end time (14 or 14:30), set via duration picker.
+    # 24+ "hours" (">50" = a comparison in the title) are left alone.
     end_str = None
     m = re.search(r'(?<!\S)>(\d{1,2}(?::\d{2})?)(?=\s|$)', q)
-    if m:
+    if m and int(m.group(1).split(":")[0]) <= 23:
         end_str = m.group(1)
         q = q[:m.start()] + q[m.end():]
 
-    # &repeat - preset token (daily/weekdays/weekly/monthly/yearly)
+    # &repeat - KNOWN presets only ("&Co" in a title is not a repeat rule)
     repeat = None
-    m = re.search(r'(?<!\S)&(\S+)', q)
+    m = re.search(r'(?<!\S)&(daily|weekdays|weekly|monthly|yearly)(?=\s|$)', q,
+                  re.IGNORECASE)
     if m:
         repeat = m.group(1).lower()
         q = q[:m.start()] + q[m.end():]
@@ -268,10 +360,10 @@ def parse_task(query):
         reminders.append(m.group(1).lower())
         q = q[:m.start()] + q[m.end():]
 
-    title = ' '.join(q.split())
+    title = _unmask(' '.join(q.split()))
     return (title, date_str, time_str, end_str, priority, tags,
-            list_name, parent_name, section_name, note, repeat, reminders,
-            attach_image, post_stage, post_focus)
+            list_name, parent_name, section_name, _unmask(note), repeat,
+            reminders, attach_image, post_stage, post_focus)
 
 def resolve_list_id(list_name, lists):
     """Find project ID by name (case-insensitive prefix/contains match)."""
@@ -1291,9 +1383,14 @@ def task_preview(query):
             dt = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%S%z") + timedelta(days=1)
             end_date = dt.strftime("%Y-%m-%dT%H:%M:%S+0000")
 
-    # Build subtitle summary
+    # Build subtitle summary. '?' = the typed list didn't resolve (every other
+    # unresolved token already marks itself) - without it a typo'd ~l read
+    # exactly like a real list while the task silently landed in Inbox.
     parts = []
-    parts.append(f"~{list_display}" if list_display else "~Inbox")
+    _lchip = f"~{list_display}" if list_display else "~Inbox"
+    if list_name and not list_id:
+        _lchip += "?"
+    parts.append(_lchip)
     if section_display:
         parts.append(f"§{section_display}")
     elif section_name:
@@ -1559,9 +1656,12 @@ def note_preview(query):
             dt = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%S%z") + timedelta(days=1)
             end_date = dt.strftime("%Y-%m-%dT%H:%M:%S+0000")
 
-    # Build subtitle
+    # Build subtitle ('?' = typed list didn't resolve, same as task preview)
     parts = []
-    parts.append(f"~{list_display}" if list_display else "~Notes")
+    _lchip = f"~{list_display}" if list_display else "~Notes"
+    if list_name and not list_id:
+        _lchip += "?"
+    parts.append(_lchip)
     if section_display:
         parts.append(f"§{section_display}")
     elif section_name:
@@ -1865,9 +1965,11 @@ def main():
     # "add" is the bare routing arg from menu rows - it must match EXACTLY:
     # startswith blanked every real title beginning with the word add
     # ("add reminder to…", "additional…" - the 2026-07-19 'add breaks all' bug).
+    # Routing args never contain spaces - a real title like "complete: review
+    # the deck" must survive.
     for prefix in ("addtask:", "addsection:", "addsubtask:", "stickynote:",
                    "pomodoro:", "attributes:", "complete:"):
-        if query.startswith(prefix):
+        if query.startswith(prefix) and " " not in query:
             query = ""
             break
     if query.strip() == "add":

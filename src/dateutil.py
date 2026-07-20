@@ -60,14 +60,19 @@ def _normalise_date(date_str):
         yi = int(yr)
         return f" {yi + 2000 if yi < 100 else yi}"
 
+    # Years must be 4-digit here: a 2-digit capture ate trailing bare HOURS
+    # ("20 sep 14" scheduled in 2014). Bare trailing numbers fall through to
+    # the hour rule (step 8) instead.
     s = re.sub(
-        rf'\b(\d{{1,2}})\s+({_month_pat})(?:\s+(\d{{2,4}}))?\b',
+        rf'\b(\d{{1,2}})\s+({_month_pat})(?:\s+(\d{{4}}))?\b',
         lambda m: f"{m.group(1)} {MONTHS[_MONTH_MAP[m.group(2).lower()]-1].capitalize()}"
                   + _expand_year(m.group(3)),
         s, flags=re.IGNORECASE,
     )
+    # (?<!\d ) - after the day-first rewrite ("1 August 9") the month-first
+    # rule must NOT re-match "August 9" and flip the day to 9.
     s = re.sub(
-        rf'\b({_month_pat})\s+(\d{{1,2}})(?:\s+(\d{{2,4}}))?\b',
+        rf'(?<!\d )\b({_month_pat})\s+(\d{{1,2}})(?:\s+(\d{{4}}))?\b',
         lambda m: f"{m.group(2)} {MONTHS[_MONTH_MAP[m.group(1).lower()]-1].capitalize()}"
                   + _expand_year(m.group(3)),
         s, flags=re.IGNORECASE,
@@ -89,7 +94,10 @@ def _normalise_date(date_str):
                 hr = re.fullmatch(r'\s+(\d{1,2}(?::\d{2})?)\s*', rest)
                 s += f" at {hr.group(1)}" if hr else rest
 
-    # 6. Hour notation: 21h → 21:00, 9h → 9:00
+    # 6. Hour notation: 21h → 21:00, 9h → 9:00. "in 2h" is a RELATIVE offset,
+    # not an o'clock - expand it first or the rewrite destroys it (all-day
+    # today instead of +2 hours).
+    s = re.sub(r'\bin\s+(\d+)h\b', r'in \1 hours', s, flags=re.IGNORECASE)
     s = re.sub(r'\b(\d{1,2})h\b', lambda x: f"{x.group(1)}:00", s)
 
     # 7. "at N" with no am/pm/colon: N<12 → am, N≥12 → 24h
@@ -102,6 +110,8 @@ def _normalise_date(date_str):
     _DATE_PHRASE = (
         r'today|tomorrow|yesterday'
         r'|monday|tuesday|wednesday|thursday|friday|saturday|sunday'
+        r'|january|february|march|april|may|june|july|august|september'
+        r'|october|november|december'
         r'|next\s+\w+|this\s+\w+|in\s+\d+\s+\w+'
     )
     def _bare_hour(x):
@@ -109,8 +119,10 @@ def _normalise_date(date_str):
         if h < 12:    return f"{x.group(1)} {h}am"
         elif h <= 23: return f"{x.group(1)} {h}:00"
         return x.group(0)
+    # Month names in the phrase list + optional year: "20 September [2026] 14"
+    # is 14:00 on Sept 20, not year 2014 / day 14.
     s = re.sub(
-        rf'(\b(?:{_DATE_PHRASE})\b)\s+(\d{{1,2}})\s*$',
+        rf'(\b(?:{_DATE_PHRASE})\b(?:\s+\d{{4}})?)\s+(\d{{1,2}})\s*$',
         _bare_hour, s, flags=re.IGNORECASE,
     )
 
