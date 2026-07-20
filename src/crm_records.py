@@ -332,9 +332,31 @@ def all_entries():
     return out
 
 
+def cut_percent():
+    """Artist's share of charged amounts (crm_cut env var, percent). Default
+    50 (Vex's split). <=0 or >=100 disables the 🫵 chip entirely (100 =
+    it's all yours anyway, nothing to show)."""
+    try:
+        v = float(os.environ.get("crm_cut", "50"))
+    except ValueError:
+        v = 50.0
+    return v if 0 < v < 100 else None
+
+
+def cut_chip(raw_total, money_str=""):
+    """' · 🫵 3975€' - the artist's share, appended after money totals.
+    Currency symbol recovered from the formatted total it follows."""
+    p = cut_percent()
+    if not p or not raw_total:
+        return ""
+    sym = re.sub(r"[-\d.,\s]", "", money_str or "") or "€"
+    pre = bool(sym) and (money_str or "").strip().startswith(sym)
+    return f" · 🫵 {_fmt_money(raw_total * p / 100.0, sym, pre)}"
+
+
 def sum_entries(entries, start=None, end=None):
-    """(money_str, session_count, hours_float) over entries whose date is in
-    [start, end] (ISO date strings, inclusive; None = unbounded)."""
+    """(money_str, session_count, hours_float, raw_total) over entries whose
+    date is in [start, end] (ISO date strings, inclusive; None = unbounded)."""
     total, n, sym, pre, mins = 0.0, 0, "", False, 0
     for date, is_s, amt, s, p, mm in entries:
         if (start and date < start) or (end and date > end):
@@ -349,8 +371,8 @@ def sum_entries(entries, start=None, end=None):
                 sym, pre = s, p
     hours = round(mins / 60.0, 1)
     if total == 0 and n == 0:
-        return "-", 0, hours
-    return _fmt_money(total, sym or "€", pre), n, hours
+        return "-", 0, hours, 0.0
+    return _fmt_money(total, sym or "€", pre), n, hours, total
 
 
 def lifetime_raw(cust_tid):

@@ -1267,11 +1267,12 @@ def render_crmmoney(sub, query):
         q0 = _date(today.year, ((today.month - 1) // 3) * 3 + 1, 1)
         y0 = _date(today.year, 1, 1)
         def row(uid, label, a, b):
-            money, n, hours = cr.sum_entries(e, a and a.isoformat(),
-                                             b and b.isoformat())
+            money, n, hours, raw = cr.sum_entries(e, a and a.isoformat(),
+                                                  b and b.isoformat())
             extra = f" · {hours:g}h" if hours else ""
             return alfred.item(
-                uid=uid, title=f"{label} · {money} · {n} session{'s' if n != 1 else ''}{extra}",
+                uid=uid, title=f"{label} · {money}{cr.cut_chip(raw, money)}"
+                               f" · {n} session{'s' if n != 1 else ''}{extra}",
                 subtitle=f"{a.isoformat() if a else '…'} → {b.isoformat() if b else 'today'}",
                 valid=False)
         rows = [
@@ -1319,7 +1320,7 @@ def render_crmmoney(sub, query):
     # root: totals + customers pinned, open logbooks below; typing also
     # searches the archived ones (chipped) so history stays reachable.
     e = cr.all_entries()
-    money, n, hours = cr.sum_entries(e)
+    money, n, hours, raw = cr.sum_entries(e)
     arch = cr.records_notes(_areas.ARCHIVE_TAG)
     rate = ""
     if hours:
@@ -1331,7 +1332,8 @@ def render_crmmoney(sub, query):
             rate = f" · {hours:g}h · ~{int(r)}{symm}/h"
     pinned = [
         alfred.item(uid="mo-total",
-                    title=f"💰 All time · {money} · {n} session{'s' if n != 1 else ''}{rate}",
+                    title=f"💰 All time · {money}{cr.cut_chip(raw, money)}"
+                          f" · {n} session{'s' if n != 1 else ''}{rate}",
                     subtitle="⏎ Weekly · monthly · quarterly · yearly",
                     arg="xact:crmbrowse:ctx:crmmoney:periods",
                     mods=_picker_mods()),
@@ -1413,10 +1415,15 @@ def render_crmstats(sub, query):
         k = cr.period_kpis(a, b)
         p = cr.period_kpis(pa, pb) if (pa or pb) else None
         fm = lambda v: cr._fmt_money(v, k["sym"], k["pre"])
+        cut = cr.cut_percent()
+        cut_part = (f" · 🫵 {fm(k['money'] * cut / 100.0)}"
+                    if cut and k["money"] else "")
         rows = [alfred.item(uid="kp-money",
                             title=f"💰 {fm(k['money'])}"
-                                  + _delta_chip(k["money"], p and p["money"]),
-                            subtitle=f"{label} · money made", valid=False)]
+                                  + _delta_chip(k["money"], p and p["money"])
+                                  + cut_part,
+                            subtitle=f"{label} · money made · 🫵 = your cut",
+                            valid=False)]
         if k["hours"]:
             rate = f" · ~{int(k['rate'])}{k['sym']}/h" if k["rate"] else ""
             rows.append(alfred.item(
@@ -1459,11 +1466,15 @@ def render_crmstats(sub, query):
 
     # root: period picker with headline subtitles
     rows = []
+    cut = cr.cut_percent()
     for key in ("thism", "lastm", "quarter", "year", "all"):
         label, a, b, _pa, _pb = periods[key]
         k = cr.period_kpis(a, b)
-        head = (f"{cr._fmt_money(k['money'], k['sym'], k['pre'])} · "
-                f"{k['sessions']} session{'s' if k['sessions'] != 1 else ''}")
+        fmz = lambda v: cr._fmt_money(v, k["sym"], k["pre"])
+        head = fmz(k["money"])
+        if cut and k["money"]:
+            head += f" · 🫵 {fmz(k['money'] * cut / 100.0)}"
+        head += f" · {k['sessions']} session{'s' if k['sessions'] != 1 else ''}"
         if k["hours"]:
             head += f" · {k['hours']:g}h"
         rows.append(alfred.item(
