@@ -559,7 +559,7 @@ def rename_logbook(log_tid, new_tattoo):
     api = _api()
     lb = api.get_task(areas.RECORDS_ID, log_tid)
     old = lb.get("title") or ""
-    m = re.match(r"^(🎨 .*? • )", old)
+    m = re.match(r"^((?:🎨|🏛️) .*? • )", old)
     new_title = (m.group(1) if m else "🎨 ") + _safe_name(new_tattoo)
     api.update_task(log_tid, areas.RECORDS_ID, current=lb, title=new_title)
     _patch_cache(log_tid, title=new_title)
@@ -581,9 +581,11 @@ def rename_customer(cust_tid, new_name):
     for lb in customer_logbooks(cust_tid):
         _swap_link_text_in_note(lb["id"], cust_tid, new_title)
         lt = lb.get("title") or ""
-        if old_disp and lt.startswith(f"🎨 {old_disp} • "):
-            tattoo_part = lt[len(f"🎨 {old_disp} • "):]
-            new_lt = f"🎨 {new_disp} • {tattoo_part}"
+        emo = next((e for e in ("🎨", "🏛️")
+                    if old_disp and lt.startswith(f"{e} {old_disp} • ")), None)
+        if emo:
+            tattoo_part = lt[len(f"{emo} {old_disp} • "):]
+            new_lt = f"{emo} {new_disp} • {tattoo_part}"
             try:
                 live_lb = api.get_task(areas.RECORDS_ID, lb["id"])
                 api.update_task(lb["id"], areas.RECORDS_ID, current=live_lb,
@@ -597,8 +599,9 @@ def rename_customer(cust_tid, new_name):
 
 
 def reopen_logbook(log_pid, log_tid):
-    """Touch-up: archived → active again (Finished cleared, retagged), with a
-    dated trace line. The next Session-done final archives it back."""
+    """Touch-up: archived → active again (Finished cleared, retagged, 🏛️
+    back to 🎨), with a dated trace line. The next Session-done final
+    archives it back."""
     api = _api()
     lb = api.get_task(log_pid, log_tid)
     content = re.sub(r"Finished \S+", "Finished -",
@@ -609,10 +612,18 @@ def reopen_logbook(log_pid, log_tid):
     tags = [t for t in (lb.get("tags") or [])
             if str(t).lower() not in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG)] \
         + [areas.LOGBOOK_TAG]
-    api.update_task(log_tid, log_pid, current=lb, content=content, tags=tags)
-    _patch_cache(log_tid, content=content, tags=tags)
-    sync_customer_bullet({**lb, "content": content})
-    return {**lb, "content": content, "tags": tags}
+    title = lb.get("title") or ""
+    fields = {"content": content, "tags": tags}
+    if title.startswith("🏛️ "):
+        fields["title"] = "🎨 " + title[len("🏛️ "):]
+    api.update_task(log_tid, log_pid, current=lb, **fields)
+    _patch_cache(log_tid, **fields)
+    if "title" in fields:
+        _ripple_task_link_text(log_tid, fields["title"])
+    sync_customer_bullet({**lb, "content": content,
+                          "title": fields.get("title") or title})
+    return {**lb, "content": content, "tags": tags,
+            "title": fields.get("title") or title}
 
 
 def convert_lead(cust):
@@ -1033,7 +1044,8 @@ def insert_session_image(log_pid, log_tid, heading, occurrence, ref):
 
 
 def finish_logbook(log_pid, log_tid, when=None):
-    """Stamp Finished, retag logbook → archive, sync the customer bullet.
+    """Stamp Finished, retag logbook → archive, retitle 🎨 → 🏛️ (Vex ruling
+    2026-07-20: the archive wears its own emoji), sync the customer bullet.
     when = ISO date for backlog imports (the last session's day); None = today."""
     api = _api()
     lb = api.get_task(log_pid, log_tid)
@@ -1043,9 +1055,16 @@ def finish_logbook(log_pid, log_tid, when=None):
     tags = [t for t in (lb.get("tags") or [])
             if str(t).lower() not in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG)] \
         + [areas.ARCHIVE_TAG]
-    api.update_task(log_tid, log_pid, current=lb, content=content, tags=tags)
-    _patch_cache(log_tid, content=content, tags=tags)
-    sync_customer_bullet({**lb, "content": content})
+    title = lb.get("title") or ""
+    fields = {"content": content, "tags": tags}
+    if title.startswith("🎨 "):
+        fields["title"] = "🏛️ " + title[len("🎨 "):]
+    api.update_task(log_tid, log_pid, current=lb, **fields)
+    _patch_cache(log_tid, **fields)
+    if "title" in fields:
+        _ripple_task_link_text(log_tid, fields["title"])
+    sync_customer_bullet({**lb, "content": content,
+                          "title": fields.get("title") or title})
 
 
 def append_note_line(pid, tid, text, section="## Notes", stamp=True):
