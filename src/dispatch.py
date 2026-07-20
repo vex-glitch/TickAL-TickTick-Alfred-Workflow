@@ -665,6 +665,11 @@ def main():
                 print("Error: task has no title")
                 return
             _ensure_tags_exist(payload.get("tags"), payload.get("_tag_parents"))
+            # CRM calendar tasks are always high priority (Vex ruling
+            # 2026-07-20); an explicit ! token still wins.
+            if CRM_ID and payload.get("projectId") == CRM_ID \
+                    and not payload.get("priority"):
+                payload["priority"] = 5
             api = TickTickAPI(cfg.get_token())
             result = api.create_task(
                 title=title,

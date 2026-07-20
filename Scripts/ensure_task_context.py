@@ -3,7 +3,10 @@
 ensure_task_context.py - Alfred Run Script
 Ensures task_list_id and task_id are set as Alfred variables before
 a List Filter that needs them. Reads from env vars (first run) or
-temp file (second run). Passes the incoming arg through unchanged.
+temp file (second run). Passes the incoming arg through unchanged -
+UNLESS argv[2] is "prefill_title": then the task title goes out as the
+arg, pre-typing the downstream text field (the rename chain: edit the
+typo instead of retyping a long linked title; ⌘⌫ still = start over).
 """
 import os, json, sys
 
@@ -36,9 +39,14 @@ if itype not in ("list", "section") and tid and not task_title:
     except Exception:
         pass
 
+_mode = sys.argv[2] if len(sys.argv) > 2 else ""
+_arg = sys.argv[1] if len(sys.argv) > 1 else ""
+if _mode == "prefill_title" and task_title:
+    _arg = task_title
+
 print(json.dumps({
     "alfredworkflow": {
-        "arg": sys.argv[1] if len(sys.argv) > 1 else "",
+        "arg": _arg,
         "variables": {
             "task_list_id": pid,
             "task_id":      tid,

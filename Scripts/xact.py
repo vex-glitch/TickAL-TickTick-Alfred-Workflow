@@ -2112,7 +2112,9 @@ def crmlink(pid, tid):
     live = api.get_task(pid, tid)
     link = cr.task_link(areas.RECORDS_ID, lb["id"], lb.get("title") or "")
     new_title = f"{link} {mk}"
-    api.update_task(tid, pid, current=live, title=new_title)
+    # priority 5: every CRM calendar task is high priority (same ruling the
+    # dispatch create hook enforces for new adds).
+    api.update_task(tid, pid, current=live, title=new_title, priority=5)
     try:   # mirror into the task caches so gates/pickers see it immediately
         for key in ("all_tasks",):
             pool = cache_store.get(key) or []
