@@ -1722,6 +1722,25 @@ def crmpast(log_tid):
     content, money, n_total, live_title = cr.append_session(
         areas.RECORDS_ID, log_tid, marker, dur, charged, did, when=when)
     _crm_say(f"📕 {marker} logged · {money} / {n_total} total")
+    # A linked OPEN task wearing this exact marker is now history (the Bruno
+    # strand: adopted as S1, logged here as past S1, task left open forever).
+    # Offer the tick before the schedule question so next_snum stays honest.
+    want_mk = marker if marker.startswith("S") else "Consult"
+    for t in cache_store.get("all_tasks") or []:
+        ti = t.get("title") or ""
+        if (t.get("status", 0) == 0 and cr.is_session_task(ti)
+                and (cr.parse_first_link(ti) or ("", "", ""))[2] == log_tid
+                and cr.title_marker(ti) == want_mk):
+            if _dialog(f"Open task {want_mk} found - complete it too?",
+                       ["Leave open", "Complete"], "Complete") == "Complete":
+                try:
+                    tp = t.get("_projectId") or t.get("projectId")
+                    _api().complete_task(tp, t["id"])
+                    _complete_cache_patch(tp, t["id"])
+                    _crm_say(f"✅ {want_mk} task completed")
+                except Exception as e:
+                    _crm_say(f"Complete failed: {type(e).__name__}: {e}")
+            break
     # Same close as Session done: offer the next booking (scheduling
     # semantics - open tasks count). Esc/Later = logged, nothing else.
     lb_title = live_title or lb.get("title") or ""
@@ -2074,10 +2093,19 @@ def crmlink(pid, tid):
             _crm_say("Logbook not found")
             return
     n = cr.next_snum(lb.get("content") or "", lb["id"])
-    mk = _dialog("Link as?", ["Cancel", "Consult", f"S{n}"], f"S{n}")
+    mk = _dialog("Link as?", ["Other S#…", "Consult", f"S{n}"], f"S{n}")
     if mk == "":
         _crm_say("Cancelled")
         return
+    if mk == "Other S#…":
+        # Adopting mid-project (Lisa case: sessions 1-2 pre-date the logbook,
+        # the task is S3) - the next-number default can't know that.
+        raw = _ask("Session number? (e.g. 3)")
+        num = (raw or "").strip().lstrip("sS")
+        if not num.isdigit() or int(num) < 1:
+            _crm_say("Cancelled · not a number")
+            return
+        mk = f"S{int(num)}"
     api = cr._api()
     live = api.get_task(pid, tid)
     old = cr.LINK_RE.sub("", live.get("title") or "").strip()
@@ -2096,18 +2124,28 @@ def crmlink(pid, tid):
                                   pid_old=pid, pid_new=pid)
     except Exception:
         pass
-    # Adopting an old task often means the session already happened (the
-    # backlog case): chain straight into Session done - it logs the entry,
-    # completes the task and offers scheduling the next one. Esc/Done = the
-    # link stands, nothing else happens.
-    if _dialog(f"🔗 Linked · {lb.get('title')} {mk} - session already "
-               "happened?", ["Didn't happen", "Happened"],
-               "Happened") == "Happened":
+    # Adopting an old task forks three ways (Vex ruling 2026-07-20):
+    #   Happened          - the backlog case: log it, complete it, offer next
+    #   Not yet - schedule - an UPCOMING session (Lisa S3): task stays open,
+    #                        straight into the schedule picker
+    #   Just link / Esc   - the link stands, nothing else happens
+    ans = _dialog(f"🔗 Linked · {lb.get('title')} {mk} - session already "
+                  "happened?", ["Just link", "Not yet - schedule", "Happened"],
+                  "Happened")
+    if ans == "Happened":
         when = _ask_date("When was it? (OK = today)")
         if when == "CANCEL":
             _crm_say(f"🔗 Linked · {lb.get('title')} {mk} · logging skipped")
             return
         sessiondone(pid, tid, when=when)
+        return
+    if ans == "Not yet - schedule":
+        try:
+            with open("/tmp/ticktick_reattribute.txt", "w") as f:
+                f.write(f"{pid}:{tid}")
+            _run_trigger("attributeScheduling")
+        except OSError:
+            reopen_actions(pid, tid)
         return
     _crm_say(f"🔗 Linked · {lb.get('title')} {mk}")
 
