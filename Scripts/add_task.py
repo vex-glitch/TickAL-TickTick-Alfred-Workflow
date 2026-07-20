@@ -82,7 +82,9 @@ def get_lists():
     if data is None:
         data = TickTickAPI(cfg.get_token()).get_projects()
         cache_store.set("projects", data)
-    return [p for p in data if p.get("kind") not in ("SMART_LIST", "NOTE")]
+    # NOTE lists included (Vex ruling 2026-07-20): tasks can live in note
+    # lists and notes in task lists - pickers mark note lists with 📝.
+    return [p for p in data if p.get("kind") != "SMART_LIST"]
 
 def get_note_lists():
     data = cache_store.get("projects")
@@ -335,13 +337,20 @@ def parse_task(query):
             time_str = f"{_h}:{_mm:02d}"
             q = q[:m.start()] + q[m.end():]
 
-    # >end - duration end time (14 or 14:30), set via duration picker.
+    # >end - end time (14 / 14:30) or DURATION (2h / 1h30 / 90m).
     # 24+ "hours" (">50" = a comparison in the title) are left alone.
     end_str = None
-    m = re.search(r'(?<!\S)>(\d{1,2}(?::\d{2})?)(?=\s|$)', q)
-    if m and int(m.group(1).split(":")[0]) <= 23:
-        end_str = m.group(1)
-        q = q[:m.start()] + q[m.end():]
+    m = re.search(r'(?<!\S)>(\d{1,2}(?::\d{2})?|\d{1,2}h(?:\d{1,2}m?)?|\d{1,3}m)(?=\s|$)',
+                  q, re.IGNORECASE)
+    if m:
+        tok = m.group(1)
+        # A plain end time needs a real hour; duration forms (h/m) always ok.
+        ok = True
+        if re.fullmatch(r'\d{1,2}(?::\d{2})?', tok):
+            ok = int(tok.split(":")[0]) <= 23
+        if ok:
+            end_str = tok
+            q = q[:m.start()] + q[m.end():]
 
     # &repeat - KNOWN presets only ("&Co" in a title is not a repeat rule)
     repeat = None
@@ -416,9 +425,10 @@ def list_picker(fill, fragment, lists=None):
     for p in lists:
         name = p["name"]
         filled = f"{fill}{name} "
+        is_note = p.get("kind") == "NOTE"
         items.append(alfred.item(
-            title=name,
-            subtitle="",
+            title=f"📝 {name}" if is_note else name,
+            subtitle="Note list" if is_note else "",
             arg="",
             valid=False,
             autocomplete=filled,
@@ -566,7 +576,13 @@ def section_picker(fill, fragment, current_list_id=None):
             if not col_name or col_name.lower() == "not sectioned":
                 continue
             subtitle = "" if current_list_id else proj["name"]
-            filled   = f"{fill}{col_name} "
+            # No list chosen yet → the pick must carry WHICH list: duplicate
+            # section names across lists made 'first match wins' land tasks
+            # in the wrong list. The autocomplete writes ~l too.
+            if current_list_id or not fill.endswith("~s "):
+                filled = f"{fill}{col_name} "
+            else:
+                filled = f"{fill[:-3]}~l {proj['name']} ~s {col_name} "
             items.append(alfred.item(
                 title=col_name,
                 subtitle=subtitle,
@@ -755,6 +771,11 @@ def time_picker(prefix, fragment):
         hour_part = fragment.split(':')[0]
         try:
             h = int(hour_part)
+            if h > 23:
+                # "25:" slipped through here and minted 25:00 rows that
+                # degraded to a silent all-day task on create.
+                return [alfred.item(title=f'"{hour_part}" is not an hour',
+                                    subtitle="Type 0-23", valid=False)]
             hh = f"{h:02d}"
         except ValueError:
             hh = hour_part
@@ -940,7 +961,12 @@ def master_menu(prefix, fragment, note_mode=False):
             ("!", "🚩", "Priority",  "low  medium  high"),
             ("#", "🏷️", "Tag",       "from your tags"),
             ("~", "🏠", "Location",  "list  section  parent"),
-            ("=", "📝", "Note",      "add note text"),
+        ]
+        if prefix.strip():
+            # Note before any title = dead end (everything typed after lands
+            # in the note; a title can never follow) - hide it until a title.
+            rows.append(("=", "📝", "Note", "add note text"))
+        rows += [
             ("^", "🖼️", "Add image", "Add screenshot from clipboard"),
             ("+stage ", "🎯", "Stage for Focus", "Stage after create"),
         ]
@@ -1027,15 +1053,29 @@ def location_router(prefix, fragment, lists=None, note_mode=False):
 
 
 # ── > duration picker ─────────────────────────────────────────────────────────
-def _normalize_end(end_str):
-    """'14' → '14:00', '14:30' stays. Returns None if unparseable."""
+def _normalize_end(end_str, time_str=None):
+    """'14' → '14:00', '14:30' stays; DURATIONS ('2h', '1h30', '90m') are
+    added onto the start time. Returns None if unparseable (a duration
+    without a start time can't resolve). Past-midnight wrap is handled by
+    the caller's end<=start day-bump."""
     m = re.match(r'^(\d{1,2})(?::(\d{2}))?$', end_str or "")
-    if not m:
-        return None
-    h, mi = int(m.group(1)), int(m.group(2) or 0)
-    if h > 23 or mi > 59:
-        return None
-    return f"{h:02d}:{mi:02d}"
+    if m:
+        h, mi = int(m.group(1)), int(m.group(2) or 0)
+        if h > 23 or mi > 59:
+            return None
+        return f"{h:02d}:{mi:02d}"
+    m = re.match(r'^(?:(\d{1,2})h(\d{1,2})?m?|(\d{1,3})m)$',
+                 (end_str or "").lower())
+    if m and time_str:
+        mins = (int(m.group(1)) * 60 + int(m.group(2) or 0)) if m.group(1) \
+            else int(m.group(3))
+        try:
+            sh, sm = time_str.split(":")
+            total = (int(sh) * 60 + int(sm) + mins) % (24 * 60)
+            return f"{total // 60:02d}:{total % 60:02d}"
+        except ValueError:
+            return None
+    return None
 
 
 def _duration_label(start_hm, end_hm):
@@ -1374,7 +1414,7 @@ def task_preview(query):
 
     # >end - duration: startDate = due_date, dueDate = end of the span
     end_date = None
-    end_norm = _normalize_end(end_str) if end_str else None
+    end_norm = _normalize_end(end_str, time_str) if end_str else None
     if end_norm and time_str and due_date:
         end_date = parse_date(f"{date_str} {end_norm}" if date_str else f"today {end_norm}")
         if end_date and end_date <= due_date:
@@ -1587,7 +1627,7 @@ def note_preview(query):
             valid=False,
         )]
 
-    all_lists    = get_lists() + get_note_lists()
+    all_lists    = get_lists()
     list_id      = None
     list_display = None
 
@@ -1648,7 +1688,7 @@ def note_preview(query):
         combined_date_str = date_str
     due_date = parse_date(combined_date_str)
     end_date = None
-    end_norm = _normalize_end(end_str) if end_str else None
+    end_norm = _normalize_end(end_str, time_str) if end_str else None
     if end_norm and time_str and due_date:
         end_date = parse_date(f"{date_str} {end_norm}" if date_str else f"today {end_norm}")
         if end_date and end_date <= due_date:
@@ -2014,7 +2054,7 @@ def main():
 
         # ── N prefix → create note ────────────────────────────────────────────
         if query.lower().startswith("n "):
-            all_lists = get_lists() + get_note_lists()
+            all_lists = get_lists()   # NOTE lists ride along since 2026-07-20
             trigger = find_active_trigger(query)
             if trigger:
                 ch, prefix, fragment = trigger
@@ -2032,6 +2072,13 @@ def main():
                     items = repeat_picker(prefix, fragment)
                 elif ch == '%':
                     items = reminder_picker(prefix, fragment)
+                elif ch == '[[':
+                    # Notes get the task-link picker too (parity with tasks)
+                    sl = parse_task(prefix)[6]
+                    scope = (resolve_list_id(sl, all_lists)[0] if sl
+                             else os.environ.get("list_id")
+                             or os.environ.get("task_list_id") or None)
+                    items = link_picker(prefix, fragment, scope)
                 elif ch == '/':
                     items = master_menu(prefix, fragment, note_mode=True)
                 else:
