@@ -1005,6 +1005,33 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
     return content, money, n, (lb.get("title") or "")
 
 
+def insert_session_image(log_pid, log_tid, heading, occurrence, ref):
+    """Plant an ![image](attid/fname) line at the END of one session block -
+    the block whose ### heading line equals `heading` (occurrence-th match;
+    non-S markers like no-show can repeat). The attachment must already be
+    uploaded to the note or the ref renders broken. Returns updated content."""
+    api = _api()
+    lb = api.get_task(log_pid, log_tid)
+    lines = (lb.get("content") or "").split("\n")
+    hits = [i for i, l in enumerate(lines) if l.strip() == heading.strip()]
+    if not hits or occurrence >= len(hits):
+        raise ValueError(f"heading not found: {heading}")
+    start = hits[occurrence]
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        s = lines[j].lstrip()
+        if s.startswith("### ") or s.startswith("## "):
+            end = j
+            break
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1   # hug the entry text, keep the blank gap after the block
+    lines.insert(end, ref)
+    content = "\n".join(lines)
+    api.update_task(log_tid, log_pid, current=lb, content=content)
+    _patch_cache(log_tid, content=content)
+    return content
+
+
 def finish_logbook(log_pid, log_tid):
     """Stamp Finished, retag logbook → archive, sync the customer bullet."""
     api = _api()

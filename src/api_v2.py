@@ -166,7 +166,9 @@ class TickTickV2:
         if r.status_code in (401, 403):
             raise V2AuthError("token expired")
         r.raise_for_status()
-        return r.json() if r.text.strip() else {}
+        # attid/fname let callers build the inline ref: ![image](attid/fname)
+        return {"attid": att_id, "fname": file_name,
+                "data": r.json() if r.text.strip() else {}}
 
     def get_completed(self, days=60, limit=200):
         """Completed tasks across ALL projects - server truth (the Open API

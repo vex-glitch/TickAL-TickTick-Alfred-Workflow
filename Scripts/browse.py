@@ -1729,6 +1729,9 @@ def render_crmback(query):
         alfred.item(uid="back-adopt", title="🔗 Adopt task",
                     subtitle="Old task → customer + logbook → log done",
                     arg="", valid=False, autocomplete="adopt "),
+        alfred.item(uid="back-img", title="🖼️ Image to session",
+                    subtitle="Copy image first · pick logbook → session",
+                    arg="", valid=False, autocomplete="img "),
     ]
     q = (query or "").strip()
     if q.startswith("adopt"):
@@ -1761,9 +1764,10 @@ def render_crmback(query):
                                 subtitle="Every calendar task is linked 💪",
                                 valid=False)]
         return add_back(rows, "ctx:crmback")
-    if q.startswith("past"):
+    if q.startswith("past") or q.startswith("img"):
+        is_img = q.startswith("img")
         import crm_records as cr
-        frag = q[4:].strip()
+        frag = (q[3:] if is_img else q[4:]).strip()
         rows = []
         seen = set()
         for tag in (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
@@ -1776,10 +1780,12 @@ def render_crmback(query):
                                                   for t in (lb.get("tags") or [])}
                         else "")
                 rows.append(alfred.item(
-                    uid=f"back-p-{lb['id']}",
+                    uid=f"back-{'i' if is_img else 'p'}-{lb['id']}",
                     title=lb.get("title") or "Untitled",
-                    subtitle=f"⏎ Log a dated session{chip}",
-                    arg=f"xact:crmpast:{lb['id']}",
+                    subtitle=(f"⏎ Pick session → image lands there{chip}"
+                              if is_img else f"⏎ Log a dated session{chip}"),
+                    arg=(f"xact:crmimg:{lb['id']}" if is_img
+                         else f"xact:crmpast:{lb['id']}"),
                     mods=_picker_mods(),
                     variables=_record_vars(lb)))
         if frag:

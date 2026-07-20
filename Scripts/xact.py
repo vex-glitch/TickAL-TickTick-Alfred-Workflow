@@ -1765,6 +1765,67 @@ def crmpast(log_tid):
         _crm_session_prefill(lb_title, f"S{nxt}")
 
 
+def crmimg(log_tid):
+    """🖼️ Clipboard image INTO a logged session's block: note-level
+    attachments render at the bottom of the note - this uploads AND plants
+    the ![image] ref under the chosen ### heading, so photo and description
+    live together. Clipboard is checked first: no image, no dialogs."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    try:
+        import clipboard as clip_util
+        img = clip_util.png_bytes()
+    except Exception:
+        img = None
+    if not img:
+        _crm_say("Clipboard has no image · copy it first")
+        return
+    try:
+        lb = cr._api().get_task(areas.RECORDS_ID, log_tid)
+    except Exception:
+        lb = None
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    headings = [l.strip() for l in (lb.get("content") or "").split("\n")
+                if l.strip().startswith("### ")]
+    if not headings:
+        _crm_say("No sessions logged yet")
+        return
+    # Repeats (two no-shows) need distinct picker rows - suffix a counter,
+    # keep the (heading, occurrence) pair for the exact-line insert.
+    seen, display, back = {}, [], {}
+    for h in headings:
+        k = seen.get(h, 0)
+        seen[h] = k + 1
+        d = h if k == 0 else f"{h}  ({k + 1})"
+        display.append(d)
+        back[d] = (h, k)
+    pick = _choose("Image under which session?", display, default=display[-1])
+    if pick is None:
+        _crm_say("Cancelled · nothing attached")
+        return
+    heading, occ = back[pick]
+    parts = [p.strip() for p in heading.lstrip("# ").split("·")]
+    fname = f"{parts[1]}.png" if len(parts) > 1 and parts[1] else "session.png"
+    try:
+        import api_v2
+        up = api_v2.TickTickV2().upload_attachment(
+            areas.RECORDS_ID, log_tid, img, fname)
+        ref = f"![image]({up['attid']}/{up['fname']})"
+    except Exception as e:
+        _crm_say(f"Upload failed: {type(e).__name__}: {e}")
+        return
+    try:
+        cr.insert_session_image(areas.RECORDS_ID, log_tid, heading, occ, ref)
+    except Exception as e:
+        _crm_say(f"🖼️ uploaded but not placed: {type(e).__name__}: {e}")
+        return
+    _crm_say(f"🖼️ {heading.lstrip('# ')}")
+
+
 def crmsched(pid, tid):
     """📅 Schedule a dormant task: jump straight into the schedule picker
     (attributeScheduling ET; ensure_task_context re-reads the temp file for
@@ -3939,6 +4000,8 @@ def main():
             crmimport()
         elif verb == "crmpast":
             crmpast(rest)
+        elif verb == "crmimg":
+            crmimg(rest)
         elif verb == "crmsched":
             pid, tid = rest.split(":", 1)
             crmsched(pid, tid)
