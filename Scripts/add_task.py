@@ -228,9 +228,12 @@ def parse_task(query):
         priority = PRIORITY_VAL[m.group(1)]
         q = q[:m.start()] + q[m.end():]
 
-    # *date - greedily takes everything to next trigger or end (stops at @)
+    # *date - greedily takes everything to next trigger or end (stops at @).
+    # A terminator only counts AFTER whitespace: with \s* the lookahead fired
+    # INSIDE "20/09" (slash is a trigger char), eating the date and leaking
+    # "/09" into the title.
     date_str = None
-    m = re.search(r'(?<!\S)\*(.+?)(?=\s*[~#!/>@=&%]|$)', q)
+    m = re.search(r'(?<!\S)\*(.+?)(?=\s+[~#!/>@=&%]|\s*$)', q)
     if m:
         date_str = m.group(1).strip()
         q = q[:m.start()] + q[m.end():]
@@ -683,13 +686,15 @@ def time_picker(prefix, fragment):
 
 # ── Symbol legend (contextual) ───────────────────────────────────────────────
 def symbol_legend(has_date=False, note_mode=False):
+    # *📅 only while UNscheduled - with a date set it read as "still needs
+    # scheduling" right next to the resolved date (Vex, 2026-07-19).
     if note_mode:
-        syms = ["*📅"]
+        syms = [] if has_date else ["*📅"]
         if has_date:
             syms += ["&🔁", "%🔔"]
         syms += ["#🏷️", "~🏠", "=📝"]
         return "/ More…  " + " ".join(syms)
-    syms = ["*📅"]
+    syms = [] if has_date else ["*📅"]
     # @ time and > duration are offered as selectable rows once a date/time is
     # set (see task_preview), so they're intentionally left out of the legend.
     if has_date:
@@ -851,14 +856,30 @@ def master_menu(prefix, fragment, note_mode=False):
             rows.append(("+focus ", "➕", "Add to focus",
                          "Add to running focus"))
 
+    # Single-value tokens REPLACE on re-pick: picking 📅 Date with a date
+    # already set used to append a second * ("task * tomorrow *") and the
+    # parser mangled the double-token state. Strip the old span first.
+    _strip = {
+        "*": re.compile(r'(?<!\S)\*.+?(?=\s+[~#!/>@=&%]|\s*$)\s*'),
+        "@": re.compile(r'(?<!\S)@\d{1,2}:\d{2}\b\s*'),
+        "!": re.compile(r'(?<!\S)![123](?=\s|$)\s*'),
+        "&": re.compile(r'(?<!\S)&\S+\s*'),
+    }
+    _set = {"*": date_str, "@": time_str, "!": None, "&": repeat}
     items = []
     for sym, emoji, name, hint in rows:
+        base = prefix
+        pat = _strip.get(sym)
+        if pat and pat.search(prefix):
+            base = pat.sub('', prefix, count=1)
+            if _set.get(sym):
+                hint = f"now {_set[sym]} · pick replaces"
         items.append(alfred.item(
             title=f"{emoji} {name}",
             subtitle=hint,
             arg="",
             valid=False,
-            autocomplete=f"{prefix}{sym}",
+            autocomplete=f"{base}{sym}",
         ))
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
@@ -1840,12 +1861,17 @@ alfred.output = _output_backstamped
 def main():
     query = sys.argv[1] if len(sys.argv) > 1 else ""
 
-    # Strip routing prefixes passed as initial arg from upstream script filters
+    # Strip routing prefixes passed as initial arg from upstream script filters.
+    # "add" is the bare routing arg from menu rows - it must match EXACTLY:
+    # startswith blanked every real title beginning with the word add
+    # ("add reminder to…", "additional…" - the 2026-07-19 'add breaks all' bug).
     for prefix in ("addtask:", "addsection:", "addsubtask:", "stickynote:",
-                   "pomodoro:", "attributes:", "complete:", "add"):
+                   "pomodoro:", "attributes:", "complete:"):
         if query.startswith(prefix):
             query = ""
             break
+    if query.strip() == "add":
+        query = ""
 
     try:
         # ── Empty → hint ──────────────────────────────────────────────────────

@@ -83,7 +83,11 @@ def _normalise_date(date_str):
             yr_part = _expand_year(yr)
             s = f"{d} {month_name}{yr_part}"
             if rest:
-                s += rest
+                # A trailing bare hour ("20/09 14") must become "at 14" NOW -
+                # appended raw it reads as day-of-month/year downstream and
+                # "20/09 14" resolved to Sept 14 instead of Sept 20 14:00.
+                hr = re.fullmatch(r'\s+(\d{1,2}(?::\d{2})?)\s*', rest)
+                s += f" at {hr.group(1)}" if hr else rest
 
     # 6. Hour notation: 21h → 21:00, 9h → 9:00
     s = re.sub(r'\b(\d{1,2})h\b', lambda x: f"{x.group(1)}:00", s)
