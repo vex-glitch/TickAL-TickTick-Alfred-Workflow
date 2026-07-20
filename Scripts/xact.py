@@ -2075,7 +2075,8 @@ def crmlink(pid, tid):
     # completes the task and offers scheduling the next one. Esc/Done = the
     # link stands, nothing else happens.
     if _dialog(f"🔗 Linked · {lb.get('title')} {mk} - session already "
-               "happened?", ["Done", "Log it now"], "Done") == "Log it now":
+               "happened?", ["Didn't happen", "Happened"],
+               "Happened") == "Happened":
         when = _ask_date("When was it? (OK = today)")
         if when == "CANCEL":
             _crm_say(f"🔗 Linked · {lb.get('title')} {mk} · logging skipped")
