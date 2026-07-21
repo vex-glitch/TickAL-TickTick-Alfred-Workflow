@@ -127,7 +127,8 @@ def get_hint_items(raw_query):
             subtitle="Type / for scope",
             valid=False,
         )]
-        # 🅿️ non-empty buffer → surface it (⌥ opens the buffer view)
+        # 🅿️ non-empty buffer → surface it (⏎ opens the buffer view; ⌥
+        # kept as a mirror for old muscle memory)
         try:
             with open(run_path("tickal_buffer.txt")) as f:
                 n = len([ln for ln in f if ln.strip()])
@@ -136,8 +137,9 @@ def get_hint_items(raw_query):
         if n:
             rows.insert(0, alfred.item(
                 title=f"🅿️ Buffer · {n} task{'s' if n != 1 else ''}",
-                subtitle="⌥ Open buffer",
-                valid=False,
+                subtitle="Open the buffer  |  ⏎⤵️",
+                valid=True, arg="",
+                variables={"browse_ctx": "ctx:buffer"},
                 mods={"alt": {"valid": True, "arg": "", "subtitle": "Open buffer",
                               "variables": {"browse_ctx": "ctx:buffer"}}},
             ))
