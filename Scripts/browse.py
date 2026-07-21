@@ -1015,10 +1015,12 @@ def _cust_row(cr, c, uid_prefix="crms"):
         age = cr.note_age_days(c)
         lead_chip = f"🎣 lead · {age}d" if age is not None else "🎣 lead"
     bd = cr.bday_next(_b)
+    g = cr.lifetime_gratis(c["id"])
     bits = [b for b in (
         f"📞 {phone}" if phone else (f"📸 {insta}" if insta else ""),
         f"{k} tattoo{'s' if k != 1 else ''}" if k else "",
         money if money != "-" else "",
+        f"🖤 {g}" if g else "",
         lead_chip,
         (f"🎂 {'today!' if bd == 0 else f'in {bd}d'}"
          if bd is not None and bd <= 14 else ""),
@@ -1083,9 +1085,11 @@ def _crm_task_row(cr, t, uid_prefix="crms"):
     if hit:
         mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
                        "variables": {"browse_ctx": f"ctx:crmbook:{hit[2]}"}}
+    emo = ("💬" if (t.get("title") or "").rstrip().endswith("Consult")
+           else "📅")
     return alfred.item(
         uid=f"{uid_prefix}-t-{t['id']}",
-        title=f"📅 {disp}",
+        title=f"{emo} {disp}",
         subtitle=(f"{day or 'Dormant · not scheduled'}{chip}"),
         arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
         mods=mods,
@@ -1145,9 +1149,11 @@ def render_crmweek(query):
             mods["alt"] = {"arg": "", "valid": True,
                            "subtitle": "Logbook hub",
                            "variables": {"browse_ctx": f"ctx:crmbook:{_l[2]}"}}
+        emo = ("💬" if (t.get("title") or "").rstrip().endswith("Consult")
+               else "📆")
         rows.append(alfred.item(
             uid=f"wk-{t['id']}",
-            title=f"📆 {when}{clock} · {disp}",
+            title=f"{emo} {when}{clock} · {disp}",
             subtitle="⏎ Open · ⌘ Actions (Session done) · ⌥ hub",
             arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
             mods=mods,
@@ -1182,6 +1188,27 @@ def render_crmweek(query):
                               "variables": {
                                   "browse_ctx": f"ctx:crmbook:{lb['id']}"}}},
                 variables=_record_vars(lb)))
+
+    # 🎣 radar: leads sitting quiet past the same cutoff - nothing booked
+    # anywhere on their logbooks. Leads rot silently; bookings don't.
+    for ld in cr.records_notes(_areas.LEAD_TAG):
+        age = cr.note_age_days(ld)
+        if age is None or age < 14:
+            continue
+        if any(cr.next_session_task(lb["id"])
+               for lb in cr.customer_logbooks(ld["id"])):
+            continue
+        rows.append(alfred.item(
+            uid=f"wk-lead-{ld['id']}",
+            title=ld.get("title") or "",
+            subtitle=f"Lead going cold · {age}d quiet · ⏎ Open · ⌥ hub",
+            arg=_open_note_arg(ld["id"]),
+            mods={**_picker_mods(),
+                  "alt": {"arg": "", "valid": True,
+                          "subtitle": "Customer hub",
+                          "variables": {
+                              "browse_ctx": f"ctx:crmcust:{ld['id']}"}}},
+            variables=_record_vars(ld)))
     if query:
         rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
     return add_back(rows, "ctx:crmhub")
@@ -1791,6 +1818,10 @@ def render_crmback(query):
         alfred.item(uid="back-img", title="🖼️ Image to session",
                     subtitle="Copy image first · pick logbook → session",
                     arg="", valid=False, autocomplete="img "),
+        alfred.item(uid="back-batch", title="🖼️ Batch images",
+                    subtitle="Select photos in Finder first · "
+                             "capture dates pick the sessions",
+                    arg="", valid=False, autocomplete="batch "),
     ]
     q = (query or "").strip()
     if q.startswith("adopt"):
@@ -1823,10 +1854,15 @@ def render_crmback(query):
                                 subtitle="Every calendar task is linked 💪",
                                 valid=False)]
         return add_back(rows, "ctx:crmback")
-    if q.startswith("past") or q.startswith("img"):
-        is_img = q.startswith("img")
+    if q.startswith(("past", "img", "batch")):
+        mode = next(m for m in ("past", "img", "batch") if q.startswith(m))
         import crm_records as cr
-        frag = (q[3:] if is_img else q[4:]).strip()
+        frag = q[len(mode):].strip()
+        sub = {"img": "⏎ Pick session → image lands there",
+               "batch": "⏎ Finder photos → sessions by date",
+               "past": "⏎ Log a dated session"}[mode]
+        verb = {"img": "crmimg", "batch": "crmbatchimg",
+                "past": "crmpast"}[mode]
         rows = []
         seen = set()
         for tag in (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
@@ -1839,12 +1875,10 @@ def render_crmback(query):
                                                   for t in (lb.get("tags") or [])}
                         else "")
                 rows.append(alfred.item(
-                    uid=f"back-{'i' if is_img else 'p'}-{lb['id']}",
+                    uid=f"back-{mode[0]}-{lb['id']}",
                     title=lb.get("title") or "Untitled",
-                    subtitle=(f"⏎ Pick session → image lands there{chip}"
-                              if is_img else f"⏎ Log a dated session{chip}"),
-                    arg=(f"xact:crmimg:{lb['id']}" if is_img
-                         else f"xact:crmpast:{lb['id']}"),
+                    subtitle=f"{sub}{chip}",
+                    arg=f"xact:{verb}:{lb['id']}",
                     mods=_picker_mods(),
                     variables=_record_vars(lb)))
         if frag:

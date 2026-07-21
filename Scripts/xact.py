@@ -1826,6 +1826,144 @@ def crmimg(log_tid):
     _crm_say(f"🖼️ {heading.lstrip('# ')}")
 
 
+_IMG_EXTS = (".jpg", ".jpeg", ".png", ".heic", ".heif", ".tif", ".tiff",
+             ".gif", ".webp")
+
+
+def _finder_selection():
+    """POSIX paths of the current Finder selection (files only)."""
+    scpt = ('set out to ""\n'
+            'tell application "Finder" to set sel to selection\n'
+            'repeat with f in sel\n'
+            'set out to out & POSIX path of (f as alias) & linefeed\n'
+            'end repeat\n'
+            'return out')
+    r = subprocess.run(["osascript", "-e", scpt],
+                       capture_output=True, text=True, timeout=15)
+    return [p for p in (r.stdout or "").splitlines()
+            if p.strip() and os.path.isfile(p)]
+
+
+def _capture_date(path):
+    """ISO date the photo was TAKEN (Spotlight metadata), else file birth."""
+    try:
+        r = subprocess.run(["mdls", "-raw", "-name",
+                            "kMDItemContentCreationDate", path],
+                           capture_output=True, text=True, timeout=10)
+        w = (r.stdout or "").strip()
+        if w and w != "(null)":
+            return w[:10]
+    except Exception:
+        pass
+    try:
+        import datetime as _dt
+        return _dt.date.fromtimestamp(os.stat(path).st_birthtime).isoformat()
+    except Exception:
+        return None
+
+
+def crmbatchimg(log_tid):
+    """🖼️ Finder roll → session blocks: every image selected in Finder is
+    matched to a session by CAPTURE date (nearest ### heading date; dateless
+    files fall to the last session), one confirm dialog shows the whole
+    mapping, uploads land under their headings in a single note write."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    try:
+        files = [p for p in _finder_selection()
+                 if os.path.splitext(p)[1].lower() in _IMG_EXTS]
+    except Exception as e:
+        _crm_say(f"Finder read failed: {type(e).__name__}")
+        return
+    if not files:
+        _crm_say("Select photos in Finder first · then run this again")
+        return
+    try:
+        lb = cr._api().get_task(areas.RECORDS_ID, log_tid)
+    except Exception:
+        lb = None
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    lb_title = lb.get("title") or "logbook"
+    headings = [l.strip() for l in (lb.get("content") or "").split("\n")
+                if l.strip().startswith("### ")]
+    if not headings:
+        _crm_say("No sessions logged yet")
+        return
+    # (heading, occurrence, iso_date, marker) - occurrence disambiguates
+    # repeated headings, same trick as the single-image picker.
+    seen, sessions = {}, []
+    for h in headings:
+        k = seen.get(h, 0)
+        seen[h] = k + 1
+        segs = [p.strip() for p in h.lstrip("# ").split("·")]
+        sessions.append((h, k, segs[0] if segs else "",
+                         segs[1] if len(segs) > 1 else "?"))
+
+    import datetime as _dt
+
+    def _iso(d):
+        try:
+            return _dt.date.fromisoformat(d)
+        except Exception:
+            return None
+
+    plan, report = [], []
+    for path in sorted(files):
+        name = os.path.basename(path)
+        fdate = _iso(_capture_date(path) or "")
+        best, note = sessions[-1], " (no date → last)"
+        if fdate:
+            dated = [(s, abs((_iso(s[2]) - fdate).days))
+                     for s in sessions if _iso(s[2])]
+            if dated:
+                best, delta = min(dated, key=lambda x: x[1])
+                note = "" if delta <= 3 else f" (±{delta}d!)"
+        plan.append((path, best[0], best[1]))
+        report.append(f"{name} → {best[3]} {best[2]}{note}")
+    msg = (f"{lb_title}\n{len(plan)} images:\n\n" + "\n".join(report[:20])
+           + ("\n…" if len(report) > 20 else ""))
+    if _dialog(msg, ["Cancel", "Attach"], "Attach") != "Attach":
+        _crm_say("Cancelled · nothing attached")
+        return
+
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    items, fails = [], 0
+    for path, heading, occ in plan:
+        try:
+            src = path
+            stem, ext = os.path.splitext(os.path.basename(path))
+            if ext.lower() in (".heic", ".heif"):
+                import tempfile
+                dst = os.path.join(tempfile.mkdtemp(), "conv.jpg")
+                subprocess.run(["sips", "-s", "format", "jpeg", path,
+                                "--out", dst], capture_output=True,
+                               timeout=30, check=True)
+                src, ext = dst, ".jpg"
+            with open(src, "rb") as f:
+                data = f.read()
+            fname = "_".join((stem + ext).split())
+            up = v2.upload_attachment(areas.RECORDS_ID, log_tid, data, fname)
+            items.append((heading, occ,
+                          f"![image]({up['attid']}/{up['fname']})"))
+        except Exception:
+            fails += 1
+    if not items:
+        _crm_say("All uploads failed · check the connection")
+        return
+    try:
+        cr.insert_session_images(areas.RECORDS_ID, log_tid, items)
+    except Exception as e:
+        _crm_say(f"🖼️ uploaded but not placed: {type(e).__name__}: {e}")
+        return
+    _crm_say(f"🖼️ {len(items)} planted · {lb_title}"
+             + (f" · {fails} failed" if fails else ""))
+
+
 def crmsched(pid, tid):
     """📅 Schedule a dormant task: jump straight into the schedule picker
     (attributeScheduling ET; ensure_task_context re-reads the temp file for
@@ -4012,6 +4150,8 @@ def main():
             crmpast(rest)
         elif verb == "crmimg":
             crmimg(rest)
+        elif verb == "crmbatchimg":
+            crmbatchimg(rest)
         elif verb == "crmsched":
             pid, tid = rest.split(":", 1)
             crmsched(pid, tid)

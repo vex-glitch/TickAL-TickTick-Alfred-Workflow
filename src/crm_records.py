@@ -831,6 +831,12 @@ def gratis_count(content):
     return n
 
 
+def lifetime_gratis(cust_tid):
+    """On-the-house session count across ALL the customer's logbooks."""
+    return sum(gratis_count(lb.get("content") or "")
+               for lb in customer_logbooks(cust_tid))
+
+
 def _totals_raw(content):
     """(total_float, session_count, sym, sym_is_prefix) - the numeric core.
     Money sums segment 4 of every entry (consultation charges count); the
@@ -1097,14 +1103,11 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
     return content, money, n, (lb.get("title") or "")
 
 
-def insert_session_image(log_pid, log_tid, heading, occurrence, ref):
-    """Plant an ![image](attid/fname) line at the END of one session block -
-    the block whose ### heading line equals `heading` (occurrence-th match;
-    non-S markers like no-show can repeat). The attachment must already be
-    uploaded to the note or the ref renders broken. Returns updated content."""
-    api = _api()
-    lb = api.get_task(log_pid, log_tid)
-    lines = (lb.get("content") or "").split("\n")
+def _plant_image_ref(content, heading, occurrence, ref):
+    """Insert `ref` at the END of one session block - the block whose ###
+    heading line equals `heading` (occurrence-th match; non-S markers like
+    no-show can repeat). Pure text-in text-out."""
+    lines = (content or "").split("\n")
     hits = [i for i, l in enumerate(lines) if l.strip() == heading.strip()]
     if not hits or occurrence >= len(hits):
         raise ValueError(f"heading not found: {heading}")
@@ -1118,7 +1121,26 @@ def insert_session_image(log_pid, log_tid, heading, occurrence, ref):
     while end > start + 1 and not lines[end - 1].strip():
         end -= 1   # hug the entry text, keep the blank gap after the block
     lines.insert(end, ref)
-    content = "\n".join(lines)
+    return "\n".join(lines)
+
+
+def insert_session_image(log_pid, log_tid, heading, occurrence, ref):
+    """Plant an ![image](attid/fname) line under one session heading. The
+    attachment must already be uploaded to the note or the ref renders
+    broken. Returns updated content."""
+    return insert_session_images(log_pid, log_tid,
+                                 [(heading, occurrence, ref)])
+
+
+def insert_session_images(log_pid, log_tid, items):
+    """Batch plant: [(heading, occurrence, ref)] in ONE read + ONE write -
+    a Finder-roll's worth of photos must not burn a rate-limit window.
+    Occurrences stay stable across inserts (refs never add ### lines)."""
+    api = _api()
+    lb = api.get_task(log_pid, log_tid)
+    content = lb.get("content") or ""
+    for heading, occurrence, ref in items:
+        content = _plant_image_ref(content, heading, occurrence, ref)
     api.update_task(log_tid, log_pid, current=lb, content=content)
     _patch_cache(log_tid, content=content)
     return content
