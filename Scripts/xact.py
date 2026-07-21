@@ -45,23 +45,29 @@ CRM records (customer notes + tattoo logbooks - src/crm_records.py):
                                     archive or chain S<n+1>
     xact:crmlog:<tid>               dialog → timestamped line under ## Notes
 
-Focus session blocks (checkbox staging):
-    xact:fx_add:<pid>:<tid>         insert the task as a "- [ ] [title](link)"
-                                    checkbox into the CURRENT focus task's
-                                    today block (src/focus_blocks.py grammar)
+Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
+    xact:fx_add:<pid>:<tid>         stage the task = MOVE it under the
+                                    CURRENT focus task as a literal subtask
+                                    (cross-list v1 move, then v1 parent-set;
+                                    origin recorded in tickal_focus_origins)
     xact:fx_add_sticky:<pid>:<tid>  fx_add + open the FOCUS task's sticky
-    xact:fx_add_to:<tpid>:<ttid>:<spid>:<stid>  insert source into a target
-    xact:fx_add_multi:<b64>         batch insert; b64 JSON {tpid,ttid,items:
-                                    [[pid,tid,title]…]} - ONE content write
-    xact:fx_tick:<pid>:<tid>[:<ctid>]  tick the first unchecked checkbox (or
-                                    the one linking ctid). env TICKAL_JSON=1
-                                    → block_summary JSON (the focus bar's
-                                    channel) instead of the human toast
-    xact:fx_sweep[:<pid>:<tid>]     complete every checked+linked+still-open
-                                    checkbox task, ALL blocks. No focus
-                                    records, no content rewrite
-    xact:fx_copy[:<pid>:<tid>]      today's UNTICKED checkboxes → clipboard
-                                    as a paste-ready "- Title" bullet list
+    xact:fx_add_to:<tpid>:<ttid>:<spid>:<stid>  stage source under an explicit
+                                    target task; NOTE target keeps the
+                                    checkbox line (focus_blocks grammar)
+    xact:fx_add_multi:<b64>         batch stage; b64 JSON {tpid,ttid,items:
+                                    [[pid,tid,title]…]}
+    xact:fx_tick:<pid>:<tid>[:<ctid>]  COMPLETE the first open subtask (or
+                                    ctid) - ticks are real completions now.
+                                    env TICKAL_JSON=1 → children_summary
+                                    JSON (the focus bar's channel)
+    xact:fx_unstage:<pid>:<tid>     remove from focus: v2 detach (v1 can't),
+                                    then home per the origins ledger -
+                                    needs the v2 token (wontdo precedent)
+    xact:fx_oneliner                dialog → "- text" bullet appended to the
+                                    focus task's content (the note)
+    xact:fx_sweep                   RETIRED stub (ticks complete for real)
+    xact:fx_copy[:<pid>:<tid>]      open subtasks → clipboard as a
+                                    paste-ready "- Title" bullet list
     xact:convert:<pid>:<tid>        flip the item kind TEXT↔NOTE (⌘ Actions
                                     "🔃 Convert" - v1 full-object update)
     xact:wontdo:<pid>:<tid>         abandon the task (status -1, "Won't Do")
@@ -71,9 +77,9 @@ Focus session blocks (checkbox staging):
                                     asks the name, creates under parent
     xact:fx_link:<pid>:<tid>        attribute a running unattributed session
                                     (timer file or pomo sidecar) to the task
-    xact:buffer_focus               buffer → today block (buffer order), clears
-    xact:view_focus:<key>           smart view → today block (view order)
-    xact:tag_focus:<pid>:<tag>      tag's open tasks → today block
+    xact:buffer_focus               buffer → subtasks (buffer order), clears
+    xact:view_focus:<key>           smart view → subtasks (view order)
+    xact:tag_focus:<pid>:<tag>      tag's open tasks → subtasks
     xact:stage_open:<pid>:<tid>     fire ET Focus prefilled "stage pid:tid "
     xact:bar_show / xact:bar_hide   focus-bar visibility (show also spawns)
     xact:focus_done                 stop+log the session, then complete its task
@@ -116,7 +122,8 @@ bootstrap()
 
 import config as cfg
 import cache as cache_store
-import focus_blocks as fb
+import focus_blocks as fb          # NOTE targets + legacy content only
+import focus_subtasks as fsub      # the subtask staging model (pure)
 
 BUFFER_FILE = run_path("tickal_buffer.txt")
 FOCUS_FILE  = run_path("tickal_focus.json")
@@ -286,9 +293,12 @@ def focus_start(pid, tid):
                  or (cache_store.find_task(tid) or {}).get("title") or "Task")
     else:
         title = "Focus"
-    _write_focus({"pid": pid, "tid": tid, "title": title, "start": _now_iso()})
+    fresh = {"pid": pid, "tid": tid, "title": title, "start": _now_iso()}
     if tid:
-        _ensure_block_if_history(pid, tid)   # carry-over; no empty-header noise
+        # done0 = children already completed BEFORE this session, so the
+        # record note and toast count only what THIS session finished
+        fresh["done0"] = _done_children_snapshot(pid, tid)
+    _write_focus(fresh)
     _bar_wake()
     print(f"⏱ Timer running on {title}{note}")
 
@@ -441,62 +451,58 @@ def _complete_cache_patch(pid, tid):
         cache_store.invalidate("all_tasks")
 
 
-def _sweep_from_doc(doc):
-    """Complete every checked+linked checkbox task not known to be closed.
-    Skip only when the cache POSITIVELY says closed or NOTE-kind; absent from
-    cache → attempt anyway (fresh tasks aren't in the hourly cache). NO focus
-    records, NO content rewrite. → (done, failed).
-
-    Completes run on a small thread pool (the POSTs are independent and were
-    the bulk of the bar-sweep wait) with one API client per call; the cache
-    mirror is ONE batched all_tasks write after the pool drains - the old
-    per-task full-cache rewrite multiplied a ~1 MB write by N."""
-    targets = fb.sweep_targets(doc)
-    if not targets:
-        return 0, 0
-    # wontdo_tasks rides along: an abandoned task left all_tasks, and its
-    # ticked checkbox must NOT get re-completed by the sweep (the entries
-    # carry status -1, so the skip below catches them)
-    known = {t.get("id"): t
-             for t in (cache_store.get("all_tasks") or [])
-             + (cache_store.get("all_notes") or [])
-             + (cache_store.get("wontdo_tasks") or [])}
-    work = []
-    for pid, tid in targets:
-        t = known.get(tid)
-        if t and (t.get("status", 0) != 0 or t.get("kind") == "NOTE"):
-            continue
-        work.append((pid, tid))
-    if not work:
-        return 0, 0
-
-    def _complete(job):
-        pid, tid = job
+def _children_state(fpid, ftid):
+    """(open_children, child_ids) of a focus task - ONE project-data GET
+    (open children live there with titles + sortOrder); get_task fallback
+    for childIds when the focus task itself left the data (completed
+    mid-session stays GET-able). childIds keeps completed children -
+    live-verified 2026-07-21 - so done = childIds minus the open set."""
+    api = _api()
+    data = api.get_project_data(fpid)
+    tasks = data.get("tasks") or []
+    open_children = [t for t in tasks if t.get("parentId") == ftid]
+    focus = next((t for t in tasks if t.get("id") == ftid), None)
+    if focus is None:
         try:
-            _api().complete_task(pid, tid)
-            return pid, tid
+            focus = api.get_task(fpid, ftid)
         except Exception:
-            return None
+            focus = {}
+    return open_children, focus.get("childIds") or []
 
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=min(4, len(work))) as pool:
-        results = list(pool.map(_complete, work))
-    swept = [r for r in results if r]
-    failed = len(results) - len(swept)
-    if swept:
-        try:
-            swept_tids = {tid for _, tid in swept}
-            cached = cache_store.get("all_tasks")
-            if cached is not None:
-                cache_store.set(
-                    "all_tasks",
-                    [t for t in cached if t.get("id") not in swept_tids])
-            from dispatch import _patch_project_data
-            for pid, tid in swept:
-                _patch_project_data(tid, pid_old=pid, remove=True)
-        except Exception:
-            cache_store.invalidate("all_tasks")
-    return len(swept), failed
+
+def _done_children_snapshot(pid, tid):
+    """Completed-child ids right now - the session-start baseline
+    (focus file key done0). Best-effort: [] when the API is down."""
+    try:
+        open_children, child_ids = _children_state(pid, tid)
+        open_ids = {t.get("id") for t in open_children}
+        return [c for c in child_ids if c not in open_ids]
+    except Exception:
+        return []
+
+
+ORIGINS_FILE = run_path("tickal_focus_origins.json")
+
+
+def _origins_update(add=None, drop=None):
+    """The origins ledger (tid → {pid, parent}): where a staged task lived
+    before fx staged it, so fx_unstage can send it home. Returns the
+    dropped entry (or None). Best-effort file - a lost ledger only means
+    remove-in-place instead of remove-home."""
+    try:
+        with open(ORIGINS_FILE) as f:
+            d = json.load(f) or {}
+    except (OSError, ValueError):
+        d = {}
+    for tid, entry in (add or {}).items():
+        d[tid] = entry
+    popped = d.pop(drop, None) if drop else None
+    try:
+        with open(ORIGINS_FILE, "w") as f:
+            json.dump(d, f)
+    except OSError:
+        pass
+    return popped
 
 
 def _log_focus_record(start_iso, secs, tid, note=None):
@@ -522,40 +528,52 @@ def _log_focus_record(start_iso, secs, tid, note=None):
 
 
 def _close_session(st):
-    """End-of-session bundle for a timer state: sweep the focus task's checked
-    checkboxes, capture today's block as the record note, log the record.
+    """End-of-session bundle for a timer state: children snapshot becomes
+    the record note (ticks completed for real during the session - nothing
+    left to sweep), then the record logs. done0 (session-start baseline)
+    keeps historical completions out of the note and the toast count.
     Returns the toast fragment. Raises only if the record itself failed."""
     secs = focus_elapsed(st)
     mins = max(1, int(secs // 60))
     tid = st.get("tid") or None
     pid = st.get("pid") or None
-    swept = 0
     note = None
+    session_done = []
     if tid and pid:
         try:
-            doc = fb.parse(_api().get_task(pid, tid).get("content") or "")
-            swept, _failed = _sweep_from_doc(doc)
-            note = fb.today_note(doc, _today()) or None
+            open_children, child_ids = _children_state(pid, tid)
+            open_ids = {t.get("id") for t in open_children}
+            before = set(st.get("done0") or [])
+            session_done = [c for c in child_ids
+                            if c not in open_ids and c not in before]
+            # titles for what THIS session finished - completed children
+            # stay GET-able; small pooled fetch, capped
+            titles = {}
+            if session_done:
+                from concurrent.futures import ThreadPoolExecutor
+
+                def _t(cid):
+                    try:
+                        return cid, _api().get_task(pid, cid).get("title", "")
+                    except Exception:
+                        return cid, ""
+                with ThreadPoolExecutor(max_workers=4) as pool:
+                    titles = dict(pool.map(_t, session_done[:20]))
+            entries = [(titles.get(c, ""), True) for c in session_done
+                       if titles.get(c)]
+            entries += [(t.get("title", ""), False) for t in
+                        sorted(open_children,
+                               key=lambda x: x.get("sortOrder") or 0)]
+            note = fsub.record_note(_today(), entries) or None
         except Exception:
-            swept, note = 0, None
+            note = None
     note_skipped = _log_focus_record(st["start"], secs, tid, note)
     frag = f"{mins}m logged" + (f" on {st.get('title', 'Task')}" if tid else " (no task)")
-    if swept:
-        frag += f" · 🧹 {swept} swept"
+    if session_done:
+        frag += f" · ✅ {len(session_done)} done"
     if note_skipped:
         frag += " · note skipped"
     return frag
-
-
-def _ensure_block_if_history(pid, tid):
-    """Session start stamps today's block ONLY when the task already has
-    staging history - no '### date/---' noise on plain focuses (carry-over of
-    older unchecked lines rides along). Best-effort."""
-    try:
-        _fx_rmw(pid, tid, lambda doc, today:
-                fb.ensure_today(doc, today) if doc.blocks else None)
-    except Exception:
-        pass
 
 
 # ── Pomo sidecar - TickTick's pomo can't be task-bound in-app, so we
@@ -3517,7 +3535,6 @@ def _pomo_attribute(pid, tid, title):
     time.sleep(0.5)   # let the timeline segment land in defaults
     _write_pomo({"pid": pid, "tid": tid, "title": title,
                  "start": _now_iso(), "pomo_start": _pomo_timeline_start()})
-    _ensure_block_if_history(pid, tid)
 
 
 def pomo_sticky(pid, tid, minutes):
@@ -3561,12 +3578,108 @@ def _tag_tasks(pid, tag):
             and (not pid or (t.get("projectId") or t.get("_projectId")) == pid)]
 
 
-# ── Focus-block staging verbs ────────────────────────────────────────────────
+# ── Focus staging verbs (subtasks - NOTE targets keep the checkbox path) ─────
+
+def _cache_children(ttid):
+    """Open children of a task, cache view - fresh for our own writes via
+    the mirror; app-side staging lags one sync. Only feeds sortOrder
+    placement, so staleness costs a misplaced row at worst."""
+    return [t for t in (cache_store.get("all_tasks") or [])
+            if t.get("parentId") == ttid and t.get("status", 0) == 0]
+
+
+def _stage_into(tpid, ttid, items):
+    """The staging engine: MOVE items = [(pid, tid, title)] under the task
+    ttid as literal subtasks. Cross-list = v1 move first, THEN the v1
+    parent-set (one update can't do both, and v1 can never detach - both
+    live-verified 2026-07-21). sortOrder stamps append at the BOTTOM of the
+    child list in item order. The origins ledger records each task's old
+    home so fx_unstage can send it back. → (staged, skipped, failed)."""
+    def _lk(t):
+        # hybrid lookup for the cycle walk: cache, else live (fresh anchors
+        # aren't cached - and the SERVER ACCEPTS a real parent loop,
+        # live-verified, so this guard is the only thing preventing one)
+        c = cache_store.find_task(t)
+        if c:
+            return c
+        try:
+            return _api().get_task(tpid, t)
+        except Exception:
+            return None
+
+    todo, skipped = [], 0
+    for pid, tid, title in items:
+        known = cache_store.find_task(tid)
+        if (not tid or tid == ttid
+                or (known and known.get("parentId") == ttid)
+                or fsub.would_cycle(ttid, tid, _lk)):
+            skipped += 1
+            continue
+        todo.append((pid, tid, title))
+    if not todo:
+        return 0, skipped, 0
+    orders = fsub.stage_orders(
+        [t.get("sortOrder") or 0 for t in _cache_children(ttid)], len(todo))
+
+    def _one(job):
+        (pid, tid, _title), so = job
+        try:
+            api = _api()
+            live = api.get_task(pid, tid)
+            if live.get("parentId") == ttid:
+                return "skip"          # already staged (cache was blind)
+            fields = {"parentId": ttid, "sortOrder": so}
+            if pid != tpid:
+                api.move_task(tid, pid, tpid)
+                fields["columnId"] = None   # the old list's section id
+            api.update_task(tid, tpid, current=live, **fields)
+            return tid, pid, live.get("parentId"), so
+        except Exception:
+            return None
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(4, len(todo))) as pool:
+        results = list(pool.map(_one, zip(todo, orders)))
+    skipped += sum(1 for r in results if r == "skip")
+    ok = [r for r in results if r and r != "skip"]
+    failed = len(results) - len(ok) - sum(1 for r in results if r == "skip")
+    if ok:
+        _origins_update(add={tid: {"pid": pid, "parent": old_parent}
+                             for tid, pid, old_parent, _so in ok})
+        try:
+            from dispatch import _patch_task_cache
+            lname = next((p.get("name", "") for p in
+                          (cache_store.get("projects") or [])
+                          if p.get("id") == tpid), "")
+            for tid, pid, _old, so in ok:
+                fields = {"parentId": ttid, "sortOrder": so}
+                if pid != tpid:
+                    fields.update(projectId=tpid, _projectId=tpid,
+                                  _projectName=lname,
+                                  columnId=None, _columnName="")
+                _patch_task_cache(tid, **fields)
+        except Exception:
+            cache_store.invalidate("all_tasks")
+        app_sync_after_write()
+    return len(ok), skipped, failed
+
+
+def _target_kind(tpid, ttid):
+    """TEXT/NOTE of a stage target - cache first, live fallback (a NOTE
+    can't parent tasks, so it keeps the checkbox grammar)."""
+    t = cache_store.find_task(ttid)
+    if t and t.get("kind"):
+        return t["kind"]
+    try:
+        return _api().get_task(tpid, ttid).get("kind") or "TEXT"
+    except Exception:
+        return "TEXT"
+
 
 def fx_add(pid, tid, open_sticky=False):
-    """Insert the task as a checkbox into the CURRENT focus task's today
-    block. ⌥ variant also opens the focus task's sticky (the list lives
-    there)."""
+    """Stage the task UNDER the current focus task - a literal subtask (the
+    task MOVES; fx_unstage sends it home). ⌥ variant also opens the focus
+    task's sticky."""
     cur = _current_focus_task()
     if not cur:
         print("🎯 No task-linked session running · start or link one first")
@@ -3576,37 +3689,48 @@ def fx_add(pid, tid, open_sticky=False):
         print("🎯 That IS the focus task")
         return
     title = _task_title(tid, pid=pid)
-    (added, _skipped), _doc, _live = _fx_rmw(
-        fpid, ftid,
-        lambda doc, today: fb.insert_checkboxes(doc, today, [(pid, tid, title)]))
-    if added:
+    staged, _skipped, failed = _stage_into(fpid, ftid, [(pid, tid, title)])
+    if staged:
         print(f"🎯 {title[:40]} → {ftitle[:30]}")
+    elif failed:
+        print("🎯 Staging failed · sync and retry")
     else:
-        print(f"🎯 already staged today on {ftitle[:30]}")
+        print(f"🎯 already under {ftitle[:30]}")
     if open_sticky:
         sticky(fpid, ftid)
 
 
 def fx_add_to(tpid, ttid, spid, stid):
-    """Insert a source task as a checkbox into an EXPLICIT target's today
-    block (the Stage-for-Focus '→ link this task to another' direction)."""
+    """Stage a source task under an EXPLICIT target (the Stage-for-Focus
+    'Out' direction). Task target = literal subtask; NOTE target keeps the
+    checkbox-block line (a CTA note can't parent tasks)."""
     if ttid == stid:
         print("🎯 Can't stage a task into itself")
         return
     title = _task_title(stid, pid=spid)
-    (added, _skipped), _doc, live = _fx_rmw(
-        tpid, ttid,
-        lambda doc, today: fb.insert_checkboxes(doc, today, [(spid, stid, title)]))
-    tname = live.get("title") or "target"
-    if added:
+    if _target_kind(tpid, ttid) == "NOTE":
+        (added, _skipped), _doc, live = _fx_rmw(
+            tpid, ttid,
+            lambda doc, today: fb.insert_checkboxes(doc, today,
+                                                    [(spid, stid, title)]))
+        tname = live.get("title") or "target"
+        print(f"🎯 {title[:40]} → {tname[:30]}" if added
+              else f"🎯 already staged today in {tname[:30]}")
+        return
+    tname = _task_title(ttid, default="target", pid=tpid)
+    staged, _skipped, failed = _stage_into(tpid, ttid, [(spid, stid, title)])
+    if staged:
         print(f"🎯 {title[:40]} → {tname[:30]}")
+    elif failed:
+        print("🎯 Staging failed · sync and retry")
     else:
-        print(f"🎯 already staged today in {tname[:30]}")
+        print(f"🎯 already under {tname[:30]}")
 
 
 def fx_add_multi(b64):
-    """Batch insert, ONE content write. b64 JSON:
-    {"tpid","ttid","items":[[pid,tid,title],…]} (built by the stage picker)."""
+    """Batch stage under the S3 'In' target. Task target = subtasks (pooled
+    move+parent per item); NOTE target = checkbox lines, ONE content write.
+    b64 JSON: {"tpid","ttid","items":[[pid,tid,title],…]}."""
     import base64
     data = json.loads(base64.b64decode(b64))
     tpid, ttid = data["tpid"], data["ttid"]
@@ -3614,32 +3738,56 @@ def fx_add_multi(b64):
     if not items:
         print("🎯 Nothing to stage")
         return
-    (added, skipped), _doc, live = _fx_rmw(
-        tpid, ttid,
-        lambda doc, today: fb.insert_checkboxes(doc, today, items))
-    tname = live.get("title") or "target"
-    msg = f"🎯 {added} staged → {tname[:30]}"
+    if _target_kind(tpid, ttid) == "NOTE":
+        (added, skipped), _doc, live = _fx_rmw(
+            tpid, ttid,
+            lambda doc, today: fb.insert_checkboxes(doc, today, items))
+        tname = live.get("title") or "target"
+        msg = f"🎯 {added} staged → {tname[:30]}"
+        if skipped:
+            msg += f" · {skipped} already there"
+        print(msg)
+        return
+    tname = _task_title(ttid, default="target", pid=tpid)
+    staged, skipped, failed = _stage_into(tpid, ttid, items)
+    msg = f"🎯 {staged} staged → {tname[:30]}"
     if skipped:
         msg += f" · {skipped} already there"
+    if failed:
+        msg += f" · {failed} failed"
     print(msg)
 
 
 def fx_tick(pid, tid, ctid=None):
-    """Tick the first unchecked checkbox (or the one linking ctid) in the
-    focus task's current block. TICKAL_JSON=1 → block_summary JSON on stdout
-    (the focus bar's reconcile channel); otherwise a human toast."""
+    """COMPLETE the first open subtask (or ctid) of the focus task - ticks
+    are real completions now, so there is no sweep step anymore.
+    TICKAL_JSON=1 → children_summary JSON on stdout (the focus bar's
+    reconcile channel); otherwise a human toast."""
     as_json = os.environ.get("TICKAL_JSON") == "1"
     try:
-        line, doc, _live = _fx_rmw(
-            pid, tid,
-            lambda doc, today: fb.tick(doc, today, target_tid=ctid or None))
-        summary = fb.block_summary(doc, _today())
-        if as_json:
-            print(json.dumps({"ok": True, "ticked": bool(line), **summary}))
-        elif line:
-            print(f"✅ ticked: {fb._display_title(line)[:50]}")
+        open_children, child_ids = _children_state(pid, tid)
+        ordered = sorted(open_children, key=lambda t: t.get("sortOrder") or 0)
+        if ctid:
+            target = next((t for t in ordered if t.get("id") == ctid), None)
         else:
-            print("Nothing to tick today")
+            target = ordered[0] if ordered else None
+        done_titles = {}
+        if target:
+            cpid = target.get("projectId") or pid
+            _api().complete_task(cpid, target["id"])
+            _complete_cache_patch(cpid, target["id"])
+            open_children = [t for t in open_children
+                             if t.get("id") != target["id"]]
+            if target["id"] not in child_ids:
+                child_ids = child_ids + [target["id"]]
+            done_titles[target["id"]] = target.get("title", "")
+        summary = fsub.children_summary(open_children, child_ids, done_titles)
+        if as_json:
+            print(json.dumps({"ok": True, "ticked": bool(target), **summary}))
+        elif target:
+            print(f"✅ done: {target.get('title', '')[:50]}")
+        else:
+            print("Nothing open to tick")
     except Exception as e:
         if as_json:
             print(json.dumps({"ok": False,
@@ -3649,49 +3797,115 @@ def fx_tick(pid, tid, ctid=None):
 
 
 def fx_sweep(pid=None, tid=None):
-    """Manual sweep - complete every checked+linked+still-open checkbox task
-    across ALL of the task's blocks (the permanent record keeps its lines)."""
-    if not (pid and tid):
-        cur = _current_focus_task()
-        if not cur:
-            print("🧹 No focus task to sweep")
-            return
-        pid, tid = cur[0], cur[1]
-    doc = fb.parse(_api().get_task(pid, tid).get("content") or "")
-    done, failed = _sweep_from_doc(doc)
-    if done or failed:
-        print(f"🧹 {done} swept" + (f", {failed} failed" if failed else ""))
+    """RETIRED by the subtask revamp - ticking a subtask completes it for
+    real, so there is nothing left to sweep. Stub keeps stale UI args calm."""
+    print("🧹 Sweep retired · ticking a subtask completes it for real")
+
+
+def fx_unstage(pid, tid):
+    """Remove from focus: v2 detach (the ONLY channel that clears parentId -
+    v1 ignores null), then send the task home per the origins ledger (move
+    back cross-list, re-adopt by its old parent). No ledger entry = detach
+    in place. Order is sacred: detach BEFORE any move - a moved child keeps
+    a stale cross-project parent link otherwise (live-verified)."""
+    api = _api()
+    try:
+        live = api.get_task(pid, tid)
+    except Exception:
+        print("➖ Task not found · sync and retry")
+        return
+    title = (live.get("title") or _title())[:40]
+    parent = live.get("parentId")
+    if not parent:
+        _origins_update(drop=tid)
+        print(f"➖ {title} is not staged")
+        return
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        print("➖ Remove needs the Attachment Login token (Settings)")
+        return
+    if not v2.task_parent([{"taskId": tid, "projectId": pid,
+                            "oldParentId": parent}]):
+        print(f"➖ TickTick refused to detach {title} · retry")
+        return
+    origin = _origins_update(drop=tid) or {}
+    dest_pid = origin.get("pid") or pid
+    if dest_pid != pid:
+        try:
+            api.move_task(tid, pid, dest_pid)
+        except Exception:
+            dest_pid = pid          # detached but stuck here - stay honest
+    applied_parent = None
+    if origin.get("parent") and dest_pid == origin.get("pid"):
+        try:
+            fresh = api.get_task(dest_pid, tid)
+            api.update_task(tid, dest_pid, current=fresh,
+                            parentId=origin["parent"])
+            applied_parent = origin["parent"]
+        except Exception:
+            pass
+    lname = next((p.get("name", "") for p in
+                  (cache_store.get("projects") or [])
+                  if p.get("id") == dest_pid),
+                 "Inbox" if dest_pid.startswith("inbox") else "")
+    try:
+        from dispatch import _patch_task_cache
+        fields = {"parentId": applied_parent}
+        if dest_pid != pid:
+            fields.update(projectId=dest_pid, _projectId=dest_pid,
+                          _projectName=lname, columnId=None, _columnName="")
+        _patch_task_cache(tid, **fields)
+    except Exception:
+        cache_store.invalidate("all_tasks")
+    app_sync_after_write()
+    if dest_pid != pid:
+        home = lname or "its list"
+        print(f"➖ {title} → back to {home}")
     else:
-        print("🧹 nothing to sweep")
+        print(f"➖ {title} unstaged")
+
+
+def fx_oneliner():
+    """✏️ One-liner: dialog → '- text' bullet appended to the focus task's
+    CONTENT - the note is free again now that staging is subtasks."""
+    cur = _current_focus_task()
+    if not cur:
+        print("✏️ No task-linked session running")
+        return
+    fpid, ftid, ftitle = cur
+    text = " ".join((_ask(f"One line for {ftitle[:30]}") or "").split())
+    if not text:
+        return   # cancelled or empty - silence, not an error toast
+    api = _api()
+    live = api.get_task(fpid, ftid)
+    old = live.get("content") or ""
+    new = (old.rstrip("\n") + "\n" if old.strip() else "") + "- " + text
+    api.update_task(ftid, fpid, current=live, content=new)
+    _patch_content_cache(ftid, new)
+    app_sync_after_write()
+    print(f"✏️ noted on {ftitle[:30]}")
 
 
 def fx_copy(pid=None, tid=None):
-    """Today's UNTICKED checkboxes → clipboard as a paste-ready bullet list
-    (ticked ones are history, not a to-paste list)."""
+    """Open subtasks of the focus task → clipboard as a paste-ready
+    "- Title" bullet list (done ones are history, not a to-paste list)."""
     if not (pid and tid):
         cur = _current_focus_task()
-        if cur:
-            pid, tid = cur[0], cur[1]
-        else:
-            ps = _pomo_sidecar()
-            if not (ps and ps.get("tid")):
-                print("📋 No task-linked session running")
-                return
-            pid, tid = ps.get("pid", ""), ps["tid"]
-    doc = fb.parse(_api().get_task(pid, tid).get("content") or "")
-    blk = fb._current_block(doc, _today())
-    lines = [l for l in (blk.lines if blk else [])
-             if l.kind == "checkbox" and not l.checked]
-    if not lines:
-        print("📋 Nothing unticked in today's block")
+        if not cur:
+            print("📋 No task-linked session running")
+            return
+        pid, tid = cur[0], cur[1]
+    open_children, _cids = _children_state(pid, tid)
+    ordered = sorted(open_children, key=lambda t: t.get("sortOrder") or 0)
+    if not ordered:
+        print("📋 No open subtasks")
         return
-    text = "\n".join("- " + fb._display_title(l) for l in lines)
+    text = "\n".join("- " + " ".join((t.get("title") or "(untitled)").split())
+                     for t in ordered)
     subprocess.run(["pbcopy"], input=text.encode())
-    # _current_block falls back to the newest block (midnight-crossing
-    # sessions) - disclose when what landed isn't actually today's
-    stale = f" (block {blk.date})" if blk.date != _today() else ""
-    print(f"📋 {len(lines)} checkbox{'es' if len(lines) != 1 else ''}"
-          f" copied as bullets{stale}")
+    print(f"📋 {len(ordered)} subtask{'s' if len(ordered) != 1 else ''}"
+          " copied as bullets")
 
 
 def convert(pid, tid):
@@ -3819,7 +4033,8 @@ def fx_link(pid, tid):
         if st.get("tid"):
             print(f"🔗 Session already linked to {st['title']}")
             return
-        st.update({"pid": pid, "tid": tid, "title": title})
+        st.update({"pid": pid, "tid": tid, "title": title,
+                   "done0": _done_children_snapshot(pid, tid)})
         _write_focus(st)
     else:
         state, _ = _pomo_app_state()
@@ -3828,14 +4043,13 @@ def fx_link(pid, tid):
             return
         _write_pomo({"pid": pid, "tid": tid, "title": title,
                      "start": _now_iso(), "pomo_start": _pomo_timeline_start()})
-    _ensure_block_if_history(pid, tid)
     _bar_wake()
     print(f"🔗 {title[:40]} linked to the running session")
 
 
 def _fx_send(items, label):
-    """Insert [(pid,tid,title)] into the current focus task's today block -
-    ONE content write. True when the insert happened."""
+    """Stage [(pid,tid,title)] under the current focus task (subtasks).
+    True when anything staged."""
     cur = _current_focus_task()
     if not cur:
         print("🎯 No task-linked session running · start or link one first")
@@ -3845,14 +4059,16 @@ def _fx_send(items, label):
     if not items:
         print(f"Nothing in {label} to add")
         return False
-    (added, skipped), _doc, _live = _fx_rmw(
-        fpid, ftid,
-        lambda doc, today: fb.insert_checkboxes(doc, today, items))
-    msg = f"🎯 {added} from {label} → {ftitle[:30]}"
+    staged, skipped, failed = _stage_into(fpid, ftid, items)
+    msg = f"🎯 {staged} from {label} → {ftitle[:30]}"
     if skipped:
         msg += f" · {skipped} already there"
+    if failed:
+        msg += f" · {failed} failed"
     print(msg)
-    return True
+    # buffer_focus clears the buffer on True - a failure keeps it for retry,
+    # all-already-there still clears (nothing left to send)
+    return not failed and bool(staged or skipped)
 
 
 def buffer_focus():
@@ -4012,22 +4228,44 @@ def stage_pick():
 
 
 def fx_move(tid, direction):
-    """Bar ⤒↑↓⤓ reorder: move the checkbox among the
-    unchecked lines of the focus task's today block - up/down one slot,
-    top/bottom to the edge. Silent no-op at the edges / unknown direction."""
+    """Bar ⤒↑↓⤓ reorder: restamp the subtask's sortOrder among the OPEN
+    children (midpoint insertion; a collapsed gap re-spreads the lot -
+    sortOrder IS the display order, childIds is creation order). Prints
+    "reordered" on success - the bar greps stdout for it."""
     cur = _current_focus_task()
     if not cur:
-        ps = _pomo_sidecar()
-        if not (ps and ps.get("tid")):
-            print("🎯 No task-linked session running")
-            return
-        fpid, ftid = ps.get("pid", ""), ps["tid"]
+        print("🎯 No task-linked session running")
+        return
+    fpid, ftid = cur[0], cur[1]
+    open_children, _cids = _children_state(fpid, ftid)
+    ordered = sorted(open_children, key=lambda t: t.get("sortOrder") or 0)
+    pos = next((i for i, t in enumerate(ordered) if t.get("id") == tid), None)
+    if pos is None:
+        print("")
+        return
+    orders = [t.get("sortOrder") or 0 for t in ordered]
+    new = fsub.move_order(orders, pos, direction)
+    if new is None:
+        print("")
+        return
+    api = _api()
+    from dispatch import _patch_task_cache
+    if new == fsub.RESPREAD:
+        seq = list(ordered)
+        tgt = {"up": pos - 1, "down": pos + 1, "top": 0,
+               "bottom": len(seq) - 1}[direction]
+        seq.insert(tgt, seq.pop(pos))
+        for t, so in zip(seq, fsub.respread(len(seq),
+                                            min(orders) - fsub.SORT_STEP)):
+            api.update_task(t["id"], t.get("projectId") or fpid,
+                            current=t, sortOrder=so)
+            _patch_task_cache(t["id"], sortOrder=so)
     else:
-        fpid, ftid, _ = cur
-    moved, _doc, _live = _fx_rmw(
-        fpid, ftid,
-        lambda doc, today: fb.move_item(doc, today, tid, direction))
-    print("reordered" if moved else "")
+        t = ordered[pos]
+        api.update_task(tid, t.get("projectId") or fpid, current=t,
+                        sortOrder=new)
+        _patch_task_cache(tid, sortOrder=new)
+    print("reordered")
 
 
 def section_focus(pid, sid):
@@ -4211,6 +4449,10 @@ def main():
                 pid, tid = rest.split(":", 1); fx_sweep(pid, tid)
             else:
                 fx_sweep()
+        elif verb == "fx_unstage":
+            pid, tid = rest.split(":", 1); fx_unstage(pid, tid)
+        elif verb == "fx_oneliner":
+            fx_oneliner()
         elif verb == "fx_copy":
             if rest:
                 pid, tid = rest.split(":", 1); fx_copy(pid, tid)

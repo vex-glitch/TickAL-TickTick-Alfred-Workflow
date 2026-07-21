@@ -159,7 +159,7 @@ def main():
                      "task_title": vname}
             sendable = vkey in ("today", "tomorrow", "next7", "inbox")
             rows = [
-                ("🎯 Send all to focus", f"Every {vname} task → the focus task's today block",
+                ("🎯 Send all to focus", f"Every {vname} task → subtasks of the focus task",
                  f"xact:view_focus:{vkey}", "focus send all stage checkbox",
                  sendable and (fx_session() or ("",))[0] == "task"),
                 ("↗️ Open in TickTick",  f"Open {vname}",
@@ -211,7 +211,7 @@ def main():
                  f"xact:tag_create_under:{tag}", "add create nested child tag",
                  _is_top_level_tag(tag)),
                 ("🎯 Send all to focus",
-                 f"Every open {fmt_tags([tag]) or '#' + tag} task → the focus task's today block",
+                 f"Every open {fmt_tags([tag]) or '#' + tag} task → subtasks of the focus task",
                  f"xact:tag_focus:{pid}:{tag}", "focus send all stage checkbox",
                  (fx_session() or ("",))[0] == "task"),
                 ("🔗 Copy link", "Copy tag URL",  f"copy:{link}", "copy url link", True),
@@ -271,7 +271,7 @@ def main():
                  "complete done all", True, sent),
                 ("⚡ Priority all…", f"Set priority on all {_n}", "priority",
                  "priority all",      True, sent),
-                ("🎯 Add buffer to focus", f"All {_n} → the focus block, clears buffer",
+                ("🎯 Add buffer to focus", f"All {_n} → subtasks of the focus task, clears buffer",
                  "xact:buffer_focus", "focus add all stage checkbox",
                  _n > 0 and (fx_session() or ("",))[0] == "task", sent),
                 ("❌ Remove this",  "Drop this task from the buffer",
@@ -521,15 +521,15 @@ def main():
              f"xact:sticky:{pid}:{tid}", "sticky note desktop pin", is_task_like and bool(tid)),
             ("🅿️ Add to buffer",   "Collect tasks, act on all (🅿️ in search)",
              f"xact:buffer_add:{pid}:{tid}", "buffer collect batch", is_task_like and bool(tid)),
-            # Focus-block staging: direct add when a task-bound session
+            # Focus staging (subtasks): direct add when a task-bound session
             # runs; the stage screen (both directions) always; live-link only
             # while a session runs unattributed.
             (f"🎯 Add to focus ({(_sess[3][:24] if _sess and _sess[0] == 'task' else '')})",
-             "→ checkbox in the focus task's today block",
+             "→ subtask of the focus task (moves under it)",
              f"xact:fx_add:{pid}:{tid}", "focus add stage checkbox now",
              is_task_like and bool(tid) and bool(_sess) and _sess[0] == "task"
              and _sess[2] != tid),
-            ("🎯 Stage for Focus", "Checkbox-link this task into another task/note…",
+            ("🎯 Stage for Focus", "Subtask it under another task, or into a note…",
              f"xact:stage_open:{pid}:{tid}", "stage focus link checkbox block",
              is_task_like and bool(tid)),
             ("🔗 Link to running focus", "Attribute the RUNNING session to this task",

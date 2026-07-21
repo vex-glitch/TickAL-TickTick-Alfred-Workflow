@@ -316,6 +316,24 @@ class TickTickV2:
         except Exception:
             return False
 
+    def task_parent(self, ops):
+        """POST /api/v2/batch/taskParent - the ONLY channel that DETACHES a
+        subtask (v1 silently ignores parentId=None - live-verified
+        2026-07-21). ops: [{"taskId","projectId","parentId"}] adopts,
+        [{"taskId","projectId","oldParentId"}] detaches. True when the
+        server acks without an id2error entry."""
+        if not self.token or not ops:
+            return False
+        try:
+            r = requests.post(
+                "https://api.ticktick.com/api/v2/batch/taskParent",
+                headers={**_base_headers(), "cookie": f"t={self.token}",
+                         "content-type": "application/json"},
+                json=ops, timeout=15)
+            return bool(r.ok) and not (r.json().get("id2error") or {})
+        except Exception:
+            return False
+
     def delete_tag(self, name):
         """DELETE /api/v2/tag?name= (probe-verified 2026-07-09). Tasks keep
         living - only the tag entity goes. True on a 2xx ack."""

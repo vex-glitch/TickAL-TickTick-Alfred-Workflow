@@ -14,9 +14,12 @@ committed token, only dispatch rows are valid=True, and every row carries the
   "{mode} link {frag}"          3 · fuzzy task search (open, non-NOTE, ≤40)
   "{mode} link {title} "        4 · dispatch - start on the task (+ sticky)
   focus file EXISTS             R · status + stop / pause⟷resume / discard
-                                    + 🎯 add · 📥 buffer · 🧹 sweep · bar
-  "add {frag}"   (session+task) A · fuzzy search → ⏎ stage into the focus
-                                    task's today block (⌥ + open its sticky)
+                                    + 🎯 add · 📥 buffer · ➖ remove ·
+                                    ✏️ one-liner · 📋 copy · bar
+  "add {frag}"   (session+task) A · fuzzy search → ⏎ stage UNDER the focus
+                                    task as a subtask (⌥ + open its sticky)
+  "remove {frag}" (session+task) RM · open subtasks → ⏎ un-stage (v2 detach
+                                    + send home per the origins ledger)
   "link {frag}"  (unattributed) L · fuzzy search → ⏎ fx_link (live attribute)
   "stop "        (unattributed) R2 · log (no task) · link a task…
   "stop link {frag}"            R3 · fuzzy task search
@@ -24,16 +27,17 @@ committed token, only dispatch rows are valid=True, and every row carries the
   "stage <pid>:<tid> …"         S · Stage-for-Focus (fired via ET prefill from
                                     ⌘ menus - works in ANY session state):
                                     "" S1 branch picker · "to {frag}" S2 target
-                                    search (tasks + NOTES) · "from {t1} | …" S3
-                                    multi-pick (tag-picker pattern, " | " sep)
-                                    → "Add N checkboxes" → ONE fx_add_multi
+                                    search (task → subtask, NOTE → checkbox) ·
+                                    "from {t1} | …" S3 multi-pick (tag-picker
+                                    pattern, " | " sep) → "Stage N" →
+                                    ONE fx_add_multi
   "stage pick {frag}"           S0 · source-task search (the idle menu's 🎯
                                     row / missing handshake) - ⏎ fires
                                     xact:stage_open → the normal S flow
 
 Unmatched trailing-space text falls back to the search screen - no dead ends.
 A running TickTick pomo has no focus file → render_pomo; with the sidecar
-(~/.ticktick_alfred/run/tickal_pomo.json) it grows the same add/sweep/bar rows.
+(~/.ticktick_alfred/run/tickal_pomo.json) it grows the same add/remove/bar rows.
 
 Dispatch args (executed by xact.py): focus_start:: · focus_start:p:t ·
 focus_sticky:p:t · pomo:default · pomo_task:p:t:default · pomo_sticky:p:t:default
@@ -130,8 +134,8 @@ def task_search(prefix, frag):
 
 # ── Staging / buffer / bar helpers ───────────────────────────────────────────
 def _stage_pool():
-    """Stage-target pool: open tasks AND notes (a CTA note is a valid home
-    for checkboxes)."""
+    """Stage-target pool: open tasks (subtask homes) AND notes (checkbox
+    homes - a CTA note can't parent tasks)."""
     pool = list(_open_tasks())
     pool += [n for n in (cache_store.get("all_notes") or [])
              if n.get("status", 0) == 0]
@@ -166,19 +170,23 @@ def _handshake():
 
 
 def _staged_tids(tid):
-    """Unchecked tids in the task's CURRENT session block - cache-read (fresh
-    for the workflow's own writes via the content mirror; sticky-side ticks
-    lag one sync). Powers the 🎯 already-staged indicator."""
+    """Open SUBTASKS of the task - cache-read (fresh for the workflow's own
+    writes via the parent mirror; app-side staging lags one sync). Powers
+    the 🎯 already-staged indicator. Completed children left the cache, and
+    they left the open-task pools these pickers render - no loss."""
     try:
-        import focus_blocks as fbx
-        from datetime import datetime as _dt
-        t = cache_store.find_task(tid)
-        doc = fbx.parse((t or {}).get("content") or "")
-        s = fbx.block_summary(doc, _dt.now().strftime("%Y-%m-%d"))
-        # checked AND unchecked - a ticked task is still "in" the focus
-        return {it["tid"] for it in s["items"] if it["tid"]}
+        return {t["id"] for t in (cache_store.get("all_tasks") or [])
+                if t.get("parentId") == tid and t.get("status", 0) == 0}
     except Exception:
         return set()
+
+
+def _staged_children(tid):
+    """Open subtask dicts of the focus task, display order (sortOrder
+    ascending) - the remove-from-focus pool."""
+    kids = [t for t in (cache_store.get("all_tasks") or [])
+            if t.get("parentId") == tid and t.get("status", 0) == 0]
+    return sorted(kids, key=lambda t: t.get("sortOrder") or 0)
 
 
 def _buffer_count():
@@ -199,7 +207,7 @@ def _bar_visible():
 
 def _bulk_add_rows(rest):
     """'add /…' - the bulk scope: a whole tag of a list, a whole
-    section, or today's tasks → the block in one ⏎. Drill grammar mirrors
+    section, or today's tasks → subtasks in one ⏎. Drill grammar mirrors
     the pickers: list search → ' | ' lock → tag/section search."""
     rest = rest.lstrip()
 
@@ -245,7 +253,7 @@ def _bulk_add_rows(rest):
                         items.append(alfred.item(
                             uid=f"fp-bulk-tag-{tg}",
                             title=f"#{tg}",
-                            subtitle=f"{counts[tg]} task{'s' if counts[tg] != 1 else ''} → the block  ⌃🔙",
+                            subtitle=f"{counts[tg]} task{'s' if counts[tg] != 1 else ''} → subtasks  ⌃🔙",
                             arg=f"xact:tag_focus:{pid}:{tg}", valid=True, mods=BACK))
                 else:
                     for c in (data.get("columns") or []):
@@ -255,7 +263,7 @@ def _bulk_add_rows(rest):
                         items.append(alfred.item(
                             uid=f"fp-bulk-sec-{c.get('id')}",
                             title=c.get("name", "Unnamed"),
-                            subtitle=f"{n} task{'s' if n != 1 else ''} → the block  ⌃🔙",
+                            subtitle=f"{n} task{'s' if n != 1 else ''} → subtasks  ⌃🔙",
                             arg=f"xact:section_focus:{pid}:{c.get('id')}",
                             valid=True, mods=BACK))
                 return items or [alfred.item(
@@ -280,7 +288,7 @@ def _bulk_add_rows(rest):
                     subtitle="Every task of a section  ⌃🔙",
                     arg="", valid=False, autocomplete="add /section ", mods=BACK),
         alfred.item(uid="fp-bulk-today", title="📅 Add today",
-                    subtitle="Every open task due today → the block  ⌃🔙",
+                    subtitle="Every open task due today → subtasks  ⌃🔙",
                     arg="xact:view_focus:today", valid=True, mods=BACK),
     ]
     if rest:
@@ -322,6 +330,29 @@ def _add_search(frag, focus_tid):
     return items
 
 
+def _remove_search(frag, fpid, ftid):
+    """Screen RM ('remove …'): the focus task's open subtasks; ⏎ un-stages
+    (v2 detach + send home per the origins ledger)."""
+    kids = _staged_children(ftid)
+    if frag:
+        kids = filter_and_score(frag, kids,
+                                key_fn=lambda t: search_key(t.get("title", "")))
+    items = []
+    for t in kids[:40]:
+        pid = t.get("projectId") or t.get("_projectId", "") or fpid
+        items.append(alfred.item(
+            uid=f"fp-rm-{t['id']}",
+            title=md_links_display(t.get("title", ""))[:60],
+            subtitle="Un-stage · send it home  ⌃🔙",
+            arg=f"xact:fx_unstage:{pid}:{t['id']}", valid=True, mods=BACK))
+    if not items:
+        items = [alfred.item(
+            uid="fp-rm-none",
+            title=f'No subtask matching "{frag}"' if frag else "Nothing staged",
+            subtitle="⌃🔙", valid=False, mods=BACK)]
+    return items
+
+
 def _link_search(frag):
     """Screen L: fuzzy rows that live-attribute the running session on ⏎."""
     hits = filter_and_score(frag, _open_tasks(),
@@ -346,10 +377,10 @@ def _link_search(frag):
 
 def _session_rows(pid, tid):
     """The session toolset shared by the timer and pomo screens:
-    add / add-buffer / sweep / bar visibility."""
+    add / add-buffer / remove / one-liner / copy / bar visibility."""
     rows = [alfred.item(
         uid="fp-add", title="➕ Add to focus",
-        subtitle="Add task/s to running focus, / for bulk  ⌃🔙",
+        subtitle="Stage task/s as subtasks, / for bulk  ⌃🔙",
         arg="", valid=False, autocomplete="add ", mods=BACK)]
     n = _buffer_count()
     if n:
@@ -357,13 +388,18 @@ def _session_rows(pid, tid):
             uid="fp-addbuf", title=f"📥 Add buffer ({n})",
             subtitle="In buffer order  ⌃🔙",
             arg="xact:buffer_focus", valid=True, mods=BACK))
+    if _staged_children(tid):
+        rows.append(alfred.item(
+            uid="fp-remove", title="➖ Remove from focus",
+            subtitle="Un-stage a subtask, send it home  ⌃🔙",
+            arg="", valid=False, autocomplete="remove ", mods=BACK))
     rows.append(alfred.item(
-        uid="fp-sweep", title="🧹 Sweep",
-        subtitle="Ticked checkboxes = Done tasks  ⌃🔙",
-        arg=f"xact:fx_sweep:{pid}:{tid}", valid=True, mods=BACK))
+        uid="fp-oneliner", title="✏️ One-liner",
+        subtitle="A '- text' bullet onto the note  ⌃🔙",
+        arg="xact:fx_oneliner", valid=True, mods=BACK))
     rows.append(alfred.item(
         uid="fp-copy", title="📋 Copy as bullet list",
-        subtitle="Unticked checkboxes → clipboard, paste-ready  ⌃🔙",
+        subtitle="Open subtasks → clipboard, paste-ready  ⌃🔙",
         arg=f"xact:fx_copy:{pid}:{tid}", valid=True, mods=BACK))
     if _bar_visible():
         rows.append(alfred.item(
@@ -386,10 +422,17 @@ def render_running(st, raw):
     paused = bool(st.get("paused_at"))
     attributed = bool(st.get("tid"))
 
-    # Add-twist: stage a searched task into the focus task's today block
+    # Add-twist: stage a searched task under the focus task
     if attributed and raw.startswith("add"):
         frag = raw[4:] if len(raw) > 3 else ""
         print(alfred.output(_add_search(frag.strip(), st.get("tid")),
+                            skipknowledge=True))
+        return
+    # Remove-twist: un-stage a subtask
+    if attributed and raw.startswith("remove"):
+        frag = raw[7:] if len(raw) > 6 else ""
+        print(alfred.output(_remove_search(frag.strip(), st.get("pid", ""),
+                                           st.get("tid")),
                             skipknowledge=True))
         return
     # Live link-twist (unattributed, distinct from the stop-twist)
@@ -574,7 +617,7 @@ def render_idle(raw):
         # The ⌘-menu stage flow, reachable without a task -
         # xact:stage_pick clears any leftover handshake, then asks WHICH task.
         alfred.item(uid="fp-stage", title="🎯 Stage for Focus",
-                    subtitle="Checkbox-link a task into another task/note…",
+                    subtitle="Stage a task under another task, or into a note…",
                     arg="xact:stage_pick", valid=True, mods=BACK),
     ]
     frag = raw.strip().lower()
@@ -596,6 +639,12 @@ def render_pomo(state, remaining, raw):
     if bound and raw.startswith("add"):
         frag = raw[4:] if len(raw) > 3 else ""
         print(alfred.output(_add_search(frag.strip(), bound["tid"]),
+                            skipknowledge=True))
+        return
+    if bound and raw.startswith("remove"):
+        frag = raw[7:] if len(raw) > 6 else ""
+        print(alfred.output(_remove_search(frag.strip(),
+                                           bound.get("pid", ""), bound["tid"]),
                             skipknowledge=True))
         return
     if not bound and raw.startswith("link"):
@@ -728,7 +777,7 @@ def render_stage(raw):
                      "items": resolved}).encode()).decode()
                 items.append(alfred.item(
                     uid="fp-st-confirm",
-                    title=f"✅ Add {len(resolved)} checkbox{'es' if len(resolved) != 1 else ''} to {sname}",
+                    title=f"✅ Stage {len(resolved)} under {sname}",
                     subtitle=" · ".join(r[2][:24] for r in resolved)[:96],
                     arg=f"xact:fx_add_multi:{payload}", valid=True, mods=BACK))
             if missing:
@@ -772,11 +821,11 @@ def render_stage(raw):
     items = [
         alfred.item(uid="fp-st-to",
                     title="⤴️ Out",
-                    subtitle="Make this task a checkbox link in another task",
+                    subtitle="Make this task a subtask elsewhere (note = checkbox)",
                     arg="", valid=False, autocomplete=f"{prefix}to ", mods=BACK),
         alfred.item(uid="fp-st-from",
                     title="⤵️ In",
-                    subtitle="Make other tasks checkbox links in this task",
+                    subtitle="Make other tasks subtasks of this task",
                     arg="", valid=False, autocomplete=f"{prefix}from ", mods=BACK),
     ]
     cur = xact._current_focus_task()

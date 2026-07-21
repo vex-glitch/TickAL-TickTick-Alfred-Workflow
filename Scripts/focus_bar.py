@@ -4,8 +4,8 @@ focus_bar.py - the floating focus pill. PyObjC, ships in the workflow.
 
 A Slash-style always-on-top capsule showing the running session:
   Row 1  ● done · task title (→ open in TickTick) · clock · ⏸/▶ · ⏹ · 🗒 · ⌄
-  Row 2  ○ tick (→ confetti) · first unchecked checkbox · 2/5
-Unattributed sessions show just the clock + controls; no checkboxes → 1 row.
+  Row 2  ○ tick (→ confetti, completes the subtask) · first open subtask · 2/5
+Unattributed sessions show just the clock + controls; no subtasks → 1 row.
 
 DUMB RENDERER: every mutation exits through an xact verb -
   channel A (direct subprocess, pure API):  focus_pause/resume · fx_tick
@@ -13,8 +13,8 @@ DUMB RENDERER: every mutation exits through an xact verb -
                                             focus_stop · focus_done
 Reads: ~/.ticktick_alfred/run/tickal_focus.json · ~/.ticktick_alfred/run/tickal_pomo.json · ~/.ticktick_alfred/run/tickal_focus_bar.json
 (xact only touches `visible` in the bar file; the bar owns origin), TickTick's
-pomo defaults keys, and LIVE api.get_task for the checkbox block (server truth
-- TickTick merges concurrent sticky/API edits, so ticks are safe).
+pomo defaults keys, and ONE LIVE api.get_project_data for the subtask list
+(server truth: open children + the parent's childIds, done included).
 
 Polling: 1 s UI clock (timestamps only) · 1 s state files (defaults read every
 2nd tick) · content 5 s → 20 s backoff after 10 min without change (rate
@@ -41,7 +41,7 @@ WF_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(WF_DIR, "src"))
 sys.path.insert(0, os.path.join(WF_DIR, "Scripts"))
 
-import focus_blocks as fb           # noqa: E402  (pure)
+import focus_subtasks as fsub       # noqa: E402  (pure)
 import xact                          # noqa: E402  (state readers + verb host)
 import config as cfg                 # noqa: E402
 from script_base import run_path  # noqa: E402
@@ -61,7 +61,7 @@ XACT = os.path.join(WF_DIR, "Scripts", "xact.py")
 W = 620          # initial only - width is dynamic per relayout
 ROW1_H = 50
 ROW2_H = 38
-CHK_H  = 28      # expanded checkbox rows pack tight
+CHK_H  = 28      # expanded subtask rows pack tight
 RADIUS = 20.0
 IDLE_EXIT_S = 10
 
@@ -169,7 +169,7 @@ class NonActivatingPanel(NSPanel):
         return False
 
     def scrollWheel_(self, event):
-        # >MAX_ROWS checkboxes scroll - labels/buttons don't consume
+        # >MAX_ROWS subtasks scroll - labels/buttons don't consume
         # wheel events, so they bubble here
         bar = getattr(self, "_bar", None)
         if bar is not None:
@@ -245,7 +245,7 @@ class BarController(NSObject):
             return None
         self.state = read_state()
         self.block = None               # block_summary dict
-        self.expanded = False           # chevron: full checkbox list
+        self.expanded = False           # chevron: full subtask list
         self.row_pool = []              # lazily-built expanded item rows
         self.visible_items = []         # the filtered+scrolled window
         self.scroll_off = 0             # first visible row index
@@ -253,7 +253,6 @@ class BarController(NSObject):
         self._rmw_lock = threading.Lock()   # serialize tick/move live writes
         self.mutation_seq = 0
         self.pending_tick = None        # (tid_or_None, seq, monotonic)
-        self.pending_sweep = 0          # monotonic of an in-flight 🌬 sweep
         self.idle_since = None
         self.content_dirty = threading.Event()
         self.content_last_change = time.monotonic()
@@ -389,16 +388,14 @@ class BarController(NSObject):
         self.b_stop.setToolTip_("Stop & log the session")
         self.b_sticky = btn("note.text", "onSticky:")
         self.b_sticky.setToolTip_("Open the sticky note")
-        self.b_sweep = btn("wind", "onSweep:")
-        self.b_sweep.setToolTip_("Sweep · ticked checkboxes complete for real")
         self.b_min = btn("minus", "onHide:", 26, 14)
         self.b_min.setToolTip_("Hide the bar · the session keeps running")
         self.b_chev = btn("chevron.down", "onExpand:", 26, 14)
-        self.b_chev.setToolTip_("Show every checkbox")
+        self.b_chev.setToolTip_("Show every subtask")
         # row 2
         self.b_tick = btn("circle", "onTick:", 26, 15)
         self.b_tick.setContentTintColor_(GREEN)   # the glow's green
-        self.b_tick.setToolTip_("Tick · the task completes on sweep/stop")
+        self.b_tick.setToolTip_("Tick · completes the subtask")
         self.t_item = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 10, 18))
         self.t_item.setBordered_(False)
         self.t_item.setTarget_(self)
@@ -501,10 +498,6 @@ class BarController(NSObject):
             if self.pending_tick and time.monotonic() - self.pending_tick[2] > 8:
                 self.pending_tick = None          # timed out - poll re-syncs
                 self.content_dirty.set()
-            if self.pending_sweep and time.monotonic() - self.pending_sweep > 8:
-                self.pending_sweep = 0            # sweep done (or gone) - rearm
-                self.b_sweep.setEnabled_(True)
-                self.b_sweep.setContentTintColor_(NSColor.secondaryLabelColor())
         except Exception as e:
             _log(f"tick: {e}")
 
@@ -536,10 +529,18 @@ class BarController(NSObject):
                 if api is None:
                     api = api_mod.TickTickAPI(cfg.get_token())
                 seq = self.mutation_seq
-                live = api.get_task(pid, tid)
-                doc = fb.parse(live.get("content") or "")
-                summary = fb.block_summary(
-                    doc, datetime.now().strftime("%Y-%m-%d"))
+                # ONE project-data GET: open children (titles + sortOrder)
+                # plus the focus task's childIds - completed children stay
+                # in childIds (verified), so done = childIds minus open.
+                data = api.get_project_data(pid)
+                tasks = data.get("tasks") or []
+                open_children = [t for t in tasks
+                                 if t.get("parentId") == tid]
+                focus = next((t for t in tasks if t.get("id") == tid), None)
+                if focus is None:   # completed mid-session stays GET-able
+                    focus = api.get_task(pid, tid)
+                summary = fsub.children_summary(
+                    open_children, focus.get("childIds") or [])
                 AppHelper.callAfter(self.applyBlock_, (summary, seq))
             except Exception as e:
                 _log(f"content_loop: {e}")
@@ -620,7 +621,7 @@ class BarController(NSObject):
             b.setTarget_(self)
             b.setAction_("onTickRow:")
             b.setTag_(idx)
-            b.setToolTip_("Tick · the task completes on sweep/stop")
+            b.setToolTip_("Tick · completes the subtask")
             self.fx.addSubview_(b)
             t = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 10, 18))
             t.setBordered_(False)
@@ -718,15 +719,11 @@ class BarController(NSObject):
         self.b_chev.setHidden_(not items)
         if items:
             self.b_chev.setImage_(sym_image("chevron.up" if expanded else "chevron.down", 14))
-            self.b_chev.setToolTip_("Collapse" if expanded else "Show every checkbox")
+            self.b_chev.setToolTip_("Collapse" if expanded else "Show every subtask")
             self.b_chev.setFrame_(NSMakeRect(rx, y1, 26, 28))
             rx -= 27
         self.b_min.setFrame_(NSMakeRect(rx, y1, 26, 28))
         rx -= 29
-        self.b_sweep.setHidden_(not att)
-        if att:
-            self.b_sweep.setFrame_(NSMakeRect(rx, y1, 28, 28))
-            rx -= 29
         self.b_sticky.setHidden_(not att)
         if att:
             self.b_sticky.setFrame_(NSMakeRect(rx, y1, 28, 28))
@@ -853,23 +850,6 @@ class BarController(NSObject):
         m = self.state
         if m["tid"]:
             self._xact_et(f"sticky:{m['pid']}:{m['tid']}")
-
-    def onSweep_(self, sender):
-        """Sweep: ticked checkboxes complete for real. Via the XAct ET like
-        the picker's 🧹 row - the '🧹 N swept' toast lands as an Alfred
-        notification, and a long sweep isn't SIGKILLed by _xact_direct's 30 s
-        subprocess timeout. Sweep never rewrites the block content, so there
-        is nothing to reconcile bar-side. The button goes green + disabled
-        while the sweep is in flight (the chain can run 4-20 s with zero
-        feedback; this also debounces a double-press), reset by tick_'s 8 s
-        fallback."""
-        m = self.state
-        if not m["tid"] or self.pending_sweep:
-            return
-        self.pending_sweep = time.monotonic()
-        self.b_sweep.setEnabled_(False)
-        self.b_sweep.setContentTintColor_(GREEN)
-        self._xact_et(f"fx_sweep:{m['pid']}:{m['tid']}")
 
     def onTitle_(self, sender):
         m = self.state
