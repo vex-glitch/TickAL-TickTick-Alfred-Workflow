@@ -823,15 +823,26 @@ def _record_vars(note):
             "item_type": "note"}
 
 
-def _picker_mods(subtitle="⏎ picks here"):
+# CRM chip legend (search-parity, mirrors display.py MOD_*): ⏎↗️ open in app
+# · ⏎⤵️ drill in Alfred · ⏎⚡ fire the flow · ⏎📅 schedule · ⏎✅ complete+log
+# · ⏎📝 log line · ⏎📋 copy · ⏎🔥 prep task · ⌘⚡ Actions · ⌥⤵️ hub · ⌃🔙
+# back. Chips ride the subtitle tail after "  |  "; chips-only rows skip the
+# pipe (Vex convention ruling 2026-07-21).
+def _picker_mods(subtitle=None):
     """Explicit mod stamps for picker rows: ⌘ Actions stays live (item vars
     carry the note/task context), the other chords are pinned dead so a
-    stray ⇧/⌥ press can't fire the row's xact arg down the wrong canvas edge."""
+    stray ⇧/⌥ press can't fire the row's xact arg down the wrong canvas
+    edge. Dead chords keep the row's OWN subtitle (the old '⏎ picks here'
+    filler confused more than it explained); pass subtitle= to say
+    something while held."""
+    dead = {"arg": "", "valid": False}
+    if subtitle:
+        dead["subtitle"] = subtitle
     return {
         "cmd":     {"arg": "", "valid": True,  "subtitle": "⌘ Actions"},
-        "shift":   {"arg": "", "valid": False, "subtitle": subtitle},
-        "alt":     {"arg": "", "valid": False, "subtitle": subtitle},
-        "alt+cmd": {"arg": "", "valid": False, "subtitle": subtitle},
+        "shift":   dict(dead),
+        "alt":     dict(dead),
+        "alt+cmd": dict(dead),
     }
 
 
@@ -854,7 +865,7 @@ def render_crmnew(kind, query):
                 archived = tag == _areas.ARCHIVE_TAG
                 n = cr.next_snum(lb.get("content") or "", lb["id"])
                 if archived:
-                    state = "📁 archived · ⏎ reopens for a touch-up"
+                    state = "📁 archived · touch-up reopens it"
                 else:
                     nxt = cr.next_session_task(lb["id"])
                     state = (f"{nxt[1] or 'session'} scheduled 📅 {nxt[0] or '?'}"
@@ -866,7 +877,7 @@ def render_crmnew(kind, query):
                 rows.append(alfred.item(
                     uid=f"crmnew-s-{lb['id']}",
                     title=lb.get("title") or "Untitled",
-                    subtitle=f"⏎ Schedule S{n} · {state}",
+                    subtitle=f"S{n} · {state}  |  ⏎📅",
                     arg=f"xact:crmnew_go:session::{lb['id']}",
                     mods=mods,
                     variables=_record_vars(lb),
@@ -898,7 +909,7 @@ def render_crmnew(kind, query):
         rows.append(alfred.item(
             uid=f"crmnew-c-{c['id']}",
             title=c.get("title") or "Untitled",
-            subtitle=f"⏎ New {label} for this customer{chip}",
+            subtitle=f"New {label}{chip}  |  ⏎⚡",
             arg=f"xact:crmnew_go:{kind}:{c['id']}",
             mods=_picker_mods(),
             variables=_record_vars(c),
@@ -931,7 +942,7 @@ def render_crmdone(query):
     rows = []
     for t in pool:
         disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
-        mods = _picker_mods("⏎ completes + logs it properly")
+        mods = _picker_mods()
         _l = cr.parse_first_link(t.get("title") or "")
         if _l:
             _lb = next((x for x in cr.records_notes()
@@ -952,7 +963,7 @@ def render_crmdone(query):
         rows.append(alfred.item(
             uid=f"crmdone-{t['id']}",
             title=f"✅ {disp}",
-            subtitle=f"📅 {_day(t) or 'Not scheduled'}{dep} · ⏎ Complete + log",
+            subtitle=f"📅 {_day(t) or 'Not scheduled'}{dep}  |  ⏎✅",
             arg=f"xact:sessiondone:{CRM_ID}:{t['id']}",
             mods=mods,
             variables={"task_id": t["id"], "task_list_id": CRM_ID,
@@ -985,7 +996,7 @@ def render_crmlog(query):
             rows.append(alfred.item(
                 uid=f"crmlog-{n['id']}",
                 title=n.get("title") or "Untitled",
-                subtitle=f"⏎ Log a line{chip}",
+                subtitle=f"→ ## Notes{chip}  |  ⏎📝",
                 arg=f"xact:crmlog:{n['id']}",
                 mods=_picker_mods(),
                 variables=_record_vars(n),
@@ -1028,7 +1039,8 @@ def _cust_row(cr, c, uid_prefix="crms"):
     return alfred.item(
         uid=f"{uid_prefix}-c-{c['id']}",
         title=c.get("title") or "Untitled",
-        subtitle=(" · ".join(bits) or "No contact yet") + " · ⌥ hub",
+        subtitle=(" · ".join(bits) or "No contact yet")
+                 + "  |  ⏎↗️  ⌘⚡  ⌥⤵️  ⌃🔙",
         arg=_open_note_arg(c["id"]),
         mods={**_picker_mods(),
               "alt": {"arg": "", "valid": True, "subtitle": "Customer hub",
@@ -1054,14 +1066,14 @@ def _logbook_row(cr, lb, uid_prefix="crms"):
                  if nxt else "▶️ nothing scheduled")
     bits = [b for b in (cust_name,
                         "" if paid.startswith("-") else paid,
-                        state) if b] + ["⌥ hub"]
+                        state) if b]
     mods = _picker_mods()
     mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
                    "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
     return alfred.item(
         uid=f"{uid_prefix}-l-{lb['id']}",
         title=lb.get("title") or "Untitled",
-        subtitle=" · ".join(bits),
+        subtitle=" · ".join(bits) + "  |  ⏎↗️  ⌘⚡  ⌥⤵️  ⌃🔙",
         arg=_open_note_arg(lb["id"]),
         mods=mods,
         variables=_record_vars(lb),
@@ -1079,7 +1091,7 @@ def _crm_task_row(cr, t, uid_prefix="crms"):
         day = ""
     disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
     linked = cr.is_session_task(t.get("title") or "")
-    chip = " · ⌥ hub" if linked else " · 🔗 unlinked (⌘ → Link)"
+    chip = "" if linked else " · 🔗 unlinked"
     mods = _picker_mods()
     hit = cr.parse_first_link(t.get("title") or "")
     if hit:
@@ -1090,7 +1102,9 @@ def _crm_task_row(cr, t, uid_prefix="crms"):
     return alfred.item(
         uid=f"{uid_prefix}-t-{t['id']}",
         title=f"{emo} {disp}",
-        subtitle=(f"{day or 'Dormant · not scheduled'}{chip}"),
+        subtitle=f"{day or 'Dormant · not scheduled'}{chip}"
+                 + ("  |  ⏎↗️  ⌘⚡  ⌥⤵️  ⌃🔙" if hit
+                    else "  |  ⏎↗️  ⌘⚡  ⌃🔙"),
         arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
         mods=mods,
         variables={"task_id": t["id"], "task_list_id": CRM_ID,
@@ -1155,7 +1169,7 @@ def render_crmweek(query):
         rows.append(alfred.item(
             uid=f"wk-{t['id']}",
             title=f"{emo} {when}{clock} · {disp}",
-            subtitle="⏎ Open · ⌘ Actions (Session done) · ⌥ hub",
+            subtitle="Session done in ⌘  |  ⏎↗️  ⌘⚡  ⌥⤵️",
             arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
             mods=mods,
             variables={"task_id": t["id"], "task_list_id": CRM_ID,
@@ -1185,7 +1199,7 @@ def render_crmweek(query):
     rows.insert(0, alfred.item(
         uid="wk-money",
         title=f"💰 {wk_money}{cr.cut_chip(wk_raw, wk_money)} this week",
-        subtitle=f"Mon-Sun logged · ahead: {booked_bit} · ⏎ Breakdown",
+        subtitle=f"Mon-Sun logged · ahead: {booked_bit}  |  ⏎⤵️",
         arg=f"xact:crmbrowse:ctx:crmmoney:wk:{monday.isoformat()}",
         mods=_picker_mods()))
 
@@ -1210,8 +1224,7 @@ def render_crmweek(query):
             rows.append(alfred.item(
                 uid=f"wk-radar-{lb['id']}",
                 title=f"🔔 {lb.get('title') or ''}",
-                subtitle=f"Nothing scheduled · {chip} · "
-                         "⏎ Schedule next session · ⌥ hub",
+                subtitle=f"Nothing scheduled · {chip}  |  ⏎📅  ⌥⤵️",
                 arg=f"xact:crmnew_go:session::{lb['id']}",
                 mods={**_picker_mods(),
                       "alt": {"arg": "", "valid": True,
@@ -1234,7 +1247,7 @@ def render_crmweek(query):
         rows.append(alfred.item(
             uid=f"wk-lead-{ld['id']}",
             title=ld.get("title") or "",
-            subtitle=f"Lead going cold · {age}d quiet · ⏎ Open · ⌥ hub",
+            subtitle=f"Going cold · {age}d quiet  |  ⏎↗️  ⌥⤵️",
             arg=_open_note_arg(ld["id"]),
             mods={**_picker_mods(),
                   "alt": {"arg": "", "valid": True,
@@ -1268,7 +1281,7 @@ def render_crmbook(log_tid, query):
         uid="bk-open", title=lb.get("title") or "Logbook",
         subtitle=cr.paid_summary(lb.get("content") or "")
                  + (f" · 🖤 {g} gratis" if g else "")
-                 + (" · 📁 archived" if archived else "") + " · ⏎ Open note",
+                 + (" · 📁 archived" if archived else "") + "  |  ⏎↗️",
         arg=_open_note_arg(log_tid), mods=_picker_mods(),
         variables=_record_vars(lb))]
     if not archived:
@@ -1715,7 +1728,7 @@ def render_crmstats(sub, query):
                 uid="kp-top",
                 title=f"👑 {k['top']['name'] or 'Top customer'} · "
                       f"{fm(k['top']['money'])}",
-                subtitle="Top customer of the period · ⏎ their hub",
+                subtitle="Top customer of the period  |  ⏎⤵️",
                 arg=f"xact:crmbrowse:ctx:crmcust:{k['top']['tid']}",
                 mods=_picker_mods()))
         if query:
@@ -1744,8 +1757,8 @@ def render_crmstats(sub, query):
                                 "browse_ctx": f"ctx:crmmoney:mw:{a[:7]}"}}
         rows.append(alfred.item(
             uid=f"st-{key}", title=f"📊 {label}",
-            subtitle=f"{head} · ⏎ Full dashboard"
-                     + (" · ⌥ weeks" if "alt" in mods_ else ""),
+            subtitle=f"{head}  |  ⏎⤵️"
+                     + ("  ⌥💰" if "alt" in mods_ else ""),
             arg=f"xact:crmbrowse:ctx:crmstats:{key}",
             mods=mods_))
     if query:
@@ -1909,7 +1922,7 @@ def _crmlist_drill(uid, emoji, name, list_id, scope, query):
     import crm_records as cr
     term = (query or "").strip()
     rows = [alfred.item(uid=f"{uid}-open", title=f"{emoji} {name}",
-                        subtitle="⏎ Open list in TickTick",
+                        subtitle="The whole list, in the app  |  ⏎↗️",
                         arg=f"open:ticktick:///webapp/#p/{list_id}/tasks")]
     hits = _crmsearch_rows(cr, scope, term)
     if term and not hits:
@@ -1955,23 +1968,23 @@ def render_crmcust(cust_tid, query):
     ) if b)
     rows.append(alfred.item(
         uid="hub-open", title=cust.get("title") or name,
-        subtitle=(info or "New customer") + " · ⏎ Open note",
+        subtitle=(info or "New customer") + "  |  ⏎↗️",
         arg=_open_note_arg(cust_tid), mods=_picker_mods(),
         variables=_record_vars(cust)))
     if phone:
         rows.append(alfred.item(uid="hub-phone", title=f"📞 {phone}",
-                                subtitle="⏎ Copy number",
+                                subtitle="⏎📋 Copy",
                                 arg=f"xact:crmcopy:{phone}",
                                 mods=_picker_mods()))
     if mail:
         rows.append(alfred.item(uid="hub-mail", title=f"✉️ {mail}",
-                                subtitle="⏎ Copy mail",
+                                subtitle="⏎📋 Copy",
                                 arg=f"xact:crmcopy:{mail}",
                                 mods=_picker_mods()))
     if insta:
         handle = insta.lstrip("@")
         rows.append(alfred.item(uid="hub-insta", title=f"📸 @{handle}",
-                                subtitle="⏎ Open profile (DMs live here)",
+                                subtitle="DMs live here  |  ⏎↗️",
                                 arg=f"open:https://instagram.com/{handle}",
                                 mods=_picker_mods()))
     if phone:
@@ -1979,7 +1992,7 @@ def render_crmcust(cust_tid, query):
         if digits:
             rows.append(alfred.item(
                 uid="hub-wa", title="💬 WhatsApp",
-                subtitle=f"⏎ Chat with {phone}",
+                subtitle=f"{phone}  |  ⏎↗️",
                 arg=f"open:https://wa.me/{digits.lstrip('0')}",
                 mods=_picker_mods()))
     lbs = cr.customer_logbooks(cust_tid)
@@ -1989,7 +2002,8 @@ def render_crmcust(cust_tid, query):
         # ⏎ opens the LOGBOOK HUB (photo/payment/summary/rename/archive all
         # live there) - the note itself is one more ⏎ inside.
         r["arg"] = f"xact:crmbrowse:ctx:crmbook:{lb['id']}"
-        r["subtitle"] = (r.get("subtitle") or "") + " · ⏎ Logbook hub"
+        r["subtitle"] = re.sub(r"\s*\|.*$", "",
+                               r.get("subtitle") or "") + "  |  ⏎⤵️  ⌘⚡"
         rows.append(r)
     for t in _crm_open_tasks():
         if any(f"/tasks/{lid})" in (t.get("title") or "") for lid in lb_ids):
@@ -2088,9 +2102,9 @@ def render_crmback(query):
         mode = next(m for m in ("past", "img", "batch") if q.startswith(m))
         import crm_records as cr
         frag = q[len(mode):].strip()
-        sub = {"img": "⏎ Pick session → image lands there",
-               "batch": "⏎ Finder photos → sessions by date",
-               "past": "⏎ Log a dated session"}[mode]
+        sub = {"img": "Pick session → image lands there",
+               "batch": "Finder photos → sessions by date",
+               "past": "Log a dated session"}[mode]
         verb = {"img": "crmimg", "batch": "crmbatchimg",
                 "past": "crmpast"}[mode]
         rows = []
@@ -2107,7 +2121,7 @@ def render_crmback(query):
                 rows.append(alfred.item(
                     uid=f"back-{mode[0]}-{lb['id']}",
                     title=lb.get("title") or "Untitled",
-                    subtitle=f"{sub}{chip}",
+                    subtitle=f"{sub}{chip}  |  ⏎⚡",
                     arg=f"xact:{verb}:{lb['id']}",
                     mods=_picker_mods(),
                     variables=_record_vars(lb)))
@@ -2136,8 +2150,8 @@ def render_crmsched(query):
         rows.append(alfred.item(
             uid=f"sched-{t['id']}",
             title=disp,
-            subtitle="⏎ Schedule"
-                     + ("" if linked else " · 🔗 unlinked · ⌘ link"),
+            subtitle=("⏎📅  ⌘⚡" if linked
+                      else "🔗 unlinked  |  ⏎📅  ⌘⚡"),
             arg=f"xact:crmsched:{CRM_ID}:{t['id']}",
             mods=_picker_mods(),
             variables={"task_id": t["id"], "task_list_id": CRM_ID,
@@ -2198,9 +2212,9 @@ def render_crmprep(query):
             else:   # beyond this week (or overdue) - weekday alone misleads
                 when = d.strftime("%d %b")
             clock = d.strftime(" %H:%M") if d.strftime("%H:%M") != "00:00" else ""
-            sub = f"{when}{clock} · ⏎ Prepare"
+            sub = f"{when}{clock}  |  ⏎🔥"
         else:
-            sub = "Dormant · ⏎ Prepare"
+            sub = "Dormant  |  ⏎🔥"
         rows.append(alfred.item(
             uid=f"prep-{t['id']}",
             title=disp,
