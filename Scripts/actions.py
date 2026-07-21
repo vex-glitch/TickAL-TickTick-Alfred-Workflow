@@ -543,8 +543,8 @@ def main():
              f"xact:fx_add:{pid}:{tid}", "focus add stage checkbox now",
              is_task_like and bool(tid) and bool(_sess) and _sess[0] == "task"
              and _sess[2] != tid),
-            ("🎯 Stage for Focus", "Subtask it under another task, or into a note…",
-             f"xact:stage_open:{pid}:{tid}", "stage focus link checkbox block",
+            ("🎯 Merge/Stage for Focus", "Subtask it under another task, or into a note…",
+             f"xact:stage_open:{pid}:{tid}", "merge stage focus link checkbox block",
              is_task_like and bool(tid)),
             ("🔗 Link to running focus", "Attribute the RUNNING session to this task",
              f"xact:fx_link:{pid}:{tid}", "link focus attribute session running",

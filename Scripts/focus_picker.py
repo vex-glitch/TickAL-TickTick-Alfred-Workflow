@@ -665,7 +665,7 @@ def render_idle(raw):
                     arg="", valid=False, autocomplete="pomo ", mods=BACK),
         # The ⌘-menu stage flow, reachable without a task -
         # xact:stage_pick clears any leftover handshake, then asks WHICH task.
-        alfred.item(uid="fp-stage", title="🎯 Stage for Focus",
+        alfred.item(uid="fp-stage", title="🎯 Merge/Stage for Focus",
                     subtitle="Stage a task under another task, or into a note…",
                     arg="xact:stage_pick", valid=True, mods=BACK),
     ]
