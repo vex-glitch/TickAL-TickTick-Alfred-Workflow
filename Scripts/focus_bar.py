@@ -541,6 +541,7 @@ class BarController(NSObject):
                     focus = api.get_task(pid, tid)
                 summary = fsub.children_summary(
                     open_children, focus.get("childIds") or [])
+                self._reconcile_cache(tid, open_children)
                 AppHelper.callAfter(self.applyBlock_, (summary, seq))
             except Exception as e:
                 _log(f"content_loop: {e}")
@@ -550,6 +551,42 @@ class BarController(NSObject):
 
     def _content_interval(self):
         return 5.0 if (time.monotonic() - self.content_last_change) < 600 else 20.0
+
+    def _reconcile_cache(self, ftid, open_children):
+        """Sticky/app-side subtask edits reach the workflow cache within one
+        POLL instead of the hourly sync - the picker's tasks/remove screens
+        and the 🎯 marks read cache. Scoped to children of the focus task,
+        best-effort (a lost write race heals on the next poll); all_tasks
+        only, project_data waits for the sync. Caveat: a child DETACHED
+        app-side is indistinguishable from a completed one here and drops
+        from the cache until the sync - rare, un-staging normally runs
+        through fx_unstage which patches properly."""
+        try:
+            import cache as cache_store
+            cached = cache_store.get("all_tasks")
+            if cached is None:
+                return
+            open_ids = {t.get("id") for t in open_children}
+            cached_ids = {t.get("id") for t in cached
+                          if t.get("parentId") == ftid
+                          and t.get("status", 0) == 0}
+            if cached_ids == open_ids:
+                return
+            keep = [t for t in cached
+                    if not (t.get("parentId") == ftid
+                            and t.get("status", 0) == 0
+                            and t.get("id") not in open_ids)]
+            have = {t.get("id") for t in keep}
+            pnames = {p.get("id"): p.get("name", "")
+                      for p in (cache_store.get("projects") or [])}
+            for t in open_children:
+                if t.get("id") not in have:
+                    pid = t.get("projectId", "")
+                    keep.append(dict(t, _projectId=pid,
+                                     _projectName=pnames.get(pid, "")))
+            cache_store.set("all_tasks", keep)
+        except Exception as e:
+            _log(f"cache reconcile: {e}")
 
     # ── main-thread state application ───────────────────────────────────
     def applyState_(self, m):

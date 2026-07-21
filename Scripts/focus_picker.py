@@ -20,6 +20,8 @@ committed token, only dispatch rows are valid=True, and every row carries the
                                     task as a subtask (⌥ + open its sticky)
   "remove {frag}" (session+task) RM · open subtasks → ⏎ un-stage (v2 detach
                                     + send home per the origins ledger)
+  "tasks {frag}"  (session+task) T · ⏎ on the status row: the staged list -
+                                    ⏎✅ complete · ⌥➖ un-stage · ⌘↗️ open
   "link {frag}"  (unattributed) L · fuzzy search → ⏎ fx_link (live attribute)
   "stop "        (unattributed) R2 · log (no task) · link a task…
   "stop link {frag}"            R3 · fuzzy task search
@@ -330,6 +332,44 @@ def _add_search(frag, focus_tid):
     return items
 
 
+def _subtask_rows(frag, fpid, ftid):
+    """Screen T ('tasks …', ⏎ from the status row): the staged list itself.
+    ⏎ completes the subtask · ⌥ un-stages it home · ⌘ opens it in the app."""
+    kids = _staged_children(ftid)
+    total = len(kids)
+    if frag:
+        kids = filter_and_score(frag, kids,
+                                key_fn=lambda t: search_key(t.get("title", "")))
+    items = []
+    for t in kids[:40]:
+        pid = t.get("projectId") or t.get("_projectId", "") or fpid
+        items.append(alfred.item(
+            uid=f"fp-sub-{t['id']}",
+            title=md_links_display(t.get("title", ""))[:60],
+            subtitle="⏎✅ done  ⌥➖ un-stage  ⌘↗️ open  ⌃🔙",
+            arg=f"xact:fx_tick:{fpid}:{ftid}:{t['id']}", valid=True,
+            mods={"alt": {"valid": True,
+                          "arg": f"xact:fx_unstage:{pid}:{t['id']}",
+                          "subtitle": "Un-stage · send it home"},
+                  "cmd": {"valid": True,
+                          "arg": f"xact:open_task:{pid}:{t['id']}",
+                          "subtitle": "Open in TickTick"},
+                  **BACK},
+        ))
+    if not items:
+        items = [alfred.item(
+            uid="fp-sub-none",
+            title=f'No subtask matching "{frag}"' if frag
+                  else "Nothing staged yet",
+            subtitle="" if frag else "➕ Add to focus stages subtasks  ⌃🔙",
+            valid=False, mods=BACK)]
+    elif not frag and total > 40:
+        items.append(alfred.item(
+            uid="fp-sub-more", title=f"… {total - 40} more",
+            subtitle="Type to narrow  ⌃🔙", valid=False, mods=BACK))
+    return items
+
+
 def _remove_search(frag, fpid, ftid):
     """Screen RM ('remove …'): the focus task's open subtasks; ⏎ un-stages
     (v2 detach + send home per the origins ledger)."""
@@ -435,6 +475,13 @@ def render_running(st, raw):
                                            st.get("tid")),
                             skipknowledge=True))
         return
+    # Subtask-twist (⏎ on the status row): the staged list, act per row
+    if attributed and raw.startswith("tasks"):
+        frag = raw[6:] if len(raw) > 5 else ""
+        print(alfred.output(_subtask_rows(frag.strip(), st.get("pid", ""),
+                                          st.get("tid")),
+                            skipknowledge=True))
+        return
     # Live link-twist (unattributed, distinct from the stop-twist)
     if not attributed and raw.startswith("link"):
         frag = raw[5:] if len(raw) > 4 else ""
@@ -477,8 +524,10 @@ def render_running(st, raw):
         title=(f"⏸️ Paused on {fname} - {hm}" if paused
                else f"🎯 Focusing on {fname} - {hm}"),
         subtitle=("Timer paused" if paused else "Timer active")
-                 + ("" if attributed else " (no task)") + "  ⌃🔙",
-        valid=False, mods=BACK,
+                 + ("  |  ⏎⤵️ subtasks  ⌃🔙" if attributed
+                    else " (no task)  ⌃🔙"),
+        valid=False, autocomplete="tasks " if attributed else None,
+        mods=BACK,
     )]
     if attributed:
         items.append(alfred.item(
@@ -647,6 +696,12 @@ def render_pomo(state, remaining, raw):
                                            bound.get("pid", ""), bound["tid"]),
                             skipknowledge=True))
         return
+    if bound and raw.startswith("tasks"):
+        frag = raw[6:] if len(raw) > 5 else ""
+        print(alfred.output(_subtask_rows(frag.strip(),
+                                          bound.get("pid", ""), bound["tid"]),
+                            skipknowledge=True))
+        return
     if not bound and raw.startswith("link"):
         frag = raw[5:] if len(raw) > 4 else ""
         print(alfred.output(_link_search(frag.strip()), skipknowledge=True))
@@ -657,8 +712,10 @@ def render_pomo(state, remaining, raw):
         alfred.item(uid="fp-pomo-status",
                     title=(f"🍅 Focusing on {tname} - {m}m left" if bound
                            else f"🍅 Pomodoro - {m}m left"),
-                    subtitle=("Pomodoro paused" if paused else "Pomodoro active") + "  ⌃🔙",
-                    valid=False, mods=BACK),
+                    subtitle=("Pomodoro paused" if paused else "Pomodoro active")
+                             + ("  |  ⏎⤵️ subtasks  ⌃🔙" if bound else "  ⌃🔙"),
+                    valid=False, autocomplete="tasks " if bound else None,
+                    mods=BACK),
         alfred.item(uid="fp-pomo-toggle",
                     title="▶️ Resume" if paused else "⏸️ Pause",
                     subtitle=("Continue the clock" if paused else "Freeze the clock") + "  ⌃🔙",

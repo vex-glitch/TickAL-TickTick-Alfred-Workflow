@@ -3436,6 +3436,13 @@ def _select_task(pid, tid):
     return False, title
 
 
+def open_task(pid, tid):
+    """Plain deep link to a task (⌘ chord on the picker's subtask rows).
+    Silent - the app opening IS the feedback."""
+    subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{tid}"],
+                   check=False)
+
+
 def sticky(pid, tid):
     """Open the task as a TickTick desktop sticky note: deep link → navigate
     to the list, then find + CLICK the task's row (guaranteed selection),
@@ -4453,6 +4460,8 @@ def main():
             pid, tid = rest.split(":", 1); fx_unstage(pid, tid)
         elif verb == "fx_oneliner":
             fx_oneliner()
+        elif verb == "open_task":
+            pid, tid = rest.split(":", 1); open_task(pid, tid)
         elif verb == "fx_copy":
             if rest:
                 pid, tid = rest.split(":", 1); fx_copy(pid, tid)
