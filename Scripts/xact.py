@@ -2114,12 +2114,16 @@ def crmclose(log_tid):
     import crm_records as cr
     lb = _record_by_id(log_tid)
     title = (lb or {}).get("title") or "logbook"
-    if _dialog(f"Archive {title}?", ["Cancel", "Archive"], "Archive") != "Archive":
+    # The date ask doubles as the confirm - Esc backs out, OK = today.
+    # Real finish date matters: monthly "finished" stats key on it.
+    when = _ask_date(f"Archive {title} - finished when? "
+                     "(OK = today · Esc cancels)")
+    if when == "CANCEL":
         _crm_say("Cancelled")
         return
     try:
-        cr.finish_logbook(areas.RECORDS_ID, log_tid)
-        _crm_say(f"📁 {title} archived")
+        cr.finish_logbook(areas.RECORDS_ID, log_tid, when=when)
+        _crm_say(f"📁 {title} archived · finished {when or 'today'}")
     except Exception as e:
         _crm_say(f"📁 Archive failed: {type(e).__name__}: {e}")
 
