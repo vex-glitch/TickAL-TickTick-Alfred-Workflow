@@ -1037,7 +1037,8 @@ def _cust_row(cr, c, uid_prefix="crms"):
 
 def _logbook_row(cr, lb, uid_prefix="crms"):
     """Logbook search row: customer + paid + next session in the subtitle,
-    ⌥ hops to the customer hub, ⏎ opens the note."""
+    ⌥ opens the LOGBOOK hub (photo/payment/rename/archive), ⏎ opens the
+    note. Customer hub: ⌥ on the customer row, or ⌃ from the hub."""
     paid = cr.paid_summary(lb.get("content") or "")
     hit = cr.parse_first_link(lb.get("content") or "")
     cust_name = re.sub(r"^👤\s*", "", hit[0]) if hit else ""
@@ -1051,11 +1052,10 @@ def _logbook_row(cr, lb, uid_prefix="crms"):
                  if nxt else "▶️ nothing scheduled")
     bits = [b for b in (cust_name,
                         "" if paid.startswith("-") else paid,
-                        state) if b]
+                        state) if b] + ["⌥ hub"]
     mods = _picker_mods()
-    if hit:
-        mods["alt"] = {"arg": "", "valid": True, "subtitle": "Customer hub",
-                       "variables": {"browse_ctx": f"ctx:crmcust:{hit[2]}"}}
+    mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
+                   "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
     return alfred.item(
         uid=f"{uid_prefix}-l-{lb['id']}",
         title=lb.get("title") or "Untitled",
