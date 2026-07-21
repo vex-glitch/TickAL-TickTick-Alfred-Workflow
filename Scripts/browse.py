@@ -1338,7 +1338,14 @@ def render_crmmoney(sub, query):
         def row(uid, label, a, b, ctx=None):
             money, n, hours, raw = cr.sum_entries(e, a and a.isoformat(),
                                                   b and b.isoformat())
-            extra = f" · {hours:g}h" if hours else ""
+            extra = ""
+            if hours:
+                extra = f" · {hours:g}h"
+                if raw:
+                    sym2 = re.sub(r"[-\d.,\s]", "", money) or "€"
+                    rr = raw / hours
+                    extra += (f" · ~{int(rr)}{sym2}/h"
+                              + cr.cut_rate_chip(rr, sym2))
             span = (f"{a.isoformat() if a else '…'} → "
                     f"{b.isoformat() if b else 'today'}")
             kw = (dict(arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
@@ -1483,6 +1490,34 @@ def render_crmmoney(sub, query):
                                          key_fn=lambda x: x["title"]) or rows
         return add_back(rows, "ctx:crmmoney")
 
+    if sub == "lbs":   # every tattoo with money on it, richest first
+        seen, pool = set(), []
+        for tag in (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
+            for lb in cr.records_notes(tag):
+                if lb["id"] not in seen:
+                    seen.add(lb["id"])
+                    pool.append(lb)
+        raws = {lb["id"]: cr._totals_raw(lb.get("content") or "")[0]
+                for lb in pool}
+        rows = []
+        for lb in sorted((x for x in pool if raws[x["id"]] > 0),
+                         key=lambda x: -raws[x["id"]]):
+            g = cr.gratis_count(lb.get("content") or "")
+            rows.append(alfred.item(
+                uid=f"mo-l-{lb['id']}",
+                title=lb.get("title") or "Untitled",
+                subtitle=cr.paid_summary(lb.get("content") or "")
+                         + (f" · 🖤 {g}" if g else "")
+                         + " · ⏎ Session split · ⌥ hub",
+                arg=f"xact:crmbrowse:ctx:crmmoney:lb:{lb['id']}",
+                mods={**_picker_mods(), "alt": _hub_alt(lb["id"])}))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title="No money logged yet", valid=False)]
+        return add_back(rows, "ctx:crmmoney")
+
     if sub.startswith("lb:"):   # one tattoo: S1 = x, S2 = y … total + rate
         tid = sub[3:]
         lb = next((x for x in cr.records_notes()
@@ -1518,10 +1553,12 @@ def render_crmmoney(sub, query):
                 subtitle=f"{x['date']}{hrs}", valid=False))
         return add_back(rows, "ctx:crmmoney")
 
-    # root: all-time + this-month + this-week + customers pinned, then every
-    # tattoo that has MONEY on it, richest first (active and archived alike -
-    # unpaid bookings have no business on a money screen, Vex ruling
-    # 2026-07-21). Every row drills deeper: periods / weeks / sessions.
+    # root: all-time + this-month + this-week + customers + tattoos - five
+    # rows, no lists (Vex ruling 2026-07-21: inline tattoos read confusing).
+    # Typing = tattoo search (the old habit routes into the lbs sub). Unpaid
+    # bookings have no business anywhere on a money screen.
+    if query:
+        return render_crmmoney("lbs", query)
     e = cr.all_entries()
     money, n, hours, raw = cr.sum_entries(e)
     today = _date.today()
@@ -1539,10 +1576,16 @@ def render_crmmoney(sub, query):
 
     def _sumrow(uid, emoji, label, a, ctx, hint):
         m2, n2, h2, r2 = cr.sum_entries(e, a.isoformat(), None)
+        extra = ""
+        if h2:
+            extra = f" · {h2:g}h"
+            if r2:
+                sym2 = re.sub(r"[-\d.,\s]", "", m2) or "€"
+                rr = r2 / h2
+                extra += f" · ~{int(rr)}{sym2}/h" + cr.cut_rate_chip(rr, sym2)
         return alfred.item(
             uid=uid, title=f"{emoji} {label} · {m2}{cr.cut_chip(r2, m2)}"
-                           f" · {n2} session{'s' if n2 != 1 else ''}"
-                           + (f" · {h2:g}h" if h2 else ""),
+                           f" · {n2} session{'s' if n2 != 1 else ''}{extra}",
             subtitle=hint, arg=f"xact:crmbrowse:{ctx}",
             mods=_picker_mods())
 
@@ -1563,36 +1606,17 @@ def render_crmmoney(sub, query):
                     subtitle="⏎ Totals per customer · richest first",
                     arg="xact:crmbrowse:ctx:crmmoney:cust",
                     mods=_picker_mods()),
+        alfred.item(uid="mo-lbs", title="🎨 Tattoos",
+                    subtitle="⏎ Money per tattoo · richest first "
+                             "(typing up here searches them too)",
+                    arg="xact:crmbrowse:ctx:crmmoney:lbs",
+                    mods=_picker_mods()),
+        alfred.item(uid="mo-csv", title="🧾 CSV export",
+                    subtitle="Every dated charge / deposit / refund"
+                             " → ~/Downloads",
+                    arg="xact:crmcsv", mods=_picker_mods()),
     ]
-    seen, pool = set(), []
-    for tag in (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
-        for lb in cr.records_notes(tag):
-            if lb["id"] not in seen:
-                seen.add(lb["id"])
-                pool.append(lb)
-    raws = {lb["id"]: cr._totals_raw(lb.get("content") or "")[0]
-            for lb in pool}
-    lbs = []
-    for lb in sorted((x for x in pool if raws[x["id"]] > 0),
-                     key=lambda x: -raws[x["id"]]):
-        g = cr.gratis_count(lb.get("content") or "")
-        lbs.append(alfred.item(
-            uid=f"mo-l-{lb['id']}",
-            title=lb.get("title") or "Untitled",
-            subtitle=cr.paid_summary(lb.get("content") or "")
-                     + (f" · 🖤 {g}" if g else "")
-                     + " · ⏎ Session split · ⌥ hub",
-            arg=f"xact:crmbrowse:ctx:crmmoney:lb:{lb['id']}",
-            mods={**_picker_mods(), "alt": _hub_alt(lb["id"])}))
-    if query:
-        lbs = fuzz.filter_and_score(query, lbs, key_fn=lambda x: x["title"])
-        return add_back(pinned + lbs, "ctx:crmhub")
-    rows = pinned + lbs
-    rows.append(alfred.item(
-        uid="mo-csv", title="🧾 CSV export",
-        subtitle="Every dated charge / deposit / refund → ~/Downloads",
-        arg="xact:crmcsv", mods=_picker_mods()))
-    return add_back(rows, "ctx:crmhub")
+    return add_back(pinned, "ctx:crmhub")
 
 
 def _stat_periods():
