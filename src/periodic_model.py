@@ -43,6 +43,7 @@ SEC_HABITS     = "🔄 Habits"
 SEC_WEEK_GOALS = "🗓️ Weekly"              # daily mirror of the weekly Goals
 SEC_DAY_GOAL   = "☀️ Daily"               # the One Thing
 SEC_YESTERDAY  = "⏪ Yesterday"
+SEC_YBRIDGE    = "🌉 Yesterday's bridge"   # fed by the bridge write, day-1
 SEC_TODAY      = "✅ Tasks"               # under the # ☀️ Today group
 SEC_TOMORROW   = "⏩ Tomorrow"
 SEC_MORNING    = "🌅 Morning journal"
@@ -95,8 +96,9 @@ SEC_DECEMBER   = "🧪 December test"
 # bare, the engine appends `: data` on refresh).
 WRITER_ANCHORS = {
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
-                  SEC_YESTERDAY, SEC_TODAY, SEC_TOMORROW, SEC_MORNING,
-                  SEC_NOTES, SEC_EVENING, SEC_DAY_SUM, SEC_MONEY],
+                  SEC_YESTERDAY, SEC_YBRIDGE, SEC_TODAY, SEC_TOMORROW,
+                  SEC_MORNING, SEC_NOTES, SEC_EVENING, SEC_DAY_SUM,
+                  SEC_MONEY],
     "weekly":    [SEC_GOALS, SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK, SEC_WEEKLY_JNL,
@@ -605,6 +607,8 @@ def journal_fixed(slot, ctx=None):
             ("goal", goal_q),
             ("money", "How much money did you earn today? (logs to 💰 Money)"),
             ("rating", "Rate the day, 1-5 stars"),
+            ("bridge", "🌉 Daily bridge - what should tomorrow-you know? "
+                       "(saves to the Bridges board + tomorrow's note)"),
         ]
     # weekly - the three-things picker is NOT a seeded question: it runs as
     # the Alfred goal-picker handoff after the dialogs (phones edit next

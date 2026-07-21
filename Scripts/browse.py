@@ -104,6 +104,7 @@ def parse_ctx(raw):
                "next7days": "ctx:smart:next7", "7days": "ctx:smart:next7",
                "overdue": "ctx:smart:overdue",
                "view_overdue": "ctx:smart:overdue",
+               "bridges": "ctx:bridges",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
                # main-menu view args (▷50F14423 branches)
                "view_today": "ctx:smart:today",
@@ -2257,6 +2258,154 @@ def render_buffer(query):
                              valid=False)]
     return add_back(items, "ctx:folders")
 
+# ── Level: bridges (🌉 - daily board + latest bridge per project) ────────────
+def _bridge_note_row(n, chip, tail_mods=True):
+    """One bridge-note row: ⏎ opens in TickTick, ⌥ drills into that list's
+    bridge history (the ⌥ edge is the Browse loop - variables only, an
+    xact arg there renders as a query; review catch), ⌥⇧ copies (that edge
+    owns the ^xact router), ⌘ Actions via item vars, ⌃ back."""
+    pid = n.get("_projectId") or n.get("projectId") or ""
+    pname = n.get("_projectName") or ""
+    sub = pname + (f" · {chip}" if chip else "")
+    legend = "⏎↗️" + ("  ⌥🗂" if tail_mods else "") + "  ⌥⇧📋  ⌘⚡  ⌃🔙"
+    mods = {"alt+shift": {"arg": f"xact:bridge_copy:{pid}:{n['id']}",
+                          "valid": True, "subtitle": "📋 Copy bridge"}}
+    if tail_mods:
+        mods["alt"] = {"arg": "", "valid": True,
+                       "subtitle": "🗂 All bridges here",
+                       "variables": {"browse_ctx": f"ctx:bridges:{pid}"}}
+    else:
+        mods["alt"] = {"arg": "", "valid": False}   # stray-chord pin
+    return alfred.item(
+        uid=f"br-{n['id']}",
+        title=n.get("title", ""),
+        subtitle=(sub + "  |  " if sub else "") + legend,
+        arg=f"open:ticktick:///webapp/#p/{pid}/tasks/{n['id']}",
+        valid=True,
+        variables={"task_id": n["id"], "task_list_id": pid, "list_id": pid,
+                   "task_title": n.get("title", ""), "item_type": "note"},
+        mods=mods,
+    )
+
+
+def render_bridges(ids, query):
+    """ctx:bridges - the 🌉 hub: daily-bridge row (write/open), board link,
+    new-project-bridge picker, latest project bridge per list.
+    ctx:bridges:new - list picker → xact:bridge_proj.
+    ctx:bridges:<pid> - every bridge of that list, newest first."""
+    import bridges as br
+    import areas
+    from datetime import date
+    sub = ids[0] if ids else ""
+    all_notes = [n for n in (cache_store.get("all_notes") or [])
+                 if n.get("status", 0) == 0]
+    today = datetime.now().date()
+
+    if sub == "new":
+        rows = []
+        for p in get_projects():
+            if p["id"] == areas.BRIDGES_ID:
+                continue
+            rows.append(alfred.item(
+                uid=f"brnew-{p['id']}", title=p.get("name", ""),
+                subtitle="⏎🌉 Bridge this list",
+                arg=f"xact:bridge_proj:{p['id']}", valid=True,
+                # real list vars - _picker_mods keeps ⌘ Actions live, and
+                # without these it would rail on the LAST acted-on task
+                variables={"task_id": "", "task_list_id": p["id"],
+                           "list_id": p["id"], "section_id": "",
+                           "task_title": p.get("name", ""),
+                           "item_type": "list"},
+                mods=_picker_mods()))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title=f'No list matching "{query}"',
+                                valid=False)]
+        return add_back(rows, "ctx:bridges")
+
+    if sub:                                   # history of one list
+        pool = [n for n in all_notes
+                if (n.get("_projectId") or n.get("projectId")) == sub
+                and (br.is_bridge_note(n)
+                     or (sub == areas.BRIDGES_ID
+                         and br.is_daily(n.get("title", ""))))]
+        pool.sort(key=lambda n: br.title_date(n.get("title")) or date.min,
+                  reverse=True)
+        rows = [_bridge_note_row(
+                    n, br.age_chip(br.title_date(n.get("title")), today),
+                    tail_mods=False) for n in pool]
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title="No bridges here yet", valid=False)]
+        return add_back(rows, "ctx:bridges")
+
+    rows = []
+    if areas.bridges_configured():
+        twant = br.daily_title(today)
+        thit = any((n.get("title") or "").strip() == twant
+                   for n in all_notes)
+        rows.append(alfred.item(
+            uid="br-daily",
+            title=("🌉 Daily bridge · written ✅" if thit
+                   else "✍️ Daily bridge"),
+            subtitle=("Open today's  |  ⏎↗️  ⌃🔙" if thit
+                      else "Write today's  |  ⏎🌉  ⌃🔙"),
+            arg="xact:bridge_daily", valid=True))
+        rows.append(alfred.item(
+            uid="br-board", title="🗂️ Bridges board",
+            subtitle="Month columns  |  ⏎↗️  ⌃🔙",
+            arg=f"open:ticktick:///webapp/#p/{areas.BRIDGES_ID}/tasks",
+            valid=True))
+    else:
+        rows.append(alfred.item(
+            uid="br-setup", valid=False,
+            title="🌉 Daily bridges need a home list",
+            subtitle="Config bridges_list_id - project bridges work anyway"))
+    rows.append(alfred.item(
+        uid="br-new", title="➕ New project bridge",
+        subtitle="Pick the list  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:bridges:new", valid=True))
+
+    latest = {}                               # pid → (note, date)
+    for n in all_notes:
+        if not br.is_bridge_note(n):
+            continue
+        pid = n.get("_projectId") or n.get("projectId") or ""
+        d = br.title_date(n.get("title"))
+        prev = latest.get(pid)
+        if prev is None or (d or date.min) > (prev[1] or date.min):
+            latest[pid] = (n, d)
+    for n, d in sorted(latest.values(),
+                       key=lambda x: x[1] or date.min, reverse=True):
+        rows.append(_bridge_note_row(n, br.age_chip(d, today)))
+
+    if areas.bridges_configured():
+        keep = {br.month_tag(today),
+                br.month_tag(today.replace(day=1) - timedelta(days=1))}
+        n_old = sum(
+            1 for n in all_notes
+            if (n.get("_projectId") or n.get("projectId")) == areas.BRIDGES_ID
+            and br.is_daily(n.get("title", ""))
+            and (br.title_date(n.get("title")) is not None)
+            and br.month_tag(br.title_date(n.get("title"))) not in keep)
+        if n_old:
+            rows.append(alfred.item(
+                uid="br-tidy", title=f"🗄️ Tidy old months · {n_old}",
+                subtitle="Complete bridges before last month · asks first  |  ⏎🗄️  ⌃🔙",
+                arg="xact:bridge_tidy", valid=True))
+
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    if not rows:
+        rows = [alfred.item(title=f'No bridge matching "{query}"',
+                            valid=False)]
+    return add_back(rows, "ctx:folders")
+
+
 # ── Level: smart (today / tomorrow / next7days) ──────────────────────────────
 def render_smart(kind, query):
     if kind in ("next7", "7", "next7d"):
@@ -2527,6 +2676,9 @@ def main():
 
         elif level == "buffer":
             items = render_buffer(query)
+
+        elif level == "bridges":
+            items = render_bridges(ids, query)
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")

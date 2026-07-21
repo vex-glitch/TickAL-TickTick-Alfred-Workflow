@@ -76,6 +76,13 @@ def get_periodic_list_id():
         return os.environ["periodic_list_id"]
     return load().get("periodic_list_id", "")
 
+def get_bridges_list_id():
+    """🌉 Bridges home list (daily bridges kanban). Same env-present-wins
+    semantics as periodic_list_id (config.json mirror for headless runs)."""
+    if "bridges_list_id" in os.environ:
+        return os.environ["bridges_list_id"]
+    return load().get("bridges_list_id", "")
+
 def get_weekly_review_id():
     """♻️ Weekly-review source: the list/task id the weekly note
     mirrors. Same env-present-wins semantics as periodic_list_id."""

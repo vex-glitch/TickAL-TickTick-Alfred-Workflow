@@ -29,6 +29,9 @@
 ### ⏪ Yesterday
 	_(pending)_
 
+### 🌉 Yesterday's bridge
+	_(pending)_
+
 ### ⏩ Tomorrow
 ---
 ### 🌅 Morning journal

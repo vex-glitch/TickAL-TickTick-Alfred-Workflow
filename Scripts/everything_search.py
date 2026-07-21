@@ -142,6 +142,16 @@ def get_hint_items(raw_query):
                 mods={"alt": {"valid": True, "arg": "", "subtitle": "Open buffer",
                               "variables": {"browse_ctx": "ctx:buffer"}}},
             ))
+        # 🌉 Bridges hub - same BrowseCtx trampoline as the buffer row
+        # (plain ⏎ exits through the modOpen shell; ⌥ mirrors for the
+        # browse edge). Always on: project bridges need no config.
+        rows.append(alfred.item(
+            title="🌉 Bridges",
+            subtitle="Daily + project handoffs  |  ⏎⤵️",
+            valid=True, arg="xact:crmbrowse:ctx:bridges",
+            mods={"alt": {"valid": True, "arg": "", "subtitle": "Open bridges",
+                          "variables": {"browse_ctx": "ctx:bridges"}}},
+        ))
         return rows
 
     if raw_query.startswith("/"):

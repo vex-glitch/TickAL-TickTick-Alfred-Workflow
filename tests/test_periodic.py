@@ -179,7 +179,8 @@ fixed_m = pm.journal_fixed("morning")
 check("14.fixed-morning", [k for k, _q in fixed_m] == ["mood", "free", "free"])
 fixed_e = pm.journal_fixed("evening", {"goal": "Ship the thing"})
 check("14.fixed-evening",
-      [k for k, _q in fixed_e] == ["free", "goal", "money", "rating"]
+      [k for k, _q in fixed_e] == ["free", "goal", "money", "rating",
+                                   "bridge"]
       and "Ship the thing" in fixed_e[1][1])
 fixed_w = pm.journal_fixed("weekly", {"goals": "A; B"})
 check("14.fixed-weekly", [k for k, _q in fixed_w] == ["highlight", "wgoals"]

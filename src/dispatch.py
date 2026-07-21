@@ -636,9 +636,21 @@ def main():
                 print("Error: list has no name")
                 return
             api = TickTickAPI(cfg.get_token())
-            api.create_project(name, group_id=payload.get("groupId"))
-            cache_store.invalidate("projects")
-            cache_store.invalidate("all_tasks")
+            proj = api.create_project(name, group_id=payload.get("groupId"))
+            # In-place cache append (create_project_meta's pattern) - a bare
+            # invalidate left search list-less until the hourly sync, and its
+            # all_tasks refetch fallback then cached an Inbox-only pool (bit
+            # Vex 2026-07-21). A new list has no tasks: all_tasks untouched.
+            try:
+                if isinstance(proj, dict) and proj.get("id"):
+                    projects_cache = cache_store.get("projects")
+                    if projects_cache is not None:
+                        projects_cache.append(proj)
+                        cache_store.set("projects", projects_cache)
+                else:
+                    cache_store.invalidate("projects")
+            except Exception:
+                cache_store.invalidate("projects")
             print(f"{name} created")
 
         elif arg.startswith("cta:"):

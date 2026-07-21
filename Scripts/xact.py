@@ -2637,6 +2637,7 @@ def pn_journal(slot):
     open_pairs = [(n, q) for n, q, a, _i in pairs if not a]
     total = len(pairs)
     answers, cancelled, routed = {}, False, []
+    bridge_said = ""
     for n, q in open_pairs:
         key = keys[n - 1] if n <= len(keys) else "free"
         a = _ask(q, title=f"{label} journal · {n}/{total}")
@@ -2667,10 +2668,17 @@ def pn_journal(slot):
                 a = "★" * int(m.group(1))
         elif key == "highlight":
             routed.append(pe.set_highlight(a, day=day0))
+        elif key == "bridge":
+            # surfaced in the final banner - a swallowed bridge failure
+            # would smile "saved 5/5" while the board got nothing
+            bridge_said = bridge_from_answer(a, day0)
+            routed.append(bridge_said)
         answers[n] = a
     filled = pe.journal_merge(slot, answers, period=jper) if answers else 0
     done_now = (total - len(open_pairs)) + filled
     bits = [f"{emoji} {label} saved {done_now}/{total}"]
+    if bridge_said:
+        bits.append(bridge_said)
     if cancelled:
         bits.append("(cancelled)")
     print(" ".join(bits))
@@ -4363,6 +4371,322 @@ def _focus_prefill(query, pid, tid):
     subprocess.run(["osascript", "-e", osa, query], check=False)
 
 
+# ── 🌉 Bridges (daily board + per-project handoff notes) ─────────────────────
+# Model in src/bridges.py. Daily bridges: ONE home list (areas.BRIDGES_ID,
+# kanban by YYMM month tag). Project bridges: NOTE in the project's own list,
+# tagged 🌉bridge. Surface: browse ctx:bridges. Evening journal routes its
+# 🌉 prompt here (bridge_from_answer).
+
+def _pbpaste():
+    try:
+        r = subprocess.run(["pbpaste"], capture_output=True)
+        return r.stdout.decode("utf-8", "replace").strip()
+    except Exception:
+        return ""
+
+
+def _list_name_of(pid):
+    for p in (cache_store.get("projects") or []):
+        if p.get("id") == pid:
+            return p.get("name") or ""
+    return ""
+
+
+def _bridge_inject_cache(task, pid, list_name):
+    """Generic twin of crm_records._inject_cache (that one is records-bound):
+    a fresh note shows in search/browse NOW, not at the next hourly sync."""
+    try:
+        entry = dict(task)
+        entry["_projectId"] = pid
+        entry["_projectName"] = list_name
+        entry["tags"] = [str(t).lower() for t in (task.get("tags") or [])]
+        for key, newest_first in (("all_notes", True), ("all_tasks", False)):
+            pool = [t for t in (cache_store.get(key) or [])
+                    if t.get("id") != task.get("id")]
+            pool.insert(0, entry) if newest_first else pool.append(entry)
+            cache_store.set(key, pool)
+        # project_data mirror too - per-list browse drills read THAT, not
+        # all_tasks (dispatch._patch_project_data's law; review catch)
+        pd_key = f"project_data_{pid}"
+        pd = cache_store.get(pd_key)
+        if pd is not None:
+            pd = dict(pd)
+            pd["tasks"] = [t for t in pd.get("tasks", [])
+                           if t.get("id") != task.get("id")] + [entry]
+            cache_store.set(pd_key, pd)
+    except Exception:
+        pass
+
+
+def _bridge_month_tag(day):
+    """Ensure the YYMM month tag ('2607') exists. '' when v2 is unavailable -
+    the bridge still saves, just tagless (board files it under No tag)."""
+    import bridges as br
+    tag = br.month_tag(day)
+    try:
+        from display import tag_match_key
+        known = {tag_match_key(t) for t in (cache_store.get("tags") or [])}
+        if tag_match_key(tag) in known:
+            return tag
+        import api_v2
+        v2 = api_v2.TickTickV2()
+        if not v2.token or not v2.create_tag(tag):
+            return ""
+        cache_store.set("tags", (cache_store.get("tags") or []) + [tag])
+        tree = cache_store.get("tags_tree")
+        if tree is not None:
+            cache_store.set("tags_tree", tree + [
+                {"name": tag, "label": tag, "parent": None}])
+        return tag
+    except Exception:
+        return ""
+
+
+def _bridge_feed_tomorrow(text, day):
+    """Same text lands where tomorrow-morning eyes go: the NEXT day's daily
+    note, ### 🌉 Yesterday's bridge. Old notes lack the header - the section
+    is inserted right after ⏪ Yesterday. Defensive: periodic is optional."""
+    import areas
+    if not (text or "").strip() or not areas.periodic_configured():
+        return ""
+    try:
+        import periodic_model as pm
+        import periodic_sections as ps
+        pe = _pn()
+        nxt = pm.period_for("daily", day + timedelta(days=1))
+        task, _ = pe.ensure_note(nxt)
+        pid = task.get("projectId") or areas.PERIODIC_LIST_ID
+        lines = [(pm.T1 + ln) if ln.strip() else "" for ln in text.splitlines()]
+
+        def mutate(doc, live):
+            if ps.find(doc, pm.SEC_YBRIDGE) is None:
+                sec = ps.Section(f"### {pm.SEC_YBRIDGE}", pm.SEC_YBRIDGE)
+                ysec = ps.find(doc, pm.SEC_YESTERDAY)
+                at = (doc.sections.index(ysec) + 1) if ysec \
+                    else len(doc.sections)
+                doc.sections.insert(at, sec)
+            return ps.set_body(doc, pm.SEC_YBRIDGE, lines)
+        pe._pn_rmw(pid, task.get("id"), mutate)
+        return "⏩ fed tomorrow's note"
+    except Exception:
+        return ""
+
+
+def _bridge_capture(skel):
+    """(text, kind) - typed beats clipboard beats skeleton. (None, '') on
+    Esc. Empty-OK deliberately reaches for the clipboard: write the bridge
+    in Claude, copy, OK mints it."""
+    a = _ask("🌉 Bridge - write it (empty OK = clipboard · Esc cancels)")
+    if a is None:
+        return None, ""
+    a = a.strip()
+    if a:
+        return a, "typed"
+    clip = _pbpaste()
+    if clip:
+        return clip, "clipboard"
+    return skel, "skeleton"
+
+
+def _bridge_find(api, pid, title):
+    """Today's bridge by EXACT title, LIVE (dupe gate - cache lies after
+    cross-device writes). Returns the task, None (definitely absent), or
+    "ERR" (couldn't look - mint verbs must NOT create blind; failing open
+    minted duplicates, review catch)."""
+    try:
+        pdata = api.get_project_data(pid) or {}
+        return next((t for t in pdata.get("tasks", [])
+                     if (t.get("title") or "").strip() == title), None)
+    except Exception:
+        return "ERR"
+
+
+def bridge_daily():
+    """✍️ Daily bridge: one per day in the 🌉 Bridges board. Exists →
+    opens. Skeleton mints open too (there is writing to do)."""
+    import bridges as br
+    import areas
+    if not areas.bridges_configured():
+        _crm_say("🌉 Bridges list not configured (Settings)")
+        return
+    day = datetime.now().date()
+    api = _api()
+    want = br.daily_title(day)
+    hit = _bridge_find(api, areas.BRIDGES_ID, want)
+    if hit == "ERR":
+        _crm_say("🌉 Can't check today's bridge (offline?) · nothing minted")
+        return
+    if hit:
+        open_task(areas.BRIDGES_ID, hit["id"])
+        _crm_say("🌉 Today's bridge exists · opening")
+        return
+    text, srckind = _bridge_capture(br.DAILY_SKEL)
+    if text is None:
+        _crm_say("🌉 Cancelled")
+        return
+    tag = _bridge_month_tag(day)
+    t = api.create_task(title=want, project_id=areas.BRIDGES_ID,
+                        content=text, tags=[tag] if tag else [],
+                        kind="NOTE")
+    _bridge_inject_cache(t, areas.BRIDGES_ID, _list_name_of(areas.BRIDGES_ID))
+    fed = "" if srckind == "skeleton" else _bridge_feed_tomorrow(text, day)
+    if srckind == "skeleton":
+        open_task(areas.BRIDGES_ID, t.get("id"))
+    bits = ["🌉 Daily bridge saved"]
+    if tag:
+        bits.append(f"#{tag}")
+    if srckind == "clipboard":
+        bits.append("📋 clipboard")
+    if srckind == "skeleton":
+        bits.append("opening to write")
+    if fed:
+        bits.append(fed)
+    _crm_say(" · ".join(bits))
+    app_sync_after_write()
+
+
+def bridge_from_answer(text, day):
+    """Evening journal 🌉 route: the answer IS the bridge - no dialogs.
+    Today's already written → the answer appends to it (second thoughts
+    stack, they don't collide)."""
+    import bridges as br
+    import areas
+    text = (text or "").strip()
+    if not text:
+        return ""
+    if not areas.bridges_configured():
+        # no board, but the tomorrow-note feed only needs periodic
+        fed = _bridge_feed_tomorrow(text, day)
+        return "🌉 no Bridges list" + (f" · {fed}" if fed else "")
+    api = _api()
+    want = br.daily_title(day)
+    try:
+        hit = _bridge_find(api, areas.BRIDGES_ID, want)
+        if hit == "ERR":
+            hit = None   # journal answers are precious: mint anyway
+        if hit:
+            live = api.get_task(areas.BRIDGES_ID, hit["id"])
+            old = live.get("content") or ""
+            new = (old.rstrip() + "\n\n" + text) if old.strip() else text
+            api.update_task(hit["id"], areas.BRIDGES_ID, current=live,
+                            content=new)
+            _patch_content_cache(hit["id"], new)
+            _bridge_feed_tomorrow(new, day)
+            return "🌉 bridged (appended)"
+        tag = _bridge_month_tag(day)
+        t = api.create_task(title=want, project_id=areas.BRIDGES_ID,
+                            content=text, tags=[tag] if tag else [],
+                            kind="NOTE")
+        _bridge_inject_cache(t, areas.BRIDGES_ID,
+                             _list_name_of(areas.BRIDGES_ID))
+        _bridge_feed_tomorrow(text, day)
+        return "🌉 bridged"
+    except Exception as e:
+        return f"🌉 bridge failed: {e}"
+
+
+def bridge_proj(pid):
+    """➕ Project bridge: NOTE in the project's own list, 🌉bridge tag,
+    'P • {Project} • Bridge 🌉 date' title. One per list per day."""
+    import bridges as br
+    if not pid:
+        _crm_say("Error: bridge_proj needs a list id")
+        return
+    day = datetime.now().date()
+    lname = _list_name_of(pid)
+    want = br.project_title(lname, day)
+    api = _api()
+    hit = _bridge_find(api, pid, want)
+    if hit == "ERR":
+        _crm_say("🌉 Can't check today's bridge (offline?) · nothing minted")
+        return
+    if hit:
+        open_task(pid, hit["id"])
+        _crm_say("🌉 Today's bridge exists · opening")
+        return
+    text, srckind = _bridge_capture(br.PROJ_SKEL)
+    if text is None:
+        _crm_say("🌉 Cancelled")
+        return
+    t = api.create_task(title=want, project_id=pid, content=text,
+                        tags=[br.BRIDGE_TAG], kind="NOTE")
+    _bridge_inject_cache(t, pid, lname)
+    if srckind == "skeleton":
+        open_task(pid, t.get("id"))
+    bits = [f"🌉 Bridge saved · {lname or 'list'}"]
+    if srckind == "clipboard":
+        bits.append("📋 clipboard")
+    if srckind == "skeleton":
+        bits.append("opening to write")
+    _crm_say(" · ".join(bits))
+    app_sync_after_write()
+
+
+def bridge_tidy():
+    """🗄️ Old-month collapse: daily bridges from BEFORE last month get
+    COMPLETED (live-verified 2026-07-21: a completed NOTE leaves project
+    data, so the board's columns stay lean; completed history keeps it).
+    Current + previous month always stay. Asks first."""
+    import bridges as br
+    import areas
+    if not areas.bridges_configured():
+        _crm_say("🌉 Bridges list not configured")
+        return
+    api = _api()
+    today = datetime.now().date()
+    keep = {br.month_tag(today),
+            br.month_tag(today.replace(day=1) - timedelta(days=1))}
+    try:
+        pdata = api.get_project_data(areas.BRIDGES_ID) or {}
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    old = []
+    for t in pdata.get("tasks", []):
+        if not br.is_daily(t.get("title", "")):
+            continue
+        d = br.title_date(t.get("title"))
+        if d is not None and br.month_tag(d) not in keep:
+            old.append(t)
+    if not old:
+        _crm_say("🗄️ Nothing older than last month")
+        return
+    if _dialog(f"Complete {len(old)} old daily bridge(s)? "
+               "They leave the board · history keeps them",
+               ["Cancel", "Complete"], "Complete") != "Complete":
+        _crm_say("🗄️ Cancelled")
+        return
+    done, ids = 0, set()
+    for t in old:
+        try:
+            api.complete_task(areas.BRIDGES_ID, t["id"])
+            ids.add(t["id"])
+            done += 1
+        except Exception:
+            pass
+    for key in ("all_notes", "all_tasks"):
+        pool = cache_store.get(key)
+        if pool is not None:
+            cache_store.set(key, [x for x in pool
+                                  if x.get("id") not in ids])
+    from dispatch import _patch_project_data
+    for tid in ids:   # list drills read project_data, not all_tasks
+        _patch_project_data(tid, pid_old=areas.BRIDGES_ID, remove=True)
+    _crm_say(f"🗄️ {done} old bridges off the board")
+    app_sync_after_write()
+
+
+def bridge_copy(rest):
+    """⌥ on a bridge row: title + content → clipboard, ready to paste into
+    the next Claude session (the whole point of a bridge)."""
+    pid, _, tid = rest.partition(":")
+    api = _api()
+    t = api.get_task(pid, tid)
+    body = f"{t.get('title') or ''}\n\n{t.get('content') or ''}".strip()
+    subprocess.run(["pbcopy"], input=body.encode())
+    _crm_say("🌉 Bridge copied · paste it to Claude")
+
+
 def tag_create(b64spec):
     """➕ Create-tag rows (search g-scope): xact:tag_create:<b64> where
     the payload keeps emoji-bearing names intact: {"label": …, "parent": …?}.
@@ -4654,6 +4978,14 @@ def main():
             crmaftercare(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
+        elif verb == "bridge_daily":
+            bridge_daily()
+        elif verb == "bridge_proj":
+            bridge_proj(rest)
+        elif verb == "bridge_copy":
+            bridge_copy(rest)
+        elif verb == "bridge_tidy":
+            bridge_tidy()
         elif verb == "crmphoto":
             crmphoto(rest)
         elif verb == "crmcold":
