@@ -1541,36 +1541,13 @@ _CRM_SCOPE_RE = re.compile(r"(?i)(calendar|logbooks|customers|archived"
                            r"|ca|lo|cu|ar)(?:\s+(.*))?$")
 
 
-def render_crmsearch(query):
-    """ONE search over the whole CRM (Vex ruling): customers + logbooks +
-    calendar. '/' opens the scope menu; picking one locks the bar to
-    '<Scope> <term>' (short codes 'ca ' etc. also work). Content matching
-    included - typing a phone number finds its customer."""
-    gate = _records_gate()
-    if gate:
-        return add_back(gate, "ctx:crmhub")
-    import crm_records as cr
-
-    q = (query or "").strip()
-    if q.startswith("/"):
-        frag = q[1:].strip()
-        rows = [alfred.item(uid=f"crms-scope-{k}", title=f"{e} {name}",
-                            subtitle=s, arg="", valid=False,
-                            autocomplete=f"{name} ")
-                for k, name, e, s in _CRM_SCOPES]
-        if frag:
-            rows = fuzz.filter_and_score(frag, rows,
-                                         key_fn=lambda x: x["title"]) or rows
-        return add_back(rows, "ctx:crmhub")
-
-    scope, term = "", q
-    m = _CRM_SCOPE_RE.fullmatch(q)
-    if m:
-        scope = m.group(1).lower()[:2]
-        term = (m.group(2) or "").strip()
-
+def _crmsearch_rows(cr, scope, term):
+    """Pooled, filtered, rendered rows for one scope code: '' = everything,
+    'cu' customers, 'lo' logbooks+archived, 'ar' archived only, 'ca' calendar
+    tasks, 're' = records (customers + logbooks) - 're' has no search-bar
+    spelling, it exists for the crmcal/crmlogs menu drills."""
     rows = []
-    if scope in ("", "cu"):
+    if scope in ("", "cu", "re"):
         leads = sorted(cr.records_notes(_areas.LEAD_TAG),
                        key=lambda c: -(cr.note_age_days(c) or 0))
         pool = cr.records_notes(_areas.CUSTOMER_TAG) + leads
@@ -1579,7 +1556,7 @@ def render_crmsearch(query):
             if c["id"] not in seen:
                 seen.add(c["id"])
                 rows.append(("cust", c))
-    if scope in ("", "lo", "ar"):
+    if scope in ("", "lo", "ar", "re"):
         seen = set()
         tags = ((_areas.ARCHIVE_TAG,) if scope == "ar"
                 else (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG))
@@ -1613,6 +1590,38 @@ def render_crmsearch(query):
             out.append(_logbook_row(cr, o))
         else:
             out.append(_crm_task_row(cr, o))
+    return out
+
+
+def render_crmsearch(query):
+    """ONE search over the whole CRM (Vex ruling): customers + logbooks +
+    calendar. '/' opens the scope menu; picking one locks the bar to
+    '<Scope> <term>' (short codes 'ca ' etc. also work). Content matching
+    included - typing a phone number finds its customer."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    import crm_records as cr
+
+    q = (query or "").strip()
+    if q.startswith("/"):
+        frag = q[1:].strip()
+        rows = [alfred.item(uid=f"crms-scope-{k}", title=f"{e} {name}",
+                            subtitle=s, arg="", valid=False,
+                            autocomplete=f"{name} ")
+                for k, name, e, s in _CRM_SCOPES]
+        if frag:
+            rows = fuzz.filter_and_score(frag, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        return add_back(rows, "ctx:crmhub")
+
+    scope, term = "", q
+    m = _CRM_SCOPE_RE.fullmatch(q)
+    if m:
+        scope = m.group(1).lower()[:2]
+        term = (m.group(2) or "").strip()
+
+    out = _crmsearch_rows(cr, scope, term)
     if not out:
         out = [alfred.item(title=f'Nothing matching "{term}"' if term
                            else "CRM is empty",
@@ -1622,6 +1631,36 @@ def render_crmsearch(query):
         out.insert(0, alfred.item(title="Type to search the CRM…",
                                   subtitle="Type / for scope", valid=False))
     return add_back(out, "ctx:crmhub")
+
+
+def _crmlist_drill(uid, emoji, name, list_id, scope, query):
+    """Menu-row drill for one of the two CRM lists (Vex ruling 2026-07-21):
+    row 1 is ALWAYS "open in TickTick" (the old ⏎), everything under it is
+    the list itself, searchable in its scope."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    import crm_records as cr
+    term = (query or "").strip()
+    rows = [alfred.item(uid=f"{uid}-open", title=f"{emoji} {name}",
+                        subtitle="⏎ Open list in TickTick",
+                        arg=f"open:ticktick:///webapp/#p/{list_id}/tasks")]
+    hits = _crmsearch_rows(cr, scope, term)
+    if term and not hits:
+        hits = [alfred.item(title=f'Nothing matching "{term}"', valid=False)]
+    return add_back(rows + hits, "ctx:crmhub")
+
+
+def render_crmcal(query):
+    """📅 The calendar list: open row on top, open tasks under it."""
+    return _crmlist_drill("crmcal", "📅", "Calendar", _areas.CRM_ID,
+                          "ca", query)
+
+
+def render_crmlogs(query):
+    """🗂️ The Records list: open row on top, customers + logbooks under."""
+    return _crmlist_drill("crmlogs", "🗂️", "Logs", _areas.RECORDS_ID,
+                          "re", query)
 
 
 def render_crmcust(cust_tid, query):
@@ -2255,6 +2294,12 @@ def main():
 
         elif level == "crmsearch":
             items = render_crmsearch(query)
+
+        elif level == "crmcal":
+            items = render_crmcal(query)
+
+        elif level == "crmlogs":
+            items = render_crmlogs(query)
 
         elif level == "crmcust":
             items = render_crmcust(ids[0], query) if ids \
