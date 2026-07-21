@@ -1185,8 +1185,9 @@ def render_crmweek(query):
     rows.insert(0, alfred.item(
         uid="wk-money",
         title=f"💰 {wk_money}{cr.cut_chip(wk_raw, wk_money)} this week",
-        subtitle=f"Mon-Sun logged · ahead: {booked_bit}",
-        valid=False))
+        subtitle=f"Mon-Sun logged · ahead: {booked_bit} · ⏎ Breakdown",
+        arg=f"xact:crmbrowse:ctx:crmmoney:wk:{monday.isoformat()}",
+        mods=_picker_mods()))
 
     # 🔔 radar: active logbook + nothing scheduled + last entry beyond the
     # crm_radar_days window (env knob, default 14 - crm_cut precedent).
@@ -1334,20 +1335,29 @@ def render_crmmoney(sub, query):
         lm_end = m0 - _td(days=1)
         q0 = _date(today.year, ((today.month - 1) // 3) * 3 + 1, 1)
         y0 = _date(today.year, 1, 1)
-        def row(uid, label, a, b):
+        def row(uid, label, a, b, ctx=None):
             money, n, hours, raw = cr.sum_entries(e, a and a.isoformat(),
                                                   b and b.isoformat())
             extra = f" · {hours:g}h" if hours else ""
+            span = (f"{a.isoformat() if a else '…'} → "
+                    f"{b.isoformat() if b else 'today'}")
+            kw = (dict(arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
+                  if ctx else dict(valid=False))
             return alfred.item(
                 uid=uid, title=f"{label} · {money}{cr.cut_chip(raw, money)}"
                                f" · {n} session{'s' if n != 1 else ''}{extra}",
-                subtitle=f"{a.isoformat() if a else '…'} → {b.isoformat() if b else 'today'}",
-                valid=False)
+                subtitle=span + (" · ⏎ Drill in" if ctx else ""), **kw)
+        lm0 = lm_end.replace(day=1)
         rows = [
-            row("mo-w",  "📆 This week",    monday, None),
-            row("mo-lw", "📆 Last week",    monday - _td(days=7), monday - _td(days=1)),
-            row("mo-m",  "📆 This month",   m0, None),
-            row("mo-lm", "📆 Last month",   lm_end.replace(day=1), lm_end),
+            row("mo-w",  "📆 This week",    monday, None,
+                f"ctx:crmmoney:wk:{monday.isoformat()}"),
+            row("mo-lw", "📆 Last week",    monday - _td(days=7),
+                monday - _td(days=1),
+                f"ctx:crmmoney:wk:{(monday - _td(days=7)).isoformat()}"),
+            row("mo-m",  "📆 This month",   m0, None,
+                f"ctx:crmmoney:mw:{m0.strftime('%Y-%m')}"),
+            row("mo-lm", "📆 Last month",   lm0, lm_end,
+                f"ctx:crmmoney:mw:{lm0.strftime('%Y-%m')}"),
             row("mo-q",  "📆 This quarter", q0, None),
             row("mo-y",  "📆 This year",    y0, None),
             row("mo-ly", "📆 Last year",    _date(today.year - 1, 1, 1),
@@ -1385,11 +1395,138 @@ def render_crmmoney(sub, query):
             rows = [alfred.item(title="Nothing archived yet", valid=False)]
         return add_back(rows, "ctx:crmmoney")
 
-    # root: totals + customers pinned, open logbooks below; typing also
-    # searches the archived ones (chipped) so history stays reachable.
+    def _entry_money(x):
+        if x["gratis"]:
+            return "🖤 free"
+        if x["amount"] is None:
+            return "-"
+        return f"{x['amount']:g}{x['sym'] or '€'}"
+
+    def _hub_alt(tid):
+        return {"arg": "", "valid": True, "subtitle": "Logbook hub",
+                "variables": {"browse_ctx": f"ctx:crmbook:{tid}"}}
+
+    if sub.startswith("mw:"):   # one month, week by week (ledger shape)
+        try:
+            y, mo_ = int(sub[3:7]), int(sub[8:10])
+            first = _date(y, mo_, 1)
+        except ValueError:
+            return add_back([alfred.item(title="Bad month", valid=False)],
+                            "ctx:crmmoney")
+        last = (_date(y + (1 if mo_ == 12 else 0), mo_ % 12 + 1, 1)
+                - _td(days=1))
+        e = cr.all_entries()
+        today = _date.today()
+        rows = []
+        w = first - _td(days=first.weekday())
+        while w <= last and w <= today:
+            wend = w + _td(days=6)
+            m2, n2, h2, r2 = cr.sum_entries(e, w.isoformat(),
+                                            wend.isoformat())
+            rows.append(alfred.item(
+                uid=f"mw-{w.isoformat()}",
+                title=f"📆 wk {w.isocalendar()[1]} · "
+                      + (f"{w.strftime('%d %b')}-{wend.strftime('%d %b')}"
+                         if w.month != wend.month
+                         else f"{w.strftime('%d')}-{wend.strftime('%d %b')}")
+                      + f" · {m2}{cr.cut_chip(r2, m2)}"
+                      f" · {n2} session{'s' if n2 != 1 else ''}"
+                      + (f" · {h2:g}h" if h2 else ""),
+                subtitle="⏎ The week's sessions",
+                arg=f"xact:crmbrowse:ctx:crmmoney:wk:{w.isoformat()}",
+                mods=_picker_mods()))
+            w += _td(days=7)
+        rows.reverse()   # newest week on top, ledger habit
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        if not rows:
+            rows = [alfred.item(title="Nothing that month", valid=False)]
+        return add_back(rows, "ctx:crmmoney")
+
+    if sub.startswith("wk:"):   # one Mon-Sun week, session by session
+        try:
+            w0 = _date.fromisoformat(sub[3:])
+        except ValueError:
+            return add_back([alfred.item(title="Bad week", valid=False)],
+                            "ctx:crmmoney")
+        w0 -= _td(days=w0.weekday())
+        wend = w0 + _td(days=6)
+        m2, n2, h2, r2 = cr.sum_entries(cr.all_entries(), w0.isoformat(),
+                                        wend.isoformat())
+        rows = [alfred.item(
+            uid="wk-sum",
+            title=f"💰 {m2}{cr.cut_chip(r2, m2)}"
+                  f" · {n2} session{'s' if n2 != 1 else ''}"
+                  + (f" · {h2:g}h" if h2 else ""),
+            subtitle=f"Mon {w0.strftime('%d %b')} → Sun "
+                     f"{wend.strftime('%d %b')}",
+            valid=False)]
+        det = sorted((x for x in cr.entries_detailed()
+                      if w0.isoformat() <= x["date"] <= wend.isoformat()
+                      and (x["amount"] is not None or x["is_s"])),
+                     key=lambda x: x["date"])
+        for x in det:
+            tid = x["lb"].get("id")
+            hrs = f" · {x['minutes'] / 60:g}h" if x["minutes"] else ""
+            d = _date.fromisoformat(x["date"])
+            rows.append(alfred.item(
+                uid=f"wke-{tid}-{x['date']}-{x['marker']}",
+                title=f"{_entry_money(x)} · {x['lb'].get('title') or ''}"
+                      f" · {x['marker']}",
+                subtitle=f"{d.strftime('%a %d %b')}{hrs}"
+                         " · ⏎ Tattoo split · ⌥ hub",
+                arg=f"xact:crmbrowse:ctx:crmmoney:lb:{tid}",
+                mods={**_picker_mods(), "alt": _hub_alt(tid)}))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        return add_back(rows, "ctx:crmmoney")
+
+    if sub.startswith("lb:"):   # one tattoo: S1 = x, S2 = y … total + rate
+        tid = sub[3:]
+        lb = next((x for x in cr.records_notes()
+                   if x.get("id") == tid), None)
+        if not lb:
+            return add_back([alfred.item(title="Logbook not found",
+                                         subtitle="Run tsy", valid=False)],
+                            "ctx:crmmoney")
+        content = lb.get("content") or ""
+        det = sorted((x for x in cr.entries_detailed()
+                      if x["lb"].get("id") == tid),
+                     key=lambda x: x["date"])
+        mins = sum(x["minutes"] or 0 for x in det)
+        total, _n2, sym2, _pre2 = cr._totals_raw(content)
+        g = cr.gratis_count(content)
+        head = cr.paid_summary(content) + (f" · 🖤 {g}" if g else "")
+        if mins:
+            head += f" · {mins / 60:g}h"
+            if total:
+                r = total / (mins / 60.0)
+                head += (f" · ~{int(r)}{sym2 or '€'}/h"
+                         + cr.cut_rate_chip(r, sym2 or "€"))
+        rows = [alfred.item(
+            uid="lb-head", title=lb.get("title") or "Logbook",
+            subtitle=head + " · ⏎ Logbook hub",
+            arg=f"xact:crmbrowse:ctx:crmbook:{tid}",
+            mods=_picker_mods())]
+        for x in det:
+            hrs = f" · {x['minutes'] / 60:g}h" if x["minutes"] else ""
+            rows.append(alfred.item(
+                uid=f"lbe-{x['date']}-{x['marker']}",
+                title=f"{x['marker']} · {_entry_money(x)}",
+                subtitle=f"{x['date']}{hrs}", valid=False))
+        return add_back(rows, "ctx:crmmoney")
+
+    # root: all-time + this-month + this-week + customers pinned, then every
+    # tattoo that has MONEY on it, richest first (active and archived alike -
+    # unpaid bookings have no business on a money screen, Vex ruling
+    # 2026-07-21). Every row drills deeper: periods / weeks / sessions.
     e = cr.all_entries()
     money, n, hours, raw = cr.sum_entries(e)
-    arch = cr.records_notes(_areas.ARCHIVE_TAG)
+    today = _date.today()
+    monday = today - _td(days=today.weekday())
+    m0 = today.replace(day=1)
     rate = ""
     if hours:
         import re as _re2
@@ -1399,6 +1536,16 @@ def render_crmmoney(sub, query):
             symm = _re2.sub(r"[-\d.,\s]", "", money) or "€"
             rate = (f" · {hours:g}h · ~{int(r)}{symm}/h"
                     + cr.cut_rate_chip(r, symm))
+
+    def _sumrow(uid, emoji, label, a, ctx, hint):
+        m2, n2, h2, r2 = cr.sum_entries(e, a.isoformat(), None)
+        return alfred.item(
+            uid=uid, title=f"{emoji} {label} · {m2}{cr.cut_chip(r2, m2)}"
+                           f" · {n2} session{'s' if n2 != 1 else ''}"
+                           + (f" · {h2:g}h" if h2 else ""),
+            subtitle=hint, arg=f"xact:crmbrowse:{ctx}",
+            mods=_picker_mods())
+
     pinned = [
         alfred.item(uid="mo-total",
                     title=f"💰 All time · {money}{cr.cut_chip(raw, money)}"
@@ -1406,15 +1553,38 @@ def render_crmmoney(sub, query):
                     subtitle="⏎ Weekly · monthly · quarterly · yearly",
                     arg="xact:crmbrowse:ctx:crmmoney:periods",
                     mods=_picker_mods()),
+        _sumrow("mo-month", "📅", "This month", m0,
+                f"ctx:crmmoney:mw:{m0.strftime('%Y-%m')}",
+                "⏎ Week by week"),
+        _sumrow("mo-week", "📆", "This week", monday,
+                f"ctx:crmmoney:wk:{monday.isoformat()}",
+                "⏎ The week's sessions"),
         alfred.item(uid="mo-cust", title="👥 Customers",
                     subtitle="⏎ Totals per customer · richest first",
                     arg="xact:crmbrowse:ctx:crmmoney:cust",
                     mods=_picker_mods()),
     ]
-    lbs = [_logbook_row(cr, lb, uid_prefix="mo")
-           for lb in cr.records_notes(_areas.LOGBOOK_TAG)]
+    seen, pool = set(), []
+    for tag in (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
+        for lb in cr.records_notes(tag):
+            if lb["id"] not in seen:
+                seen.add(lb["id"])
+                pool.append(lb)
+    raws = {lb["id"]: cr._totals_raw(lb.get("content") or "")[0]
+            for lb in pool}
+    lbs = []
+    for lb in sorted((x for x in pool if raws[x["id"]] > 0),
+                     key=lambda x: -raws[x["id"]]):
+        g = cr.gratis_count(lb.get("content") or "")
+        lbs.append(alfred.item(
+            uid=f"mo-l-{lb['id']}",
+            title=lb.get("title") or "Untitled",
+            subtitle=cr.paid_summary(lb.get("content") or "")
+                     + (f" · 🖤 {g}" if g else "")
+                     + " · ⏎ Session split · ⌥ hub",
+            arg=f"xact:crmbrowse:ctx:crmmoney:lb:{lb['id']}",
+            mods={**_picker_mods(), "alt": _hub_alt(lb["id"])}))
     if query:
-        lbs += [_logbook_row(cr, lb, uid_prefix="mo-a") for lb in arch]
         lbs = fuzz.filter_and_score(query, lbs, key_fn=lambda x: x["title"])
         return add_back(pinned + lbs, "ctx:crmhub")
     rows = pinned + lbs
@@ -1422,13 +1592,6 @@ def render_crmmoney(sub, query):
         uid="mo-csv", title="🧾 CSV export",
         subtitle="Every dated charge / deposit / refund → ~/Downloads",
         arg="xact:crmcsv", mods=_picker_mods()))
-    if arch:
-        rows.append(alfred.item(
-            uid="mo-arch",
-            title=f"📁 Archived · {len(arch)} logbook{'s' if len(arch) != 1 else ''}",
-            subtitle="⏎ Show them (typing up here searches them too)",
-            arg="xact:crmbrowse:ctx:crmmoney:arch",
-            mods=_picker_mods()))
     return add_back(rows, "ctx:crmhub")
 
 
@@ -1549,11 +1712,18 @@ def render_crmstats(sub, query):
         head += f" · {k['sessions']} session{'s' if k['sessions'] != 1 else ''}"
         if k["hours"]:
             head += f" · {k['hours']:g}h"
+        mods_ = _picker_mods()
+        if key in ("thism", "lastm") and a:
+            mods_["alt"] = {"arg": "", "valid": True,
+                            "subtitle": "Money · week by week",
+                            "variables": {
+                                "browse_ctx": f"ctx:crmmoney:mw:{a[:7]}"}}
         rows.append(alfred.item(
             uid=f"st-{key}", title=f"📊 {label}",
-            subtitle=f"{head} · ⏎ Full dashboard",
+            subtitle=f"{head} · ⏎ Full dashboard"
+                     + (" · ⌥ weeks" if "alt" in mods_ else ""),
             arg=f"xact:crmbrowse:ctx:crmstats:{key}",
-            mods=_picker_mods()))
+            mods=mods_))
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
@@ -2362,7 +2532,7 @@ def main():
             items = render_crmstats(ids[0] if ids else "", query)
 
         elif level == "crmmoney":
-            items = render_crmmoney(ids[0] if ids else "", query)
+            items = render_crmmoney(":".join(ids) if ids else "", query)
 
         elif level == "crmweek":
             items = render_crmweek(query)
