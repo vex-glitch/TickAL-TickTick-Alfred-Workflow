@@ -127,8 +127,10 @@ def get_hint_items(raw_query):
             subtitle="Type / for scope",
             valid=False,
         )]
-        # 🅿️ non-empty buffer → surface it (⏎ opens the buffer view; ⌥
-        # kept as a mirror for old muscle memory)
+        # 🅿️ non-empty buffer → surface it. Plain ⏎ can't ride the ⌥-bound
+        # browse edge - it exits through the modOpen shell (xact:*|open:*),
+        # so the BrowseCtx trampoline reopens the buffer view (the crmhub
+        # navigation pattern). ⌥ kept as a mirror for old muscle memory.
         try:
             with open(run_path("tickal_buffer.txt")) as f:
                 n = len([ln for ln in f if ln.strip()])
@@ -138,8 +140,7 @@ def get_hint_items(raw_query):
             rows.insert(0, alfred.item(
                 title=f"🅿️ Buffer · {n} task{'s' if n != 1 else ''}",
                 subtitle="Open the buffer  |  ⏎⤵️",
-                valid=True, arg="",
-                variables={"browse_ctx": "ctx:buffer"},
+                valid=True, arg="xact:crmbrowse:ctx:buffer",
                 mods={"alt": {"valid": True, "arg": "", "subtitle": "Open buffer",
                               "variables": {"browse_ctx": "ctx:buffer"}}},
             ))
