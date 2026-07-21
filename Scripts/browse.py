@@ -1366,7 +1366,7 @@ def render_crmmoney(sub, query):
             return alfred.item(
                 uid=uid, title=f"{label} · {money}{cr.cut_chip(raw, money)}"
                                f" · {n} session{'s' if n != 1 else ''}{extra}",
-                subtitle=span + (" · ⏎ Drill in" if ctx else ""), **kw)
+                subtitle=span + ("  |  ⏎⤵️" if ctx else ""), **kw)
         lm0 = lm_end.replace(day=1)
         rows = [
             row("mo-w",  "📆 This week",    monday, None,
@@ -1452,7 +1452,7 @@ def render_crmmoney(sub, query):
                       + f" · {m2}{cr.cut_chip(r2, m2)}"
                       f" · {n2} session{'s' if n2 != 1 else ''}"
                       + (f" · {h2:g}h" if h2 else ""),
-                subtitle="⏎ The week's sessions",
+                subtitle="The week's sessions  |  ⏎⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:wk:{w.isoformat()}",
                 mods=_picker_mods()))
             w += _td(days=7)
@@ -1494,8 +1494,7 @@ def render_crmmoney(sub, query):
                 uid=f"wke-{tid}-{x['date']}-{x['marker']}",
                 title=f"{_entry_money(x)} · {x['lb'].get('title') or ''}"
                       f" · {x['marker']}",
-                subtitle=f"{d.strftime('%a %d %b')}{hrs}"
-                         " · ⏎ Tattoo split · ⌥ hub",
+                subtitle=f"{d.strftime('%a %d %b')}{hrs}  |  ⏎⤵️  ⌥⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:lb:{tid}",
                 mods={**_picker_mods(), "alt": _hub_alt(tid)}))
         if query:
@@ -1521,7 +1520,7 @@ def render_crmmoney(sub, query):
                 title=lb.get("title") or "Untitled",
                 subtitle=cr.paid_summary(lb.get("content") or "")
                          + (f" · 🖤 {g}" if g else "")
-                         + " · ⏎ Session split · ⌥ hub",
+                         + "  |  ⏎⤵️  ⌥⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:lb:{lb['id']}",
                 mods={**_picker_mods(), "alt": _hub_alt(lb["id"])}))
         if query:
@@ -1555,7 +1554,7 @@ def render_crmmoney(sub, query):
                          + cr.cut_rate_chip(r, sym2 or "€"))
         rows = [alfred.item(
             uid="lb-head", title=lb.get("title") or "Logbook",
-            subtitle=head + " · ⏎ Logbook hub",
+            subtitle=head + "  |  ⏎⤵️",
             arg=f"xact:crmbrowse:ctx:crmbook:{tid}",
             mods=_picker_mods())]
         for x in det:
@@ -1606,22 +1605,22 @@ def render_crmmoney(sub, query):
         alfred.item(uid="mo-total",
                     title=f"💰 All time · {money}{cr.cut_chip(raw, money)}"
                           f" · {n} session{'s' if n != 1 else ''}{rate}",
-                    subtitle="⏎ Weekly · monthly · quarterly · yearly",
+                    subtitle="Weekly · monthly · quarterly · yearly  |  ⏎⤵️",
                     arg="xact:crmbrowse:ctx:crmmoney:periods",
                     mods=_picker_mods()),
         _sumrow("mo-month", "📅", "This month", m0,
                 f"ctx:crmmoney:mw:{m0.strftime('%Y-%m')}",
-                "⏎ Week by week"),
+                "Week by week  |  ⏎⤵️"),
         _sumrow("mo-week", "📆", "This week", monday,
                 f"ctx:crmmoney:wk:{monday.isoformat()}",
-                "⏎ The week's sessions"),
+                "The week's sessions  |  ⏎⤵️"),
         alfred.item(uid="mo-cust", title="👥 Customers",
-                    subtitle="⏎ Totals per customer · richest first",
+                    subtitle="Totals per customer · richest first  |  ⏎⤵️",
                     arg="xact:crmbrowse:ctx:crmmoney:cust",
                     mods=_picker_mods()),
         alfred.item(uid="mo-lbs", title="🎨 Tattoos",
-                    subtitle="⏎ Money per tattoo · richest first "
-                             "(typing up here searches them too)",
+                    subtitle="Money per tattoo · richest first · "
+                             "typing up here searches too  |  ⏎⤵️",
                     arg="xact:crmbrowse:ctx:crmmoney:lbs",
                     mods=_picker_mods()),
         alfred.item(uid="mo-csv", title="🧾 CSV export",
