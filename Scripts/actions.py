@@ -171,6 +171,9 @@ def main():
                 ("↗️ Open in TickTick",  f"Open {vname}",
                  f"xact:view_open:{vkey}", "open app view",
                  not vurl and vkey in ("summary", "habits", "matrix", "pomo")),
+                ("🗑️ Empty Inbox", "Everything open → TickTick's Trash · asks first",
+                 "xact:inboxempty", "empty inbox delete all trash clear",
+                 vkey == "inbox"),
                 ("🔙 Go back",           "Back to search", "back",  "back", True),
             ]
             items = [alfred.item(title=t, subtitle=s, arg=a, variables=vvars,

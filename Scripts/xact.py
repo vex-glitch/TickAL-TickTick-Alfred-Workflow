@@ -3443,6 +3443,56 @@ def open_task(pid, tid):
                    check=False)
 
 
+def inboxempty():
+    """🗑️ Empty Inbox (the Inbox view's ⌘ menu): every OPEN inbox item →
+    TickTick's Trash, ONE confirm dialog first. Trash keeps them
+    recoverable - a move, not a purge; completed history stays. LIVE
+    project-data read, not cache - emptying the inbox is mostly about
+    fresh captures the hourly cache hasn't seen."""
+    api = _api()
+    data = api.get_project_data("inbox")   # literal id, API-accepted
+    tasks = list(data.get("tasks") or [])
+    n = len(tasks)
+    if not n:
+        print("📥 Inbox is already empty")
+        return
+    if _dialog(f"Delete {n} inbox task{'s' if n != 1 else ''}?\n\n"
+               "They land in TickTick's Trash (recoverable).",
+               ["Cancel", "Delete"], "Delete") != "Delete":
+        print("📥 Inbox kept")
+        return
+    # children first - a parent delete cascades, and the child's own delete
+    # would then 404 into the failed count
+    tasks.sort(key=lambda t: 0 if t.get("parentId") else 1)
+
+    def _del(t):
+        try:
+            _api().delete_task(t.get("projectId") or "inbox", t["id"])
+            return t["id"]
+        except Exception:
+            return None
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(4, n)) as pool:
+        gone = {r for r in pool.map(_del, tasks) if r}
+    try:
+        cache_store.set("project_data_inbox",
+                        dict(data, tasks=[t for t in tasks
+                                          if t["id"] not in gone]))
+        for key in ("all_tasks", "all_notes"):
+            cached = cache_store.get(key)
+            if cached is not None:
+                cache_store.set(key, [t for t in cached
+                                      if t.get("id") not in gone])
+    except Exception:
+        cache_store.invalidate("all_tasks")
+    left = n - len(gone)
+    msg = f"🗑️ {len(gone)} → Trash · Inbox emptied"
+    if left:
+        msg = f"🗑️ {len(gone)} → Trash · {left} refused, retry"
+    print(msg)
+
+
 def sticky(pid, tid):
     """Open the task as a TickTick desktop sticky note: deep link → navigate
     to the list, then find + CLICK the task's row (guaranteed selection),
@@ -4464,6 +4514,8 @@ def main():
             fx_oneliner()
         elif verb == "open_task":
             pid, tid = rest.split(":", 1); open_task(pid, tid)
+        elif verb == "inboxempty":
+            inboxempty()
         elif verb == "fx_copy":
             if rest:
                 pid, tid = rest.split(":", 1); fx_copy(pid, tid)
