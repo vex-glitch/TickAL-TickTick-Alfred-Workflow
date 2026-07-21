@@ -79,6 +79,15 @@ Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
                                     (timer file or pomo sidecar) to the task
     xact:buffer_focus               buffer → subtasks (buffer order), clears
     xact:view_focus:<key>           smart view → subtasks (view order)
+    xact:view_buffer:<key>          scope's tasks → the buffer (dedupe)
+    xact:dateclear:<key>            scope-wide date bankruptcy: confirm →
+                                    dates cleared, tasks survive (repeating
+                                    + CRM-calendar exempt); key incl 'buffer'
+    xact:dateroll:<key>             scope's tasks → today, spans shifted
+                                    whole days (hours/durations survive),
+                                    same exemptions
+    xact:inboxempty                 Inbox ⌘/inline row: confirm → every open
+                                    inbox item to TickTick's Trash
     xact:tag_focus:<pid>:<tag>      tag's open tasks → subtasks
     xact:stage_open:<pid>:<tid>     fire ET Focus prefilled "stage pid:tid "
     xact:bar_show / xact:bar_hide   focus-bar visibility (show also spawns)
@@ -3443,6 +3452,165 @@ def open_task(pid, tid):
                    check=False)
 
 
+def view_buffer(key):
+    """🅿️ Buffer all: a whole scope's tasks → the buffer (dedupe, view
+    order kept). The buffer is the universal bulk gateway - complete /
+    move / tag / priority / delete / focus / date verbs all loop it."""
+    tasks, label = _view_tasks(key)
+    if tasks is None:
+        print(f"View {key!r} can't be buffered")
+        return
+    lines = buffer_ids()
+    have = set(lines)
+    added = 0
+    for t in tasks:
+        pid = t.get("projectId") or t.get("_projectId", "")
+        k = f"{pid}:{t.get('id')}"
+        if t.get("id") and k not in have:
+            lines.append(k)
+            have.add(k)
+            added += 1
+    _write_buffer(lines)
+    print(f"🅿️ {added} from {label} buffered · {len(lines)} in buffer")
+
+
+def _shift_dates(t, delta_days):
+    """startDate/dueDate shifted by whole days - wall-clock time survives,
+    so all-day stays all-day (_is_all_day sees the same local midnight)
+    and timed keeps its hour. Tolerates both '.000+0000' (cache/server)
+    and bare '+0000' stamps."""
+    out = {}
+    for f in ("startDate", "dueDate"):
+        v = t.get(f)
+        if not v:
+            continue
+        for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z"):
+            try:
+                dt = datetime.strptime(v, fmt)
+                break
+            except ValueError:
+                dt = None
+        if dt is None:
+            return None      # unparseable stamp - skip the whole task
+        out[f] = (dt + timedelta(days=delta_days)).strftime(
+            "%Y-%m-%dT%H:%M:%S.000+0000")
+    return out or None
+
+
+def _date_bulk_pool(key):
+    """(tasks, label, repeating_kept, crm_kept) - a date-bulk scope with
+    the two hard exemptions: repeating tasks (the date IS the recurrence -
+    clearing kills the series, shifting re-anchors it unverified) and the
+    CRM calendar list (bookings are records the CRM math reads)."""
+    tasks, label = _view_tasks(key)
+    if tasks is None:
+        return None, key, 0, 0
+    import areas
+    keep, rep, crm = [], 0, 0
+    for t in tasks:
+        pid = t.get("projectId") or t.get("_projectId", "")
+        if areas.CRM_ID and pid == areas.CRM_ID:
+            crm += 1
+        elif t.get("repeatFlag"):
+            rep += 1
+        elif t.get("startDate") or t.get("dueDate"):
+            keep.append(t)
+    return keep, label, rep, crm
+
+
+def _date_bulk_run(tasks, fields_fn):
+    """Pooled updates: fields_fn(task) → update fields (None skips).
+    → (done, failed). Cache mirrored per task."""
+    from concurrent.futures import ThreadPoolExecutor
+    from dispatch import _patch_task_cache
+
+    def _one(t):
+        try:
+            fields = fields_fn(t)
+            if not fields:
+                return None
+            pid = t.get("projectId") or t.get("_projectId", "")
+            _api().update_task(t["id"], pid, current=t, **fields)
+            _patch_task_cache(t["id"], **fields)
+            return t["id"]
+        except Exception:
+            return None
+
+    with ThreadPoolExecutor(max_workers=min(4, len(tasks))) as pool:
+        done = [r for r in pool.map(_one, tasks) if r]
+    return len(done), len(tasks) - len(done)
+
+
+def _exempt_bits(rep, crm):
+    bits = ""
+    if rep:
+        bits += f" · {rep} repeating kept"
+    if crm:
+        bits += f" · {crm} CRM kept"
+    return bits
+
+
+def dateclear(key):
+    """📅 Clear all dates on a scope (Overdue's date bankruptcy): the tasks
+    survive and sink back into their lists as dateless backlog. ONE
+    confirm; repeating + CRM-calendar tasks are exempt."""
+    tasks, label, rep, crm = _date_bulk_pool(key)
+    if tasks is None:
+        print(f"View {key!r} can't be date-cleared")
+        return
+    if not tasks:
+        print(f"📅 Nothing to clear in {label}" + _exempt_bits(rep, crm))
+        return
+    n = len(tasks)
+    if _dialog(f"Clear dates on {n} {label} task{'s' if n != 1 else ''}?\n\n"
+               "They stay in their lists, dateless."
+               + (f"\nExempt:{_exempt_bits(rep, crm)}" if rep or crm else ""),
+               ["Cancel", "Clear"], "Clear") != "Clear":
+        print("📅 Dates kept")
+        return
+    done, failed = _date_bulk_run(
+        tasks, lambda t: {"startDate": None, "dueDate": None})
+    msg = f"📅 {done} cleared" + _exempt_bits(rep, crm)
+    if failed:
+        msg += f" · {failed} failed"
+    print(msg)
+
+
+def dateroll(key):
+    """⏭️ Roll a scope's tasks to today: each task's whole span shifts by
+    whole days so its day lands TODAY - hour and duration survive, all-day
+    stays all-day. Same exemptions as dateclear."""
+    from filtering import task_local_date
+    tasks, label, rep, crm = _date_bulk_pool(key)
+    if tasks is None:
+        print(f"View {key!r} can't be rolled")
+        return
+    today = datetime.now().date()
+    tasks = [t for t in tasks if task_local_date(t)
+             and task_local_date(t) != today.isoformat()]
+    if not tasks:
+        print(f"⏭️ Nothing to roll in {label}" + _exempt_bits(rep, crm))
+        return
+    n = len(tasks)
+    if _dialog(f"Roll {n} {label} task{'s' if n != 1 else ''} to today?\n\n"
+               "Times and durations survive."
+               + (f"\nExempt:{_exempt_bits(rep, crm)}" if rep or crm else ""),
+               ["Cancel", "Roll"], "Roll") != "Roll":
+        print("⏭️ Dates kept")
+        return
+
+    def _fields(t):
+        d = task_local_date(t)
+        delta = (today - datetime.strptime(d, "%Y-%m-%d").date()).days
+        return _shift_dates(t, delta) if delta else None
+
+    done, failed = _date_bulk_run(tasks, _fields)
+    msg = f"⏭️ {done} rolled to today" + _exempt_bits(rep, crm)
+    if failed:
+        msg += f" · {failed} failed"
+    print(msg)
+
+
 def inboxempty():
     """🗑️ Empty Inbox (the Inbox view's ⌘ menu): every OPEN inbox item →
     TickTick's Trash, ONE confirm dialog first. Trash keeps them
@@ -3601,16 +3769,19 @@ def pomo_sticky(pid, tid, minutes):
             _pomo_attribute(pid, tid, _task_title(tid))
 
 
-# ── View/tag collectors - feed view_focus / tag_focus ────────────────────────
+# ── View/tag collectors - feed view_focus / view_buffer / date bulks ─────────
 def _view_tasks(key):
-    """Ordered open tasks of a smart view → (tasks, label) - used by the
-    focus-block send."""
+    """Ordered open tasks of a scope → (tasks, label) - used by the focus
+    send, buffer-all and the date bulks. 'buffer' resolves the parked ids
+    through the cache."""
     from filtering import smart_filter
     all_tasks = cache_store.get("all_tasks") or []
     labels = {"today": "Today", "tomorrow": "Tomorrow",
-              "next7": "Next 7 Days", "inbox": "Inbox"}
-    if key in ("today", "tomorrow", "next7"):
-        kind = {"today": "today", "tomorrow": "tomorrow", "next7": "next7days"}[key]
+              "next7": "Next 7 Days", "inbox": "Inbox",
+              "overdue": "Overdue", "buffer": "the buffer"}
+    if key in ("today", "tomorrow", "next7", "overdue"):
+        kind = {"today": "today", "tomorrow": "tomorrow",
+                "next7": "next7days", "overdue": "overdue"}[key]
         tasks = smart_filter(all_tasks, kind)
         if key in ("today", "tomorrow"):   # time order, like the app's view
             tasks = sorted(tasks, key=lambda t: (t.get("startDate")
@@ -3619,6 +3790,13 @@ def _view_tasks(key):
         data = cache_store.get("project_data_inbox") or {}
         tasks = [t for t in data.get("tasks", [])
                  if t.get("status", 0) == 0 and not t.get("parentId")]
+    elif key == "buffer":
+        tasks = []
+        for ln in buffer_ids():
+            pid, tid = ln.split(":", 1)
+            t = cache_store.find_task(tid)
+            if t:
+                tasks.append(t)
     else:
         return None, None
     return tasks, labels.get(key, key)
@@ -4516,6 +4694,12 @@ def main():
             pid, tid = rest.split(":", 1); open_task(pid, tid)
         elif verb == "inboxempty":
             inboxempty()
+        elif verb == "view_buffer":
+            view_buffer(rest)
+        elif verb == "dateclear":
+            dateclear(rest)
+        elif verb == "dateroll":
+            dateroll(rest)
         elif verb == "fx_copy":
             if rest:
                 pid, tid = rest.split(":", 1); fx_copy(pid, tid)

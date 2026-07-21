@@ -157,11 +157,20 @@ def main():
             vvars = {"item_type": "view", "view_key": vkey, "view_name": vname,
                      "view_url": vurl, "task_id": "", "task_list_id": "",
                      "task_title": vname}
-            sendable = vkey in ("today", "tomorrow", "next7", "inbox")
+            sendable = vkey in ("today", "tomorrow", "next7", "inbox", "overdue")
             rows = [
                 ("🎯 Send all to focus", f"Every {vname} task → subtasks of the focus task",
                  f"xact:view_focus:{vkey}", "focus send all stage checkbox",
                  sendable and (fx_session() or ("",))[0] == "task"),
+                ("🅿️ Buffer all", f"Every {vname} task → the buffer",
+                 f"xact:view_buffer:{vkey}", "buffer all collect park",
+                 sendable),
+                ("📅 Clear all dates", "Tasks survive, dateless · asks first",
+                 "xact:dateclear:overdue", "clear dates all unschedule",
+                 vkey == "overdue"),
+                ("⏭️ Roll all to today", "Times and durations survive · asks first",
+                 "xact:dateroll:overdue", "roll today postpone all reschedule",
+                 vkey == "overdue"),
                 ("↗️ Open in TickTick",  f"Open {vname}",
                  f"open:{vurl}",          "open app view",          bool(vurl)),
                 # Views without a working deep link (Summary) open via the
@@ -274,6 +283,11 @@ def main():
                  "complete done all", True, sent),
                 ("⚡ Priority all…", f"Set priority on all {_n}", "priority",
                  "priority all",      True, sent),
+                ("📅 Clear all dates", f"All {_n} survive, dateless · asks first",
+                 "xact:dateclear:buffer", "clear dates all unschedule", True, sent),
+                ("⏭️ Roll all to today", "Times and durations survive · asks first",
+                 "xact:dateroll:buffer", "roll today postpone all reschedule",
+                 True, sent),
                 ("🎯 Add buffer to focus", f"All {_n} → subtasks of the focus task, clears buffer",
                  "xact:buffer_focus", "focus add all stage checkbox",
                  _n > 0 and (fx_session() or ("",))[0] == "task", sent),

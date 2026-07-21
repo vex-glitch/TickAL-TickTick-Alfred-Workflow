@@ -308,6 +308,9 @@ VIEWS = [
      "ticktick://v1/show?smartlist=tomorrow"),
     ("next7",     "📅", "Next 7 Days", "alfred", "ctx:smart:next7",
      "ticktick://v1/show?smartlist=next_7_days"),
+    # Overdue has no app deep link - a computed TickAL scope (open, dated,
+    # day strictly before today), home of the date bulks
+    ("overdue",   "⏰", "Overdue",     "alfred", "ctx:smart:overdue", None),
     ("inbox",     "📥", "Inbox",       "alfred", "ctx:inbox",
      "ticktick:///webapp/#p/inbox/tasks"),
     ("summary",   "📈", "Summary",     "app", None, None),
@@ -560,10 +563,40 @@ def render_view_inline(entry, query):
     if kind == "app":
         return items
 
-    if key in ("today", "tomorrow", "next7"):
+    if key == "inbox":
+        # Vex's spot: row 2, right under Open in TickTick
+        items.append(alfred.item(
+            uid="view-inbox-empty",
+            title="🗑️ Empty Inbox",
+            subtitle="Everything open → TickTick's Trash · asks first  |  ⏎⚡",
+            arg="xact:inboxempty",
+            variables={"item_type": "view", "view_key": "inbox",
+                       "view_name": "Inbox", "view_url": ""},
+        ))
+    elif key == "overdue":
+        # the date bulks live at the top of the scope they act on
+        items.append(alfred.item(
+            uid="view-overdue-clear",
+            title="📅 Clear all dates",
+            subtitle="Tasks survive, dateless · asks first  |  ⏎⚡",
+            arg="xact:dateclear:overdue",
+            variables={"item_type": "view", "view_key": "overdue",
+                       "view_name": "Overdue", "view_url": ""},
+        ))
+        items.append(alfred.item(
+            uid="view-overdue-roll",
+            title="⏭️ Roll all to today",
+            subtitle="Times and durations survive · asks first  |  ⏎⚡",
+            arg="xact:dateroll:overdue",
+            variables={"item_type": "view", "view_key": "overdue",
+                       "view_name": "Overdue", "view_url": ""},
+        ))
+
+    if key in ("today", "tomorrow", "next7", "overdue"):
         from filtering import smart_filter
         pool = cache_store.get("all_tasks") or []
-        kind_map = {"today": "today", "tomorrow": "tomorrow", "next7": "next7days"}
+        kind_map = {"today": "today", "tomorrow": "tomorrow",
+                    "next7": "next7days", "overdue": "overdue"}
         rows = [_inline_task_row(t, name, pool)
                 for t in smart_filter(pool, kind_map[key])]
     elif key == "inbox":

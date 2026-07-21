@@ -102,6 +102,8 @@ def parse_ctx(raw):
     # without argument-injector nodes
     ALIASES = {"today": "ctx:smart:today", "tomorrow": "ctx:smart:tomorrow",
                "next7days": "ctx:smart:next7", "7days": "ctx:smart:next7",
+               "overdue": "ctx:smart:overdue",
+               "view_overdue": "ctx:smart:overdue",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
                # main-menu view args (▷50F14423 branches)
                "view_today": "ctx:smart:today",

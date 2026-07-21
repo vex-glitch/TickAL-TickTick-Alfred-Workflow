@@ -41,6 +41,7 @@ SMART_LABELS = {
     "today":     "Today",
     "tomorrow":  "Tomorrow",
     "next7days": "Next 7 Days",
+    "overdue":   "Overdue",
 }
 
 
@@ -58,6 +59,14 @@ def smart_filter(all_tasks, smartlist):
         return [t for t in incomplete if task_local_date(t) == tomorrow]
     elif smartlist == "next7days":
         tasks = [t for t in incomplete if today <= task_local_date(t) <= in7days]
+        return sorted(tasks, key=lambda t: task_local_date(t))
+    elif smartlist == "overdue":
+        # day-level: strictly before today (today's timed tasks are today's
+        # business); dateless excluded ("" would sort before any date), notes
+        # carry dates as metadata, not obligations
+        tasks = [t for t in incomplete
+                 if t.get("kind") != "NOTE"
+                 and (task_local_date(t) or "~") < today]
         return sorted(tasks, key=lambda t: task_local_date(t))
     return []
 
