@@ -1584,7 +1584,7 @@ def crmperson():
         return
     tag = areas.LEAD_TAG if kind == "Lead" else areas.CUSTOMER_TAG
     cr.create_customer(name, *contact, tag=tag)
-    _crm_say(f"{'🌱 Lead' if kind == 'Lead' else '👤 Customer'} {name} created")
+    _crm_say(f"{'🎣 Lead' if kind == 'Lead' else '👤 Customer'} {name} created")
 
 
 def _choose_customer(prompt="Which customer?"):
@@ -2015,7 +2015,7 @@ def crmrename(tid):
         _crm_say("Not found · run tsy")
         return
     title = note.get("title") or ""
-    if title.startswith("👤"):
+    if title.startswith(("👤", "🎣")):
         new = _ask(f"{title} - new name?")
         if not (new or "").strip():
             _crm_say("Cancelled")

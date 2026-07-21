@@ -115,9 +115,13 @@ def _ensure_tag(tag):
         pass
 
 
+PERSON_RE = re.compile(r"^(?:👤|🎣)\s*")   # customer / lead note markers
+
+
 def customer_display(cust):
-    """'👤 Marko' → 'Marko' (note titles keep the marker, prose drops it)."""
-    return re.sub(r"^👤\s*", "", (cust or {}).get("title") or "").strip()
+    """'👤 Marko' / '🎣 Marko' → 'Marko' (note titles keep the marker,
+    prose drops it)."""
+    return PERSON_RE.sub("", (cust or {}).get("title") or "").strip()
 
 
 def contact_of(cust):
@@ -420,7 +424,7 @@ def entries_detailed():
             seen.add(lb["id"])
             hit = parse_first_link(lb.get("content") or "")
             cust_tid = hit[2] if hit else ""
-            cust_title = re.sub(r"^👤\s*", "", hit[0]).strip() if hit else ""
+            cust_title = PERSON_RE.sub("", hit[0]).strip() if hit else ""
             for m in ENTRY_RE.finditer(lb.get("content") or ""):
                 segs = [s.strip() for s in m.group(1).split("·")]
                 marker = segs[1] if len(segs) > 1 else ""
@@ -601,7 +605,9 @@ def rename_customer(cust_tid, new_name):
     cust = api.get_task(areas.RECORDS_ID, cust_tid)
     old_disp = customer_display(cust)
     new_disp = _safe_name(new_name)
-    new_title = f"👤 {new_disp}"
+    # Keep whichever person marker the note wears (🎣 lead vs 👤 customer).
+    old_mark = "🎣" if (cust.get("title") or "").startswith("🎣") else "👤"
+    new_title = f"{old_mark} {new_disp}"
     api.update_task(cust_tid, areas.RECORDS_ID, current=cust, title=new_title)
     _patch_cache(cust_tid, title=new_title)
     for lb in customer_logbooks(cust_tid):
@@ -653,7 +659,8 @@ def reopen_logbook(log_pid, log_tid):
 
 
 def convert_lead(cust):
-    """Lead → customer (first booking, or explicit). RMW retag + mirrors."""
+    """Lead → customer (first booking, or explicit). RMW retag + mirrors;
+    the 🎣 marker becomes 👤 and any logbook links follow suit."""
     if not is_lead(cust):
         return cust
     api = _api()
@@ -662,9 +669,19 @@ def convert_lead(cust):
             if str(t).lower() not in (areas.LEAD_TAG, areas.CUSTOMER_TAG)] \
         + [areas.CUSTOMER_TAG]
     _ensure_tag(areas.CUSTOMER_TAG)
-    api.update_task(cust["id"], areas.RECORDS_ID, current=live, tags=tags)
-    _patch_cache(cust["id"], tags=tags)
-    return {**cust, "tags": tags}
+    fields = {"tags": tags}
+    title = live.get("title") or ""
+    if title.startswith("🎣 "):
+        fields["title"] = "👤 " + title[len("🎣 "):]
+    api.update_task(cust["id"], areas.RECORDS_ID, current=live, **fields)
+    _patch_cache(cust["id"], **fields)
+    if "title" in fields:
+        for lb in customer_logbooks(cust["id"]):
+            try:
+                _swap_link_text_in_note(lb["id"], cust["id"], fields["title"])
+            except Exception:
+                pass
+    return {**cust, **fields}
 
 
 # ── cache mirrors (same pattern as dispatch.py's create path) ───────────────
@@ -804,6 +821,16 @@ def is_gratis(seg):
     return bool(seg and GRATIS_RE.fullmatch(seg.strip()))
 
 
+def gratis_count(content):
+    """How many sessions in this logbook were on the house."""
+    n = 0
+    for m in ENTRY_RE.finditer(content or ""):
+        segs = [s.strip() for s in m.group(1).split("·")]
+        if len(segs) > 3 and is_gratis(segs[3]):
+            n += 1
+    return n
+
+
 def _totals_raw(content):
     """(total_float, session_count, sym, sym_is_prefix) - the numeric core.
     Money sums segment 4 of every entry (consultation charges count); the
@@ -924,15 +951,17 @@ def _seg(v):
 
 
 def create_customer(name, phone="", mail="", bday="", insta="", tag=None):
-    """New 👤 customer note in the records list (tag=areas.LEAD_TAG mints a
-    lead - same note, different kanban group). Returns the created task."""
+    """New person note in the records list: 👤 customer, or 🎣 lead when
+    tag=areas.LEAD_TAG (same note shape, different marker + kanban group;
+    convert_lead swaps 🎣 → 👤). Returns the created task."""
     tag = tag or areas.CUSTOMER_TAG
     insta = ("@" + insta.lstrip("@")) if (insta or "").strip() else ""
     content = (f"📞 {_seg(phone)} · ✉️ {_seg(mail)} · 🎂 {_seg(bday)}"
                f" · 📸 {_seg(insta)}\n\n"
                "## Fun facts\n\n## Tattoos\n\n## Notes\n")
     _ensure_tag(tag)
-    t = _api().create_task(title=f"👤 {_safe_name(name)}",
+    mark = "🎣" if tag == areas.LEAD_TAG else "👤"
+    t = _api().create_task(title=f"{mark} {_safe_name(name)}",
                            project_id=areas.RECORDS_ID, content=content,
                            tags=[tag], kind="NOTE")
     _inject_cache(t)

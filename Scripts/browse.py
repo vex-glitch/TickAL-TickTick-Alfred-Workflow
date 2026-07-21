@@ -894,7 +894,7 @@ def render_crmnew(kind, query):
         if c["id"] in seen:
             continue
         seen.add(c["id"])
-        chip = " · 🌱 lead converts" if cr.is_lead(c) else ""
+        chip = " · 🎣 lead converts" if cr.is_lead(c) else ""
         rows.append(alfred.item(
             uid=f"crmnew-c-{c['id']}",
             title=c.get("title") or "Untitled",
@@ -1013,7 +1013,7 @@ def _cust_row(cr, c, uid_prefix="crms"):
     lead_chip = ""
     if cr.is_lead(c):
         age = cr.note_age_days(c)
-        lead_chip = f"🌱 lead · {age}d" if age is not None else "🌱 lead"
+        lead_chip = f"🎣 lead · {age}d" if age is not None else "🎣 lead"
     bd = cr.bday_next(_b)
     bits = [b for b in (
         f"📞 {phone}" if phone else (f"📸 {insta}" if insta else ""),
@@ -1041,7 +1041,7 @@ def _logbook_row(cr, lb, uid_prefix="crms"):
     note. Customer hub: ⌥ on the customer row, or ⌃ from the hub."""
     paid = cr.paid_summary(lb.get("content") or "")
     hit = cr.parse_first_link(lb.get("content") or "")
-    cust_name = re.sub(r"^👤\s*", "", hit[0]) if hit else ""
+    cust_name = cr.PERSON_RE.sub("", hit[0]) if hit else ""
     archived = _areas.ARCHIVE_TAG in {str(t).lower()
                                       for t in (lb.get("tags") or [])}
     if archived:
@@ -1068,7 +1068,8 @@ def _logbook_row(cr, lb, uid_prefix="crms"):
 
 def _crm_task_row(cr, t, uid_prefix="crms"):
     """Calendar task row for the CRM search: ⏎ opens, ⌘ Actions carries the
-    Session done row, dateless tasks read as dormant."""
+    Session done row, ⌥ jumps to the linked tattoo's logbook hub, dateless
+    tasks read as dormant."""
     due = t.get("dueDate") or t.get("startDate") or ""
     try:
         day = utc_str_to_local_date(due) if due else ""
@@ -1076,13 +1077,18 @@ def _crm_task_row(cr, t, uid_prefix="crms"):
         day = ""
     disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
     linked = cr.is_session_task(t.get("title") or "")
-    chip = "" if linked else " · 🔗 unlinked (⌘ → Link)"
+    chip = " · ⌥ hub" if linked else " · 🔗 unlinked (⌘ → Link)"
+    mods = _picker_mods()
+    hit = cr.parse_first_link(t.get("title") or "")
+    if hit:
+        mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
+                       "variables": {"browse_ctx": f"ctx:crmbook:{hit[2]}"}}
     return alfred.item(
         uid=f"{uid_prefix}-t-{t['id']}",
         title=f"📅 {disp}",
         subtitle=(f"{day or 'Dormant · not scheduled'}{chip}"),
         arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
-        mods=_picker_mods(),
+        mods=mods,
         variables={"task_id": t["id"], "task_list_id": CRM_ID,
                    "list_id": CRM_ID, "task_title": t.get("title") or "",
                    "item_type": "task"},
@@ -1136,17 +1142,13 @@ def render_crmweek(query):
         mods = _picker_mods()
         _l = cr.parse_first_link(t.get("title") or "")
         if _l:
-            _lb = next((x for x in cr.records_notes()
-                        if x.get("id") == _l[2]), None)
-            _c = cr.parse_first_link((_lb or {}).get("content") or "")
-            if _c:
-                mods["alt"] = {"arg": "", "valid": True,
-                               "subtitle": "Customer hub",
-                               "variables": {"browse_ctx": f"ctx:crmcust:{_c[2]}"}}
+            mods["alt"] = {"arg": "", "valid": True,
+                           "subtitle": "Logbook hub",
+                           "variables": {"browse_ctx": f"ctx:crmbook:{_l[2]}"}}
         rows.append(alfred.item(
             uid=f"wk-{t['id']}",
             title=f"📆 {when}{clock} · {disp}",
-            subtitle="⏎ Open · ⌘ Actions (Session done lives there)",
+            subtitle="⏎ Open · ⌘ Actions (Session done) · ⌥ hub",
             arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
             mods=mods,
             variables={"task_id": t["id"], "task_list_id": CRM_ID,
@@ -1171,9 +1173,14 @@ def render_crmweek(query):
             rows.append(alfred.item(
                 uid=f"wk-radar-{lb['id']}",
                 title=f"🔔 {lb.get('title') or ''}",
-                subtitle=f"Nothing scheduled · {chip} · ⏎ Schedule next session",
+                subtitle=f"Nothing scheduled · {chip} · "
+                         "⏎ Schedule next session · ⌥ hub",
                 arg=f"xact:crmnew_go:session::{lb['id']}",
-                mods=_picker_mods(),
+                mods={**_picker_mods(),
+                      "alt": {"arg": "", "valid": True,
+                              "subtitle": "Logbook hub",
+                              "variables": {
+                                  "browse_ctx": f"ctx:crmbook:{lb['id']}"}}},
                 variables=_record_vars(lb)))
     if query:
         rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
@@ -1196,9 +1203,11 @@ def render_crmbook(log_tid, query):
     hit = cr.parse_first_link(lb.get("content") or "")
     back = f"ctx:crmcust:{hit[2]}" if hit else "ctx:crmhub"
     n = cr.next_snum(lb.get("content") or "", log_tid)
+    g = cr.gratis_count(lb.get("content") or "")
     rows = [alfred.item(
         uid="bk-open", title=lb.get("title") or "Logbook",
         subtitle=cr.paid_summary(lb.get("content") or "")
+                 + (f" · 🖤 {g} gratis" if g else "")
                  + (" · 📁 archived" if archived else "") + " · ⏎ Open note",
         arg=_open_note_arg(log_tid), mods=_picker_mods(),
         variables=_record_vars(lb))]
@@ -1685,7 +1694,7 @@ def render_crmcust(cust_tid, query):
         f"{k} tattoo{'s' if k != 1 else ''}",
         f"{n} session{'s' if n != 1 else ''}",
         f"🎂 {bday}" if bday else "",
-        "🌱 lead" if cr.is_lead(cust) else "",
+        "🎣 lead" if cr.is_lead(cust) else "",
     ) if b)
     rows.append(alfred.item(
         uid="hub-open", title=cust.get("title") or name,
