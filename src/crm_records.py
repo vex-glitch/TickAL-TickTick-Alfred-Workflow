@@ -358,6 +358,16 @@ def cut_chip(raw_total, money_str=""):
     return f" · 🫵 {_fmt_money(raw_total * p / 100.0, sym, pre)}"
 
 
+def cut_rate_chip(rate, sym="€"):
+    """' · 🫵 ~60€/h' - the artist's share of an hourly rate. Without it the
+    €/h reads double what actually lands in the pocket (Vex catch
+    2026-07-21)."""
+    p = cut_percent()
+    if not p or not rate:
+        return ""
+    return f" · 🫵 ~{int(rate * p / 100.0)}{sym}/h"
+
+
 def sum_entries(entries, start=None, end=None):
     """(money_str, session_count, hours_float, raw_total) over entries whose
     date is in [start, end] (ISO date strings, inclusive; None = unbounded)."""

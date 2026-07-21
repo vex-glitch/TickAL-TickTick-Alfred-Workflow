@@ -1115,8 +1115,9 @@ def render_crmweek(query):
     import crm_records as cr
     from datetime import date as _date, datetime as _dt, timedelta as _td
 
-    def _local_dt(t):
-        due = t.get("dueDate") or t.get("startDate") or ""
+    def _local_dt(t, key=None):
+        due = (t.get(key) if key
+               else t.get("dueDate") or t.get("startDate")) or ""
         if not due:
             return None
         try:
@@ -1165,8 +1166,37 @@ def render_crmweek(query):
                             subtitle="The radar below is your move",
                             valid=False)]
 
-    # 🔔 radar: active logbook + nothing scheduled + last entry > 14d ago
-    cutoff = (today - _td(days=14)).isoformat()
+    # 💰 the ledger line: what this calendar week logged so far + what is
+    # still booked before Sunday (Vex tracks weekly cuts by hand).
+    monday = today - _td(days=today.weekday())
+    sunday = monday + _td(days=6)
+    wk_money, wk_n, _wh, wk_raw = cr.sum_entries(
+        cr.all_entries(), monday.isoformat(), sunday.isoformat())
+    bk_n, bk_h = 0, 0.0
+    for d, t in pool:
+        if d.date() > sunday:
+            continue
+        bk_n += 1
+        s, e2 = _local_dt(t, "startDate"), _local_dt(t, "dueDate")
+        if s and e2 and e2 > s:
+            bk_h += (e2 - s).total_seconds() / 3600.0
+    booked_bit = (f"{bk_n} booked" + (f" · {bk_h:g}h" if bk_h else "")
+                  if bk_n else "nothing booked")
+    rows.insert(0, alfred.item(
+        uid="wk-money",
+        title=f"💰 {wk_money}{cr.cut_chip(wk_raw, wk_money)} this week",
+        subtitle=f"Mon-Sun logged · ahead: {booked_bit}",
+        valid=False))
+
+    # 🔔 radar: active logbook + nothing scheduled + last entry beyond the
+    # crm_radar_days window (env knob, default 14 - crm_cut precedent).
+    def _days_env(name):
+        try:
+            v = int(float(os.environ.get(name, "") or 14))
+            return v if v > 0 else 14
+        except ValueError:
+            return 14
+    cutoff = (today - _td(days=_days_env("crm_radar_days"))).isoformat()
     for lb in cr.records_notes(_areas.LOGBOOK_TAG):
         if cr.next_session_task(lb["id"]):
             continue
@@ -1189,11 +1219,13 @@ def render_crmweek(query):
                                   "browse_ctx": f"ctx:crmbook:{lb['id']}"}}},
                 variables=_record_vars(lb)))
 
-    # 🎣 radar: leads sitting quiet past the same cutoff - nothing booked
-    # anywhere on their logbooks. Leads rot silently; bookings don't.
+    # 🎣 radar: leads sitting quiet past their own window (crm_lead_days,
+    # default 14) - nothing booked anywhere on their logbooks. Leads rot
+    # silently; bookings don't.
+    lead_days = _days_env("crm_lead_days")
     for ld in cr.records_notes(_areas.LEAD_TAG):
         age = cr.note_age_days(ld)
-        if age is None or age < 14:
+        if age is None or age < lead_days:
             continue
         if any(cr.next_session_task(lb["id"])
                for lb in cr.customer_logbooks(ld["id"])):
@@ -1365,7 +1397,8 @@ def render_crmmoney(sub, query):
         if mnum:
             r = float(mnum.group(0)) / hours
             symm = _re2.sub(r"[-\d.,\s]", "", money) or "€"
-            rate = f" · {hours:g}h · ~{int(r)}{symm}/h"
+            rate = (f" · {hours:g}h · ~{int(r)}{symm}/h"
+                    + cr.cut_rate_chip(r, symm))
     pinned = [
         alfred.item(uid="mo-total",
                     title=f"💰 All time · {money}{cr.cut_chip(raw, money)}"
@@ -1461,11 +1494,14 @@ def render_crmstats(sub, query):
                             subtitle=f"{label} · money made · 🫵 = your cut",
                             valid=False)]
         if k["hours"]:
-            rate = f" · ~{int(k['rate'])}{k['sym']}/h" if k["rate"] else ""
+            rate = ((f" · ~{int(k['rate'])}{k['sym']}/h"
+                     + cr.cut_rate_chip(k["rate"], k["sym"]))
+                    if k["rate"] else "")
             rows.append(alfred.item(
                 uid="kp-hours", title=f"🧮 {k['hours']:g}h{rate}"
                 + _delta_chip(k["hours"], p and p["hours"]),
-                subtitle="Hours in the chair · effective rate", valid=False))
+                subtitle="Hours in the chair · effective rate · 🫵 = your cut",
+                valid=False))
         rows.append(alfred.item(
             uid="kp-sess", title=f"🪡 {k['sessions']} session"
             + ("s" if k["sessions"] != 1 else "")
