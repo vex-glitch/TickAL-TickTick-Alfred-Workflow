@@ -3573,6 +3573,9 @@ def dateclear(key):
     msg = f"📅 {done} cleared" + _exempt_bits(rep, crm)
     if failed:
         msg += f" · {failed} failed"
+    if key == "buffer" and not failed:
+        _write_buffer([])           # house rule: a buffer bulk clears it
+        msg += " · buffer cleared"
     print(msg)
 
 
@@ -3608,6 +3611,9 @@ def dateroll(key):
     msg = f"⏭️ {done} rolled to today" + _exempt_bits(rep, crm)
     if failed:
         msg += f" · {failed} failed"
+    if key == "buffer" and not failed:
+        _write_buffer([])           # house rule: a buffer bulk clears it
+        msg += " · buffer cleared"
     print(msg)
 
 

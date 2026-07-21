@@ -131,11 +131,9 @@ def get_hint_items(raw_query):
         # browse edge - it exits through the modOpen shell (xact:*|open:*),
         # so the BrowseCtx trampoline reopens the buffer view (the crmhub
         # navigation pattern). ⌥ kept as a mirror for old muscle memory.
-        try:
-            with open(run_path("tickal_buffer.txt")) as f:
-                n = len([ln for ln in f if ln.strip()])
-        except OSError:
-            n = 0
+        # buffer_pairs SELF-HEALS: dead lines drop, no phantom row.
+        from display import buffer_pairs
+        n = len(buffer_pairs())
         if n:
             rows.insert(0, alfred.item(
                 title=f"🅿️ Buffer · {n} task{'s' if n != 1 else ''}",

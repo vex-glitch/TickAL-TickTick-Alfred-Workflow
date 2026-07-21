@@ -2236,11 +2236,8 @@ def render_crmprep(query):
 
 # ── Level: buffer (🅿️ - tasks collected via ⌘/⌥⇧) ───────────────────────────
 def render_buffer(query):
-    try:
-        with open(run_path("tickal_buffer.txt")) as f:
-            pairs = [ln.strip().split(":", 1) for ln in f if ln.strip()]
-    except OSError:
-        pairs = []
+    from display import buffer_pairs
+    pairs = buffer_pairs()   # self-healed: dead lines drop, file rewrites
     all_tasks = cache_store.get("all_tasks") or []
     by_id = {t["id"]: t for t in all_tasks}
     items = []

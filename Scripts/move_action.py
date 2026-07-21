@@ -62,12 +62,23 @@ def _buffer_lines():
         return []
 
 
+def _clear_buffer():
+    """House convention (_buffer_apply's): a buffer-wide bulk CLEARS the
+    buffer - a finished job leaving lines behind reads as a phantom
+    '🅿️ Buffer · N' in search (bit Vex 2026-07-21)."""
+    try:
+        open(run_path("tickal_buffer.txt"), "w").close()
+    except OSError:
+        pass
+
+
 def _buffer_move(api, rest):
     """🧺 BUFFER sentinel: apply the picked target to every buffered task -
     the move picker runs unchanged for the buffer, only the executor loops
     (delete_action/priority_action pattern; this branch was MISSING and the
     API got literal 'BUFFER' ids → empty-200 → 'Expecting value' JSON error).
-    Buffer stays intact afterwards (attr_move parity)."""
+    The buffer CLEARS afterwards (_buffer_apply parity - every other
+    buffer bulk does; leftover lines haunt search as a phantom row)."""
     lines = _buffer_lines()
     if not lines:
         print("🅿️ Buffer is empty")
@@ -85,7 +96,8 @@ def _buffer_move(api, rest):
                 done += 1
             except Exception:
                 pass
-        print(f"🅿️ {done} moved to {lname or 'list'}")
+        _clear_buffer()
+        print(f"🅿️ {done} moved to {lname or 'list'} · buffer cleared")
     elif rest.startswith("section:"):
         _, list_id, col_id = rest.split(":", 2)
         lname = _list_name(list_id)
@@ -101,7 +113,8 @@ def _buffer_move(api, rest):
                 done += 1
             except Exception:
                 pass
-        print(f"🅿️ {done} moved to the section")
+        _clear_buffer()
+        print(f"🅿️ {done} moved to the section · buffer cleared")
     elif rest.startswith("task:"):
         _, parent_pid, parent_tid = rest.split(":", 2)
         import focus_subtasks as fsub
@@ -133,10 +146,11 @@ def _buffer_move(api, rest):
                 done += 1
             except Exception:
                 pass
+        _clear_buffer()
         msg = f"🅿️ {done} → subtasks of {pname[:30]}"
         if skipped:
             msg += f" · {skipped} skipped"
-        print(msg)
+        print(msg + " · buffer cleared")
     else:
         print(f"Error: unexpected buffer move target: {rest!r}")
 

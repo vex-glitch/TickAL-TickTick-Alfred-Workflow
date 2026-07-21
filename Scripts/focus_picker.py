@@ -193,9 +193,9 @@ def _staged_children(tid):
 
 def _buffer_count():
     try:
-        with open(run_path("tickal_buffer.txt")) as f:
-            return len([ln for ln in f if ln.strip()])
-    except OSError:
+        from display import buffer_pairs
+        return len(buffer_pairs())   # self-healed count
+    except Exception:
         return 0
 
 

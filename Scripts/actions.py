@@ -265,11 +265,8 @@ def main():
     # with the BUFFER sentinel; dispatch loops the buffer file.
     if itype == "buffer_item":
         try:
-            try:
-                with open(run_path("tickal_buffer.txt")) as _bf:
-                    _n = len([ln for ln in _bf if ln.strip()])
-            except OSError:
-                _n = 0
+            from display import buffer_pairs
+            _n = len(buffer_pairs())   # self-healed count
             sent = {"task_id": "BUFFER", "task_list_id": "BUFFER", "list_id": "",
                     "section_id": "", "item_type": "buffer_item",
                     "task_title": f"🅿️ Buffer ({_n})"}

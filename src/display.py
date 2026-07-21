@@ -206,6 +206,38 @@ def buffered_ids():
     return _BUFFERED_IDS
 
 
+def buffer_pairs():
+    """(pid, tid) buffer lines, SELF-HEALED: entries whose task is gone or
+    closed in the cache (completed / deleted / abandoned since buffering)
+    are dropped AND the file rewrites - a dead line otherwise haunts search
+    as an immortal '🅿️ Buffer · N' phantom row with no user-side exit.
+    cache=None → no judgement, no heal. Every buffer count/render reads
+    through here; xact's writers keep their raw reads."""
+    try:
+        with open(run_path("tickal_buffer.txt")) as f:
+            pairs = [ln.strip().split(":", 1) for ln in f
+                     if ln.strip() and ":" in ln]
+    except OSError:
+        return []
+    if not pairs:
+        return []
+    import cache as cache_store
+    tasks = cache_store.get("all_tasks")
+    notes = cache_store.get("all_notes")
+    if tasks is None and notes is None:
+        return pairs
+    alive = {t.get("id") for t in (tasks or []) + (notes or [])
+             if t.get("status", 0) == 0}
+    healed = [p for p in pairs if p[1] in alive]
+    if len(healed) < len(pairs):
+        try:
+            with open(run_path("tickal_buffer.txt"), "w") as f:
+                f.write("".join(f"{p}:{t}\n" for p, t in healed))
+        except OSError:
+            pass
+    return healed
+
+
 def build_title(task, buffered=False):
     """
     Build the Alfred item title field (the breadcrumb now lives in the subtitle).
