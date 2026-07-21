@@ -14,7 +14,7 @@ import json
 
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from script_base import bootstrap, reopen_actions
+from script_base import bootstrap, reopen_actions, run_path
 bootstrap()
 
 import config as cfg
@@ -53,6 +53,94 @@ def _update_temp(pid, tid):
 from dispatch import _patch_task_cache
 
 
+def _buffer_lines():
+    try:
+        with open(run_path("tickal_buffer.txt")) as f:
+            return [ln.strip().split(":", 1) for ln in f
+                    if ln.strip() and ":" in ln]
+    except OSError:
+        return []
+
+
+def _buffer_move(api, rest):
+    """🧺 BUFFER sentinel: apply the picked target to every buffered task -
+    the move picker runs unchanged for the buffer, only the executor loops
+    (delete_action/priority_action pattern; this branch was MISSING and the
+    API got literal 'BUFFER' ids → empty-200 → 'Expecting value' JSON error).
+    Buffer stays intact afterwards (attr_move parity)."""
+    lines = _buffer_lines()
+    if not lines:
+        print("🅿️ Buffer is empty")
+        return
+    done = 0
+    if rest.startswith("list:"):
+        new_pid = rest[5:]
+        lname = _list_name(new_pid)
+        for bpid, btid in lines:
+            try:
+                api.move_task(btid, bpid, new_pid)
+                _patch_task_cache(btid, projectId=new_pid, _projectId=new_pid,
+                                  _projectName=lname, columnId=None,
+                                  _columnName="", parentId=None)
+                done += 1
+            except Exception:
+                pass
+        print(f"🅿️ {done} moved to {lname or 'list'}")
+    elif rest.startswith("section:"):
+        _, list_id, col_id = rest.split(":", 2)
+        lname = _list_name(list_id)
+        for bpid, btid in lines:
+            try:
+                live = api.get_task(bpid, btid)   # BEFORE any move (race)
+                if list_id != bpid:
+                    api.move_task(btid, bpid, list_id)
+                api.update_task(btid, list_id, current=live, columnId=col_id)
+                _patch_task_cache(btid, projectId=list_id, _projectId=list_id,
+                                  _projectName=lname, columnId=col_id,
+                                  parentId=None)
+                done += 1
+            except Exception:
+                pass
+        print(f"🅿️ {done} moved to the section")
+    elif rest.startswith("task:"):
+        _, parent_pid, parent_tid = rest.split(":", 2)
+        import focus_subtasks as fsub
+        all_tasks = cache_store.get("all_tasks") or []
+        pname = next((t.get("title", "") for t in all_tasks
+                      if t["id"] == parent_tid), "the task")
+        lname = _list_name(parent_pid)
+        skipped = 0
+        for bpid, btid in lines:
+            # a buffered parent target / ancestor would loop - and the
+            # server ACCEPTS parent cycles (live-verified 2026-07-21)
+            if btid == parent_tid or fsub.would_cycle(
+                    parent_tid, btid, cache_store.find_task):
+                skipped += 1
+                continue
+            try:
+                # live BEFORE the move: a GET from the new project right
+                # after move_task races replication (empty-200 → JSON error)
+                live = api.get_task(bpid, btid)
+                fields = {"parentId": parent_tid}
+                if parent_pid != bpid:
+                    api.move_task(btid, bpid, parent_pid)
+                    fields["columnId"] = None
+                api.update_task(btid, parent_pid, current=live, **fields)
+                _patch_task_cache(btid, projectId=parent_pid,
+                                  _projectId=parent_pid, _projectName=lname,
+                                  parentId=parent_tid, columnId=None,
+                                  _columnName="")
+                done += 1
+            except Exception:
+                pass
+        msg = f"🅿️ {done} → subtasks of {pname[:30]}"
+        if skipped:
+            msg += f" · {skipped} skipped"
+        print(msg)
+    else:
+        print(f"Error: unexpected buffer move target: {rest!r}")
+
+
 def main():
     arg        = sys.argv[1] if len(sys.argv) > 1 else ""
     task_title = os.environ.get("task_title", "Task")
@@ -80,6 +168,11 @@ def main():
     api = TickTickAPI(cfg.get_token())
 
     try:
+        # ── 🧺 Buffer: the sentinel loops every buffered task ────────────────
+        if tid == "BUFFER":
+            _buffer_move(api, rest)
+            return
+
         # ── List move ─────────────────────────────────────────────────────────
         if rest.startswith("list:"):
             new_pid  = rest[5:]
@@ -99,10 +192,13 @@ def main():
         # ── Section move ──────────────────────────────────────────────────────
         elif rest.startswith("section:"):
             _, list_id, col_id = rest.split(":", 2)
+            # live BEFORE any move: a GET from the new project right after
+            # move_task races replication (empty-200 → 'Expecting value')
+            live = api.get_task(old_pid, tid)
             if list_id != old_pid:
                 # Cross-list: move first, then set column
                 api.move_task(tid, old_pid, list_id)
-            api.update_task(tid, list_id, columnId=col_id)
+            api.update_task(tid, list_id, current=live, columnId=col_id)
             # Resolve section name for notification
             section_name = ""
             pdata = cache_store.get(f"project_data_{list_id}")
@@ -127,13 +223,23 @@ def main():
         # ── Parent task (make subtask) ─────────────────────────────────────────
         elif rest.startswith("task:"):
             _, parent_pid, parent_tid = rest.split(":", 2)
+            import focus_subtasks as fsub
+            if parent_tid == tid or fsub.would_cycle(
+                    parent_tid, tid, cache_store.find_task):
+                print(f"Error: {task_title} can't be its own ancestor")
+                return
             # Resolve parent title before any mutation
             all_tasks    = cache_store.get("all_tasks") or []
             parent_title = next((t.get("title", "") for t in all_tasks if t["id"] == parent_tid), "")
+            # live BEFORE any move: a GET from the new project right after
+            # move_task races replication (empty-200 → 'Expecting value')
+            live = api.get_task(old_pid, tid)
+            fields = {"parentId": parent_tid}
             if parent_pid != old_pid:
                 # Cross-list: move task to parent's list first
                 api.move_task(tid, old_pid, parent_pid)
-            api.update_task(tid, parent_pid, parentId=parent_tid)
+                fields["columnId"] = None
+            api.update_task(tid, parent_pid, current=live, **fields)
             lname = _list_name(parent_pid)
             _patch_task_cache(tid,
                               projectId=parent_pid,

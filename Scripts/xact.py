@@ -3846,8 +3846,10 @@ def fx_unstage(pid, tid):
     applied_parent = None
     if origin.get("parent") and dest_pid == origin.get("pid"):
         try:
-            fresh = api.get_task(dest_pid, tid)
-            api.update_task(tid, dest_pid, current=fresh,
+            # `live` from BEFORE the move - a fresh GET from the new project
+            # races replication (empty-200); the full-object post with the
+            # projectId/parentId overrides is what counts
+            api.update_task(tid, dest_pid, current=live,
                             parentId=origin["parent"])
             applied_parent = origin["parent"]
         except Exception:
