@@ -168,7 +168,7 @@
 		<array>
 			<dict>
 				<key>destinationuid</key>
-				<string>0FE70005-90A1-4B2C-8D3E-000000000005</string>
+				<string>B31D6E2A-0000-4000-9000-2026072400FF</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -1709,6 +1709,30 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>B31D6E28-0000-4000-9000-2026072400FF</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>B31D6E29-0000-4000-9000-2026072400FF</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>51D50972-BAE6-4C3B-BFBF-40384532F712</key>
 		<array>
@@ -3113,6 +3137,71 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>B31D6E21-0000-4000-9000-2026072400FF</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>B31D6E22-0000-4000-9000-2026072400FF</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E24-0000-4000-9000-2026072400FF</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>B31D6E23-0000-4000-9000-2026072400FF</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E24-0000-4000-9000-2026072400FF</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>B31D6E25-0000-4000-9000-2026072400FF</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E26-0000-4000-9000-2026072400FF</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>B31D6E26-0000-4000-9000-2026072400FF</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E27-0000-4000-9000-2026072400FF</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>B31D6E2A-0000-4000-9000-2026072400FF</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E2B-0000-4000-9000-2026072400FF</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -5012,6 +5101,34 @@ fi</string>
 						<string>People</string>
 						<key>uid</key>
 						<string>B31D6E05-4E7A-4C3D-9A66-2026072400EE</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>countdowns</string>
+						<key>outputlabel</key>
+						<string>Countdowns</string>
+						<key>uid</key>
+						<string>B31D6E28-0000-4000-9000-2026072400FF</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>habits</string>
+						<key>outputlabel</key>
+						<string>Habits</string>
+						<key>uid</key>
+						<string>B31D6E29-0000-4000-9000-2026072400FF</string>
 					</dict>
 				</array>
 				<key>elselabel</key>
@@ -9193,29 +9310,6 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>102</integer>
-				<key>script</key>
-				<string>open "ticktick://habit"</string>
-				<key>scriptargtype</key>
-				<integer>1</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>0FE70005-90A1-4B2C-8D3E-000000000005</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
@@ -10318,7 +10412,7 @@ esac</string>
 				<key>skipuniversalaction</key>
 				<true/>
 				<key>subtext</key>
-				<string>Habits view</string>
+				<string>🔄 Tick, streaks, diary</string>
 				<key>text</key>
 				<string>Habits · TickAL</string>
 				<key>withspace</key>
@@ -12335,58 +12429,6 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>argumenttype</key>
-				<integer>2</integer>
-				<key>keyword</key>
-				<string>{var:people_kw}</string>
-				<key>skipuniversalaction</key>
-				<true/>
-				<key>subtext</key>
-				<string>👽 Cards, CTAs, log, stats</string>
-				<key>text</key>
-				<string>People · TickAL</string>
-				<key>withspace</key>
-				<false/>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.input.keyword</string>
-			<key>uid</key>
-			<string>B31D6E10-0000-4000-9000-2026072400FF</string>
-			<key>version</key>
-			<integer>1</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>B31D6E11-0000-4000-9000-2026072400FF</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
 				<string>People</string>
 				<key>passinputasargument</key>
@@ -12406,6 +12448,37 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>123</integer>
+				<key>hotmod</key>
+				<integer>12451840</integer>
+				<key>hotstring</key>
+				<string>←</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>B31D6E11-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
@@ -12415,6 +12488,29 @@ esac</string>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
 			<string>B31D6E13-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:people_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>👽 Cards, CTAs, log, stats</string>
+				<key>text</key>
+				<string>People · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>B31D6E10-0000-4000-9000-2026072400FF</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -12483,35 +12579,6 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>B31D6E17-0000-4000-9000-2026072400FF</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
 				<string>Bridges</string>
 				<key>passinputasargument</key>
@@ -12527,6 +12594,37 @@ esac</string>
 			<string>B31D6E18-0000-4000-9000-2026072400FF</string>
 			<key>version</key>
 			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>16</integer>
+				<key>hotmod</key>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>Y</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>B31D6E17-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>2</integer>
 		</dict>
 		<dict>
 			<key>config</key>
@@ -12608,35 +12706,6 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>action</key>
-				<integer>0</integer>
-				<key>argument</key>
-				<integer>0</integer>
-				<key>focusedappvariable</key>
-				<false/>
-				<key>focusedappvariablename</key>
-				<string></string>
-				<key>hotkey</key>
-				<integer>0</integer>
-				<key>hotmod</key>
-				<integer>0</integer>
-				<key>leftcursor</key>
-				<false/>
-				<key>modsmode</key>
-				<integer>2</integer>
-				<key>relatedAppsMode</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.trigger.hotkey</string>
-			<key>uid</key>
-			<string>B31D6E1D-0000-4000-9000-2026072400FF</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
 				<key>externaltriggerid</key>
 				<string>PersonLog</string>
 				<key>passinputasargument</key>
@@ -12656,6 +12725,37 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>124</integer>
+				<key>hotmod</key>
+				<integer>12451840</integer>
+				<key>hotstring</key>
+				<string>→</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>B31D6E1D-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
@@ -12665,6 +12765,25 @@ esac</string>
 			<string>alfred.workflow.trigger.external</string>
 			<key>uid</key>
 			<string>B31D6E1F-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Browse</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>B31D6E21-0000-4000-9000-2026072400FF</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -12691,6 +12810,112 @@ esac</string>
 		<dict>
 			<key>config</key>
 			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:countdown_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>⏳ Days until, count-ups, birthdays</string>
+				<key>text</key>
+				<string>Countdowns · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>B31D6E22-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>B31D6E23-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Countdowns</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>B31D6E24-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>Countdowns</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>B31D6E25-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argument</key>
+				<string></string>
+				<key>passthroughargument</key>
+				<false/>
+				<key>variables</key>
+				<dict>
+					<key>browse_ctx</key>
+					<string>ctx:countdowns</string>
+				</dict>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.argument</string>
+			<key>uid</key>
+			<string>B31D6E26-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
 				<key>externaltriggerid</key>
 				<string>Browse</string>
 				<key>passinputasargument</key>
@@ -12703,7 +12928,46 @@ esac</string>
 			<key>type</key>
 			<string>alfred.workflow.output.callexternaltrigger</string>
 			<key>uid</key>
-			<string>B31D6E21-0000-4000-9000-2026072400FF</string>
+			<string>B31D6E27-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argument</key>
+				<string></string>
+				<key>passthroughargument</key>
+				<false/>
+				<key>variables</key>
+				<dict>
+					<key>browse_ctx</key>
+					<string>ctx:habits</string>
+				</dict>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.argument</string>
+			<key>uid</key>
+			<string>B31D6E2A-0000-4000-9000-2026072400FF</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Browse</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>B31D6E2B-0000-4000-9000-2026072400FF</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
@@ -12869,15 +13133,6 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<integer>3</integer>
 			<key>xpos</key>
 			<real>2940.0</real>
-			<key>ypos</key>
-			<real>2350.0</real>
-		</dict>
-		<key>0FE70005-90A1-4B2C-8D3E-000000000005</key>
-		<dict>
-			<key>colorindex</key>
-			<integer>1</integer>
-			<key>xpos</key>
-			<real>3165.0</real>
 			<key>ypos</key>
 			<real>2350.0</real>
 		</dict>
@@ -15556,6 +15811,84 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>ypos</key>
 			<real>4855.0</real>
 		</dict>
+		<key>B31D6E22-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>7</integer>
+			<key>note</key>
+			<string>COUNTDOWNS</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>4955.0</real>
+		</dict>
+		<key>B31D6E23-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>COUNTDOWNS</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>4955.0</real>
+		</dict>
+		<key>B31D6E24-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>4955.0</real>
+		</dict>
+		<key>B31D6E25-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>note</key>
+			<string>ET Countdowns</string>
+			<key>xpos</key>
+			<real>2400.0</real>
+			<key>ypos</key>
+			<real>4955.0</real>
+		</dict>
+		<key>B31D6E26-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>note</key>
+			<string>→ ctx:countdowns</string>
+			<key>xpos</key>
+			<real>2560.0</real>
+			<key>ypos</key>
+			<real>4985.0</real>
+		</dict>
+		<key>B31D6E27-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>2720.0</real>
+			<key>ypos</key>
+			<real>4985.0</real>
+		</dict>
+		<key>B31D6E2A-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>note</key>
+			<string>→ ctx:habits</string>
+			<key>xpos</key>
+			<real>2560.0</real>
+			<key>ypos</key>
+			<real>2380.0</real>
+		</dict>
+		<key>B31D6E2B-0000-4000-9000-2026072400FF</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>2720.0</real>
+			<key>ypos</key>
+			<real>2380.0</real>
+		</dict>
 		<key>B438F2BF-DDDB-4FD6-B4F3-2471B890A94B</key>
 		<dict>
 			<key>colorindex</key>
@@ -17109,6 +17442,27 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<string>textfield</string>
 			<key>variable</key>
 			<string>plog_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tco</string>
+				<key>placeholder</key>
+				<string>tco</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>⏳ Countdowns hub - days until, count-ups, stats</string>
+			<key>label</key>
+			<string>[keyword] Countdowns</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>countdown_kw</string>
 		</dict>
 		<dict>
 			<key>config</key>
