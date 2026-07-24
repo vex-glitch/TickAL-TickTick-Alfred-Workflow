@@ -177,6 +177,12 @@ def tag_link(tag):
     #t/8J-UpWNybQ/tasks). The Mac app's ticktick:// handler IGNORES tag routes
     (#q/all/tag/…, #t/…, v1/show?tag= all tested dead against the real app),
     so this must stay an https URL - it opens the logged-in web app.
+
+    RETESTED 2026-07-24 on 8.0.75: still dead (#t/, #q/all/tag/, #search/
+    all ignored, AX-verified the app never navigates). sdef has no nav
+    commands; the binary HAS openTag: but exposes no external door. An AX
+    sidebar-row click was proposed and REJECTED by Vex (UI gimmick - if
+    it needs clicking pixels, leave it dead). Do not re-propose.
     """
     import base64
     enc = base64.urlsafe_b64encode(tag.encode()).decode().rstrip("=")
