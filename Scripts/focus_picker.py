@@ -577,6 +577,10 @@ def render_running(st, raw):
                 subtitle="Bring back the pill  ⌃🔙",
                 arg="xact:bar_show", valid=True, mods=BACK))
     items.append(alfred.item(
+        uid="fp-backlog", title="🕰️ Log past focus",
+        subtitle="When it started, when it ended - task or random…",
+        arg="", valid=False, autocomplete="log ", mods=BACK))
+    items.append(alfred.item(
         uid="fp-discard", title="🚮 Discard",
         subtitle="Stop without logging anything  ⌃🔙",
         arg="xact:focus_discard", valid=True, mods=BACK))
@@ -740,6 +744,9 @@ def render_pomo(state, remaining, raw):
                     title="↗️ Pomodoro view",
                     subtitle="Open in TickTick  ⌃🔙",
                     arg="xact:view_open:pomo", valid=True, mods=BACK),
+        alfred.item(uid="fp-backlog", title="🕰️ Log past focus",
+                    subtitle="When it started, when it ended - task or random…",
+                    arg="", valid=False, autocomplete="log ", mods=BACK),
     ]
     if bound:
         rows[1:1] = _session_rows(bound.get("pid", ""), bound["tid"])
