@@ -66,10 +66,16 @@ check("3.bday-bad-date", pe.parse_birthday("1993/02/31") is None)
 
 # ── 4. log: insert prepends, missing heading appends ─────────────────────────
 l1 = pe.log_line("met at market", datetime(2026, 7, 24, 14, 30))
-check("4.line", l1 == "- 2026-07-24 14:30 - met at market")
+check("4.line", l1 == "- met at market\n\t- *2026-07-24 14:30*")
 c2 = pe.log_insert(CARD, l1)
 check("4.prepend-under-heading",
-      "## 🧾 Log\n- 2026-07-24 14:30 - met at market" in c2, repr(c2[-70:]))
+      "## 🧾 Log\n- met at market\n\t- *2026-07-24 14:30*" in c2,
+      repr(c2[-70:]))
+check("4.entries", pe.log_entries(c2)
+      == [("met at market", "2026-07-24 14:30")])
+check("4.entries-legacy", pe.log_entries(
+    "## 🧾 Log\n- 2026-07-20 09:00 - old call\n")
+    == [("old call", "2026-07-20 09:00")])
 c3 = pe.log_insert(c2, "- 2026-07-25 09:00 - called")
 check("4.newest-on-top", c3.index("2026-07-25") < c3.index("2026-07-24"))
 check("4.card-untouched", "Birthday: 1993/06/27" in c3)
@@ -144,8 +150,14 @@ check("6c.facts-coexist", pe.ideas_body(pe.ideas_insert(cf2, "- socks"))
 check("6.skel-sections", all(h in pe.CARD_SKEL for h in
                              (pe.SEC_CARD, pe.SEC_FACTS, pe.SEC_IDEAS,
                               pe.SEC_LOG)))
-check("6.skel-fields", all(f in pe.CARD_SKEL for f in
-                           ("Birthday: ", "Phone: ", "Mail: ")))
+check("6.skel-fields", all(f"{f}: " in pe.CARD_SKEL
+                           for f in pe.CARD_FIELDS))
+check("6.field-set-replace", pe.card_field(
+    pe.card_field_set(pe.CARD_SKEL, "Instagram", "@goga"), "Instagram")
+    == "@goga")
+check("6.field-set-insert", pe.card_field(pe.card_field_set(
+    "## 📇 Card\nPhone: 1\n\n## 🧾 Log\n", "Mail", "a@b.c"), "Mail")
+    == "a@b.c")
 
 print(f"people suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:

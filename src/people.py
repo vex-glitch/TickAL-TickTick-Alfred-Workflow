@@ -38,11 +38,14 @@ SEC_FACTS = "## 💬 Facts"        # conversation starters ("cat named Garfield"
 SEC_IDEAS = "## 🎁 Ideas"
 SEC_LOG = "## 🧾 Log"
 
+CARD_FIELDS = ("Birthday", "Phone", "Mail", "Instagram")
+
 CARD_SKEL = (
     "## 📇 Card\n"
     "Birthday: \n"
     "Phone: \n"
     "Mail: \n"
+    "Instagram: \n"
     "\n"
     "## 💬 Facts\n"
     "\n"
@@ -112,10 +115,35 @@ def circle_chip(tags):
 # ── card fields ──────────────────────────────────────────────────────────────
 
 def card_field(content, field):
-    """'Birthday:' / 'Phone:' / 'Mail:' value from the 📇 Card section."""
-    m = re.search(rf"^{re.escape(field)}:\s*(.*?)\s*$",
+    """'Birthday:' / 'Phone:' / … value from the 📇 Card section.
+    [ \\t]* only - a \\s* after the colon crosses the newline on an EMPTY
+    field and steals the next line as the value (review-era bug class)."""
+    m = re.search(rf"^{re.escape(field)}:[ \t]*(.*?)[ \t]*$",
                   content or "", re.M | re.I)
     return m.group(1).strip() if m else ""
+
+
+def card_field_set(content, field, value):
+    """Set 'Field: value' in the 📇 Card section - replaces the existing
+    line, inserts one when missing, mints the section when absent."""
+    c = content or ""
+    line = f"{field}: {value.strip()}"
+    m = re.search(rf"^{re.escape(field)}:.*$", c, re.M | re.I)
+    if m:
+        return c[:m.start()] + line + c[m.end():]
+    span = _sec_span(c, SEC_CARD)
+    if span is None:
+        sep = "" if not c else ("\n" if c.endswith("\n") else "\n\n")
+        return f"{SEC_CARD}\n{line}\n\n{c}" if not c else \
+            f"{SEC_CARD}\n{line}\n\n" + c
+    start, end = span
+    body = c[start:end]
+    last = None
+    for fm in re.finditer(r"^[A-Za-z]+:.*$", body, re.M):
+        last = fm
+    at = start + (last.end() if last else 0)
+    return c[:at] + ("\n" if last else "\n") + line + c[at:] if last else \
+        c[:start] + "\n" + line + c[start:]
 
 
 def parse_birthday(value):
@@ -152,12 +180,45 @@ def parse_birthday(value):
 
 # ── log ──────────────────────────────────────────────────────────────────────
 
-_LOG_DATE_RE = re.compile(r"^-\s+(\d{4}-\d{2}-\d{2})\b", re.M)
+# dates live on the indented *stamp* line now; legacy top-level
+# '- YYYY-MM-DD…' entries (CRM style) still parse
+_LOG_DATE_RE = re.compile(r"^[ \t]*-\s+\*?(\d{4}-\d{2}-\d{2})", re.M)
 
 
 def log_line(text, now=None):
+    """Two lines: the entry, then the tab-indented italic datestamp
+    (Vex re-rule 2026-07-24 - the text leads, the clock whispers)."""
     ts = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
-    return f"- {ts} - {text.strip()}"
+    return f"- {text.strip()}\n\t- *{ts}*"
+
+
+def log_entries(content):
+    """[(text, stamp)] pairs from the Log, newest-first as stored. Both
+    grammars parse: entry + indented *stamp*, and legacy '- ts - text'."""
+    out = []
+    lines = log_body(content).splitlines()
+    i = 0
+    while i < len(lines):
+        m = re.match(r"^-\s+(.*)$", lines[i])
+        if not m:
+            i += 1
+            continue
+        txt = m.group(1).strip()
+        lm = re.match(
+            r"^(\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?)\s*-\s*(.*)$", txt)
+        if lm:
+            out.append((lm.group(2).strip(), lm.group(1)))
+            i += 1
+            continue
+        stamp = ""
+        if i + 1 < len(lines):
+            sm = re.match(r"^[ \t]+-\s+\*(.+?)\*\s*$", lines[i + 1])
+            if sm:
+                stamp = sm.group(1)
+                i += 1
+        out.append((txt, stamp))
+        i += 1
+    return out
 
 
 def _sec_span(content, heading):

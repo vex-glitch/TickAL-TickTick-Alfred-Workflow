@@ -4933,6 +4933,35 @@ def person_idea(rest):
     app_sync_after_write()
 
 
+def person_edit(rest):
+    """📇 One card field via dialog, current value prefilled.
+    rest = field:pid:tid (field from people.CARD_FIELDS)."""
+    import people as pe
+    field, _, r2 = rest.partition(":")
+    pid, _, tid = r2.partition(":")
+    if field not in pe.CARD_FIELDS:
+        _crm_say(f"📇 Unknown field: {field}")
+        return
+    api = _api()
+    try:
+        live = api.get_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    cur = pe.card_field(live.get("content") or "", field)
+    a = _ask(f"📇 {field} (Esc cancels · empty clears)", default=cur)
+    if a is None:
+        _crm_say("📇 Cancelled")
+        return
+    new = pe.card_field_set(live.get("content") or "", field, a.strip())
+    api.update_task(tid, pid, current=live, content=new)
+    _patch_content_cache(tid, new)
+    shown = a.strip() or "cleared"
+    _crm_say(f"📇 {field} · {shown} · "
+             f"{pe.person_name(live.get('title') or '')}")
+    app_sync_after_write()
+
+
 def person_fact(rest):
     """💬 Conversation starter onto the card ('Has a cat named Garfield').
     Typed beats clipboard; bare bullet, no timestamp - facts don't age."""
@@ -5582,6 +5611,8 @@ def main():
             person_idea(rest)
         elif verb == "person_fact":
             person_fact(rest)
+        elif verb == "person_edit":
+            person_edit(rest)
         elif verb == "person_idea_from":
             person_idea_from(rest)
         elif verb == "person_setup":

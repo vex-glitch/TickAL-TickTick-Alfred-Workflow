@@ -2380,6 +2380,25 @@ def render_people(level, ids, query):
             return add_back([alfred.item(
                 title="Card not cached yet · sync or reopen",
                 valid=False)], "ctx:people")
+
+        if len(ids) > 1 and ids[1] == "edit":
+            # 📇 field editor - one dialog per row, current value shown
+            icons = {"Birthday": "🎂", "Phone": "📞", "Mail": "✉️",
+                     "Instagram": "📸"}
+            content = card.get("content") or ""
+            rows = []
+            for f in pe.CARD_FIELDS:
+                val = pe.card_field(content, f)
+                rows.append(alfred.item(
+                    uid=f"pedit-{tid}-{f}",
+                    title=f"{icons.get(f, '📇')} {f} · {val or '—'}",
+                    subtitle="⏎✏️ edit  ⌃🔙",
+                    arg=f"xact:person_edit:{f}:{areas.PEOPLE_ID}:{tid}",
+                    valid=True))
+            if query:
+                rows = fuzz.filter_and_score(query, rows,
+                                             key_fn=lambda x: x["title"])
+            return add_back(rows, f"ctx:person:{tid}")
         name = pe.person_name(card.get("title", ""))
         chip = pe.circle_chip(card.get("tags"))
         content = card.get("content") or ""
@@ -2389,6 +2408,10 @@ def render_people(level, ids, query):
             subtitle=f"{pe.age_chip(content)}  |  ⏎↗️ card  ⌘⚡  ⌃🔙",
             arg=f"open:{link}", valid=True,
             variables=_person_vars(card), mods=_picker_mods())]
+        rows.append(alfred.item(
+            uid=f"pedit-{tid}", title="📇 Edit card",
+            subtitle="Birthday · phone · mail · instagram  |  ⏎✏️  ⌃🔙",
+            arg=f"xact:crmbrowse:ctx:person:{tid}:edit", valid=True))
         rows.append(alfred.item(
             uid=f"plog-{tid}", title="🧾 Add log entry",
             subtitle="Timestamped · newest on top  |  ⏎🧾  ⌃🔙",
@@ -2425,6 +2448,14 @@ def render_people(level, ids, query):
                 uid=f"pmail-{tid}", title=f"✉️ Mail · {mail}",
                 subtitle="⏎✉️  ⌃🔙", arg=f"open:mailto:{mail}",
                 valid=True))
+        insta = pe.card_field(content, "Instagram")
+        if insta:
+            handle = insta.strip().lstrip("@")
+            url = insta if insta.startswith("http") \
+                else f"https://www.instagram.com/{handle}/"
+            rows.append(alfred.item(
+                uid=f"pinsta-{tid}", title=f"📸 Instagram · {insta}",
+                subtitle="⏎↗️  ⌃🔙", arg=f"open:{url}", valid=True))
         log = pe.log_body(content)
         if log.strip():
             n = sum(1 for ln in log.splitlines() if ln.strip())
@@ -2452,9 +2483,9 @@ def render_people(level, ids, query):
                    if l.strip()][:5]:
             rows.append(alfred.item(
                 title=ln.strip().lstrip("- "), subtitle="💬", valid=False))
-        for ln in [l for l in log.splitlines() if l.strip()][:5]:
+        for txt, stamp in pe.log_entries(content)[:5]:
             rows.append(alfred.item(
-                title=ln.strip().lstrip("- "), subtitle="🧾", valid=False))
+                title=txt, subtitle=f"🧾 {stamp}".strip(), valid=False))
         if query:
             rows = fuzz.filter_and_score(query, rows,
                                          key_fn=lambda x: x["title"])
