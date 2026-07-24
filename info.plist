@@ -1685,6 +1685,18 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>B31D6E01-9F4C-4A7E-B1CE-2026072100AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>51D50972-BAE6-4C3B-BFBF-40384532F712</key>
 		<array>
@@ -4754,6 +4766,20 @@ fi</string>
 						<string>Docs</string>
 						<key>uid</key>
 						<string>98749A8C-7316-40CB-9023-8365E4FF10F5</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>bridges</string>
+						<key>outputlabel</key>
+						<string>Bridges</string>
+						<key>uid</key>
+						<string>B31D6E01-9F4C-4A7E-B1CE-2026072100AA</string>
 					</dict>
 				</array>
 				<key>elselabel</key>
@@ -11981,6 +12007,25 @@ esac</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>BrowseCtx</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -14622,6 +14667,15 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<real>410.0</real>
 			<key>ypos</key>
 			<real>1445.0</real>
+		</dict>
+		<key>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>xpos</key>
+			<real>1050.0</real>
+			<key>ypos</key>
+			<real>925.0</real>
 		</dict>
 		<key>B438F2BF-DDDB-4FD6-B4F3-2471B890A94B</key>
 		<dict>
