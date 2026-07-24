@@ -40,6 +40,10 @@ committed token, only dispatch rows are valid=True, and every row carries the
                                     state): when = [y|yy|D.M] A-B|A+MIN
                                     (src/focus_backlog grammar) → 🎲 random
                                     top row + task rows, ⏎ mints the record
+  "log " (guided)               D · date rows (Today preselected, back ~10
+                                    days) → "log D.M @" hour → ":" minute →
+                                    ">" duration (reschedule's own pickers,
+                                    incl 2h/90m/1h30 typed lengths) → B
 
 Unmatched trailing-space text falls back to the search screen - no dead ends.
 A running TickTick pomo has no focus file → render_pomo; with the sidecar
@@ -904,21 +908,86 @@ def render_stage(raw):
 
 
 # ── Task-bound start flow ("for" - the ⌘ 🎯 Focus row) ───────────────────────
+def _backlog_dates(frag):
+    """Guided screen D - the backlog date picker: ☀️ Today preselected,
+    Yesterday, then weekday rows back through the last ~10 days. ⏎ commits
+    'log D.M @' - straight into the schedule hour picker."""
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    fl = (frag or "").strip().lower()
+    rows = []
+    for i in range(11):
+        d = today - timedelta(days=i)
+        tok = f"{d.day}.{d.month}"
+        label = ("☀️ Today" if i == 0 else
+                 "Yesterday" if i == 1 else d.strftime("%A"))
+        hay = f"{label} {d.strftime('%a')} {tok}".lower()
+        if fl and fl not in hay:
+            continue
+        rows.append(alfred.item(
+            uid=f"fp-log-d{i}", title=label,
+            subtitle=f"{d.strftime('%a')} {tok}  |  ⏎ Pick the hour  ⌃🔙",
+            arg="", valid=False, autocomplete=f"log {tok} @", mods=BACK))
+    return rows
+
+
+def _backlog_guided(rest):
+    """Guided road: 'log [D.M ]@HH:MM >HH:MM [task frag]' - the schedule
+    dropdowns themselves (reschedule's hour/minute/duration pickers,
+    imported, so the rows match the schedule flow to the pixel; the
+    duration picker keeps its typed 2h/90m/1h30 shortcut). Returns (items, None) while a
+    token is being picked, (None, compact) once everything is committed -
+    compact is the typed-grammar line the shared parse road eats."""
+    import re as _re
+    import reschedule as rs
+    datepart, _, tail = rest.partition("@")
+    m = _re.match(r"^(\d{1,2}:\d{2}) (.*)$", tail)
+    if not m:                                    # start hour/minute stage
+        return rs.time_picker(f"log {datepart}", tail, BACK), None
+    start, rem = m.group(1), m.group(2)
+    em = _re.match(r"^>(\d{1,2}:\d{2}) (.*)$", rem)
+    if not em:                                   # duration stage
+        frag = rem[1:] if rem.startswith(">") else rem
+        return rs.duration_picker(f"log {datepart}@{start} ", frag,
+                                  start, BACK), None
+    date_tok = datepart.strip()
+    compact = ((f"{date_tok} " if date_tok else "")
+               + f"{start}-{em.group(1)}"
+               + (f" {em.group(2)}" if em.group(2) else ""))
+    return None, compact
+
+
 def render_backlog(raw):
-    """'log ' screen B - retro focus record. Grammar (src/focus_backlog):
-    '[y|yy|D.M] A-B|A+MIN [task frag]'. Top row = 🎲 unattributed, task
-    rows attribute; ⏎ = xact:focus_backlog:<s>:<e>:<pid>:<tid>. Routed in
-    main() BEFORE the state check (like stage/for) - backlogging works
-    while a timer or pomo runs."""
+    """'log ' screen B - retro focus record. Two roads to the same rows:
+    guided (date rows → @hour → :minute → >duration - _backlog_guided) or
+    typed (src/focus_backlog grammar '[y|yy|D.M] A-B|A+MIN [task frag]').
+    Top row = 🎲 unattributed, task rows attribute; ⏎ =
+    xact:focus_backlog:<s>:<e>:<pid>:<tid>. Routed in main() BEFORE the
+    state check (like stage/for) - backlogging works while a timer or
+    pomo runs."""
     import focus_backlog as fbk
     rest = raw[3:].lstrip()
+    if "@" in rest:
+        items, compact = _backlog_guided(rest)
+        if items is not None:
+            print(alfred.output(items, skipknowledge=True))
+            return
+        rest = compact
     start, end, frag = fbk.parse_when(rest)
     if not start:
-        print(alfred.output([alfred.item(
-            uid="fp-log-help", title="🕰️ When? start-end, then the task",
+        # Screen D: date rows (typed grammar stays welcome underneath)
+        items = _backlog_dates(rest)
+        if not items and rest.endswith(" ") \
+                and fbk._DAY_RE.fullmatch(rest.strip()):
+            # hand-typed day outside the row window ('1.6 ') → hour picker
+            import reschedule as rs
+            items = rs.time_picker(f"log {rest}", "", BACK)
+        items.append(alfred.item(
+            uid="fp-log-help", title="🕰️ Or type it: start-end, then the task",
             subtitle="14:30-15:45 · 1430+45 · 9-11 · y 9-11 = yesterday · "
                      "22.7 14-16  ⌃🔙",
-            valid=False, mods=BACK)], skipknowledge=True))
+            valid=False, mods=BACK))
+        print(alfred.output(items, skipknowledge=True))
         return
     err = fbk.validate(start, end)
     if err:
