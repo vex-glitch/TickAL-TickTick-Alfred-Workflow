@@ -874,6 +874,7 @@ def mode_menu(fragment):
         ("N ", "📝", "Note",    "New note"),
         ("P ", "💼", "Project", "list + meta task"),
         ("T ", "🏷️", "Tag",     "a new tag"),
+        ("B ", "🌉", "Bridge",  "daily / project"),
     ]
     items = []
     for ac, emoji, name, hint in rows:
@@ -884,6 +885,24 @@ def mode_menu(fragment):
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     return items or [alfred.item(title=f'No options matching "{fragment}"', valid=False)]
+
+
+def bridge_create_items(fragment):
+    """'b ' mode: the two bridge mints. Both fire verbs through dispatch's
+    xact: passthrough (ET XAct - dialogs + banners live there)."""
+    rows = [
+        alfred.item(title="🌉 Daily bridge",
+                    subtitle="Write today's · typed / clipboard",
+                    arg="xact:bridge_daily", valid=True),
+        alfred.item(title="📁 Project bridge",
+                    subtitle="Pick the list, then write",
+                    arg="xact:crmbrowse:ctx:bridges:new", valid=True),
+    ]
+    if fragment:
+        rows = fuzz.filter_and_score(fragment, rows,
+                                     key_fn=lambda x: x["title"])
+    return rows or [alfred.item(title=f'No bridge option "{fragment}"',
+                                valid=False)]
 
 
 def _fx_running():
@@ -1013,13 +1032,6 @@ def master_menu(prefix, fragment, note_mode=False):
             valid=False,
             autocomplete=f"{base}{sym}",
         ))
-    # 🌉 fires a VERB, not a prefill - rides dispatch's xact: passthrough
-    # (ET XAct executor, _crm_say banners).
-    items.append(alfred.item(
-        title="🌉 Daily bridge",
-        subtitle="Write today's · typed / clipboard",
-        arg="xact:bridge_daily", valid=True,
-    ))
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     if not items:
@@ -2070,6 +2082,12 @@ def main():
         # ── T prefix → create tag ─────────────────────────────────────────────
         if query.lower().startswith("t "):
             items = tag_create_items(query[2:].strip())
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # ── B prefix → bridge (daily / project) ───────────────────────────────
+        if query.lower().startswith("b "):
+            items = bridge_create_items(query[2:].strip())
             print(alfred.output(items, skipknowledge=True))
             return
 

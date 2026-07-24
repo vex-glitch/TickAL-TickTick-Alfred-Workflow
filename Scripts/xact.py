@@ -4676,22 +4676,36 @@ def bridge_tidy():
     app_sync_after_write()
 
 
-def bridge_sethome(pid):
-    """⚙️ Make a list the daily-bridge home (⌘ Actions on any list):
-    writes bridges_list_id to config.json + flips the list to kanban
-    (best effort - tag-grouping and edit-sort stay one in-app tap,
-    they're client-side view settings)."""
-    if not pid:
-        _crm_say("Error: no list id")
+def search_pre(prefix):
+    """Jump into Search prefilled with a scope prefix ('bd' → 'bd ') -
+    the pn_journal picker-handoff pattern, generalized."""
+    _run_trigger("Search", (prefix or "").strip() + " ")
+
+
+def bridge_setlist():
+    """⚙️ Settings → 🌉 Bridges list: paste the home list's id (⌘ Copy id
+    on any list row mints it). Saves config bridges_list_id + flips the
+    list to kanban (grouping and edit-sort stay one in-app tap - client
+    view settings)."""
+    import re as _re
+    cur = cfg.get_bridges_list_id()
+    a = _ask("🌉 Bridges list id (⌘ Copy id on any list · Esc cancels)",
+             default=cur)
+    if a is None:
+        _crm_say("🌉 Cancelled")
+        return
+    a = a.strip()
+    if not _re.fullmatch(r"[0-9a-fA-F]{24}", a or ""):
+        _crm_say("🌉 That does not look like a list id · nothing saved")
         return
     data = cfg.load()
-    data["bridges_list_id"] = pid
+    data["bridges_list_id"] = a
     cfg.save(data)
     try:
-        _api().update_project(pid, viewMode="kanban")
+        _api().update_project(a, viewMode="kanban")
     except Exception:
         pass
-    _crm_say(f"🌉 {_list_name_of(pid) or 'List'} is the Bridges home now")
+    _crm_say(f"🌉 Bridges home set · {_list_name_of(a) or a}")
 
 
 def bridge_copy(rest):
@@ -5004,8 +5018,10 @@ def main():
             bridge_copy(rest)
         elif verb == "bridge_tidy":
             bridge_tidy()
-        elif verb == "bridge_sethome":
-            bridge_sethome(rest)
+        elif verb == "bridge_setlist":
+            bridge_setlist()
+        elif verb == "search_pre":
+            search_pre(rest)
         elif verb == "crmphoto":
             crmphoto(rest)
         elif verb == "crmcold":

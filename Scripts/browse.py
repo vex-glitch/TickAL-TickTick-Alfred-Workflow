@@ -2258,44 +2258,14 @@ def render_buffer(query):
                              valid=False)]
     return add_back(items, "ctx:folders")
 
-# ── Level: bridges (🌉 - daily board + latest bridge per project) ────────────
-def _bridge_note_row(n, chip, tail_mods=True):
-    """One bridge-note row: ⏎ opens in TickTick, ⌥ drills into that list's
-    bridge history (the ⌥ edge is the Browse loop - variables only, an
-    xact arg there renders as a query; review catch), ⌥⇧ copies (that edge
-    owns the ^xact router), ⌘ Actions via item vars, ⌃ back."""
-    pid = n.get("_projectId") or n.get("projectId") or ""
-    pname = n.get("_projectName") or ""
-    sub = pname + (f" · {chip}" if chip else "")
-    legend = "⏎↗️" + ("  ⌥🗂" if tail_mods else "") + "  ⌥⇧📋  ⌘⚡  ⌃🔙"
-    mods = {"alt+shift": {"arg": f"xact:bridge_copy:{pid}:{n['id']}",
-                          "valid": True, "subtitle": "📋 Copy bridge"}}
-    if tail_mods:
-        mods["alt"] = {"arg": "", "valid": True,
-                       "subtitle": "🗂 All bridges here",
-                       "variables": {"browse_ctx": f"ctx:bridges:{pid}"}}
-    else:
-        mods["alt"] = {"arg": "", "valid": False}   # stray-chord pin
-    return alfred.item(
-        uid=f"br-{n['id']}",
-        title=n.get("title", ""),
-        subtitle=(sub + "  |  " if sub else "") + legend,
-        arg=f"open:ticktick:///webapp/#p/{pid}/tasks/{n['id']}",
-        valid=True,
-        variables={"task_id": n["id"], "task_list_id": pid, "list_id": pid,
-                   "task_title": n.get("title", ""), "item_type": "note"},
-        mods=mods,
-    )
-
-
+# ── Level: bridges (🌉 - the five-row hub + the project picker) ──────────────
 def render_bridges(ids, query):
-    """ctx:bridges - the 🌉 hub: daily-bridge row (write/open), board link,
-    new-project-bridge picker, latest project bridge per list.
-    ctx:bridges:new - list picker → xact:bridge_proj.
-    ctx:bridges:<pid> - every bridge of that list, newest first."""
+    """ctx:bridges - the ruled five rows: Add Daily / Add Project /
+    Search Daily / Search Project / Board (searching itself lives in the
+    search scopes b · bd · bp - the hub only routes).
+    ctx:bridges:new - list picker → xact:bridge_proj."""
     import bridges as br
     import areas
-    from datetime import date
     sub = ids[0] if ids else ""
     all_notes = [n for n in (cache_store.get("all_notes") or [])
                  if n.get("status", 0) == 0]
@@ -2325,24 +2295,6 @@ def render_bridges(ids, query):
                                 valid=False)]
         return add_back(rows, "ctx:bridges")
 
-    if sub:                                   # history of one list
-        pool = [n for n in all_notes
-                if (n.get("_projectId") or n.get("projectId")) == sub
-                and (br.is_bridge_note(n)
-                     or (sub == areas.BRIDGES_ID
-                         and br.is_daily(n.get("title", ""))))]
-        pool.sort(key=lambda n: br.title_date(n.get("title")) or date.min,
-                  reverse=True)
-        rows = [_bridge_note_row(
-                    n, br.age_chip(br.title_date(n.get("title")), today),
-                    tail_mods=False) for n in pool]
-        if query:
-            rows = fuzz.filter_and_score(query, rows,
-                                         key_fn=lambda x: x["title"])
-        if not rows:
-            rows = [alfred.item(title="No bridges here yet", valid=False)]
-        return add_back(rows, "ctx:bridges")
-
     rows = []
     if areas.bridges_configured():
         twant = br.daily_title(today)
@@ -2350,40 +2302,34 @@ def render_bridges(ids, query):
                    for n in all_notes)
         rows.append(alfred.item(
             uid="br-daily",
-            title=("🌉 Daily bridge · written ✅" if thit
-                   else "✍️ Daily bridge"),
+            title=("🌉 Add Daily Bridge · written ✅" if thit
+                   else "✍️ Add Daily Bridge"),
             subtitle=("Open today's  |  ⏎↗️  ⌃🔙" if thit
                       else "Write today's  |  ⏎🌉  ⌃🔙"),
             arg="xact:bridge_daily", valid=True))
-        rows.append(alfred.item(
-            uid="br-board", title="🗂️ Bridges board",
-            subtitle="Month columns  |  ⏎↗️  ⌃🔙",
-            arg=f"open:ticktick:///webapp/#p/{areas.BRIDGES_ID}/tasks",
-            valid=True))
     else:
         rows.append(alfred.item(
             uid="br-setup", valid=False,
             title="🌉 Daily bridges need a home list",
-            subtitle="Config bridges_list_id - project bridges work anyway"))
+            subtitle="Settings → 🌉 Bridges list · project bridges work anyway"))
     rows.append(alfred.item(
-        uid="br-new", title="➕ New project bridge",
+        uid="br-new", title="➕ Add Project Bridge",
         subtitle="Pick the list  |  ⏎⤵️  ⌃🔙",
         arg="xact:crmbrowse:ctx:bridges:new", valid=True))
-
-    latest = {}                               # pid → (note, date)
-    for n in all_notes:
-        if not br.is_bridge_note(n):
-            continue
-        pid = n.get("_projectId") or n.get("projectId") or ""
-        d = br.title_date(n.get("title"))
-        prev = latest.get(pid)
-        if prev is None or (d or date.min) > (prev[1] or date.min):
-            latest[pid] = (n, d)
-    for n, d in sorted(latest.values(),
-                       key=lambda x: x[1] or date.min, reverse=True):
-        rows.append(_bridge_note_row(n, br.age_chip(d, today)))
-
+    rows.append(alfred.item(
+        uid="br-sd", title="🔎 Search Daily Bridges",
+        subtitle="Newest on top  |  ⏎🔎  ⌃🔙",
+        arg="xact:search_pre:bd", valid=True))
+    rows.append(alfred.item(
+        uid="br-sp", title="🔎 Search Project Bridges",
+        subtitle="Newest on top  |  ⏎🔎  ⌃🔙",
+        arg="xact:search_pre:bp", valid=True))
     if areas.bridges_configured():
+        rows.append(alfred.item(
+            uid="br-board", title="🗂️ Bridges Board",
+            subtitle="Month columns  |  ⏎↗️  ⌃🔙",
+            arg=f"open:ticktick:///webapp/#p/{areas.BRIDGES_ID}/tasks",
+            valid=True))
         keep = {br.month_tag(today),
                 br.month_tag(today.replace(day=1) - timedelta(days=1))}
         n_old = sum(
@@ -2401,7 +2347,7 @@ def render_bridges(ids, query):
     if query:
         rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
     if not rows:
-        rows = [alfred.item(title=f'No bridge matching "{query}"',
+        rows = [alfred.item(title=f'No bridge row matching "{query}"',
                             valid=False)]
     return add_back(rows, "ctx:folders")
 

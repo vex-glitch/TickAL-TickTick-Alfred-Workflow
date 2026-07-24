@@ -94,6 +94,7 @@ SCOPES = [
     ("fo ", "📂", "Folders",          "your TickTick folders",    "FO"),
     ("la ", "👉", "Last Added",       "recently created first",   "LA"),
     ("pn ", "💫", "Periodic",         "daily / weekly notes",     "PN"),
+    ("b ",  "🌉", "Bridges",          "daily / project bridges",  "B"),
     ("n ",  "📝", "Notes",            "note titles",              "N"),
     ("nc ", "📄", "Note bodies",      "note text",  "NC"),
 ]
@@ -111,14 +112,6 @@ def scope_menu(fragment):
             subtitle=desc,
             arg="", valid=False,
             autocomplete=prefix,
-        ))
-    # 🌉 opens the hub outright (⏎ = the BrowseCtx trampoline, not a
-    # prefix) - Bridges is a destination, not a filter scope.
-    if not frag or "bridges".startswith(frag) or frag == "b":
-        items.append(alfred.item(
-            title="🌉  Bridges",
-            subtitle="Daily + project handoffs  |  ⏎⤵️",
-            valid=True, arg="xact:crmbrowse:ctx:bridges",
         ))
     if not items:
         items = [alfred.item(title=f'No scope matching "{fragment}"', valid=False)]
@@ -150,16 +143,6 @@ def get_hint_items(raw_query):
                 mods={"alt": {"valid": True, "arg": "", "subtitle": "Open buffer",
                               "variables": {"browse_ctx": "ctx:buffer"}}},
             ))
-        # 🌉 Bridges hub - same BrowseCtx trampoline as the buffer row
-        # (plain ⏎ exits through the modOpen shell; ⌥ mirrors for the
-        # browse edge). Always on: project bridges need no config.
-        rows.append(alfred.item(
-            title="🌉 Bridges",
-            subtitle="Daily + project handoffs  |  ⏎⤵️",
-            valid=True, arg="xact:crmbrowse:ctx:bridges",
-            mods={"alt": {"valid": True, "arg": "", "subtitle": "Open bridges",
-                          "variables": {"browse_ctx": "ctx:bridges"}}},
-        ))
         return rows
 
     if raw_query.startswith("/"):
@@ -182,6 +165,9 @@ SCOPE_PREFIXES = {
     "pn ": "periodic",
     "n ":  "note",
     "nc ": "note_content",
+    "b ":  "bridges",
+    "bd ": "bridge_daily",
+    "bp ": "bridge_proj",
 }
 
 def detect_scope(query):
@@ -486,6 +472,74 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
                    "task_list_id": pid, "search_name": name, "type_rank": 2,
                    "_priority": t.get("priority") or 0},
     )
+
+
+def _bridge_search_row(n):
+    """One bridge note row, note-scope shape (⏎↗️ open, ⌘⚡ Actions,
+    ⌥⌘ copy link, ⌃ main menu; stray chords dead). The title already
+    carries the 🌉 date - no extra age chip."""
+    nid    = n["id"]
+    npid   = n.get("projectId") or n.get("_projectId", "")
+    ntitle = n.get("title", "Untitled")
+    link   = f"ticktick:///webapp/#p/{npid}/tasks/{nid}"
+    sub    = build_subtitle(0, "Note", breadcrumb=n.get("_projectName", ""),
+                            actions=True,
+                            note=note_snippet((n.get("content") or "").strip()))
+    return alfred.item(
+        uid=f"br-{nid}", title=md_links_display(ntitle), subtitle=sub,
+        arg=f"open:{link}",
+        mods={
+            "shift":      {"valid": False, "subtitle": ""},
+            "alt":        {"valid": False, "subtitle": ""},
+            "alt+shift":  {"valid": False, "subtitle": ""},
+            "ctrl+shift": {"valid": False, "subtitle": ""},
+            "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
+            "alt+cmd":    {"arg": f"copy:{link}"},
+        },
+        variables={"item_type": "note", "task_id": nid, "task_list_id": npid,
+                   "task_title": ntitle, "search_name": ntitle,
+                   "type_rank": 5},
+    )
+
+
+def bridge_scope_rows(scope, query):
+    """B / BD / BP scopes: bridge notes, NEWEST FIRST (the LA pattern -
+    fuzzy decides inclusion, recency rules order). Bare 'b ' leads with the
+    two narrowing rows; 'bd ' / 'bp ' are locked to one kind."""
+    import bridges as br
+    import areas
+    from datetime import date
+    all_notes = [n for n in (cache_store.get("all_notes") or [])
+                 if n.get("status", 0) == 0]
+    daily = [n for n in all_notes
+             if (n.get("projectId") or n.get("_projectId")) == areas.BRIDGES_ID
+             and br.is_daily(n.get("title", ""))]
+    proj  = [n for n in all_notes if br.is_bridge_note(n)]
+    rows = []
+    if scope == "bridges" and not query:
+        rows.append(alfred.item(title="📅  Daily bridges",
+                                subtitle=f"{len(daily)} notes", valid=False,
+                                autocomplete="bd "))
+        rows.append(alfred.item(title="📁  Project bridges",
+                                subtitle=f"{len(proj)} notes", valid=False,
+                                autocomplete="bp "))
+    pool = (daily if scope == "bridge_daily"
+            else proj if scope == "bridge_proj" else daily + proj)
+    if query:
+        pool = fuzz.filter_and_score(
+            query, pool,
+            key_fn=lambda n: search_key(
+                f"{n.get('title', '')} {n.get('_projectName', '')}"))
+    pool = sorted(pool,
+                  key=lambda n: (br.title_date(n.get("title"))
+                                 or date.min).isoformat(),
+                  reverse=True)[:100]
+    rows += [_bridge_search_row(n) for n in pool]
+    if not rows:
+        rows = [alfred.item(
+            title="No bridges" + (f' matching "{query}"' if query else " yet"),
+            valid=False)]
+    return rows
 
 
 def last_added_rows(query, all_tasks):
@@ -856,6 +910,11 @@ def main():
         if scope == "periodic":
             import periodic_rows
             print(alfred.output(periodic_rows.rows(query), skipknowledge=True))
+            return
+        # ── B / BD / BP scopes: bridge notes, newest first ───────────────────
+        if scope in ("bridges", "bridge_daily", "bridge_proj"):
+            print(alfred.output(bridge_scope_rows(scope, query),
+                                skipknowledge=True))
             return
 
         items = []
