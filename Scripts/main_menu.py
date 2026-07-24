@@ -136,6 +136,20 @@ def build_items():
             subtitle="Cards, CTAs, log",
             arg="people",
         ),
+        # args "countdowns" / "habits" ride the SAME BrowseCtx leg family
+        # (phase_cdhb): browse_ctx=<arg> → ALIASES → the hub ctx.
+        alfred.item(
+            uid="countdowns",
+            title="⏳ Countdowns",
+            subtitle="Days until, count-ups, birthdays",
+            arg="countdowns",
+        ),
+        alfred.item(
+            uid="habits",
+            title="🔄 Habits",
+            subtitle="Tick, streaks, diary",
+            arg="habits",
+        ),
         # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) were
         # retired - they only re-fired TickTick's own global shortcuts, and
         # the task-bound sticky/pomo in ⌘ Actions are better. tt_shortcut.py

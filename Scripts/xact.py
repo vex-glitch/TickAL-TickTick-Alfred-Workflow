@@ -20,6 +20,25 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
     xact:focus_backlog:<s>:<e>:<pid>:<tid>  retro record between epochs
                                     <s>..<e> (empty ids = 🎲 unattributed) -
                                     the picker's `log` screen mints these
+
+⏳ Countdowns + 🔄 Habits (hubs 2026-07-24; v2 batch channels, all probed):
+    xact:countdown_new[:<b64>]      dialogs (or Add-window C mode payload)
+                                    → countdown/batch mint
+    xact:countdown_edit:<f>:<id>    name|date|remark dialog, live RMW
+    xact:countdown_appear:<id>:<v>  typeOfSmartList (0/-3/-7/-9999/9999)
+    xact:countdown_flip:<id>        countdown ⟷ countup (up drops RRULE)
+    xact:countdown_archive:<id>     status 1 - off the hub
+    xact:countdown_delete:<id>      confirm dialog → batch delete
+    xact:habit_tick:<id>            today: Boolean → done · Real → +step;
+                                    diary habits ask the note on completion
+    xact:habit_tick_past:<id>       dialog day (y · yy · D.M) → retro tick
+    xact:habit_untick:<id>          today back to blank (UPDATE status 0 -
+                                    checkin DELETE 500s, trap)
+    xact:habit_skip:<id>            explicit ⛔ skipped state
+    xact:habit_note:<id>            diary note for today (habitRecords)
+    xact:habit_new[:<b64name>]      dialogs: section → rhythm → type → diary
+    xact:habit_archive:<id>         status 1
+    xact:habit_delete:<id>          confirm → delete (checkins cascade)
     xact:pomo:<minutes|default>     start TickTick's REAL pomodoro (hidden
                                     AppleScript command in TickTick.sdef);
                                     "default"/empty = the app's own length
@@ -5327,6 +5346,610 @@ def people_setlist():
     _crm_say(f"👽 People home set · {_list_name_of(a) or a}")
 
 
+# ── ⏳ Countdowns + 🔄 Habits verbs (hubs 2026-07-24; all API-clean:
+#    countdown/batch · habits/batch · habitCheckins/batch · habitRecords,
+#    every one probe-verified; caches patched after each write) ─────────────
+
+def _op_iso():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+
+
+def _cd_patch(entity=None, delete_id=None):
+    """Mirror a countdown write into the 'countdowns' cache."""
+    try:
+        cds = cache_store.get("countdowns") or []
+        if delete_id:
+            cds = [c for c in cds if c.get("id") != delete_id]
+        elif entity:
+            hit = False
+            cds = [entity if c.get("id") == entity["id"] else c for c in cds]
+            hit = any(c.get("id") == entity["id"] for c in cds)
+            if not hit:
+                cds.append(entity)
+        cache_store.set("countdowns", cds)
+    except Exception:
+        cache_store.invalidate("countdowns")
+
+
+def _hb_patch(entity=None, delete_id=None):
+    try:
+        hs = cache_store.get("habits") or []
+        if delete_id:
+            hs = [h for h in hs if h.get("id") != delete_id]
+        elif entity:
+            if any(h.get("id") == entity["id"] for h in hs):
+                hs = [entity if h.get("id") == entity["id"] else h
+                      for h in hs]
+            else:
+                hs.append(entity)
+        cache_store.set("habits", hs)
+        if delete_id:
+            checks = cache_store.get("habit_checkins") or {}
+            checks.pop(delete_id, None)
+            cache_store.set("habit_checkins", checks)
+    except Exception:
+        cache_store.invalidate("habits")
+
+
+def _ck_patch(hid, entry):
+    """Upsert one checkin into the 'habit_checkins' cache (keyed by day)."""
+    try:
+        checks = cache_store.get("habit_checkins") or {}
+        arr = [c for c in (checks.get(hid) or [])
+               if c.get("checkinStamp") != entry.get("checkinStamp")]
+        arr.append(entry)
+        checks[hid] = arr
+        cache_store.set("habit_checkins", checks)
+    except Exception:
+        cache_store.invalidate("habit_checkins")
+
+
+def _cd_live(v2, cid):
+    """Live countdown entity by id - None = offline/missing (fail closed)."""
+    cds = v2.get_countdowns()
+    if cds is None:
+        return None
+    return next((c for c in cds if c.get("id") == cid), None)
+
+
+def countdown_new(rest=""):
+    """➕ New countdown. rest = b64 {"name","date","yearless"} from the Add
+    window's C mode, else dialogs all the way: name → date (dot grammar) →
+    kind → appearance (typeOfSmartList) → anniversary count direction."""
+    import base64
+    import countdowns as cdm
+    import api_v2
+    name = date_int = None
+    yearless = False
+    if rest:
+        try:
+            spec = json.loads(base64.b64decode(rest))
+            name = (spec.get("name") or "").strip()
+            date_int, yearless = spec.get("date"), spec.get("yearless")
+        except Exception:
+            pass
+    if not name:
+        name = (_ask("Countdown name:", title="⏳ New countdown") or "").strip()
+        if not name:
+            return
+    if not date_int:
+        raw = _ask(f"Date for {name}: · 28.7 · 27.06.1993 · 1993/06/27",
+                   title="⏳ New countdown")
+        if raw is None:
+            return
+        parsed = cdm.parse_cd_date(raw)
+        if not parsed:
+            _crm_say("⏳ Can't read that date · 28.7 · 27.06.1993")
+            return
+        date_int, yearless = parsed[0], not parsed[1]
+    kinds = ["⏳ Countdown", "🎂 Birthday", "💞 Anniversary", "🎉 Holiday"]
+    kmap = {"⏳ Countdown": 4, "🎂 Birthday": 2, "💞 Anniversary": 3,
+            "🎉 Holiday": 1}
+    k = _choose("What kind?", kinds, title="⏳ New countdown",
+                default=kinds[0])
+    if k is None:
+        return
+    kind = kmap.get(k, 4)
+    labels = [lbl for _v, lbl in cdm.APPEAR]
+    ap = _choose("Appears in calendar + smart lists:", labels,
+                 title="⏳ New countdown", default="On the day")
+    if ap is None:
+        return
+    appear = next((v for v, lbl in cdm.APPEAR if lbl == ap), 0)
+    countup = False
+    if kind == 3:
+        d = _choose("Counting?", ["⬇️ Down to the date", "⬆️ Up since it"],
+                    title="💞 Anniversary", default="⬇️ Down to the date")
+        if d is None:
+            return
+        countup = d.startswith("⬆️")
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        _crm_say("⏳ Needs the v2 login (Settings → Attachment Login)")
+        return
+    have = v2.get_countdowns()
+    if have is None:
+        _crm_say("⏳ Can't reach countdowns (offline?) · nothing minted")
+        return
+    ent = cdm.new_entity(
+        api_v2.new_object_id(), name, date_int, kind, appear=appear,
+        countup=countup, yearless=yearless,
+        sort_order=min([c.get("sortOrder", 0) for c in have] or [0])
+        - 1048576)
+    if not v2.countdown_batch(add=[ent]):
+        _crm_say("⏳ Mint failed (offline?)")
+        return
+    _cd_patch(entity=ent)
+    _crm_say(f"{cdm.kind_chip(ent)} {name} · "
+             f"{cdm.distance_label(ent)} · minted")
+
+
+def countdown_edit(field, cid):
+    """✏️ name / 📅 date / 💬 remark - dialog prefilled, live RMW."""
+    import countdowns as cdm
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    cd = _cd_live(v2, cid) if v2.token else None
+    if cd is None:
+        _crm_say("⏳ Can't fetch it (offline?) · nothing changed")
+        return
+    if field == "date":
+        raw = _ask("New date: · 28.7 · 27.06.1993 · 1993/06/27",
+                   title=f"⏳ {cd.get('name', '')}")
+        if raw is None or not raw.strip():
+            return
+        parsed = cdm.parse_cd_date(raw)
+        if not parsed:
+            _crm_say("⏳ Can't read that date")
+            return
+        date_int, had_year = parsed
+        if not had_year and not cd.get("ignoreYear") \
+                and (cd.get("date") or 0) // 10000:
+            # yearless edit on a year-bearing entity KEEPS the stored
+            # year (a birth year must survive a day tweak - review catch)
+            from datetime import date as _dd
+            y0 = cd["date"] // 10000
+            mo, d = date_int // 100 % 100, date_int % 100
+            try:
+                _dd(y0, mo, d)
+            except ValueError:
+                _crm_say(f"⏳ {d}.{mo} doesn't exist in {y0}")
+                return
+            date_int, had_year = y0 * 10000 + mo * 100 + d, True
+        cd["date"] = date_int
+        if cd.get("type") == 2:
+            cd["ignoreYear"] = not had_year
+            cd["showAge"] = had_year
+        if cd.get("repeatFlag") and "FREQ=YEARLY" in cd["repeatFlag"]:
+            mo, d = date_int // 100 % 100, date_int % 100
+            cd["repeatFlag"] = (f"RRULE:FREQ=YEARLY;INTERVAL=1;"
+                                f"BYMONTH={mo};BYMONTHDAY={d}")
+    elif field in ("name", "remark"):
+        cur = cd.get(field) or ""
+        val = _ask(f"{'Name' if field == 'name' else 'Remark'}:",
+                   title=f"⏳ {cd.get('name', '')}", default=cur)
+        if val is None:
+            return
+        if field == "name" and not val.strip():
+            return
+        cd[field] = val.strip()
+    else:
+        _crm_say(f"⏳ Unknown field {field!r}")
+        return
+    if not v2.countdown_batch(update=[cd]):
+        _crm_say("⏳ Save failed (offline?)")
+        return
+    _cd_patch(entity=cd)
+    _crm_say(f"⏳ {cd.get('name', '')} · saved")
+
+
+def countdown_appear(cid, val):
+    import countdowns as cdm
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    cd = _cd_live(v2, cid) if v2.token else None
+    if cd is None:
+        _crm_say("⏳ Can't fetch it (offline?) · nothing changed")
+        return
+    cd["typeOfSmartList"] = int(val)
+    if not v2.countdown_batch(update=[cd]):
+        _crm_say("⏳ Save failed (offline?)")
+        return
+    _cd_patch(entity=cd)
+    _crm_say(f"👁️ {cd.get('name', '')} · "
+             + cdm.APPEAR_LABEL.get(int(val), "?"))
+
+
+def countdown_flip(cid):
+    """⏱️ countdown ⟷ countup. Up drops the yearly RRULE (a count-up
+    counts since ONE date); down restores it for dated kinds."""
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    cd = _cd_live(v2, cid) if v2.token else None
+    if cd is None:
+        _crm_say("⏳ Can't fetch it (offline?) · nothing changed")
+        return
+    if (cd.get("timerMode") or 0) == 0:
+        cd["timerMode"] = 1
+        cd["repeatFlag"] = None
+        word = "up"
+    else:
+        cd["timerMode"] = 0
+        if cd.get("type") in (1, 2, 3):
+            n = cd.get("date") or 0
+            mo, d = n // 100 % 100, n % 100
+            cd["repeatFlag"] = (f"RRULE:FREQ=YEARLY;INTERVAL=1;"
+                                f"BYMONTH={mo};BYMONTHDAY={d}")
+        word = "down"
+    if not v2.countdown_batch(update=[cd]):
+        _crm_say("⏳ Save failed (offline?)")
+        return
+    _cd_patch(entity=cd)
+    _crm_say(f"⏱️ {cd.get('name', '')} · counting {word}")
+
+
+def countdown_archive(cid):
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    cd = _cd_live(v2, cid) if v2.token else None
+    if cd is None:
+        _crm_say("⏳ Can't fetch it (offline?) · nothing changed")
+        return
+    cd["status"] = 1
+    if not v2.countdown_batch(update=[cd]):
+        _crm_say("⏳ Archive failed (offline?)")
+        return
+    _cd_patch(delete_id=cid)
+    _crm_say(f"🗄️ {cd.get('name', '')} · archived")
+
+
+def countdown_delete(cid):
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    cd = _cd_live(v2, cid) if v2.token else None
+    if cd is None:
+        _crm_say("⏳ Can't fetch it (offline?) · nothing deleted")
+        return
+    if _dialog(f"Delete countdown {cd.get('name', '')!r}?",
+               ["Cancel", "Delete"], "Cancel") != "Delete":
+        return
+    if not v2.countdown_batch(delete=[cid]):
+        _crm_say("⏳ Delete failed (offline?)")
+        return
+    _cd_patch(delete_id=cid)
+    _crm_say(f"🗑️ {cd.get('name', '')} · deleted")
+
+
+def _habit_by_id(hid):
+    """Cache habit, else a live GET (fail closed → None)."""
+    h = next((x for x in (cache_store.get("habits") or [])
+              if x.get("id") == hid), None)
+    if h:
+        return h
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        return None
+    live = v2.get_habits()
+    return next((x for x in live or [] if x.get("id") == hid), None)
+
+
+def _habit_day_checkin(v2, hid, day_stamp):
+    """LIVE checkin for one habit+day - (checkin|None, ok). ok False =
+    the query itself failed (offline) → callers bail, never double-add."""
+    j = v2.habit_checkins([hid], day_stamp - 1)
+    if j is None:
+        return None, False
+    import habits_model as hm
+    return hm.checkin_for(j.get(hid), day_stamp), True
+
+
+def _habit_parse_day(raw):
+    """'y' · 'yy' · 'D.M' / 'D.M.YYYY' → YYYYMMDD int (past days only),
+    None when unreadable."""
+    from datetime import date as _d, timedelta as _td
+    t = (raw or "").strip().lower().rstrip(".")
+    today = _d.today()
+    if t in ("y", "yy"):
+        d = today - _td(days=len(t))
+        return d.year * 10000 + d.month * 100 + d.day
+    import re as _re
+    m = _re.fullmatch(r"(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?", t)
+    if not m:
+        return None
+    day, mo = int(m.group(1)), int(m.group(2))
+    explicit_year = bool(m.group(3))
+    y = int(m.group(3)) if explicit_year else today.year
+    try:
+        d = _d(y, mo, day)
+    except ValueError:
+        return None
+    if d > today:
+        if explicit_year:
+            return None          # a typed future year is a typo, not -1y
+        try:
+            d = d.replace(year=d.year - 1)
+        except ValueError:
+            return None          # Feb 29 with no leap twin last year
+    return d.year * 10000 + d.month * 100 + d.day
+
+
+def _habit_tick_core(hid, day_stamp, retro=False):
+    """Shared tick: live day-checkin read (fail closed) → tick_payload →
+    batch write → cache patches + streak bump → note dialog when the habit
+    keeps a diary and the day just completed (today only)."""
+    import habits_model as hm
+    import api_v2
+    h = _habit_by_id(hid)
+    if h is None:
+        _crm_say("🔄 Habit not found (offline?)")
+        return
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        _crm_say("🔄 Needs the v2 login (Settings → Attachment Login)")
+        return
+    existing, ok = _habit_day_checkin(v2, hid, day_stamp)
+    if not ok:
+        _crm_say("🔄 Can't read checkins (offline?) · nothing ticked")
+        return
+    payload = hm.tick_payload(h, day_stamp, existing, _op_iso())
+    if payload is None:
+        _crm_say(f"✅ {h.get('name', '')} · already done")
+        return
+    entry, done, value = payload
+    if existing:
+        ok2 = v2.habit_checkins_batch(update=[entry])
+    else:
+        entry["id"] = api_v2.new_object_id()
+        ok2 = v2.habit_checkins_batch(add=[entry])
+    if not ok2:
+        _crm_say("🔄 Tick failed (offline?)")
+        return
+    _ck_patch(hid, entry)
+    name = h.get("name", "")
+    was_done = existing and existing.get("status") == hm.DONE
+    if done and not was_done and not retro:
+        h2 = dict(h)
+        h2["currentStreak"] = (h.get("currentStreak") or 0) + 1
+        h2["totalCheckIns"] = (h.get("totalCheckIns") or 0) + 1
+        _hb_patch(entity=h2)
+        h = h2
+    noted = ""
+    if done and not was_done and not retro and h.get("recordEnable"):
+        txt = _ask(f"Note for {name}? (optional)", title="🔄 Habit diary")
+        if txt and txt.strip():
+            rec = hm.record_payload(api_v2.new_object_id(), hid, day_stamp,
+                                    txt.strip(), _op_iso())
+            if v2.habit_records_batch(add=[rec]):
+                noted = " · 📝"
+    if hm.is_real(h) and not done:
+        goal = h.get("goal") or 1
+        _crm_say(f"🔄 {name} · {value:g}/{goal:g} {h.get('unit') or ''}"
+                 .rstrip())
+    else:
+        streak = h.get("currentStreak") or 0
+        chip = f" · 🔥{streak}" if streak > 1 else ""
+        when = "" if not retro else " · ⏪"
+        _crm_say(f"✅ {name}{chip}{when}{noted}")
+
+
+def habit_tick(hid):
+    import habits_model as hm
+    from datetime import date as _d
+    _habit_tick_core(hid, hm.stamp(_d.today()))
+
+
+def habit_tick_past(hid):
+    raw = _ask("Which day? · y · yy · 22.7 · 22.7.2026",
+               title="⏪ Tick a past day")
+    if raw is None or not raw.strip():
+        return
+    day = _habit_parse_day(raw)
+    if not day:
+        _crm_say("⏪ Can't read that day · y · yy · 22.7")
+        return
+    _habit_tick_core(hid, day, retro=True)
+
+
+def habit_untick(hid):
+    import habits_model as hm
+    import api_v2
+    from datetime import date as _d
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        _crm_say("🔄 Needs the v2 login")
+        return
+    ts = hm.stamp(_d.today())
+    existing, ok = _habit_day_checkin(v2, hid, ts)
+    if not ok:
+        _crm_say("🔄 Can't read checkins (offline?)")
+        return
+    entry = hm.untick_payload(existing, _op_iso())
+    if entry is None:
+        _crm_say("↩️ Nothing to un-tick today")
+        return
+    if not v2.habit_checkins_batch(update=[entry]):
+        _crm_say("🔄 Un-tick failed (offline?)")
+        return
+    _ck_patch(hid, entry)
+    h = _habit_by_id(hid) or {}
+    was_done = existing.get("status") == hm.DONE
+    if was_done and h.get("currentStreak"):
+        # only a cleared DONE undoes the tick's heuristic bump - clearing
+        # a partial value or a skip never counted (review catch)
+        h2 = dict(h)
+        h2["currentStreak"] = max(0, h["currentStreak"] - 1)
+        h2["totalCheckIns"] = max(0, (h.get("totalCheckIns") or 1) - 1)
+        _hb_patch(entity=h2)
+    _crm_say(f"↩️ {h.get('name', '')} · blank again")
+
+
+def habit_skip(hid):
+    import habits_model as hm
+    import api_v2
+    from datetime import date as _d
+    h = _habit_by_id(hid)
+    if h is None:
+        _crm_say("🔄 Habit not found (offline?)")
+        return
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        _crm_say("🔄 Needs the v2 login")
+        return
+    ts = hm.stamp(_d.today())
+    existing, ok = _habit_day_checkin(v2, hid, ts)
+    if not ok:
+        _crm_say("🔄 Can't read checkins (offline?)")
+        return
+    entry = hm.skip_payload(h, ts, existing, _op_iso())
+    if existing:
+        ok2 = v2.habit_checkins_batch(update=[entry])
+    else:
+        entry["id"] = api_v2.new_object_id()
+        ok2 = v2.habit_checkins_batch(add=[entry])
+    if not ok2:
+        _crm_say("🔄 Skip failed (offline?)")
+        return
+    _ck_patch(hid, entry)
+    _crm_say(f"⛔ {h.get('name', '')} · skipped today")
+
+
+def habit_note(hid):
+    import habits_model as hm
+    import api_v2
+    from datetime import date as _d
+    h = _habit_by_id(hid)
+    if h is None:
+        _crm_say("🔄 Habit not found (offline?)")
+        return
+    txt = _ask(f"Note for {h.get('name', '')}:", title="🔄 Habit diary")
+    if txt is None or not txt.strip():
+        return
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        _crm_say("🔄 Needs the v2 login")
+        return
+    rec = hm.record_payload(api_v2.new_object_id(), hid,
+                            hm.stamp(_d.today()), txt.strip(), _op_iso())
+    if not v2.habit_records_batch(add=[rec]):
+        _crm_say("🔄 Note failed (offline?)")
+        return
+    _crm_say(f"📝 {h.get('name', '')} · noted")
+
+
+def habit_new(rest=""):
+    """➕ New habit: name (b64 from the Add window's R mode, else dialog) →
+    section → rhythm preset → done-or-amount (goal + unit) → diary flag."""
+    import base64
+    import habits_model as hm
+    import api_v2
+    from datetime import date as _d
+    name = ""
+    if rest:
+        try:
+            name = (base64.b64decode(rest).decode() or "").strip()
+        except Exception:
+            name = ""
+    if not name:
+        name = (_ask("Habit name:", title="🔄 New habit") or "").strip()
+        if not name:
+            return
+    secs = cache_store.get("habit_sections") or []
+    sec_labels = [s.get("name", "").lstrip("_").capitalize()
+                  for s in secs if s.get("name")]
+    pick = _choose("Section:", ["None"] + sec_labels, title="🔄 New habit",
+                   default="None")
+    if pick is None:
+        return
+    sec_id = "-1"
+    for s in secs:
+        if s.get("name", "").lstrip("_").capitalize() == pick:
+            sec_id = s["id"]
+            break
+    labels = [lbl for lbl, _r in hm.RULE_PRESETS]
+    rl = _choose("How often?", labels, title="🔄 New habit",
+                 default=labels[0])
+    if rl is None:
+        return
+    rule = dict(hm.RULE_PRESETS).get(rl)
+    kind = _choose("Tick type:", ["✅ Done / not done", "🔢 An amount"],
+                   title="🔄 New habit", default="✅ Done / not done")
+    if kind is None:
+        return
+    real, goal, unit = False, 1, "Count"
+    if kind.startswith("🔢"):
+        real = True
+        g = _ask("Daily goal (number):", title="🔄 New habit", default="8")
+        if g is None:
+            return
+        try:
+            goal = float(g)
+        except ValueError:
+            _crm_say("🔄 Goal must be a number · nothing minted")
+            return
+        u = _ask("Unit:", title="🔄 New habit", default="Count")
+        if u is None:
+            return               # Esc = cancel, not 'Count' (review catch)
+        unit = u.strip() or "Count"
+    diary = _choose("Diary note on tick?", ["No", "Yes"],
+                    title="🔄 New habit", default="No")
+    if diary is None:
+        return
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        _crm_say("🔄 Needs the v2 login (Settings → Attachment Login)")
+        return
+    today = _d.today()
+    ent = hm.new_entity(api_v2.new_object_id(), name, section_id=sec_id,
+                        rule=rule, goal=goal, unit=unit, real=real,
+                        record=(diary == "Yes"),
+                        start_stamp=today.year * 10000 + today.month * 100
+                        + today.day)
+    if not v2.habits_batch(add=[ent]):
+        _crm_say("🔄 Mint failed (offline?)")
+        return
+    _hb_patch(entity=ent)
+    _crm_say(f"🔄 {name} · minted · {rl}")
+
+
+def habit_archive(hid):
+    """Live RMW like countdown_archive - the cached entity is up to an
+    hour stale AND carries the tick verbs' heuristic streak bumps; pushing
+    it whole would clobber newer server state (review catch)."""
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    live = v2.get_habits() if v2.token else None
+    h = next((x for x in live or [] if x.get("id") == hid), None) \
+        if live is not None else None
+    if h is None:
+        _crm_say("🔄 Can't fetch it (offline?) · nothing archived")
+        return
+    h2 = dict(h)
+    h2["status"] = 1
+    if not v2.habits_batch(update=[h2]):
+        _crm_say("🔄 Archive failed (offline?)")
+        return
+    _hb_patch(delete_id=hid)
+    _crm_say(f"🗄️ {h.get('name', '')} · archived")
+
+
+def habit_delete(hid):
+    import api_v2
+    h = _habit_by_id(hid)
+    if h is None:
+        _crm_say("🔄 Habit not found (offline?)")
+        return
+    if _dialog(f"Delete habit {h.get('name', '')!r} and its history?",
+               ["Cancel", "Delete"], "Cancel") != "Delete":
+        return
+    v2 = api_v2.TickTickV2()
+    if not v2.token or not v2.habits_batch(delete=[hid]):
+        _crm_say("🔄 Delete failed (offline?)")
+        return
+    _hb_patch(delete_id=hid)
+    _crm_say(f"🗑️ {h.get('name', '')} · deleted")
+
+
 def tag_create(b64spec):
     """➕ Create-tag rows (search g-scope): xact:tag_create:<b64> where
     the payload keeps emoji-bearing names intact: {"label": …, "parent": …?}.
@@ -5560,6 +6183,34 @@ def main():
             pid, tid, m = rest.split(":", 2); focus_log(pid, tid, m)
         elif verb == "focus_backlog":
             focus_backlog(rest)
+        elif verb == "countdown_new":
+            countdown_new(rest)
+        elif verb == "countdown_edit":
+            f, _, cid = rest.partition(":"); countdown_edit(f, cid)
+        elif verb == "countdown_appear":
+            cid, _, val = rest.partition(":"); countdown_appear(cid, val)
+        elif verb == "countdown_flip":
+            countdown_flip(rest)
+        elif verb == "countdown_archive":
+            countdown_archive(rest)
+        elif verb == "countdown_delete":
+            countdown_delete(rest)
+        elif verb == "habit_tick":
+            habit_tick(rest)
+        elif verb == "habit_tick_past":
+            habit_tick_past(rest)
+        elif verb == "habit_untick":
+            habit_untick(rest)
+        elif verb == "habit_skip":
+            habit_skip(rest)
+        elif verb == "habit_note":
+            habit_note(rest)
+        elif verb == "habit_new":
+            habit_new(rest)
+        elif verb == "habit_archive":
+            habit_archive(rest)
+        elif verb == "habit_delete":
+            habit_delete(rest)
         elif verb == "pomo":
             pomo(rest)
         elif verb == "pomo_task":

@@ -106,6 +106,8 @@ def parse_ctx(raw):
                "view_overdue": "ctx:smart:overdue",
                "bridges": "ctx:bridges",
                "people": "ctx:people",
+               "countdowns": "ctx:countdowns",
+               "habits": "ctx:habits",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
                # main-menu view args (▷50F14423 branches)
                "view_today": "ctx:smart:today",
@@ -2391,7 +2393,7 @@ def render_people(level, ids, query):
                 val = pe.card_field(content, f)
                 rows.append(alfred.item(
                     uid=f"pedit-{tid}-{f}",
-                    title=f"{icons.get(f, '📇')} {f} · {val or '—'}",
+                    title=f"{icons.get(f, '📇')} {f} · {val or '…'}",
                     subtitle="⏎✏️ edit  ⌃🔙",
                     arg=f"xact:person_edit:{f}:{areas.PEOPLE_ID}:{tid}",
                     valid=True))
@@ -2652,6 +2654,352 @@ def render_people(level, ids, query):
         rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
     if not rows:
         rows = [alfred.item(title=f'No people row matching "{query}"',
+                            valid=False)]
+    return add_back(rows, "ctx:folders")
+
+
+# ── Level: countdowns / countdown ────────────────────────────────────────────
+def _cd_display_date(cd):
+    """'27.6' (+ '.1993' when the year is real); weekly/monthly repeats
+    show the rhythm, not the anchor date."""
+    rule = cd.get("repeatFlag") or ""
+    if "FREQ=WEEKLY" in rule:
+        return "weekly"
+    if "FREQ=MONTHLY" in rule:
+        return "monthly"
+    n = cd.get("date") or 0
+    d, mo, y = n % 100, n // 100 % 100, n // 10000
+    return f"{d}.{mo}" + ("" if cd.get("ignoreYear") else f".{y}")
+
+
+def render_countdowns(level, ids, query):
+    """ctx:countdowns - the ⏳ hub (soonest first, count-ups below).
+    ctx:countdowns:stats - counts · next 30 days · running count-ups.
+    ctx:countdown:<id> - one countdown as a screen (edit rows).
+    ctx:countdown:<id>:appear - the calendar/smart-list visibility picker.
+    Renders from the hourly 'countdowns' cache (verbs patch it)."""
+    import countdowns as cdm
+    from datetime import date as _date
+    today = _date.today()
+    cached = cache_store.get("countdowns")
+    if cached is None:
+        return add_back([alfred.item(
+            title="⏳ Not synced yet",
+            subtitle="Run tsy · the hourly sync fills this", valid=False)],
+            "ctx:folders")
+    cds = [c for c in cached if c.get("status") == 0]
+
+    if level == "countdown":
+        cid = ids[0] if ids else ""
+        cd = next((c for c in cds if c.get("id") == cid), None)
+        if cd is None:
+            return add_back([alfred.item(
+                title="Countdown not cached yet · sync or reopen",
+                valid=False)], "ctx:countdowns")
+        chip = cdm.kind_chip(cd)
+        name = cd.get("name", "?")
+
+        if len(ids) > 1 and ids[1] == "appear":
+            cur = cd.get("typeOfSmartList") or 0
+            rows = []
+            for val, label in cdm.APPEAR:
+                mark = " ✓" if val == cur else ""
+                rows.append(alfred.item(
+                    uid=f"cda-{cid}-{val}", title=f"👁️ {label}{mark}",
+                    subtitle="Calendar + smart lists  |  ⏎👁️  ⌃🔙",
+                    arg=f"xact:countdown_appear:{cid}:{val}", valid=True))
+            return add_back(rows, f"ctx:countdown:{cid}")
+
+        rows = [alfred.item(
+            uid=f"cd-{cid}",
+            title=f"{chip} {name} · {cdm.distance_label(cd, today)}",
+            subtitle=f"{_cd_display_date(cd)}  ⌃🔙", valid=False)]
+        rows.append(alfred.item(
+            uid=f"cdn-{cid}", title="✏️ Name",
+            subtitle=f"{name}  |  ⏎✏️  ⌃🔙",
+            arg=f"xact:countdown_edit:name:{cid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"cdd-{cid}", title=f"📅 Date · {_cd_display_date(cd)}",
+            subtitle="27.06.1993 · 28.7 · 1993/06/27  |  ⏎✏️  ⌃🔙",
+            arg=f"xact:countdown_edit:date:{cid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"cda-{cid}",
+            title="👁️ Appears · "
+                  + cdm.APPEAR_LABEL.get(cd.get("typeOfSmartList") or 0,
+                                         "On the day"),
+            subtitle="When calendar + smart lists show it  |  ⏎⤵️  ⌃🔙",
+            arg=f"xact:crmbrowse:ctx:countdown:{cid}:appear", valid=True))
+        rows.append(alfred.item(
+            uid=f"cdr-{cid}",
+            title=f"💬 Remark · {cd.get('remark') or '…'}",
+            subtitle="⏎✏️  ⌃🔙",
+            arg=f"xact:countdown_edit:remark:{cid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"cdf-{cid}",
+            title="⏱️ Counting " + ("up" if cdm.is_countup(cd) else "down"),
+            subtitle="Flip the direction  |  ⏎🔃  ⌃🔙",
+            arg=f"xact:countdown_flip:{cid}", valid=True))
+        if cd.get("type") == 2:
+            import people as pe
+            import areas
+            match = next(
+                (t for t in (cache_store.get("all_tasks") or [])
+                 if t.get("status", 0) == 0
+                 and (t.get("_projectId") or t.get("projectId"))
+                 == areas.PEOPLE_ID and pe.is_person(t.get("title", ""))
+                 and pe.person_name(t.get("title", "")).lower()
+                 == name.strip().lower()), None)
+            if match:
+                rows.append(alfred.item(
+                    uid=f"cdp-{cid}", title=f"👽 Open {name}'s card",
+                    subtitle="⏎⤵️  ⌃🔙",
+                    arg=f"xact:crmbrowse:ctx:person:{match['id']}",
+                    valid=True))
+        rows.append(alfred.item(
+            uid=f"cdar-{cid}", title="🗄️ Archive",
+            subtitle="Out of the hub, kept in the app  |  ⏎🗄️  ⌃🔙",
+            arg=f"xact:countdown_archive:{cid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"cddel-{cid}", title="🗑️ Delete",
+            subtitle="Asks first  |  ⏎🗑️  ⌃🔙",
+            arg=f"xact:countdown_delete:{cid}", valid=True))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        return add_back(rows, "ctx:countdowns")
+
+    if ids and ids[0] == "stats":
+        rows = []
+        kinds = {}
+        for c in cds:
+            kinds[c.get("type") or 4] = kinds.get(c.get("type") or 4, 0) + 1
+        counts = " · ".join(f"{cdm.KINDS[k][0]} {n}"
+                            for k, n in sorted(kinds.items()))
+        rows.append(alfred.item(uid="cds-counts", title=f"⏳ {len(cds)} · "
+                                + counts, subtitle="⌃🔙", valid=False))
+        ahead = []
+        for c in cds:
+            occ = cdm.days_until(c, today)
+            if occ and occ[1] == "ahead" and occ[0] <= 30:
+                ahead.append((occ[0], c))
+        for n, c in sorted(ahead, key=lambda x: x[0]):
+            age = cdm.age_on_next(c, today)
+            rows.append(alfred.item(
+                uid=f"cds-{c['id']}",
+                title=f"{cdm.kind_chip(c)} {c.get('name', '?')} · "
+                      + cdm.distance_label(c, today)
+                      + (f" · turns {age}" if age else ""),
+                subtitle=f"{_cd_display_date(c)}  |  ⏎⤵️  ⌃🔙",
+                arg=f"xact:crmbrowse:ctx:countdown:{c['id']}", valid=True))
+        ups = [(occ[0], c) for c in cds
+               for occ in [cdm.days_until(c, today)]
+               if occ and occ[1] == "since"]
+        for n, c in sorted(ups, reverse=True, key=lambda x: x[0]):
+            ms = cdm.milestone(c, today)
+            rows.append(alfred.item(
+                uid=f"cdsu-{c['id']}",
+                title=f"⏱️ {c.get('name', '?')} · {n}d"
+                      + (f" · {ms}" if ms else ""),
+                subtitle=f"Counting up since {_cd_display_date(c)}  |  "
+                         "⏎⤵️  ⌃🔙",
+                arg=f"xact:crmbrowse:ctx:countdown:{c['id']}", valid=True))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        return add_back(rows, "ctx:countdowns")
+
+    # ── the hub ──────────────────────────────────────────────────────────
+    rows = [alfred.item(
+        uid="cd-new", title="➕ New countdown",
+        subtitle="Name · date · kind · when it appears  |  ⏎➕  ⌃🔙",
+        arg="xact:countdown_new", valid=True)]
+    rows.append(alfred.item(
+        uid="cd-stats", title="📊 Stats",
+        subtitle="Next 30 days · counts · running count-ups  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:countdowns:stats", valid=True))
+    for c in sorted(cds, key=lambda c: cdm.sort_key(c, today)):
+        age = cdm.age_on_next(c, today)
+        ms = cdm.milestone(c, today)
+        bits = [cdm.distance_label(c, today), _cd_display_date(c)]
+        if age:
+            bits.append(f"turns {age}")
+        if ms:
+            bits.append(ms)
+        rows.append(alfred.item(
+            uid=f"cdh-{c['id']}",
+            title=f"{cdm.kind_chip(c)} {c.get('name', '?')}",
+            subtitle=" · ".join(bits) + "  |  ⏎⤵️  ⌃🔙",
+            arg=f"xact:crmbrowse:ctx:countdown:{c['id']}", valid=True))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    if not rows:
+        rows = [alfred.item(title=f'No countdown matching "{query}"',
+                            valid=False)]
+    return add_back(rows, "ctx:folders")
+
+
+# ── Level: habits / habit ────────────────────────────────────────────────────
+def render_habits(level, ids, query):
+    """ctx:habits - the 🔄 hub, sections as headers, due-first: ⏎ TICKS
+    today (value habits step; note dialog rides recordEnable habits).
+    ctx:habit:<id> - one habit as a screen (retro tick, skip, un-tick,
+    note, review-note hop, archive, delete).
+    ctx:habits:stats - streaks · dots · totals.
+    Renders from the hourly caches (verbs patch them)."""
+    import habits_model as hm
+    from datetime import date as _date
+    today = _date.today()
+    ts = hm.stamp(today)
+    cached = cache_store.get("habits")
+    if cached is None:
+        return add_back([alfred.item(
+            title="🔄 Not synced yet",
+            subtitle="Run tsy · the hourly sync fills this", valid=False)],
+            "ctx:folders")
+    habits = [h for h in cached if h.get("status") == 0]
+    checks = cache_store.get("habit_checkins") or {}
+    sec_rows = sorted(cache_store.get("habit_sections") or [],
+                      key=lambda s: s.get("sortOrder") or 0)
+    sec_name = {s["id"]: s.get("name", "") for s in sec_rows}
+
+    def _today_chip(h):
+        return hm.state_chip(h, hm.checkin_for(checks.get(h["id"]), ts))
+
+    def _sub(h):
+        bits = [hm.dots(h, checks.get(h["id"]), today)]
+        if h.get("currentStreak"):
+            bits.append(f"🔥{h['currentStreak']}")
+        tpw = hm.times_per_week(h)
+        if tpw:
+            bits.append(f"{hm.week_done(checks.get(h['id']), today)}/{tpw} wk")
+        return " · ".join(bits)
+
+    if level == "habit":
+        hid = ids[0] if ids else ""
+        h = next((x for x in habits if x.get("id") == hid), None)
+        if h is None:
+            return add_back([alfred.item(
+                title="Habit not cached yet · sync or reopen",
+                valid=False)], "ctx:habits")
+        name = h.get("name", "?")
+        cur = hm.checkin_for(checks.get(hid), ts)
+        rows = [alfred.item(
+            uid=f"hb-{hid}", title=f"{_today_chip(h)} {name}",
+            subtitle=f"{_sub(h)} · {h.get('maxStreak') or 0} best · "
+                     f"{h.get('totalCheckIns') or 0} total  ⌃🔙",
+            valid=False)]
+        rows.append(alfred.item(
+            uid=f"hbt-{hid}", title="✅ Tick today",
+            subtitle="⏎✅  ⌃🔙", arg=f"xact:habit_tick:{hid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"hbp-{hid}", title="⏪ Tick a past day",
+            subtitle="Asks the date · y = yesterday  |  ⏎⏪  ⌃🔙",
+            arg=f"xact:habit_tick_past:{hid}", valid=True))
+        if cur and (cur.get("value") or cur.get("status")):
+            rows.append(alfred.item(
+                uid=f"hbu-{hid}", title="↩️ Un-tick today",
+                subtitle="Back to blank  |  ⏎↩️  ⌃🔙",
+                arg=f"xact:habit_untick:{hid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"hbs-{hid}", title="⛔ Skip today",
+            subtitle="Not happening · streak-honest  |  ⏎⛔  ⌃🔙",
+            arg=f"xact:habit_skip:{hid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"hbn-{hid}", title="📝 Note for today",
+            subtitle="Rides the habit's diary  |  ⏎📝  ⌃🔙",
+            arg=f"xact:habit_note:{hid}", valid=True))
+        slot = hm.review_slot(name)
+        if slot:
+            rows.append(alfred.item(
+                uid=f"hbw-{hid}", title=f"💫 Open the {slot} note",
+                subtitle="The review lives there  |  ⏎↗️  ⌃🔙",
+                arg=f"xact:pn_open:{slot}", valid=True))
+        rows.append(alfred.item(
+            uid=f"hba-{hid}", title="🗄️ Archive",
+            subtitle="Off the hub, history kept  |  ⏎🗄️  ⌃🔙",
+            arg=f"xact:habit_archive:{hid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"hbd-{hid}", title="🗑️ Delete",
+            subtitle="Checkins + notes go with it · asks first  |  ⏎🗑️  ⌃🔙",
+            arg=f"xact:habit_delete:{hid}", valid=True))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        return add_back(rows, "ctx:habits")
+
+    if ids and ids[0] == "stats":
+        rows = []
+        for h in sorted(habits, key=lambda x: -(x.get("currentStreak") or 0)):
+            rows.append(alfred.item(
+                uid=f"hbs-{h['id']}", title=f"{_today_chip(h)} "
+                + h.get("name", "?"),
+                subtitle=f"{_sub(h)} · {h.get('maxStreak') or 0} best · "
+                         f"{h.get('totalCheckIns') or 0} total  |  ⏎⤵️  ⌃🔙",
+                arg=f"xact:crmbrowse:ctx:habit:{h['id']}", valid=True))
+        if not rows:
+            rows = [alfred.item(title="No habits yet", valid=False)]
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        return add_back(rows, "ctx:habits")
+
+    # ── the hub ──────────────────────────────────────────────────────────
+    rows = [alfred.item(
+        uid="hb-new", title="➕ New habit",
+        subtitle="Name · rhythm · section  |  ⏎➕  ⌃🔙",
+        arg="xact:habit_new", valid=True)]
+    rows.append(alfred.item(
+        uid="hb-stats", title="📊 Stats",
+        subtitle="Streaks · history · totals  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:habits:stats", valid=True))
+    rows.append(alfred.item(
+        uid="hb-app", title="↗️ Open in TickTick",
+        subtitle="The app's habit board  |  ⏎↗️  ⌃🔙",
+        arg="open:ticktick://habit", valid=True))
+    due = [h for h in habits if hm.due_today(h, today)]
+    if due and all(
+            (hm.checkin_for(checks.get(h["id"]), ts) or {}).get("status")
+            in (hm.DONE, hm.SKIPPED) for h in due):
+        rows.append(alfred.item(uid="hb-alldone",
+                                title="🎉 All done today",
+                                subtitle="⌃🔙", valid=False))
+
+    def _hub_key(h):
+        c = hm.checkin_for(checks.get(h["id"]), ts)
+        is_due = hm.due_today(h, today)
+        done = c and c.get("status") in (hm.DONE, hm.SKIPPED)
+        return (0 if is_due and not done else 1 if is_due else 2,
+                h.get("sortOrder") or 0)
+
+    by_sec = {}
+    for h in habits:
+        by_sec.setdefault(h.get("sectionId") or "-1", []).append(h)
+    sec_order = [s["id"] for s in sec_rows if s["id"] in by_sec]
+    sec_order += [k for k in by_sec if k not in sec_order]
+    many = len([k for k in sec_order if by_sec[k]]) > 1
+    for sid in sec_order:
+        group = sorted(by_sec[sid], key=_hub_key)
+        if not group:
+            continue
+        if many:
+            nm = sec_name.get(sid, "").lstrip("_").capitalize() or "Habits"
+            rows.append(alfred.item(uid=f"hbsec-{sid}", title=f"§ {nm}",
+                                    subtitle="⌃🔙", valid=False))
+        for h in group:
+            due_chip = "" if hm.due_today(h, today) else "  💤"
+            rows.append(alfred.item(
+                uid=f"hbh-{h['id']}",
+                title=f"{_today_chip(h)} {h.get('name', '?')}{due_chip}",
+                subtitle=f"{_sub(h)}  |  ⏎✅ tick  ⌥⤵️  ⌃🔙",
+                arg=f"xact:habit_tick:{h['id']}", valid=True,
+                mods={"alt": {"arg": "", "valid": True,
+                              "subtitle": "Habit screen",
+                              "variables": {"browse_ctx":
+                                            f"ctx:habit:{h['id']}"}}}))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    if not rows:
+        rows = [alfred.item(title=f'No habit matching "{query}"',
                             valid=False)]
     return add_back(rows, "ctx:folders")
 
@@ -2932,6 +3280,12 @@ def main():
 
         elif level in ("people", "person"):
             items = render_people(level, ids, query)
+
+        elif level in ("countdowns", "countdown"):
+            items = render_countdowns(level, ids, query)
+
+        elif level in ("habits", "habit"):
+            items = render_habits(level, ids, query)
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")

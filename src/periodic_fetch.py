@@ -229,8 +229,10 @@ def _habits():
         if rows is None:
             _HABITS = None
             return None
-        _HABITS = [h for h in rows
-                   if h.get("status") == 0 and not h.get("archivedTime")]
+        # status==0 is the only archive flag; archivedTime carries a
+        # 2001-01-01 sentinel on NEVER-archived habits - filtering on its
+        # truthiness silently dropped live habits (bug caught 2026-07-24)
+        _HABITS = [h for h in rows if h.get("status") == 0]
     return _HABITS
 
 
@@ -312,6 +314,18 @@ def _next_occurrence(cd, today):
         if not days:
             return None
         ahead = min((d - today.weekday()) % 7 for d in days)
+        im = re.search(r"INTERVAL=(\d+)", rule)
+        k = int(im.group(1)) if im else 1
+        if k > 1:
+            # biweekly+ parity, anchored at the entity date's week
+            # (mirrors src/countdowns.days_until - keep in step)
+            cand = today + timedelta(days=ahead)
+            a_mon = target - timedelta(days=target.weekday())
+            c_mon = cand - timedelta(days=cand.weekday())
+            off = ((c_mon - a_mon).days // 7) % k
+            if off:
+                cand += timedelta(days=7 * (k - off))
+                ahead = (cand - today).days
         return ahead, ""
     if "FREQ=MONTHLY" in rule:
         dom = target.day

@@ -876,6 +876,8 @@ def mode_menu(fragment):
         ("T ", "🏷️", "Tag",     "a new tag"),
         ("B ", "🌉", "Bridge",  "daily / project"),
         ("H ", "👽", "Person",  "cta / new person"),
+        ("C ", "⏳", "Countdown", "name + date"),
+        ("R ", "🔄", "Habit",   "new habit"),
     ]
     items = []
     for ac, emoji, name, hint in rows:
@@ -944,6 +946,53 @@ def bridge_create_items(fragment):
                                      key_fn=lambda x: x["title"])
     return rows or [alfred.item(title=f'No bridge option "{fragment}"',
                                 valid=False)]
+
+
+def countdown_create_items(fragment):
+    """'c ' mode: '⏳ name [date]' - a trailing date token (28.7 ·
+    27.06.1993 · 1993/06/27) pre-fills the mint; the rest (kind,
+    appearance) stays dialogs in xact:countdown_new."""
+    import base64
+    import countdowns as cdm
+    frag = (fragment or "").strip()
+    if not frag:
+        return [alfred.item(
+            title="⏳ New countdown…",
+            subtitle="Asks name · date · kind · appearance  |  ⏎⏳",
+            arg="xact:countdown_new", valid=True)]
+    toks = frag.split()
+    parsed = cdm.parse_cd_date(toks[-1]) if len(toks) > 1 else None
+    if parsed:
+        name = " ".join(toks[:-1])
+        spec = {"name": name, "date": parsed[0], "yearless": not parsed[1]}
+        b64 = base64.b64encode(json.dumps(spec).encode()).decode()
+        d, mo = parsed[0] % 100, parsed[0] // 100 % 100
+        return [alfred.item(
+            title=f"⏳ {name} · {d}.{mo}",
+            subtitle="Kind + appearance next  |  ⏎⏳",
+            arg=f"xact:countdown_new:{b64}", valid=True)]
+    b64 = base64.b64encode(json.dumps({"name": frag}).encode()).decode()
+    return [alfred.item(
+        title=f"⏳ New countdown · {frag}",
+        subtitle="No date yet - asks it · 28.7 · 27.06.1993  |  ⏎⏳",
+        arg=f"xact:countdown_new:{b64}", valid=True)]
+
+
+def habit_create_items(fragment):
+    """'r ' mode: the habit mint - name here, section/rhythm/type/diary
+    as xact:habit_new dialogs."""
+    import base64
+    frag = (fragment or "").strip()
+    if frag:
+        b64 = base64.b64encode(frag.encode()).decode()
+        return [alfred.item(
+            title=f"🔄 New habit · {frag}",
+            subtitle="Section · rhythm · type · diary next  |  ⏎🔄",
+            arg=f"xact:habit_new:{b64}", valid=True)]
+    return [alfred.item(
+        title="🔄 New habit…",
+        subtitle="Asks the name, then section · rhythm · type  |  ⏎🔄",
+        arg="xact:habit_new", valid=True)]
 
 
 def _fx_running():
@@ -2135,6 +2184,18 @@ def main():
         # ── B prefix → bridge (daily / project) ───────────────────────────────
         if query.lower().startswith("b "):
             items = bridge_create_items(query[2:].strip())
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # ── C prefix → countdown (name + date) ────────────────────────────────
+        if query.lower().startswith("c "):
+            items = countdown_create_items(query[2:].strip())
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # ── R prefix → habit ──────────────────────────────────────────────────
+        if query.lower().startswith("r "):
+            items = habit_create_items(query[2:].strip())
             print(alfred.output(items, skipknowledge=True))
             return
 

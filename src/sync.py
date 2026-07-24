@@ -189,6 +189,37 @@ def do_sync():
     except Exception:
         pass
 
+    # ⏳ Countdowns + 🔄 Habits caches - the hubs render from these (an
+    # Alfred script filter re-runs per keystroke; live GETs would hammer
+    # the API). Write verbs patch these after each batch write. None =
+    # fetch failed → keep last-known-good; [] / {} are account truth.
+    try:
+        import api_v2 as _a2
+        v2h = _a2.TickTickV2()
+        if v2h.token:
+            cds = v2h.get_countdowns()
+            if isinstance(cds, list):
+                cache_store.set("countdowns", cds)
+            habits = v2h.get_habits()
+            if isinstance(habits, list):
+                cache_store.set("habits", habits)
+                secs = v2h.get_habit_sections()
+                if isinstance(secs, list):
+                    cache_store.set("habit_sections", secs)
+                # status==0 is the ONLY archive flag - archivedTime holds
+                # a 2001-01-01 sentinel on never-archived habits (trap)
+                hids = [h["id"] for h in habits if h.get("status") == 0]
+                if hids:
+                    from datetime import date as _d, timedelta as _td
+                    after = ((_d.today() - _td(days=32)).year * 10000
+                             + (_d.today() - _td(days=32)).month * 100
+                             + (_d.today() - _td(days=32)).day)
+                    checks = v2h.habit_checkins(hids, after)
+                    if isinstance(checks, dict):
+                        cache_store.set("habit_checkins", checks)
+    except Exception:
+        pass
+
     summary = f"Synced {len(projects)} lists, {len(all_tasks)} tasks, {len(all_notes)} notes, {len(all_tags)} tags"
     if errors:
         summary += f" ({errors} list(s) failed)"

@@ -96,6 +96,8 @@ SCOPES = [
     ("pn ", "💫", "Periodic",         "daily / weekly notes",     "PN"),
     ("b ",  "🌉", "Bridges",          "daily / project bridges",  "B"),
     ("h ",  "👽", "People",           "cards by last contact",    "H"),
+    ("cd ", "⏳", "Countdowns",       "days until · count-ups",   "CD"),
+    ("hb ", "🔄", "Habits",           "⏎ ticks today",            "HB"),
     ("n ",  "📝", "Notes",            "note titles",              "N"),
     ("nc ", "📄", "Note bodies",      "note text",  "NC"),
 ]
@@ -171,6 +173,8 @@ SCOPE_PREFIXES = {
     "bp ": "bridge_proj",
     "h ":  "people",
     "hs ": "people_stale",
+    "cd ": "countdowns",
+    "hb ": "habits",
 }
 
 def detect_scope(query):
@@ -616,6 +620,93 @@ def people_scope_rows(scope, query):
     return rows
 
 
+_DEAD_MODS = {
+    "shift":      {"valid": False, "subtitle": ""},
+    "alt":        {"valid": False, "subtitle": ""},
+    "cmd":        {"valid": False, "subtitle": ""},
+    "alt+shift":  {"valid": False, "subtitle": ""},
+    "ctrl+shift": {"valid": False, "subtitle": ""},
+    "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
+}
+
+
+def countdown_scope_rows(query):
+    """CD scope: countdowns soonest-first, ⏎ → the countdown's screen
+    (BrowseCtx trampoline - search-⏎ only forwards xact:/open: args).
+    Non-task rows: every hard search chord dead (person-row shape)."""
+    import countdowns as cdm
+    from datetime import date
+    today = date.today()
+    cached = cache_store.get("countdowns")
+    if cached is None:
+        return [alfred.item(title="⏳ Not synced yet",
+                            subtitle="Run tsy · the hourly sync fills this",
+                            valid=False)]
+    pool = [c for c in cached if c.get("status") == 0]
+    if query:
+        pool = fuzz.filter_and_score(
+            query, pool, key_fn=lambda c: search_key(c.get("name", "")))
+    pool = sorted(pool, key=lambda c: cdm.sort_key(c, today))
+    rows = []
+    for c in pool[:60]:
+        age = cdm.age_on_next(c, today)
+        ms = cdm.milestone(c, today)
+        bits = [cdm.distance_label(c, today)]
+        if age:
+            bits.append(f"turns {age}")
+        if ms:
+            bits.append(ms)
+        rows.append(alfred.item(
+            uid=f"cds-{c['id']}",
+            title=f"{cdm.kind_chip(c)} {c.get('name', '?')}",
+            subtitle=" · ".join(bits) + "  |  ⏎⤵️ screen  ⌃🔙",
+            arg=f"xact:crmbrowse:ctx:countdown:{c['id']}", valid=True,
+            mods=dict(_DEAD_MODS)))
+    if not rows:
+        rows = [alfred.item(
+            title="No countdown" + (f' matching "{query}"' if query
+                                    else "s yet"),
+            subtitle="⏳ hub → ➕ New countdown", valid=False)]
+    return rows
+
+
+def habit_scope_rows(query):
+    """HB scope: habits with today's state - ⏎ TICKS today from anywhere
+    (the screen lives in the hub; the search SF's ⌥/⌘ edges can't carry a
+    trampoline arg, so stray chords are dead - person-row shape)."""
+    import habits_model as hm
+    from datetime import date
+    today = date.today()
+    ts = hm.stamp(today)
+    cached = cache_store.get("habits")
+    if cached is None:
+        return [alfred.item(title="🔄 Not synced yet",
+                            subtitle="Run tsy · the hourly sync fills this",
+                            valid=False)]
+    checks = cache_store.get("habit_checkins") or {}
+    pool = [h for h in cached if h.get("status") == 0]
+    if query:
+        pool = fuzz.filter_and_score(
+            query, pool, key_fn=lambda h: search_key(h.get("name", "")))
+    rows = []
+    for h in pool[:60]:
+        chip = hm.state_chip(h, hm.checkin_for(checks.get(h["id"]), ts))
+        bits = [hm.dots(h, checks.get(h["id"]), today, days=7)]
+        if h.get("currentStreak"):
+            bits.append(f"🔥{h['currentStreak']}")
+        rows.append(alfred.item(
+            uid=f"hbs-{h['id']}",
+            title=f"{chip} {h.get('name', '?')}",
+            subtitle=" · ".join(bits) + "  |  ⏎✅ tick  ⌃🔙",
+            arg=f"xact:habit_tick:{h['id']}", valid=True,
+            mods=dict(_DEAD_MODS)))
+    if not rows:
+        rows = [alfred.item(
+            title="No habit" + (f' matching "{query}"' if query else "s yet"),
+            subtitle="🔄 hub → ➕ New habit", valid=False)]
+    return rows
+
+
 def last_added_rows(query, all_tasks):
     """LA scope: incomplete tasks, newest createdTime first. Typing
     filters, but recency keeps ruling the order (fuzzy decides inclusion,
@@ -993,6 +1084,15 @@ def main():
         # ── H / HS scopes: person cards, freshest contact first ──────────────
         if scope in ("people", "people_stale"):
             print(alfred.output(people_scope_rows(scope, query),
+                                skipknowledge=True))
+            return
+        # ── CD / HB scopes: countdowns · habits (⏎ ticks) ────────────────────
+        if scope == "countdowns":
+            print(alfred.output(countdown_scope_rows(query),
+                                skipknowledge=True))
+            return
+        if scope == "habits":
+            print(alfred.output(habit_scope_rows(query),
                                 skipknowledge=True))
             return
 

@@ -387,6 +387,83 @@ class TickTickV2:
         except Exception:
             return False
 
+    # ── habits (endpoints lifted from the webapp bundle, full lifecycle
+    #    probe-verified 2026-07-24: create/checkin/record/delete) ─────────────
+    def _v2_read(self, method, path, body=None):
+        """Shared read plumbing: parsed JSON, or None on ANY failure - []/{}
+        mean genuinely empty, so callers can fail CLOSED on the difference."""
+        if not self.token:
+            return None
+        try:
+            kw = {"headers": {**_base_headers(), "cookie": f"t={self.token}",
+                              "content-type": "application/json"},
+                  "timeout": 15}
+            url = f"https://api.ticktick.com/api/v2/{path}"
+            r = (requests.post(url, json=body or {}, **kw) if method == "post"
+                 else requests.get(url, **kw))
+            return r.json() if r.ok else None
+        except Exception:
+            return None
+
+    def _v2_batch(self, path, add=None, update=None, delete=None):
+        """Shared {add,update,delete} batch write. True on a clean ack."""
+        if not self.token:
+            return False
+        try:
+            r = requests.post(
+                f"https://api.ticktick.com/api/v2/{path}",
+                headers={**_base_headers(), "cookie": f"t={self.token}",
+                         "content-type": "application/json"},
+                json={"add": add or [], "update": update or [],
+                      "delete": delete or []},
+                timeout=15)
+            return bool(r.ok) and not (r.json().get("id2error") or {})
+        except Exception:
+            return False
+
+    def get_habits(self):
+        """GET /api/v2/habits - raw habit entities (streaks ride on them:
+        currentStreak/maxStreak/totalCheckIns). None on failure."""
+        j = self._v2_read("get", "habits")
+        return j if isinstance(j, list) else None
+
+    def get_habit_sections(self):
+        """GET /api/v2/habitSections. None on failure."""
+        j = self._v2_read("get", "habitSections")
+        return j if isinstance(j, list) else None
+
+    def habit_checkins(self, habit_ids, after_stamp):
+        """POST habitCheckins/query - {habitId: [checkin,…]} strictly AFTER
+        after_stamp (YYYYMMDD int; pass day-before to include a day)."""
+        j = self._v2_read("post", "habitCheckins/query",
+                          {"habitIds": list(habit_ids),
+                           "afterStamp": after_stamp})
+        return j.get("checkins") if isinstance(j, dict) else None
+
+    def habit_records(self, habit_ids, after_stamp):
+        """POST getHabitRecords - {habitId: [record,…]} (diary notes:
+        stamp/content/emoji). None on failure."""
+        j = self._v2_read("post", "getHabitRecords",
+                          {"habitIds": list(habit_ids),
+                           "afterStamp": after_stamp})
+        return j.get("habitRecords") if isinstance(j, dict) else None
+
+    def habits_batch(self, add=None, update=None, delete=None):
+        """POST habits/batch - full entities in add/update, bare ids in
+        delete (deleting a habit CASCADES its checkins + records,
+        probe-verified)."""
+        return self._v2_batch("habits/batch", add, update, delete)
+
+    def habit_checkins_batch(self, add=None, update=None, delete=None):
+        """POST habitCheckins/batch. TRAP: delete-by-id 500s - un-tick via
+        UPDATE (status 0, value 0), never delete."""
+        return self._v2_batch("habitCheckins/batch", add, update, delete)
+
+    def habit_records_batch(self, add=None, update=None, delete=None):
+        """POST habitRecords. TRAP: delete takes FULL record objects, a bare
+        id 500s (probe 2026-07-24)."""
+        return self._v2_batch("habitRecords", add, update, delete)
+
     def upload_attachment(self, project_id, task_id, file_bytes, file_name, mime="image/png"):
         """Upload an image as a real attachment on the task. Uses the saved session
         token; for password accounts it can refresh via signon, but a Sign-in-with-
