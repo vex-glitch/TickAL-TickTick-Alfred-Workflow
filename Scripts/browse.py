@@ -2398,6 +2398,10 @@ def render_people(level, ids, query):
             subtitle="Type it · *date @time schedules  |  ⏎➕  ⌃🔙",
             arg=f"xact:add_pre:~p {card.get('title', '')}", valid=True))
         rows.append(alfred.item(
+            uid=f"pfact-{tid}", title="💬 Add fact",
+            subtitle="Conversation starter  |  ⏎💬  ⌃🔙",
+            arg=f"xact:person_fact:{areas.PEOPLE_ID}:{tid}", valid=True))
+        rows.append(alfred.item(
             uid=f"pidea-{tid}", title="🎁 Add idea",
             subtitle="Gift stash · typed or clipboard  |  ⏎🎁  ⌃🔙",
             arg=f"xact:person_idea:{areas.PEOPLE_ID}:{tid}", valid=True))
@@ -2444,6 +2448,10 @@ def render_people(level, ids, query):
                            "task_title": t.get("title", ""),
                            "item_type": "subtask"},
                 mods=_picker_mods()))
+        for ln in [l for l in pe.facts_body(content).splitlines()
+                   if l.strip()][:5]:
+            rows.append(alfred.item(
+                title=ln.strip().lstrip("- "), subtitle="💬", valid=False))
         for ln in [l for l in log.splitlines() if l.strip()][:5]:
             rows.append(alfred.item(
                 title=ln.strip().lstrip("- "), subtitle="🧾", valid=False))

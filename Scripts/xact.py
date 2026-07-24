@@ -4933,6 +4933,32 @@ def person_idea(rest):
     app_sync_after_write()
 
 
+def person_fact(rest):
+    """💬 Conversation starter onto the card ('Has a cat named Garfield').
+    Typed beats clipboard; bare bullet, no timestamp - facts don't age."""
+    import people as pe
+    pid, _, tid = rest.partition(":")
+    a = _ask("💬 Fact (empty OK = clipboard · Esc cancels)")
+    if a is None:
+        _crm_say("💬 Cancelled")
+        return
+    text = a.strip() or _pbpaste()
+    if not text:
+        _crm_say("💬 Nothing to note (empty + empty clipboard)")
+        return
+    api = _api()
+    try:
+        live = api.get_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    new = pe.facts_insert(live.get("content") or "", f"- {text}")
+    api.update_task(tid, pid, current=live, content=new)
+    _patch_content_cache(tid, new)
+    _crm_say(f"💬 Noted · {pe.person_name(live.get('title') or '')}")
+    app_sync_after_write()
+
+
 def person_idea_from(rest):
     """🎁 The acted-on item BECOMES the idea: its title (+ first link)
     lands on the chosen card's Ideas. rest = person_tid:src_pid:src_tid.
@@ -5554,6 +5580,8 @@ def main():
             person_attach(rest)
         elif verb == "person_idea":
             person_idea(rest)
+        elif verb == "person_fact":
+            person_fact(rest)
         elif verb == "person_idea_from":
             person_idea_from(rest)
         elif verb == "person_setup":

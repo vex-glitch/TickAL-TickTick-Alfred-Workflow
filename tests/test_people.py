@@ -27,18 +27,20 @@ def check(name, cond, detail=""):
         FAILURES.append(f"{name}: {detail}")
 
 
-# ── 1. title grammar ─────────────────────────────────────────────────────────
-check("1.title", pe.person_title("Goga") == "👽H • Goga")
-check("1.name", pe.person_name("👽H • Goga") == "Goga")
-check("1.name-archive", pe.person_name("👽H • Goga · 🗄️ 2026.07.24") == "Goga")
-check("1.is-person", pe.is_person("👽H • Goga"))
+# ── 1. title grammar (no 'H •' since the 2026-07-24 re-rule) ─────────────────
+check("1.title", pe.person_title("Goga") == "👽 Goga")
+check("1.name", pe.person_name("👽 Goga") == "Goga")
+check("1.name-legacy", pe.person_name("👽H • Goga") == "Goga")
+check("1.name-archive", pe.person_name("👽 Goga · 🗄️ 2026.07.24") == "Goga")
+check("1.is-person", pe.is_person("👽 Goga"))
+check("1.is-person-legacy", pe.is_person("👽H • Goga"))
 check("1.not-person-archive",
-      not pe.is_person("👽H • Goga · 🗄️ 2026.07.24"))
+      not pe.is_person("👽 Goga · 🗄️ 2026.07.24"))
 check("1.not-person-plain", not pe.is_person("Buy milk"))
-check("1.is-archive", pe.is_archive("👽H • Goga · 🗄️ 2026.07.24"))
+check("1.is-archive", pe.is_archive("👽 Goga · 🗄️ 2026.07.24"))
 check("1.archive-title",
       pe.archive_title("Goga", date(2026, 7, 24))
-      == "👽H • Goga · 🗄️ 2026.07.24")
+      == "👽 Goga · 🗄️ 2026.07.24")
 
 # ── 2. circles ───────────────────────────────────────────────────────────────
 check("2.of", pe.circle_of(["👽family"]) == "👽family")
@@ -123,9 +125,25 @@ check("6b.nudge-from-log", pe.nudge_silent_days(
 check("6b.nudge-no-basis",
       pe.nudge_silent_days({"content": ""}, date(2026, 7, 24)) is None)
 
+# ── 6c. facts ────────────────────────────────────────────────────────────────
+cf = pe.facts_insert(pe.CARD_SKEL, "- Has a cat named Garfield")
+check("6c.facts-in-place",
+      "## 💬 Facts\n- Has a cat named Garfield\n\n## 🎁 Ideas" in cf)
+cf2 = pe.facts_insert(cf, "- Hates cilantro")
+check("6c.facts-append",
+      pe.facts_body(cf2) == "- Has a cat named Garfield\n- Hates cilantro")
+old = "## 📇 Card\nPhone: 1\n\n## 🎁 Ideas\n\n\n## 🧾 Log\n"
+mf = pe.facts_insert(old, "- Diver")
+check("6c.facts-minted-before-ideas",
+      mf.index("## 💬 Facts") < mf.index("## 🎁 Ideas") and "- Diver" in mf)
+check("6c.facts-coexist", pe.ideas_body(pe.ideas_insert(cf2, "- socks"))
+      == "- socks" and pe.facts_body(pe.ideas_insert(cf2, "- socks"))
+      == "- Has a cat named Garfield\n- Hates cilantro")
+
 # ── 6. skeleton sanity ───────────────────────────────────────────────────────
 check("6.skel-sections", all(h in pe.CARD_SKEL for h in
-                             (pe.SEC_CARD, pe.SEC_IDEAS, pe.SEC_LOG)))
+                             (pe.SEC_CARD, pe.SEC_FACTS, pe.SEC_IDEAS,
+                              pe.SEC_LOG)))
 check("6.skel-fields", all(f in pe.CARD_SKEL for f in
                            ("Birthday: ", "Phone: ", "Mail: ")))
 

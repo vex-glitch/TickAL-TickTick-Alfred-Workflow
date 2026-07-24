@@ -16,7 +16,9 @@ Impure sides (dialogs, API, cache) live in Scripts/xact.py and browse.
 import re
 from datetime import date, datetime
 
-PERSON_PREFIX = "👽H • "
+PERSON_PREFIX = "👽 "            # the card marker (Vex re-rule 2026-07-24:
+LEGACY_PREFIX = "👽H • "         # no 'H •' - search scopes do the narrowing;
+                                 # legacy accepted on read, never minted)
 PARENT_TAG = "👽people"          # existing live parent tag - circles nest under
 ARCHIVE_TAG = "archive"
 ARCHIVE_MARK = "🗄️"
@@ -32,6 +34,7 @@ CIRCLES = (
 CIRCLE_TAGS = tuple(c[0] for c in CIRCLES)
 
 SEC_CARD = "## 📇 Card"
+SEC_FACTS = "## 💬 Facts"        # conversation starters ("cat named Garfield")
 SEC_IDEAS = "## 🎁 Ideas"
 SEC_LOG = "## 🧾 Log"
 
@@ -40,6 +43,9 @@ CARD_SKEL = (
     "Birthday: \n"
     "Phone: \n"
     "Mail: \n"
+    "\n"
+    "## 💬 Facts\n"
+    "\n"
     "\n"
     "## 🎁 Ideas\n"
     "\n"
@@ -57,23 +63,29 @@ def person_title(name):
 
 
 def person_name(title):
-    """'👽H • Goga' → 'Goga' (archive titles lose the 🗄️ tail too)."""
+    """'👽 Goga' → 'Goga' (legacy '👽H • ' and archive 🗄️ tails too)."""
     t = (title or "").strip()
-    if t.startswith(PERSON_PREFIX):
-        t = t[len(PERSON_PREFIX):]
+    for pre in (LEGACY_PREFIX, PERSON_PREFIX):
+        if t.startswith(pre):
+            t = t[len(pre):]
+            break
     t = re.sub(r"\s*·\s*🗄️?\s*[\d./-]+\s*$", "", t)
     return t.strip()
 
 
+def _prefixed(t):
+    return t.startswith(PERSON_PREFIX) or t.startswith(LEGACY_PREFIX)
+
+
 def is_person(title):
-    """Live card - prefixed, NOT an archive copy."""
+    """Live card - marked, NOT an archive copy."""
     t = (title or "").strip()
-    return t.startswith(PERSON_PREFIX) and ARCHIVE_MARK not in t
+    return _prefixed(t) and ARCHIVE_MARK not in t
 
 
 def is_archive(title):
     t = (title or "").strip()
-    return t.startswith(PERSON_PREFIX) and ARCHIVE_MARK in t
+    return _prefixed(t) and ARCHIVE_MARK in t
 
 
 def archive_title(name, d):
@@ -184,6 +196,32 @@ def ideas_insert(content, line):
     if end < len(c):
         newbody += "\n"          # keep one blank before the next section
     return c[:start] + newbody + c[end:]
+
+
+def facts_insert(content, line):
+    """Append a bare bullet to 💬 Facts. Missing heading → minted before
+    🎁 Ideas (else before the Log, else appended)."""
+    c = content or ""
+    span = _sec_span(c, SEC_FACTS)
+    if span is None:
+        for anchor in (SEC_IDEAS, SEC_LOG):
+            if _sec_span(c, anchor) is not None:
+                at = c.rfind(anchor)
+                return c[:at] + f"{SEC_FACTS}\n{line}\n\n" + c[at:]
+        sep = "" if (not c or c.endswith("\n\n")) else \
+            ("\n" if c.endswith("\n") else "\n\n")
+        return f"{c}{sep}{SEC_FACTS}\n{line}\n"
+    start, end = span
+    body = (c[start:end]).strip("\n")
+    newbody = "\n" + (body + "\n" if body else "") + line + "\n"
+    if end < len(c):
+        newbody += "\n"
+    return c[:start] + newbody + c[end:]
+
+
+def facts_body(content):
+    span = _sec_span(content, SEC_FACTS)
+    return (content or "")[span[0]:span[1]].strip("\n") if span else ""
 
 
 def log_insert(content, line):
