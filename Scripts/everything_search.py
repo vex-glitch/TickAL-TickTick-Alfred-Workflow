@@ -112,6 +112,14 @@ def scope_menu(fragment):
             arg="", valid=False,
             autocomplete=prefix,
         ))
+    # 🌉 opens the hub outright (⏎ = the BrowseCtx trampoline, not a
+    # prefix) - Bridges is a destination, not a filter scope.
+    if not frag or "bridges".startswith(frag) or frag == "b":
+        items.append(alfred.item(
+            title="🌉  Bridges",
+            subtitle="Daily + project handoffs  |  ⏎⤵️",
+            valid=True, arg="xact:crmbrowse:ctx:bridges",
+        ))
     if not items:
         items = [alfred.item(title=f'No scope matching "{fragment}"', valid=False)]
     return items

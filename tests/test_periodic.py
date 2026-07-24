@@ -177,6 +177,10 @@ check("14.deterministic", p1 == p2 and len(p1) == 3)
 check("14.slot-differs", p1 != p3 and len(p3) == 5)
 fixed_m = pm.journal_fixed("morning")
 check("14.fixed-morning", [k for k, _q in fixed_m] == ["mood", "free", "free"])
+fixed_mb = pm.journal_fixed("morning", {"ybridge": "Ship the bridge"})
+check("14.fixed-morning-bridge",
+      [k for k, _q in fixed_mb] == ["mood", "free", "free", "free"]
+      and "Ship the bridge" in fixed_mb[1][1])
 fixed_e = pm.journal_fixed("evening", {"goal": "Ship the thing"})
 check("14.fixed-evening",
       [k for k, _q in fixed_e] == ["free", "goal", "money", "rating",

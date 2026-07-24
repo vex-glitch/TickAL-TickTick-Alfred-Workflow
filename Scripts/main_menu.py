@@ -119,6 +119,15 @@ def build_items():
             subtitle="Daily, weekly, journal, money",
             arg="periodic",
         ),
+        # arg "bridges" → conditional branch → Call-ET BrowseCtx; its
+        # Arg&Vars plants browse_ctx="bridges", parse_ctx's ALIASES
+        # resolve it to ctx:bridges (phase_bridges).
+        alfred.item(
+            uid="bridges",
+            title="🌉 Bridges",
+            subtitle="Daily + project handoffs",
+            arg="bridges",
+        ),
         # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) were
         # retired - they only re-fired TickTick's own global shortcuts, and
         # the task-bound sticky/pomo in ⌘ Actions are better. tt_shortcut.py

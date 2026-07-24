@@ -1013,6 +1013,13 @@ def master_menu(prefix, fragment, note_mode=False):
             valid=False,
             autocomplete=f"{base}{sym}",
         ))
+    # 🌉 fires a VERB, not a prefill - rides dispatch's xact: passthrough
+    # (ET XAct executor, _crm_say banners).
+    items.append(alfred.item(
+        title="🌉 Daily bridge",
+        subtitle="Write today's · typed / clipboard",
+        arg="xact:bridge_daily", valid=True,
+    ))
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     if not items:

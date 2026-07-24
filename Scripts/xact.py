@@ -4676,6 +4676,24 @@ def bridge_tidy():
     app_sync_after_write()
 
 
+def bridge_sethome(pid):
+    """⚙️ Make a list the daily-bridge home (⌘ Actions on any list):
+    writes bridges_list_id to config.json + flips the list to kanban
+    (best effort - tag-grouping and edit-sort stay one in-app tap,
+    they're client-side view settings)."""
+    if not pid:
+        _crm_say("Error: no list id")
+        return
+    data = cfg.load()
+    data["bridges_list_id"] = pid
+    cfg.save(data)
+    try:
+        _api().update_project(pid, viewMode="kanban")
+    except Exception:
+        pass
+    _crm_say(f"🌉 {_list_name_of(pid) or 'List'} is the Bridges home now")
+
+
 def bridge_copy(rest):
     """⌥ on a bridge row: title + content → clipboard, ready to paste into
     the next Claude session (the whole point of a bridge)."""
@@ -4986,6 +5004,8 @@ def main():
             bridge_copy(rest)
         elif verb == "bridge_tidy":
             bridge_tidy()
+        elif verb == "bridge_sethome":
+            bridge_sethome(rest)
         elif verb == "crmphoto":
             crmphoto(rest)
         elif verb == "crmcold":

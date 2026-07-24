@@ -1439,7 +1439,15 @@ def journal_seed(slot):
 
     def mutate(doc, live):
         ctx = {}
-        if slot == "evening":
+        if slot == "morning":
+            # 🌉 yesterday's bridge already lives IN this note (the bridge
+            # write fans out to the next day) - echo it as a prompt.
+            bsec = ps.find(doc, pm.SEC_YBRIDGE)
+            if bsec:
+                ctx["ybridge"] = " ".join(
+                    ln.strip() for ln in bsec.body
+                    if ln.strip() and "_(pending)_" not in ln)
+        elif slot == "evening":
             gsec = ps.find(doc, pm.SEC_DAY_GOAL)
             ctx["goal"] = pm.day_goal_title(gsec.body) if gsec else ""
         elif slot == "weekly":

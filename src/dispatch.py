@@ -45,6 +45,18 @@ def _fire_add_prefill(query):
     subprocess.run(["osascript", "-e", osa, query], check=False)
 
 
+def _fire_xact(arg):
+    """Generic xact passthrough: any row on a dispatch-routed surface (the
+    Add window's / menu, SaveURL, …) can fire a verb by emitting a full
+    "xact:…" arg. Rides ET XAct - the same executor the ⌘ Actions ^xact
+    leg uses, so banners (_crm_say) and reopen behaviour match."""
+    osa = ('on run argv\n'
+           f'tell application id "{ALFRED_APP}" to run trigger "XAct" '
+           f'in workflow "{WF_BUNDLE}" with argument (item 1 of argv)\n'
+           'end run')
+    subprocess.run(["osascript", "-e", osa, arg], check=False)
+
+
 # Act-again: attribute changes reopen the ⌘ Actions menu for the same
 # task - fresh values on every row, esc dismisses. Alfred is closed by the time
 # dispatch runs, so the external-trigger fire opens a live window (same timing
@@ -237,6 +249,11 @@ def main():
             url = arg[5:]
             subprocess.run(["open", url], check=False)
             # no output → notification node shows nothing
+
+        elif arg.startswith("xact:"):
+            # passthrough → ET XAct (banners via _crm_say there, so no
+            # output here). Lets Add-route rows fire verbs with no wiring.
+            _fire_xact(arg)
 
         elif arg.startswith("docsopen:"):
             # docsopen:<notification text>|<url> - like open:, but tells the

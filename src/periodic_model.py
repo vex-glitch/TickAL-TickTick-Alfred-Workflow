@@ -589,12 +589,24 @@ def journal_fixed(slot, ctx=None):
     """[(route_key, question)] - the fixed head of each journal, in order."""
     ctx = ctx or {}
     if slot == "morning":
-        return [
+        out = [
             ("mood", "Mood 1-5 (1 😢 · 3 😐 · 5 😁), optional note after ·"),
+        ]
+        # 🌉 yesterday's bridge echoes as a reflection prompt. Key MUST stay
+        # "free": inserted prompts shift later indexes, and index-keyed
+        # routing tolerates that only while every shifting slot is "free".
+        yb = (ctx.get("ybridge") or "").strip()
+        if yb:
+            if len(yb) > 140:
+                yb = yb[:140].rstrip() + "…"
+            out.append(("free", f"🌉 Yesterday's bridge: {yb} - "
+                                "what carries into today?"))
+        out += [
             ("free", "What is on your mind?"),
             ("free", "What is the one thing you need to do today? What would, "
                      "if achieved, make this day count?"),
         ]
+        return out
     if slot == "evening":
         goal = (ctx.get("goal") or "").strip()
         goal_q = (f"Did you achieve your daily goal, {goal}? "
