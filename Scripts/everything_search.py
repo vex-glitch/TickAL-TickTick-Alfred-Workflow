@@ -95,6 +95,7 @@ SCOPES = [
     ("la ", "👉", "Last Added",       "recently created first",   "LA"),
     ("pn ", "💫", "Periodic",         "daily / weekly notes",     "PN"),
     ("b ",  "🌉", "Bridges",          "daily / project bridges",  "B"),
+    ("h ",  "👽", "People",           "cards by last contact",    "H"),
     ("n ",  "📝", "Notes",            "note titles",              "N"),
     ("nc ", "📄", "Note bodies",      "note text",  "NC"),
 ]
@@ -168,6 +169,8 @@ SCOPE_PREFIXES = {
     "b ":  "bridges",
     "bd ": "bridge_daily",
     "bp ": "bridge_proj",
+    "h ":  "people",
+    "hs ": "people_stale",
 }
 
 def detect_scope(query):
@@ -539,6 +542,78 @@ def bridge_scope_rows(scope, query):
         rows = [alfred.item(
             title="No bridges" + (f' matching "{query}"' if query else " yet"),
             valid=False)]
+    return rows
+
+
+def _person_search_row(t, today=None):
+    """One person card row: ⏎ = the card screen in browse (crmbrowse
+    trampoline), ⌘⚡ Actions via real task vars, ⌥⌘ copy link; stray
+    chords dead (bridge-row shape)."""
+    import people as pe
+    import areas
+    tid = t["id"]
+    title = t.get("title", "")
+    content = t.get("content") or ""
+    link = f"ticktick:///webapp/#p/{areas.PEOPLE_ID}/tasks/{tid}"
+    chip = pe.circle_chip(t.get("tags"))
+    sub = f"{chip + '  ' if chip else ''}{pe.age_chip(content)}  |  ⏎⤵️ card  ⌘⚡  ⌃🔙"
+    return alfred.item(
+        uid=f"pe-{tid}", title=title, subtitle=sub,
+        arg=f"xact:crmbrowse:ctx:person:{tid}",
+        mods={
+            "shift":      {"valid": False, "subtitle": ""},
+            "alt":        {"valid": False, "subtitle": ""},
+            "alt+shift":  {"valid": False, "subtitle": ""},
+            "ctrl+shift": {"valid": False, "subtitle": ""},
+            "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
+            "alt+cmd":    {"arg": f"copy:{link}"},
+        },
+        variables={"item_type": "task", "task_id": tid,
+                   "task_list_id": areas.PEOPLE_ID, "task_title": title,
+                   "search_name": title, "type_rank": 5},
+    )
+
+
+def people_scope_rows(scope, query):
+    """H / HS scopes: person cards, freshest contact first (LA pattern -
+    fuzzy decides inclusion, recency rules order). 'hs ' flips to the
+    neglect view: stale-only, worst silence on top."""
+    import people as pe
+    import areas
+    from datetime import date
+    persons = [t for t in (cache_store.get("all_tasks") or [])
+               if t.get("status", 0) == 0
+               and (t.get("_projectId") or t.get("projectId")) == areas.PEOPLE_ID
+               and pe.is_person(t.get("title", ""))]
+    rows = []
+    if scope == "people" and not query:
+        n_stale = sum(1 for t in persons
+                      if pe.is_stale(t.get("content") or ""))
+        if n_stale:
+            rows.append(alfred.item(
+                title="🕸️  Stale only",
+                subtitle=("1 person" if n_stale == 1
+                          else f"{n_stale} people"),
+                valid=False, autocomplete="hs "))
+    pool = persons
+    if scope == "people_stale":
+        pool = [t for t in pool if pe.is_stale(t.get("content") or "")]
+    if query:
+        pool = fuzz.filter_and_score(
+            query, pool,
+            key_fn=lambda t: search_key(t.get("title", "")))
+    if scope == "people_stale":
+        pool = sorted(pool, key=lambda t: pe.days_silent(
+            t.get("content") or "") or 10**6, reverse=True)
+    else:
+        pool = sorted(pool, key=lambda t: (
+            pe.last_log_date(t.get("content") or "") or date.min).isoformat(),
+            reverse=True)
+    rows += [_person_search_row(t) for t in pool[:100]]
+    if not rows:
+        rows = [alfred.item(
+            title="No people" + (f' matching "{query}"' if query else " yet"),
+            subtitle="👽 hub → ➕ Add Person", valid=False)]
     return rows
 
 
@@ -914,6 +989,11 @@ def main():
         # ── B / BD / BP scopes: bridge notes, newest first ───────────────────
         if scope in ("bridges", "bridge_daily", "bridge_proj"):
             print(alfred.output(bridge_scope_rows(scope, query),
+                                skipknowledge=True))
+            return
+        # ── H / HS scopes: person cards, freshest contact first ──────────────
+        if scope in ("people", "people_stale"):
+            print(alfred.output(people_scope_rows(scope, query),
                                 skipknowledge=True))
             return
 

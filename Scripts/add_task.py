@@ -875,6 +875,7 @@ def mode_menu(fragment):
         ("P ", "💼", "Project", "list + meta task"),
         ("T ", "🏷️", "Tag",     "a new tag"),
         ("B ", "🌉", "Bridge",  "daily / project"),
+        ("H ", "👽", "Person",  "cta / new person"),
     ]
     items = []
     for ac, emoji, name, hint in rows:
@@ -885,6 +886,46 @@ def mode_menu(fragment):
     if fragment:
         items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     return items or [alfred.item(title=f'No options matching "{fragment}"', valid=False)]
+
+
+def people_create_items(fragment):
+    """H mode: person CTAs by autocomplete (the ~p parent token does the
+    rest - list inherits from the card, *date @time schedule natively) +
+    the New-person mint."""
+    import base64
+    import people as pe
+    import areas
+    if not areas.people_configured():
+        return [alfred.item(title="👽 People need a home list",
+                            subtitle="Settings → 👽 People list",
+                            valid=False)]
+    items = []
+    persons = [t for t in (cache_store.get("all_tasks") or [])
+               if t.get("status", 0) == 0
+               and (t.get("_projectId") or t.get("projectId")) == areas.PEOPLE_ID
+               and pe.is_person(t.get("title", ""))]
+    persons.sort(key=lambda t: t.get("title", ""))
+    if fragment:
+        persons = fuzz.filter_and_score(
+            fragment, persons, key_fn=lambda t: t.get("title", ""))
+    for t in persons:
+        name = pe.person_name(t.get("title", ""))
+        items.append(alfred.item(
+            title=f"📌 CTA → {name}",
+            subtitle="⏎ compose · *date @time schedules · lands under the card",
+            autocomplete=f"~p {t.get('title', '')} ", valid=False))
+    if fragment:
+        b64 = base64.b64encode(fragment.encode()).decode()
+        items.append(alfred.item(
+            title=f"👽 New person · {fragment}",
+            subtitle="Circle → card opens to fill  |  ⏎👽",
+            arg=f"xact:person_new:{b64}", valid=True))
+    else:
+        items.append(alfred.item(
+            title="👽 New person…",
+            subtitle="Asks the name · circle → card opens  |  ⏎👽",
+            arg="xact:person_new", valid=True))
+    return items
 
 
 def bridge_create_items(fragment):
@@ -2082,6 +2123,12 @@ def main():
         # ── T prefix → create tag ─────────────────────────────────────────────
         if query.lower().startswith("t "):
             items = tag_create_items(query[2:].strip())
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # ── H prefix → person (cta / new person) ──────────────────────────────
+        if query.lower().startswith("h "):
+            items = people_create_items(query[2:].strip())
             print(alfred.output(items, skipknowledge=True))
             return
 

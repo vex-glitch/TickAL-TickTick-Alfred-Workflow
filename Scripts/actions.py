@@ -427,6 +427,25 @@ def main():
             except Exception:
                 cta_row = None
 
+        # 👽 People context: person cards grow their own verb rows; any
+        # other task can attach as a CTA under a card.
+        _is_person_card = False
+        _p_phone = _p_digits = _p_mail = ""
+        _people_ok = False
+        try:
+            import re as _pre
+            import people as _pe
+            _people_ok = areas.people_configured()
+            _is_person_card = (is_task_like and _people_ok
+                               and pid == areas.PEOPLE_ID
+                               and _pe.is_person(name))
+            if _is_person_card:
+                _p_phone = _pe.card_field(task.get("content") or "", "Phone")
+                _p_digits = _pre.sub(r"[^\d+]", "", _p_phone)
+                _p_mail = _pe.card_field(task.get("content") or "", "Mail")
+        except Exception:
+            pass
+
         # (title, subtitle, arg, search keywords, show?)
         # Notes get everything but Complete and Priority; list/section get only the
         # container-applicable actions (open / browse / add / copy / back).
@@ -495,6 +514,26 @@ def main():
             ("📋 Copy bridge", "Title + content → clipboard, paste to Claude",
              f"xact:bridge_copy:{pid}:{tid}", "bridge copy clipboard claude",
              is_note and "Bridge 🌉" in name),
+            ("🧾 Add log entry",  "Timestamped line · newest on top",
+             f"xact:person_log:{pid}:{tid}", "log entry person people",
+             _is_person_card),
+            ("🎂 Birthday → countdown", "From the card's 📇 Birthday field",
+             f"xact:person_bday:{pid}:{tid}",
+             "birthday countdown person people", _is_person_card),
+            ("🗄️ Archive log",    "Old entries → dated note · asks first",
+             f"xact:person_archive:{pid}:{tid}", "archive log person people",
+             _is_person_card),
+            (f"📞 Call · {_p_phone}", "From the card",
+             f"open:tel:{_p_digits}", "call phone person people",
+             _is_person_card and bool(_p_digits)),
+            (f"✉️ Mail · {_p_mail}", "From the card",
+             f"open:mailto:{_p_mail}", "mail email person people",
+             _is_person_card and bool(_p_mail)),
+            ("👽 Attach to person", "Becomes a CTA under a card",
+             f"xact:crmbrowse:ctx:people:attach:{pid}:{tid}",
+             "person people attach cta assign",
+             is_task_like and not is_note and _people_ok
+             and not _is_person_card),
             ("⤵️ Browse tasks",    "Drill into tasks",     "browse",        "browse tasks drill", itype == "section"),
             (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like),
             ("☀️ Add to today",    "Land it on today",     f"xact:pn_sched:today|{pid}|{tid}",

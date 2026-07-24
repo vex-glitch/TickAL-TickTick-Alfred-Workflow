@@ -348,6 +348,45 @@ class TickTickV2:
         except Exception:
             return False
 
+    def get_countdowns(self):
+        """GET /api/v2/countdown/list - raw countdown entities (the
+        {"countdowns": [...]} envelope unwrapped; probe-verified
+        2026-07-24). None on ANY failure - a [] means a genuinely empty
+        list, so mint verbs can fail CLOSED on the difference (law 9)."""
+        if not self.token:
+            return None
+        try:
+            r = requests.get("https://api.ticktick.com/api/v2/countdown/list",
+                             headers={**_base_headers(),
+                                      "cookie": f"t={self.token}"},
+                             timeout=15)
+            if not r.ok:
+                return None
+            j = r.json()
+            return j.get("countdowns", []) if isinstance(j, dict) else j
+        except Exception:
+            return None
+
+    def countdown_batch(self, add=None, update=None, delete=None):
+        """POST /api/v2/countdown/batch - the web app's own write channel
+        (endpoint lifted from the webapp bundle, create+delete probe-verified
+        2026-07-24). add/update take FULL countdown entities (client-minted
+        24-hex ids - new_object_id()); delete takes ids. True when the
+        server acks without an id2error entry."""
+        if not self.token:
+            return False
+        try:
+            r = requests.post(
+                "https://api.ticktick.com/api/v2/countdown/batch",
+                headers={**_base_headers(), "cookie": f"t={self.token}",
+                         "content-type": "application/json"},
+                json={"add": add or [], "update": update or [],
+                      "delete": delete or []},
+                timeout=15)
+            return bool(r.ok) and not (r.json().get("id2error") or {})
+        except Exception:
+            return False
+
     def upload_attachment(self, project_id, task_id, file_bytes, file_name, mime="image/png"):
         """Upload an image as a real attachment on the task. Uses the saved session
         token; for password accounts it can refresh via signon, but a Sign-in-with-

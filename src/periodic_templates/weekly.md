@@ -29,6 +29,8 @@
 	_(pending)_
 
 ### 💰 Income
+### 👽 People
+	_(pending)_
 ---
 ### ⏪ Last week
 	_(pending)_

@@ -223,12 +223,16 @@ def buffer_complete():
     api = api_mod.TickTickAPI(cfg.get_token())
     done = skipped = 0
     completed_tids = set()
+    plogged = []
     for ln in buffer_ids():
         pid, tid = ln.split(":", 1)
         try:
             api.complete_task(pid, tid)
             done += 1
             completed_tids.add(tid)
+            _pl = person_autolog(tid)   # before the cache drop below
+            if _pl and _pl not in plogged:
+                plogged.append(_pl)
             cached = cache_store.get("all_tasks")
             if cached is not None:
                 cache_store.set("all_tasks", [t for t in cached if t.get("id") != tid])
@@ -237,7 +241,8 @@ def buffer_complete():
         except Exception:
             skipped += 1
     _write_buffer([])
-    print(f"🅿️ {done} completed" + (f", {skipped} skipped" if skipped else ""))
+    print(f"🅿️ {done} completed" + (f", {skipped} skipped" if skipped else "")
+          + "".join(plogged))
     # Complete-guard: completing the focused task ends its session too.
     st = _focus_state()
     if st and st.get("tid") in completed_tids:
@@ -4021,10 +4026,12 @@ def fx_tick(pid, tid, ctid=None):
         else:
             target = ordered[0] if ordered else None
         done_titles = {}
+        plog = ""
         if target:
             cpid = target.get("projectId") or pid
             _api().complete_task(cpid, target["id"])
             _complete_cache_patch(cpid, target["id"])
+            plog = person_autolog(target["id"], target)
             open_children = [t for t in open_children
                              if t.get("id") != target["id"]]
             if target["id"] not in child_ids:
@@ -4034,7 +4041,7 @@ def fx_tick(pid, tid, ctid=None):
         if as_json:
             print(json.dumps({"ok": True, "ticked": bool(target), **summary}))
         elif target:
-            print(f"✅ done: {target.get('title', '')[:50]}")
+            print(f"✅ done: {target.get('title', '')[:50]}{plog}")
         else:
             print("Nothing open to tick")
     except Exception as e:
@@ -4719,6 +4726,440 @@ def bridge_copy(rest):
     _crm_say("🌉 Bridge copied · paste it to Claude")
 
 
+# ── 👽 People (cards + CTAs + log) ───────────────────────────────────────────
+# Model in src/people.py. A person is a TASK in areas.PEOPLE_ID (CTAs nest
+# under it as real schedulable subtasks - notes can't have children), card
+# content = 📇 Card / 🎁 Ideas / 🧾 Log sections, kanban by circle tag.
+# CTA composing is NOT a verb - the Add window does it natively via the
+# ~p parent token (add_pre prefills it; the parent's list is inherited).
+
+
+def _person_find(api, title):
+    """A person card by EXACT title, LIVE (dupe gate - same fail-CLOSED
+    contract as _bridge_find: task, None, or "ERR")."""
+    import areas
+    try:
+        pdata = api.get_project_data(areas.PEOPLE_ID) or {}
+        return next((t for t in pdata.get("tasks", [])
+                     if (t.get("title") or "").strip() == title), None)
+    except Exception:
+        return "ERR"
+
+
+def _person_inject_cache(task, pid):
+    """Task twin of _bridge_inject_cache (which also feeds all_notes -
+    wrong pool for a TASK card): all_tasks + project_data only."""
+    try:
+        entry = dict(task)
+        entry["_projectId"] = pid
+        entry["_projectName"] = _list_name_of(pid)
+        entry["tags"] = [str(t).lower() for t in (task.get("tags") or [])]
+        pool = [t for t in (cache_store.get("all_tasks") or [])
+                if t.get("id") != task.get("id")]
+        pool.append(entry)
+        cache_store.set("all_tasks", pool)
+        pd_key = f"project_data_{pid}"
+        pd = cache_store.get(pd_key)
+        if pd is not None:
+            pd = dict(pd)
+            pd["tasks"] = [t for t in pd.get("tasks", [])
+                           if t.get("id") != task.get("id")] + [entry]
+            cache_store.set(pd_key, pd)
+    except Exception:
+        pass
+
+
+def _person_circle_pick():
+    """Circle tag for a new card. None = Cancel (abort the mint),
+    '' = deliberately uncircled."""
+    import people as pe
+    opts = [f"{chip} {label}" for _, chip, label in pe.CIRCLES]
+    opts.append("⚪️ No circle")
+    got = _choose("👽 Circle for this person", opts)
+    if got is None:
+        return None
+    for tag, chip, label in pe.CIRCLES:
+        if got == f"{chip} {label}":
+            return tag
+    return ""
+
+
+def _person_circle_tag(tag, parent="__circle__"):
+    """Ensure ONE tag exists - circles nest under 👽people (the default),
+    parent=None mints a flat tag (#archive). '' when v2 is unavailable -
+    the card still mints, just untagged. Mirrors _bridge_month_tag."""
+    import people as pe
+    if parent == "__circle__":
+        parent = pe.PARENT_TAG
+    try:
+        from display import tag_match_key
+        known = {tag_match_key(t) for t in (cache_store.get("tags") or [])}
+        if tag_match_key(tag) in known:
+            return tag
+        import api_v2
+        v2 = api_v2.TickTickV2()
+        if not v2.token or not v2.create_tag(tag, parent=parent):
+            return ""
+        cache_store.set("tags", (cache_store.get("tags") or []) + [tag])
+        tree = cache_store.get("tags_tree")
+        if tree is not None:
+            cache_store.set("tags_tree", tree + [
+                {"name": tag, "label": tag, "parent": parent}])
+        return tag
+    except Exception:
+        return ""
+
+
+def person_new(rest=""):
+    """➕ New person card: 👽H • {Name}, circle tag, 📇/🎁/🧾 skeleton.
+    Opens right away - the card wants its birthday + phone. rest is an
+    optional b64 name (the Add H-mode row passes the typed fragment)."""
+    import base64
+    import people as pe
+    import areas
+    if not areas.people_configured():
+        _crm_say("👽 People list not configured (Settings)")
+        return
+    name = ""
+    if rest:
+        try:
+            name = base64.b64decode(rest).decode("utf-8", "replace").strip()
+        except Exception:
+            name = ""
+    if not name:
+        a = _ask("👽 Person name (Esc cancels)")
+        if a is None or not a.strip():
+            _crm_say("👽 Cancelled")
+            return
+        name = a
+    import re as _re
+    # ':' breaks xact args; the rest are ~p span terminators in the Add
+    # parser - a name carrying one truncates the parent match (review catch)
+    name = " ".join(_re.sub(r"[~#!*@/>=&%:]", " ", name).split())
+    want = pe.person_title(name)
+    api = _api()
+    hit = _person_find(api, want)
+    if hit == "ERR":
+        _crm_say("👽 Can't check for a twin (offline?) · nothing minted")
+        return
+    if hit:
+        open_task(areas.PEOPLE_ID, hit["id"])
+        _crm_say(f"👽 {name} exists · opening")
+        return
+    circle = _person_circle_pick()
+    if circle is None:
+        _crm_say("👽 Cancelled")
+        return
+    tag = _person_circle_tag(circle) if circle else ""
+    t = api.create_task(title=want, project_id=areas.PEOPLE_ID,
+                        content=pe.CARD_SKEL, tags=[tag] if tag else [])
+    _person_inject_cache(t, areas.PEOPLE_ID)
+    open_task(areas.PEOPLE_ID, t.get("id"))
+    bits = [f"👽 {name} · card minted · fill the 📇"]
+    if tag:
+        bits.append(f"#{tag}")
+    elif circle == "":
+        bits.append("uncircled")
+    _crm_say(" · ".join(bits))
+    app_sync_after_write()
+
+
+def person_log(rest):
+    """🧾 Timestamped line onto the card, newest on top (private meeting
+    notes). Typed beats clipboard; both empty = nothing to log."""
+    import people as pe
+    pid, _, tid = rest.partition(":")
+    a = _ask("🧾 Log entry (empty OK = clipboard · Esc cancels)")
+    if a is None:
+        _crm_say("🧾 Cancelled")
+        return
+    text = a.strip() or _pbpaste()
+    if not text:
+        _crm_say("🧾 Nothing to log (empty + empty clipboard)")
+        return
+    api = _api()
+    try:
+        live = api.get_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    new = pe.log_insert(live.get("content") or "", pe.log_line(text))
+    api.update_task(tid, pid, current=live, content=new)
+    _patch_content_cache(tid, new)
+    _crm_say(f"🧾 Logged · {pe.person_name(live.get('title') or '')}")
+    app_sync_after_write()
+
+
+def add_pre(rest):
+    """Jump into the Add window prefilled ('~p 👽H • Goga ' → CTA composer
+    with native *date @time scheduling; 'H' → the person picker mode).
+    search_pre's twin for the Add ET."""
+    _run_trigger("Add", (rest or "").rstrip() + " ")
+
+
+def _bday_date_int(y, mo, d):
+    """YYYYMMDD int for the countdown. Year unknown → current year; a
+    Feb-29 in a non-leap year clamps to 28 (the RRULE keeps BYMONTHDAY=29,
+    so leap years still land on the 29th)."""
+    yy = y or datetime.now().year
+    try:
+        datetime(yy, mo, d)
+    except ValueError:
+        d = 28
+    return int(f"{yy}{mo:02d}{d:02d}")
+
+
+def person_bday(rest):
+    """🎂 Card's Birthday field → a TickTick countdown in Vex's exact
+    grammar (bare name, birthday icon, 9:00 day-of + 2-days-before
+    reminders; birth year known → age shown). Idempotent by name."""
+    import people as pe
+    import api_v2
+    pid, _, tid = rest.partition(":")
+    api = _api()
+    try:
+        live = api.get_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    name = pe.person_name(live.get("title") or "")
+    bd = pe.parse_birthday(pe.card_field(live.get("content") or "",
+                                         "Birthday"))
+    if not bd:
+        _crm_say("🎂 No parsable Birthday on the card · 1993/06/27 · "
+                 "27.06.1993 · 06/27")
+        return
+    y, mo, d = bd
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        _crm_say("🎂 Needs the v2 login (Settings → Attachment Login)")
+        return
+    have = v2.get_countdowns()
+    if have is None:
+        _crm_say("🎂 Can't check countdowns (offline?) · nothing minted")
+        return
+    if any((c.get("name") or "").strip().lower() == name.lower()
+           for c in have):
+        _crm_say(f"🎂 Countdown already exists · {name}")
+        return
+    ent = {
+        "id": api_v2.new_object_id(), "type": 2,
+        "iconRes": "countdown_birthday", "color": "#A0EFED",
+        "name": name, "date": _bday_date_int(y, mo, d),
+        "ignoreYear": not y, "showCalendarType": 1,
+        "reminders": ["TRIGGER:P0DT9H0M0S", "TRIGGER:-P2DT15H0M0S"],
+        "repeatFlag": f"RRULE:FREQ=YEARLY;INTERVAL=1;BYMONTH={mo};"
+                      f"BYMONTHDAY={d}",
+        "remark": "", "status": 0, "style": "cartoon",
+        "styleColor": ["#2B2B2B", "#E4E4E4"], "dateDisplayFormat": "day",
+        "timerMode": 0, "showAge": bool(y), "daysOption": 0,
+        "sortOrder": min([c.get("sortOrder", 0) for c in have] or [0])
+        - 1048576,
+    }
+    if v2.countdown_batch(add=[ent]):
+        _crm_say(f"🎂 {name} · countdown minted"
+                 + (" · age shown" if y else ""))
+    else:
+        _crm_say("🎂 Countdown mint failed (offline?)")
+
+
+def person_archive(rest):
+    """🗄️ Big log → split off: the old 🧾 Log becomes an archive NOTE
+    (👽H • {Name} · 🗄️ date, #archive, no circle - a second grouped tag
+    would double cards), the LIVE card keeps its id/subtasks/circle and
+    gets a fresh empty log. Asks first."""
+    import people as pe
+    import areas
+    pid, _, tid = rest.partition(":")
+    api = _api()
+    try:
+        live = api.get_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    name = pe.person_name(live.get("title") or "")
+    log = pe.log_body(live.get("content") or "")
+    if not log.strip():
+        _crm_say("🗄️ Log is empty · nothing to archive")
+        return
+    n = sum(1 for ln in log.splitlines() if ln.strip())
+    if _dialog(f"Archive {name}'s log ({n} lines)? Old entries move to a "
+               "dated note · the card starts a fresh log",
+               ["Cancel", "Archive"], "Archive") != "Archive":
+        _crm_say("🗄️ Cancelled")
+        return
+    day = datetime.now().date()
+    want = pe.archive_title(name, day)
+    hit = _person_find(api, want)        # retry-safe: same-day rerun reuses
+    if hit == "ERR":
+        _crm_say("🗄️ Can't check for today's archive (offline?) · nothing minted")
+        return
+    if hit:
+        note = hit
+    else:
+        _person_circle_tag(pe.ARCHIVE_TAG, parent=None)   # plain #archive
+        note = api.create_task(title=want,
+                               project_id=areas.PEOPLE_ID, content=log,
+                               tags=[pe.ARCHIVE_TAG], kind="NOTE")
+        _bridge_inject_cache(note, areas.PEOPLE_ID,
+                             _list_name_of(areas.PEOPLE_ID))
+    new = pe.log_reset(live.get("content") or "")
+    api.update_task(tid, pid, current=live, content=new)
+    _patch_content_cache(tid, new)
+    _crm_say(f"🗄️ {name} · log archived ({n} lines) · card reset")
+    app_sync_after_write()
+
+
+def person_attach(rest):
+    """👽 Any task → a CTA under a person (fx_unstage's sacred order:
+    v2 detach if parented → move list → v1 adopt). rest =
+    person_tid:src_pid:src_tid."""
+    import people as pe
+    import areas
+    ptid, _, r2 = rest.partition(":")
+    spid, _, stid = r2.partition(":")
+    if not (ptid and spid and stid) or stid == ptid:
+        _crm_say("👽 Can't attach that")
+        return
+    api = _api()
+    try:
+        live = api.get_task(spid, stid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    if live.get("childIds"):
+        _crm_say("👽 It has subtasks · move them out first")
+        return
+    old_parent = live.get("parentId")
+    if old_parent:
+        import api_v2
+        v2 = api_v2.TickTickV2()
+        if not (v2.token and v2.task_parent([{
+                "taskId": stid, "projectId": spid,
+                "oldParentId": old_parent}])):
+            _crm_say("👽 It's someone's subtask and the detach needs the "
+                     "v2 login · not moved")
+            return
+    try:
+        if spid != areas.PEOPLE_ID:
+            api.move_task(stid, spid, areas.PEOPLE_ID)
+        api.update_task(stid, areas.PEOPLE_ID, current=live,
+                        parentId=ptid, columnId=None)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    from dispatch import _patch_project_data
+    _patch_project_data(stid, pid_old=spid, remove=True)
+    pool = cache_store.get("all_tasks")
+    if pool is not None:
+        for x in pool:
+            if x.get("id") == stid:
+                x["projectId"] = areas.PEOPLE_ID
+                x["_projectId"] = areas.PEOPLE_ID
+                x["_projectName"] = _list_name_of(areas.PEOPLE_ID)
+                x["parentId"] = ptid
+        cache_store.set("all_tasks", pool)
+    pd_key = f"project_data_{areas.PEOPLE_ID}"
+    pd = cache_store.get(pd_key)
+    if pd is not None:
+        entry = dict(live)
+        entry["projectId"] = areas.PEOPLE_ID
+        entry["parentId"] = ptid
+        pd = dict(pd)
+        pd["tasks"] = [t for t in pd.get("tasks", [])
+                       if t.get("id") != stid] + [entry]
+        cache_store.set(pd_key, pd)
+    pname = pe.person_name(next(
+        (x.get("title", "") for x in (cache_store.get("all_tasks") or [])
+         if x.get("id") == ptid), ""))
+    _crm_say(f"👽 {(live.get('title') or 'Task').strip()} → {pname or 'person'}")
+    app_sync_after_write()
+
+
+def person_autolog(tid, snap=None):
+    """Completing a person's CTA writes the card's log itself
+    ('- ts - ✅ …'). Returns a toast suffix (' · 🧾 Goga') or ''.
+    NEVER raises - completion must not break on a logging nicety."""
+    try:
+        import people as pe
+        import areas
+        if not areas.people_configured():
+            return ""
+        pool = cache_store.get("all_tasks") or []
+        t = snap or next((x for x in pool if x.get("id") == tid), None)
+        if not t or not t.get("parentId"):
+            return ""
+        par = next((x for x in pool if x.get("id") == t["parentId"]), None)
+        if not par:
+            return ""
+        ppid = par.get("_projectId") or par.get("projectId")
+        if ppid != areas.PEOPLE_ID or not pe.is_person(par.get("title", "")):
+            return ""
+        api = _api()
+        live = api.get_task(areas.PEOPLE_ID, par["id"])
+        new = pe.log_insert(live.get("content") or "",
+                            pe.log_line(f"✅ {(t.get('title') or '').strip()}"))
+        api.update_task(par["id"], areas.PEOPLE_ID, current=live,
+                        content=new)
+        _patch_content_cache(par["id"], new)
+        return f" · 🧾 {pe.person_name(par.get('title') or '')}"
+    except Exception:
+        return ""
+
+
+def person_setup():
+    """⚙️ One shot: seed the five circle tags (nested under 👽people) +
+    flip the People list to kanban. Idempotent - reruns just report."""
+    import people as pe
+    import areas
+    if not areas.people_configured():
+        _crm_say("👽 People list not configured (Settings)")
+        return
+    made, have = [], []
+    for tag, _, _ in pe.CIRCLES:
+        from display import tag_match_key
+        known = {tag_match_key(t) for t in (cache_store.get("tags") or [])}
+        if tag_match_key(tag) in known:
+            have.append(tag)
+        elif _person_circle_tag(tag):
+            made.append(tag)
+    try:
+        _api().update_project(areas.PEOPLE_ID, viewMode="kanban")
+    except Exception:
+        pass
+    if made:
+        _crm_say(f"👽 Circles seeded · {len(made)} new · board kanban "
+                 "(group by tag = one in-app tap)")
+    elif len(have) == len(pe.CIRCLES):
+        _crm_say("👽 All circles exist · board kanban")
+    else:
+        _crm_say("👽 Some circles failed (v2 login?) · retry from the hub")
+
+
+def people_setlist():
+    """⚙️ Settings → 👽 People list: paste the home list's id. Saves
+    config people_list_id + flips the list to kanban."""
+    import re as _re
+    cur = cfg.get_people_list_id()
+    a = _ask("👽 People list id (⌘ Copy id on any list · Esc cancels)",
+             default=cur)
+    if a is None:
+        _crm_say("👽 Cancelled")
+        return
+    a = a.strip()
+    if not _re.fullmatch(r"[0-9a-fA-F]{24}", a or ""):
+        _crm_say("👽 That does not look like a list id · nothing saved")
+        return
+    data = cfg.load()
+    data["people_list_id"] = a
+    cfg.save(data)
+    try:
+        _api().update_project(a, viewMode="kanban")
+    except Exception:
+        pass
+    _crm_say(f"👽 People home set · {_list_name_of(a) or a}")
+
+
 def tag_create(b64spec):
     """➕ Create-tag rows (search g-scope): xact:tag_create:<b64> where
     the payload keeps emoji-bearing names intact: {"label": …, "parent": …?}.
@@ -4899,8 +5340,9 @@ def focus_done():
         focus_stop()
         try:
             _api().complete_task(pid, tid)
+            plog = person_autolog(tid)
             _complete_cache_patch(pid, tid)
-            print(f"✅ {title[:40]} completed")
+            print(f"✅ {title[:40]} completed{plog}")
         except Exception as e:
             print(f"✅ complete failed: {type(e).__name__}")
         return
@@ -4910,8 +5352,9 @@ def focus_done():
         pomo_abandon()
         try:
             _api().complete_task(pid, tid)
+            plog = person_autolog(tid)
             _complete_cache_patch(pid, tid)
-            print(f"✅ {title[:40]} completed")
+            print(f"✅ {title[:40]} completed{plog}")
         except Exception as e:
             print(f"✅ complete failed: {type(e).__name__}")
         return
@@ -5022,6 +5465,22 @@ def main():
             bridge_setlist()
         elif verb == "search_pre":
             search_pre(rest)
+        elif verb == "person_new":
+            person_new(rest)
+        elif verb == "person_log":
+            person_log(rest)
+        elif verb == "person_bday":
+            person_bday(rest)
+        elif verb == "person_archive":
+            person_archive(rest)
+        elif verb == "person_attach":
+            person_attach(rest)
+        elif verb == "person_setup":
+            person_setup()
+        elif verb == "people_setlist":
+            people_setlist()
+        elif verb == "add_pre":
+            add_pre(rest)
         elif verb == "crmphoto":
             crmphoto(rest)
         elif verb == "crmcold":

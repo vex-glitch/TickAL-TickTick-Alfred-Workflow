@@ -128,6 +128,14 @@ def build_items():
             subtitle="Daily + project handoffs",
             arg="bridges",
         ),
+        # arg "people" rides the same Call-ET BrowseCtx leg family
+        # (phase_people): browse_ctx="people" → ALIASES → ctx:people.
+        alfred.item(
+            uid="people",
+            title="👽 People",
+            subtitle="Cards, CTAs, log",
+            arg="people",
+        ),
         # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) were
         # retired - they only re-fired TickTick's own global shortcuts, and
         # the task-bound sticky/pomo in ⌘ Actions are better. tt_shortcut.py

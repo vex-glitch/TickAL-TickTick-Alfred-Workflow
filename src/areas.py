@@ -31,6 +31,7 @@ PROJECTS_FOLDER_ID = os.environ.get("projects_folder_id") or ""  # 💼Projects-
 CRM_ID             = os.environ.get("crm_list_id") or ""         # 🔥CRM-style list
 PERIODIC_LIST_ID   = cfg.get_periodic_list_id()                  # 💫Periodic notes list
 BRIDGES_ID         = cfg.get_bridges_list_id()                   # 🌉Bridges daily-bridge list
+PEOPLE_ID          = cfg.get_people_list_id()                    # 👽People cards list
 DOCS_BASE = "https://github.com/vex-glitch/TickAL-TickTick-Alfred-Workflow/blob/main/docs"
 # The CRM tag family - Configure fields since 2026-07-17. This is the ONLY
 # home - every consumer (add_task, browse, tag pickers, dispatch) reads these
@@ -157,6 +158,10 @@ def periodic_configured():
 
 def bridges_configured():
     return bool(BRIDGES_ID)
+
+
+def people_configured():
+    return bool(PEOPLE_ID)
 
 
 def crm_list_name():

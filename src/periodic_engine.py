@@ -983,6 +983,32 @@ def _fill_weekly(doc, p, index):
                         for i in range(7)])
                 + [pm.money_total_line(inc_cur, 3)])
 
+    # ── 👽 People - birthdays inside 14d (countdowns) + stale cards
+    plines = list(getattr(t2, "bday_lines", lambda d=14: None)(14) or []) \
+        if t2 else []
+    try:
+        import people as _pe
+        if areas.people_configured():
+            stale = []
+            for t in (cache_store.get("all_tasks") or []):
+                if t.get("status", 0) != 0 \
+                        or (t.get("_projectId") or t.get("projectId")) \
+                        != areas.PEOPLE_ID \
+                        or not _pe.is_person(t.get("title", "")):
+                    continue
+                ds = _pe.days_silent(t.get("content") or "")
+                if ds is None or ds >= _pe.STALE_DAYS:
+                    chip = "never logged" if ds is None else f"{ds}d silent"
+                    nm = _pe.person_name(t.get("title", ""))
+                    stale.append((ds if ds is not None else 10**6,
+                                  f"- 🕸️ {nm} · {chip}"))
+            stale.sort(key=lambda kv: -kv[0])
+            plines += [ln for _k, ln in stale[:6]]
+    except Exception:
+        pass
+    if plines:
+        ps.set_body(doc, pm.SEC_PEOPLE, pm.ind(plines))
+
     # ── 📔 Weekly journal - seed + dynamic-goal prompt refresh
     gsec = ps.find(doc, pm.SEC_GOALS)
     goals = "; ".join(pm.goal_titles(gsec.body)[:5]) if gsec else ""

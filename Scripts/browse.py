@@ -105,6 +105,7 @@ def parse_ctx(raw):
                "overdue": "ctx:smart:overdue",
                "view_overdue": "ctx:smart:overdue",
                "bridges": "ctx:bridges",
+               "people": "ctx:people",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
                # main-menu view args (▷50F14423 branches)
                "view_today": "ctx:smart:today",
@@ -2352,6 +2353,177 @@ def render_bridges(ids, query):
     return add_back(rows, "ctx:folders")
 
 
+def render_people(level, ids, query):
+    """ctx:people - the People hub (Add Person / Add CTA / Add Log /
+    Search / Board, + conditional 🕸️ stale and ⚙️ seed rows).
+    ctx:people:log - person picker → xact:person_log.
+    ctx:people:attach:SRCPID:SRCTID - person picker → xact:person_attach.
+    ctx:person:TID - one card as a screen: 📇 fields, open CTAs, log tail."""
+    import people as pe
+    import areas
+    all_tasks = [t for t in (cache_store.get("all_tasks") or [])
+                 if t.get("status", 0) == 0]
+    persons = [t for t in all_tasks
+               if (t.get("_projectId") or t.get("projectId")) == areas.PEOPLE_ID
+               and pe.is_person(t.get("title", ""))]
+    persons.sort(key=lambda t: t.get("title", ""))
+
+    def _person_vars(t):
+        return {"task_id": t["id"], "task_list_id": areas.PEOPLE_ID,
+                "list_id": "", "section_id": "",
+                "task_title": t.get("title", ""), "item_type": "task"}
+
+    if level == "person":
+        tid = ids[0] if ids else ""
+        card = next((t for t in persons if t.get("id") == tid), None)
+        if card is None:
+            return add_back([alfred.item(
+                title="Card not cached yet · sync or reopen",
+                valid=False)], "ctx:people")
+        name = pe.person_name(card.get("title", ""))
+        chip = pe.circle_chip(card.get("tags"))
+        content = card.get("content") or ""
+        link = f"ticktick:///webapp/#p/{areas.PEOPLE_ID}/tasks/{tid}"
+        rows = [alfred.item(
+            uid=f"pcard-{tid}", title=f"{chip + ' ' if chip else ''}👽 {name}",
+            subtitle=f"{pe.age_chip(content)}  |  ⏎↗️ card  ⌘⚡  ⌃🔙",
+            arg=f"open:{link}", valid=True,
+            variables=_person_vars(card), mods=_picker_mods())]
+        rows.append(alfred.item(
+            uid=f"plog-{tid}", title="🧾 Add log entry",
+            subtitle="Timestamped · newest on top  |  ⏎🧾  ⌃🔙",
+            arg=f"xact:person_log:{areas.PEOPLE_ID}:{tid}", valid=True))
+        rows.append(alfred.item(
+            uid=f"pcta-{tid}", title="📌 Add CTA",
+            subtitle="Type it · *date @time schedules  |  ⏎➕  ⌃🔙",
+            arg=f"xact:add_pre:~p {card.get('title', '')}", valid=True))
+        bday = pe.card_field(content, "Birthday")
+        if pe.parse_birthday(bday):
+            rows.append(alfred.item(
+                uid=f"pbday-{tid}", title=f"🎂 Birthday · {bday}",
+                subtitle="Mint the countdown  |  ⏎🎂  ⌃🔙",
+                arg=f"xact:person_bday:{areas.PEOPLE_ID}:{tid}", valid=True))
+        phone = pe.card_field(content, "Phone")
+        if phone:
+            digits = re.sub(r"[^\d+]", "", phone)
+            if digits:
+                rows.append(alfred.item(
+                    uid=f"pcall-{tid}", title=f"📞 Call · {phone}",
+                    subtitle="⏎📞  ⌃🔙", arg=f"open:tel:{digits}",
+                    valid=True))
+        mail = pe.card_field(content, "Mail")
+        if mail and "@" in mail:
+            rows.append(alfred.item(
+                uid=f"pmail-{tid}", title=f"✉️ Mail · {mail}",
+                subtitle="⏎✉️  ⌃🔙", arg=f"open:mailto:{mail}",
+                valid=True))
+        log = pe.log_body(content)
+        if log.strip():
+            n = sum(1 for ln in log.splitlines() if ln.strip())
+            rows.append(alfred.item(
+                uid=f"parch-{tid}", title=f"🗄️ Archive log · {n} lines",
+                subtitle="Old entries → dated note · asks first  |  ⏎🗄️  ⌃🔙",
+                arg=f"xact:person_archive:{areas.PEOPLE_ID}:{tid}",
+                valid=True))
+        ctas = sorted((t for t in all_tasks if t.get("parentId") == tid),
+                      key=lambda t: t.get("dueDate") or "9999")
+        for t in ctas:
+            tlink = f"ticktick:///webapp/#p/{areas.PEOPLE_ID}/tasks/{t['id']}"
+            due = (t.get("dueDate") or "")[:10]
+            rows.append(alfred.item(
+                uid=f"pc-{t['id']}", title=f"📌 {t.get('title', '')}",
+                subtitle=(f"{due}  |  " if due else "") + "⏎↗️  ⌘⚡  ⌃🔙",
+                arg=f"open:{tlink}", valid=True,
+                variables={"task_id": t["id"],
+                           "task_list_id": areas.PEOPLE_ID,
+                           "list_id": "", "section_id": "",
+                           "task_title": t.get("title", ""),
+                           "item_type": "subtask"},
+                mods=_picker_mods()))
+        for ln in [l for l in log.splitlines() if l.strip()][:5]:
+            rows.append(alfred.item(
+                title=ln.strip().lstrip("- "), subtitle="🧾", valid=False))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        return add_back(rows, "ctx:people")
+
+    sub = ids[0] if ids else ""
+    if sub in ("log", "attach"):
+        rows = []
+        for t in persons:
+            if sub == "log":
+                arg = f"xact:person_log:{areas.PEOPLE_ID}:{t['id']}"
+                subt = "⏎🧾 Log to this card"
+            else:
+                src = ":".join(ids[1:3])
+                arg = f"xact:person_attach:{t['id']}:{src}"
+                subt = "⏎👽 CTA under this person"
+            rows.append(alfred.item(
+                uid=f"ppick-{t['id']}", title=t.get("title", ""),
+                subtitle=f"{pe.age_chip(t.get('content') or '')}  |  {subt}",
+                arg=arg, valid=True,
+                variables=_person_vars(t), mods=_picker_mods()))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title=(f'No person matching "{query}"'
+                                       if query else "No people yet"),
+                                valid=False)]
+        return add_back(rows, "ctx:people")
+
+    # ── the hub ──────────────────────────────────────────────────────────
+    rows = []
+    if not areas.people_configured():
+        rows.append(alfred.item(
+            uid="pe-setup", valid=False,
+            title="👽 People need a home list",
+            subtitle="Settings → 👽 People list · then re-enter"))
+        return add_back(rows, "ctx:folders")
+    rows.append(alfred.item(
+        uid="pe-new", title="➕ Add Person",
+        subtitle="Name → circle → card opens  |  ⏎👽  ⌃🔙",
+        arg="xact:person_new", valid=True))
+    rows.append(alfred.item(
+        uid="pe-cta", title="📌 Add CTA",
+        subtitle="Pick person · type · *date @time  |  ⏎➕  ⌃🔙",
+        arg="xact:add_pre:H", valid=True))
+    rows.append(alfred.item(
+        uid="pe-log", title="🧾 Add Log Entry",
+        subtitle="Pick person · timestamped line  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:people:log", valid=True))
+    rows.append(alfred.item(
+        uid="pe-search", title="🔎 Search People",
+        subtitle="Freshest contact on top  |  ⏎🔎  ⌃🔙",
+        arg="xact:search_pre:h", valid=True))
+    rows.append(alfred.item(
+        uid="pe-board", title="🗂️ People Board",
+        subtitle="Circle columns  |  ⏎↗️  ⌃🔙",
+        arg=f"open:ticktick:///webapp/#p/{areas.PEOPLE_ID}/tasks",
+        valid=True))
+    n_stale = sum(1 for t in persons
+                  if pe.is_stale(t.get("content") or ""))
+    if n_stale:
+        rows.append(alfred.item(
+            uid="pe-stale", title=f"🕸️ Stale people · {n_stale}",
+            subtitle=f"No log line in {pe.STALE_DAYS}d  |  ⏎🔎  ⌃🔙",
+            arg="xact:search_pre:hs", valid=True))
+    from display import tag_match_key
+    known = {tag_match_key(t) for t in (cache_store.get("tags") or [])}
+    if any(tag_match_key(tag) not in known for tag in pe.CIRCLE_TAGS):
+        rows.append(alfred.item(
+            uid="pe-seed", title="⚙️ Seed circles + board",
+            subtitle="Mint the 5 circle tags · flip kanban  |  ⏎⚙️  ⌃🔙",
+            arg="xact:person_setup", valid=True))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
+    if not rows:
+        rows = [alfred.item(title=f'No people row matching "{query}"',
+                            valid=False)]
+    return add_back(rows, "ctx:folders")
+
+
 # ── Level: smart (today / tomorrow / next7days) ──────────────────────────────
 def render_smart(kind, query):
     if kind in ("next7", "7", "next7d"):
@@ -2625,6 +2797,9 @@ def main():
 
         elif level == "bridges":
             items = render_bridges(ids, query)
+
+        elif level in ("people", "person"):
+            items = render_people(level, ids, query)
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")

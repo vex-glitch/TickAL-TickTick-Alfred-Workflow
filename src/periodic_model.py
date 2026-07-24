@@ -67,6 +67,7 @@ SEC_HABIT_WEEK = "🔄 Habit consistency"
 SEC_WEEKLY_JNL = "📔 Weekly journal"
 SEC_REVIEW     = "♻️ Weekly Review"
 SEC_INCOME     = "💰 Income"              # prefix
+SEC_PEOPLE     = "👽 People"              # birthdays + stale cards
 SEC_STATS      = "📈 Stats"               # monthly
 # LEGACY names (older notes) - readers fall back to these, writers don't
 LEGACY_NAV     = "🧭 Nav"
@@ -102,7 +103,7 @@ WRITER_ANCHORS = {
     "weekly":    [SEC_GOALS, SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK, SEC_WEEKLY_JNL,
-                  SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME],
+                  SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME, SEC_PEOPLE],
     "monthly":   [SEC_STATS, SEC_SPARKS, SEC_TOP_WINS, SEC_MONEY],
     "quarterly": [SEC_MONEY],            # v3.0: template + money only
     "yearly":    [SEC_MONEY],

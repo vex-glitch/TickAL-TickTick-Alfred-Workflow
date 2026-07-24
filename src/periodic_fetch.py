@@ -321,9 +321,14 @@ def _next_occurrence(cd, today):
                 return k, ""
         return None
     if "FREQ=YEARLY" in rule or cd.get("ignoreYear"):
-        cand = target.replace(year=today.year)
+        def _yr(y):   # Feb-29 in a non-leap year clamps to the 28th
+            try:
+                return target.replace(year=y)
+            except ValueError:
+                return date(y, target.month, 28)
+        cand = _yr(today.year)
         if cand < today:
-            cand = target.replace(year=today.year + 1)
+            cand = _yr(today.year + 1)
         return (cand - today).days, ""
     delta = (target - today).days
     if delta >= 0:
@@ -355,3 +360,29 @@ def countdown_lines():
     if not rows:
         return None
     return [line for _k, line in sorted(rows)[:6]]
+
+
+def bday_lines(days=14):
+    """'- 🎂 Name · in 3d' - birthday countdowns (type 2) landing inside
+    the window, soonest first. None on reader failure, [] when quiet."""
+    j = _v2_get("countdown/list")
+    if not isinstance(j, dict):
+        return None
+    today = date.today()
+    rows = []
+    for cd in j.get("countdowns") or []:
+        if cd.get("type") != 2 or cd.get("status") != 0 \
+                or cd.get("archivedTime"):
+            continue
+        try:
+            occ = _next_occurrence(cd, today)   # Feb-29 birthdays raise
+        except Exception:
+            continue
+        if occ is None or occ[1]:               # 'since' = not upcoming
+            continue
+        n = occ[0]
+        if n > days:
+            continue
+        label = "today 🎉" if n == 0 else f"in {n}d"
+        rows.append((n, f"- 🎂 {cd.get('name', '?')} · {label}"))
+    return [line for _k, line in sorted(rows)]

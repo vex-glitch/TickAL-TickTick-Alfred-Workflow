@@ -336,7 +336,19 @@ def main():
                 _patch_project_data(tid, pid_old=pid, remove=True)
             except Exception:
                 cache_store.invalidate("all_tasks")
-            print(f"{title} completed{guard_note}")
+            # Person-CTA autolog: completing a subtask of a 👽 card writes
+            # the card's 🧾 Log itself. Suffix-only - never blocks the toast.
+            log_suffix = ""
+            try:
+                _xdir = os.path.join(os.path.dirname(SCRIPT_DIR), "Scripts")
+                if _xdir not in sys.path:
+                    sys.path.insert(0, _xdir)
+                import xact as _xact
+                log_suffix = _xact.person_autolog(
+                    tid, snap if isinstance(snap, dict) else None)
+            except Exception:
+                pass
+            print(f"{title} completed{guard_note}{log_suffix}")
 
         elif arg.startswith("attr_date:"):
             # attr_date:projectId:taskId:isoDate[;R:tok,tok]
