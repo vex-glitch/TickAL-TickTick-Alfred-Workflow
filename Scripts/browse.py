@@ -2397,6 +2397,10 @@ def render_people(level, ids, query):
             uid=f"pcta-{tid}", title="📌 Add CTA",
             subtitle="Type it · *date @time schedules  |  ⏎➕  ⌃🔙",
             arg=f"xact:add_pre:~p {card.get('title', '')}", valid=True))
+        rows.append(alfred.item(
+            uid=f"pidea-{tid}", title="🎁 Add idea",
+            subtitle="Gift stash · typed or clipboard  |  ⏎🎁  ⌃🔙",
+            arg=f"xact:person_idea:{areas.PEOPLE_ID}:{tid}", valid=True))
         bday = pe.card_field(content, "Birthday")
         if pe.parse_birthday(bday):
             rows.append(alfred.item(
@@ -2449,12 +2453,94 @@ def render_people(level, ids, query):
         return add_back(rows, "ctx:people")
 
     sub = ids[0] if ids else ""
-    if sub in ("log", "attach"):
+
+    if sub == "linktask":
+        # any open task → hop into the person picker with it in tow
+        pool = [t for t in all_tasks
+                if (t.get("_projectId") or t.get("projectId"))
+                != areas.PEOPLE_ID
+                and t.get("kind") != "NOTE" and not t.get("parentId")]
+        pool.sort(key=lambda t: t.get("createdTime") or "", reverse=True)
+        rows = []
+        for t in pool[:200]:
+            tpid = t.get("_projectId") or t.get("projectId") or ""
+            rows.append(alfred.item(
+                uid=f"plt-{t['id']}", title=t.get("title", ""),
+                subtitle=(t.get("_projectName", "")
+                          + "  |  ⏎👽 pick the person  ⌃🔙"),
+                arg=f"xact:crmbrowse:ctx:people:attach:{tpid}:{t['id']}",
+                valid=True,
+                variables={"task_id": t["id"], "task_list_id": tpid,
+                           "list_id": "", "section_id": "",
+                           "task_title": t.get("title", ""),
+                           "item_type": "task"},
+                mods=_picker_mods()))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        rows = rows[:60]
+        if not rows:
+            rows = [alfred.item(title=(f'No task matching "{query}"'
+                                       if query else "No tasks"),
+                                valid=False)]
+        return add_back(rows, "ctx:people")
+
+    if sub == "stats":
+        today = datetime.now().date()
+        scored = []
+        for t in persons:
+            content = t.get("content") or ""
+            nd = pe.nudge_silent_days(t, today)
+            n_open = sum(1 for x in all_tasks
+                         if x.get("parentId") == t["id"])
+            bd = pe.parse_birthday(pe.card_field(content, "Birthday"))
+            bchip = ""
+            if bd:
+                _y, mo, d = bd
+                try:
+                    cand = today.replace(month=mo, day=d)
+                except ValueError:
+                    cand = today.replace(month=mo, day=28)
+                if cand < today:
+                    cand = cand.replace(year=today.year + 1)
+                bchip = f"🎂 {(cand - today).days}d"
+            scored.append((nd if nd is not None else -1, t, n_open, bchip))
+        scored.sort(key=lambda kv: -kv[0])
+        rows = [alfred.item(
+            title=f"📊 {len(persons)} people · "
+                  f"{sum(1 for nd, *_ in scored if nd >= pe.STALE_DAYS)} stale",
+            subtitle=f"Quietest first · 🫂 nudges at {pe.NUDGE_DAYS}d silence",
+            valid=False)]
+        for nd, t, n_open, bchip in scored:
+            chip = pe.circle_chip(t.get("tags"))
+            bits = [pe.age_chip(t.get("content") or "")]
+            if n_open:
+                bits.append(f"📌 {n_open} open")
+            if bchip:
+                bits.append(bchip)
+            rows.append(alfred.item(
+                uid=f"pst-{t['id']}",
+                title=f"{chip + ' ' if chip else ''}{pe.person_name(t.get('title', ''))}",
+                subtitle="  ·  ".join(bits) + "  |  ⏎⤵️ card  ⌃🔙",
+                arg=f"xact:crmbrowse:ctx:person:{t['id']}", valid=True,
+                variables=_person_vars(t), mods=_picker_mods()))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"])
+        if not rows:
+            rows = [alfred.item(title="No people yet", valid=False)]
+        return add_back(rows, "ctx:people")
+
+    if sub in ("log", "attach", "idea"):
         rows = []
         for t in persons:
             if sub == "log":
                 arg = f"xact:person_log:{areas.PEOPLE_ID}:{t['id']}"
                 subt = "⏎🧾 Log to this card"
+            elif sub == "idea":
+                src = ":".join(ids[1:3])
+                arg = f"xact:person_idea_from:{t['id']}:{src}"
+                subt = "⏎🎁 Stash on this card"
             else:
                 src = ":".join(ids[1:3])
                 arg = f"xact:person_attach:{t['id']}:{src}"
@@ -2498,12 +2584,19 @@ def render_people(level, ids, query):
         subtitle="Freshest contact on top  |  ⏎🔎  ⌃🔙",
         arg="xact:search_pre:h", valid=True))
     rows.append(alfred.item(
+        uid="pe-link", title="🔗 Attach a task",
+        subtitle="Pick task · pick person · becomes a CTA  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:people:linktask", valid=True))
+    rows.append(alfred.item(
+        uid="pe-stats", title="📊 Stats",
+        subtitle="Silence · open CTAs · birthdays  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:people:stats", valid=True))
+    rows.append(alfred.item(
         uid="pe-board", title="🗂️ People Board",
         subtitle="Circle columns  |  ⏎↗️  ⌃🔙",
         arg=f"open:ticktick:///webapp/#p/{areas.PEOPLE_ID}/tasks",
         valid=True))
-    n_stale = sum(1 for t in persons
-                  if pe.is_stale(t.get("content") or ""))
+    n_stale = sum(1 for t in persons if pe.is_stale_task(t))
     if n_stale:
         rows.append(alfred.item(
             uid="pe-stale", title=f"🕸️ Stale people · {n_stale}",

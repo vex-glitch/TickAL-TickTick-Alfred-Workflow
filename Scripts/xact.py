@@ -4851,11 +4851,29 @@ def person_new(rest=""):
         _crm_say("👽 Cancelled")
         return
     tag = _person_circle_tag(circle) if circle else ""
+    skel, bfrom = pe.CARD_SKEL, ""
+    try:                       # an existing countdown seeds the 📇 Birthday
+        import api_v2
+        cds = api_v2.TickTickV2().get_countdowns()
+        cd = next((c for c in (cds or [])
+                   if (c.get("name") or "").strip().lower() == name.lower()
+                   and c.get("type") == 2), None)
+        if cd and cd.get("date"):
+            n = int(cd["date"])
+            val = (f"{n % 10000 // 100:02d}/{n % 100:02d}"
+                   if cd.get("ignoreYear")
+                   else f"{n // 10000}/{n % 10000 // 100:02d}/{n % 100:02d}")
+            skel = skel.replace("Birthday: ", f"Birthday: {val}")
+            bfrom = f"🎂 {val}"
+    except Exception:
+        pass
     t = api.create_task(title=want, project_id=areas.PEOPLE_ID,
-                        content=pe.CARD_SKEL, tags=[tag] if tag else [])
+                        content=skel, tags=[tag] if tag else [])
     _person_inject_cache(t, areas.PEOPLE_ID)
     open_task(areas.PEOPLE_ID, t.get("id"))
     bits = [f"👽 {name} · card minted · fill the 📇"]
+    if bfrom:
+        bits.append(f"{bfrom} from countdowns")
     if tag:
         bits.append(f"#{tag}")
     elif circle == "":
@@ -4887,6 +4905,65 @@ def person_log(rest):
     api.update_task(tid, pid, current=live, content=new)
     _patch_content_cache(tid, new)
     _crm_say(f"🧾 Logged · {pe.person_name(live.get('title') or '')}")
+    app_sync_after_write()
+
+
+def person_idea(rest):
+    """🎁 Gift idea onto the card's Ideas stash (typed beats clipboard)."""
+    import people as pe
+    pid, _, tid = rest.partition(":")
+    a = _ask("🎁 Idea (empty OK = clipboard · Esc cancels)")
+    if a is None:
+        _crm_say("🎁 Cancelled")
+        return
+    text = a.strip() or _pbpaste()
+    if not text:
+        _crm_say("🎁 Nothing to stash (empty + empty clipboard)")
+        return
+    api = _api()
+    try:
+        live = api.get_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    new = pe.ideas_insert(live.get("content") or "", f"- {text}")
+    api.update_task(tid, pid, current=live, content=new)
+    _patch_content_cache(tid, new)
+    _crm_say(f"🎁 Stashed · {pe.person_name(live.get('title') or '')}")
+    app_sync_after_write()
+
+
+def person_idea_from(rest):
+    """🎁 The acted-on item BECOMES the idea: its title (+ first link)
+    lands on the chosen card's Ideas. rest = person_tid:src_pid:src_tid.
+    The source stays where it is - this is a reference, not a move."""
+    import people as pe
+    import areas
+    ptid, _, r2 = rest.partition(":")
+    spid, _, stid = r2.partition(":")
+    api = _api()
+    try:
+        src = api.get_task(spid, stid)
+        card = api.get_task(areas.PEOPLE_ID, ptid)
+    except Exception as e:
+        _crm_say(f"Error: {e}")
+        return
+    title = (src.get("title") or "").strip()
+    if not title:
+        _crm_say("🎁 Nothing to stash")
+        return
+    line = f"- {title}"
+    try:
+        import links as links_util
+        found = links_util.extract_links(f"{title} {src.get('content') or ''}")
+        if found and found[0][1] not in title:
+            line += f" · {found[0][1]}"
+    except Exception:
+        pass
+    new = pe.ideas_insert(card.get("content") or "", line)
+    api.update_task(ptid, areas.PEOPLE_ID, current=card, content=new)
+    _patch_content_cache(ptid, new)
+    _crm_say(f"🎁 {title[:40]} → {pe.person_name(card.get('title') or '')}")
     app_sync_after_write()
 
 
@@ -5475,6 +5552,10 @@ def main():
             person_archive(rest)
         elif verb == "person_attach":
             person_attach(rest)
+        elif verb == "person_idea":
+            person_idea(rest)
+        elif verb == "person_idea_from":
+            person_idea_from(rest)
         elif verb == "person_setup":
             person_setup()
         elif verb == "people_setlist":

@@ -587,8 +587,7 @@ def people_scope_rows(scope, query):
                and pe.is_person(t.get("title", ""))]
     rows = []
     if scope == "people" and not query:
-        n_stale = sum(1 for t in persons
-                      if pe.is_stale(t.get("content") or ""))
+        n_stale = sum(1 for t in persons if pe.is_stale_task(t))
         if n_stale:
             rows.append(alfred.item(
                 title="🕸️  Stale only",
@@ -597,14 +596,14 @@ def people_scope_rows(scope, query):
                 valid=False, autocomplete="hs "))
     pool = persons
     if scope == "people_stale":
-        pool = [t for t in pool if pe.is_stale(t.get("content") or "")]
+        pool = [t for t in pool if pe.is_stale_task(t)]
     if query:
         pool = fuzz.filter_and_score(
             query, pool,
             key_fn=lambda t: search_key(t.get("title", "")))
     if scope == "people_stale":
-        pool = sorted(pool, key=lambda t: pe.days_silent(
-            t.get("content") or "") or 10**6, reverse=True)
+        pool = sorted(pool, key=lambda t: pe.nudge_silent_days(t) or 0,
+                      reverse=True)
     else:
         pool = sorted(pool, key=lambda t: (
             pe.last_log_date(t.get("content") or "") or date.min).isoformat(),

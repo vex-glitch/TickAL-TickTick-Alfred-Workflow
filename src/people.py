@@ -48,6 +48,8 @@ CARD_SKEL = (
 )
 
 STALE_DAYS = 30
+NUDGE_DAYS = 14                  # silence before the hourly sync mints a CTA
+NUDGE_TITLE = "🫂 Reach out"
 
 
 def person_title(name):
@@ -146,15 +148,42 @@ def log_line(text, now=None):
     return f"- {ts} - {text.strip()}"
 
 
-def _log_span(content):
-    """(start, end) char span of the 🧾 Log section body, or None."""
+def _sec_span(content, heading):
+    """(start, end) char span of a ## section's body (starts at the
+    heading line's own newline - [ \\t]* keeps \\s* from eating blank
+    lines), or None."""
     c = content or ""
-    m = re.search(rf"^{re.escape(SEC_LOG)}\s*$", c, re.M)
+    m = re.search(rf"^{re.escape(heading)}[ \t]*$", c, re.M)
     if not m:
         return None
     start = m.end()
     nxt = re.search(r"^## ", c[start:], re.M)
     return (start, start + nxt.start() if nxt else len(c))
+
+
+def _log_span(content):
+    return _sec_span(content, SEC_LOG)
+
+
+def ideas_insert(content, line):
+    """Append a bullet at the END of 🎁 Ideas (chronological stash).
+    Missing heading → minted right before the Log (or at the end)."""
+    c = content or ""
+    span = _sec_span(c, SEC_IDEAS)
+    if span is None:
+        log = _sec_span(c, SEC_LOG)
+        if log is None:
+            sep = "" if (not c or c.endswith("\n\n")) else \
+                ("\n" if c.endswith("\n") else "\n\n")
+            return f"{c}{sep}{SEC_IDEAS}\n{line}\n"
+        at = c.rfind(SEC_LOG)
+        return c[:at] + f"{SEC_IDEAS}\n{line}\n\n" + c[at:]
+    start, end = span
+    body = (c[start:end]).strip("\n")
+    newbody = "\n" + (body + "\n" if body else "") + line + "\n"
+    if end < len(c):
+        newbody += "\n"          # keep one blank before the next section
+    return c[:start] + newbody + c[end:]
 
 
 def log_insert(content, line):
@@ -218,3 +247,40 @@ def is_stale(content, today=None, limit=STALE_DAYS):
 def age_chip(content, today=None):
     d = days_silent(content, today)
     return "🗨️ never" if d is None else f"🗨️ {d}d"
+
+
+def ideas_body(content):
+    span = _sec_span(content, SEC_IDEAS)
+    return (content or "")[span[0]:span[1]].strip("\n") if span else ""
+
+
+def created_date(task):
+    """The card's createdTime → date (None when unparsable)."""
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", task.get("createdTime") or "")
+    if not m:
+        return None
+    try:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+
+
+def is_stale_task(task, today=None, limit=STALE_DAYS):
+    """Staleness with the same basis as the nudge: last log line, else
+    card age. A card minted yesterday is NOT stale (its log is just
+    young). No basis at all → stale."""
+    d = nudge_silent_days(task, today)
+    return d is None or d >= limit
+
+
+def nudge_silent_days(task, today=None):
+    """Silence for the reach-out nudge: days since the last log entry,
+    falling back to card AGE when never logged (a card minted yesterday
+    must not nudge today). None = no usable basis."""
+    today = today or date.today()
+    last = last_log_date(task.get("content") or "")
+    if last is None:
+        last = created_date(task)
+    if last is None:
+        return None
+    return (today - last).days

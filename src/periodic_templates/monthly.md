@@ -13,6 +13,9 @@ _(pending)_
 ### 🏆 Top wins
 _(pending)_
 
+### 👽 People
+_(pending)_
+
 ### 💡 Observations
 
 ### 💰 Money

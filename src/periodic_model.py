@@ -104,7 +104,8 @@ WRITER_ANCHORS = {
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK, SEC_WEEKLY_JNL,
                   SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME, SEC_PEOPLE],
-    "monthly":   [SEC_STATS, SEC_SPARKS, SEC_TOP_WINS, SEC_MONEY],
+    "monthly":   [SEC_STATS, SEC_SPARKS, SEC_TOP_WINS, SEC_MONEY,
+                  SEC_PEOPLE],
     "quarterly": [SEC_MONEY],            # v3.0: template + money only
     "yearly":    [SEC_MONEY],
 }

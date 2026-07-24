@@ -67,7 +67,7 @@ l1 = pe.log_line("met at market", datetime(2026, 7, 24, 14, 30))
 check("4.line", l1 == "- 2026-07-24 14:30 - met at market")
 c2 = pe.log_insert(CARD, l1)
 check("4.prepend-under-heading",
-      "## 🧾 Log\n\n- 2026-07-24 14:30 - met at market" in c2, repr(c2[-70:]))
+      "## 🧾 Log\n- 2026-07-24 14:30 - met at market" in c2, repr(c2[-70:]))
 c3 = pe.log_insert(c2, "- 2026-07-25 09:00 - called")
 check("4.newest-on-top", c3.index("2026-07-25") < c3.index("2026-07-24"))
 check("4.card-untouched", "Birthday: 1993/06/27" in c3)
@@ -98,6 +98,30 @@ check("5.stale-fresh", not pe.is_stale(c3, date(2026, 7, 28)))
 check("5.stale-never", pe.is_stale(CARD))
 check("5.chip", pe.age_chip(c3, date(2026, 7, 28)) == "🗨️ 3d")
 check("5.chip-never", pe.age_chip(CARD) == "🗨️ never")
+
+# ── 6b. ideas + nudge basis ──────────────────────────────────────────────────
+ci = pe.ideas_insert(pe.CARD_SKEL, "- socks")
+check("6b.ideas-before-log", "## 🎁 Ideas\n- socks\n\n## 🧾 Log" in ci)
+ci2 = pe.ideas_insert(ci, "- vinyl")
+check("6b.ideas-append-order", pe.ideas_body(ci2) == "- socks\n- vinyl")
+mi = pe.ideas_insert("## 📇 Card\nPhone: 1\n\n## 🧾 Log\n- 2026-01-01 - x\n",
+                     "- gift")
+check("6b.ideas-minted-before-log",
+      mi.index("## 🎁 Ideas") < mi.index("## 🧾 Log")
+      and pe.log_body(mi) == "- 2026-01-01 - x")
+check("6b.ideas-no-sections",
+      pe.ideas_insert("plain", "- gift").endswith("## 🎁 Ideas\n- gift\n"))
+li = pe.log_insert(ci2, "- 2026-07-24 10:00 - hey")
+check("6b.log-ideas-coexist", pe.last_log_date(li) == date(2026, 7, 24)
+      and pe.ideas_body(li) == "- socks\n- vinyl")
+check("6b.nudge-from-created", pe.nudge_silent_days(
+    {"content": "", "createdTime": "2026-07-10T08:00:00+0000"},
+    date(2026, 7, 24)) == 14)
+check("6b.nudge-from-log", pe.nudge_silent_days(
+    {"content": pe.log_insert("", "- 2026-07-20 09:00 - hi"),
+     "createdTime": "2026-07-01T08:00:00+0000"}, date(2026, 7, 24)) == 4)
+check("6b.nudge-no-basis",
+      pe.nudge_silent_days({"content": ""}, date(2026, 7, 24)) is None)
 
 # ── 6. skeleton sanity ───────────────────────────────────────────────────────
 check("6.skel-sections", all(h in pe.CARD_SKEL for h in

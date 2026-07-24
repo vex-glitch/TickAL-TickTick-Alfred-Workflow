@@ -192,8 +192,61 @@ def do_sync():
     summary = f"Synced {len(projects)} lists, {len(all_tasks)} tasks, {len(all_notes)} notes, {len(all_tags)} tags"
     if errors:
         summary += f" ({errors} list(s) failed)"
+    nudged = _people_nudge(api, all_tasks)
+    if nudged:
+        summary += f" · 🫂 {nudged} reach-out" + ("s" if nudged > 1 else "")
     print(summary)
     return summary
+
+
+def _people_nudge(api, all_tasks):
+    """👽 Reach-out nudges, riding the hourly sync: a person card silent
+    NUDGE_DAYS+ (last log line, or card age when never logged) with NO
+    open subtask gets a '🫂 Reach out · Name' CTA due today. Self-
+    regulating: the minted CTA stays open and blocks further mints;
+    completing it auto-logs the card, which resets the silence clock.
+    Never raises - the sync must not die on a nicety. Returns the count."""
+    try:
+        import people as pe
+        import areas
+        if not areas.people_configured():
+            return 0
+        from datetime import date
+        today = date.today()
+        kids = {}
+        for t in all_tasks:
+            if t.get("parentId") and t.get("status", 0) == 0:
+                kids.setdefault(t["parentId"], []).append(t)
+        made = 0
+        for t in all_tasks:
+            if t.get("status", 0) != 0 \
+                    or (t.get("_projectId") or t.get("projectId")) \
+                    != areas.PEOPLE_ID \
+                    or not pe.is_person(t.get("title", "")):
+                continue
+            if kids.get(t["id"]):          # anything open = planned contact
+                continue
+            ds = pe.nudge_silent_days(t, today)
+            if ds is None or ds < pe.NUDGE_DAYS:
+                continue
+            name = pe.person_name(t.get("title", ""))
+            try:
+                cta = api.create_task(
+                    title=f"{pe.NUDGE_TITLE} · {name}",
+                    project_id=areas.PEOPLE_ID, parent_id=t["id"],
+                    due_date=today.isoformat())
+                if cta.get("id"):
+                    made += 1
+                    entry = dict(cta)
+                    entry["_projectId"] = areas.PEOPLE_ID
+                    entry["parentId"] = t["id"]
+                    all_tasks.append(entry)
+                    cache_store.set("all_tasks", all_tasks)
+            except Exception:
+                pass
+        return made
+    except Exception:
+        return 0
 
 
 def _notify(text, title="TickAL sync"):

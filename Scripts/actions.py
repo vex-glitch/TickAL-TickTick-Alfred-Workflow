@@ -534,6 +534,10 @@ def main():
              "person people attach cta assign",
              is_task_like and not is_note and _people_ok
              and not _is_person_card),
+            ("🎁 Gift idea for person", "Title + link → a card's 🎁 stash",
+             f"xact:crmbrowse:ctx:people:idea:{pid}:{tid}",
+             "gift idea person people present",
+             is_task_like and _people_ok and not _is_person_card),
             ("⤵️ Browse tasks",    "Drill into tasks",     "browse",        "browse tasks drill", itype == "section"),
             (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like),
             ("☀️ Add to today",    "Land it on today",     f"xact:pn_sched:today|{pid}|{tid}",

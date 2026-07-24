@@ -671,6 +671,9 @@ def refresh_period(p, index=None, force=False):
             _fill_weekly(doc, p, index)
         else:
             _fill_rollup_money(doc, p, index)
+            if p.kind == "monthly" and \
+                    p.start <= today <= p.end + timedelta(days=1):
+                _fill_people(doc, _tier2(), days=31)
         return True
 
     _res, doc_out = _pn_rmw(pid, tid, mutate)
@@ -870,6 +873,38 @@ def _set_headed(doc, prefix, data, body_lines=None):
         ps.set_sec_body(doc, sec, body_lines)
 
 
+def _fill_people(doc, t2, days=14):
+    """### 👽 People - birthdays landing inside the window (countdowns)
+    + stale cards, worst silence first. Weekly (14d) and monthly (31d)
+    share this; a note without the header silently skips (kill switch)."""
+    plines = list(getattr(t2, "bday_lines", lambda d=14: None)(days) or []) \
+        if t2 else []
+    try:
+        import people as _pe
+        if areas.people_configured():
+            stale = []
+            for t in (cache_store.get("all_tasks") or []):
+                if t.get("status", 0) != 0 \
+                        or (t.get("_projectId") or t.get("projectId")) \
+                        != areas.PEOPLE_ID \
+                        or not _pe.is_person(t.get("title", "")):
+                    continue
+                ds = _pe.nudge_silent_days(t)
+                if _pe.is_stale_task(t):
+                    chip = ("never logged" if
+                            _pe.last_log_date(t.get("content") or "") is None
+                            else f"{ds}d silent")
+                    nm = _pe.person_name(t.get("title", ""))
+                    stale.append((ds if ds is not None else 10**6,
+                                  f"- 🕸️ {nm} · {chip}"))
+            stale.sort(key=lambda kv: -kv[0])
+            plines += [ln for _k, ln in stale[:6]]
+    except Exception:
+        pass
+    if plines:
+        ps.set_body(doc, pm.SEC_PEOPLE, pm.ind(plines))
+
+
 def _fill_weekly(doc, p, index):
     """The 📌 This Week subsections (data-in-header) + 📨
     Entries + 😊 Moods + habits + 📔 journal seed + ♻️ review mirror + ⏪
@@ -984,30 +1019,7 @@ def _fill_weekly(doc, p, index):
                 + [pm.money_total_line(inc_cur, 3)])
 
     # ── 👽 People - birthdays inside 14d (countdowns) + stale cards
-    plines = list(getattr(t2, "bday_lines", lambda d=14: None)(14) or []) \
-        if t2 else []
-    try:
-        import people as _pe
-        if areas.people_configured():
-            stale = []
-            for t in (cache_store.get("all_tasks") or []):
-                if t.get("status", 0) != 0 \
-                        or (t.get("_projectId") or t.get("projectId")) \
-                        != areas.PEOPLE_ID \
-                        or not _pe.is_person(t.get("title", "")):
-                    continue
-                ds = _pe.days_silent(t.get("content") or "")
-                if ds is None or ds >= _pe.STALE_DAYS:
-                    chip = "never logged" if ds is None else f"{ds}d silent"
-                    nm = _pe.person_name(t.get("title", ""))
-                    stale.append((ds if ds is not None else 10**6,
-                                  f"- 🕸️ {nm} · {chip}"))
-            stale.sort(key=lambda kv: -kv[0])
-            plines += [ln for _k, ln in stale[:6]]
-    except Exception:
-        pass
-    if plines:
-        ps.set_body(doc, pm.SEC_PEOPLE, pm.ind(plines))
+    _fill_people(doc, t2, days=14)
 
     # ── 📔 Weekly journal - seed + dynamic-goal prompt refresh
     gsec = ps.find(doc, pm.SEC_GOALS)
