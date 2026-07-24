@@ -36,6 +36,10 @@ committed token, only dispatch rows are valid=True, and every row carries the
   "stage pick {frag}"           S0 · source-task search (the idle menu's 🎯
                                     row / missing handshake) - ⏎ fires
                                     xact:stage_open → the normal S flow
+  "log {when} {frag}"           B · retro focus record (works in ANY session
+                                    state): when = [y|yy|D.M] A-B|A+MIN
+                                    (src/focus_backlog grammar) → 🎲 random
+                                    top row + task rows, ⏎ mints the record
 
 Unmatched trailing-space text falls back to the search screen - no dead ends.
 A running TickTick pomo has no focus file → render_pomo; with the sidecar
@@ -43,7 +47,8 @@ A running TickTick pomo has no focus file → render_pomo; with the sidecar
 
 Dispatch args (executed by xact.py): focus_start:: · focus_start:p:t ·
 focus_sticky:p:t · pomo:default · pomo_task:p:t:default · pomo_sticky:p:t:default
-· focus_stop · focus_stop_as:p:t · focus_pause · focus_resume · focus_discard.
+· focus_stop · focus_stop_as:p:t · focus_pause · focus_resume · focus_discard
+· focus_backlog:s:e:p:t (epochs; empty p:t = unattributed).
 Pomo rows say "+ open", not "for" - TickTick's pomo does NOT bind to the
 selection (verified against the app - see xact.pomo_task).
 """
@@ -668,6 +673,9 @@ def render_idle(raw):
         alfred.item(uid="fp-stage", title="🎯 Merge/Stage for Focus",
                     subtitle="Stage a task under another task, or into a note…",
                     arg="xact:stage_pick", valid=True, mods=BACK),
+        alfred.item(uid="fp-backlog", title="🕰️ Log past focus",
+                    subtitle="When it started, when it ended - task or random…",
+                    arg="", valid=False, autocomplete="log ", mods=BACK),
     ]
     frag = raw.strip().lower()
     hits = [r for r in rows if not frag or frag in r["title"].lower()]
@@ -896,6 +904,58 @@ def render_stage(raw):
 
 
 # ── Task-bound start flow ("for" - the ⌘ 🎯 Focus row) ───────────────────────
+def render_backlog(raw):
+    """'log ' screen B - retro focus record. Grammar (src/focus_backlog):
+    '[y|yy|D.M] A-B|A+MIN [task frag]'. Top row = 🎲 unattributed, task
+    rows attribute; ⏎ = xact:focus_backlog:<s>:<e>:<pid>:<tid>. Routed in
+    main() BEFORE the state check (like stage/for) - backlogging works
+    while a timer or pomo runs."""
+    import focus_backlog as fbk
+    rest = raw[3:].lstrip()
+    start, end, frag = fbk.parse_when(rest)
+    if not start:
+        print(alfred.output([alfred.item(
+            uid="fp-log-help", title="🕰️ When? start-end, then the task",
+            subtitle="14:30-15:45 · 1430+45 · 9-11 · y 9-11 = yesterday · "
+                     "22.7 14-16  ⌃🔙",
+            valid=False, mods=BACK)], skipknowledge=True))
+        return
+    err = fbk.validate(start, end)
+    if err:
+        print(alfred.output([alfred.item(
+            uid="fp-log-bad", title=f"🕰️ {err}",
+            subtitle=f"{fbk.fmt_range(start, end)}  |  ⌃🔙",
+            valid=False, mods=BACK)], skipknowledge=True))
+        return
+    rng = fbk.fmt_range(start, end)
+    s_ep, e_ep = int(start.timestamp()), int(end.timestamp())
+    items = [alfred.item(
+        uid="fp-log-random", title=f"🎲 Random focus · {rng}",
+        subtitle="No task - straight into the focus list  ⌃🔙",
+        arg=f"xact:focus_backlog:{s_ep}:{e_ep}::", valid=True, mods=BACK)]
+    pool = _open_tasks()
+    if frag:
+        pool = filter_and_score(frag, pool,
+                                key_fn=lambda t: search_key(t.get("title", "")))
+    else:
+        pool = sorted(pool, key=lambda t: t.get("modifiedTime")
+                      or t.get("createdTime") or "", reverse=True)
+    for t in pool[:40]:
+        pid, tid, tvars = _task_vars(t)
+        items.append(alfred.item(
+            uid=f"fp-log-{tid}",
+            title=md_links_display(t.get("title", "")),
+            subtitle=f"📂 {t.get('_projectName') or 'Inbox'}  |  "
+                     f"⏎🕰️ {rng}  ⌃🔙",
+            arg=f"xact:focus_backlog:{s_ep}:{e_ep}:{pid}:{tid}",
+            valid=True, variables=tvars, mods=BACK))
+    if frag and not pool:
+        items.append(alfred.item(
+            uid="fp-log-nohit", title=f'No open task matching "{frag}"',
+            subtitle="⌃🔙", valid=False, mods=BACK))
+    print(alfred.output(items, skipknowledge=True))
+
+
 def render_for(raw):
     """Fired via ET prefill "for " with the task in the handshake file. One
     🎯 Focus row replaces the old Start-focus / sticky+timer / Start-pomo
@@ -958,6 +1018,9 @@ def main():
             return
         if raw.startswith("for"):
             render_for(raw)
+            return
+        if raw == "log" or raw.startswith("log "):
+            render_backlog(raw)
             return
         st = xact._focus_state()
         if st:

@@ -17,6 +17,9 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
                                     unattributed stop-twist
     xact:focus_discard              stop without logging
     xact:focus_log:<pid>:<tid>:<m>  retro-log <m> minutes ending now
+    xact:focus_backlog:<s>:<e>:<pid>:<tid>  retro record between epochs
+                                    <s>..<e> (empty ids = 🎲 unattributed) -
+                                    the picker's `log` screen mints these
     xact:pomo:<minutes|default>     start TickTick's REAL pomodoro (hidden
                                     AppleScript command in TickTick.sdef);
                                     "default"/empty = the app's own length
@@ -387,6 +390,38 @@ def focus_log(pid, tid, minutes):
     api_mod.TickTickAPI(cfg.get_token()).create_focus(
         start.strftime(fmt), end.strftime(fmt), task_id=tid)
     print(f"🎯 {minutes}m logged on {_title()}")
+
+
+def focus_backlog(rest):
+    """🕰️ Retro focus record - '<start_epoch>:<end_epoch>:<pid>:<tid>'
+    (empty ids = 🎲 unattributed). The picker's `log` screen builds the
+    epochs from src/focus_backlog's local-time grammar; bounds re-guarded
+    here anyway (1m-12h, already over). POST open/v1/focus type 1 - the
+    record lands in TickTick's focus list."""
+    import focus_backlog as fbk
+    try:
+        s, e, pid, tid = rest.split(":", 3)
+        start = datetime.fromtimestamp(int(s), timezone.utc)
+        end = datetime.fromtimestamp(int(e), timezone.utc)
+    except ValueError:
+        print("🕰️ Bad backlog args · nothing logged")
+        return
+    secs = (end - start).total_seconds()
+    if not 60 <= secs <= fbk.MAX_HOURS * 3600:
+        print(f"🕰️ Range must be 1m-{fbk.MAX_HOURS}h · nothing logged")
+        return
+    if end > datetime.now(timezone.utc) + timedelta(minutes=1):
+        print("🕰️ Ends in the future · nothing logged")
+        return
+    fmt = "%Y-%m-%dT%H:%M:%S+0000"
+    try:
+        _api().create_focus(start.strftime(fmt), end.strftime(fmt),
+                            task_id=tid or None)
+    except Exception as ex:
+        print(f"🕰️ Log failed ({type(ex).__name__}) · try again")
+        return
+    what = _task_title(tid, pid=pid) if tid else "🎲 random focus"
+    print(f"🕰️ {fbk.fmt_dur(secs)} logged · {what}")
 
 
 # ── Focus session blocks ─────────────────────────────────────────────────────
@@ -5523,6 +5558,8 @@ def main():
             focus_stop(discard=True)
         elif verb == "focus_log":
             pid, tid, m = rest.split(":", 2); focus_log(pid, tid, m)
+        elif verb == "focus_backlog":
+            focus_backlog(rest)
         elif verb == "pomo":
             pomo(rest)
         elif verb == "pomo_task":
