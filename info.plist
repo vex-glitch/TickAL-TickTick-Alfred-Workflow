@@ -17051,9 +17051,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>config</key>
 			<dict>
 				<key>default</key>
-				<string>ppl</string>
+				<string>tpe</string>
 				<key>placeholder</key>
-				<string>ppl</string>
+				<string>tpe</string>
 				<key>required</key>
 				<false/>
 				<key>trim</key>
@@ -17072,9 +17072,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>config</key>
 			<dict>
 				<key>default</key>
-				<string>brg</string>
+				<string>tbr</string>
 				<key>placeholder</key>
-				<string>brg</string>
+				<string>tbr</string>
 				<key>required</key>
 				<false/>
 				<key>trim</key>
@@ -17093,9 +17093,9 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>config</key>
 			<dict>
 				<key>default</key>
-				<string>plg</string>
+				<string>tpl</string>
 				<key>placeholder</key>
-				<string>plg</string>
+				<string>tpl</string>
 				<key>required</key>
 				<false/>
 				<key>trim</key>
