@@ -4225,9 +4225,13 @@ def fx_copy(pid=None, tid=None):
 
 
 def _task_copy_block(t, full):
-    """'Title' (+ '> description' blockquote lines when full) - the
-    clipboard shape Vex ruled (2026-07-24)."""
+    """'- [ ] Title' (+ '> description' blockquote lines when full) - the
+    clipboard shape Vex ruled (2026-07-24; checkbox re-rule same day).
+    Completed tasks paste ticked; NOTE items keep a plain title."""
     title = " ".join((t.get("title") or "").split()) or "(untitled)"
+    if (t.get("kind") or "").upper() != "NOTE":
+        box = "- [x] " if t.get("status", 0) == 2 else "- [ ] "
+        title = box + title
     if not full:
         return title, False
     desc = (t.get("content") or "").strip()
