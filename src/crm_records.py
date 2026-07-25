@@ -1007,6 +1007,39 @@ def next_snum(log_content, log_tid, include_tasks=True):
     return top + 1
 
 
+def current_snum(log_content, log_tid):
+    """The session being WORKED (photo naming/tagging): max(S in logged
+    entries, S of open linked tasks already STARTED - local start date
+    today or earlier). A merely-scheduled FUTURE S must never renumber
+    today's shots (review find 2026-07-25 - sibling of the Bruno case
+    in next_snum's docstring). Min 1."""
+    top = 0
+    for segs in _entries(log_content):
+        if len(segs) > 1:
+            m = re.fullmatch(r"S(\d+)", segs[1] or "")
+            if m:
+                top = max(top, int(m.group(1)))
+    today = _today()
+    for t in cache_store.get("all_tasks") or []:
+        if ((t.get("_projectId") or t.get("projectId")) != areas.CRM_ID
+                or t.get("status", 0) != 0
+                or f"/tasks/{log_tid})" not in (t.get("title") or "")):
+            continue
+        due = t.get("startDate") or t.get("dueDate") or ""
+        if due:
+            try:
+                from filtering import utc_str_to_local_date
+                day = utc_str_to_local_date(due)
+            except Exception:
+                day = due[:10]
+            if day > today:
+                continue
+        sn = title_snum(t.get("title") or "")
+        if sn:
+            top = max(top, sn)
+    return max(1, top)
+
+
 # ── note builders / writers ──────────────────────────────────────────────────
 
 def _seg(v):

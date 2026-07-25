@@ -56,6 +56,10 @@ def selection_snapshot_export(dest_dir, timeout=600):
     path = the exported primary file (Live-Photo .MOV sidecars skipped).
     Raises PhotosError on empty selection - honest, never guesses."""
     os.makedirs(dest_dir, exist_ok=True)
+    # Metadata line = counter TAB id TAB favorite TAB filename: the
+    # counter (not enumerate) keys the subdir so a dropped line can
+    # never shift the item→file mapping, and filename sits LAST so a
+    # tab inside it survives the split (review find 2026-07-25).
     script = f'''
 set outRoot to "{_esc(dest_dir)}"
 set out to ""
@@ -68,8 +72,8 @@ tell application "Photos"
         set sub to outRoot & "/" & i
         do shell script "mkdir -p " & quoted form of sub
         export {{contents of mi}} to (POSIX file sub) with using originals
-        set out to out & (id of mi) & tab & (filename of mi) & tab & \
-(favorite of mi) & linefeed
+        set out to out & i & tab & (id of mi) & tab & (favorite of mi) & \
+tab & (filename of mi) & linefeed
     end repeat
 end tell
 return out'''
@@ -79,16 +83,23 @@ return out'''
         if "EMPTY_SELECTION" in str(e):
             raise PhotosError("nothing selected in Photos")
         raise
-    items = []
-    for i, line in enumerate([l for l in raw.splitlines() if l.strip()], 1):
-        parts = line.split("\t")
-        if len(parts) != 3:
+    items, bad = [], 0
+    for line in raw.splitlines():
+        if not line.strip():
             continue
-        mid, fname, fav = parts
-        sub = os.path.join(dest_dir, str(i))
-        items.append({"id": mid, "filename": fname,
+        parts = line.split("\t", 3)
+        if len(parts) != 4 or not parts[0].strip().isdigit():
+            bad += 1
+            continue
+        idx, mid, fav, fname = parts
+        sub = os.path.join(dest_dir, idx.strip())
+        items.append({"id": mid, "filename": fname.strip(),
                       "favorite": fav.strip().lower() == "true",
                       "path": _primary_file(sub)})
+    if bad:
+        # fail CLOSED: an unmapped item means a possible wrong-file
+        # import - never guess
+        raise PhotosError(f"{bad} selected items had unparseable names")
     good = [it for it in items if it["path"]]
     if not good:
         raise PhotosError("export produced no files")

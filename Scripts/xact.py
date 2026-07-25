@@ -2403,6 +2403,24 @@ def crmclose(log_tid):
 # Content-PL task); Eagle holds the files. src/eagle.py raises
 # toast-ready EagleError - every verb here fails CLOSED.
 
+def _fresher_of(a, b):
+    """The fresher of two logbook contents: more ### session entries
+    wins; tie → more header fields (🎬/🦅); tie → b. Guards the
+    back-to-back-write clobber (review find 2026-07-25: a lagging
+    TickTick re-read seconds after the 🎬 write would base the 🦅
+    write on pre-🎬 content and silently drop the field)."""
+    import crm_records as cr
+    ea = len(cr.ENTRY_RE.findall(a or ""))
+    eb = len(cr.ENTRY_RE.findall(b or ""))
+    if ea != eb:
+        return a if ea > eb else b
+    ha = sum(1 for p in ("🎬", "🦅")
+             if re.search(rf"^{p} ", a or "", re.M))
+    hb = sum(1 for p in ("🎬", "🦅")
+             if re.search(rf"^{p} ", b or "", re.M))
+    return a if ha > hb else b
+
+
 def _eagle_ensure_logbook_folder(lb):
     """CRM-library folder id for this logbook. First need CREATES the
     whole per-tattoo skeleton (01 Consultation … 06 Healed - consult
@@ -2435,7 +2453,9 @@ def _eagle_ensure_logbook_folder(lb):
             eagle.create_folder(name, parent=fid)
     api = cr._api()
     live = api.get_task(areas.RECORDS_ID, lb["id"])
-    new = cr.set_eagle_folder(live.get("content") or "", fid)
+    base_content = _fresher_of(lb.get("content") or "",
+                               live.get("content") or "")
+    new = cr.set_eagle_folder(base_content, fid)
     api.update_task(lb["id"], areas.RECORDS_ID, current=live, content=new)
     _patch_content_cache(lb["id"], new)
     return fid
@@ -2476,19 +2496,19 @@ def _task_base(title):
     return re.sub(r"\s*eagle://\S+", "", title or "").strip()
 
 
-def _content_retag(t, drop, add):
-    """Swap one 📸 state tag on a content task (others kept), plus any
-    extra fields (title retarget rides the same write)."""
+def _content_retag(t, drop, add, **fields):
+    """Swap one 📸 state tag on a content task (others kept); extra
+    fields (title retarget) ride the same write and cache patch."""
     import crm_records as cr
     api = cr._api()
     pid = t.get("_projectId") or t.get("projectId")
     live = api.get_task(pid, t["id"])
     tags = [x for x in (live.get("tags") or [])
             if str(x).lower() != drop] + ([add] if add else [])
-    api.update_task(t["id"], pid, current=live, tags=tags)
+    api.update_task(t["id"], pid, current=live, tags=tags, **fields)
     try:
         import dispatch as _disp
-        _disp._patch_task_cache(t["id"], tags=tags)
+        _disp._patch_task_cache(t["id"], tags=tags, **fields)
     except Exception:
         cache_store.invalidate("all_tasks")
 
@@ -2517,7 +2537,8 @@ def content_dest(log_tid):
             else "fm" if pick.startswith("🖋") else "-")
     api = cr._api()
     live = api.get_task(areas.RECORDS_ID, log_tid)
-    new = cr.set_content_dest(live.get("content") or "", dest)
+    fresh = cr._fresher_content(log_tid, live.get("content") or "")
+    new = cr.set_content_dest(fresh, dest)
     api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
     _patch_content_cache(log_tid, new)
     lb = dict(lb)
@@ -2549,17 +2570,24 @@ def content_dest(log_tid):
             api.move_task(t["id"], pid_old, want_pid)
             try:
                 import dispatch as _disp
-                _disp._patch_project_data(t["id"], pid_old=pid_old,
-                                          pid_new=want_pid)
                 pool = cache_store.get("all_tasks") or []
                 for x in pool:
                     if x.get("id") == t["id"]:
                         x["projectId"] = want_pid
                         x["_projectId"] = want_pid
                 cache_store.set("all_tasks", pool)
+                _disp._patch_project_data(t["id"], pid_old=pid_old,
+                                          pid_new=want_pid)
             except Exception:
                 cache_store.invalidate("all_tasks")
             note += " · 📸 task moved"
+        # backfill a linkless title once the folder finally exists
+        # (task minted while Eagle was asleep - review find)
+        if fid and "eagle://folder/" not in (t.get("title") or ""):
+            base = cr.logbook_base(lb)
+            _content_retag(t, "", "",
+                           title=f"{base} eagle://folder/{fid}")
+            note += " · link backfilled"
     _crm_say(f"🎬 {dest.upper()} set{note}")
 
 
@@ -2619,8 +2647,10 @@ def _pick_hero(shots):
     else:
         return None, "no ♥ in selection"
     ext = os.path.splitext(hero["path"] or "")[1].lstrip(".").lower()
-    if ext not in _MIME:
+    if ext in ("mov", "mp4", "m4v"):
         return None, "♥ is a video - images only"
+    if ext not in _MIME:
+        return None, f"♥ .{ext} not attachable - JPG/HEIC/PNG only"
     return hero, ""
 
 
@@ -2662,7 +2692,7 @@ def session_photos(log_tid, stage=""):
                           if c.get("name") == sub_name), None)
             sub_id = child["id"] if child else eagle.create_folder(
                 sub_name, parent=fid)
-            n = max(1, cr.next_snum(lb.get("content") or "", log_tid) - 1)
+            n = cr.current_snum(lb.get("content") or "", log_tid)
             label = "Finished" if stage == "finished" else f"S{n}"
             start = eagle.next_index(
                 eagle.list_item_names(sub_id), base, label)
@@ -2772,8 +2802,7 @@ def eagle_triage(rest):
         m = re.match(r"^s(\d+)?$", stage)
         if m:
             n = (int(m.group(1)) if m.group(1)
-                 else max(1, cr.next_snum(lb.get("content") or "",
-                                          log_tid) - 1))
+                 else cr.current_snum(lb.get("content") or "", log_tid))
             folder_name, label = "04 Sessions", f"S{n}"
             stage_tags = ["session", f"s{n}"]
         else:
@@ -2839,6 +2868,7 @@ def _eagle_archive_folder(log_tid):
         return
     import eagle
     try:
+        eagle.ensure_running(launch=False)   # asleep = honest skip, no launch
         eagle.ensure_library("crm")
         tree = eagle.folder_tree()
         arch = eagle.find_folder("Archive", tree=tree)
@@ -2850,8 +2880,7 @@ def _eagle_archive_folder(log_tid):
         ids = set()
 
         def rec(nd):
-            data = eagle._raw(f"item/list?limit=400&folders={nd['id']}")
-            ids.update(i["id"] for i in (data or []))
+            ids.update(i["id"] for i in eagle.items_in_folder(nd["id"]))
             for c in nd.get("children") or []:
                 rec(c)
         rec(node)
@@ -2920,7 +2949,8 @@ def edit_this(log_tid):
     if dest != cur:
         api = cr._api()
         live = api.get_task(areas.RECORDS_ID, log_tid)
-        new = cr.set_content_dest(live.get("content") or "", dest)
+        fresh = cr._fresher_content(log_tid, live.get("content") or "")
+        new = cr.set_content_dest(fresh, dest)
         api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
         _patch_content_cache(log_tid, new)
     try:
@@ -2954,42 +2984,64 @@ def edit_this(log_tid):
             tgt = next((mapping[f] for f in it["folders"] if f in mapping),
                        base_id)
             by_folder.setdefault(tgt, []).append(it)
-        n = 0
+        n = skipped = 0
         for tgt, group in by_folder.items():
-            eagle.add_items([{"path": g["path"], "name": g["name"],
-                              "tags": g["tags"]} for g in group],
-                            folder_id=tgt)
-            n += len(group)
+            # idempotency: a re-run (or a retry after a mid-run error)
+            # must not duplicate already-copied files (review find) -
+            # names are per-item unique by convention
+            have = set(eagle.list_item_names(tgt))
+            fresh_group = [g for g in group if g["name"] not in have]
+            skipped += len(group) - len(fresh_group)
+            if fresh_group:
+                eagle.add_items([{"path": g["path"], "name": g["name"],
+                                  "tags": g["tags"]} for g in fresh_group],
+                                folder_id=tgt)
+            n += len(fresh_group)
     except eagle.EagleError as e:
         _crm_say(f"🎬 {e}")
         return
     want_pid = (areas.CONTENT_TV_ID if dest == "tv"
                 else areas.CONTENT_FM_ID)
-    t = _content_task_for(log_tid)
+    _content_slide_to_edit(lb, dest, want_pid, base_id)
+    extra = f" · {skipped} already staged" if skipped else ""
+    _crm_say(f"🎬 {n} files → {dest.upper()} To edit · task → 📸Edit{extra}")
+
+
+def _content_slide_to_edit(lb, dest, want_pid, base_id):
+    """Shared promote tail (editthis + promotesel - review find: the
+    selection road skipped all three steps): move the content task to
+    the dest list, swap 📸raw→📸edit, retarget the title link to the
+    To edit folder, patch caches - or mint fresh when none exists."""
+    import crm_records as cr
+    base = cr.logbook_base(lb)
+    t = _content_task_for(lb["id"])
     if t is None:
         _mint_raw_task(lb, dest, base_id, tag="📸edit")
-    else:
-        api = cr._api()
-        pid_old = t.get("_projectId") or t.get("projectId")
-        if pid_old != want_pid:
-            api.move_task(t["id"], pid_old, want_pid)
-        live = api.get_task(want_pid, t["id"])
-        tags = [x for x in (live.get("tags") or [])
-                if str(x).lower() != "📸raw"]
-        if "📸edit" not in {str(x).lower() for x in tags}:
-            tags.append("📸edit")
-        api.update_task(t["id"], want_pid, current=live, tags=tags,
-                        title=f"{base} eagle://folder/{base_id}")
-        try:
-            import dispatch as _disp
-            _disp._patch_project_data(t["id"], pid_old=pid_old,
-                                      pid_new=want_pid)
-            _disp._patch_task_cache(
-                t["id"], tags=tags,
-                title=f"{base} eagle://folder/{base_id}")
-        except Exception:
-            cache_store.invalidate("all_tasks")
-    _crm_say(f"🎬 {n} files → {dest.upper()} To edit · task → 📸Edit")
+        return
+    api = cr._api()
+    pid_old = t.get("_projectId") or t.get("projectId")
+    if pid_old != want_pid:
+        api.move_task(t["id"], pid_old, want_pid)
+    live = api.get_task(want_pid, t["id"])
+    tags = [x for x in (live.get("tags") or [])
+            if str(x).lower() != "📸raw"]
+    if "📸edit" not in {str(x).lower() for x in tags}:
+        tags.append("📸edit")
+    title = f"{base} eagle://folder/{base_id}"
+    api.update_task(t["id"], want_pid, current=live, tags=tags, title=title)
+    try:
+        import dispatch as _disp
+        pool = cache_store.get("all_tasks") or []
+        for x in pool:
+            if x.get("id") == t["id"]:
+                x["projectId"] = want_pid
+                x["_projectId"] = want_pid
+        cache_store.set("all_tasks", pool)
+        _disp._patch_project_data(t["id"], pid_old=pid_old,
+                                  pid_new=want_pid)
+        _disp._patch_task_cache(t["id"], tags=tags, title=title)
+    except Exception:
+        cache_store.invalidate("all_tasks")
 
 
 def promote_selection():
@@ -3057,15 +3109,18 @@ def promote_selection():
     except eagle.EagleError as e:
         _crm_say(f"🎬 {e}")
         return
+    import crm_records as cr
+    if dest != cur:
+        api = cr._api()
+        live = api.get_task(areas.RECORDS_ID, owner["id"])
+        fresh = cr._fresher_content(owner["id"], live.get("content") or "")
+        new = cr.set_content_dest(fresh, dest)
+        api.update_task(owner["id"], areas.RECORDS_ID, current=live,
+                        content=new)
+        _patch_content_cache(owner["id"], new)
     want_pid = (areas.CONTENT_TV_ID if dest == "tv"
                 else areas.CONTENT_FM_ID)
-    t = _content_task_for(owner["id"])
-    if t is None:
-        _mint_raw_task(owner, dest, base_id, tag="📸edit")
-    else:
-        tags_lc = {str(x).lower() for x in (t.get("tags") or [])}
-        if "📸raw" in tags_lc:
-            _content_retag(t, "📸raw", "📸edit")
+    _content_slide_to_edit(owner, dest, want_pid, base_id)
     _crm_say(f"🎬 {len(paths)} → {dest.upper()} To edit/{base}")
 
 
@@ -3137,7 +3192,9 @@ def file_edited():
                     try:
                         os.remove(p)
                     except OSError:
-                        pass
+                        # a stuck source would re-import as a dupe next
+                        # run - surface it, never claim clean filing
+                        notes.append(f"{os.path.basename(p)} stuck in intake")
                 filed += len(ids)
                 t = cands.get(base)
                 if t and "📸edit" in {str(x).lower()
@@ -3186,7 +3243,10 @@ def to_portfolio():
             return
         by_base = {}
         for it in sel:
-            base = (it.get("name") or "").split(" • ")[0].strip()
+            name = it.get("name") or ""
+            if " • " not in name:
+                continue     # non-pipeline item - never mint junk shelves
+            base = name.split(" • ")[0].strip()
             if base:
                 by_base.setdefault(base, []).append(it["id"])
         if not by_base:
@@ -3262,7 +3322,8 @@ def content_retire(tid):
     if hit:
         try:
             live = api.get_task(areas.RECORDS_ID, hit[2])
-            new = cr.set_content_dest(live.get("content") or "", "-")
+            fresh = cr._fresher_content(hit[2], live.get("content") or "")
+            new = cr.set_content_dest(fresh, "-")
             api.update_task(hit[2], areas.RECORDS_ID, current=live,
                             content=new)
             _patch_content_cache(hit[2], new)

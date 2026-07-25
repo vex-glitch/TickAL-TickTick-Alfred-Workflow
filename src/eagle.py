@@ -187,12 +187,24 @@ def trash_items(ids):
     _raw("item/moveToTrash", {"itemIds": list(ids)})
 
 
-def list_item_names(folder_id, limit=400):
-    """Item names inside one folder of the OPEN library (numbering
-    input). TRAP: imports from the last few seconds may not appear yet -
-    compute numbering BEFORE importing, never after."""
-    data = _raw(f"item/list?limit={limit}&folders={folder_id}")
-    return [i.get("name") or "" for i in (data or [])]
+def items_in_folder(folder_id, page=400):
+    """ALL items of one folder in the OPEN library, paged - a flat To
+    post shelf outgrows any single limit (review find 2026-07-25).
+    TRAP: imports from the last few seconds may not appear yet."""
+    out, offset = [], 0
+    while True:
+        data = _raw(f"item/list?limit={page}&offset={offset}"
+                    f"&folders={folder_id}") or []
+        out.extend(data)
+        if len(data) < page:
+            return out
+        offset += page
+
+
+def list_item_names(folder_id):
+    """Item names inside one folder (numbering input). Compute numbering
+    BEFORE importing, never after (fresh-import lag)."""
+    return [i.get("name") or "" for i in items_in_folder(folder_id)]
 
 
 def folder_node(fid, tree=None):

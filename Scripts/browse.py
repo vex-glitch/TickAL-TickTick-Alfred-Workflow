@@ -1810,34 +1810,47 @@ def render_tph(query):
             subtitle="Open Photos · select shots · ♥ the hero",
             valid=False))
     # today's session bubbles up: open CRM session task starting today
+    # (LOCAL date - raw UTC prefix misses after-midnight/all-day tasks)
     today = datetime.now().date().isoformat()
     todays = set()
     for t in cache_store.get("all_tasks") or []:
         if ((t.get("_projectId") or t.get("projectId")) != _areas.CRM_ID
                 or t.get("status", 0) != 0
-                or not cr.is_session_task(t.get("title") or "")
-                or not (t.get("startDate") or "").startswith(today)):
+                or not cr.is_session_task(t.get("title") or "")):
+            continue
+        due = t.get("startDate") or t.get("dueDate") or ""
+        try:
+            from filtering import utc_str_to_local_date
+            day = utc_str_to_local_date(due) if due else ""
+        except Exception:
+            day = due[:10]
+        if day != today:
             continue
         hit = cr.parse_first_link(t.get("title") or "")
         if hit:
             todays.add(hit[2])
 
     def lb_row(lb, archived=False):
+        # ⌥⇧ is the ONE chord whose canvas edge routes ^xact: args to
+        # XAct (892DFDB7); ⌘/⌥ edges drop or misroute custom args -
+        # review find 2026-07-25, verified against the plist.
         base = cr.logbook_base(lb)
         is_today = lb.get("id") in todays
         if archived:
             sub, arg = "Archived · ⏎ finished shots", \
                 f"xact:sessphotos:{lb['id']}:finished"
         else:
-            sub = "⏎ session pics · ⌘ finished shots"
+            sub = "⏎ session pics · ⌥⇧ finished shots"
             if is_today:
                 sub = "Today's session · " + sub
             arg = f"xact:sessphotos:{lb['id']}"
         return alfred.item(
             uid=f"tph-{lb['id']}", title=f"📸 → {base}", subtitle=sub,
             arg=arg, match=f"{base} photos session",
-            mods={"cmd": {"arg": f"xact:sessphotos:{lb['id']}:finished",
-                          "subtitle": "Finished-tattoo shots → 05 Finished"}})
+            mods={"alt+shift": {
+                "arg": f"xact:sessphotos:{lb['id']}:finished",
+                "subtitle": "Finished-tattoo shots → 05 Finished",
+                "valid": True}})
 
     active = cr.records_notes(_areas.LOGBOOK_TAG)
     active.sort(key=lambda l: l.get("id") not in todays)
@@ -1849,8 +1862,9 @@ def render_tph(query):
                                 subtitle="➕ New tattoo mints one",
                                 valid=False))
     if query:
-        rows = fuzz.filter_and_score(query, rows,
-                                     key_fn=lambda x: x["title"]) or rows
+        # state row stays pinned - a query must not hide the warning
+        rows = rows[:1] + (fuzz.filter_and_score(
+            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
     return add_back(rows, "ctx:crmhub")
 
 
@@ -1904,8 +1918,9 @@ def render_triage(sub, query):
         rows += [lb_row(lb, archived=True)
                  for lb in cr.records_notes(_areas.ARCHIVE_TAG)]
         if query:
-            rows = fuzz.filter_and_score(query, rows,
-                                         key_fn=lambda x: x["title"]) or rows
+            # state row stays pinned - the OPEN-CRM warning must survive
+            rows = rows[:1] + (fuzz.filter_and_score(
+                query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
         return add_back(rows, "ctx:crmhub")
     # stage screen for one logbook
     lb = next((l for l in cr.records_notes() if l.get("id") == sub), None)
@@ -1914,26 +1929,27 @@ def render_triage(sub, query):
                                      subtitle="Run tsy", valid=False)],
                         "ctx:triage")
     base = cr.logbook_base(lb)
-    n = max(1, cr.next_snum(lb.get("content") or "", sub) - 1)
+    n = cr.current_snum(lb.get("content") or "", sub)
     rows[0]["subtitle"] = f"Filing into {base}"
     for key, folder, subtxt in _TRIAGE_STAGES:
-        label = f"S{n}" if key == "s" else folder.split(" ", 1)[1]
         rows.append(alfred.item(
             uid=f"tris-{key}", title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
             subtitle=(subtxt or f"Session pics · names get S{n}")
-                     + "  ·  ⌘ +attach to task",
+                     + "  ·  ⌥⇧ +attach to task",
             arg=f"xact:triage:{sub}:{key}",
-            mods={"cmd": {"arg": f"xact:triage:{sub}:{key}:attach",
-                          "subtitle": "File + first pick → task attachment"}}))
+            mods={"alt+shift": {"arg": f"xact:triage:{sub}:{key}:attach",
+                                "subtitle": "File + first pick → task attachment",
+                                "valid": True}}))
     m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
     if m:
         k = int(m.group(1))
         rows.append(alfred.item(
             uid="tris-sn", title=f"→ 04 Sessions · S{k}",
-            subtitle=f"Older session · names get S{k}  ·  ⌘ +attach",
+            subtitle=f"Older session · names get S{k}  ·  ⌥⇧ +attach",
             arg=f"xact:triage:{sub}:s{k}",
-            mods={"cmd": {"arg": f"xact:triage:{sub}:s{k}:attach",
-                          "subtitle": "File + first pick → task attachment"}}))
+            mods={"alt+shift": {"arg": f"xact:triage:{sub}:s{k}:attach",
+                                "subtitle": "File + first pick → task attachment",
+                                "valid": True}}))
     elif query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
@@ -1992,14 +2008,17 @@ def render_contentpl(query):
             arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
             mods = dict(_picker_mods())
             sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "")
+            # ⌥⇧ = the one chord that executes row-supplied xact args
             if tag == "📸post":
-                mods["cmd"] = {"arg": f"xact:posted:{t['id']}",
-                               "subtitle": "Mark POSTED · shelf clears"}
-                sub += " · ⌘ posted"
+                mods["alt+shift"] = {"arg": f"xact:posted:{t['id']}",
+                                     "subtitle": "Mark POSTED · shelf clears",
+                                     "valid": True}
+                sub += " · ⌥⇧ posted"
             elif tag == "📸raw":
-                mods["alt"] = {"arg": f"xact:cretire:{t['id']}",
-                               "subtitle": "Retire · logbook 🎬 → ➖"}
-                sub += " · ⌥ retire"
+                mods["alt+shift"] = {"arg": f"xact:cretire:{t['id']}",
+                                     "subtitle": "Retire · logbook 🎬 → ➖",
+                                     "valid": True}
+                sub += " · ⌥⇧ retire"
             rows.append(alfred.item(
                 uid=f"cpl-{t['id']}", title=f"{icon} {base}", subtitle=sub,
                 arg=arg, valid=bool(arg), match=f"{base} {word}",
