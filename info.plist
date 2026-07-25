@@ -1733,6 +1733,18 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>E19E07-0000-4000-9000-2026072500AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>51D50972-BAE6-4C3B-BFBF-40384532F712</key>
 		<array>
@@ -3751,6 +3763,84 @@
 				<false/>
 			</dict>
 		</array>
+		<key>E19E01-0000-4000-9000-2026072500AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E19E03-0000-4000-9000-2026072500AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>E19E02-0000-4000-9000-2026072500AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E19E03-0000-4000-9000-2026072500AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>E19E03-0000-4000-9000-2026072500AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>E19E04-0000-4000-9000-2026072500AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E19E06-0000-4000-9000-2026072500AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>E19E05-0000-4000-9000-2026072500AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E19E06-0000-4000-9000-2026072500AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>E19E06-0000-4000-9000-2026072500AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>E48E5384-D8CD-47FA-9ED0-4E1B41C0AD09</key>
 		<array>
 			<dict>
@@ -5129,6 +5219,20 @@ fi</string>
 						<string>Habits</string>
 						<key>uid</key>
 						<string>B31D6E29-0000-4000-9000-2026072400FF</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>content</string>
+						<key>outputlabel</key>
+						<string>Content</string>
+						<key>uid</key>
+						<string>E19E07-0000-4000-9000-2026072500AA</string>
 					</dict>
 				</array>
 				<key>elselabel</key>
@@ -12975,6 +13079,144 @@ esac</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:tph_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>📸 Photos selection → Eagle + task</string>
+				<key>text</key>
+				<string>Session photos · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>E19E01-0000-4000-9000-2026072500AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>E19E02-0000-4000-9000-2026072500AA</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argument</key>
+				<string>ctx:tph</string>
+				<key>passthroughargument</key>
+				<false/>
+				<key>variables</key>
+				<dict/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.argument</string>
+			<key>uid</key>
+			<string>E19E03-0000-4000-9000-2026072500AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:contentpl_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>🎬 To edit · To post queues</string>
+				<key>text</key>
+				<string>Content pipeline · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>E19E04-0000-4000-9000-2026072500AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>E19E05-0000-4000-9000-2026072500AA</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argument</key>
+				<string>ctx:contentpl</string>
+				<key>passthroughargument</key>
+				<false/>
+				<key>variables</key>
+				<dict/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.argument</string>
+			<key>uid</key>
+			<string>E19E06-0000-4000-9000-2026072500AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -16358,6 +16600,68 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>ypos</key>
 			<real>2255.0</real>
 		</dict>
+		<key>E19E01-0000-4000-9000-2026072500AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>7</integer>
+			<key>note</key>
+			<string>SESSION PHOTOS</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>5085.0</real>
+		</dict>
+		<key>E19E02-0000-4000-9000-2026072500AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>SESSION PHOTOS</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>5085.0</real>
+		</dict>
+		<key>E19E03-0000-4000-9000-2026072500AA</key>
+		<dict>
+			<key>note</key>
+			<string>→ ctx:tph</string>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>5085.0</real>
+		</dict>
+		<key>E19E04-0000-4000-9000-2026072500AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>7</integer>
+			<key>note</key>
+			<string>CONTENT PIPELINE</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>5215.0</real>
+		</dict>
+		<key>E19E05-0000-4000-9000-2026072500AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>CONTENT PIPELINE</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>5215.0</real>
+		</dict>
+		<key>E19E06-0000-4000-9000-2026072500AA</key>
+		<dict>
+			<key>note</key>
+			<string>→ ctx:contentpl</string>
+			<key>xpos</key>
+			<real>410.0</real>
+			<key>ypos</key>
+			<real>5215.0</real>
+		</dict>
 		<key>E21B489A-27E0-4AA1-B720-876B3F1067B5</key>
 		<dict>
 			<key>colorindex</key>
@@ -17469,6 +17773,48 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<string>textfield</string>
 			<key>variable</key>
 			<string>countdown_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tph</string>
+				<key>placeholder</key>
+				<string>tph</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>📸 Session photos - Photos selection → Eagle + task</string>
+			<key>label</key>
+			<string>[keyword] Session photos</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>tph_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tcp</string>
+				<key>placeholder</key>
+				<string>tcp</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>🎬 Content pipeline hub - To edit, To post, Raw</string>
+			<key>label</key>
+			<string>[keyword] Content pipeline</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>contentpl_kw</string>
 		</dict>
 		<dict>
 			<key>config</key>
