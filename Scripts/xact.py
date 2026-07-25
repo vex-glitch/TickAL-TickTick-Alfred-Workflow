@@ -231,10 +231,14 @@ def app_sync_after_write():
 def buffer_add(pid, tid):
     lines = buffer_ids()
     key = f"{pid}:{tid}"
-    if key not in lines:
+    if key in lines:
+        # honest toast - the silent dedupe read as "buffer broken" when
+        # the same task was added twice (Vex 2026-07-24)
+        print(f"🅿️ {_title()} already in buffer ({len(lines)} total)")
+    else:
         lines.append(key)
         _write_buffer(lines)
-    print(f"🅿️ {_title()} buffered ({len(lines)} in buffer)")
+        print(f"🅿️ {_title()} buffered ({len(lines)} in buffer)")
     _run_trigger("Search")
 
 
