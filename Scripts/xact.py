@@ -1606,6 +1606,7 @@ def sessiondone(pid, tid, when=None):
             try:
                 cr.finish_logbook(log_pid, log_tid)
                 _crm_say(f"📁 Consultation logged · logbook archived{photo}")
+                _eagle_archive_folder(log_tid)
                 return
             except Exception as e:
                 _crm_say(f"Archive FAILED: {type(e).__name__}{photo}")
@@ -1616,6 +1617,7 @@ def sessiondone(pid, tid, when=None):
     if final:
         try:
             cr.finish_logbook(log_pid, log_tid)
+            _eagle_archive_folder(log_tid)
             pick = _dialog(f"✅ {marker} done · {money} total · archived{photo}",
                            ["Healing check", "Open logbook", "Done"], "Done")
             if pick == "Open logbook":
@@ -2391,6 +2393,7 @@ def crmclose(log_tid):
     try:
         cr.finish_logbook(areas.RECORDS_ID, log_tid, when=when)
         _crm_say(f"📁 {title} archived · finished {when or 'today'}")
+        _eagle_archive_folder(log_tid)
     except Exception as e:
         _crm_say(f"📁 Archive failed: {type(e).__name__}: {e}")
 
@@ -2822,6 +2825,41 @@ def eagle_triage(rest):
         except Exception as e:
             att = f" · 📎 failed: {type(e).__name__}"
     _crm_say(f"🦅 {len(sel)} filed → {base} · {label}{att}")
+
+
+def _eagle_archive_folder(log_tid):
+    """Post-archive weave: tattoo folder → Archive/ + 'archive' tag on
+    its items. Best-effort AFTER the TickTick archive (the state owner
+    is already right) - Eagle asleep → honest skip toast. No 🦅 line
+    (backlog imports) → silent no-op."""
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    fid = cr.eagle_folder_of((lb or {}).get("content") or "")[0]
+    if not fid:
+        return
+    import eagle
+    try:
+        eagle.ensure_library("crm")
+        tree = eagle.folder_tree()
+        arch = eagle.find_folder("Archive", tree=tree)
+        arch_id = arch["id"] if arch else eagle.create_folder("Archive")
+        node = eagle.folder_node(fid, tree=tree)
+        if node is None:
+            return
+        eagle.move_folder(fid, arch_id)
+        ids = set()
+
+        def rec(nd):
+            data = eagle._raw(f"item/list?limit=400&folders={nd['id']}")
+            ids.update(i["id"] for i in (data or []))
+            for c in nd.get("children") or []:
+                rec(c)
+        rec(node)
+        if ids:
+            eagle.add_item_tags(sorted(ids), ["archive"])
+        _crm_say("🦅 Eagle folder → Archive")
+    except eagle.EagleError as e:
+        _crm_say(f"🦅 archive move skipped: {e}")
 
 
 def _cp_folders(eagle, names=("To edit", "To post")):
