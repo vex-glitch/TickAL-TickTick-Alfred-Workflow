@@ -1989,7 +1989,7 @@ def render_contentpl(query):
             m = re.search(r"eagle://folder/(\S+)", title)
             lib, chip = pids[t.get("_projectId") or t.get("projectId")]
             open_lib = "crm" if tag == "📸raw" else lib
-            arg = f"xact:eagleopen:{open_lib}:{m.group(1)}" if m else ""
+            arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
             mods = dict(_picker_mods())
             sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "")
             if tag == "📸post":

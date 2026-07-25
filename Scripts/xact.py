@@ -104,7 +104,7 @@ Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
     xact:posted:<tid>               📤 leave To post (Portfolio stays,
                                     rest → trash), task completes
     xact:cretire:<tid>              ➖ complete 📸Raw task + logbook 🎬→➖
-    xact:eagleopen:<lib>:<fid>      ↗️ switch library, open folder
+    xact:eaglego:<lib>:<fid>      ↗️ switch library, open folder
 
 Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:fx_add:<pid>:<tid>         stage the task = MOVE it under the
@@ -7323,7 +7323,7 @@ def main():
             content_posted(rest)
         elif verb == "cretire":
             content_retire(rest)
-        elif verb == "eagleopen":
+        elif verb == "eaglego":
             eagle_open(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
