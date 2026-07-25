@@ -71,6 +71,13 @@ CRM records (customer notes + tattoo logbooks - src/crm_records.py):
                                     archive or chain S<n+1>
     xact:crmlog:<tid>               dialog → timestamped line under ## Notes
 
+Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
+    xact:cdest:<logTid>             🎬 TV|FM|➖ picker → header line;
+                                    TV|FM ensures Eagle skeleton +
+                                    mints/moves 📸Raw task, ➖ completes it
+    xact:eaglefolder:<logTid>       🦅 ensure per-tattoo skeleton, open
+                                    in Eagle (switches to CRM lib first)
+
 Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:fx_add:<pid>:<tid>         stage the task = MOVE it under the
                                     CURRENT focus task as a literal subtask
@@ -2358,6 +2365,172 @@ def crmclose(log_tid):
         _crm_say(f"📁 {title} archived · finished {when or 'today'}")
     except Exception as e:
         _crm_say(f"📁 Archive failed: {type(e).__name__}: {e}")
+
+
+# ── Editing pipeline: Photos → Eagle CRM → TV/FM (2026-07-25) ─────────────────
+# State owner = TickTick (logbook 🎬/🦅 header lines + 📸 tags on the
+# Content-PL task); Eagle holds the files. src/eagle.py raises
+# toast-ready EagleError - every verb here fails CLOSED.
+
+def _eagle_ensure_logbook_folder(lb):
+    """CRM-library folder id for this logbook. First need CREATES the
+    whole per-tattoo skeleton (01 Consultation … 06 Healed - consult
+    refs get dragged in on day one) under Customers/ and writes the
+    header 🦅 line back to the logbook. Returns the folder id."""
+    import areas
+    import crm_records as cr
+    import eagle
+    fid, _lib = cr.eagle_folder_of(lb.get("content") or "")
+    if fid:
+        return fid
+    eagle.ensure_library("crm")
+    tree = eagle.folder_tree()
+    cust = eagle.find_folder("Customers", tree=tree)
+    base = cr.logbook_base(lb)
+    tat = None
+    if cust:
+        cust_id = cust["id"]
+        tat = eagle.find_folder(base, parent_id=cust_id, tree=tree)
+    else:
+        cust_id = eagle.create_folder("Customers")
+    if tat:
+        fid = tat["id"]
+        have = {c.get("name") for c in (tat.get("children") or [])}
+    else:
+        fid = eagle.create_folder(base, parent=cust_id)
+        have = set()
+    for name in eagle.SKELETON:
+        if name not in have:
+            eagle.create_folder(name, parent=fid)
+    api = cr._api()
+    live = api.get_task(areas.RECORDS_ID, lb["id"])
+    new = cr.set_eagle_folder(live.get("content") or "", fid)
+    api.update_task(lb["id"], areas.RECORDS_ID, current=live, content=new)
+    _patch_content_cache(lb["id"], new)
+    return fid
+
+
+def _content_task_for(log_tid):
+    """The open Content-PL task whose BODY links this logbook (mint
+    writes that link exactly so this lookup works), or None."""
+    import areas
+    for t in cache_store.get("all_tasks") or []:
+        if (t.get("status", 0) == 0
+                and (t.get("_projectId") or t.get("projectId"))
+                in (areas.CONTENT_TV_ID, areas.CONTENT_FM_ID)
+                and f"/tasks/{log_tid})" in (t.get("content") or "")):
+            return t
+    return None
+
+
+def _mint_raw_task(lb, dest, fid):
+    """📸Raw task in the dest Content PL list - ONE task carries the
+    tattoo's whole content life (📸Raw → 📸Edit → 📸Post → done).
+    Title = base + eagle folder link (folder, never an image)."""
+    import areas
+    import crm_records as cr
+    api = cr._api()
+    base = cr.logbook_base(lb)
+    title = f"{base} eagle://folder/{fid}" if fid else base
+    body = f"🎨 {cr.task_link(areas.RECORDS_ID, lb['id'], lb.get('title') or '')}"
+    pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
+    t = api.create_task(title=title, project_id=pid, content=body,
+                        tags=["📸raw"])
+    _person_inject_cache(t, pid)
+    return t
+
+
+def content_dest(log_tid):
+    """🎬 picker on a logbook: TV / FM / ➖. TV|FM writes the header
+    line, ensures the Eagle folder (best-effort - field sticks even
+    with Eagle asleep) and mints/moves the 📸Raw task; ➖ completes an
+    open 📸Raw task (ONLY that tag - never in-edit work)."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    cur = cr.content_dest_of(lb.get("content") or "")
+    OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline", "➖ None - CRM only"]
+    dflt = {"tv": OPTS[0], "fm": OPTS[1], "-": OPTS[2]}.get(cur)
+    pick = _choose("🎬 Content potential?", OPTS, default=dflt)
+    if pick is None:
+        _crm_say("Cancelled")
+        return
+    dest = ("tv" if pick.startswith("📺")
+            else "fm" if pick.startswith("🖋") else "-")
+    api = cr._api()
+    live = api.get_task(areas.RECORDS_ID, log_tid)
+    new = cr.set_content_dest(live.get("content") or "", dest)
+    api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+    _patch_content_cache(log_tid, new)
+    lb = dict(lb)
+    lb["content"] = new
+    if dest == "-":
+        t = _content_task_for(log_tid)
+        if t and "📸raw" in {str(x).lower() for x in (t.get("tags") or [])}:
+            pid = t.get("_projectId") or t.get("projectId")
+            api.complete_task(pid, t["id"])
+            _complete_cache_patch(pid, t["id"])
+            _crm_say("🎬 ➖ set · 📸Raw task completed")
+        else:
+            _crm_say("🎬 ➖ set · CRM only")
+        return
+    note = ""
+    fid = ""
+    try:
+        fid = _eagle_ensure_logbook_folder(lb)
+    except Exception as e:
+        note = f" · 🦅 folder pending: {e}"
+    want_pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
+    t = _content_task_for(log_tid)
+    if t is None:
+        _mint_raw_task(lb, dest, fid)
+        note += " · 📸Raw minted"
+    else:
+        pid_old = t.get("_projectId") or t.get("projectId")
+        if pid_old != want_pid:
+            api.move_task(t["id"], pid_old, want_pid)
+            try:
+                import dispatch as _disp
+                _disp._patch_project_data(t["id"], pid_old=pid_old,
+                                          pid_new=want_pid)
+                pool = cache_store.get("all_tasks") or []
+                for x in pool:
+                    if x.get("id") == t["id"]:
+                        x["projectId"] = want_pid
+                        x["_projectId"] = want_pid
+                cache_store.set("all_tasks", pool)
+            except Exception:
+                cache_store.invalidate("all_tasks")
+            note += " · 📸 task moved"
+    _crm_say(f"🎬 {dest.upper()} set{note}")
+
+
+def eagle_folder(log_tid):
+    """🦅 Ensure the logbook's Eagle skeleton exists, then open it in
+    Eagle (switches to the CRM library first - raw links can't)."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    had, _ = cr.eagle_folder_of(lb.get("content") or "")
+    try:
+        import eagle
+        fid = _eagle_ensure_logbook_folder(lb)
+        eagle.ensure_library("crm")
+        subprocess.run(["open", f"eagle://folder/{fid}"], capture_output=True)
+    except Exception as e:
+        _crm_say(f"🦅 {e}")
+        return
+    _crm_say("🦅 Folder opened in Eagle" if had
+             else "🦅 Skeleton created · opened in Eagle")
 
 
 def crmconvert(tid):
@@ -6348,6 +6521,10 @@ def main():
             crmedit(rest)
         elif verb == "crmaftercare":
             crmaftercare(rest)
+        elif verb == "cdest":
+            content_dest(rest)
+        elif verb == "eaglefolder":
+            eagle_folder(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
         elif verb == "bridge_daily":

@@ -85,6 +85,12 @@ ARCHIVE_TAG        = _role(_rec, "archive", "finish", "done") \
 LEAD_TAG           = _role(_rec, "lead") \
     or (_rec[2] if len(_rec) > 3 else _REC_DEFAULTS[2])
 
+# ── Content pipeline (editing pipeline 2026-07-25) ───────────────────────────
+# Content PL lists mirror the Eagle content libraries: TV = neotrad,
+# FM = fineline. Env-overridable; defaults = Vex's live list ids.
+CONTENT_TV_ID = os.environ.get("content_tv_list_id") or "6a268ea28f081f1de80eaedd"
+CONTENT_FM_ID = os.environ.get("content_fm_list_id") or "6a64d5798f08bf71b4203ba1"
+
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # keycap number emoji: digit + optional VS-16 + U+20E3 (⃣). Searched anywhere in

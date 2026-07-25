@@ -1305,6 +1305,16 @@ def render_crmbook(log_tid, query):
         alfred.item(uid="bk-photo", title="🖼 Attach photo",
                     subtitle="Clipboard → logbook (reference · session · healed)",
                     arg=f"xact:crmphoto:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-eagle", title="🦅 Eagle folder",
+                    subtitle="Create if new · open in Eagle",
+                    arg=f"xact:eaglefolder:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-cdest",
+                    title="🎬 Content potential · "
+                          + {"tv": "TV", "fm": "FM", "-": "➖"}.get(
+                              cr.content_dest_of(lb.get("content") or ""),
+                              "unset"),
+                    subtitle="TV · FM · none",
+                    arg=f"xact:cdest:{log_tid}", mods=_picker_mods()),
         alfred.item(uid="bk-pay", title="💶 Log payment",
                     subtitle="Deposit · remainder · minus = refund",
                     arg=f"xact:crmpay:{log_tid}", mods=_picker_mods()),

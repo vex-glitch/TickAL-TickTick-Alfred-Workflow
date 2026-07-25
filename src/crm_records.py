@@ -934,6 +934,54 @@ def _set_paid_line(content):
     return head + sep + tail
 
 
+def logbook_base(lb):
+    """'{Customer} - {tattoo}' Eagle-facing base name from a logbook
+    title '🎨 C • T' (archived '🏛️' too). His Eagle folders use ' - '."""
+    t = re.sub(r"^[🎨🏛️\s]+", "", (lb.get("title") or "").strip())
+    parts = [s.strip() for s in t.split("•") if s.strip()]
+    return " - ".join(parts) if parts else t
+
+
+def content_dest_of(content):
+    """Header 🎬 line → 'tv' | 'fm' | '-' (explicit ➖) | '' (never set)."""
+    head = (content or "").partition("\n## ")[0]
+    m = re.search(r"^🎬 (TV|FM|➖)$", head, re.M)
+    return {"TV": "tv", "FM": "fm", "➖": "-"}[m.group(1)] if m else ""
+
+
+def _set_header_line(content, emoji, line):
+    """Rewrite (or append) a '{emoji} …' line in the HEADER region -
+    same scoping discipline as _set_paid_line, lambda replacement so
+    values are never regex templates."""
+    head, sep, tail = (content or "").partition("\n## ")
+    pat = rf"^{emoji} .*$"
+    if re.search(pat, head, re.M):
+        head = re.sub(pat, lambda _m: line, head, count=1, flags=re.M)
+    else:
+        head = head.rstrip("\n") + f"\n{line}\n"
+    return head + sep + tail
+
+
+def set_content_dest(content, dest):
+    """Write the header '🎬 TV|FM|➖' line (dest 'tv'/'fm'/'-')."""
+    label = {"tv": "TV", "fm": "FM", "-": "➖"}[dest]
+    return _set_header_line(content, "🎬", f"🎬 {label}")
+
+
+def eagle_folder_of(content):
+    """Header 🦅 line → (folder_id, lib_key) - ('', '') when absent.
+    Line shape: '🦅 eagle://folder/<id> · CRM' (deep link doubles as
+    the id carrier; clickable only while that library is open)."""
+    head = (content or "").partition("\n## ")[0]
+    m = re.search(r"^🦅 eagle://folder/(\S+) · (\w+)$", head, re.M)
+    return (m.group(1), m.group(2).lower()) if m else ("", "")
+
+
+def set_eagle_folder(content, fid, lib="crm"):
+    return _set_header_line(content, "🦅",
+                            f"🦅 eagle://folder/{fid} · {lib.upper()}")
+
+
 def next_snum(log_content, log_tid, include_tasks=True):
     """Next session number: max(S in logged entries, S in OPEN calendar tasks
     linking this logbook) + 1 - so a scheduled-but-not-yet-done S1 makes the
