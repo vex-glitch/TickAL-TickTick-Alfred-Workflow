@@ -187,6 +187,27 @@ def trash_items(ids):
     _raw("item/moveToTrash", {"itemIds": list(ids)})
 
 
+def list_item_names(folder_id, limit=400):
+    """Item names inside one folder of the OPEN library (numbering
+    input). TRAP: imports from the last few seconds may not appear yet -
+    compute numbering BEFORE importing, never after."""
+    data = _raw(f"item/list?limit={limit}&folders={folder_id}")
+    return [i.get("name") or "" for i in (data or [])]
+
+
+def folder_node(fid, tree=None):
+    """The folder dict with this id from the OPEN library's tree."""
+    def walk(nodes):
+        for f in nodes:
+            if f.get("id") == fid:
+                return f
+            hit = walk(f.get("children") or [])
+            if hit:
+                return hit
+        return None
+    return walk(tree if tree is not None else folder_tree())
+
+
 # ------------------------------------------------- MCP plugin channel
 
 def _mcp_call(tool, arguments, timeout=60):

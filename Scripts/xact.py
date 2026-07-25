@@ -77,6 +77,15 @@ Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
                                     mints/moves 📸Raw task, ➖ completes it
     xact:eaglefolder:<logTid>       🦅 ensure per-tattoo skeleton, open
                                     in Eagle (switches to CRM lib first)
+    xact:sessphotos:<logTid>[:finished]  📸 Photos selection → originals →
+                                    04 Sessions (05 Finished on the
+                                    finished road / archived logbook),
+                                    rename+tags, ♥ → session-task attach,
+                                    '✅ In Eagle' album after verify
+    xact:photoattach:<pid>:<tid>    📎 ♥/single Photos pick → attachment
+                                    on any task (no Eagle)
+    xact:eaglesweep                 🦅 skeletons for every active logbook
+                                    missing one
 
 Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:fx_add:<pid>:<tid>         stage the task = MOVE it under the
@@ -2531,6 +2540,181 @@ def eagle_folder(log_tid):
         return
     _crm_say("🦅 Folder opened in Eagle" if had
              else "🦅 Skeleton created · opened in Eagle")
+
+
+_MIME = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+         "heic": "image/heic", "heif": "image/heif", "tif": "image/tiff",
+         "tiff": "image/tiff", "webp": "image/webp", "gif": "image/gif"}
+
+
+def _attach_file_to(pid, tid, path, fname=None):
+    """One file → real TickTick attachment. IMAGES ONLY (spec: videos
+    pipeline through Eagle, never TickTick)."""
+    ext = os.path.splitext(path)[1].lstrip(".").lower()
+    mime = _MIME.get(ext)
+    if not mime:
+        raise ValueError(f"not an image (.{ext})")
+    with open(path, "rb") as f:
+        data = f.read()
+    import api_v2
+    api_v2.TickTickV2().upload_attachment(
+        pid, tid, data, fname or os.path.basename(path), mime)
+
+
+def _pick_hero(shots):
+    """The ONE shot that becomes the TickTick attachment: exactly one
+    ♥ favorite, or a single-item selection. None + reason otherwise -
+    honest, never guesses."""
+    favs = [s for s in shots if s.get("favorite")]
+    if len(favs) == 1:
+        hero = favs[0]
+    elif len(favs) > 1:
+        return None, f"{len(favs)} ♥ - heart exactly one"
+    elif len(shots) == 1:
+        hero = shots[0]
+    else:
+        return None, "no ♥ in selection"
+    ext = os.path.splitext(hero["path"] or "")[1].lstrip(".").lower()
+    if ext not in _MIME:
+        return None, "♥ is a video - images only"
+    return hero, ""
+
+
+def session_photos(log_tid, stage=""):
+    """📸 Flow A: Photos selection → originals → Eagle CRM library
+    ({C} - {T}/04 Sessions, or 05 Finished on the finished road /
+    archived logbook) + rename + tags → ♥ hero attached to the open
+    session task (logbook note when none) → shots filed to the
+    '✅ In Eagle' album ONLY after the import verified."""
+    if not _records_ready():
+        return
+    import shutil
+    import tempfile
+    import areas
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    import eagle
+    import photos_bridge as pb
+    tmp = tempfile.mkdtemp(prefix="tickal_tph_")
+    try:
+        try:
+            shots = pb.selection_snapshot_export(tmp)
+        except pb.PhotosError as e:
+            _crm_say(f"📸 {e}")
+            return
+        base = cr.logbook_base(lb)
+        tags_lc = {str(t).lower() for t in (lb.get("tags") or [])}
+        if not stage and areas.ARCHIVE_TAG in tags_lc:
+            stage = "finished"
+        try:
+            fid = _eagle_ensure_logbook_folder(lb)
+            eagle.ensure_library("crm")
+            node = eagle.folder_node(fid)
+            sub_name = "05 Finished" if stage == "finished" else "04 Sessions"
+            child = next((c for c in (node or {}).get("children") or []
+                          if c.get("name") == sub_name), None)
+            sub_id = child["id"] if child else eagle.create_folder(
+                sub_name, parent=fid)
+            n = max(1, cr.next_snum(lb.get("content") or "", log_tid) - 1)
+            label = "Finished" if stage == "finished" else f"S{n}"
+            start = eagle.next_index(
+                eagle.list_item_names(sub_id), base, label)
+            cust, _, tat = base.partition(" - ")
+            tags = [t for t in (cust.strip(), tat.strip()) if t]
+            tags.append("finished" if stage == "finished" else "session")
+            if stage != "finished":
+                tags.append(f"s{n}")
+            dest = cr.content_dest_of(lb.get("content") or "")
+            if dest in ("tv", "fm"):
+                tags.append(dest)
+            specs = [{"path": s["path"],
+                      "name": eagle.item_name(base, label, start + i),
+                      "tags": tags} for i, s in enumerate(shots)]
+            eagle.add_items(specs, folder_id=sub_id)
+        except eagle.EagleError as e:
+            _crm_say(f"📸 nothing imported · {e}")
+            return
+        hero, why = _pick_hero(shots)
+        att = ""
+        if hero:
+            nxt = cr.next_session_task(log_tid)
+            if nxt:
+                a_pid = (nxt[2].get("_projectId")
+                         or nxt[2].get("projectId") or areas.CRM_ID)
+                a_tid, target = nxt[2]["id"], nxt[1]
+            else:
+                a_pid, a_tid, target = areas.RECORDS_ID, log_tid, "logbook"
+            try:
+                _attach_file_to(a_pid, a_tid, hero["path"],
+                                f"{base} · {label}.{hero['path'].rsplit('.', 1)[-1]}")
+                att = f" · ♥ → {target}"
+            except Exception as e:
+                att = f" · ♥ attach failed: {type(e).__name__}"
+        else:
+            att = f" · {why}"
+        try:
+            pb.file_to_album([s["id"] for s in shots])
+            alb = " · ✅ album"
+        except pb.PhotosError:
+            alb = " · album skipped"
+        _crm_say(f"📸 {len(shots)} → {base} · {label}{att}{alb}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def photo_attach(pid, tid):
+    """📎 Independent attach: ♥ (or single selection) from Photos →
+    attachment on ANY task. Eagle not involved."""
+    import shutil
+    import tempfile
+    import photos_bridge as pb
+    tmp = tempfile.mkdtemp(prefix="tickal_att_")
+    try:
+        try:
+            shots = pb.selection_snapshot_export(tmp)
+        except pb.PhotosError as e:
+            _crm_say(f"📎 {e}")
+            return
+        hero, why = _pick_hero(shots)
+        if not hero:
+            _crm_say(f"📎 {why}")
+            return
+        try:
+            _attach_file_to(pid, tid, hero["path"], hero["filename"])
+        except Exception as e:
+            _crm_say(f"📎 Attach failed: {type(e).__name__}: {e}")
+            return
+        _crm_say(f"📎 {hero['filename']} attached")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def eagle_sweep():
+    """🦅 Backtrack: create Eagle skeletons for every ACTIVE logbook
+    still missing its 🦅 line. One switch, N folders."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    lbs = cr.records_notes(areas.LOGBOOK_TAG)
+    missing = [lb for lb in lbs
+               if not cr.eagle_folder_of(lb.get("content") or "")[0]]
+    if not missing:
+        _crm_say(f"🦅 All {len(lbs)} active logbooks already linked")
+        return
+    done = 0
+    try:
+        for lb in missing:
+            _eagle_ensure_logbook_folder(lb)
+            done += 1
+    except Exception as e:
+        _crm_say(f"🦅 {done}/{len(missing)} created, then: {e}")
+        return
+    _crm_say(f"🦅 {done} skeletons created · {len(lbs) - len(missing)} "
+             "were already linked")
 
 
 def crmconvert(tid):
@@ -6525,6 +6709,14 @@ def main():
             content_dest(rest)
         elif verb == "eaglefolder":
             eagle_folder(rest)
+        elif verb == "sessphotos":
+            log_tid, _, stage = rest.partition(":")
+            session_photos(log_tid, stage)
+        elif verb == "photoattach":
+            pid, tid = rest.split(":", 1)
+            photo_attach(pid, tid)
+        elif verb == "eaglesweep":
+            eagle_sweep()
         elif verb == "crmbrowse":
             crmbrowse(rest)
         elif verb == "bridge_daily":

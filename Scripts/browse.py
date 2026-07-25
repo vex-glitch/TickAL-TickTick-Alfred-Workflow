@@ -108,6 +108,7 @@ def parse_ctx(raw):
                "people": "ctx:people",
                "countdowns": "ctx:countdowns",
                "habits": "ctx:habits",
+               "tph": "ctx:tph",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
                # main-menu view args (▷50F14423 branches)
                "view_today": "ctx:smart:today",
@@ -1782,6 +1783,73 @@ def render_crmstats(sub, query):
     return add_back(rows, "ctx:crmhub")
 
 
+def render_tph(query):
+    """📸 Send-session-photos target picker: today's session first, then
+    every active logbook (archived below - late finished/healed shots).
+    ⏎ = session pics · ⌘ = finished shots."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    import crm_records as cr
+    import photos_bridge as pb
+    rows = []
+    if pb.photos_running():
+        n = pb.selection_count()
+        rows.append(alfred.item(
+            title=(f"📸 {n} selected in Photos" if n
+                   else "📸 Nothing selected in Photos"),
+            subtitle="Select shots · ♥ the hero · pick target below",
+            valid=False))
+    else:
+        rows.append(alfred.item(
+            title="📸 Photos is not running",
+            subtitle="Open Photos · select shots · ♥ the hero",
+            valid=False))
+    # today's session bubbles up: open CRM session task starting today
+    today = datetime.now().date().isoformat()
+    todays = set()
+    for t in cache_store.get("all_tasks") or []:
+        if ((t.get("_projectId") or t.get("projectId")) != _areas.CRM_ID
+                or t.get("status", 0) != 0
+                or not cr.is_session_task(t.get("title") or "")
+                or not (t.get("startDate") or "").startswith(today)):
+            continue
+        hit = cr.parse_first_link(t.get("title") or "")
+        if hit:
+            todays.add(hit[2])
+
+    def lb_row(lb, archived=False):
+        base = cr.logbook_base(lb)
+        is_today = lb.get("id") in todays
+        if archived:
+            sub, arg = "Archived · ⏎ finished shots", \
+                f"xact:sessphotos:{lb['id']}:finished"
+        else:
+            sub = "⏎ session pics · ⌘ finished shots"
+            if is_today:
+                sub = "Today's session · " + sub
+            arg = f"xact:sessphotos:{lb['id']}"
+        return alfred.item(
+            uid=f"tph-{lb['id']}", title=f"📸 → {base}", subtitle=sub,
+            arg=arg, match=f"{base} photos session",
+            mods={"cmd": {"arg": f"xact:sessphotos:{lb['id']}:finished",
+                          "subtitle": "Finished-tattoo shots → 05 Finished"}})
+
+    active = cr.records_notes(_areas.LOGBOOK_TAG)
+    active.sort(key=lambda l: l.get("id") not in todays)
+    rows += [lb_row(lb) for lb in active]
+    rows += [lb_row(lb, archived=True)
+             for lb in cr.records_notes(_areas.ARCHIVE_TAG)]
+    if len(rows) == 1:
+        rows.append(alfred.item(title="No logbooks yet",
+                                subtitle="➕ New tattoo mints one",
+                                valid=False))
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:crmhub")
+
+
 def render_crmhub(query):
     """🏠 The CRM home inside browse - every verb one row away. ⌃ from any
     CRM screen lands here (the two-key Session-done → Next-session loop).
@@ -1804,6 +1872,8 @@ def render_crmhub(query):
         alfred.item(uid="hub-person", title="➕ New lead / customer",
                     subtitle="Dialogs · lead lands in Records",
                     arg="xact:crmperson", mods=_picker_mods()),
+        hop("hub-photos", "📸 Session photos", "Photos selection → Eagle + task",
+            "ctx:tph"),
         hop("hub-backlog", "📕 Backlog", "Import finished tattoo · past session",
             "ctx:crmback"),
         hop("hub-sched", "📅 Schedule", "Dormant tasks → schedule + link",
@@ -1818,6 +1888,9 @@ def render_crmhub(query):
             "ctx:crmmoney"),
         hop("hub-week", "📆 Week", "Who's coming + the needs-booking radar",
             "ctx:crmweek"),
+        alfred.item(uid="hub-eaglesweep", title="🦅 Eagle sweep",
+                    subtitle="Skeleton folders for logbooks missing one",
+                    arg="xact:eaglesweep", mods=_picker_mods()),
     ]
     if query:
         rows = fuzz.filter_and_score(query, rows,
@@ -3296,6 +3369,9 @@ def main():
 
         elif level in ("habits", "habit"):
             items = render_habits(level, ids, query)
+
+        elif level == "tph":
+            items = render_tph(query)
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")

@@ -138,9 +138,22 @@ end tell''', timeout=timeout)
     return _primary_file(dest_dir)
 
 
+def photos_running():
+    """True when Photos.app is up. Surfaces check this BEFORE
+    selection_count - an AS call would otherwise LAUNCH Photos as a
+    render side effect."""
+    try:
+        return subprocess.run(["pgrep", "-x", "Photos"],
+                              capture_output=True).returncode == 0
+    except Exception:
+        return False
+
+
 def selection_count():
     """Cheap peek for surfaces that want to show '3 selected'. 0 on any
     scripting trouble - display only, never a gate."""
+    if not photos_running():
+        return 0
     try:
         return int(_run('tell application "Photos" to count of selection',
                         timeout=30).strip() or "0")
