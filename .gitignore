@@ -19,6 +19,7 @@ src/lib/bin/
 
 # Claude Code
 .claude/
+.mcp.json
 
 # Credentials (stored in ~/.ticktick_alfred/config.json, never here)
 config.json
