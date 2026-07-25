@@ -1850,6 +1850,88 @@ def render_tph(query):
     return add_back(rows, "ctx:crmhub")
 
 
+_TRIAGE_STAGES = [
+    ("consult", "01 Consultation", "Customer refs"),
+    ("prep", "02 Preparation", "Refs found while drawing"),
+    ("design", "03 Design", "Final design files"),
+    ("s", "04 Sessions", None),          # subtitle built with S<n>
+    ("finished", "05 Finished", "Finished-tattoo shots"),
+    ("healed", "06 Healed", "Healed shots"),
+]
+
+
+def render_triage(sub, query):
+    """🦅 Eagle triage: file the CURRENT Eagle selection into a tattoo's
+    lifecycle folder (Review backlog, Inbox strays, any misfile).
+    Selection must be made in the CRM library - applying never switches
+    (a switch would drop the selection). Two screens: pick tattoo →
+    pick stage; ⌘ on a stage also attaches the FIRST selected item to
+    the session task."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:crmhub")
+    import crm_records as cr
+    import eagle
+    try:
+        eagle.ensure_running(launch=False)
+        lib = eagle.current_library()
+        sel = eagle.selected_items()
+        state = f"🦅 {len(sel)} selected · {lib}"
+        if lib != eagle.LIBS["crm"][0]:
+            state += " · OPEN THE CRM LIBRARY"
+    except eagle.EagleError as e:
+        state = f"🦅 {e}"
+    rows = [alfred.item(title=state,
+                        subtitle="Select items in Eagle · pick below",
+                        valid=False)]
+    if not sub:
+        def lb_row(lb, archived=False):
+            base = cr.logbook_base(lb)
+            return alfred.item(
+                uid=f"tri-{lb['id']}", title=f"🦅 → {base}",
+                subtitle=("Archived · " if archived else "") + "⏎ pick stage",
+                arg=f"xact:crmbrowse:ctx:triage:{lb['id']}",
+                match=f"{base} triage file", mods=_picker_mods())
+        rows += [lb_row(lb) for lb in cr.records_notes(_areas.LOGBOOK_TAG)]
+        rows += [lb_row(lb, archived=True)
+                 for lb in cr.records_notes(_areas.ARCHIVE_TAG)]
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        return add_back(rows, "ctx:crmhub")
+    # stage screen for one logbook
+    lb = next((l for l in cr.records_notes() if l.get("id") == sub), None)
+    if lb is None:
+        return add_back([alfred.item(title="Logbook not found",
+                                     subtitle="Run tsy", valid=False)],
+                        "ctx:triage")
+    base = cr.logbook_base(lb)
+    n = max(1, cr.next_snum(lb.get("content") or "", sub) - 1)
+    rows[0]["subtitle"] = f"Filing into {base}"
+    for key, folder, subtxt in _TRIAGE_STAGES:
+        label = f"S{n}" if key == "s" else folder.split(" ", 1)[1]
+        rows.append(alfred.item(
+            uid=f"tris-{key}", title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
+            subtitle=(subtxt or f"Session pics · names get S{n}")
+                     + "  ·  ⌘ +attach to task",
+            arg=f"xact:triage:{sub}:{key}",
+            mods={"cmd": {"arg": f"xact:triage:{sub}:{key}:attach",
+                          "subtitle": "File + first pick → task attachment"}}))
+    m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
+    if m:
+        k = int(m.group(1))
+        rows.append(alfred.item(
+            uid="tris-sn", title=f"→ 04 Sessions · S{k}",
+            subtitle=f"Older session · names get S{k}  ·  ⌘ +attach",
+            arg=f"xact:triage:{sub}:s{k}",
+            mods={"cmd": {"arg": f"xact:triage:{sub}:s{k}:attach",
+                          "subtitle": "File + first pick → task attachment"}}))
+    elif query:
+        rows = rows[:1] + (fuzz.filter_and_score(
+            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+    return add_back(rows, "ctx:triage")
+
+
 def render_crmhub(query):
     """🏠 The CRM home inside browse - every verb one row away. ⌃ from any
     CRM screen lands here (the two-key Session-done → Next-session loop).
@@ -1874,6 +1956,8 @@ def render_crmhub(query):
                     arg="xact:crmperson", mods=_picker_mods()),
         hop("hub-photos", "📸 Session photos", "Photos selection → Eagle + task",
             "ctx:tph"),
+        hop("hub-triage", "🦅 Eagle triage", "Eagle selection → tattoo folder",
+            "ctx:triage"),
         hop("hub-backlog", "📕 Backlog", "Import finished tattoo · past session",
             "ctx:crmback"),
         hop("hub-sched", "📅 Schedule", "Dormant tasks → schedule + link",
@@ -3372,6 +3456,9 @@ def main():
 
         elif level == "tph":
             items = render_tph(query)
+
+        elif level == "triage":
+            items = render_triage(ids[0] if ids else "", query)
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")

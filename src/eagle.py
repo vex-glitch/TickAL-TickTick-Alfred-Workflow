@@ -291,6 +291,13 @@ def add_item_tags(ids, tags):
     _mcp_call("item_add_tags", {"ids": list(ids), "tags": list(tags)})
 
 
+def get_items(ids, full=True):
+    """Item dicts by id (fullDetails carries filePath - the attach and
+    promote roads need the real file on disk)."""
+    out = _mcp_call("item_get", {"ids": list(ids), "fullDetails": bool(full)})
+    return out.get("data") or []
+
+
 # ------------------------------------------------ closed-library disk
 
 def disk_folder_tree(lib_path):

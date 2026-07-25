@@ -86,6 +86,11 @@ Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
                                     on any task (no Eagle)
     xact:eaglesweep                 🦅 skeletons for every active logbook
                                     missing one
+    xact:triage:<logTid>:<stage>[:attach]  🦅 file the Eagle selection
+                                    into the stage subfolder (move +
+                                    rename + tags; stage = consult|prep|
+                                    design|s[<n>]|finished|healed);
+                                    :attach → first pick onto the task
 
 Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:fx_add:<pid>:<tid>         stage the task = MOVE it under the
@@ -2690,6 +2695,97 @@ def photo_attach(pid, tid):
         _crm_say(f"📎 {hero['filename']} attached")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def eagle_triage(rest):
+    """🦅 Apply the triage pick: file the CURRENT Eagle selection into
+    <logTid>'s stage subfolder - move (membership REPLACED, so Review/
+    Inbox strays leave their old shelf) + rename to convention +
+    incremental tags. NEVER switches libraries: a switch would drop the
+    selection - the CRM library must already be open (folder creation
+    inside it is fine). ':attach' also attaches the FIRST selected item
+    (image only) to the open session task / logbook."""
+    if not _records_ready():
+        return
+    parts = rest.split(":")
+    if len(parts) < 2:
+        _crm_say("🦅 Bad triage arg")
+        return
+    log_tid, stage = parts[0], parts[1]
+    attach = len(parts) > 2 and parts[2] == "attach"
+    import areas
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    import eagle
+    base = cr.logbook_base(lb)
+    try:
+        eagle.ensure_running(launch=False)
+        if eagle.current_library() != eagle.LIBS["crm"][0]:
+            _crm_say("🦅 Open the CRM library in Eagle first")
+            return
+        sel = eagle.selected_items()
+        if not sel:
+            _crm_say("🦅 Nothing selected in Eagle")
+            return
+        m = re.match(r"^s(\d+)?$", stage)
+        if m:
+            n = (int(m.group(1)) if m.group(1)
+                 else max(1, cr.next_snum(lb.get("content") or "",
+                                          log_tid) - 1))
+            folder_name, label = "04 Sessions", f"S{n}"
+            stage_tags = ["session", f"s{n}"]
+        else:
+            folder_name, label = {
+                "consult": ("01 Consultation", "Consult"),
+                "prep": ("02 Preparation", "Prep"),
+                "design": ("03 Design", "Design"),
+                "finished": ("05 Finished", "Finished"),
+                "healed": ("06 Healed", "Healed"),
+            }.get(stage, (None, None))
+            if not folder_name:
+                _crm_say(f"🦅 Unknown stage {stage!r}")
+                return
+            stage_tags = [stage]
+        fid = _eagle_ensure_logbook_folder(lb)
+        node = eagle.folder_node(fid)
+        child = next((c for c in (node or {}).get("children") or []
+                      if c.get("name") == folder_name), None)
+        sub_id = child["id"] if child else eagle.create_folder(
+            folder_name, parent=fid)
+        start = eagle.next_index(eagle.list_item_names(sub_id), base, label)
+        eagle.update_items([{"id": it["id"],
+                             "name": eagle.item_name(base, label, start + i),
+                             "folders": [sub_id]}
+                            for i, it in enumerate(sel)])
+        cust, _, tat = base.partition(" - ")
+        tags = [t for t in (cust.strip(), tat.strip()) if t] + stage_tags
+        dest = cr.content_dest_of(lb.get("content") or "")
+        if dest in ("tv", "fm"):
+            tags.append(dest)
+        eagle.add_item_tags([it["id"] for it in sel], tags)
+    except eagle.EagleError as e:
+        _crm_say(f"🦅 {e}")
+        return
+    att = ""
+    if attach:
+        try:
+            full = eagle.get_items([sel[0]["id"]])
+            path = (full[0] if full else {}).get("filePath") or ""
+            nxt = cr.next_session_task(log_tid)
+            if nxt:
+                a_pid = (nxt[2].get("_projectId")
+                         or nxt[2].get("projectId") or areas.CRM_ID)
+                a_tid, target = nxt[2]["id"], nxt[1]
+            else:
+                a_pid, a_tid, target = areas.RECORDS_ID, log_tid, "logbook"
+            _attach_file_to(a_pid, a_tid, path)
+            att = f" · 📎 → {target}"
+        except Exception as e:
+            att = f" · 📎 failed: {type(e).__name__}"
+    _crm_say(f"🦅 {len(sel)} filed → {base} · {label}{att}")
 
 
 def eagle_sweep():
@@ -6717,6 +6813,8 @@ def main():
             photo_attach(pid, tid)
         elif verb == "eaglesweep":
             eagle_sweep()
+        elif verb == "triage":
+            eagle_triage(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
         elif verb == "bridge_daily":
