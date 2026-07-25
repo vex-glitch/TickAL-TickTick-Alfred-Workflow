@@ -91,6 +91,20 @@ Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
                                     rename + tags; stage = consult|prep|
                                     design|s[<n>]|finished|healed);
                                     :attach → first pick onto the task
+    xact:editthis:<logTid>          🎬 whole CRM tree (disk-read, ONE
+                                    switch) → dest To edit/{base};
+                                    task → 📸Edit, link retargeted
+    xact:promotesel                 🎬 Eagle selection (CRM open) →
+                                    To edit/{base}; tattoo inferred
+    xact:filedited                  📥 intake folders → flat To post,
+                                    '• Edit • n', 📸Edit→📸Post, ⭐
+                                    offer, finished? → tree → Raw/
+    xact:portfolio                  ⭐ Eagle selection → Portfolio/{base}
+                                    membership (multi-shelf, no move)
+    xact:posted:<tid>               📤 leave To post (Portfolio stays,
+                                    rest → trash), task completes
+    xact:cretire:<tid>              ➖ complete 📸Raw task + logbook 🎬→➖
+    xact:eagleopen:<lib>:<fid>      ↗️ switch library, open folder
 
 Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:fx_add:<pid>:<tid>         stage the task = MOVE it under the
@@ -2437,8 +2451,8 @@ def _content_task_for(log_tid):
     return None
 
 
-def _mint_raw_task(lb, dest, fid):
-    """📸Raw task in the dest Content PL list - ONE task carries the
+def _mint_raw_task(lb, dest, fid, tag="📸raw"):
+    """📸 task in the dest Content PL list - ONE task carries the
     tattoo's whole content life (📸Raw → 📸Edit → 📸Post → done).
     Title = base + eagle folder link (folder, never an image)."""
     import areas
@@ -2449,9 +2463,31 @@ def _mint_raw_task(lb, dest, fid):
     body = f"🎨 {cr.task_link(areas.RECORDS_ID, lb['id'], lb.get('title') or '')}"
     pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
     t = api.create_task(title=title, project_id=pid, content=body,
-                        tags=["📸raw"])
+                        tags=[tag])
     _person_inject_cache(t, pid)
     return t
+
+
+def _task_base(title):
+    """'{C} - {T}' from a content-task title (eagle link stripped)."""
+    return re.sub(r"\s*eagle://\S+", "", title or "").strip()
+
+
+def _content_retag(t, drop, add):
+    """Swap one 📸 state tag on a content task (others kept), plus any
+    extra fields (title retarget rides the same write)."""
+    import crm_records as cr
+    api = cr._api()
+    pid = t.get("_projectId") or t.get("projectId")
+    live = api.get_task(pid, t["id"])
+    tags = [x for x in (live.get("tags") or [])
+            if str(x).lower() != drop] + ([add] if add else [])
+    api.update_task(t["id"], pid, current=live, tags=tags)
+    try:
+        import dispatch as _disp
+        _disp._patch_task_cache(t["id"], tags=tags)
+    except Exception:
+        cache_store.invalidate("all_tasks")
 
 
 def content_dest(log_tid):
@@ -2786,6 +2822,428 @@ def eagle_triage(rest):
         except Exception as e:
             att = f" · 📎 failed: {type(e).__name__}"
     _crm_say(f"🦅 {len(sel)} filed → {base} · {label}{att}")
+
+
+def _cp_folders(eagle, names=("To edit", "To post")):
+    """(Content pipeline id, {name: id}) in the OPEN content library -
+    creating what is missing. To post is FLAT by design: Eagle has no
+    folder-delete API, per-tattoo To post subfolders would pile up as
+    empty husks after posting; item names carry identity instead."""
+    tree = eagle.folder_tree()
+    cp = eagle.find_folder("Content pipeline", tree=tree)
+    cp_id = cp["id"] if cp else eagle.create_folder("Content pipeline")
+    kids = {c.get("name"): c["id"]
+            for c in ((cp or {}).get("children") or [])}
+    out = {}
+    for n in names:
+        out[n] = kids.get(n) or eagle.create_folder(n, parent=cp_id)
+    return cp_id, out
+
+
+def _portfolio_folder(eagle, base):
+    """Tattoo Portfolio/{base} id in the OPEN library, created if new."""
+    tree = eagle.folder_tree()
+    port = eagle.find_folder("Tattoo Portfolio", tree=tree)
+    pid = port["id"] if port else eagle.create_folder("Tattoo Portfolio")
+    hit = next((c for c in ((port or {}).get("children") or [])
+                if c.get("name") == base), None)
+    return hit["id"] if hit else eagle.create_folder(base, parent=pid)
+
+
+def edit_this(log_tid):
+    """🎬 Edit this: copy the WHOLE CRM tattoo tree (read from DISK -
+    the closed CRM library is never opened, ONE switch total) into
+    {dest}/Content pipeline/To edit/{base}, then slide the content task
+    to 📸Edit with its link retargeted to the To edit folder. From that
+    folder id on, the link NEVER changes - editing-done re-parents the
+    same folder under Raw/, and Eagle re-parenting keeps ids."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    import eagle
+    base = cr.logbook_base(lb)
+    fid, _lib = cr.eagle_folder_of(lb.get("content") or "")
+    if not fid:
+        _crm_say("🎬 No Eagle folder yet · run 🦅 or 📸 first")
+        return
+    cur = cr.content_dest_of(lb.get("content") or "")
+    OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline"]
+    pick = _choose(f"🎬 Edit {base} - where to?", OPTS,
+                   default={"tv": OPTS[0], "fm": OPTS[1]}.get(cur))
+    if pick is None:
+        _crm_say("Cancelled")
+        return
+    dest = "tv" if pick.startswith("📺") else "fm"
+    if dest != cur:
+        api = cr._api()
+        live = api.get_task(areas.RECORDS_ID, log_tid)
+        new = cr.set_content_dest(live.get("content") or "", dest)
+        api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+        _patch_content_cache(log_tid, new)
+    try:
+        crm_path = eagle.LIBS["crm"][1]
+        root, sub_ids = eagle.disk_subtree_ids(crm_path, fid)
+        items = [i for i in eagle.disk_items_in(crm_path, sub_ids)
+                 if i.get("path")]
+        eagle.ensure_library(dest)
+        _cp, cp_kids = _cp_folders(eagle)
+        tedit_id = cp_kids["To edit"]
+        tree = eagle.folder_tree()
+        tenode = eagle.folder_node(tedit_id, tree=tree)
+        hit = next((c for c in (tenode or {}).get("children") or []
+                    if c.get("name") == base), None)
+        base_id = hit["id"] if hit else eagle.create_folder(
+            base, parent=tedit_id)
+        mapping = {root["id"]: base_id}
+
+        def mirror(src_node, dest_id):
+            dnode = eagle.folder_node(dest_id)
+            have = {c.get("name"): c["id"]
+                    for c in (dnode or {}).get("children") or []}
+            for c in src_node.get("children") or []:
+                did = have.get(c["name"]) or eagle.create_folder(
+                    c["name"], parent=dest_id)
+                mapping[c["id"]] = did
+                mirror(c, did)
+        mirror(root, base_id)
+        by_folder = {}
+        for it in items:
+            tgt = next((mapping[f] for f in it["folders"] if f in mapping),
+                       base_id)
+            by_folder.setdefault(tgt, []).append(it)
+        n = 0
+        for tgt, group in by_folder.items():
+            eagle.add_items([{"path": g["path"], "name": g["name"],
+                              "tags": g["tags"]} for g in group],
+                            folder_id=tgt)
+            n += len(group)
+    except eagle.EagleError as e:
+        _crm_say(f"🎬 {e}")
+        return
+    want_pid = (areas.CONTENT_TV_ID if dest == "tv"
+                else areas.CONTENT_FM_ID)
+    t = _content_task_for(log_tid)
+    if t is None:
+        _mint_raw_task(lb, dest, base_id, tag="📸edit")
+    else:
+        api = cr._api()
+        pid_old = t.get("_projectId") or t.get("projectId")
+        if pid_old != want_pid:
+            api.move_task(t["id"], pid_old, want_pid)
+        live = api.get_task(want_pid, t["id"])
+        tags = [x for x in (live.get("tags") or [])
+                if str(x).lower() != "📸raw"]
+        if "📸edit" not in {str(x).lower() for x in tags}:
+            tags.append("📸edit")
+        api.update_task(t["id"], want_pid, current=live, tags=tags,
+                        title=f"{base} eagle://folder/{base_id}")
+        try:
+            import dispatch as _disp
+            _disp._patch_project_data(t["id"], pid_old=pid_old,
+                                      pid_new=want_pid)
+            _disp._patch_task_cache(
+                t["id"], tags=tags,
+                title=f"{base} eagle://folder/{base_id}")
+        except Exception:
+            cache_store.invalidate("all_tasks")
+    _crm_say(f"🎬 {n} files → {dest.upper()} To edit · task → 📸Edit")
+
+
+def promote_selection():
+    """🎬 Cherry-pick promote: the Eagle selection (CRM library open,
+    never switched before reading - a switch drops it) → To edit/{base}
+    flat. The tattoo is inferred from the selection's folders via the
+    logbooks' 🦅 lines; spanning two tattoos is an honest refusal."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    import eagle
+    try:
+        eagle.ensure_running(launch=False)
+        if eagle.current_library() != eagle.LIBS["crm"][0]:
+            _crm_say("🎬 Open the CRM library + select items first")
+            return
+        sel = eagle.selected_items()
+        if not sel:
+            _crm_say("🎬 Nothing selected in Eagle")
+            return
+        full = eagle.get_items([s["id"] for s in sel])
+        paths = [(f.get("name"), f.get("filePath"), f.get("tags") or [])
+                 for f in full if f.get("filePath")]
+        sel_folders = set()
+        for f in full:
+            sel_folders.update(f.get("folders") or [])
+        crm_path = eagle.LIBS["crm"][1]
+        owner = None
+        for lb in cr.records_notes(areas.LOGBOOK_TAG) \
+                + cr.records_notes(areas.ARCHIVE_TAG):
+            f0, _ = cr.eagle_folder_of(lb.get("content") or "")
+            if not f0:
+                continue
+            try:
+                _root, ids = eagle.disk_subtree_ids(crm_path, f0)
+            except eagle.EagleError:
+                continue
+            if sel_folders & set(ids):
+                if owner and owner.get("id") != lb.get("id"):
+                    _crm_say("🎬 Selection spans two tattoos - pick one")
+                    return
+                owner = lb
+        if owner is None:
+            _crm_say("🎬 Selection is not inside a tattoo folder")
+            return
+        base = cr.logbook_base(owner)
+        cur = cr.content_dest_of(owner.get("content") or "")
+        OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline"]
+        pick = _choose(f"🎬 Promote {len(paths)} of {base} - where to?",
+                       OPTS, default={"tv": OPTS[0], "fm": OPTS[1]}.get(cur))
+        if pick is None:
+            _crm_say("Cancelled")
+            return
+        dest = "tv" if pick.startswith("📺") else "fm"
+        eagle.ensure_library(dest)
+        _cp, cp_kids = _cp_folders(eagle)
+        tenode = eagle.folder_node(cp_kids["To edit"])
+        hit = next((c for c in (tenode or {}).get("children") or []
+                    if c.get("name") == base), None)
+        base_id = hit["id"] if hit else eagle.create_folder(
+            base, parent=cp_kids["To edit"])
+        eagle.add_items([{"path": p, "name": nm, "tags": tg}
+                         for nm, p, tg in paths], folder_id=base_id)
+    except eagle.EagleError as e:
+        _crm_say(f"🎬 {e}")
+        return
+    want_pid = (areas.CONTENT_TV_ID if dest == "tv"
+                else areas.CONTENT_FM_ID)
+    t = _content_task_for(owner["id"])
+    if t is None:
+        _mint_raw_task(owner, dest, base_id, tag="📸edit")
+    else:
+        tags_lc = {str(x).lower() for x in (t.get("tags") or [])}
+        if "📸raw" in tags_lc:
+            _content_retag(t, "📸raw", "📸edit")
+    _crm_say(f"🎬 {len(paths)} → {dest.upper()} To edit/{base}")
+
+
+def file_edited():
+    """📥 File edited shots: read the iCloud intake folders DIRECTLY
+    (Eagle's global auto-import is the open-library trap) → import into
+    the right library's flat To post + '{base} • Edit • n' names →
+    source files removed → task slides 📸Edit → 📸Post → optional ⭐
+    hero to Portfolio → optional 'editing finished' folder move
+    To edit/{base} → Raw/ (same folder id - task links survive)."""
+    import areas
+    import crm_records as cr
+    import eagle
+    batches = {}
+    for lib in ("tv", "fm"):
+        d = eagle.INTAKE[lib]
+        try:
+            fs = [os.path.join(d, f) for f in sorted(os.listdir(d))
+                  if not f.startswith(".")
+                  and os.path.isfile(os.path.join(d, f))]
+        except OSError:
+            fs = []
+        if fs:
+            batches[lib] = fs
+    if not batches:
+        _crm_say("📥 Both intake folders empty")
+        return
+    filed = 0
+    notes = []
+    for lib, files in batches.items():
+        pid = areas.CONTENT_TV_ID if lib == "tv" else areas.CONTENT_FM_ID
+        cands = {}
+        for t in cache_store.get("all_tasks") or []:
+            if ((t.get("_projectId") or t.get("projectId")) == pid
+                    and t.get("status", 0) == 0):
+                tags_lc = {str(x).lower() for x in (t.get("tags") or [])}
+                if tags_lc & {"📸edit", "📸post", "📸raw"}:
+                    cands[_task_base(t.get("title") or "")] = t
+        groups = {}
+        for path in files:
+            stem = os.path.splitext(os.path.basename(path))[0]
+            best, _score, conf = eagle.fuzzy_match(stem, list(cands))
+            if not conf:
+                pick = _choose(f"📥 {os.path.basename(path)} → which tattoo?",
+                               sorted(cands) or ["(no content tasks)"],
+                               default=best)
+                if pick is None or pick not in cands:
+                    notes.append(f"{os.path.basename(path)} skipped")
+                    continue
+                best = pick
+            groups.setdefault(best, []).append(path)
+        if not groups:
+            continue
+        try:
+            eagle.ensure_library(lib)
+            _cp, cp_kids = _cp_folders(eagle)
+            tpost_id = cp_kids["To post"]
+            existing = eagle.list_item_names(tpost_id)
+            for base, paths in groups.items():
+                start = eagle.next_index(existing, base, "Edit")
+                cust, _, tat = base.partition(" - ")
+                tags = [x for x in (cust.strip(), tat.strip()) if x]
+                tags.append("edited")
+                specs = [{"path": p,
+                          "name": eagle.item_name(base, "Edit", start + i),
+                          "tags": tags} for i, p in enumerate(paths)]
+                ids = eagle.add_items(specs, folder_id=tpost_id)
+                for p in paths:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+                filed += len(ids)
+                t = cands.get(base)
+                if t and "📸edit" in {str(x).lower()
+                                      for x in (t.get("tags") or [])}:
+                    _content_retag(t, "📸edit", "📸post")
+                names = [s["name"] for s in specs]
+                hero = _choose(f"⭐ {base}: hero to Portfolio?",
+                               ["None"] + names, default="None")
+                if hero and hero != "None":
+                    eagle.add_to_folders([ids[names.index(hero)]],
+                                         [_portfolio_folder(eagle, base)])
+                fin = _dialog(f"✅ {base}: editing finished?",
+                              ["Not yet", "Finished"], "Not yet")
+                if fin == "Finished":
+                    tree = eagle.folder_tree()
+                    ten = eagle.folder_node(cp_kids["To edit"], tree=tree)
+                    bnode = next((c for c in (ten or {}).get("children")
+                                  or [] if c.get("name") == base), None)
+                    if bnode:
+                        raw = eagle.find_folder("Raw", tree=tree)
+                        raw_id = (raw["id"] if raw
+                                  else eagle.create_folder("Raw"))
+                        eagle.move_folder(bnode["id"], raw_id)
+                        notes.append(f"{base} → Raw")
+        except eagle.EagleError as e:
+            _crm_say(f"📥 {lib.upper()}: {e}")
+            return
+    extra = (" · " + " · ".join(notes)) if notes else ""
+    _crm_say(f"📥 {filed} filed → To post{extra}")
+
+
+def to_portfolio():
+    """⭐ Eagle selection (TV/FM open) → Tattoo Portfolio/{base}
+    membership added - the multi-shelf trick, nothing moves. Base from
+    the item names ('{C} - {T} • …' - To post is flat)."""
+    import eagle
+    try:
+        eagle.ensure_running(launch=False)
+        lib = eagle.current_library()
+        if lib not in (eagle.LIBS["tv"][0], eagle.LIBS["fm"][0]):
+            _crm_say("⭐ Open the TV or FM library + select edits first")
+            return
+        sel = eagle.selected_items()
+        if not sel:
+            _crm_say("⭐ Nothing selected in Eagle")
+            return
+        by_base = {}
+        for it in sel:
+            base = (it.get("name") or "").split(" • ")[0].strip()
+            if base:
+                by_base.setdefault(base, []).append(it["id"])
+        if not by_base:
+            _crm_say("⭐ Names carry no '{C} - {T} • …' base")
+            return
+        for base, ids in by_base.items():
+            eagle.add_to_folders(ids, [_portfolio_folder(eagle, base)])
+    except eagle.EagleError as e:
+        _crm_say(f"⭐ {e}")
+        return
+    tot = sum(len(v) for v in by_base.values())
+    _crm_say(f"⭐ {tot} → Portfolio · {', '.join(sorted(by_base))}")
+
+
+def content_posted(tid):
+    """📤 Posted: this tattoo's '• Edit •' items leave the flat To post
+    shelf - Portfolio members survive there, shelf-only items go to
+    Eagle TRASH (recoverable). Task completes; Raw material is
+    untouched (round 2 = fresh promote)."""
+    import areas
+    import crm_records as cr
+    t = cache_store.find_task(tid)
+    if not t:
+        _crm_say("Not found · run tsy")
+        return
+    pid = t.get("_projectId") or t.get("projectId")
+    lib = "tv" if pid == areas.CONTENT_TV_ID else "fm"
+    base = _task_base(t.get("title") or "")
+    import eagle
+    try:
+        eagle.ensure_library(lib)
+        _cp, cp_kids = _cp_folders(eagle)
+        tpost_id = cp_kids["To post"]
+        data = eagle._raw(f"item/list?limit=400&folders={tpost_id}")
+        mine = [i["id"] for i in (data or [])
+                if (i.get("name") or "").startswith(f"{base} • ")]
+        kept = trashed = 0
+        if mine:
+            full = eagle.get_items(mine)
+            keep = [f["id"] for f in full
+                    if len([x for x in (f.get("folders") or [])
+                            if x != tpost_id])]
+            drop = [f["id"] for f in full if f["id"] not in set(keep)]
+            if keep:
+                eagle.remove_from_folders(keep, [tpost_id])
+            if drop:
+                eagle.trash_items(drop)
+            kept, trashed = len(keep), len(drop)
+    except eagle.EagleError as e:
+        _crm_say(f"📤 {e}")
+        return
+    api = cr._api()
+    api.complete_task(pid, tid)
+    _complete_cache_patch(pid, tid)
+    _crm_say(f"📤 {base} posted · {kept} kept in Portfolio · "
+             f"{trashed} → Eagle trash")
+
+
+def content_retire(tid):
+    """➖ Retire a 📸Raw task: completes it + flips the logbook 🎬 to ➖
+    in one stroke."""
+    import areas
+    import crm_records as cr
+    t = cache_store.find_task(tid)
+    if not t:
+        _crm_say("Not found · run tsy")
+        return
+    pid = t.get("_projectId") or t.get("projectId")
+    api = cr._api()
+    api.complete_task(pid, tid)
+    _complete_cache_patch(pid, tid)
+    hit = cr.parse_first_link(t.get("content") or "")
+    if hit:
+        try:
+            live = api.get_task(areas.RECORDS_ID, hit[2])
+            new = cr.set_content_dest(live.get("content") or "", "-")
+            api.update_task(hit[2], areas.RECORDS_ID, current=live,
+                            content=new)
+            _patch_content_cache(hit[2], new)
+        except Exception:
+            pass
+    _crm_say(f"➖ {_task_base(t.get('title') or '')} retired from content")
+
+
+def eagle_open(rest):
+    """↗️ Open an Eagle folder cross-library: switch first, then the
+    deep link (raw eagle:// clicks can't switch - this row always can)."""
+    lib, _, fid = rest.partition(":")
+    import eagle
+    try:
+        eagle.ensure_library(lib)
+    except eagle.EagleError as e:
+        _crm_say(f"🦅 {e}")
+        return
+    subprocess.run(["open", f"eagle://folder/{fid}"], capture_output=True)
 
 
 def eagle_sweep():
@@ -6815,6 +7273,20 @@ def main():
             eagle_sweep()
         elif verb == "triage":
             eagle_triage(rest)
+        elif verb == "editthis":
+            edit_this(rest)
+        elif verb == "promotesel":
+            promote_selection()
+        elif verb == "filedited":
+            file_edited()
+        elif verb == "portfolio":
+            to_portfolio()
+        elif verb == "posted":
+            content_posted(rest)
+        elif verb == "cretire":
+            content_retire(rest)
+        elif verb == "eagleopen":
+            eagle_open(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
         elif verb == "bridge_daily":

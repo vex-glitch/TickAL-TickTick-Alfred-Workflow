@@ -109,6 +109,7 @@ def parse_ctx(raw):
                "countdowns": "ctx:countdowns",
                "habits": "ctx:habits",
                "tph": "ctx:tph",
+               "content": "ctx:contentpl",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
                # main-menu view args (▷50F14423 branches)
                "view_today": "ctx:smart:today",
@@ -1316,6 +1317,9 @@ def render_crmbook(log_tid, query):
                               "unset"),
                     subtitle="TV · FM · none",
                     arg=f"xact:cdest:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-editthis", title="🎬 Edit this",
+                    subtitle="Whole tree → To edit · task → Edit",
+                    arg=f"xact:editthis:{log_tid}", mods=_picker_mods()),
         alfred.item(uid="bk-pay", title="💶 Log payment",
                     subtitle="Deposit · remainder · minus = refund",
                     arg=f"xact:crmpay:{log_tid}", mods=_picker_mods()),
@@ -1885,6 +1889,10 @@ def render_triage(sub, query):
                         subtitle="Select items in Eagle · pick below",
                         valid=False)]
     if not sub:
+        rows.append(alfred.item(
+            uid="tri-promote", title="🎬 Promote selection",
+            subtitle="Picked shots → To edit (tattoo inferred)",
+            arg="xact:promotesel", mods=_picker_mods()))
         def lb_row(lb, archived=False):
             base = cr.logbook_base(lb)
             return alfred.item(
@@ -1932,6 +1940,80 @@ def render_triage(sub, query):
     return add_back(rows, "ctx:triage")
 
 
+_CPL_STATES = [("📸edit", "✂️", "Editing"), ("📸post", "📤", "Ready to post"),
+               ("📸raw", "🎞", "Raw · undecided"), ("📸studio", "🏷", "Studio")]
+
+
+def render_contentpl(query):
+    """🎬 Content pipeline hub - the To edit / To post / Raw / Studio
+    queues across BOTH Content PL lists, rendered from the TickTick
+    cache (Eagle not needed to look). ⏎ opens the task's Eagle folder
+    cross-library; ⌘ on Post rows = mark posted; ⌥ on Raw = retire."""
+    import areas as _ar
+    import eagle as _eagle
+    pending = 0
+    for lib in ("tv", "fm"):
+        try:
+            pending += len([f for f in os.listdir(_eagle.INTAKE[lib])
+                            if not f.startswith(".") and os.path.isfile(
+                                os.path.join(_eagle.INTAKE[lib], f))])
+        except OSError:
+            pass
+    rows = [alfred.item(
+        title="🎬 Content pipeline",
+        subtitle=(f"{pending} edited files waiting in intake"
+                  if pending else "Intake empty"), valid=False)]
+    if pending:
+        rows.append(alfred.item(
+            uid="cpl-file", title=f"📥 File edited shots ({pending})",
+            subtitle="Intake → To post · names · task → Post",
+            arg="xact:filedited", mods=_picker_mods()))
+    rows += [
+        alfred.item(uid="cpl-promote", title="🎬 Promote Eagle selection",
+                    subtitle="CRM picks → To edit",
+                    arg="xact:promotesel", mods=_picker_mods()),
+        alfred.item(uid="cpl-star", title="⭐ Portfolio Eagle selection",
+                    subtitle="Edits → Tattoo Portfolio shelf",
+                    arg="xact:portfolio", mods=_picker_mods()),
+    ]
+    pids = {_ar.CONTENT_TV_ID: ("tv", "📺"), _ar.CONTENT_FM_ID: ("fm", "🖋️")}
+    tasks = [t for t in cache_store.get("all_tasks") or []
+             if (t.get("_projectId") or t.get("projectId")) in pids
+             and t.get("status", 0) == 0]
+    for tag, icon, word in _CPL_STATES:
+        for t in tasks:
+            if tag not in {str(x).lower() for x in (t.get("tags") or [])}:
+                continue
+            title = t.get("title") or ""
+            base = re.sub(r"\s*eagle://\S+", "", title).strip()
+            m = re.search(r"eagle://folder/(\S+)", title)
+            lib, chip = pids[t.get("_projectId") or t.get("projectId")]
+            open_lib = "crm" if tag == "📸raw" else lib
+            arg = f"xact:eagleopen:{open_lib}:{m.group(1)}" if m else ""
+            mods = dict(_picker_mods())
+            sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "")
+            if tag == "📸post":
+                mods["cmd"] = {"arg": f"xact:posted:{t['id']}",
+                               "subtitle": "Mark POSTED · shelf clears"}
+                sub += " · ⌘ posted"
+            elif tag == "📸raw":
+                mods["alt"] = {"arg": f"xact:cretire:{t['id']}",
+                               "subtitle": "Retire · logbook 🎬 → ➖"}
+                sub += " · ⌥ retire"
+            rows.append(alfred.item(
+                uid=f"cpl-{t['id']}", title=f"{icon} {base}", subtitle=sub,
+                arg=arg, valid=bool(arg), match=f"{base} {word}",
+                mods=mods))
+    if len(rows) <= 4:
+        rows.append(alfred.item(title="Queues empty",
+                                subtitle="🎬 Edit this on a logbook feeds them",
+                                valid=False))
+    if query:
+        rows = rows[:1] + (fuzz.filter_and_score(
+            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+    return add_back(rows, "ctx:crmhub")
+
+
 def render_crmhub(query):
     """🏠 The CRM home inside browse - every verb one row away. ⌃ from any
     CRM screen lands here (the two-key Session-done → Next-session loop).
@@ -1958,6 +2040,8 @@ def render_crmhub(query):
             "ctx:tph"),
         hop("hub-triage", "🦅 Eagle triage", "Eagle selection → tattoo folder",
             "ctx:triage"),
+        hop("hub-content", "🎬 Content pipeline", "To edit · To post · Raw queues",
+            "ctx:contentpl"),
         hop("hub-backlog", "📕 Backlog", "Import finished tattoo · past session",
             "ctx:crmback"),
         hop("hub-sched", "📅 Schedule", "Dormant tasks → schedule + link",
@@ -3459,6 +3543,9 @@ def main():
 
         elif level == "triage":
             items = render_triage(ids[0] if ids else "", query)
+
+        elif level == "contentpl":
+            items = render_contentpl(query)
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")
