@@ -9328,7 +9328,7 @@ esac</string>
 				<key>availableviaurlhandler</key>
 				<false/>
 				<key>triggerid</key>
-				<string>OpenHabits</string>
+				<string>Habits</string>
 			</dict>
 			<key>type</key>
 			<string>alfred.workflow.trigger.external</string>
@@ -10358,7 +10358,7 @@ esac</string>
 			<key>config</key>
 			<dict>
 				<key>externaltriggerid</key>
-				<string>OpenHabits</string>
+				<string>Habits</string>
 				<key>passinputasargument</key>
 				<true/>
 				<key>passvariables</key>
@@ -13131,6 +13131,8 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 		<dict>
 			<key>colorindex</key>
 			<integer>3</integer>
+			<key>note</key>
+			<string>ET Habits</string>
 			<key>xpos</key>
 			<real>2940.0</real>
 			<key>ypos</key>
