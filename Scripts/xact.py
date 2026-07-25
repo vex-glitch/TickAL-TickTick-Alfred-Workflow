@@ -42,7 +42,7 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
     xact:task_copy:<pid>:<tid>      📋 task name → clipboard
     xact:task_copy_full:<pid>:<tid> name + '>' blockquoted description
     xact:buffer_copy[:full]         every buffered task as a block,
-                                    blank line between blocks
+                                    one per line (no blank separators)
     xact:pomo:<minutes|default>     start TickTick's REAL pomodoro (hidden
                                     AppleScript command in TickTick.sdef);
                                     "default"/empty = the app's own length
@@ -4269,8 +4269,9 @@ def task_copy(pid, tid, full=False):
 
 
 def buffer_copy(full=False):
-    """📋 Buffer batch: every buffered task as a block, blank line
-    between blocks."""
+    """📋 Buffer batch: every buffered task as a block, joined with
+    single newlines (Vex 2026-07-25: blank separator lines were weird
+    in practice - a pasted batch should read as one tight checklist)."""
     from display import buffer_pairs
     pairs = buffer_pairs()
     if not pairs:
@@ -4285,7 +4286,7 @@ def buffer_copy(full=False):
     if not chunks:
         _crm_say("🅿️ Buffer empty · nothing copied")
         return
-    subprocess.run(["pbcopy"], input="\n\n".join(chunks).encode())
+    subprocess.run(["pbcopy"], input="\n".join(chunks).encode())
     _crm_say(f"📋 {len(chunks)} task{'s' if len(chunks) != 1 else ''} "
              "copied" + (" with descriptions" if full else ""))
 

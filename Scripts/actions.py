@@ -278,7 +278,7 @@ def main():
                  "move all list",    True, sent),
                 ("✔️ Complete all", f"Complete all {_n}",  "xact:buffer_complete",
                  "complete done all", True, sent),
-                ("📋 Copy all names", f"All {_n} → clipboard, blank line between",
+                ("📋 Copy all names", f"All {_n} → clipboard, one per line",
                  "xact:buffer_copy", "copy names clipboard all", True, sent),
                 ("📋 Copy all + descriptions", "Name + '>' quoted description blocks",
                  "xact:buffer_copy:full", "copy descriptions clipboard all",
