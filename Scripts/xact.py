@@ -39,6 +39,10 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
     xact:habit_new[:<b64name>]      dialogs: section → rhythm → type → diary
     xact:habit_archive:<id>         status 1
     xact:habit_delete:<id>          confirm → delete (checkins cascade)
+    xact:task_copy:<pid>:<tid>      📋 task name → clipboard
+    xact:task_copy_full:<pid>:<tid> name + '>' blockquoted description
+    xact:buffer_copy[:full]         every buffered task as a block,
+                                    blank line between blocks
     xact:pomo:<minutes|default>     start TickTick's REAL pomodoro (hidden
                                     AppleScript command in TickTick.sdef);
                                     "default"/empty = the app's own length
@@ -4220,6 +4224,64 @@ def fx_copy(pid=None, tid=None):
           " copied as bullets")
 
 
+def _task_copy_block(t, full):
+    """'Title' (+ '> description' blockquote lines when full) - the
+    clipboard shape Vex ruled (2026-07-24)."""
+    title = " ".join((t.get("title") or "").split()) or "(untitled)"
+    if not full:
+        return title, False
+    desc = (t.get("content") or "").strip()
+    if not desc:
+        return title, False
+    quoted = "\n".join(f"> {ln}" if ln.strip() else ">"
+                       for ln in desc.splitlines())
+    return f"{title}\n{quoted}", True
+
+
+def task_copy(pid, tid, full=False):
+    """📋 ⌘ Actions: task name → clipboard; full=True adds the
+    description as a '>' blockquote. Cache first, live GET on miss."""
+    t = cache_store.find_task(tid)
+    if not t or (full and not (t.get("content") or "").strip()):
+        try:
+            t = _api().get_task(pid, tid)
+        except Exception:
+            t = t or {}
+    if not t:
+        _crm_say("📋 Task not found · nothing copied")
+        return
+    text, had_desc = _task_copy_block(t, full)
+    subprocess.run(["pbcopy"], input=text.encode())
+    title = " ".join((t.get("title") or "").split())[:40]
+    if full and not had_desc:
+        _crm_say(f"📋 No description · name copied · {title}")
+    else:
+        _crm_say("📋 Copied" + (" with description" if full else "")
+                 + f" · {title}")
+
+
+def buffer_copy(full=False):
+    """📋 Buffer batch: every buffered task as a block, blank line
+    between blocks."""
+    from display import buffer_pairs
+    pairs = buffer_pairs()
+    if not pairs:
+        _crm_say("🅿️ Buffer empty · nothing copied")
+        return
+    chunks = []
+    for pid, tid in pairs:
+        t = cache_store.find_task(tid)
+        if not t:
+            continue
+        chunks.append(_task_copy_block(t, full)[0])
+    if not chunks:
+        _crm_say("🅿️ Buffer empty · nothing copied")
+        return
+    subprocess.run(["pbcopy"], input="\n\n".join(chunks).encode())
+    _crm_say(f"📋 {len(chunks)} task{'s' if len(chunks) != 1 else ''} "
+             "copied" + (" with descriptions" if full else ""))
+
+
 def convert(pid, tid):
     """⌘ Actions '🔃 Convert': flip the item kind TEXT↔NOTE via the
     v1 update (the full-object post carries kind - verified both
@@ -6211,6 +6273,12 @@ def main():
             habit_archive(rest)
         elif verb == "habit_delete":
             habit_delete(rest)
+        elif verb == "task_copy":
+            pid, tid = rest.split(":", 1); task_copy(pid, tid)
+        elif verb == "task_copy_full":
+            pid, tid = rest.split(":", 1); task_copy(pid, tid, full=True)
+        elif verb == "buffer_copy":
+            buffer_copy(full=(rest == "full"))
         elif verb == "pomo":
             pomo(rest)
         elif verb == "pomo_task":
