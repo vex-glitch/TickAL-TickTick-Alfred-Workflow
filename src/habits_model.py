@@ -157,8 +157,9 @@ def week_done(checkins, today=None):
 
 
 def dots(habit, checkins, today=None, days=14):
-    """Last-N-days history strip, oldest→today: ● done · ◦ scheduled but
-    blank · ✕ skipped · · not scheduled."""
+    """Last-N-days history strip, oldest→today, square scheme (Vex
+    re-rule 2026-07-24): 🟩 done · 🟥 skipped · ⬜ due but blank ·
+    ▫️ nothing scheduled that day."""
     today = today or date.today()
     by_stamp = {c.get("checkinStamp"): c for c in checkins or []}
     out = []
@@ -166,13 +167,13 @@ def dots(habit, checkins, today=None, days=14):
         d = today - timedelta(days=i)
         c = by_stamp.get(stamp(d))
         if c and c.get("status") == DONE:
-            out.append("●")
+            out.append("🟩")
         elif c and c.get("status") == SKIPPED:
-            out.append("✕")
+            out.append("🟥")
         elif due_today(habit, d):
-            out.append("◦")
+            out.append("⬜")
         else:
-            out.append("·")
+            out.append("▫️")
     return "".join(out)
 
 

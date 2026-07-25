@@ -94,9 +94,9 @@ check("week-skip-not-counted", hm.week_done([C(stamp_=mon, status=1)], T)
       == 0)
 d = hm.dots(H(), [C(stamp_=TS), C(stamp_=hm.stamp(date(2026, 7, 22)),
                                  status=1)], T, days=5)
-check("dots", d == "◦◦✕◦●", d)
+check("dots", d == "⬜⬜🟥⬜🟩", d)
 d2 = hm.dots(H(repeatRule="RRULE:FREQ=WEEKLY;BYDAY=FR"), [], T, days=3)
-check("dots-unscheduled", d2 == "··◦", d2)
+check("dots-unscheduled", d2 == "▫️▫️⬜", d2)
 
 # ── entity + presets + review map ────────────────────────────────────────
 n = hm.new_entity("a" * 24, "Stretch", rule=hm.RULE_PRESETS[1][1])
