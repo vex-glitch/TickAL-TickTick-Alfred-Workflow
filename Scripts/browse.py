@@ -2511,8 +2511,7 @@ def render_lbeagle(ids, query):
         n = len(shots)
         rows.append(alfred.item(
             uid=f"lbe-{cid}", title=name,
-            subtitle=(f"{n} image{'s' if n != 1 else ''}" if n
-                      else "no images yet")
+            subtitle=f"🖼️ {n}"
                      + ("  |  ⏎🖼  ⌘⚡  ⌃🔙" if n else "  |  ⌃🔙"),
             arg=peek_arg(cid), valid=bool(n),
             mods=_picker_mods(), variables=_record_vars(lb)))
@@ -2525,9 +2524,7 @@ def render_lbeagle(ids, query):
                 label = f"S{k}" if k else "unnumbered"
                 rows.append(alfred.item(
                     uid=f"lbe-{cid}-s{k}", title=f"   · {label}",
-                    subtitle=f"{len(sess[k])} image"
-                             f"{'s' if len(sess[k]) != 1 else ''}"
-                             "  |  ⏎🖼  ⌃🔙",
+                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌃🔙",
                     arg=peek_arg(cid, f"s{k}"),
                     mods=_picker_mods(), variables=_record_vars(lb)))
     # honest strays: shots dragged straight into the tattoo root folder
@@ -2538,8 +2535,7 @@ def render_lbeagle(ids, query):
         ns = len(strays)
         rows.append(alfred.item(
             uid=f"lbe-{root['id']}-strays", title="· unfiled",
-            subtitle=f"{ns} image{'s' if ns != 1 else ''} at folder root"
-                     "  |  ⏎🖼  ⌃🔙",
+            subtitle=f"🖼️ {ns} · folder root  |  ⏎🖼  ⌃🔙",
             arg=peek_arg(root["id"], direct=True),
             mods=_picker_mods(), variables=_record_vars(lb)))
     if query:
