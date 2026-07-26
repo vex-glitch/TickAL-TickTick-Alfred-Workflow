@@ -497,6 +497,7 @@ def main():
         # copy rows on EVERY surface that reaches ⌘ Actions, not just the
         # hub. Same cheap-gate-first rule as above.
         _phone = _mail = _insta = ""
+        _is_logbook = False
         if (pid and areas.records_configured() and pid == areas.RECORDS_ID
                 and is_note and bool(tid)):
             try:
@@ -504,6 +505,9 @@ def main():
                 _phone, _mail, _bd, _insta = _cr2.contact_of(task or {})
             except Exception:
                 pass
+            # logbook notes get the editing-pipeline rows right here -
+            # Vex's reflex is ⌘ Actions, not the ⌥ drill (smoke 2026-07-26)
+            _is_logbook = (name or "").startswith(("🎨", "🏛️"))
 
         rows = [
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
@@ -574,6 +578,18 @@ def main():
             ("➕ Add task",        add_sub,                "add",           "add new task",      True),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
             ("🆔 Copy id",         "List id → clipboard",  f"copy:{pid}",   "id copy identifier configure", itype == "list"),
+            ("📸 Send session photos", "Photos selection → Eagle + task",
+             f"xact:sessphotos:{tid}", "session photos eagle send import",
+             _is_logbook),
+            ("🦅 Eagle folder",    "Create if new · open in Eagle",
+             f"xact:eaglefolder:{tid}", "eagle folder open create skeleton",
+             _is_logbook),
+            ("🎬 Content potential", "TV · FM · none",
+             f"xact:cdest:{tid}", "content potential tv fm dest",
+             _is_logbook),
+            ("🎬 Edit this",       "Whole tree → To edit",
+             f"xact:editthis:{tid}", "edit this promote content tree",
+             _is_logbook),
             (f"📞 Copy {_phone}",  "Number → clipboard",   f"copy:{_phone}", "phone copy number contact call", bool(_phone)),
             (f"✉️ Copy {_mail}",   "Mail → clipboard",     f"copy:{_mail}",  "mail copy email contact", bool(_mail)),
             (f"📸 Open {_insta}",  "Instagram profile (DMs)",
