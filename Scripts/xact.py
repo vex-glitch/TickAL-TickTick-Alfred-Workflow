@@ -2718,9 +2718,11 @@ def session_photos(log_tid, stage=""):
             specs = [{"path": s["path"],
                       "name": eagle.item_name(base, label, start + i),
                       "tags": tags} for i, s in enumerate(shots)]
-            eagle.add_items(specs, folder_id=sub_id)
+            ids = eagle.add_items(specs, folder_id=sub_id)
+            # the background copy MUST finish before the tmp exports die
+            eagle.wait_imported(ids)
         except eagle.EagleError as e:
-            _crm_say(f"📸 nothing imported · {e}")
+            _crm_say(f"📸 Eagle trouble: {e} · shots safe in Photos")
             return
         hero, why = _pick_hero(shots)
         att = ""
@@ -3199,6 +3201,8 @@ def file_edited():
                           "name": eagle.item_name(base, "Edit", start + i),
                           "tags": tags} for i, p in enumerate(paths)]
                 ids = eagle.add_items(specs, folder_id=tpost_id)
+                # sources are DELETED below - verify the copy landed first
+                eagle.wait_imported(ids)
                 for p in paths:
                     try:
                         os.remove(p)

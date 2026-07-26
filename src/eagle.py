@@ -310,6 +310,28 @@ def get_items(ids, full=True):
     return out.get("data") or []
 
 
+def wait_imported(ids, timeout=120):
+    """Block until Eagle has PHYSICALLY copied freshly added items into
+    the library. addFromPaths returns ids BEFORE the background copy -
+    deleting the source files early ENOENTs the import (Vex smoke
+    2026-07-26: Rebecca S2 • 5/6 lost their sources mid-copy). Callers
+    must not delete/file sources before this returns."""
+    if not ids:
+        return
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            full = get_items(ids)
+        except EagleError:
+            full = []
+        ok = sum(1 for f in full
+                 if f.get("filePath") and os.path.exists(f["filePath"]))
+        if ok == len(ids):
+            return
+        time.sleep(0.6)
+    raise EagleError("Eagle did not finish copying the imports")
+
+
 # ------------------------------------------------ closed-library disk
 
 def disk_folder_tree(lib_path):
