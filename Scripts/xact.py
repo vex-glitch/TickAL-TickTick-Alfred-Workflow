@@ -1540,6 +1540,28 @@ def sessiondone(pid, tid, when=None):
     # Smart defaults make the daily close Enter-Enter-Enter: duration =
     # last session's, charged = the open quote remainder.
     lb_cached = _record_by_id(log_tid) or {}
+    # 📸 Photos-selection catch (Vex ruling 2026-07-26: the wrong order
+    # must be impossible). Import BEFORE completing so the ♥ hero lands
+    # on THIS still-open task; a failed import stops the flow with the
+    # task untouched. Needle sessions only - consult refs go through
+    # the stage screen.
+    if is_s:
+        try:
+            import photos_bridge as pb
+            n_sel = pb.selection_count() if pb.photos_running() else 0
+        except Exception:
+            n_sel = 0
+        if n_sel:
+            pick = _dialog(f"📸 {n_sel} selected in Photos - import to "
+                           f"{marker} first?",
+                           ["Cancel", "Skip", "Import"], "Import")
+            if pick == "":
+                _crm_say("Cancelled · task untouched")
+                return
+            if pick == "Import" and not session_photos(log_tid):
+                _crm_say("📸 Import failed · task untouched - fix and "
+                         "re-run Session done")
+                return
     d_dur = cr.last_duration(lb_cached.get("content") or "")
     d_chg = cr.quote_remainder(lb_cached.get("content") or "")
     d_setup = cr.last_setup(lb_cached.get("content") or "")
@@ -2702,7 +2724,7 @@ def session_photos(log_tid, stage=""):
     attached to the open session task (logbook note when none) → shots
     filed to the '✅ In Eagle' album ONLY after the import verified."""
     if not _records_ready():
-        return
+        return False
     import shutil
     import tempfile
     import areas
@@ -2710,7 +2732,7 @@ def session_photos(log_tid, stage=""):
     lb = _record_by_id(log_tid)
     if not lb:
         _crm_say("Logbook not found · run tsy")
-        return
+        return False
     import eagle
     import photos_bridge as pb
     tmp = tempfile.mkdtemp(prefix="tickal_tph_")
@@ -2719,7 +2741,7 @@ def session_photos(log_tid, stage=""):
             shots = pb.selection_snapshot_export(tmp)
         except pb.PhotosError as e:
             _crm_say(f"📸 {e}")
-            return
+            return False
         base = cr.logbook_base(lb)
         tags_lc = {str(t).lower() for t in (lb.get("tags") or [])}
         if not stage and areas.ARCHIVE_TAG in tags_lc:
@@ -2748,7 +2770,7 @@ def session_photos(log_tid, stage=""):
             eagle.wait_imported(ids)
         except eagle.EagleError as e:
             _crm_say(f"📸 Eagle trouble: {e} · shots safe in Photos")
-            return
+            return False
         hero, why = _pick_hero(shots)
         att = ""
         if hero:
@@ -2773,6 +2795,7 @@ def session_photos(log_tid, stage=""):
         except pb.PhotosError:
             alb = " · album skipped"
         _crm_say(f"📸 {len(shots)} → {base} · {label}{att}{alb}")
+        return True
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
