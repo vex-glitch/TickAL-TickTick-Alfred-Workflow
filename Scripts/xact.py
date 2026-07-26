@@ -2708,7 +2708,7 @@ def _attach_file_to(pid, tid, path, fname=None):
         with open(path, "rb") as f:
             data = f.read()
         import api_v2
-        api_v2.TickTickV2().upload_attachment(
+        return api_v2.TickTickV2().upload_attachment(
             pid, tid, data, fname or os.path.basename(path), mime)
     finally:
         if cleanup:
@@ -2825,11 +2825,16 @@ def session_photos(log_tid, stage=""):
             ok_n = 0
             for i, h in enumerate(heroes):
                 try:
-                    _attach_file_to(
+                    up = _attach_file_to(
                         a_pid, a_tid, h["path"],
                         f"{base} · {label} · {i + 1}."
                         f"{h['path'].rsplit('.', 1)[-1]}")
                     ok_n += 1
+                    if a_tid == log_tid:   # note target → plant the ref
+                        try:
+                            _plant_logbook_ref(log_tid, up, label)
+                        except Exception:
+                            pass
                 except Exception as e:
                     why = f"attach failed: {type(e).__name__}"
             att = f" · ♥×{ok_n} → {target}" if ok_n else f" · ♥ {why}"
@@ -2867,11 +2872,21 @@ def photo_attach(pid, tid):
         if not heroes:
             _crm_say(f"📎 {why}")
             return
+        import areas
+        _is_lb_note = False
+        if pid == areas.RECORDS_ID:
+            t = cache_store.find_task(tid) or {}
+            _is_lb_note = (t.get("title") or "").startswith(("🎨", "🏛️"))
         ok_n = 0
         for h in heroes:
             try:
-                _attach_file_to(pid, tid, h["path"], h["filename"])
+                up = _attach_file_to(pid, tid, h["path"], h["filename"])
                 ok_n += 1
+                if _is_lb_note:   # logbook note → plant, never bottom
+                    try:
+                        _plant_logbook_ref(tid, up)
+                    except Exception:
+                        pass
             except Exception as e:
                 why = f"{type(e).__name__}: {e}"
         if ok_n:
@@ -3009,8 +3024,38 @@ def img_link(path):
     _crm_say("🔗 Eagle link copied")
 
 
+def _plant_logbook_ref(log_tid, up, label=""):
+    """Planted, not just uploaded: bare attachments render at the
+    BOTTOM of the note (Vex smoke 2026-07-26: 'ended up in notes').
+    The ![image] ref goes under the matching '### <label> ·' entry
+    when one exists ('S2' matches '### S2 ·', 'Consult' matches
+    '### Consultation ·'), else straight under ## Sessions. False =
+    could not place (attachment still on the note)."""
+    if not (up or {}).get("attid"):
+        return False
+    import areas
+    import crm_records as cr
+    ref = f"![image]({up['attid']}/{up['fname']})"
+    content = (_record_by_id(log_tid) or {}).get("content") or ""
+    heading = None
+    if label:
+        for l in content.split("\n"):
+            s = l.strip()
+            if s.startswith("### ") and s.lstrip("# ").startswith(label):
+                heading = s
+                break
+    if heading is None and re.search(r"^## Sessions\s*$", content, re.M):
+        heading = "## Sessions"
+    if heading is None:
+        return False
+    cr.insert_session_image(areas.RECORDS_ID, log_tid, heading, 0, ref)
+    return True
+
+
 def img_attach(path):
-    """🖼 grid ⌥⇧: THIS shot → real attachment on the logbook note."""
+    """🖼 grid ⌥⇧: THIS shot → real attachment on the logbook note,
+    PLANTED into the right block (label parsed from the convention
+    name '{base} • S2 • 3')."""
     if not _records_ready():
         return
     import areas
@@ -3019,11 +3064,18 @@ def img_attach(path):
         _crm_say("🖼 Lost the logbook context · re-enter the grid")
         return
     try:
-        _attach_file_to(areas.RECORDS_ID, log_tid, path)
+        up = _attach_file_to(areas.RECORDS_ID, log_tid, path)
     except Exception as e:
         _crm_say(f"📎 {e}")
         return
-    _crm_say("📎 Attached to the logbook")
+    m = re.search(r"• ([^•]+) • \d+", os.path.basename(path))
+    label = m.group(1).strip() if m else ""
+    try:
+        planted = _plant_logbook_ref(log_tid, up, label)
+    except Exception:
+        planted = False
+    _crm_say("📎 Attached · " + (f"under {label or 'Sessions'}"
+                                 if planted else "note bottom"))
 
 
 def img_trash(path):
