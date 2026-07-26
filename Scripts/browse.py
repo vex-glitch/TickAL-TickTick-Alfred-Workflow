@@ -1790,10 +1790,11 @@ def render_crmstats(sub, query):
     return add_back(rows, "ctx:crmhub")
 
 
-def render_tph(query):
+def render_tph(sub, query):
     """📸 Send-session-photos target picker: today's session first, then
     every active logbook (archived below - late finished/healed shots).
-    ⏎ = session pics · ⌘ = finished shots."""
+    ⏎ = current session · ⌥⇧ = finished · ⌥ = stage screen (older
+    session backlog, consult refs, prep refs, design, healed)."""
     gate = _records_gate()
     if gate:
         return add_back(gate, "ctx:crmhub")
@@ -1812,6 +1813,34 @@ def render_tph(query):
             title="📸 Photos is not running",
             subtitle="Open Photos · select shots · ♥ the hero",
             valid=False))
+    if sub:
+        # stage screen for ONE tattoo - the Photos-side backlog road
+        lb = next((l for l in cr.records_notes() if l.get("id") == sub),
+                  None)
+        if lb is None:
+            return add_back([alfred.item(title="Logbook not found",
+                                         subtitle="Run tsy", valid=False)],
+                            "ctx:tph")
+        base = cr.logbook_base(lb)
+        n = cr.current_snum(lb.get("content") or "", sub)
+        rows[0]["subtitle"] = f"Sending the Photos selection to {base}"
+        for key, folder, subtxt in _TRIAGE_STAGES:
+            rows.append(alfred.item(
+                uid=f"tphs-{key}",
+                title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
+                subtitle=subtxt or f"Session pics · names get S{n}",
+                arg=f"xact:sessphotos:{sub}:{key}"))
+        m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
+        if m:
+            k = int(m.group(1))
+            rows.append(alfred.item(
+                uid="tphs-sn", title=f"→ 04 Sessions · S{k}",
+                subtitle=f"Older session · names get S{k}",
+                arg=f"xact:sessphotos:{sub}:s{k}"))
+        elif query:
+            rows = rows[:1] + (fuzz.filter_and_score(
+                query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+        return add_back(rows, "ctx:tph")
     # today's session bubbles up: open CRM session task starting today
     # (LOCAL date - raw UTC prefix misses after-midnight/all-day tasks)
     today = datetime.now().date().isoformat()
@@ -1840,20 +1869,25 @@ def render_tph(query):
         base = cr.logbook_base(lb)
         is_today = lb.get("id") in todays
         if archived:
-            sub, arg = "Archived · ⏎ finished shots", \
+            subt, arg = "Archived · ⏎ finished shots · ⌥ pick stage", \
                 f"xact:sessphotos:{lb['id']}:finished"
         else:
-            sub = "⏎ session pics · ⌥⇧ finished shots"
+            subt = "⏎ session pics · ⌥⇧ finished · ⌥ pick stage"
             if is_today:
-                sub = "Today's session · " + sub
+                subt = "Today's session · " + subt
             arg = f"xact:sessphotos:{lb['id']}"
         return alfred.item(
-            uid=f"tph-{lb['id']}", title=f"📸 → {base}", subtitle=sub,
+            uid=f"tph-{lb['id']}", title=f"📸 → {base}", subtitle=subt,
             arg=arg, match=f"{base} photos session",
             mods={"alt+shift": {
                 "arg": f"xact:sessphotos:{lb['id']}:finished",
                 "subtitle": "Finished-tattoo shots → 05 Finished",
-                "valid": True}})
+                "valid": True},
+                "alt": {
+                "arg": "", "valid": True,
+                "subtitle": "Stage screen: older S · consult · refs "
+                            "· design · healed",
+                "variables": {"browse_ctx": f"ctx:tph:{lb['id']}"}}})
 
     active = cr.records_notes(_areas.LOGBOOK_TAG)
     active.sort(key=lambda l: l.get("id") not in todays)
@@ -3563,7 +3597,7 @@ def main():
             items = render_habits(level, ids, query)
 
         elif level == "tph":
-            items = render_tph(query)
+            items = render_tph(ids[0] if ids else "", query)
 
         elif level == "triage":
             items = render_triage(ids[0] if ids else "", query)

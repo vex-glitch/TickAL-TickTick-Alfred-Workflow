@@ -2665,12 +2665,36 @@ def _pick_hero(shots):
     return hero, ""
 
 
+_STAGES = {
+    "consult": ("01 Consultation", "Consult", ["consult"]),
+    "prep": ("02 Preparation", "Prep", ["prep"]),
+    "design": ("03 Design", "Design", ["design"]),
+    "finished": ("05 Finished", "Finished", ["finished"]),
+    "healed": ("06 Healed", "Healed", ["healed"]),
+}
+
+
+def _stage_spec(stage, lb, log_tid):
+    """(folder_name, label, stage_tags) for a stage key. '' / 's' =
+    the CURRENT session (started tasks only - never a merely-scheduled
+    future one); 's<k>' = an explicit older session (backlog roads)."""
+    import crm_records as cr
+    if stage in _STAGES:
+        f, l, t = _STAGES[stage]
+        return f, l, list(t)
+    m = re.match(r"^s(\d+)$", stage or "")
+    n = (int(m.group(1)) if m
+         else cr.current_snum(lb.get("content") or "", log_tid))
+    return "04 Sessions", f"S{n}", ["session", f"s{n}"]
+
+
 def session_photos(log_tid, stage=""):
-    """📸 Flow A: Photos selection → originals → Eagle CRM library
-    ({C} - {T}/04 Sessions, or 05 Finished on the finished road /
-    archived logbook) + rename + tags → ♥ hero attached to the open
-    session task (logbook note when none) → shots filed to the
-    '✅ In Eagle' album ONLY after the import verified."""
+    """📸 Flow A: Photos selection → originals → Eagle CRM library,
+    into ANY lifecycle stage: '' = current session, 's<k>' = older
+    session backlog, consult|prep|design|finished|healed = the other
+    shelves (⌥ stage screen on the tph rows). + rename + tags → ♥ hero
+    attached to the open session task (logbook note when none) → shots
+    filed to the '✅ In Eagle' album ONLY after the import verified."""
     if not _records_ready():
         return
     import shutil
@@ -2698,20 +2722,15 @@ def session_photos(log_tid, stage=""):
             fid = _eagle_ensure_logbook_folder(lb)
             eagle.ensure_library("crm")
             node = eagle.folder_node(fid)
-            sub_name = "05 Finished" if stage == "finished" else "04 Sessions"
+            sub_name, label, stage_tags = _stage_spec(stage, lb, log_tid)
             child = next((c for c in (node or {}).get("children") or []
                           if c.get("name") == sub_name), None)
             sub_id = child["id"] if child else eagle.create_folder(
                 sub_name, parent=fid)
-            n = cr.current_snum(lb.get("content") or "", log_tid)
-            label = "Finished" if stage == "finished" else f"S{n}"
             start = eagle.next_index(
                 eagle.list_item_names(sub_id), base, label)
             cust, _, tat = base.partition(" - ")
-            tags = [t for t in (cust.strip(), tat.strip()) if t]
-            tags.append("finished" if stage == "finished" else "session")
-            if stage != "finished":
-                tags.append(f"s{n}")
+            tags = [t for t in (cust.strip(), tat.strip()) if t] + stage_tags
             dest = cr.content_dest_of(lb.get("content") or "")
             if dest in ("tv", "fm"):
                 tags.append(dest)
@@ -2812,24 +2831,11 @@ def eagle_triage(rest):
         if not sel:
             _crm_say("🦅 Nothing selected in Eagle")
             return
-        m = re.match(r"^s(\d+)?$", stage)
-        if m:
-            n = (int(m.group(1)) if m.group(1)
-                 else cr.current_snum(lb.get("content") or "", log_tid))
-            folder_name, label = "04 Sessions", f"S{n}"
-            stage_tags = ["session", f"s{n}"]
-        else:
-            folder_name, label = {
-                "consult": ("01 Consultation", "Consult"),
-                "prep": ("02 Preparation", "Prep"),
-                "design": ("03 Design", "Design"),
-                "finished": ("05 Finished", "Finished"),
-                "healed": ("06 Healed", "Healed"),
-            }.get(stage, (None, None))
-            if not folder_name:
-                _crm_say(f"🦅 Unknown stage {stage!r}")
-                return
-            stage_tags = [stage]
+        if stage not in _STAGES and not re.match(r"^s(\d+)?$", stage):
+            _crm_say(f"🦅 Unknown stage {stage!r}")
+            return
+        folder_name, label, stage_tags = _stage_spec(
+            "" if stage == "s" else stage, lb, log_tid)
         fid = _eagle_ensure_logbook_folder(lb)
         node = eagle.folder_node(fid)
         child = next((c for c in (node or {}).get("children") or []
