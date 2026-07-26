@@ -3367,6 +3367,17 @@ def eagle_open(rest):
     subprocess.run(["open", f"eagle://folder/{fid}"], capture_output=True)
 
 
+def note_go(tid):
+    """↗️ Open a records note in TickTick - the ⌥⇧ chord on record
+    rows (2026-07-26 inversion: ⏎ drills, ⌥⇧ opens; the plain ⌥ edge
+    cannot execute args)."""
+    import areas
+    t = cache_store.find_task(tid)
+    pid = ((t or {}).get("_projectId") or (t or {}).get("projectId")
+           or areas.RECORDS_ID)
+    open_task(pid, tid)
+
+
 def eagle_sweep():
     """🦅 Backtrack: create Eagle skeletons for every ACTIVE logbook
     still missing its 🦅 line. One switch, N folders."""
@@ -7392,6 +7403,8 @@ def main():
             photo_attach(pid, tid)
         elif verb == "eaglesweep":
             eagle_sweep()
+        elif verb == "notego":
+            note_go(rest)
         elif verb == "triage":
             eagle_triage(rest)
         elif verb == "editthis":

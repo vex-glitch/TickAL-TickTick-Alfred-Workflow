@@ -1025,8 +1025,9 @@ def _open_note_arg(tid):
 
 
 def _cust_row(cr, c, uid_prefix="crms"):
-    """Customer search row: contact + lifetime in the subtitle, ⌥ drills into
-    the customer hub, ⏎ opens the note."""
+    """Customer search row: contact + lifetime in the subtitle. ⏎ (and
+    ⌥) drill into the customer hub, ⌥⇧ opens the note in TickTick -
+    inverted 2026-07-26, Vex: drilling is the frequent move."""
     phone, mail, _b, insta = cr.contact_of(c)
     money, k, n = cr.lifetime(c["id"])
     lead_chip = ""
@@ -1048,19 +1049,22 @@ def _cust_row(cr, c, uid_prefix="crms"):
         uid=f"{uid_prefix}-c-{c['id']}",
         title=c.get("title") or "Untitled",
         subtitle=(" · ".join(bits) or "No contact yet")
-                 + "  |  ⏎↗️  ⌘⚡  ⌥⤵️  ⌃🔙",
-        arg=_open_note_arg(c["id"]),
+                 + "  |  ⏎⤵️  ⌘⚡  ⌥⇧↗️  ⌃🔙",
+        arg=f"xact:crmbrowse:ctx:crmcust:{c['id']}",
         mods={**_picker_mods(),
               "alt": {"arg": "", "valid": True, "subtitle": "Customer hub",
-                      "variables": {"browse_ctx": f"ctx:crmcust:{c['id']}"}}},
+                      "variables": {"browse_ctx": f"ctx:crmcust:{c['id']}"}},
+              "alt+shift": {"arg": f"xact:notego:{c['id']}", "valid": True,
+                            "subtitle": "Open in TickTick"}},
         variables=_record_vars(c),
     )
 
 
 def _logbook_row(cr, lb, uid_prefix="crms"):
-    """Logbook search row: customer + paid + next session in the subtitle,
-    ⌥ opens the LOGBOOK hub (photo/payment/rename/archive), ⏎ opens the
-    note. Customer hub: ⌥ on the customer row, or ⌃ from the hub."""
+    """Logbook search row: customer + paid + next session in the
+    subtitle. ⏎ (and ⌥) open the LOGBOOK hub (photo/payment/rename/
+    archive), ⌥⇧ opens the note in TickTick - inverted 2026-07-26,
+    Vex: drilling is the frequent move."""
     paid = cr.paid_summary(lb.get("content") or "")
     hit = cr.parse_first_link(lb.get("content") or "")
     cust_name = cr.PERSON_RE.sub("", hit[0]) if hit else ""
@@ -1078,11 +1082,13 @@ def _logbook_row(cr, lb, uid_prefix="crms"):
     mods = _picker_mods()
     mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
                    "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
+    mods["alt+shift"] = {"arg": f"xact:notego:{lb['id']}", "valid": True,
+                         "subtitle": "Open in TickTick"}
     return alfred.item(
         uid=f"{uid_prefix}-l-{lb['id']}",
         title=lb.get("title") or "Untitled",
-        subtitle=" · ".join(bits) + "  |  ⏎↗️  ⌘⚡  ⌥⤵️  ⌃🔙",
-        arg=_open_note_arg(lb["id"]),
+        subtitle=" · ".join(bits) + "  |  ⏎⤵️  ⌘⚡  ⌥⇧↗️  ⌃🔙",
+        arg=f"xact:crmbrowse:ctx:crmbook:{lb['id']}",
         mods=mods,
         variables=_record_vars(lb),
     )
@@ -1255,13 +1261,16 @@ def render_crmweek(query):
         rows.append(alfred.item(
             uid=f"wk-lead-{ld['id']}",
             title=ld.get("title") or "",
-            subtitle=f"Going cold · {age}d quiet  |  ⏎↗️  ⌥⤵️",
-            arg=_open_note_arg(ld["id"]),
+            subtitle=f"Going cold · {age}d quiet  |  ⏎⤵️  ⌥⇧↗️",
+            arg=f"xact:crmbrowse:ctx:crmcust:{ld['id']}",
             mods={**_picker_mods(),
                   "alt": {"arg": "", "valid": True,
                           "subtitle": "Customer hub",
                           "variables": {
-                              "browse_ctx": f"ctx:crmcust:{ld['id']}"}}},
+                              "browse_ctx": f"ctx:crmcust:{ld['id']}"}},
+                  "alt+shift": {"arg": f"xact:notego:{ld['id']}",
+                                "valid": True,
+                                "subtitle": "Open in TickTick"}},
             variables=_record_vars(ld)))
     if query:
         rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["title"])
