@@ -2474,12 +2474,23 @@ def render_lbeagle(ids, query):
             variables=_record_vars(lb))], back)
     lib = lib or "crm"
     lib_path = eagle.LIBS.get(lib, eagle.LIBS["crm"])[1]
-    def _lbe_mods():
-        # ⌥⇧ = 🎬 Edit this from any folder row (Vex smoke ask; ⌥⇧ is
-        # the one free executing chord on browse rows - canvas fact)
+    _LBE_STAGE_KEYS = {"01 Consultation": "consult",
+                       "02 Preparation": "prep", "03 Design": "design",
+                       "04 Sessions": "s", "05 Finished": "finished",
+                       "06 Healed": "healed"}
+
+    def _lbe_mods(stage=None):
+        # ⌥⇧ is the one free executing chord (canvas fact): on STAGE
+        # rows it imports the Photos selection INTO that stage (Vex
+        # ask 2026-07-26); the head row keeps 🎬 Edit this.
         m = _picker_mods()
-        m["alt+shift"] = {"arg": f"xact:editthis:{log_tid}", "valid": True,
-                          "subtitle": "🎬 Edit this"}
+        if stage:
+            m["alt+shift"] = {"arg": f"xact:sessphotos:{log_tid}:{stage}",
+                              "valid": True,
+                              "subtitle": "📸 Photos selection → here"}
+        else:
+            m["alt+shift"] = {"arg": f"xact:editthis:{log_tid}",
+                              "valid": True, "subtitle": "🎬 Edit this"}
         return m
 
     head = alfred.item(uid="lbe-open", title=f"🦅 {base}",
@@ -2525,13 +2536,15 @@ def render_lbeagle(ids, query):
         shots = list({it["id"]: it for it in items
                       if set(it.get("folders") or []) & cset}.values())
         n = len(shots)
+        skey = _LBE_STAGE_KEYS.get(name)
+        chord = "⌥⇧📸" if skey else "⌥⇧🎬"
         rows.append(alfred.item(
             uid=f"lbe-{cid}", title=name,
             subtitle=f"🖼️ {n}"
-                     + ("  |  ⏎🖼  ⌘⚡  ⌥⇧🎬  ⌃🔙" if n
-                        else "  |  ⌥⇧🎬  ⌃🔙"),
+                     + (f"  |  ⏎🖼  ⌘⚡  {chord}  ⌃🔙" if n
+                        else f"  |  {chord}  ⌃🔙"),
             arg=peek_arg(cid), valid=bool(n),
-            mods=_lbe_mods(), variables=_record_vars(lb)))
+            mods=_lbe_mods(skey), variables=_record_vars(lb)))
         if name == "04 Sessions" and n:
             sess = {}
             for it in shots:
@@ -2541,9 +2554,10 @@ def render_lbeagle(ids, query):
                 label = f"S{k}" if k else "unnumbered"
                 rows.append(alfred.item(
                     uid=f"lbe-{cid}-s{k}", title=f"   · {label}",
-                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌥⇧🎬  ⌃🔙",
+                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌥⇧📸  ⌃🔙",
                     arg=peek_arg(cid, f"s{k}"),
-                    mods=_lbe_mods(), variables=_record_vars(lb)))
+                    mods=_lbe_mods(f"s{k}" if k else "s"),
+                    variables=_record_vars(lb)))
     # honest strays: shots dragged straight into the tattoo root folder
     # (outside the 01-06 skeleton) get their own row (review find)
     strays = list({it["id"]: it for it in items

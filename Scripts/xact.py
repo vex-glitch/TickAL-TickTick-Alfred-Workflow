@@ -2892,18 +2892,25 @@ def photo_attach(pid, tid):
         if pid == areas.RECORDS_ID:
             t = cache_store.find_task(tid) or {}
             _is_lb_note = (t.get("title") or "").startswith(("🎨", "🏛️"))
+        _att_log(f"photo_attach pid={pid} tid={tid} lb_note={_is_lb_note} "
+                 f"heroes={len(heroes)}")
         ok_n = 0
         for h in heroes:
             try:
                 up = _attach_file_to(pid, tid, h["path"], h["filename"])
                 ok_n += 1
+                _att_log(f"uploaded {h['filename']} → "
+                         f"{(up or {}).get('attid')}")
                 if _is_lb_note:   # logbook note → plant, never bottom
                     try:
                         _plant_logbook_ref(tid, up)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        import traceback
+                        _att_log("plant EXC: "
+                                 + traceback.format_exc(limit=3))
             except Exception as e:
                 why = f"{type(e).__name__}: {e}"
+                _att_log(f"upload EXC {h['filename']}: {why}")
         if ok_n:
             _crm_say(f"📎 {ok_n} attached"
                      + ("" if ok_n == len(heroes)
@@ -3039,6 +3046,17 @@ def img_link(path):
     _crm_say("🔗 Eagle link copied")
 
 
+def _att_log(msg):
+    """Attach-road debug trail (Sarah smoke: 7 uploads toasted, note
+    untouched, unreproducible from CLI - the next live run logs)."""
+    try:
+        import datetime
+        with open("/tmp/tickal_attach.log", "a") as f:
+            f.write(f"{datetime.datetime.now():%H:%M:%S} {msg}\n")
+    except OSError:
+        pass
+
+
 def _plant_logbook_ref(log_tid, up, label=""):
     """Planted, not just uploaded: bare attachments render at the
     BOTTOM of the note (Vex smoke 2026-07-26: 'ended up in notes').
@@ -3047,6 +3065,7 @@ def _plant_logbook_ref(log_tid, up, label=""):
     '### Consultation ·'), else straight under ## Sessions. False =
     could not place (attachment still on the note)."""
     if not (up or {}).get("attid"):
+        _att_log(f"plant skip: no attid in {up!r:.120}")
         return False
     import areas
     import crm_records as cr
@@ -3062,8 +3081,11 @@ def _plant_logbook_ref(log_tid, up, label=""):
     if heading is None and re.search(r"^## Sessions\s*$", content, re.M):
         heading = "## Sessions"
     if heading is None:
+        _att_log(f"plant skip: no heading (label={label!r}, "
+                 f"content {len(content)}b)")
         return False
     cr.insert_session_image(areas.RECORDS_ID, log_tid, heading, 0, ref)
+    _att_log(f"planted under {heading!r}")
     return True
 
 
@@ -3088,6 +3110,8 @@ def img_attach(path):
     try:
         planted = _plant_logbook_ref(log_tid, up, label)
     except Exception:
+        import traceback
+        _att_log("img_attach plant EXC: " + traceback.format_exc(limit=3))
         planted = False
     _crm_say("📎 Attached · " + (f"under {label or 'Sessions'}"
                                  if planted else "note bottom"))
