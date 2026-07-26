@@ -2482,7 +2482,7 @@ def _mint_raw_task(lb, dest, fid, tag="📸raw"):
     import crm_records as cr
     api = cr._api()
     base = cr.logbook_base(lb)
-    title = f"{base} eagle://folder/{fid}" if fid else base
+    title = _eagle_title(base, fid)
     body = f"🎨 {cr.task_link(areas.RECORDS_ID, lb['id'], lb.get('title') or '')}"
     pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
     t = api.create_task(title=title, project_id=pid, content=body,
@@ -2491,9 +2491,20 @@ def _mint_raw_task(lb, dest, fid, tag="📸raw"):
     return t
 
 
+def _eagle_title(base, fid):
+    """Content-task title: markdown link - TickTick linkifies ONLY
+    [text](eagle://…), never the bare scheme (Vex smoke 2026-07-26)."""
+    return f"[{base}](eagle://folder/{fid})" if fid else base
+
+
 def _task_base(title):
-    """'{C} - {T}' from a content-task title (eagle link stripped)."""
-    return re.sub(r"\s*eagle://\S+", "", title or "").strip()
+    """'{C} - {T}' from a content-task title (markdown or legacy bare
+    eagle link stripped)."""
+    t = (title or "").strip()
+    m = re.match(r"^\[(.*?)\]\(eagle://[^)]*\)$", t)
+    if m:
+        return m.group(1).strip()
+    return re.sub(r"\s*eagle://\S+", "", t).strip()
 
 
 def _content_retag(t, drop, add, **fields):
@@ -2581,12 +2592,11 @@ def content_dest(log_tid):
             except Exception:
                 cache_store.invalidate("all_tasks")
             note += " · 📸 task moved"
-        # backfill a linkless title once the folder finally exists
-        # (task minted while Eagle was asleep - review find)
-        if fid and "eagle://folder/" not in (t.get("title") or ""):
-            base = cr.logbook_base(lb)
+        # backfill a linkless title once the folder exists, and upgrade
+        # legacy bare-scheme titles to the clickable markdown form
+        if fid and not (t.get("title") or "").startswith("["):
             _content_retag(t, "", "",
-                           title=f"{base} eagle://folder/{fid}")
+                           title=_eagle_title(cr.logbook_base(lb), fid))
             note += " · link backfilled"
     _crm_say(f"🎬 {dest.upper()} set{note}")
 
@@ -3027,7 +3037,7 @@ def _content_slide_to_edit(lb, dest, want_pid, base_id):
             if str(x).lower() != "📸raw"]
     if "📸edit" not in {str(x).lower() for x in tags}:
         tags.append("📸edit")
-    title = f"{base} eagle://folder/{base_id}"
+    title = _eagle_title(base, base_id)
     api.update_task(t["id"], want_pid, current=live, tags=tags, title=title)
     try:
         import dispatch as _disp

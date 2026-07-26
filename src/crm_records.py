@@ -970,16 +970,21 @@ def set_content_dest(content, dest):
 
 def eagle_folder_of(content):
     """Header 🦅 line → (folder_id, lib_key) - ('', '') when absent.
-    Line shape: '🦅 eagle://folder/<id> · CRM' (deep link doubles as
-    the id carrier; clickable only while that library is open)."""
+    Line shape: '🦅 [Eagle folder](eagle://folder/<id>) · CRM' -
+    TickTick only linkifies the markdown scheme (Vex smoke 2026-07-26);
+    the plain pre-markdown form stays parseable. Clicking works only
+    while that library is open - eagle:// cannot switch (probed: no
+    URL form does); the Alfred rows switch first."""
     head = (content or "").partition("\n## ")[0]
-    m = re.search(r"^🦅 eagle://folder/(\S+) · (\w+)$", head, re.M)
+    m = re.search(r"^🦅 (?:\[[^\]]*\]\()?eagle://folder/([^)\s]+)\)?"
+                  r" · (\w+)$", head, re.M)
     return (m.group(1), m.group(2).lower()) if m else ("", "")
 
 
 def set_eagle_folder(content, fid, lib="crm"):
-    return _set_header_line(content, "🦅",
-                            f"🦅 eagle://folder/{fid} · {lib.upper()}")
+    return _set_header_line(
+        content, "🦅",
+        f"🦅 [Eagle folder](eagle://folder/{fid}) · {lib.upper()}")
 
 
 def next_snum(log_content, log_tid, include_tasks=True):

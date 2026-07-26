@@ -2000,9 +2000,11 @@ def render_contentpl(query):
         for t in tasks:
             if tag not in {str(x).lower() for x in (t.get("tags") or [])}:
                 continue
-            title = t.get("title") or ""
-            base = re.sub(r"\s*eagle://\S+", "", title).strip()
-            m = re.search(r"eagle://folder/(\S+)", title)
+            title = (t.get("title") or "").strip()
+            mk = re.match(r"^\[(.*?)\]\(eagle://[^)]*\)$", title)
+            base = (mk.group(1).strip() if mk
+                    else re.sub(r"\s*eagle://\S+", "", title).strip())
+            m = re.search(r"eagle://folder/([^)\s]+)", title)
             lib, chip = pids[t.get("_projectId") or t.get("projectId")]
             open_lib = "crm" if tag == "📸raw" else lib
             arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
