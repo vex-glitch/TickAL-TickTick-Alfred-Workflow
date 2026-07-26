@@ -66,52 +66,21 @@ def build_items():
     # dormant hand-adds get scheduled + linked via 📅 Schedule.
     if not areas.records_configured():
         return [alfred.item(**areas.setup_row("CRM records", "47-crm.md"))]
-    return [
-        # The two lists themselves, top of the menu (Vex ruling 2026-07-21):
-        # ⏎ drills into the list - searchable in its scope - and row 1 in
-        # there is ALWAYS "open in TickTick" (the pre-R4.6 ⏎).
-        _records_row("crm-open-cal", "📅 Calendar",
-                     "Tasks · search · row 1 opens TickTick", "ctx:crmcal"),
-        _records_row("crm-open-cust", "👥 Customers",
-                     "Leads too · search · row 1 opens TickTick",
-                     "ctx:crmcusts"),
-        _records_row("crm-open-logs", "🎨 Logbooks",
-                     "Archived too · search · row 1 opens TickTick",
-                     "ctx:crmlbs"),
-        _records_row("crm-week", "📆 Week",
-                     "Who's coming + needs-booking radar", "ctx:crmweek"),
-        _records_row("crm-session-done", "✅ Session done",
-                     "Tick off · log · schedule next", "ctx:crmdone"),
-        _records_row("crm-next-session", "▶️ Next session",
-                     "Pick logbook → S<n>", "ctx:crmnew:session"),
-        _records_row("crm-new-tattoo", "➕ New tattoo",
-                     "Customer → logbook → S1", "ctx:crmnew:tattoo"),
-        _records_row("crm-new-consult", "➕ New consultation",
-                     "Customer → logbook → schedule", "ctx:crmnew:consult"),
-        alfred.item(
-            uid="crm-person",
-            title="➕ New lead / customer",
-            subtitle="Dialogs · lead lands in Records, never the calendar",
-            arg="xact:crmperson",
-            variables=CRM_VARS,
-        ),
-        _records_row("crm-backlog", "📕 Backlog",
-                     "Import · past session · adopt task · image · batch",
-                     "ctx:crmback"),
-        _records_row("crm-sched", "📅 Schedule",
-                     "Dormant tasks → schedule + link", "ctx:crmsched"),
-        _records_row("crm-prep", "🔥 Prepare",
-                     "Pick booking → prep task", "ctx:crmprep"),
-        _records_row("crm-search", "🔍 Search",
-                     "Everything CRM · / scopes calendar, logbooks, customers",
-                     "ctx:crmsearch"),
-        _records_row("crm-money", "💰 Money",
-                     "Totals · periods · per customer", "ctx:crmmoney"),
-        _records_row("crm-stats", "📊 Stats",
-                     "Earnings + sessions per month", "ctx:crmstats"),
-        _records_row("crm-log", "📝 Log",
-                     "Line into a customer / logbook note", "ctx:crmlog"),
-    ]
+    # ONE source of truth with the crmhub screen: src/crm_home.py
+    # (Vex simplification green 2026-07-26 - the two homes had drifted
+    # four rows apart each). ctx rows ride the conditional's BROWSE
+    # branch; xact rows go straight through.
+    import crm_home
+    rows = []
+    for uid, title, subtitle, kind, val in crm_home.rows_for(
+            crm_home.MENU_ORDER, crm_home.MENU_UIDS, "crm-"):
+        if kind == "ctx":
+            rows.append(_records_row(uid, title, subtitle, val))
+        else:
+            rows.append(alfred.item(uid=uid, title=title,
+                                    subtitle=subtitle, arg=val,
+                                    variables=CRM_VARS))
+    return rows
 
 
 # Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row

@@ -934,6 +934,30 @@ def _set_paid_line(content):
     return head + sep + tail
 
 
+def logbook_notes(include_archived=True):
+    """THE logbook pool: 🎨 active (+ 🏛️ archived) notes in records
+    order, deduped, person-shaped notes excluded (a crmcold lead
+    carries bare ARCHIVE_TAG and is NOT a logbook). Every
+    logbook-listing surface rides this ONE pool (Vex simplification
+    green 2026-07-26) - the cold-lead leak dies everywhere at once."""
+    out, seen = [], set()
+    tags = ([areas.LOGBOOK_TAG, areas.ARCHIVE_TAG] if include_archived
+            else [areas.LOGBOOK_TAG])
+    for tag in tags:
+        for lb in records_notes(tag):
+            if lb["id"] in seen or PERSON_RE.match(lb.get("title") or ""):
+                continue
+            seen.add(lb["id"])
+            out.append(lb)
+    return out
+
+
+def logbook_archived(lb):
+    """Archived? - from the note's own tags."""
+    return areas.ARCHIVE_TAG in {str(t).lower()
+                                 for t in (lb.get("tags") or [])}
+
+
 def logbook_base(lb):
     """'{Customer} - {tattoo}' Eagle-facing base name from a logbook
     title '🎨 C • T' (archived '🏛️' too). His Eagle folders use ' - '."""

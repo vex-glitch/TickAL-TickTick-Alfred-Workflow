@@ -1834,20 +1834,12 @@ def render_tph(sub, query):
         base = cr.logbook_base(lb)
         n = cr.current_snum(lb.get("content") or "", sub)
         rows[0]["subtitle"] = f"Sending the Photos selection to {base}"
-        for key, folder, subtxt in _TRIAGE_STAGES:
-            rows.append(alfred.item(
-                uid=f"tphs-{key}",
-                title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
-                subtitle=subtxt or f"Session pics · names get S{n}",
-                arg=f"xact:sessphotos:{sub}:{key}"))
-        m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
-        if m:
-            k = int(m.group(1))
-            rows.append(alfred.item(
-                uid="tphs-sn", title=f"→ 04 Sessions · S{k}",
-                subtitle=f"Older session · names get S{k}",
-                arg=f"xact:sessphotos:{sub}:s{k}"))
-        elif query:
+        srows, digit = _stage_rows(
+            "tphs", n, query, lambda k: f"xact:sessphotos:{sub}:{k}",
+            f"Session pics · names get S{n}",
+            "Older session · names get S{k}")
+        rows += srows
+        if not digit and query:
             rows = rows[:1] + (fuzz.filter_and_score(
                 query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
         return add_back(rows, "ctx:tph")
@@ -1899,11 +1891,12 @@ def render_tph(sub, query):
                             "· design · healed",
                 "variables": {"browse_ctx": f"ctx:tph:{lb['id']}"}}})
 
-    active = cr.records_notes(_areas.LOGBOOK_TAG)
+    pool = cr.logbook_notes()
+    active = [l for l in pool if not cr.logbook_archived(l)]
     active.sort(key=lambda l: l.get("id") not in todays)
     rows += [lb_row(lb) for lb in active]
     rows += [lb_row(lb, archived=True)
-             for lb in cr.records_notes(_areas.ARCHIVE_TAG)]
+             for lb in pool if cr.logbook_archived(lb)]
     if len(rows) == 1:
         rows.append(alfred.item(title="No logbooks yet",
                                 subtitle="➕ New tattoo mints one",
@@ -1923,6 +1916,39 @@ _TRIAGE_STAGES = [
     ("finished", "05 Finished", "Finished-tattoo shots"),
     ("healed", "06 Healed", "Healed shots"),
 ]
+
+
+def _stage_rows(prefix, n, query, arg_fn, s_default, sk_default,
+                suffix="", dsuffix="", mods_fn=None, variables=None):
+    """THE stage-picker skeleton (Vex simplification green 2026-07-26:
+    one engine behind the three stage screens - tph / triage /
+    imgstage - so a chip change lands everywhere at once). Callers
+    pin their own head row, pass their arg shape + trimmings, then
+    fuzz. Returns the stage rows (+ the typed-digit S<k> row when the
+    query is one)."""
+    def extras(key):
+        out = {}
+        if mods_fn:
+            out["mods"] = mods_fn(key)
+        if variables is not None:
+            out["variables"] = variables
+        return out
+    rows = []
+    for key, folder, subtxt in _TRIAGE_STAGES:
+        rows.append(alfred.item(
+            uid=f"{prefix}-{key}",
+            title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
+            subtitle=(subtxt or s_default) + suffix,
+            arg=arg_fn(key), **extras(key)))
+    m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
+    if m:
+        k = int(m.group(1))
+        rows.append(alfred.item(
+            uid=f"{prefix}-sn", title=f"→ 04 Sessions · S{k}",
+            subtitle=sk_default.format(k=k) + dsuffix,
+            arg=arg_fn(f"s{k}"), **extras(f"s{k}")))
+        return rows, True
+    return rows, False
 
 
 def render_triage(sub, query):
@@ -1961,9 +1987,10 @@ def render_triage(sub, query):
                 subtitle=("Archived · " if archived else "") + "⏎ pick stage",
                 arg=f"xact:crmbrowse:ctx:triage:{lb['id']}",
                 match=f"{base} triage file", mods=_picker_mods())
-        rows += [lb_row(lb) for lb in cr.records_notes(_areas.LOGBOOK_TAG)]
+        pool = cr.logbook_notes()
+        rows += [lb_row(lb) for lb in pool if not cr.logbook_archived(lb)]
         rows += [lb_row(lb, archived=True)
-                 for lb in cr.records_notes(_areas.ARCHIVE_TAG)]
+                 for lb in pool if cr.logbook_archived(lb)]
         if query:
             # state row stays pinned - the OPEN-CRM warning must survive
             rows = rows[:1] + (fuzz.filter_and_score(
@@ -1978,26 +2005,17 @@ def render_triage(sub, query):
     base = cr.logbook_base(lb)
     n = cr.current_snum(lb.get("content") or "", sub)
     rows[0]["subtitle"] = f"Filing into {base}"
-    for key, folder, subtxt in _TRIAGE_STAGES:
-        rows.append(alfred.item(
-            uid=f"tris-{key}", title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
-            subtitle=(subtxt or f"Session pics · names get S{n}")
-                     + "  ·  ⌥⇧ +attach to task",
-            arg=f"xact:triage:{sub}:{key}",
-            mods={"alt+shift": {"arg": f"xact:triage:{sub}:{key}:attach",
-                                "subtitle": "File + first pick → task attachment",
-                                "valid": True}}))
-    m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
-    if m:
-        k = int(m.group(1))
-        rows.append(alfred.item(
-            uid="tris-sn", title=f"→ 04 Sessions · S{k}",
-            subtitle=f"Older session · names get S{k}  ·  ⌥⇧ +attach",
-            arg=f"xact:triage:{sub}:s{k}",
-            mods={"alt+shift": {"arg": f"xact:triage:{sub}:s{k}:attach",
-                                "subtitle": "File + first pick → task attachment",
-                                "valid": True}}))
-    elif query:
+    srows, digit = _stage_rows(
+        "tris", n, query, lambda k: f"xact:triage:{sub}:{k}",
+        f"Session pics · names get S{n}",
+        "Older session · names get S{k}",
+        suffix="  ·  ⌥⇧ +attach to task", dsuffix="  ·  ⌥⇧ +attach",
+        mods_fn=lambda k: {"alt+shift": {
+            "arg": f"xact:triage:{sub}:{k}:attach",
+            "subtitle": "File + first pick → task attachment",
+            "valid": True}})
+    rows += srows
+    if not digit and query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
     return add_back(rows, "ctx:triage")
@@ -2028,14 +2046,12 @@ def render_lbpick(verb, query):
                                      valid=False)], "ctx:cmanage")
     import crm_records as cr
     rows = []
-    for lb in (cr.records_notes(_areas.LOGBOOK_TAG)
-               + cr.records_notes(_areas.ARCHIVE_TAG)):
-        archived = _areas.ARCHIVE_TAG in {str(t).lower()
-                                          for t in (lb.get("tags") or [])}
+    for lb in cr.logbook_notes():
         rows.append(alfred.item(
             uid=f"lbp-{lb['id']}",
             title=f"{icon} {cr.logbook_base(lb)}",
-            subtitle=("Archived · " if archived else "") + subt,
+            subtitle=("Archived · " if cr.logbook_archived(lb) else "")
+                     + subt,
             arg=f"xact:{verb}:{lb['id']}",
             match=f"{cr.logbook_base(lb)}"))
     if not rows:
@@ -2387,15 +2403,7 @@ def render_clbs(query):
     if gate:
         return add_back(gate, "ctx:contentpl")
     import crm_records as cr
-    rows, seen = [], set()
-    for lb in (cr.records_notes(_areas.LOGBOOK_TAG)
-               + cr.records_notes(_areas.ARCHIVE_TAG)):
-        # skip double-tag dupes AND person-shaped notes (a crmcold lead
-        # carries bare ARCHIVE_TAG - it is NOT a logbook; review find)
-        if lb["id"] in seen or cr.PERSON_RE.match(lb.get("title") or ""):
-            continue
-        seen.add(lb["id"])
-        rows.append(_content_logbook_row(cr, lb))
+    rows = [_content_logbook_row(cr, lb) for lb in cr.logbook_notes()]
     if not rows:
         rows = [alfred.item(title="No logbooks yet",
                             subtitle="➕ New tattoo mints one", valid=False)]
@@ -2603,24 +2611,14 @@ def render_imgstage(query):
     rows = [alfred.item(title=f"🖼 {os.path.basename(path)}",
                         subtitle=f"File into a stage of {cr.logbook_base(lb)}",
                         valid=False)]
-    for key, folder, subtxt in _TRIAGE_STAGES:
-        rows.append(alfred.item(
-            uid=f"imgs-{key}",
-            title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
-            subtitle=subtxt or f"Current session · name gets S{n}",
-            arg=f"xact:imgmove:{key}",
-            variables={**carry, **_record_vars(lb)},
-            mods=_picker_mods()))
-    m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
-    if m:
-        k = int(m.group(1))
-        rows.append(alfred.item(
-            uid="imgs-sn", title=f"→ 04 Sessions · S{k}",
-            subtitle=f"Older session · name gets S{k}",
-            arg=f"xact:imgmove:s{k}",
-            variables={**carry, **_record_vars(lb)},
-            mods=_picker_mods()))
-    elif query:
+    srows, digit = _stage_rows(
+        "imgs", n, query, lambda k: f"xact:imgmove:{k}",
+        f"Current session · name gets S{n}",
+        "Older session · name gets S{k}",
+        mods_fn=lambda k: _picker_mods(),
+        variables={**carry, **_record_vars(lb)})
+    rows += srows
+    if not digit and query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
     return add_back(rows, back)
@@ -2633,45 +2631,17 @@ def render_crmhub(query):
     gate = _records_gate()
     if gate:
         return add_back(gate, "ctx:crmhub")
-    def hop(uid, title, subtitle, ctx):
-        return alfred.item(uid=uid, title=title, subtitle=subtitle,
-                           arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
-    rows = [
-        hop("hub-done", "✅ Session done", "Tick off · log · schedule next",
-            "ctx:crmdone"),
-        hop("hub-next", "▶️ Next session", "Pick logbook → S<n>",
-            "ctx:crmnew:session"),
-        hop("hub-tattoo", "➕ New tattoo", "Customer → logbook → S1",
-            "ctx:crmnew:tattoo"),
-        hop("hub-consult", "➕ New consultation", "Customer → logbook → schedule",
-            "ctx:crmnew:consult"),
-        alfred.item(uid="hub-person", title="➕ New lead / customer",
-                    subtitle="Dialogs · lead lands in Records",
-                    arg="xact:crmperson", mods=_picker_mods()),
-        hop("hub-photos", "📸 Session photos", "Photos selection → Eagle + task",
-            "ctx:tph"),
-        hop("hub-triage", "🦅 Eagle triage", "Eagle selection → tattoo folder",
-            "ctx:triage"),
-        hop("hub-content", "🎬 Content pipeline", "To edit · To post · Raw queues",
-            "ctx:contentpl"),
-        hop("hub-backlog", "📕 Backlog", "Import finished tattoo · past session",
-            "ctx:crmback"),
-        hop("hub-sched", "📅 Schedule", "Dormant tasks → schedule + link",
-            "ctx:crmsched"),
-        hop("hub-search", "🔍 Search", "Everything CRM · / scopes",
-            "ctx:crmsearch"),
-        hop("hub-log", "📝 Log", "Line into a customer / logbook note",
-            "ctx:crmlog"),
-        hop("hub-stats", "📊 Stats", "Earnings + sessions per month",
-            "ctx:crmstats"),
-        hop("hub-money", "💰 Money", "Totals · periods · per customer",
-            "ctx:crmmoney"),
-        hop("hub-week", "📆 Week", "Who's coming + the needs-booking radar",
-            "ctx:crmweek"),
-        alfred.item(uid="hub-eaglesweep", title="🦅 Eagle sweep",
-                    subtitle="Skeleton folders for logbooks missing one",
-                    arg="xact:eaglesweep", mods=_picker_mods()),
-    ]
+    # ONE source of truth with crm_menu.py: src/crm_home.py (Vex
+    # simplification green 2026-07-26). ctx rows trampoline via
+    # xact:crmbrowse (plain rows can't switch ctx on ⏎).
+    import crm_home
+    rows = []
+    for uid, title, subtitle, kind, val in crm_home.rows_for(
+            crm_home.HUB_ORDER, crm_home.HUB_UIDS, "hub-"):
+        rows.append(alfred.item(
+            uid=uid, title=title, subtitle=subtitle,
+            arg=(f"xact:crmbrowse:{val}" if kind == "ctx" else val),
+            mods=_picker_mods()))
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
@@ -2704,18 +2674,10 @@ def _crmsearch_rows(cr, scope, term):
                 seen.add(c["id"])
                 rows.append(("cust", c))
     if scope in ("", "lo", "ar", "re"):
-        seen = set()
-        tags = ((_areas.ARCHIVE_TAG,) if scope == "ar"
-                else (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG))
-        for tag in tags:
-            for lb in cr.records_notes(tag):
-                # person-shaped notes are never logbooks - a crmcold
-                # lead carries bare ARCHIVE_TAG (review find 2026-07-26)
-                if cr.PERSON_RE.match(lb.get("title") or ""):
-                    continue
-                if lb["id"] not in seen:
-                    seen.add(lb["id"])
-                    rows.append(("log", lb))
+        for lb in cr.logbook_notes():
+            if scope == "ar" and not cr.logbook_archived(lb):
+                continue
+            rows.append(("log", lb))
     if scope in ("", "ca"):
         tasks = _crm_open_tasks()
         tasks.sort(key=lambda t: (t.get("dueDate") or t.get("startDate")

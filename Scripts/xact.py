@@ -2272,30 +2272,6 @@ def crmbrowse(ctx):
     _run_trigger("BrowseCtx", ctx)
 
 
-def crmphoto(log_tid):
-    """🖼 Clipboard image → logbook attachment, anytime (reference sketch,
-    session result, healed shot - same mechanism as Session done's photo)."""
-    if not _records_ready():
-        return
-    import areas
-    lb = _record_by_id(log_tid)
-    try:
-        import clipboard as clip_util
-        img = clip_util.png_bytes()
-    except Exception:
-        img = None
-    if not img:
-        _crm_say("🖼 No image on the clipboard")
-        return
-    try:
-        import api_v2
-        api_v2.TickTickV2().upload_attachment(areas.RECORDS_ID, log_tid, img,
-                                              "photo.png")
-        _crm_say(f"🖼 Photo attached to {(lb or {}).get('title') or 'logbook'}")
-    except Exception as e:
-        _crm_say(f"🖼 Upload failed: {type(e).__name__}: {e}")
-
-
 def crmcold(tid):
     """🥶 A lead went cold: one-line reason into ## Notes, retag → archive
     (out of every picker, kanban keeps the corpse)."""
@@ -7945,8 +7921,6 @@ def main():
             people_setlist()
         elif verb == "add_pre":
             add_pre(rest)
-        elif verb == "crmphoto":
-            crmphoto(rest)
         elif verb == "crmcold":
             crmcold(rest)
         elif verb == "crmclose":
