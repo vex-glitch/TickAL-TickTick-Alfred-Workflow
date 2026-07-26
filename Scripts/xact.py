@@ -1560,27 +1560,28 @@ def sessiondone(pid, tid, when=None):
     # last session's, charged = the open quote remainder.
     lb_cached = _record_by_id(log_tid) or {}
     # 📸 Photos-selection catch (Vex ruling 2026-07-26: the wrong order
-    # must be impossible). Import BEFORE completing so the ♥ hero lands
-    # on THIS still-open task; a failed import stops the flow with the
-    # task untouched. Needle sessions only - consult refs go through
-    # the stage screen.
-    if is_s:
-        try:
-            import photos_bridge as pb
-            n_sel = pb.selection_count() if pb.photos_running() else 0
-        except Exception:
-            n_sel = 0
-        if n_sel:
-            pick = _dialog(f"📸 {n_sel} selected in Photos - import to "
-                           f"{marker} first?",
-                           ["Cancel", "Skip", "Import"], "Import")
-            if pick == "":
-                _crm_say("Cancelled · task untouched")
-                return
-            if pick == "Import" and not session_photos(log_tid):
-                _crm_say("📸 Import failed · task untouched - fix and "
-                         "re-run Session done")
-                return
+    # must be impossible). Import BEFORE completing so the ♥ heroes
+    # land while the task is still open; a failed import stops the
+    # flow with the task untouched. Consultations catch too (Sarah
+    # smoke: consult day IS reference-shot day) - they file to
+    # 01 Consultation, heroes → the logbook note.
+    try:
+        import photos_bridge as pb
+        n_sel = pb.selection_count() if pb.photos_running() else 0
+    except Exception:
+        n_sel = 0
+    if n_sel:
+        pick = _dialog(f"📸 {n_sel} selected in Photos - import to "
+                       f"{marker} first?",
+                       ["Cancel", "Skip", "Import"], "Import")
+        if pick == "":
+            _crm_say("Cancelled · task untouched")
+            return
+        if (pick == "Import"
+                and not session_photos(log_tid, "" if is_s else "consult")):
+            _crm_say("📸 Import failed · task untouched - fix and "
+                     "re-run Session done")
+            return
     d_dur = cr.last_duration(lb_cached.get("content") or "")
     d_chg = cr.quote_remainder(lb_cached.get("content") or "")
     d_setup = cr.last_setup(lb_cached.get("content") or "")
@@ -2815,7 +2816,10 @@ def session_photos(log_tid, stage=""):
         heroes, why = _pick_heroes(shots)
         att = ""
         if heroes:
-            nxt = cr.next_session_task(log_tid)
+            # consult refs are PERMANENT logbook material - never on
+            # the (about-to-complete) consult task (Sarah smoke)
+            nxt = None if label == "Consult" \
+                else cr.next_session_task(log_tid)
             if nxt:
                 a_pid = (nxt[2].get("_projectId")
                          or nxt[2].get("projectId") or areas.CRM_ID)
