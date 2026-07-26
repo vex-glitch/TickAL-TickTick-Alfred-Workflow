@@ -525,14 +525,15 @@ def main():
             ("📋 Copy + description", "Name, then '>' quoted description",
              f"xact:task_copy_full:{pid}:{tid}",
              "copy description content clipboard", is_task_like),
-            ("📎 Attach Photos pick", "♥ → TickTick ONLY · no Eagle",
+            # generic tasks keep the light attach; on logbooks THE 📸
+            # action below is the only story (Vex unification: one
+            # verb, edge cases inside - never two flavors)
+            ("📎 Attach Photos pick", "♥ → attachment on this task",
              f"xact:photoattach:{pid}:{tid}",
-             "photo attach picture image photos", is_task_like),
-            # the full-convention import (ALL → Eagle stage, ♥ →
-            # TickTick, album, delete) on logbooks - the 📎 trap
-            # cost a smoke round (Vex 2026-07-26)
-            ("📸 Import selection → stage",
-             "ALL → Eagle folder · ♥ → TickTick · the convention",
+             "photo attach picture image photos",
+             is_task_like and not _is_logbook),
+            ("📸 Import → pick stage",
+             "Folder screen · ⌥⇧📸 on the stage",
              f"xact:crmbrowse:ctx:lbeagle:{tid}:hub",
              "import selection stage eagle convention photos",
              _is_logbook),
@@ -594,7 +595,7 @@ def main():
             ("➕ Add task",        add_sub,                "add",           "add new task",      True),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
             ("🆔 Copy id",         "List id → clipboard",  f"copy:{pid}",   "id copy identifier configure", itype == "list"),
-            ("📸 Send session photos", "Photos selection → Eagle + task",
+            ("📸 Photos import", "Selection or clipboard → Eagle + TickTick",
              f"xact:sessphotos:{tid}", "session photos eagle send import",
              _is_logbook),
             ("🦅 Browse photos",   "Folders · counts · thumbnail grid",

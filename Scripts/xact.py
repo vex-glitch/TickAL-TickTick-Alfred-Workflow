@@ -2770,12 +2770,15 @@ def _stage_spec(stage, lb, log_tid):
 
 
 def session_photos(log_tid, stage=""):
-    """📸 Flow A: Photos selection → originals → Eagle CRM library,
-    into ANY lifecycle stage: '' = current session, 's<k>' = older
-    session backlog, consult|prep|design|finished|healed = the other
-    shelves (⌥ stage screen on the tph rows). + rename + tags → ♥ hero
-    attached to the open session task (logbook note when none) → shots
-    filed to the '✅ In Eagle' album ONLY after the import verified."""
+    """📸 THE import action (Vex unification 2026-07-26: 'one action
+    for everything, edge cases inside'). Source: Photos selection when
+    one exists, else a clipboard image (content-hash named, so
+    re-pastes dedupe), else honest toast. ALL shots → Eagle stage
+    ('' = current session, s<k> = older, consult|prep|design|
+    finished|healed = shelves) - each import annotated 'ph:<photos
+    id>' and NEVER reimported; ♥ heroes → TickTick planted (stem
+    guard, never duplicated); album + Photos delete for Photos
+    sources only. Every surface rides THIS verb."""
     if not _records_ready():
         return False
     import shutil
@@ -2790,11 +2793,33 @@ def session_photos(log_tid, stage=""):
     import photos_bridge as pb
     tmp = tempfile.mkdtemp(prefix="tickal_tph_")
     try:
-        try:
-            shots = pb.selection_snapshot_export(tmp)
-        except pb.PhotosError as e:
-            _crm_say(f"📸 {e}")
-            return False
+        src = "photos"
+        shots = []
+        if pb.photos_running() and pb.selection_count():
+            try:
+                shots = pb.selection_snapshot_export(tmp)
+            except pb.PhotosError as e:
+                _crm_say(f"📸 {e}")
+                return False
+        else:
+            try:
+                import clipboard as clip_util
+                img = clip_util.png_bytes()
+            except Exception:
+                img = None
+            if img:
+                import hashlib
+                stem = "clip-" + hashlib.sha1(img).hexdigest()[:10]
+                p = os.path.join(tmp, f"{stem}.png")
+                with open(p, "wb") as f:
+                    f.write(img)
+                shots = [{"id": "", "path": p, "filename": f"{stem}.png",
+                          "favorite": True}]
+                src = "clip"
+            else:
+                _crm_say("📸 Nothing to import · no Photos selection, "
+                         "no clipboard image")
+                return False
         base = cr.logbook_base(lb)
         tags_lc = {str(t).lower() for t in (lb.get("tags") or [])}
         if not stage and areas.ARCHIVE_TAG in tags_lc:
@@ -2808,6 +2833,14 @@ def session_photos(log_tid, stage=""):
                           if c.get("name") == sub_name), None)
             sub_id = child["id"] if child else eagle.create_folder(
                 sub_name, parent=fid)
+            # reimport guard: every import is annotated with its
+            # source identity - a re-run must never duplicate
+            def _mark(s):
+                return f"ph:{s.get('id') or s['filename']}"
+            have = {(it.get("annotation") or "")
+                    for it in eagle.items_in_folder(sub_id)}
+            new_shots = [s for s in shots if _mark(s) not in have]
+            esk = len(shots) - len(new_shots)
             start = eagle.next_index(
                 eagle.list_item_names(sub_id), base, label)
             cust, _, tat = base.partition(" - ")
@@ -2817,10 +2850,12 @@ def session_photos(log_tid, stage=""):
                 tags.append(dest)
             specs = [{"path": s["path"],
                       "name": eagle.item_name(base, label, start + i),
-                      "tags": tags} for i, s in enumerate(shots)]
-            ids = eagle.add_items(specs, folder_id=sub_id)
-            # the background copy MUST finish before the tmp exports die
-            eagle.wait_imported(ids)
+                      "tags": tags, "annotation": _mark(s)}
+                     for i, s in enumerate(new_shots)]
+            if specs:
+                ids = eagle.add_items(specs, folder_id=sub_id)
+                # background copy MUST finish before the tmp exports die
+                eagle.wait_imported(ids)
         except eagle.EagleError as e:
             _crm_say(f"📸 Eagle trouble: {e} · shots safe in Photos")
             return False
@@ -2862,16 +2897,22 @@ def session_photos(log_tid, stage=""):
                    + (f" · {dup_n} already there" if dup_n else ""))
         else:
             att = f" · {why}"
-        try:
-            pb.file_to_album([s["id"] for s in shots])
-            alb = " · ✅ album"
-        except pb.PhotosError:
-            alb = " · album skipped"
-        # imports verified above (wait_imported) - NOW the originals may
-        # leave Photos (PhotoKit; macOS shows its own confirm dialog)
-        deln, dwhy = pb.photokit_delete([s["id"] for s in shots])
-        trash = f" · 🗑 {deln} Photos" if deln else f" · 🗑 kept: {dwhy}"
-        _crm_say(f"📸 {len(shots)} → {base} · {label}{att}{alb}{trash}")
+        alb = trash = ""
+        if src == "photos":
+            try:
+                pb.file_to_album([s["id"] for s in shots])
+                alb = " · ✅ album"
+            except pb.PhotosError:
+                alb = " · album skipped"
+            # imports verified above (wait_imported) - NOW the originals
+            # may leave Photos (PhotoKit; macOS shows its own confirm)
+            deln, dwhy = pb.photokit_delete([s["id"] for s in shots])
+            trash = (f" · 🗑 {deln} Photos" if deln
+                     else f" · 🗑 kept: {dwhy}")
+        head = (f"📸 {len(new_shots)} → {base} · {label}"
+                + (f" · {esk} already in Eagle" if esk else "")
+                + (" · from clipboard" if src == "clip" else ""))
+        _crm_say(f"{head}{att}{alb}{trash}")
         return True
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

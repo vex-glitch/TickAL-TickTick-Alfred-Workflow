@@ -1313,11 +1313,8 @@ def render_crmbook(log_tid, query):
             subtitle="From the previous session · prefilled at the next one",
             valid=False))
     rows += [
-        alfred.item(uid="bk-photo", title="🖼 Attach photo",
-                    subtitle="Clipboard → logbook (reference · session · healed)",
-                    arg=f"xact:crmphoto:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-sessphotos", title="📸 Send session photos",
-                    subtitle="Photos selection → Eagle + task",
+        alfred.item(uid="bk-sessphotos", title="📸 Photos import",
+                    subtitle="Selection or clipboard → Eagle + TickTick",
                     arg=f"xact:sessphotos:{log_tid}", mods=_picker_mods()),
         alfred.item(uid="bk-eaglebrowse", title="🦅 Browse photos",
                     subtitle="Folders · counts · thumbnail grid",
