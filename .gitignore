@@ -33,6 +33,8 @@ local.mk
 # maintainer-only, never public
 /CLAUDE.md
 /HANDOFF.md
+/HANDOFF_CRM.md
+/HANDOFF_CONTENT.md
 /RESTRUCTURE_PLAN.md
 /tools/
 /docs/forum/
