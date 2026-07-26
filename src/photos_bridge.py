@@ -181,16 +181,28 @@ def photokit_delete(ids):
     (attributed to Alfred). Returns (n_deleted, "") or (0, reason) -
     never raises; the '✅ In Eagle' album stays the manual-purge
     fallback whenever this skips. Recently Deleted keeps 30 days."""
+    def _log(msg):
+        try:
+            import datetime
+            with open("/tmp/tickal_photokit.log", "a") as f:
+                f.write(f"{datetime.datetime.now():%H:%M:%S} {msg}\n")
+        except OSError:
+            pass
+
     if not ids:
         return 0, "nothing to delete"
     try:
         import Photos
     except ImportError:
+        _log("Photos framework missing")
         return 0, "PyObjC Photos framework missing"
     try:
         st = Photos.PHPhotoLibrary.authorizationStatus()
-        if st == 0:                       # notDetermined - block on ask
-            import threading
+        _log(f"auth status pre: {st}")
+        if st == 0:                       # notDetermined - block on ask,
+            import threading              # PUMPING the runloop (a headless
+            import time as _t             # wait can starve the callback)
+            from Foundation import NSRunLoop, NSDate
             ev = threading.Event()
             got = {}
 
@@ -198,12 +210,18 @@ def photokit_delete(ids):
                 got["s"] = s
                 ev.set()
             Photos.PHPhotoLibrary.requestAuthorization_(_cb)
-            ev.wait(120)
+            end = _t.time() + 120
+            while not ev.is_set() and _t.time() < end:
+                NSRunLoop.currentRunLoop().runMode_beforeDate_(
+                    "kCFRunLoopDefaultMode",
+                    NSDate.dateWithTimeIntervalSinceNow_(0.2))
             st = got.get("s", 0)
+            _log(f"auth status post-request: {st}")
         if st not in (3, 4):              # authorized · limited
             return 0, "Photos access not granted (Privacy settings)"
         assets = Photos.PHAsset.fetchAssetsWithLocalIdentifiers_options_(
             list(ids), None)
+        _log(f"fetched {assets.count()} of {len(ids)} ids")
         if assets.count() == 0:
             return 0, "no matching assets"
 
@@ -211,8 +229,10 @@ def photokit_delete(ids):
             Photos.PHAssetChangeRequest.deleteAssets_(assets)
         ok, err = Photos.PHPhotoLibrary.sharedPhotoLibrary() \
             .performChangesAndWait_error_(_change, None)
+        _log(f"performChanges ok={ok} err={err}")
         if not ok:
             return 0, "cancelled" if err is None else f"refused: {err}"
         return assets.count(), ""
     except Exception as e:
+        _log(f"EXC {type(e).__name__}: {e}")
         return 0, f"{type(e).__name__}: {e}"
