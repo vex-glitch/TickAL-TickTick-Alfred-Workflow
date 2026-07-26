@@ -2499,10 +2499,11 @@ def _eagle_title(base, fid):
 
 
 def _task_base(title):
-    """'{C} - {T}' from a content-task title (markdown or legacy bare
-    eagle link stripped)."""
+    """'{C} - {T}' from a content-task title - markdown of ANY scheme
+    (new eagle:// AND the legacy localhost:41595 links Vex's old
+    backlog tasks carry) or a bare eagle link stripped."""
     t = (title or "").strip()
-    m = re.match(r"^\[(.*?)\]\(eagle://[^)]*\)$", t)
+    m = re.match(r"^\[(.*?)\]\(\S+?\)$", t)
     if m:
         return m.group(1).strip()
     return re.sub(r"\s*eagle://\S+", "", t).strip()

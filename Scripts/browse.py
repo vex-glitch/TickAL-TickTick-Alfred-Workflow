@@ -2074,75 +2074,141 @@ def render_cmanage(query):
     return add_back(rows, "ctx:contentpl")
 
 
-def render_contentpl(query):
-    """🎬 Content pipeline hub - the To edit / To post / Raw / Studio
-    queues across BOTH Content PL lists, rendered from the TickTick
-    cache (Eagle not needed to look). ⏎ opens the task's Eagle folder
-    cross-library; ⌘ on Post rows = mark posted; ⌥ on Raw = retire."""
+def _cpl_task_row(t, tag, icon, word, lib, chip):
+    """One content-task row: ⏎ opens the Eagle folder cross-library,
+    ⌥⇧ = posted (Post rows) / retire (Raw rows)."""
+    title = (t.get("title") or "").strip()
+    # markdown of ANY scheme - legacy tasks link http://localhost:41595
+    mk = re.match(r"^\[(.*?)\]\(\S+?\)$", title)
+    base = (mk.group(1).strip() if mk
+            else re.sub(r"\s*eagle://\S+", "", title).strip())
+    m = (re.search(r"eagle://folder/([^)\s]+)", title)
+         or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
+    open_lib = "crm" if tag == "📸raw" else lib
+    arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
+    mods = dict(_picker_mods())
+    sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "")
+    if tag == "📸post":
+        mods["alt+shift"] = {"arg": f"xact:posted:{t['id']}",
+                             "subtitle": "Mark POSTED · shelf clears",
+                             "valid": True}
+        sub += " · ⌥⇧ posted"
+    elif tag == "📸raw":
+        mods["alt+shift"] = {"arg": f"xact:cretire:{t['id']}",
+                             "subtitle": "Retire · logbook 🎬 → ➖",
+                             "valid": True}
+        sub += " · ⌥⇧ retire"
+    return alfred.item(uid=f"cpl-{t['id']}", title=f"{icon} {base}",
+                       subtitle=sub, arg=arg, valid=bool(arg),
+                       match=f"{base} {word}", mods=mods)
+
+
+def render_contentpl(ids, query):
+    """🎬 Content pipeline - three levels (Vex smoke 2026-07-26: never a
+    flat both-lists dump). Root: intake state + actions + 📺 TV / 🖋️ FM
+    rows. Per-library: Open in TickTick + the tag queues (To post /
+    To edit / Raw / Studio / All - 'basically our tags'). Queue: task
+    rows. Renders from the TickTick cache, Eagle not needed to look."""
     import areas as _ar
     import eagle as _eagle
-    pending = 0
-    for lib in ("tv", "fm"):
-        try:
-            pending += len([f for f in os.listdir(_eagle.INTAKE[lib])
-                            if not f.startswith(".") and os.path.isfile(
-                                os.path.join(_eagle.INTAKE[lib], f))])
-        except OSError:
-            pass
-    rows = [alfred.item(
-        title="🎬 Content pipeline",
-        subtitle=(f"{pending} edited files waiting in intake"
-                  if pending else "Intake empty"), valid=False)]
-    if pending:
-        rows.append(alfred.item(
-            uid="cpl-file", title=f"📥 File edited shots ({pending})",
-            subtitle="Intake → To post · names · task → Post",
-            arg="xact:filedited", mods=_picker_mods()))
-    rows.append(alfred.item(
-        uid="cpl-manage", title="🎛 Manage content",
-        subtitle="All pipeline actions · photos · triage · promote",
-        arg="xact:crmbrowse:ctx:cmanage", mods=_picker_mods()))
-    pids = {_ar.CONTENT_TV_ID: ("tv", "📺"), _ar.CONTENT_FM_ID: ("fm", "🖋️")}
-    tasks = [t for t in cache_store.get("all_tasks") or []
-             if (t.get("_projectId") or t.get("projectId")) in pids
-             and t.get("status", 0) == 0]
-    for tag, icon, word in _CPL_STATES:
-        for t in tasks:
-            if tag not in {str(x).lower() for x in (t.get("tags") or [])}:
-                continue
-            title = (t.get("title") or "").strip()
-            mk = re.match(r"^\[(.*?)\]\(eagle://[^)]*\)$", title)
-            base = (mk.group(1).strip() if mk
-                    else re.sub(r"\s*eagle://\S+", "", title).strip())
-            m = re.search(r"eagle://folder/([^)\s]+)", title)
-            lib, chip = pids[t.get("_projectId") or t.get("projectId")]
-            open_lib = "crm" if tag == "📸raw" else lib
-            arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
-            mods = dict(_picker_mods())
-            sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "")
-            # ⌥⇧ = the one chord that executes row-supplied xact args
-            if tag == "📸post":
-                mods["alt+shift"] = {"arg": f"xact:posted:{t['id']}",
-                                     "subtitle": "Mark POSTED · shelf clears",
-                                     "valid": True}
-                sub += " · ⌥⇧ posted"
-            elif tag == "📸raw":
-                mods["alt+shift"] = {"arg": f"xact:cretire:{t['id']}",
-                                     "subtitle": "Retire · logbook 🎬 → ➖",
-                                     "valid": True}
-                sub += " · ⌥⇧ retire"
+    LIBS = {"tv": (_ar.CONTENT_TV_ID, "📺", "TV"),
+            "fm": (_ar.CONTENT_FM_ID, "🖋️", "FM")}
+    lib = ids[0] if ids else ""
+    queue = ids[1] if len(ids) > 1 else ""
+
+    def hop(uid, title, subtitle, ctx):
+        return alfred.item(uid=uid, title=title, subtitle=subtitle,
+                           arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
+
+    if lib not in LIBS:
+        # root: intake state + global actions + one row per library
+        pending = 0
+        for k in ("tv", "fm"):
+            try:
+                pending += len([f for f in os.listdir(_eagle.INTAKE[k])
+                                if not f.startswith(".") and os.path.isfile(
+                                    os.path.join(_eagle.INTAKE[k], f))])
+            except OSError:
+                pass
+        rows = [alfred.item(
+            title="🎬 Content pipeline",
+            subtitle=(f"{pending} edited exports waiting in the intake "
+                      "folders" if pending
+                      else "No edited exports waiting (LR → Eagle Inbox "
+                           "TV/FM)"), valid=False)]
+        if pending:
             rows.append(alfred.item(
-                uid=f"cpl-{t['id']}", title=f"{icon} {base}", subtitle=sub,
-                arg=arg, valid=bool(arg), match=f"{base} {word}",
-                mods=mods))
-    if len(rows) <= 4:
-        rows.append(alfred.item(title="Queues empty",
-                                subtitle="🎬 Edit this on a logbook feeds them",
-                                valid=False))
+                uid="cpl-file", title=f"📥 File edited shots ({pending})",
+                subtitle="Intake → To post · names · task → Post",
+                arg="xact:filedited", mods=_picker_mods()))
+        rows.append(alfred.item(
+            uid="cpl-manage", title="🎛 Manage content",
+            subtitle="All pipeline actions · photos · triage · promote",
+            arg="xact:crmbrowse:ctx:cmanage", mods=_picker_mods()))
+        for k, (pid, chip, word) in LIBS.items():
+            n = sum(1 for t in cache_store.get("all_tasks") or []
+                    if (t.get("_projectId") or t.get("projectId")) == pid
+                    and t.get("status", 0) == 0
+                    and {str(x).lower() for x in (t.get("tags") or [])}
+                    & {s[0] for s in _CPL_STATES})
+            rows.append(hop(f"cpl-{k}", f"{chip} {word} Pipeline",
+                            f"{n} in the pipeline · ⏎ queues",
+                            f"ctx:contentpl:{k}"))
+        if query:
+            rows = rows[:1] + (fuzz.filter_and_score(
+                query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+        return add_back(rows, "ctx:crmhub")
+
+    pid, chip, word = LIBS[lib]
+    tasks = [t for t in cache_store.get("all_tasks") or []
+             if (t.get("_projectId") or t.get("projectId")) == pid
+             and t.get("status", 0) == 0]
+
+    def tags_of(t):
+        return {str(x).lower() for x in (t.get("tags") or [])}
+
+    if not queue:
+        # per-library screen: Open in TickTick + the tag queues
+        def count(tag):
+            return sum(1 for t in tasks if tag in tags_of(t))
+        rows = [alfred.item(
+            uid="cpq-open", title="↗️ Open in TickTick",
+            subtitle=f"The Content PL · {word} list",
+            arg=f"open:https://ticktick.com/webapp/#p/{pid}/tasks",
+            mods=_picker_mods())]
+        for key, tag, icon, label in (
+                ("post", "📸post", "📤", "To post"),
+                ("edit", "📸edit", "✂️", "To edit"),
+                ("raw", "📸raw", "🎞", "Raw"),
+                ("studio", "📸studio", "🏷", "Studio")):
+            rows.append(hop(f"cpq-{key}", f"{icon} {label}",
+                            f"{count(tag)} here",
+                            f"ctx:contentpl:{lib}:{key}"))
+        rows.append(hop("cpq-all", "🗂 All",
+                        f"{len([t for t in tasks if tags_of(t) & {s[0] for s in _CPL_STATES}])} entries flat",
+                        f"ctx:contentpl:{lib}:all"))
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        return add_back(rows, "ctx:contentpl")
+
+    # queue screen: task rows for one tag (or all, grouped by state)
+    KEY2TAG = {"post": "📸post", "edit": "📸edit",
+               "raw": "📸raw", "studio": "📸studio"}
+    rows = []
+    for tag, icon, wrd in _CPL_STATES:
+        if queue != "all" and KEY2TAG.get(queue) != tag:
+            continue
+        rows += [_cpl_task_row(t, tag, icon, wrd, lib, chip)
+                 for t in tasks if tag in tags_of(t)]
+    if not rows:
+        rows = [alfred.item(title="Queue empty",
+                            subtitle="🎬 Edit this on a logbook feeds it",
+                            valid=False)]
     if query:
-        rows = rows[:1] + (fuzz.filter_and_score(
-            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
-    return add_back(rows, "ctx:crmhub")
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, f"ctx:contentpl:{lib}")
 
 
 def render_crmhub(query):
@@ -3676,7 +3742,7 @@ def main():
             items = render_triage(ids[0] if ids else "", query)
 
         elif level == "contentpl":
-            items = render_contentpl(query)
+            items = render_contentpl(ids, query)
 
         elif level == "cmanage":
             items = render_cmanage(query)
