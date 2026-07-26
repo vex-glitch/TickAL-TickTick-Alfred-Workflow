@@ -1319,6 +1319,10 @@ def render_crmbook(log_tid, query):
         alfred.item(uid="bk-sessphotos", title="📸 Send session photos",
                     subtitle="Photos selection → Eagle + task",
                     arg=f"xact:sessphotos:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-eaglebrowse", title="🦅 Browse photos",
+                    subtitle="Folders · counts · thumbnail grid",
+                    arg=f"xact:crmbrowse:ctx:lbeagle:{log_tid}:hub",
+                    mods=_picker_mods()),
         alfred.item(uid="bk-eagle", title="🦅 Eagle folder",
                     subtitle="Create if new · open in Eagle",
                     arg=f"xact:eaglefolder:{log_tid}", mods=_picker_mods()),
@@ -2271,6 +2275,10 @@ def render_contentpl(ids, query):
             uid="cpl-manage", title="🎛 Manage content",
             subtitle="All pipeline actions · photos · triage · promote",
             arg="xact:crmbrowse:ctx:cmanage", mods=_picker_mods()))
+        rows.append(hop("cpl-cust", "👥 Customers",
+                        "Birdseye · customer → tattoos", "ctx:ccust"))
+        rows.append(hop("cpl-logs", "🎨 Logbooks",
+                        "Tattoo → 🦅 folders → images", "ctx:clbs"))
         for k, (pid, chip, word) in LIBS.items():
             n = sum(1 for t in cache_store.get("all_tasks") or []
                     if (t.get("_projectId") or t.get("projectId")) == pid
@@ -2335,6 +2343,210 @@ def render_contentpl(ids, query):
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
     return add_back(rows, f"ctx:contentpl:{lib}")
+
+
+def _content_logbook_row(cr, lb):
+    """Content-world logbook row (Vex design 2026-07-26): the tattoo IS
+    the content entity here, so ⏎ drills into its 🦅 folder screen
+    (counts → grid), ⌥ the CRM logbook hub, ⌥⇧ opens the note. Same
+    entity as the CRM row, different world, different ⏎."""
+    base = cr.logbook_base(lb)
+    dest = cr.content_dest_of(lb.get("content") or "")
+    dchip = {"tv": "🎬 TV", "fm": "🎬 FM", "-": "🎬 ➖"}.get(dest, "🎬 unset")
+    fid, _l = cr.eagle_folder_of(lb.get("content") or "")
+    archived = _areas.ARCHIVE_TAG in {str(t).lower()
+                                      for t in (lb.get("tags") or [])}
+    mods = _picker_mods()
+    mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
+                   "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
+    mods["alt+shift"] = {"arg": f"xact:notego:{lb['id']}", "valid": True,
+                         "subtitle": "Open in TickTick"}
+    bits = [b for b in (("📁 archived" if archived else ""), dchip,
+                        "" if fid else "🦅 no folder yet") if b]
+    return alfred.item(
+        uid=f"clb-{lb['id']}", title=f"🎨 {base}",
+        subtitle=" · ".join(bits) + "  |  ⏎🦅  ⌘⚡  ⌥⤵️  ⌥⇧↗️  ⌃🔙",
+        arg=f"xact:crmbrowse:ctx:lbeagle:{lb['id']}",
+        match=base, mods=mods, variables=_record_vars(lb))
+
+
+def render_clbs(query):
+    """🎨 Content > Logbooks - every tattoo, ⏎ = its Eagle folders."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:contentpl")
+    import crm_records as cr
+    rows = [_content_logbook_row(cr, lb)
+            for lb in (cr.records_notes(_areas.LOGBOOK_TAG)
+                       + cr.records_notes(_areas.ARCHIVE_TAG))]
+    if not rows:
+        rows = [alfred.item(title="No logbooks yet",
+                            subtitle="➕ New tattoo mints one", valid=False)]
+    elif query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:contentpl")
+
+
+def render_ccust(ids, query):
+    """👥 Content > Customers - birdseye only: customer → the tattoos
+    they did (light rows, never the heavy CRM customer hub)."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:contentpl")
+    import crm_records as cr
+    if ids:
+        rows = [_content_logbook_row(cr, lb)
+                for lb in cr.customer_logbooks(ids[0])]
+        if not rows:
+            rows = [alfred.item(title="No tattoos yet",
+                                subtitle="Nothing to browse", valid=False)]
+        elif query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        return add_back(rows, "ctx:ccust")
+    rows, seen = [], set()
+    for c in (cr.records_notes(_areas.CUSTOMER_TAG)
+              + cr.records_notes(_areas.LEAD_TAG)):
+        if c["id"] in seen:
+            continue
+        seen.add(c["id"])
+        _m, k, _n = cr.lifetime(c["id"])
+        rows.append(alfred.item(
+            uid=f"ccu-{c['id']}", title=c.get("title") or "Untitled",
+            subtitle=(f"{k} tattoo{'s' if k != 1 else ''}" if k
+                      else "no tattoos yet") + "  |  ⏎⤵️  ⌃🔙",
+            arg=f"xact:crmbrowse:ctx:ccust:{c['id']}",
+            mods=_picker_mods(), variables=_record_vars(c)))
+    if not rows:
+        rows = [alfred.item(title="No customers yet", valid=False)]
+    elif query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:contentpl")
+
+
+def render_lbeagle(ids, query):
+    """🦅 Folder screen - ONE tattoo's Eagle reality, straight from
+    DISK (closed libraries read fine - no switching just to look).
+    Counts per stage folder, honest zeroes, per-session sub-rows under
+    04 Sessions, create row when no folder exists. ⏎ on a folder =
+    peek:<fid> → the Grid View (canvas phase_grid)."""
+    log_tid = ids[0]
+    ret_hub = len(ids) > 1 and ids[1] == "hub"
+    back = f"ctx:crmbook:{log_tid}" if ret_hub else "ctx:clbs"
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, back)
+    import crm_records as cr
+    import eagle
+    lb = next((l for l in cr.records_notes() if l.get("id") == log_tid), None)
+    if lb is None:
+        return add_back([alfred.item(title="Logbook not found",
+                                     subtitle="Run tsy", valid=False)], back)
+    base = cr.logbook_base(lb)
+    fid, lib = cr.eagle_folder_of(lb.get("content") or "")
+    if not fid:
+        return add_back([alfred.item(
+            uid="lbe-none", title=f"🦅 {base} - no Eagle folder yet",
+            subtitle="⏎ create the skeleton + open in Eagle",
+            arg=f"xact:eaglefolder:{log_tid}", mods=_picker_mods(),
+            variables=_record_vars(lb))], back)
+    lib = lib or "crm"
+    lib_path = eagle.LIBS.get(lib, eagle.LIBS["crm"])[1]
+    head = alfred.item(uid="lbe-open", title=f"🦅 {base}",
+                       subtitle="Whole folder, in Eagle  |  ⏎↗️  ⌘⚡  ⌃🔙",
+                       arg=f"xact:eaglego:{log_tid}", mods=_picker_mods(),
+                       variables=_record_vars(lb))
+    try:
+        root, _all = eagle.disk_subtree_ids(lib_path, fid)
+        sub_ids = [root["id"]] + [c["id"] for c in root.get("children") or []]
+        items = eagle.disk_items_in(lib_path, sub_ids)
+    except eagle.EagleError as e:
+        return add_back([head, alfred.item(title=f"🦅 {e}",
+                                           subtitle="T9 plugged in?",
+                                           valid=False)], back)
+    by_folder = {}
+    for it in items:
+        for f in it.get("folders") or []:
+            by_folder.setdefault(f, []).append(it)
+    peek_vars = {**_record_vars(lb),
+                 "lb_tid": log_tid, "peek_lib": lib,
+                 "peek_ret": f"ctx:lbeagle:{log_tid}"
+                             + (":hub" if ret_hub else "")}
+    order = {n: i for i, n in enumerate(eagle.SKELETON)}
+    kids = sorted(root.get("children") or [],
+                  key=lambda c: (order.get(c.get("name"), 99),
+                                 c.get("name") or ""))
+    rows = [head]
+    for c in kids:
+        cid, name = c["id"], c.get("name") or "?"
+        shots = list({it["id"]: it for it in by_folder.get(cid, [])}.values())
+        n = len(shots)
+        rows.append(alfred.item(
+            uid=f"lbe-{cid}", title=name,
+            subtitle=(f"{n} image{'s' if n != 1 else ''}" if n
+                      else "no images yet")
+                     + ("  |  ⏎🖼  ⌘⚡  ⌃🔙" if n else "  |  ⌃🔙"),
+            arg=f"peek:{cid}", valid=bool(n),
+            mods=_picker_mods(), variables=peek_vars))
+        if name == "04 Sessions" and n:
+            sess = {}
+            for it in shots:
+                m = re.search(r"• S(\d+) •", it.get("name") or "")
+                sess.setdefault(int(m.group(1)) if m else 0, []).append(it)
+            for k in sorted(sess):
+                label = f"S{k}" if k else "unnumbered"
+                rows.append(alfred.item(
+                    uid=f"lbe-{cid}-s{k}", title=f"   · {label}",
+                    subtitle=f"{len(sess[k])} image"
+                             f"{'s' if len(sess[k]) != 1 else ''}"
+                             "  |  ⏎🖼  ⌃🔙",
+                    arg=f"peek:{cid}:s{k}",
+                    mods=_picker_mods(), variables=peek_vars))
+    if query:
+        rows = rows[:1] + (fuzz.filter_and_score(
+            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+    return add_back(rows, back)
+
+
+def render_imgstage(query):
+    """Stage picker for ONE grid shot (the grid's ⌘⇧ road): full
+    lifecycle stages, current session default, typed digit = older
+    session - rows fire xact:imgmove:<stage>, the shot rides img_path
+    (re-carried on every row so the verb never loses it)."""
+    import crm_records as cr
+    path = os.environ.get("img_path") or ""
+    log_tid = os.environ.get("lb_tid") or ""
+    back = os.environ.get("peek_ret") or "ctx:clbs"
+    lb = next((l for l in cr.records_notes() if l.get("id") == log_tid), None)
+    if not (path and lb):
+        return add_back([alfred.item(title="Lost the image context",
+                                     subtitle="Re-enter from the grid",
+                                     valid=False)], back)
+    n = cr.current_snum(lb.get("content") or "", log_tid)
+    carry = {"img_path": path, "lb_tid": log_tid, "peek_ret": back}
+    rows = [alfred.item(title=f"🖼 {os.path.basename(path)}",
+                        subtitle=f"File into a stage of {cr.logbook_base(lb)}",
+                        valid=False)]
+    for key, folder, subtxt in _TRIAGE_STAGES:
+        rows.append(alfred.item(
+            uid=f"imgs-{key}",
+            title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
+            subtitle=subtxt or f"Current session · name gets S{n}",
+            arg=f"xact:imgmove:{key}", variables=carry,
+            mods=_picker_mods()))
+    m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
+    if m:
+        k = int(m.group(1))
+        rows.append(alfred.item(
+            uid="imgs-sn", title=f"→ 04 Sessions · S{k}",
+            subtitle=f"Older session · name gets S{k}",
+            arg=f"xact:imgmove:s{k}", variables=carry, mods=_picker_mods()))
+    elif query:
+        rows = rows[:1] + (fuzz.filter_and_score(
+            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+    return add_back(rows, back)
 
 
 def render_crmhub(query):
@@ -2515,10 +2727,18 @@ def render_crmcal(query):
                           "ca", query)
 
 
-def render_crmlogs(query):
-    """🗂️ The Records list: open row on top, customers + logbooks under."""
-    return _crmlist_drill("crmlogs", "🗂️", "Logs", _areas.RECORDS_ID,
-                          "re", query)
+def render_crmcusts(query):
+    """👥 Customers (leads too): open row on top, customer rows under -
+    the 🗂️ Logs pooled search died 2026-07-26 (Vex: customers must
+    never pollute a logbook search, and vice versa)."""
+    return _crmlist_drill("crmcusts", "👥", "Customers", _areas.RECORDS_ID,
+                          "cu", query)
+
+
+def render_crmlbs(query):
+    """🎨 Logbooks (archived too): open row on top, logbook rows under."""
+    return _crmlist_drill("crmlbs", "🎨", "Logbooks", _areas.RECORDS_ID,
+                          "lo", query)
 
 
 def render_crmcust(cust_tid, query):
@@ -3934,8 +4154,24 @@ def main():
         elif level == "crmcal":
             items = render_crmcal(query)
 
-        elif level == "crmlogs":
-            items = render_crmlogs(query)
+        elif level == "crmcusts":
+            items = render_crmcusts(query)
+
+        elif level == "crmlbs":
+            items = render_crmlbs(query)
+
+        elif level == "ccust":
+            items = render_ccust(ids, query)
+
+        elif level == "clbs":
+            items = render_clbs(query)
+
+        elif level == "lbeagle":
+            items = render_lbeagle(ids, query) if ids \
+                else _missing(level, "<logbookTid>[:hub]")
+
+        elif level == "imgstage":
+            items = render_imgstage(query)
 
         elif level == "crmcust":
             items = render_crmcust(ids[0], query) if ids \

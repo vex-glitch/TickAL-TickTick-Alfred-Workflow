@@ -2876,6 +2876,168 @@ def eagle_triage(rest):
     _crm_say(f"🦅 {len(sel)} filed → {base} · {label}{att}")
 
 
+def _img_id_lib(path):
+    """(item_id, lib_key) from an on-disk Eagle media path -
+    …/<lib>.library/images/<id>.info/<file>. ('', '') when foreign."""
+    import eagle
+    m = re.search(r"/images/([^/]+)\.info/", path or "")
+    iid = m.group(1) if m else ""
+    lib = ""
+    for k, (_n, p) in eagle.LIBS.items():
+        if (path or "").startswith(p.rstrip("/") + "/"):
+            lib = k
+            break
+    return iid, lib
+
+
+def img_open(path):
+    """🖼 grid ⏎: open THIS shot in Eagle - switches to its library
+    first (raw eagle:// links can't - probed 2026-07-25)."""
+    import eagle
+    iid, lib = _img_id_lib(path)
+    if not iid:
+        _crm_say("🖼 Not an Eagle item path")
+        return
+    try:
+        eagle.ensure_library(lib or "crm")
+        subprocess.run(["open", f"eagle://item/{iid}"], capture_output=True)
+    except Exception as e:
+        _crm_say(f"🦅 {e}")
+
+
+def img_link(path):
+    """🖼 grid ⌥⌘: eagle://item link → clipboard. No switch needed."""
+    iid, _lib = _img_id_lib(path)
+    if not iid:
+        _crm_say("🖼 Not an Eagle item path")
+        return
+    subprocess.run(["pbcopy"], input=f"eagle://item/{iid}".encode())
+    _crm_say("🔗 Eagle link copied")
+
+
+def img_attach(path):
+    """🖼 grid ⌥⇧: THIS shot → real attachment on the logbook note."""
+    if not _records_ready():
+        return
+    import areas
+    log_tid = os.environ.get("lb_tid") or ""
+    if not log_tid:
+        _crm_say("🖼 Lost the logbook context · re-enter the grid")
+        return
+    try:
+        _attach_file_to(areas.RECORDS_ID, log_tid, path)
+    except Exception as e:
+        _crm_say(f"📎 {e}")
+        return
+    _crm_say("📎 Attached to the logbook")
+
+
+def img_trash(path):
+    """🖼 grid ⌃⇧: cull the dud - Eagle trash (recoverable), its
+    library switched open first (the API acts on the open library)."""
+    import eagle
+    iid, lib = _img_id_lib(path)
+    if not iid:
+        _crm_say("🖼 Not an Eagle item path")
+        return
+    try:
+        eagle.ensure_library(lib or "crm")
+        eagle.trash_items([iid])
+    except Exception as e:
+        _crm_say(f"🦅 {e}")
+        return
+    _crm_say("🗑 To Eagle trash · recoverable in Eagle")
+
+
+def img_post(path):
+    """🖼 grid ⇧: THIS shot is final → COPY to the dest library's
+    To post shelf + task → 📸Post (single-shot promote; ⌘ Edit-this
+    stays the batch road). The CRM original is never touched - the
+    source path lives inside another .library on disk."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    import eagle
+    log_tid = os.environ.get("lb_tid") or ""
+    lb = _record_by_id(log_tid) if log_tid else None
+    if not lb:
+        _crm_say("🖼 Lost the logbook context · re-enter the grid")
+        return
+    dest = cr.content_dest_of(lb.get("content") or "")
+    if dest not in ("tv", "fm"):
+        _crm_say("🎬 Set Content potential (TV · FM) first")
+        return
+    try:
+        eagle.ensure_library(dest)
+        _cp, shelves = _cp_folders(eagle)
+        ids = eagle.add_items([{"path": path}], folder_id=shelves["To post"])
+        eagle.wait_imported(ids)
+    except Exception as e:
+        _crm_say(f"🦅 {e}")
+        return
+    fid, _l = cr.eagle_folder_of(lb.get("content") or "")
+    t = _content_task_for(log_tid)
+    if t is None:
+        _mint_raw_task(lb, dest, fid, tag="📸post")
+        note = "📸Post task minted"
+    else:
+        tags = {str(x).lower() for x in (t.get("tags") or [])}
+        if "📸post" in tags:
+            note = "task already Post"
+        else:
+            drop = ("📸raw" if "📸raw" in tags
+                    else "📸edit" if "📸edit" in tags else "")
+            _content_retag(t, drop, "📸post")
+            note = "task → Post"
+    _crm_say(f"📤 Shot → To post · {note}")
+
+
+def img_move(stage):
+    """🖼 grid ⌘⇧ road tail: move ONE shot into a lifecycle stage
+    folder + rename to convention + incremental tags (mirrors the
+    triage tail, but the item rides img_path env - no Eagle selection
+    at stake, so switching libraries is safe here)."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    import eagle
+    path = os.environ.get("img_path") or ""
+    log_tid = os.environ.get("lb_tid") or ""
+    lb = _record_by_id(log_tid) if log_tid else None
+    iid, lib = _img_id_lib(path)
+    if not (lb and iid):
+        _crm_say("🖼 Lost the image context · re-enter the grid")
+        return
+    if lib and lib != "crm":
+        _crm_say("🖼 CRM-library shots only - stages live there")
+        return
+    base = cr.logbook_base(lb)
+    try:
+        eagle.ensure_library("crm")
+        folder_name, label, stage_tags = _stage_spec(
+            "" if stage == "s" else stage, lb, log_tid)
+        fid = _eagle_ensure_logbook_folder(lb)
+        node = eagle.folder_node(fid)
+        child = next((c for c in (node or {}).get("children") or []
+                      if c.get("name") == folder_name), None)
+        sub_id = child["id"] if child else eagle.create_folder(
+            folder_name, parent=fid)
+        n = eagle.next_index(eagle.list_item_names(sub_id), base, label)
+        eagle.update_items([{"id": iid,
+                             "name": eagle.item_name(base, label, n),
+                             "folders": [sub_id]}])
+        cust, _, tat = base.partition(" - ")
+        tags = [t for t in (cust.strip(), tat.strip()) if t] + stage_tags
+        dest = cr.content_dest_of(lb.get("content") or "")
+        if dest in ("tv", "fm"):
+            tags.append(dest)
+        eagle.add_item_tags([iid], tags)
+    except eagle.EagleError as e:
+        _crm_say(f"🦅 {e}")
+        return
+    _crm_say(f"🖼 → {folder_name} · {label}")
+
+
 def _eagle_archive_folder(log_tid):
     """Post-archive weave: tattoo folder → Archive/ + 'archive' tag on
     its items. Best-effort AFTER the TickTick archive (the state owner
@@ -7421,6 +7583,18 @@ def main():
             content_retire(rest)
         elif verb == "eaglego":
             eagle_open(rest)
+        elif verb == "imgopen":
+            img_open(rest)
+        elif verb == "imglink":
+            img_link(rest)
+        elif verb == "imgpost":
+            img_post(rest)
+        elif verb == "imgattach":
+            img_attach(rest)
+        elif verb == "imgtrash":
+            img_trash(rest)
+        elif verb == "imgmove":
+            img_move(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
         elif verb == "bridge_daily":
