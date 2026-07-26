@@ -1383,6 +1383,7 @@ def _crmnew_continue(kind, cust):
         if deposit.strip():
             cr.append_session(areas.RECORDS_ID, lb["id"], "payment",
                               charged=deposit, text="Deposit.")
+    _crmnew_photos_catch(lb)
     if kind == "consult":
         _crm_session_prefill(lb.get("title") or "", "Consult")
         _crm_say("🗂️ Logbook ready · schedule the consultation")
@@ -1390,6 +1391,24 @@ def _crmnew_continue(kind, cust):
         n = cr.next_snum(lb.get("content") or "", lb["id"])
         _crm_session_prefill(lb.get("title") or "", f"S{n}")
         _crm_say(f"🗂️ Logbook ready · schedule S{n}")
+
+
+def _crmnew_photos_catch(lb):
+    """➕ New tattoo / consultation: reference shots are exactly what
+    Vex holds at creation time (his ask 2026-07-26) - a Photos
+    selection offers itself into 01 Consultation before the schedule
+    handoff. Skip or failure never blocks the chain; the ♥ hero lands
+    on the logbook note (no session task exists yet)."""
+    try:
+        import photos_bridge as pb
+        n_sel = pb.selection_count() if pb.photos_running() else 0
+    except Exception:
+        n_sel = 0
+    if not n_sel:
+        return
+    if _dialog(f"📸 {n_sel} selected in Photos - import as consult "
+               "references?", ["Skip", "Import"], "Import") == "Import":
+        session_photos(lb["id"], "consult")
 
 
 def crmnew_newcust(kind):
