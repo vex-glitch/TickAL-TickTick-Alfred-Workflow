@@ -525,9 +525,17 @@ def main():
             ("📋 Copy + description", "Name, then '>' quoted description",
              f"xact:task_copy_full:{pid}:{tid}",
              "copy description content clipboard", is_task_like),
-            ("📎 Attach Photos pick", "♥ or single selection → attachment",
+            ("📎 Attach Photos pick", "♥ → TickTick ONLY · no Eagle",
              f"xact:photoattach:{pid}:{tid}",
              "photo attach picture image photos", is_task_like),
+            # the full-convention import (ALL → Eagle stage, ♥ →
+            # TickTick, album, delete) on logbooks - the 📎 trap
+            # cost a smoke round (Vex 2026-07-26)
+            ("📸 Import selection → stage",
+             "ALL → Eagle folder · ♥ → TickTick · the convention",
+             f"xact:crmbrowse:ctx:lbeagle:{tid}:hub",
+             "import selection stage eagle convention photos",
+             _is_logbook),
             ("✅ Session done",    "Tick off · log · schedule next",
              f"xact:sessiondone:{pid}:{tid}", "session done log crm tattoo", _sess_done),
             ("🔗 Link to logbook", "Pick logbook · title gains link + S<n>",
