@@ -65,7 +65,8 @@ def _rows(fid, sess, lib, direct=False):
         thumb = os.path.splitext(p)[0] + "_thumbnail.png"
         rows.append({"uid": it["id"], "title": it.get("name") or "?",
                      "subtitle": os.path.splitext(p)[1].lstrip(".").upper()
-                     + "  |  ⏎↗️  ⌘🎬  ⇧📤  ⌥⌘🔗  ⌘⇧📂  ⌥⇧📎  ⌃⇧🗑  ⌃🔙",
+                     + "  |  ⏎ Eagle · ⌘ Edit · ⇧ Post · ⌥⌘ Link"
+                       " · ⌘⇧ Stage · ⌥⇧ Attach · ⌃⇧ Trash · ⌃ Back",
                      "arg": p, "match": it.get("name") or "",
                      "icon": {"path": thumb if os.path.exists(thumb) else p}})
     if not rows:
