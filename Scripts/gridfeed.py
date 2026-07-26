@@ -2,15 +2,20 @@
 """
 gridfeed.py - feeds the 🖼 Grid View (canvas phase_grid).
 
-The folder-screen row arg "peek:<folderId>[:s<k>]" arrives as argv;
-peek_lib rides the session env (set as row variables in
-browse.py render_lbeagle). Reads the library straight from DISK
-(eagle.py disk readers - closed libraries read fine, no switch just to
-LOOK). Emits the Grid View items JSON (script-filter shape): title =
-item name, arg = the media file's absolute path (the item id stays
-parseable from the .info dir - xact._img_id_lib), icon = Eagle's own
+Road: folder-screen row ⏎ arg "xact:peek:<b64>" → xact img_peek fires
+ET GridPeek (osascript trampoline - fresh session, row variables DROP)
+→ this script (argv = the b64 payload) → Grid View. The payload is
+b64 JSON {"fid","sess","lib","lb","ret"}; the output is the Alfred
+envelope {"alfredworkflow": {"arg": <grid items JSON>, "variables":
+{lb_tid, peek_lib, peek_ret}}} - the variables RE-SEED the session so
+the grid's chord edges can ride {var:lb_tid}/{var:peek_ret} and the
+xact img verbs read lb_tid from env.
+
+Reads the library straight from DISK (eagle.py disk readers - closed
+libraries read fine, no switch just to LOOK). Item icon = Eagle's own
 *_thumbnail.png beside the file when present (never the multi-MB
-original when a thumb exists - grid stays snappy).
+original when a thumb exists - the grid stays snappy); arg = the media
+file's absolute path (item id stays parseable - xact._img_id_lib).
 
 Chords on a grid shot land on canvas edges (phase_grid), NOT here:
 ⏎ open in Eagle · ⌘ Edit this · ⇧ → To post · ⌥⌘ copy link ·
@@ -20,6 +25,7 @@ import sys
 import os
 import json
 import re
+import base64
 
 # ── script_base bootstrap ────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
@@ -33,9 +39,8 @@ except Exception as e:
     sys.exit(0)
 
 
-def _rows(fid, sess):
+def _rows(fid, sess, lib):
     import eagle
-    lib = os.environ.get("peek_lib") or "crm"
     lib_path = eagle.LIBS.get(lib, eagle.LIBS["crm"])[1]
     _root, ids_all = eagle.disk_subtree_ids(lib_path, fid)
     items = eagle.disk_items_in(lib_path, ids_all)
@@ -66,17 +71,23 @@ def _rows(fid, sess):
 
 def main():
     raw = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
-    parts = raw.split(":")
-    if parts and parts[0] == "peek":
-        parts = parts[1:]
-    fid = parts[0] if parts else ""
-    sess = parts[1] if len(parts) > 1 else ""
+    ctx = {}
     try:
-        rows = _rows(fid, sess)
+        ctx = json.loads(base64.b64decode(raw).decode())
+    except Exception:
+        pass
+    fid = ctx.get("fid") or ""
+    lib = ctx.get("lib") or "crm"
+    try:
+        rows = _rows(fid, ctx.get("sess") or "", lib)
     except Exception as e:
         rows = [{"title": f"🦅 {type(e).__name__}: {e}",
                  "subtitle": "T9 plugged in?", "valid": False}]
-    print(json.dumps({"items": rows}))
+    print(json.dumps({"alfredworkflow": {
+        "arg": json.dumps({"items": rows}),
+        "variables": {"lb_tid": ctx.get("lb") or "",
+                      "peek_lib": lib,
+                      "peek_ret": ctx.get("ret") or "ctx:clbs"}}}))
 
 
 if __name__ == "__main__":

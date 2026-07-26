@@ -2890,6 +2890,15 @@ def _img_id_lib(path):
     return iid, lib
 
 
+def img_peek(payload):
+    """⏎ on a folder-screen row: trampoline into the Grid View chain
+    (ET GridPeek → gridfeed → grid). The whole context rides a b64
+    payload because the osascript re-entry starts a FRESH session -
+    row variables drop (crmbrowse-style); gridfeed's output envelope
+    re-seeds lb_tid / peek_lib / peek_ret for the grid's chords."""
+    _run_trigger("GridPeek", payload)
+
+
 def img_open(path):
     """🖼 grid ⏎: open THIS shot in Eagle - switches to its library
     first (raw eagle:// links can't - probed 2026-07-25)."""
@@ -7583,6 +7592,8 @@ def main():
             content_retire(rest)
         elif verb == "eaglego":
             eagle_open(rest)
+        elif verb == "peek":
+            img_peek(rest)
         elif verb == "imgopen":
             img_open(rest)
         elif verb == "imglink":

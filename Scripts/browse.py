@@ -2470,10 +2470,17 @@ def render_lbeagle(ids, query):
     for it in items:
         for f in it.get("folders") or []:
             by_folder.setdefault(f, []).append(it)
-    peek_vars = {**_record_vars(lb),
-                 "lb_tid": log_tid, "peek_lib": lib,
-                 "peek_ret": f"ctx:lbeagle:{log_tid}"
-                             + (":hub" if ret_hub else "")}
+    ret_ctx = f"ctx:lbeagle:{log_tid}" + (":hub" if ret_hub else "")
+
+    def peek_arg(cid, sess=""):
+        # The whole grid context rides b64 - the ⏎ road trampolines
+        # through ET GridPeek (fresh session, row variables drop).
+        import base64
+        payload = json.dumps({"fid": cid, "sess": sess, "lib": lib,
+                              "lb": log_tid, "ret": ret_ctx})
+        return "xact:peek:" + base64.b64encode(
+            payload.encode()).decode()
+
     order = {n: i for i, n in enumerate(eagle.SKELETON)}
     kids = sorted(root.get("children") or [],
                   key=lambda c: (order.get(c.get("name"), 99),
@@ -2488,8 +2495,8 @@ def render_lbeagle(ids, query):
             subtitle=(f"{n} image{'s' if n != 1 else ''}" if n
                       else "no images yet")
                      + ("  |  ⏎🖼  ⌘⚡  ⌃🔙" if n else "  |  ⌃🔙"),
-            arg=f"peek:{cid}", valid=bool(n),
-            mods=_picker_mods(), variables=peek_vars))
+            arg=peek_arg(cid), valid=bool(n),
+            mods=_picker_mods(), variables=_record_vars(lb)))
         if name == "04 Sessions" and n:
             sess = {}
             for it in shots:
@@ -2502,8 +2509,8 @@ def render_lbeagle(ids, query):
                     subtitle=f"{len(sess[k])} image"
                              f"{'s' if len(sess[k]) != 1 else ''}"
                              "  |  ⏎🖼  ⌃🔙",
-                    arg=f"peek:{cid}:s{k}",
-                    mods=_picker_mods(), variables=peek_vars))
+                    arg=peek_arg(cid, f"s{k}"),
+                    mods=_picker_mods(), variables=_record_vars(lb)))
     if query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
