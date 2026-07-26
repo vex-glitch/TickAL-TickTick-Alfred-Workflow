@@ -1585,21 +1585,32 @@ def sessiondone(pid, tid, when=None):
     d_dur = cr.last_duration(lb_cached.get("content") or "")
     d_chg = cr.quote_remainder(lb_cached.get("content") or "")
     d_setup = cr.last_setup(lb_cached.get("content") or "")
+    # Consultations skip duration/charged/setup (Vex 2026-07-26) - one
+    # question, prep-flavored; needle sessions keep the full four.
+    prompts = ((
+        (f"How long was the {word}? (OK skips · Esc cancels)", d_dur),
+        ("Charged? (gift = free friend · OK skips · Esc cancels)", d_chg),
+        ("What did you do? (OK skips · Esc cancels)", ""),
+        ("Setup? needles · inks · machine (OK skips)", d_setup),
+    ) if is_s else (
+        ("What was discussed · anything to remember for the prep? "
+         "(OK skips · Esc cancels)", ""),
+    ))
     answers = []
-    for prompt, dflt in (
-            (f"How long was the {word}? (OK skips · Esc cancels)", d_dur),
-            ("Charged? (gift = free friend · OK skips · Esc cancels)", d_chg),
-            ("What did you do? (OK skips · Esc cancels)", ""),
-            ("Setup? needles · inks · machine (OK skips)", d_setup)):
+    for prompt, dflt in prompts:
         v = _ask(prompt, default=dflt)
         if v is None:
             _crm_say("Cancelled · task NOT completed, nothing logged")
             return
         answers.append(v)
-    dur, charged, did, setup = answers
-    if (setup or "").strip():
-        did = (did.strip() + ("\n" if did.strip() else "")
-               + f"Setup: {setup.strip()}")
+    if is_s:
+        dur, charged, did, setup = answers
+        if (setup or "").strip():
+            did = (did.strip() + ("\n" if did.strip() else "")
+                   + f"Setup: {setup.strip()}")
+    else:
+        dur = charged = setup = ""
+        did = answers[0]
     final = False
     if is_s:   # the archive question belongs to needle sessions only
         f_ans = _dialog("Final session - archive the logbook?",
