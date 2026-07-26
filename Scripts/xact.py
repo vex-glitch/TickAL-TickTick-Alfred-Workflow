@@ -2659,17 +2659,41 @@ _MIME = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
 
 
 def _attach_file_to(pid, tid, path, fname=None):
-    """One file → real TickTick attachment. IMAGES ONLY (spec: videos
-    pipeline through Eagle, never TickTick)."""
+    """One file → real TickTick attachment. Videos never (spec: they
+    pipeline through Eagle). RAW/DNG gets a sips JPEG rendition first,
+    3072px max (Vex ruling 2026-07-26: ALL his shots are ProRAW -
+    TickTick only takes JPG/HEIC/PNG, and a 48MP upload is pointless
+    for a task preview). Probe: ~3s, ~1MB per ProRAW."""
     ext = os.path.splitext(path)[1].lstrip(".").lower()
+    if ext in ("mov", "mp4", "m4v"):
+        raise ValueError("video - images only")
     mime = _MIME.get(ext)
+    cleanup = None
     if not mime:
-        raise ValueError(f"not an image (.{ext})")
-    with open(path, "rb") as f:
-        data = f.read()
-    import api_v2
-    api_v2.TickTickV2().upload_attachment(
-        pid, tid, data, fname or os.path.basename(path), mime)
+        import shutil
+        import tempfile
+        tmpd = tempfile.mkdtemp(prefix="tickal_att_")
+        cleanup = lambda: shutil.rmtree(tmpd, ignore_errors=True)
+        out = os.path.join(
+            tmpd, os.path.splitext(os.path.basename(path))[0] + ".jpg")
+        r = subprocess.run(["sips", "-s", "format", "jpeg", "-Z", "3072",
+                            path, "--out", out],
+                           capture_output=True, timeout=120)
+        if r.returncode != 0 or not os.path.exists(out):
+            cleanup()
+            raise ValueError(f".{ext} not convertible to JPEG")
+        path, mime = out, "image/jpeg"
+        if fname:
+            fname = os.path.splitext(fname)[0] + ".jpg"
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        import api_v2
+        api_v2.TickTickV2().upload_attachment(
+            pid, tid, data, fname or os.path.basename(path), mime)
+    finally:
+        if cleanup:
+            cleanup()
 
 
 def _pick_hero(shots):
@@ -2688,8 +2712,7 @@ def _pick_hero(shots):
     ext = os.path.splitext(hero["path"] or "")[1].lstrip(".").lower()
     if ext in ("mov", "mp4", "m4v"):
         return None, "♥ is a video - images only"
-    if ext not in _MIME:
-        return None, f"♥ .{ext} not attachable - JPG/HEIC/PNG only"
+    # RAW/DNG heroes are fine - _attach_file_to renders a JPEG first
     return hero, ""
 
 
