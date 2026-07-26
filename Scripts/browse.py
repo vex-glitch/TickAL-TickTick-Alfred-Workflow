@@ -2074,6 +2074,123 @@ def render_cmanage(query):
     return add_back(rows, "ctx:contentpl")
 
 
+def _cpl_counts():
+    """Open pipeline-task counts per 📸 tag across BOTH content lists."""
+    import areas as _ar
+    pids = (_ar.CONTENT_TV_ID, _ar.CONTENT_FM_ID)
+    out = {tag: 0 for tag, _i, _w in _CPL_STATES}
+    for t in cache_store.get("all_tasks") or []:
+        if ((t.get("_projectId") or t.get("projectId")) not in pids
+                or t.get("status", 0) != 0):
+            continue
+        tags = {str(x).lower() for x in (t.get("tags") or [])}
+        for tag in out:
+            if tag in tags:
+                out[tag] += 1
+    return out
+
+
+def render_cstats(query):
+    """📊 Content pipeline stats: queue totals + TV/FM split, posted /
+    retired by month (completed content tasks via v2 - 365d window),
+    minted-per-month, oldest item stuck in To edit. Queue counts render
+    from cache; history needs the v2 login and says so when missing."""
+    import areas as _ar
+    LIBS = {_ar.CONTENT_TV_ID: "TV", _ar.CONTENT_FM_ID: "FM"}
+    tasks = [t for t in cache_store.get("all_tasks") or []
+             if (t.get("_projectId") or t.get("projectId")) in LIBS
+             and t.get("status", 0) == 0]
+
+    def tags_of(t):
+        return {str(x).lower() for x in (t.get("tags") or [])}
+
+    rows = []
+    chips = _cpl_counts()
+    per_lib = {"TV": 0, "FM": 0}
+    for t in tasks:
+        if tags_of(t) & {s[0] for s in _CPL_STATES}:
+            per_lib[LIBS[t.get("_projectId") or t.get("projectId")]] += 1
+    rows.append(alfred.item(
+        uid="cs-now", title=f"🎞 {chips['📸raw']} raw · ✂️ {chips['📸edit']} "
+        f"editing · 📤 {chips['📸post']} to post · 🏷 {chips['📸studio']} studio",
+        subtitle=f"Open now · 📺 TV {per_lib['TV']} · 🖋️ FM {per_lib['FM']}",
+        valid=False))
+    # oldest thing stuck in editing - the actionable number
+    oldest = None
+    for t in tasks:
+        if "📸edit" in tags_of(t) and t.get("createdTime"):
+            if oldest is None or t["createdTime"] < oldest["createdTime"]:
+                oldest = t
+    if oldest:
+        try:
+            born = datetime.fromisoformat(
+                oldest["createdTime"].replace("Z", "+00:00"))
+            days = (datetime.now(timezone.utc) - born).days
+            mk = re.match(r"^\[(.*?)\]", (oldest.get("title") or "").strip())
+            nm = mk.group(1) if mk else (oldest.get("title") or "")[:30]
+            rows.append(alfred.item(
+                uid="cs-old", title=f"⏳ Longest in editing · {nm}",
+                subtitle=f"{days} days in To edit", valid=False))
+        except Exception:
+            pass
+    # history: completed content tasks = posted (📸post) / retired (📸raw)
+    try:
+        import api_v2
+        done = api_v2.TickTickV2().get_completed(days=365, limit=500)
+        mine = [t for t in done or []
+                if t.get("projectId") in LIBS]
+        months = {}
+        posted_all = retired_all = 0
+        for t in mine:
+            mo = (t.get("completedTime") or "")[:7]
+            if not mo:
+                continue
+            tags = {str(x).lower() for x in (t.get("tags") or [])}
+            bucket = months.setdefault(mo, [0, 0, 0])
+            if "📸post" in tags:
+                bucket[0] += 1
+                posted_all += 1
+            elif "📸raw" in tags:
+                bucket[1] += 1
+                retired_all += 1
+            else:
+                bucket[2] += 1
+        rows.append(alfred.item(
+            uid="cs-alltime",
+            title=f"✅ {posted_all} posted · ➖ {retired_all} retired",
+            subtitle="Completed content tasks · last 365 days",
+            valid=False))
+        for mo in sorted(months, reverse=True)[:12]:
+            p, r, o = months[mo]
+            bits = [f"✅ {p} posted"] + ([f"➖ {r} retired"] if r else []) \
+                + ([f"☑️ {o} other"] if o else [])
+            rows.append(alfred.item(
+                uid=f"cs-{mo}", title=f"📅 {mo} · " + " · ".join(bits),
+                subtitle="", valid=False))
+    except Exception as e:
+        rows.append(alfred.item(
+            title="✅ Posted history unavailable",
+            subtitle=f"Needs Attachment Login · {type(e).__name__}",
+            valid=False))
+    # minted per month from open tasks' createdTime (best-effort)
+    minted = {}
+    for t in tasks:
+        mo = (t.get("createdTime") or "")[:7]
+        if mo and tags_of(t) & {s[0] for s in _CPL_STATES}:
+            minted[mo] = minted.get(mo, 0) + 1
+    if minted:
+        top = sorted(minted, reverse=True)[:3]
+        rows.append(alfred.item(
+            uid="cs-minted",
+            title="➕ New in pipeline · "
+                  + " · ".join(f"{mo} {minted[mo]}" for mo in top),
+            subtitle="Open tasks by creation month", valid=False))
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:contentpl")
+
+
 def _cpl_task_row(t, tag, icon, word, lib, chip):
     """One content-task row: ⏎ opens the Eagle folder cross-library,
     ⌥⇧ = posted (Post rows) / retire (Raw rows)."""
@@ -2121,7 +2238,7 @@ def render_contentpl(ids, query):
                            arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
 
     if lib not in LIBS:
-        # root: intake state + global actions + one row per library
+        # root: chip state row (⏎ stats) + global actions + library rows
         pending = 0
         for k in ("tv", "fm"):
             try:
@@ -2130,12 +2247,12 @@ def render_contentpl(ids, query):
                                     os.path.join(_eagle.INTAKE[k], f))])
             except OSError:
                 pass
+        chips = _cpl_counts()
         rows = [alfred.item(
-            title="🎬 Content pipeline",
-            subtitle=(f"{pending} edited exports waiting in the intake "
-                      "folders" if pending
-                      else "No edited exports waiting (LR → Eagle Inbox "
-                           "TV/FM)"), valid=False)]
+            uid="cpl-stats", title="🎬 Content pipeline",
+            subtitle=f"📥{pending} · 🎞{chips['📸raw']} ✂️{chips['📸edit']} "
+                     f"📤{chips['📸post']} 🏷{chips['📸studio']}  |  ⏎ stats",
+            arg="xact:crmbrowse:ctx:cstats", mods=_picker_mods())]
         if pending:
             rows.append(alfred.item(
                 uid="cpl-file", title=f"📥 File edited shots ({pending})",
@@ -3746,6 +3863,9 @@ def main():
 
         elif level == "cmanage":
             items = render_cmanage(query)
+
+        elif level == "cstats":
+            items = render_cstats(query)
 
         elif level == "lbpick":
             items = render_lbpick(ids[0] if ids else "", query)
