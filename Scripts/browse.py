@@ -1997,6 +1997,83 @@ _CPL_STATES = [("📸edit", "✂️", "Editing"), ("📸post", "📤", "Ready to
                ("📸raw", "🎞", "Raw · undecided"), ("📸studio", "🏷", "Studio")]
 
 
+_LBPICK_VERBS = {
+    "eaglefolder": ("🦅", "Create if new · open in Eagle"),
+    "cdest": ("🎬", "Set TV · FM · none"),
+    "editthis": ("🎬", "Whole tree → To edit"),
+    "sessphotos": ("📸", "Photos selection → current session"),
+}
+
+
+def render_lbpick(verb, query):
+    """Generic logbook picker: one screen, any pipeline verb - the
+    'Manage content' road so everything Eagle is reachable from the
+    Content pipeline too, not just from CRM."""
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, "ctx:cmanage")
+    icon, subt = _LBPICK_VERBS.get(verb, ("", ""))
+    if not icon:
+        return add_back([alfred.item(title=f"Unknown action {verb!r}",
+                                     valid=False)], "ctx:cmanage")
+    import crm_records as cr
+    rows = []
+    for lb in (cr.records_notes(_areas.LOGBOOK_TAG)
+               + cr.records_notes(_areas.ARCHIVE_TAG)):
+        archived = _areas.ARCHIVE_TAG in {str(t).lower()
+                                          for t in (lb.get("tags") or [])}
+        rows.append(alfred.item(
+            uid=f"lbp-{lb['id']}",
+            title=f"{icon} {cr.logbook_base(lb)}",
+            subtitle=("Archived · " if archived else "") + subt,
+            arg=f"xact:{verb}:{lb['id']}",
+            match=f"{cr.logbook_base(lb)}"))
+    if not rows:
+        rows = [alfred.item(title="No logbooks yet",
+                            subtitle="➕ New tattoo mints one", valid=False)]
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:cmanage")
+
+
+def render_cmanage(query):
+    """🎛 Manage content - EVERY pipeline action on one screen (Vex:
+    'anything related to Eagle from the Content Pipeline list as well
+    as from CRM'). Picker roads hop, selection/global roads fire."""
+    def hop(uid, title, subtitle, ctx):
+        return alfred.item(uid=uid, title=title, subtitle=subtitle,
+                           arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
+    rows = [
+        hop("cm-photos", "📸 Send session photos",
+            "Photos selection → any stage (⌥ on the tattoo)", "ctx:tph"),
+        hop("cm-triage", "🦅 Eagle triage",
+            "Eagle selection → any tattoo stage", "ctx:triage"),
+        hop("cm-folder", "🦅 Create Eagle folder",
+            "Pick tattoo → skeleton + open", "ctx:lbpick:eaglefolder"),
+        hop("cm-cdest", "🎬 Content potential",
+            "Pick tattoo → TV · FM · none", "ctx:lbpick:cdest"),
+        hop("cm-edit", "🎬 Edit this",
+            "Pick tattoo → whole tree → To edit", "ctx:lbpick:editthis"),
+        alfred.item(uid="cm-promote", title="🎬 Promote Eagle selection",
+                    subtitle="CRM picks → To edit",
+                    arg="xact:promotesel", mods=_picker_mods()),
+        alfred.item(uid="cm-file", title="📥 File edited shots",
+                    subtitle="Intake → To post · task slides",
+                    arg="xact:filedited", mods=_picker_mods()),
+        alfred.item(uid="cm-star", title="⭐ Portfolio Eagle selection",
+                    subtitle="Edits → Tattoo Portfolio shelf",
+                    arg="xact:portfolio", mods=_picker_mods()),
+        alfred.item(uid="cm-sweep", title="🦅 Eagle sweep",
+                    subtitle="Skeletons for logbooks missing one",
+                    arg="xact:eaglesweep", mods=_picker_mods()),
+    ]
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:contentpl")
+
+
 def render_contentpl(query):
     """🎬 Content pipeline hub - the To edit / To post / Raw / Studio
     queues across BOTH Content PL lists, rendered from the TickTick
@@ -2021,14 +2098,10 @@ def render_contentpl(query):
             uid="cpl-file", title=f"📥 File edited shots ({pending})",
             subtitle="Intake → To post · names · task → Post",
             arg="xact:filedited", mods=_picker_mods()))
-    rows += [
-        alfred.item(uid="cpl-promote", title="🎬 Promote Eagle selection",
-                    subtitle="CRM picks → To edit",
-                    arg="xact:promotesel", mods=_picker_mods()),
-        alfred.item(uid="cpl-star", title="⭐ Portfolio Eagle selection",
-                    subtitle="Edits → Tattoo Portfolio shelf",
-                    arg="xact:portfolio", mods=_picker_mods()),
-    ]
+    rows.append(alfred.item(
+        uid="cpl-manage", title="🎛 Manage content",
+        subtitle="All pipeline actions · photos · triage · promote",
+        arg="xact:crmbrowse:ctx:cmanage", mods=_picker_mods()))
     pids = {_ar.CONTENT_TV_ID: ("tv", "📺"), _ar.CONTENT_FM_ID: ("fm", "🖋️")}
     tasks = [t for t in cache_store.get("all_tasks") or []
              if (t.get("_projectId") or t.get("projectId")) in pids
@@ -3604,6 +3677,12 @@ def main():
 
         elif level == "contentpl":
             items = render_contentpl(query)
+
+        elif level == "cmanage":
+            items = render_cmanage(query)
+
+        elif level == "lbpick":
+            items = render_lbpick(ids[0] if ids else "", query)
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")
