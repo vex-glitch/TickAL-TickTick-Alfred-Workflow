@@ -2837,13 +2837,19 @@ def session_photos(log_tid, stage=""):
                 a_tid, target = nxt[2]["id"], nxt[1]
             else:
                 a_pid, a_tid, target = areas.RECORDS_ID, log_tid, "logbook"
-            ok_n = 0
+            ok_n = dup_n = 0
             for i, h in enumerate(heroes):
+                if (a_tid == log_tid
+                        and _already_on_note(log_tid, h["filename"])):
+                    dup_n += 1
+                    continue
                 try:
-                    up = _attach_file_to(
-                        a_pid, a_tid, h["path"],
-                        f"{base} · {label} · {i + 1}."
-                        f"{h['path'].rsplit('.', 1)[-1]}")
+                    # note target: keep the ORIGINAL filename - it is
+                    # the stable dedupe key across re-runs
+                    fname = (h["filename"] if a_tid == log_tid
+                             else f"{base} · {label} · {i + 1}."
+                                  f"{h['path'].rsplit('.', 1)[-1]}")
+                    up = _attach_file_to(a_pid, a_tid, h["path"], fname)
                     ok_n += 1
                     if a_tid == log_tid:   # note target → plant the ref
                         try:
@@ -2852,7 +2858,8 @@ def session_photos(log_tid, stage=""):
                             pass
                 except Exception as e:
                     why = f"attach failed: {type(e).__name__}"
-            att = f" · ♥×{ok_n} → {target}" if ok_n else f" · ♥ {why}"
+            att = ((f" · ♥×{ok_n} → {target}" if ok_n else f" · ♥ {why}")
+                   + (f" · {dup_n} already there" if dup_n else ""))
         else:
             att = f" · {why}"
         try:
@@ -2894,8 +2901,12 @@ def photo_attach(pid, tid):
             _is_lb_note = (t.get("title") or "").startswith(("🎨", "🏛️"))
         _att_log(f"photo_attach pid={pid} tid={tid} lb_note={_is_lb_note} "
                  f"heroes={len(heroes)}")
-        ok_n = 0
+        ok_n = dup_n = 0
         for h in heroes:
+            if _is_lb_note and _already_on_note(tid, h["filename"]):
+                dup_n += 1
+                _att_log(f"skip dup {h['filename']}")
+                continue
             try:
                 up = _attach_file_to(pid, tid, h["path"], h["filename"])
                 ok_n += 1
@@ -2911,10 +2922,13 @@ def photo_attach(pid, tid):
             except Exception as e:
                 why = f"{type(e).__name__}: {e}"
                 _att_log(f"upload EXC {h['filename']}: {why}")
+        dup = f" · {dup_n} already there" if dup_n else ""
         if ok_n:
-            _crm_say(f"📎 {ok_n} attached"
-                     + ("" if ok_n == len(heroes)
+            _crm_say(f"📎 {ok_n} attached{dup}"
+                     + ("" if ok_n + dup_n == len(heroes)
                         else f" · rest failed: {why}"))
+        elif dup_n:
+            _crm_say(f"📎 All {dup_n} already on the note")
         else:
             _crm_say(f"📎 Attach failed: {why}")
     finally:
@@ -3057,6 +3071,19 @@ def _att_log(msg):
         pass
 
 
+def _already_on_note(log_tid, fname):
+    """True when an ![image] ref with this file's STEM already sits in
+    the note - re-runs must never duplicate (Vex rule 2026-07-26).
+    Stem match survives the RAW → .jpg rename; the cache is fresh
+    enough (insert_session_images patches it per plant)."""
+    stem = os.path.splitext(os.path.basename(fname or ""))[0]
+    if not stem:
+        return False
+    c = (_record_by_id(log_tid) or {}).get("content") or ""
+    return any(stem in l for l in c.split("\n")
+               if l.lstrip().startswith("![image]("))
+
+
 def _plant_logbook_ref(log_tid, up, label=""):
     """Planted, not just uploaded: bare attachments render at the
     BOTTOM of the note (Vex smoke 2026-07-26: 'ended up in notes').
@@ -3099,6 +3126,9 @@ def img_attach(path):
     log_tid = os.environ.get("lb_tid") or ""
     if not log_tid:
         _crm_say("🖼 Lost the logbook context · re-enter the grid")
+        return
+    if _already_on_note(log_tid, os.path.basename(path)):
+        _crm_say("📎 Already on the note")
         return
     try:
         up = _attach_file_to(areas.RECORDS_ID, log_tid, path)
