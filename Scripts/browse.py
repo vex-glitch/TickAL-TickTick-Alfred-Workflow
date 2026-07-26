@@ -2345,11 +2345,13 @@ def render_contentpl(ids, query):
     return add_back(rows, f"ctx:contentpl:{lib}")
 
 
-def _content_logbook_row(cr, lb):
+def _content_logbook_row(cr, lb, ret=""):
     """Content-world logbook row (Vex design 2026-07-26): the tattoo IS
     the content entity here, so ⏎ drills into its 🦅 folder screen
     (counts → grid), ⌥ the CRM logbook hub, ⌥⇧ opens the note. Same
-    entity as the CRM row, different world, different ⏎."""
+    entity as the CRM row, different world, different ⏎. ret = return
+    tail threaded into lbeagle so ⌃ backs to where Vex came from
+    (':cu:<custId>' from the customer birdseye; review find)."""
     base = cr.logbook_base(lb)
     dest = cr.content_dest_of(lb.get("content") or "")
     dchip = {"tv": "🎬 TV", "fm": "🎬 FM", "-": "🎬 ➖"}.get(dest, "🎬 unset")
@@ -2366,7 +2368,7 @@ def _content_logbook_row(cr, lb):
     return alfred.item(
         uid=f"clb-{lb['id']}", title=f"🎨 {base}",
         subtitle=" · ".join(bits) + "  |  ⏎🦅  ⌘⚡  ⌥⤵️  ⌥⇧↗️  ⌃🔙",
-        arg=f"xact:crmbrowse:ctx:lbeagle:{lb['id']}",
+        arg=f"xact:crmbrowse:ctx:lbeagle:{lb['id']}{ret}",
         match=base, mods=mods, variables=_record_vars(lb))
 
 
@@ -2376,9 +2378,15 @@ def render_clbs(query):
     if gate:
         return add_back(gate, "ctx:contentpl")
     import crm_records as cr
-    rows = [_content_logbook_row(cr, lb)
-            for lb in (cr.records_notes(_areas.LOGBOOK_TAG)
-                       + cr.records_notes(_areas.ARCHIVE_TAG))]
+    rows, seen = [], set()
+    for lb in (cr.records_notes(_areas.LOGBOOK_TAG)
+               + cr.records_notes(_areas.ARCHIVE_TAG)):
+        # skip double-tag dupes AND person-shaped notes (a crmcold lead
+        # carries bare ARCHIVE_TAG - it is NOT a logbook; review find)
+        if lb["id"] in seen or cr.PERSON_RE.match(lb.get("title") or ""):
+            continue
+        seen.add(lb["id"])
+        rows.append(_content_logbook_row(cr, lb))
     if not rows:
         rows = [alfred.item(title="No logbooks yet",
                             subtitle="➕ New tattoo mints one", valid=False)]
@@ -2396,7 +2404,7 @@ def render_ccust(ids, query):
         return add_back(gate, "ctx:contentpl")
     import crm_records as cr
     if ids:
-        rows = [_content_logbook_row(cr, lb)
+        rows = [_content_logbook_row(cr, lb, f":cu:{ids[0]}")
                 for lb in cr.customer_logbooks(ids[0])]
         if not rows:
             rows = [alfred.item(title="No tattoos yet",
@@ -2433,8 +2441,13 @@ def render_lbeagle(ids, query):
     04 Sessions, create row when no folder exists. ⏎ on a folder =
     peek:<fid> → the Grid View (canvas phase_grid)."""
     log_tid = ids[0]
-    ret_hub = len(ids) > 1 and ids[1] == "hub"
-    back = f"ctx:crmbook:{log_tid}" if ret_hub else "ctx:clbs"
+    tail = ids[1:]
+    if tail[:1] == ["hub"]:
+        back = f"ctx:crmbook:{log_tid}"
+    elif tail[:1] == ["cu"] and len(tail) > 1:
+        back = f"ctx:ccust:{tail[1]}"
+    else:
+        back = "ctx:clbs"
     gate = _records_gate()
     if gate:
         return add_back(gate, back)
@@ -2456,30 +2469,32 @@ def render_lbeagle(ids, query):
     lib_path = eagle.LIBS.get(lib, eagle.LIBS["crm"])[1]
     head = alfred.item(uid="lbe-open", title=f"🦅 {base}",
                        subtitle="Whole folder, in Eagle  |  ⏎↗️  ⌘⚡  ⌃🔙",
-                       arg=f"xact:eaglego:{log_tid}", mods=_picker_mods(),
+                       arg=f"xact:eaglego:{lib}:{fid}", mods=_picker_mods(),
                        variables=_record_vars(lb))
     try:
-        root, _all = eagle.disk_subtree_ids(lib_path, fid)
-        sub_ids = [root["id"]] + [c["id"] for c in root.get("children") or []]
-        items = eagle.disk_items_in(lib_path, sub_ids)
+        root, all_ids = eagle.disk_subtree_ids(lib_path, fid)
+        items = eagle.disk_items_in(lib_path, all_ids)
     except eagle.EagleError as e:
         return add_back([head, alfred.item(title=f"🦅 {e}",
                                            subtitle="T9 plugged in?",
                                            valid=False)], back)
-    by_folder = {}
-    for it in items:
-        for f in it.get("folders") or []:
-            by_folder.setdefault(f, []).append(it)
-    ret_ctx = f"ctx:lbeagle:{log_tid}" + (":hub" if ret_hub else "")
+    ret_ctx = "ctx:lbeagle:" + ":".join(ids)
 
-    def peek_arg(cid, sess=""):
+    def peek_arg(cid, sess="", direct=False):
         # The whole grid context rides b64 - the ⏎ road trampolines
         # through ET GridPeek (fresh session, row variables drop).
         import base64
         payload = json.dumps({"fid": cid, "sess": sess, "lib": lib,
-                              "lb": log_tid, "ret": ret_ctx})
+                              "lb": log_tid, "ret": ret_ctx,
+                              "direct": direct})
         return "xact:peek:" + base64.b64encode(
             payload.encode()).decode()
+
+    def _sub(node):
+        out = {node["id"]}
+        for ch in node.get("children") or []:
+            out |= _sub(ch)
+        return out
 
     order = {n: i for i, n in enumerate(eagle.SKELETON)}
     kids = sorted(root.get("children") or [],
@@ -2488,7 +2503,11 @@ def render_lbeagle(ids, query):
     rows = [head]
     for c in kids:
         cid, name = c["id"], c.get("name") or "?"
-        shots = list({it["id"]: it for it in by_folder.get(cid, [])}.values())
+        # count over the child's SUBTREE - matches exactly what its
+        # grid peek shows (manual nesting counts; review find)
+        cset = _sub(c)
+        shots = list({it["id"]: it for it in items
+                      if set(it.get("folders") or []) & cset}.values())
         n = len(shots)
         rows.append(alfred.item(
             uid=f"lbe-{cid}", title=name,
@@ -2511,6 +2530,18 @@ def render_lbeagle(ids, query):
                              "  |  ⏎🖼  ⌃🔙",
                     arg=peek_arg(cid, f"s{k}"),
                     mods=_picker_mods(), variables=_record_vars(lb)))
+    # honest strays: shots dragged straight into the tattoo root folder
+    # (outside the 01-06 skeleton) get their own row (review find)
+    strays = list({it["id"]: it for it in items
+                   if root["id"] in (it.get("folders") or [])}.values())
+    if strays:
+        ns = len(strays)
+        rows.append(alfred.item(
+            uid=f"lbe-{root['id']}-strays", title="· unfiled",
+            subtitle=f"{ns} image{'s' if ns != 1 else ''} at folder root"
+                     "  |  ⏎🖼  ⌃🔙",
+            arg=peek_arg(root["id"], direct=True),
+            mods=_picker_mods(), variables=_record_vars(lb)))
     if query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
@@ -2541,7 +2572,8 @@ def render_imgstage(query):
             uid=f"imgs-{key}",
             title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
             subtitle=subtxt or f"Current session · name gets S{n}",
-            arg=f"xact:imgmove:{key}", variables=carry,
+            arg=f"xact:imgmove:{key}",
+            variables={**carry, **_record_vars(lb)},
             mods=_picker_mods()))
     m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
     if m:
@@ -2549,7 +2581,9 @@ def render_imgstage(query):
         rows.append(alfred.item(
             uid="imgs-sn", title=f"→ 04 Sessions · S{k}",
             subtitle=f"Older session · name gets S{k}",
-            arg=f"xact:imgmove:s{k}", variables=carry, mods=_picker_mods()))
+            arg=f"xact:imgmove:s{k}",
+            variables={**carry, **_record_vars(lb)},
+            mods=_picker_mods()))
     elif query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
@@ -2639,6 +2673,10 @@ def _crmsearch_rows(cr, scope, term):
                 else (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG))
         for tag in tags:
             for lb in cr.records_notes(tag):
+                # person-shaped notes are never logbooks - a crmcold
+                # lead carries bare ARCHIVE_TAG (review find 2026-07-26)
+                if cr.PERSON_RE.match(lb.get("title") or ""):
+                    continue
                 if lb["id"] not in seen:
                     seen.add(lb["id"])
                     rows.append(("log", lb))
@@ -4175,7 +4213,7 @@ def main():
 
         elif level == "lbeagle":
             items = render_lbeagle(ids, query) if ids \
-                else _missing(level, "<logbookTid>[:hub]")
+                else _missing(level, "<logbookTid>[:hub|:cu:<custId>]")
 
         elif level == "imgstage":
             items = render_imgstage(query)

@@ -2613,6 +2613,11 @@ def eagle_folder(log_tid):
     if not lb:
         _crm_say("Logbook not found · run tsy")
         return
+    if cr.PERSON_RE.match(lb.get("title") or ""):
+        # a cold lead carries bare ARCHIVE_TAG and could reach a logbook
+        # surface - never mint an Eagle skeleton for a person note
+        _crm_say("🦅 Not a logbook")
+        return
     had, _ = cr.eagle_folder_of(lb.get("content") or "")
     try:
         import eagle
@@ -2976,11 +2981,30 @@ def img_post(path):
     if dest not in ("tv", "fm"):
         _crm_say("🎬 Set Content potential (TV · FM) first")
         return
+    iid, _slib = _img_id_lib(path)
+    base = cr.logbook_base(lb)
     try:
         eagle.ensure_library(dest)
         _cp, shelves = _cp_folders(eagle)
-        ids = eagle.add_items([{"path": path}], folder_id=shelves["To post"])
-        eagle.wait_imported(ids)
+        shelf = shelves["To post"]
+        # idempotency: the copy's annotation carries the SOURCE item id -
+        # a second ⇧ on the same shot must not duplicate (review find)
+        mark = f"src:{iid}" if iid else ""
+        copied = True
+        if mark and any((it.get("annotation") or "") == mark
+                        for it in eagle.items_in_folder(shelf)):
+            copied = False
+        else:
+            # name + tags like every other To-post road: convention
+            # '{base} • Edit • n' keeps the shot sweepable by Posted
+            # and acceptable to ⭐ Portfolio (review find)
+            cust, _, tat = base.partition(" - ")
+            tags = [x for x in (cust.strip(), tat.strip()) if x] + [dest]
+            n = eagle.next_index(eagle.list_item_names(shelf), base, "Edit")
+            ids = eagle.add_items(
+                [{"path": path, "name": eagle.item_name(base, "Edit", n),
+                  "tags": tags, "annotation": mark}], folder_id=shelf)
+            eagle.wait_imported(ids)
     except Exception as e:
         _crm_say(f"🦅 {e}")
         return
@@ -2998,7 +3022,8 @@ def img_post(path):
                     else "📸edit" if "📸edit" in tags else "")
             _content_retag(t, drop, "📸post")
             note = "task → Post"
-    _crm_say(f"📤 Shot → To post · {note}")
+    _crm_say(("📤 Shot → To post · " if copied
+              else "📤 Already on To post · ") + note)
 
 
 def img_move(stage):

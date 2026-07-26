@@ -39,11 +39,15 @@ except Exception as e:
     sys.exit(0)
 
 
-def _rows(fid, sess, lib):
+def _rows(fid, sess, lib, direct=False):
     import eagle
     lib_path = eagle.LIBS.get(lib, eagle.LIBS["crm"])[1]
     _root, ids_all = eagle.disk_subtree_ids(lib_path, fid)
     items = eagle.disk_items_in(lib_path, ids_all)
+    if direct:
+        # the '· unfiled' strays row: only shots sitting IN this folder,
+        # not the whole subtree (review find)
+        items = [i for i in items if fid in (i.get("folders") or [])]
     m = re.match(r"^s(\d+)$", sess or "")
     if m:
         k = int(m.group(1))
@@ -79,7 +83,8 @@ def main():
     fid = ctx.get("fid") or ""
     lib = ctx.get("lib") or "crm"
     try:
-        rows = _rows(fid, ctx.get("sess") or "", lib)
+        rows = _rows(fid, ctx.get("sess") or "", lib,
+                     bool(ctx.get("direct")))
     except Exception as e:
         rows = [{"title": f"🦅 {type(e).__name__}: {e}",
                  "subtitle": "T9 plugged in?", "valid": False}]
