@@ -2715,24 +2715,23 @@ def _attach_file_to(pid, tid, path, fname=None):
             cleanup()
 
 
-def _pick_hero(shots):
-    """The ONE shot that becomes the TickTick attachment: exactly one
-    ♥ favorite, or a single-item selection. None + reason otherwise -
-    honest, never guesses."""
+def _pick_heroes(shots):
+    """EVERY ♥ favorite becomes a TickTick attachment (Vex 2026-07-26:
+    arm shot + reference = two heroes; the old exactly-one rule died);
+    a single-item selection counts without a ♥. Video ♥s skipped
+    honestly; RAW/DNG fine - _attach_file_to renders JPEGs. Returns
+    ([], reason) when nothing is attachable."""
     favs = [s for s in shots if s.get("favorite")]
-    if len(favs) == 1:
-        hero = favs[0]
-    elif len(favs) > 1:
-        return None, f"{len(favs)} ♥ - heart exactly one"
-    elif len(shots) == 1:
-        hero = shots[0]
-    else:
-        return None, "no ♥ in selection"
-    ext = os.path.splitext(hero["path"] or "")[1].lstrip(".").lower()
-    if ext in ("mov", "mp4", "m4v"):
-        return None, "♥ is a video - images only"
-    # RAW/DNG heroes are fine - _attach_file_to renders a JPEG first
-    return hero, ""
+    if not favs and len(shots) == 1:
+        favs = list(shots)
+    if not favs:
+        return [], "no ♥ in selection"
+    out = [s for s in favs
+           if os.path.splitext(s["path"] or "")[1].lstrip(".").lower()
+           not in ("mov", "mp4", "m4v")]
+    if not out:
+        return [], "♥ all videos - images only"
+    return out, ""
 
 
 _STAGES = {
@@ -2813,9 +2812,9 @@ def session_photos(log_tid, stage=""):
         except eagle.EagleError as e:
             _crm_say(f"📸 Eagle trouble: {e} · shots safe in Photos")
             return False
-        hero, why = _pick_hero(shots)
+        heroes, why = _pick_heroes(shots)
         att = ""
-        if hero:
+        if heroes:
             nxt = cr.next_session_task(log_tid)
             if nxt:
                 a_pid = (nxt[2].get("_projectId")
@@ -2823,12 +2822,17 @@ def session_photos(log_tid, stage=""):
                 a_tid, target = nxt[2]["id"], nxt[1]
             else:
                 a_pid, a_tid, target = areas.RECORDS_ID, log_tid, "logbook"
-            try:
-                _attach_file_to(a_pid, a_tid, hero["path"],
-                                f"{base} · {label}.{hero['path'].rsplit('.', 1)[-1]}")
-                att = f" · ♥ → {target}"
-            except Exception as e:
-                att = f" · ♥ attach failed: {type(e).__name__}"
+            ok_n = 0
+            for i, h in enumerate(heroes):
+                try:
+                    _attach_file_to(
+                        a_pid, a_tid, h["path"],
+                        f"{base} · {label} · {i + 1}."
+                        f"{h['path'].rsplit('.', 1)[-1]}")
+                    ok_n += 1
+                except Exception as e:
+                    why = f"attach failed: {type(e).__name__}"
+            att = f" · ♥×{ok_n} → {target}" if ok_n else f" · ♥ {why}"
         else:
             att = f" · {why}"
         try:
@@ -2836,7 +2840,11 @@ def session_photos(log_tid, stage=""):
             alb = " · ✅ album"
         except pb.PhotosError:
             alb = " · album skipped"
-        _crm_say(f"📸 {len(shots)} → {base} · {label}{att}{alb}")
+        # imports verified above (wait_imported) - NOW the originals may
+        # leave Photos (PhotoKit; macOS shows its own confirm dialog)
+        deln, dwhy = pb.photokit_delete([s["id"] for s in shots])
+        trash = f" · 🗑 {deln} Photos" if deln else f" · 🗑 kept: {dwhy}"
+        _crm_say(f"📸 {len(shots)} → {base} · {label}{att}{alb}{trash}")
         return True
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -2855,16 +2863,23 @@ def photo_attach(pid, tid):
         except pb.PhotosError as e:
             _crm_say(f"📎 {e}")
             return
-        hero, why = _pick_hero(shots)
-        if not hero:
+        heroes, why = _pick_heroes(shots)
+        if not heroes:
             _crm_say(f"📎 {why}")
             return
-        try:
-            _attach_file_to(pid, tid, hero["path"], hero["filename"])
-        except Exception as e:
-            _crm_say(f"📎 Attach failed: {type(e).__name__}: {e}")
-            return
-        _crm_say(f"📎 {hero['filename']} attached")
+        ok_n = 0
+        for h in heroes:
+            try:
+                _attach_file_to(pid, tid, h["path"], h["filename"])
+                ok_n += 1
+            except Exception as e:
+                why = f"{type(e).__name__}: {e}"
+        if ok_n:
+            _crm_say(f"📎 {ok_n} attached"
+                     + ("" if ok_n == len(heroes)
+                        else f" · rest failed: {why}"))
+        else:
+            _crm_say(f"📎 Attach failed: {why}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

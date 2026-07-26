@@ -170,3 +170,49 @@ def selection_count():
                         timeout=30).strip() or "0")
     except (PhotosError, ValueError):
         return 0
+
+
+def photokit_delete(ids):
+    """Move media items to Photos' Recently Deleted via PhotoKit -
+    AppleScript has NO delete (probed; parked stage 2, unparked on
+    Vex's ask 2026-07-26). macOS ALWAYS shows its own 'Delete N
+    photos?' confirm - one click per run, Apple's design, cancel =
+    honest keep. First run prompts for Photos-library access
+    (attributed to Alfred). Returns (n_deleted, "") or (0, reason) -
+    never raises; the '✅ In Eagle' album stays the manual-purge
+    fallback whenever this skips. Recently Deleted keeps 30 days."""
+    if not ids:
+        return 0, "nothing to delete"
+    try:
+        import Photos
+    except ImportError:
+        return 0, "PyObjC Photos framework missing"
+    try:
+        st = Photos.PHPhotoLibrary.authorizationStatus()
+        if st == 0:                       # notDetermined - block on ask
+            import threading
+            ev = threading.Event()
+            got = {}
+
+            def _cb(s):
+                got["s"] = s
+                ev.set()
+            Photos.PHPhotoLibrary.requestAuthorization_(_cb)
+            ev.wait(120)
+            st = got.get("s", 0)
+        if st not in (3, 4):              # authorized · limited
+            return 0, "Photos access not granted (Privacy settings)"
+        assets = Photos.PHAsset.fetchAssetsWithLocalIdentifiers_options_(
+            list(ids), None)
+        if assets.count() == 0:
+            return 0, "no matching assets"
+
+        def _change():
+            Photos.PHAssetChangeRequest.deleteAssets_(assets)
+        ok, err = Photos.PHPhotoLibrary.sharedPhotoLibrary() \
+            .performChangesAndWait_error_(_change, None)
+        if not ok:
+            return 0, "cancelled" if err is None else f"refused: {err}"
+        return assets.count(), ""
+    except Exception as e:
+        return 0, f"{type(e).__name__}: {e}"
