@@ -509,6 +509,14 @@ def main():
             # Vex's reflex is ⌘ Actions, not the ⌥ drill (smoke 2026-07-26)
             _is_logbook = (name or "").startswith(("🎨", "🏛️"))
 
+        # 📸 content-task rows (both-places rule: posted/retire live on
+        # the queue rows' ⌥⇧ AND here)
+        _ct_tags = set()
+        if (pid in (areas.CONTENT_TV_ID, areas.CONTENT_FM_ID)
+                and is_task_like and bool(tid)):
+            _ct_tags = {str(x).lower()
+                        for x in ((task or {}).get("tags") or [])}
+
         rows = [
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
             ("📋 Copy name",       "Task name → clipboard",
@@ -594,6 +602,12 @@ def main():
             ("🎬 Edit this",       "Whole tree → To edit",
              f"xact:editthis:{tid}", "edit this promote content tree",
              _is_logbook),
+            ("✅ Posted",          "Shelf clears · task completes",
+             f"xact:posted:{tid}", "posted done shelf content",
+             "📸post" in _ct_tags),
+            ("➖ Retire",          "Logbook 🎬 → ➖ · task completes",
+             f"xact:cretire:{tid}", "retire content raw backlog",
+             "📸raw" in _ct_tags),
             (f"📞 Copy {_phone}",  "Number → clipboard",   f"copy:{_phone}", "phone copy number contact call", bool(_phone)),
             (f"✉️ Copy {_mail}",   "Mail → clipboard",     f"copy:{_mail}",  "mail copy email contact", bool(_mail)),
             (f"📸 Open {_insta}",  "Instagram profile (DMs)",

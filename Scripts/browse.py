@@ -2217,7 +2217,7 @@ def _cpl_task_row(t, tag, icon, word, lib, chip):
     open_lib = "crm" if tag == "📸raw" else lib
     arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
     mods = dict(_picker_mods())
-    sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "")
+    sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "") + " · ⌘⚡"
     if tag == "📸post":
         mods["alt+shift"] = {"arg": f"xact:posted:{t['id']}",
                              "subtitle": "Mark POSTED · shelf clears",
@@ -2228,9 +2228,16 @@ def _cpl_task_row(t, tag, icon, word, lib, chip):
                              "subtitle": "Retire · logbook 🎬 → ➖",
                              "valid": True}
         sub += " · ⌥⇧ retire"
+    pid = t.get("_projectId") or t.get("projectId") or ""
     return alfred.item(uid=f"cpl-{t['id']}", title=f"{icon} {base}",
                        subtitle=sub, arg=arg, valid=bool(arg),
-                       match=f"{base} {word}", mods=mods)
+                       match=f"{base} {word}", mods=mods,
+                       # task vars → ⌘ Actions opens ON this task
+                       # (↗️ Open row 1, focus, tags - Vex smoke ask)
+                       variables={"task_id": t["id"], "task_list_id": pid,
+                                  "list_id": pid,
+                                  "task_title": t.get("title") or "",
+                                  "item_type": "task"})
 
 
 def render_contentpl(ids, query):
@@ -2467,9 +2474,18 @@ def render_lbeagle(ids, query):
             variables=_record_vars(lb))], back)
     lib = lib or "crm"
     lib_path = eagle.LIBS.get(lib, eagle.LIBS["crm"])[1]
+    def _lbe_mods():
+        # ⌥⇧ = 🎬 Edit this from any folder row (Vex smoke ask; ⌥⇧ is
+        # the one free executing chord on browse rows - canvas fact)
+        m = _picker_mods()
+        m["alt+shift"] = {"arg": f"xact:editthis:{log_tid}", "valid": True,
+                          "subtitle": "🎬 Edit this"}
+        return m
+
     head = alfred.item(uid="lbe-open", title=f"🦅 {base}",
-                       subtitle="Whole folder, in Eagle  |  ⏎↗️  ⌘⚡  ⌃🔙",
-                       arg=f"xact:eaglego:{lib}:{fid}", mods=_picker_mods(),
+                       subtitle="Whole folder, in Eagle"
+                               "  |  ⏎↗️  ⌘⚡  ⌥⇧🎬  ⌃🔙",
+                       arg=f"xact:eaglego:{lib}:{fid}", mods=_lbe_mods(),
                        variables=_record_vars(lb))
     try:
         root, all_ids = eagle.disk_subtree_ids(lib_path, fid)
@@ -2512,9 +2528,10 @@ def render_lbeagle(ids, query):
         rows.append(alfred.item(
             uid=f"lbe-{cid}", title=name,
             subtitle=f"🖼️ {n}"
-                     + ("  |  ⏎🖼  ⌘⚡  ⌃🔙" if n else "  |  ⌃🔙"),
+                     + ("  |  ⏎🖼  ⌘⚡  ⌥⇧🎬  ⌃🔙" if n
+                        else "  |  ⌥⇧🎬  ⌃🔙"),
             arg=peek_arg(cid), valid=bool(n),
-            mods=_picker_mods(), variables=_record_vars(lb)))
+            mods=_lbe_mods(), variables=_record_vars(lb)))
         if name == "04 Sessions" and n:
             sess = {}
             for it in shots:
@@ -2524,9 +2541,9 @@ def render_lbeagle(ids, query):
                 label = f"S{k}" if k else "unnumbered"
                 rows.append(alfred.item(
                     uid=f"lbe-{cid}-s{k}", title=f"   · {label}",
-                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌃🔙",
+                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌥⇧🎬  ⌃🔙",
                     arg=peek_arg(cid, f"s{k}"),
-                    mods=_picker_mods(), variables=_record_vars(lb)))
+                    mods=_lbe_mods(), variables=_record_vars(lb)))
     # honest strays: shots dragged straight into the tattoo root folder
     # (outside the 01-06 skeleton) get their own row (review find)
     strays = list({it["id"]: it for it in items
@@ -2535,9 +2552,9 @@ def render_lbeagle(ids, query):
         ns = len(strays)
         rows.append(alfred.item(
             uid=f"lbe-{root['id']}-strays", title="· unfiled",
-            subtitle=f"🖼️ {ns} · folder root  |  ⏎🖼  ⌃🔙",
+            subtitle=f"🖼️ {ns} · folder root  |  ⏎🖼  ⌥⇧🎬  ⌃🔙",
             arg=peek_arg(root["id"], direct=True),
-            mods=_picker_mods(), variables=_record_vars(lb)))
+            mods=_lbe_mods(), variables=_record_vars(lb)))
     if query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])

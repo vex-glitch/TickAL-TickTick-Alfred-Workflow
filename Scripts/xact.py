@@ -3179,6 +3179,36 @@ def _portfolio_folder(eagle, base):
     return hit["id"] if hit else eagle.create_folder(base, parent=pid)
 
 
+def _studio_task(lb, fid):
+    """🏷 Studio pick on Edit this (Vex smoke 2026-07-26): a
+    DISPOSABLE 📸studio task - the studio errand never rides the
+    content task (its lifecycle must survive the studio send; a
+    studio task completes on sent). No Eagle filing - the lane's
+    spec: quick basic edit straight from the CRM folder, file
+    discarded after sending."""
+    import areas
+    import crm_records as cr
+    dest = cr.content_dest_of(lb.get("content") or "")
+    if dest not in ("tv", "fm"):
+        p = _choose("🏷 Studio task - which board?",
+                    ["📺 TV - neotrad", "🖋️ FM - fineline"])
+        if p is None:
+            _crm_say("Cancelled")
+            return
+        dest = "tv" if p.startswith("📺") else "fm"
+    api = cr._api()
+    base = cr.logbook_base(lb)
+    pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
+    t = api.create_task(
+        title=_eagle_title(base, fid), project_id=pid,
+        content="🏷 Studio edit · send + complete\n"
+                f"🎨 {cr.task_link(areas.RECORDS_ID, lb['id'], lb.get('title') or '')}",
+        tags=["📸studio"])
+    _person_inject_cache(t, pid)
+    _crm_say("🏷 Studio task minted · edit from the CRM folder · "
+             "complete on sent")
+
+
 def edit_this(log_tid):
     """🎬 Edit this: copy the WHOLE CRM tattoo tree (read from DISK -
     the closed CRM library is never opened, ONE switch total) into
@@ -3201,11 +3231,15 @@ def edit_this(log_tid):
         _crm_say("🎬 No Eagle folder yet · run 🦅 or 📸 first")
         return
     cur = cr.content_dest_of(lb.get("content") or "")
-    OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline"]
+    OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline",
+            "🏷 Studio - quick edit · no filing"]
     pick = _choose(f"🎬 Edit {base} - where to?", OPTS,
                    default={"tv": OPTS[0], "fm": OPTS[1]}.get(cur))
     if pick is None:
         _crm_say("Cancelled")
+        return
+    if pick.startswith("🏷"):
+        _studio_task(lb, fid)
         return
     dest = "tv" if pick.startswith("📺") else "fm"
     if dest != cur:
