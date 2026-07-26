@@ -2370,11 +2370,16 @@ def _content_logbook_row(cr, lb, ret=""):
                    "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
     mods["alt+shift"] = {"arg": f"xact:notego:{lb['id']}", "valid": True,
                          "subtitle": "Open in TickTick"}
+    if fid:
+        # ⌥⌘ rides the modURL copy chain - the tattoo's Eagle link
+        mods["alt+cmd"] = {"arg": f"copy:eagle://folder/{fid}",
+                           "valid": True, "subtitle": "🔗 Copy Eagle link"}
     bits = [b for b in (("📁 archived" if archived else ""), dchip,
                         "" if fid else "🦅 no folder yet") if b]
     return alfred.item(
         uid=f"clb-{lb['id']}", title=f"🎨 {base}",
-        subtitle=" · ".join(bits) + "  |  ⏎🦅  ⌘⚡  ⌥⤵️  ⌥⇧↗️  ⌃🔙",
+        subtitle=" · ".join(bits) + "  |  ⏎🦅  ⌘⚡  ⌥⤵️  ⌥⇧↗️"
+                 + ("  ⌥⌘🔗" if fid else "") + "  ⌃🔙",
         arg=f"xact:crmbrowse:ctx:lbeagle:{lb['id']}{ret}",
         match=base, mods=mods, variables=_record_vars(lb))
 
@@ -2479,10 +2484,12 @@ def render_lbeagle(ids, query):
                        "04 Sessions": "s", "05 Finished": "finished",
                        "06 Healed": "healed"}
 
-    def _lbe_mods(stage=None):
+    def _lbe_mods(stage=None, link=""):
         # ⌥⇧ is the one free executing chord (canvas fact): on STAGE
         # rows it imports the Photos selection INTO that stage (Vex
-        # ask 2026-07-26); the head row keeps 🎬 Edit this.
+        # ask 2026-07-26); the head row keeps 🎬 Edit this. ⌥⌘ rides
+        # the modURL copy chain (copies whatever arg it gets) - the
+        # folder's eagle:// link, zero canvas.
         m = _picker_mods()
         if stage:
             m["alt+shift"] = {"arg": f"xact:sessphotos:{log_tid}:{stage}",
@@ -2491,12 +2498,17 @@ def render_lbeagle(ids, query):
         else:
             m["alt+shift"] = {"arg": f"xact:editthis:{log_tid}",
                               "valid": True, "subtitle": "🎬 Edit this"}
+        if link:
+            m["alt+cmd"] = {"arg": f"copy:eagle://folder/{link}",
+                            "valid": True,
+                            "subtitle": "🔗 Copy Eagle link"}
         return m
 
     head = alfred.item(uid="lbe-open", title=f"🦅 {base}",
                        subtitle="Whole folder, in Eagle"
-                               "  |  ⏎↗️  ⌘⚡  ⌥⇧🎬  ⌃🔙",
-                       arg=f"xact:eaglego:{lib}:{fid}", mods=_lbe_mods(),
+                               "  |  ⏎↗️  ⌘⚡  ⌥⇧🎬  ⌥⌘🔗  ⌃🔙",
+                       arg=f"xact:eaglego:{lib}:{fid}",
+                       mods=_lbe_mods(link=fid),
                        variables=_record_vars(lb))
     try:
         root, all_ids = eagle.disk_subtree_ids(lib_path, fid)
@@ -2541,10 +2553,10 @@ def render_lbeagle(ids, query):
         rows.append(alfred.item(
             uid=f"lbe-{cid}", title=name,
             subtitle=f"🖼️ {n}"
-                     + (f"  |  ⏎🖼  ⌘⚡  {chord}  ⌃🔙" if n
-                        else f"  |  {chord}  ⌃🔙"),
+                     + (f"  |  ⏎🖼  ⌘⚡  {chord}  ⌥⌘🔗  ⌃🔙" if n
+                        else f"  |  {chord}  ⌥⌘🔗  ⌃🔙"),
             arg=peek_arg(cid), valid=bool(n),
-            mods=_lbe_mods(skey), variables=_record_vars(lb)))
+            mods=_lbe_mods(skey, cid), variables=_record_vars(lb)))
         if name == "04 Sessions" and n:
             sess = {}
             for it in shots:
@@ -2554,9 +2566,9 @@ def render_lbeagle(ids, query):
                 label = f"S{k}" if k else "unnumbered"
                 rows.append(alfred.item(
                     uid=f"lbe-{cid}-s{k}", title=f"   · {label}",
-                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌥⇧📸  ⌃🔙",
+                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌥⇧📸  ⌥⌘🔗  ⌃🔙",
                     arg=peek_arg(cid, f"s{k}"),
-                    mods=_lbe_mods(f"s{k}" if k else "s"),
+                    mods=_lbe_mods(f"s{k}" if k else "s", cid),
                     variables=_record_vars(lb)))
     # honest strays: shots dragged straight into the tattoo root folder
     # (outside the 01-06 skeleton) get their own row (review find)
