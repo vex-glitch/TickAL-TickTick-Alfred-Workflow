@@ -2094,6 +2094,37 @@ def crmbrowse(ctx):
     _run_trigger("BrowseCtx", ctx)
 
 
+def crm_trash(tid):
+    """🗑 Delete a records entry OUTRIGHT (Vex ask 2026-07-27: mistakes
+    need an eraser - archive is for finished work, not typos). Confirm
+    first; TickTick's own Trash can restore it. HONEST scope: linked
+    leftovers (customer bullet, calendar tasks, Eagle folder) are NOT
+    touched - the dialog says so."""
+    if not _records_ready():
+        return
+    import areas
+    import crm_records as cr
+    t = _record_by_id(tid)
+    if not t:
+        _crm_say("Not found · run tsy")
+        return
+    title = t.get("title") or "Untitled"
+    if _dialog(f"🗑 Delete '{title}' completely? TickTick Trash can "
+               "restore it. Linked bullets, calendar tasks and Eagle "
+               "folders stay as they are.",
+               ["Cancel", "Delete"], "Cancel") != "Delete":
+        _crm_say("Cancelled · nothing deleted")
+        return
+    pid = t.get("_projectId") or t.get("projectId") or areas.RECORDS_ID
+    try:
+        cr._api().delete_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"Delete failed: {type(e).__name__}: {e}")
+        return
+    cr.purge_cache(tid)
+    _crm_say(f"🗑 Deleted · {title}")
+
+
 def crmcold(tid):
     """🥶 A lead went cold: one-line reason into ## Notes, retag → archive
     (out of every picker, kanban keeps the corpse)."""
@@ -7750,6 +7781,8 @@ def main():
             people_setlist()
         elif verb == "add_pre":
             add_pre(rest)
+        elif verb == "crmtrash":
+            crm_trash(rest)
         elif verb == "crmcold":
             crmcold(rest)
         elif verb == "crmclose":

@@ -1370,6 +1370,10 @@ def render_crmbook(log_tid, query):
             uid="bk-close", title="📁 Archive",
             subtitle="Close without a session",
             arg=f"xact:crmclose:{log_tid}", mods=_picker_mods()))
+    rows.append(alfred.item(
+        uid="bk-trash", title="🗑 Delete entry",
+        subtitle="Mistakes only · TickTick Trash can restore",
+        arg=f"xact:crmtrash:{log_tid}", mods=_picker_mods()))
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
@@ -2892,6 +2896,10 @@ def render_crmcust(cust_tid, query):
             uid="hub-cold", title="🥶 Cold lead · archive",
             subtitle="One-line reason → ## Notes · out of the pickers",
             arg=f"xact:crmcold:{cust_tid}", mods=_picker_mods()))
+    rows.append(alfred.item(
+        uid="hub-trash", title="🗑 Delete entry",
+        subtitle="Mistakes only · TickTick Trash can restore",
+        arg=f"xact:crmtrash:{cust_tid}", mods=_picker_mods()))
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows

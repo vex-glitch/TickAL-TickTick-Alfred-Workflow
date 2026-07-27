@@ -934,6 +934,19 @@ def _set_paid_line(content):
     return head + sep + tail
 
 
+def purge_cache(tid):
+    """Drop a deleted note from every cache pool (the 🗑 delete road,
+    2026-07-27) - the pickers must not resurrect it before the sync."""
+    try:
+        for key in ("all_notes", "all_tasks"):
+            pool = [t for t in (cache_store.get(key) or [])
+                    if t.get("id") != tid]
+            cache_store.set(key, pool)
+        cache_store.invalidate(f"project_data_{areas.RECORDS_ID}")
+    except Exception:
+        cache_store.invalidate()
+
+
 def logbook_notes(include_archived=True):
     """THE logbook pool: 🎨 active (+ 🏛️ archived) notes in records
     order, deduped, person-shaped notes excluded (a crmcold lead
