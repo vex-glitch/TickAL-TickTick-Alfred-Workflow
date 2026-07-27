@@ -12,9 +12,13 @@ Contracts that shaped this module:
   just its .MOV and IS the primary). Each item exports into its own
   numbered subdir so item→file mapping is exact even when two items
   share a filename.
-- Deleting photos is NOT scriptable (no AS verb). Stage 1 files
-  imported shots into the "✅ In Eagle" album instead; Vex purges it
-  manually. (Stage 2 someday: PhotoKit delete via PyObjC.)
+- Deleting photos is CLOSED, permanently (Vex ruling 2026-07-27):
+  no AS verb exists; in-process PhotoKit SIGABRTs any interpreter
+  lacking an NSPhotoLibraryUsageDescription bundle key (TCC kill,
+  three crash reports 2026-07-26/27); a Shortcuts helper was built
+  and REJECTED as a hack. THE design: imported shots go to the
+  "✅ In Eagle" album after the verified import - Vex purges that
+  album manually. Do not reopen this road.
 - Automation permission: first run pops the macOS dialog; a -1743
   error means it was denied → System Settings → Privacy → Automation.
 """
@@ -170,35 +174,4 @@ def selection_count():
                         timeout=30).strip() or "0")
     except (PhotosError, ValueError):
         return 0
-
-
-def photos_purge():
-    """Empty the '✅ In Eagle' album via the user's Shortcuts helper -
-    exactly the set our flows file ONLY after a verified Eagle import.
-    In-process PhotoKit is IMPOSSIBLE here: macOS SIGABRTs any process
-    touching the photo library without an NSPhotoLibraryUsageDescription
-    Info.plist key, and a bare interpreter has none (TCC privacy kill -
-    three crash reports 2026-07-26/27; AppleScript has no delete
-    either, probed). The shortcut (name via photos_purge_shortcut env,
-    default 'Empty In Eagle') = Find Photos in album → Delete Photos;
-    its own 'Ask Before Deleting' toggle controls the confirm. Deleted
-    shots sit in Recently Deleted for 30 days. Returns (True, '') on a
-    clean run, (False, honest reason) otherwise - never raises."""
-    name = os.environ.get("photos_purge_shortcut") or "Empty In Eagle"
-    try:
-        have = subprocess.run(["shortcuts", "list"], capture_output=True,
-                              text=True, timeout=20)
-        if name not in (have.stdout or "").splitlines():
-            return False, f"no '{name}' shortcut yet"
-        r = subprocess.run(["shortcuts", "run", name],
-                           capture_output=True, text=True, timeout=180)
-        if r.returncode != 0:
-            return False, ((r.stderr or "").strip().split("\n")[-1][:80]
-                           or "shortcut failed")
-        return True, ""
-    except subprocess.TimeoutExpired:
-        return False, "shortcut timed out"
-    except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
-
 

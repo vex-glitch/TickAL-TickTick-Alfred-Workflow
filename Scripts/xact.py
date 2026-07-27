@@ -2873,23 +2873,17 @@ def session_photos(log_tid, stage=""):
                    + (f" · {dup_n} already there" if dup_n else ""))
         else:
             att = f" · {why}"
-        alb = trash = ""
+        alb = ""
         if src == "photos":
             try:
                 pb.file_to_album([s["id"] for s in shots])
                 alb = " · ✅ album"
             except pb.PhotosError:
                 alb = " · album skipped"
-            # imports verified + album filed - NOW the Shortcuts helper
-            # empties the album (in-process PhotoKit = TCC kill, see
-            # photos_bridge.photos_purge)
-            ok, dwhy = pb.photos_purge()
-            trash = (" · 🗑 album emptied" if ok
-                     else f" · 🗑 kept: {dwhy}")
         head = (f"📸 {len(new_shots)} → {base} · {label}"
                 + (f" · {esk} already in Eagle" if esk else "")
                 + (" · from clipboard" if src == "clip" else ""))
-        _crm_say(f"{head}{att}{alb}{trash}")
+        _crm_say(f"{head}{att}{alb}")
         return True
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
