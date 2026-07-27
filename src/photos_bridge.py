@@ -172,67 +172,33 @@ def selection_count():
         return 0
 
 
-def photokit_delete(ids):
-    """Move media items to Photos' Recently Deleted via PhotoKit -
-    AppleScript has NO delete (probed; parked stage 2, unparked on
-    Vex's ask 2026-07-26). macOS ALWAYS shows its own 'Delete N
-    photos?' confirm - one click per run, Apple's design, cancel =
-    honest keep. First run prompts for Photos-library access
-    (attributed to Alfred). Returns (n_deleted, "") or (0, reason) -
-    never raises; the '✅ In Eagle' album stays the manual-purge
-    fallback whenever this skips. Recently Deleted keeps 30 days."""
-    def _log(msg):
-        try:
-            import datetime
-            with open("/tmp/tickal_photokit.log", "a") as f:
-                f.write(f"{datetime.datetime.now():%H:%M:%S} {msg}\n")
-        except OSError:
-            pass
-
-    if not ids:
-        return 0, "nothing to delete"
+def photos_purge():
+    """Empty the '✅ In Eagle' album via the user's Shortcuts helper -
+    exactly the set our flows file ONLY after a verified Eagle import.
+    In-process PhotoKit is IMPOSSIBLE here: macOS SIGABRTs any process
+    touching the photo library without an NSPhotoLibraryUsageDescription
+    Info.plist key, and a bare interpreter has none (TCC privacy kill -
+    three crash reports 2026-07-26/27; AppleScript has no delete
+    either, probed). The shortcut (name via photos_purge_shortcut env,
+    default 'Empty In Eagle') = Find Photos in album → Delete Photos;
+    its own 'Ask Before Deleting' toggle controls the confirm. Deleted
+    shots sit in Recently Deleted for 30 days. Returns (True, '') on a
+    clean run, (False, honest reason) otherwise - never raises."""
+    name = os.environ.get("photos_purge_shortcut") or "Empty In Eagle"
     try:
-        import Photos
-    except ImportError:
-        _log("Photos framework missing")
-        return 0, "PyObjC Photos framework missing"
-    try:
-        st = Photos.PHPhotoLibrary.authorizationStatus()
-        _log(f"auth status pre: {st}")
-        if st == 0:                       # notDetermined - block on ask,
-            import threading              # PUMPING the runloop (a headless
-            import time as _t             # wait can starve the callback)
-            from Foundation import NSRunLoop, NSDate
-            ev = threading.Event()
-            got = {}
-
-            def _cb(s):
-                got["s"] = s
-                ev.set()
-            Photos.PHPhotoLibrary.requestAuthorization_(_cb)
-            end = _t.time() + 120
-            while not ev.is_set() and _t.time() < end:
-                NSRunLoop.currentRunLoop().runMode_beforeDate_(
-                    "kCFRunLoopDefaultMode",
-                    NSDate.dateWithTimeIntervalSinceNow_(0.2))
-            st = got.get("s", 0)
-            _log(f"auth status post-request: {st}")
-        if st not in (3, 4):              # authorized · limited
-            return 0, "Photos access not granted (Privacy settings)"
-        assets = Photos.PHAsset.fetchAssetsWithLocalIdentifiers_options_(
-            list(ids), None)
-        _log(f"fetched {assets.count()} of {len(ids)} ids")
-        if assets.count() == 0:
-            return 0, "no matching assets"
-
-        def _change():
-            Photos.PHAssetChangeRequest.deleteAssets_(assets)
-        ok, err = Photos.PHPhotoLibrary.sharedPhotoLibrary() \
-            .performChangesAndWait_error_(_change, None)
-        _log(f"performChanges ok={ok} err={err}")
-        if not ok:
-            return 0, "cancelled" if err is None else f"refused: {err}"
-        return assets.count(), ""
+        have = subprocess.run(["shortcuts", "list"], capture_output=True,
+                              text=True, timeout=20)
+        if name not in (have.stdout or "").splitlines():
+            return False, f"no '{name}' shortcut yet"
+        r = subprocess.run(["shortcuts", "run", name],
+                           capture_output=True, text=True, timeout=180)
+        if r.returncode != 0:
+            return False, ((r.stderr or "").strip().split("\n")[-1][:80]
+                           or "shortcut failed")
+        return True, ""
+    except subprocess.TimeoutExpired:
+        return False, "shortcut timed out"
     except Exception as e:
-        _log(f"EXC {type(e).__name__}: {e}")
-        return 0, f"{type(e).__name__}: {e}"
+        return False, f"{type(e).__name__}: {e}"
+
+

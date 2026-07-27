@@ -2880,10 +2880,11 @@ def session_photos(log_tid, stage=""):
                 alb = " · ✅ album"
             except pb.PhotosError:
                 alb = " · album skipped"
-            # imports verified above (wait_imported) - NOW the originals
-            # may leave Photos (PhotoKit; macOS shows its own confirm)
-            deln, dwhy = pb.photokit_delete([s["id"] for s in shots])
-            trash = (f" · 🗑 {deln} Photos" if deln
+            # imports verified + album filed - NOW the Shortcuts helper
+            # empties the album (in-process PhotoKit = TCC kill, see
+            # photos_bridge.photos_purge)
+            ok, dwhy = pb.photos_purge()
+            trash = (" · 🗑 album emptied" if ok
                      else f" · 🗑 kept: {dwhy}")
         head = (f"📸 {len(new_shots)} → {base} · {label}"
                 + (f" · {esk} already in Eagle" if esk else "")
