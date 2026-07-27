@@ -1174,18 +1174,28 @@ def render_crmweek(query):
         clock = d.strftime(" %H:%M") if d.strftime("%H:%M") != "00:00" else ""
         mods = _picker_mods()
         _l = cr.parse_first_link(t.get("title") or "")
+        # inversion (Vex 2026-07-27: "⏎ drills everywhere"): linked
+        # rows ⏎ → logbook hub, ⌥ drills too (muscle memory), ⌥⇧
+        # opens the task in TickTick; unlinked rows keep ⏎↗️ (nothing
+        # to drill into)
         if _l:
             mods["alt"] = {"arg": "", "valid": True,
                            "subtitle": "Logbook hub",
                            "variables": {"browse_ctx": f"ctx:crmbook:{_l[2]}"}}
+            mods["alt+shift"] = {"arg": f"xact:notego:{t['id']}",
+                                 "valid": True,
+                                 "subtitle": "Open in TickTick"}
+            arg = f"xact:crmbrowse:ctx:crmbook:{_l[2]}"
+            chips = "Session done in ⌘  |  ⏎⤵️  ⌘⚡  ⌥⇧↗️"
+        else:
+            arg = f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}"
+            chips = "Session done in ⌘  |  ⏎↗️  ⌘⚡"
         emo = ("💬" if (t.get("title") or "").rstrip().endswith("Consult")
                else "📆")
         rows.append(alfred.item(
             uid=f"wk-{t['id']}",
             title=f"{emo} {when}{clock} · {disp}",
-            subtitle="Session done in ⌘  |  ⏎↗️  ⌘⚡  ⌥⤵️",
-            arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
-            mods=mods,
+            subtitle=chips, arg=arg, mods=mods,
             variables={"task_id": t["id"], "task_list_id": CRM_ID,
                        "list_id": CRM_ID, "task_title": t.get("title") or "",
                        "item_type": "task"}))
