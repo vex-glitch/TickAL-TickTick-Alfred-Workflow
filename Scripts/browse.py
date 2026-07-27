@@ -2914,13 +2914,10 @@ def render_crmback(query):
         alfred.item(uid="back-adopt", title="🔗 Adopt task",
                     subtitle="Old task → customer + logbook → log done",
                     arg="", valid=False, autocomplete="adopt "),
-        alfred.item(uid="back-img", title="🖼️ Image to session",
-                    subtitle="Copy image first · pick logbook → session",
+        alfred.item(uid="back-img", title="📸 Images → tattoo",
+                    subtitle="Finder selection or clipboard · pick "
+                             "logbook → stage",
                     arg="", valid=False, autocomplete="img "),
-        alfred.item(uid="back-batch", title="🖼️ Batch images",
-                    subtitle="Select photos in Finder first · "
-                             "capture dates pick the sessions",
-                    arg="", valid=False, autocomplete="batch "),
     ]
     q = (query or "").strip()
     if q.startswith("adopt"):
@@ -2953,14 +2950,15 @@ def render_crmback(query):
                                 subtitle="Every calendar task is linked 💪",
                                 valid=False)]
         return add_back(rows, "ctx:crmback")
-    if q.startswith(("past", "img", "batch")):
-        mode = next(m for m in ("past", "img", "batch") if q.startswith(m))
+    if q.startswith(("past", "img")):
+        mode = next(m for m in ("past", "img") if q.startswith(m))
         import crm_records as cr
         frag = q[len(mode):].strip()
-        sub = {"img": "Pick session → image lands there",
-               "batch": "Finder photos → sessions by date",
+        sub = {"img": "⏎ 🦅 folders · ⌥⇧📸 into a stage",
                "past": "Log a dated session"}[mode]
-        verb = {"img": "crmimg", "batch": "crmbatchimg",
+        # img drills into the folder screen - the ONE 📸 action
+        # (Finder source) does the import from there (Vex unification)
+        verb = {"img": "crmbrowse:ctx:lbeagle",
                 "past": "crmpast"}[mode]
         rows = []
         seen = set()
