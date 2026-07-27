@@ -1210,9 +1210,12 @@ def render_crmweek(query):
             bk_h += (e2 - s).total_seconds() / 3600.0
     booked_bit = (f"{bk_n} booked" + (f" · {bk_h:g}h" if bk_h else "")
                   if bk_n else "nothing booked")
+    # zero state says 0€ - a bare "-" on Monday morning reads like the
+    # money display vanished (Vex smoke 2026-07-27)
     rows.insert(0, alfred.item(
         uid="wk-money",
-        title=f"💰 {wk_money}{cr.cut_chip(wk_raw, wk_money)} this week",
+        title=f"💰 {wk_money if wk_money != '-' else '0€'}"
+              f"{cr.cut_chip(wk_raw, wk_money)} this week",
         subtitle=f"Mon-Sun logged · ahead: {booked_bit}  |  ⏎⤵️",
         arg=f"xact:crmbrowse:ctx:crmmoney:wk:{monday.isoformat()}",
         mods=_picker_mods()))
