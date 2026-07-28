@@ -3090,6 +3090,50 @@ def _already_on_note(log_tid, fname):
                if l.lstrip().startswith("![image]("))
 
 
+# label → the note section that mirrors its Eagle folder. Sessions are
+# NOT here: they resolve to their own '### <date> · S<n>' entry.
+_NOTE_SECTIONS = {"Consult": "## Consultation", "Prep": "## Preparation",
+                  "Design": "## Design", "Finished": "## Finished",
+                  "Healed": "## Healed"}
+
+
+def _ensure_note_heading(log_tid, heading, anchor=None):
+    """Guarantee `heading` exists in the logbook note, creating it when
+    missing. anchor='## Sessions' appends a '### …' entry at the END of
+    that section; otherwise a '## …' section is inserted before
+    ## Notes so the note keeps reading header → sessions → stages →
+    notes. Returns the heading, or None if the write failed."""
+    import areas
+    import crm_records as cr
+    try:
+        api = cr._api()
+        live = api.get_task(areas.RECORDS_ID, log_tid)
+        content = cr._fresher_content(log_tid, live.get("content") or "")
+        if re.search(rf"^{re.escape(heading)}\s*$", content, re.M):
+            return heading
+        lines = content.split("\n")
+        if anchor:
+            i = next((k for k, l in enumerate(lines)
+                      if l.strip() == anchor), len(lines) - 1)
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith("## "):
+                j += 1
+            while j > i + 1 and not lines[j - 1].strip():
+                j -= 1              # sit right after the last content line
+            lines[j:j] = ["", heading]
+        else:
+            i = next((k for k, l in enumerate(lines)
+                      if l.strip() == "## Notes"), len(lines))
+            lines[i:i] = [heading, ""]
+        new = "\n".join(lines)
+        api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+        _patch_content_cache(log_tid, new)
+        return heading
+    except Exception as e:
+        _att_log(f"ensure heading failed ({heading!r}): {type(e).__name__}: {e}")
+        return None
+
+
 def _plant_logbook_ref(log_tid, up, label=""):
     """Planted, not just uploaded: bare attachments render at the
     BOTTOM of the note (Vex smoke 2026-07-26: 'ended up in notes').
@@ -3120,8 +3164,19 @@ def _plant_logbook_ref(log_tid, up, label=""):
                    for seg in segs):
                 heading = s
                 break
-    if heading is None and re.search(r"^## Sessions\s*$", content, re.M):
-        heading = "## Sessions"
+    # NO '## Sessions' dumping ground (Vex 2026-07-28: "that should not
+    # even exist. At all"). The note MIRRORS the Eagle folders: a
+    # session photo goes under its exact session entry, a consultation
+    # photo under ## Consultation, prep under ## Preparation, and so
+    # on - the heading is CREATED when missing rather than the image
+    # being dropped into a generic bucket.
+    if heading is None:
+        sect = _NOTE_SECTIONS.get(label)
+        if sect:
+            heading = _ensure_note_heading(log_tid, sect)
+        elif re.fullmatch(r"S\d+", label or ""):
+            heading = _ensure_note_heading(log_tid, f"### {label}",
+                                           anchor="## Sessions")
     if heading is None:
         _att_log(f"plant skip: no heading (label={label!r}, "
                  f"content {len(content)}b)")
