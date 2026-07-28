@@ -3965,19 +3965,65 @@ def _archive_refile():
         eagle.ensure_library("crm")
     except eagle.EagleError as e:
         return 0, 0, str(e)
+    import time
     n = cands = 0
+    touched = []
     for lb in cr.logbook_notes():
         if not cr.logbook_archived(lb):
             continue
-        if not cr.eagle_folder_of(lb.get("content") or "")[0]:
+        fid = cr.eagle_folder_of(lb.get("content") or "")[0]
+        if not fid:
             continue
         cands += 1
         try:
             if _eagle_archive_folder(lb["id"], quiet=True):
                 n += 1
+                touched.append(fid)
+                # Eagle needs a beat to commit a re-parent; firing the
+                # next move immediately is what left a folder listed
+                # under BOTH parents and wedged its sidebar (Vex smoke
+                # 2026-07-28).
+                time.sleep(0.4)
         except Exception:
             pass
+    _heal_double_parents(touched)
     return n, cands, ""
+
+
+def _heal_double_parents(fids):
+    """ONE verification pass after a batch of moves: any folder still
+    listed under two parents gets its parent re-set, which makes Eagle
+    rewrite the entry cleanly (probe-verified 2026-07-28 - the same
+    call that raced is the call that repairs it). Cheap: one tree read
+    for the whole batch, and a no-op when nothing raced."""
+    if not fids:
+        return 0
+    import time
+    import eagle
+    try:
+        tree = eagle.folder_tree()
+    except eagle.EagleError:
+        return 0
+    seen = {}
+
+    def walk(nodes, parent=None):
+        for f in nodes:
+            seen.setdefault(f.get("id"), []).append(parent)
+            walk(f.get("children") or [], f.get("id"))
+    walk(tree)
+    arch = eagle.find_folder("Archive", tree=tree)
+    if not arch:
+        return 0
+    healed = 0
+    for fid in set(fids):
+        if len(seen.get(fid) or []) > 1:
+            try:
+                eagle.move_folder(fid, arch["id"])
+                time.sleep(0.4)
+                healed += 1
+            except Exception:
+                pass
+    return healed
 
 
 def crmconvert(tid):
