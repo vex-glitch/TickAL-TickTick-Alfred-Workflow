@@ -890,6 +890,31 @@ def bar_hide():
     print("🫥 Focus bar hidden")
 
 
+def _osa_dialog(body):
+    """THE dialog runner: every AppleScript prompt goes through here.
+
+    Runs the dialog with the ALREADY-FRONTMOST app as its owner, so it
+    opens holding the keyboard - arrows and Return work immediately,
+    no mouse click first (Vex 2026-07-28). A bare `osascript` dialog
+    belongs to a background process and NEVER takes focus: probed with
+    synthetic keystrokes, they landed in the app BEHIND the dialog
+    while it just sat there. Nothing is activated, so dismissing leaves
+    focus exactly where it was.
+
+    Falls back to the bare call when the front app cannot host the
+    dialog (not scriptable, automation not granted yet, busy) - but
+    NEVER on a user cancel (-128), or pressing Esc would re-open the
+    dialog in a loop."""
+    wrapped = ("set _fa to (path to frontmost application as text)\n"
+               "tell application _fa\n" + body + "\nend tell")
+    r = subprocess.run(["osascript", "-e", wrapped],
+                       capture_output=True, text=True)
+    if r.returncode == 0 or "-128" in (r.stderr or ""):
+        return r
+    return subprocess.run(["osascript", "-e", body],
+                          capture_output=True, text=True)
+
+
 def _ask(prompt, title="TickAL", hidden=False, default=""):
     """Module-level dialog helper. Returns None on Cancel, "" on
     empty-OK - the journal flow assigns those OPPOSITE meanings (cancel =
@@ -900,7 +925,7 @@ def _ask(prompt, title="TickAL", hidden=False, default=""):
     osa = ('text returned of (display dialog "{}" default answer "{}" '
            'with title "{}"{})').format(esc(prompt), esc(default), esc(title),
                                         " with hidden answer" if hidden else "")
-    r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
+    r = _osa_dialog(osa)
     if r.returncode != 0:
         return None
     return r.stdout.rstrip("\n") if hidden else r.stdout.strip()
@@ -1152,7 +1177,7 @@ def _dialog(prompt, buttons, default):
     osa = ('button returned of (display dialog "{}" with title "TickAL" '
            'buttons {{{}}} default button "{}")').format(
                esc(prompt), blist, esc(default))
-    r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
+    r = _osa_dialog(osa)
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
@@ -1304,7 +1329,7 @@ def _choose(prompt, options, title="TickAL", default=None):
     dflt = f' default items {{"{esc(default)}"}}' if default else ""
     osa = ('choose from list {{{}}} with prompt "{}" with title "{}"{}'
            .format(olist, esc(prompt), esc(title), dflt))
-    r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
+    r = _osa_dialog(osa)
     out = r.stdout.strip()
     return None if (r.returncode != 0 or out in ("false", "")) else out
 
@@ -3924,7 +3949,7 @@ def v2login():
         osa = ('text returned of (display dialog "{}" default answer "" '
                'with title "TickAL"{})').format(
                    prompt, " with hidden answer" if hidden else "")
-        r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
+        r = _osa_dialog(osa)
         if r.returncode != 0:
             return ""
         # Passwords may legitimately carry edge whitespace - shave only
@@ -7554,7 +7579,7 @@ def tag_create_under(parent):
     osa = ('text returned of (display dialog "New tag under #{}" '
            'default answer "" with title "TickAL")').format(
                parent.replace("\\", "").replace('"', ""))
-    r = subprocess.run(["osascript", "-e", osa], capture_output=True, text=True)
+    r = _osa_dialog(osa)
     name = (r.stdout or "").strip() if r.returncode == 0 else ""
     # spaces would shred the '#name' token grammar downstream
     name = "".join(name.split())
