@@ -164,8 +164,8 @@ def build_items():
         # stays (xact sticky imports its decoder).
         alfred.item(
             uid="crm",
-            title="📈 CRM...",
-            subtitle="Search or add a booking",
+            title="📈 CRM / Content Pipeline...",
+            subtitle="Customers · tattoos · photos · money",
             arg="crm",
         ),
         # arg "docs" → conditional branch → Call-ET OpenDocs → docs_menu.py
