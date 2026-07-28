@@ -135,6 +135,9 @@ _orig_output = alfred.output
 def _output_backstamped(items, **kw):
     for _it in items:
         _it.setdefault("mods", {}).setdefault("ctrl", {"valid": True, "arg": "back", "subtitle": "🔙 Back to search"})
+        # Marks "this fired from the Actions menu" so act-again loops
+        # reopen here and NOT from a browse row's ⌥⌘ (Vex 2026-07-28).
+        _it.setdefault("variables", {})["actions_loop"] = "1"
     return _orig_output(items, **kw)
 alfred.output = _output_backstamped
 

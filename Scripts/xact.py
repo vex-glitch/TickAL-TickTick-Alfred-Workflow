@@ -3103,7 +3103,16 @@ def _plant_logbook_ref(log_tid, up, label=""):
     if label:
         for l in content.split("\n"):
             s = l.strip()
-            if s.startswith("### ") and s.lstrip("# ").startswith(label):
+            if not s.startswith("### "):
+                continue
+            # Entries are '### <date> · S1 · 6h · 750' - they start with
+            # the DATE, so the old startswith(label) test could never
+            # match and EVERY hero silently fell back to ## Sessions
+            # (Vex smoke 2026-07-28). Match the label as a · segment.
+            segs = [x.strip() for x in s.lstrip("# ").split("·")]
+            exact = re.fullmatch(r"S\d+", label or "")
+            if any(seg == label or (not exact and seg.startswith(label))
+                   for seg in segs):
                 heading = s
                 break
     if heading is None and re.search(r"^## Sessions\s*$", content, re.M):

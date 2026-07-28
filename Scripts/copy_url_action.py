@@ -24,9 +24,13 @@ what = "URL" if "://" in url else "id"
 title = f"{task_title} · {what} Copied" if task_title else f"{what} Copied"
 print(f"{title}\n{url}")
 
-# Act-again: reopen the ⌘ Actions menu on the task after copying (loop UX).
+# Act-again: reopen the ⌘ Actions menu after copying - ONLY when the copy
+# was fired FROM that menu. Browse rows carry task_list_id/task_id too, so
+# the old pid+tid test made every ⌥⌘ row chord pop the Actions menu open
+# (Vex smoke 2026-07-28: "that should not happen on a modifier"). The loop
+# belongs to ⏎ on an Actions row; actions.py stamps actions_loop on its own.
 _pid, _tid = os.environ.get("task_list_id", ""), os.environ.get("task_id", "")
-if _pid and _tid:
+if _pid and _tid and os.environ.get("actions_loop") == "1":
     try:
         with open("/tmp/ticktick_reattribute.txt", "w") as _f:
             _f.write(f"{_pid}:{_tid}")

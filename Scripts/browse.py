@@ -2508,9 +2508,11 @@ def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None):
                    "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
     mods["shift"] = {"arg": f"xact:crmbrowse:ctx:lbeagle:{lb['id']}{ret}",
                      "valid": True, "subtitle": "⇧ Content · Eagle folders"}
-    if fid:
-        mods["alt+cmd"] = {"arg": f"copy:eagle://folder/{fid}",
-                           "valid": True, "subtitle": "🔗 Copy Eagle link"}
+    # ⌥⌘ copies the TICKTICK link here (Vex 2026-07-28) - the Eagle link
+    # is one step deeper, on ⇧ Content, where Eagle is what you are
+    # looking at. Same chord, right link for the world you are in.
+    mods["alt+cmd"] = {"arg": f"copy:{_open_note_arg(lb['id'])[5:]}",
+                       "valid": True, "subtitle": "🔗 Copy TickTick link"}
     return alfred.item(
         uid=f"{uid_prefix}-{lb['id']}",
         title=f"🎨 {name}  {circle} " + " • ".join(head),
