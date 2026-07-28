@@ -1824,7 +1824,8 @@ def render_tph(sub, query):
         srows, digit = _stage_rows(
             "tphs", n, query, lambda k: f"xact:sessphotos:{sub}:{k}",
             f"Session pics · names get S{n}",
-            "Older session · names get S{k}")
+            "Older session · names get S{k}",
+            counts=_stage_counts(cr, lb, n))
         rows += srows
         if not digit and query:
             rows = rows[:1] + (fuzz.filter_and_score(
@@ -1905,8 +1906,59 @@ _TRIAGE_STAGES = [
 ]
 
 
+def _stage_counts(cr, lb, n):
+    """{stage key: image count} for one tattoo's lifecycle folders, so
+    every destination row can say what is already there (Vex 2026-07-28:
+    "can descriptions show number of photos in that destination? If none
+    it should also say 🖼️0"). None = T9 unplugged, in which case the rows
+    say nothing rather than lying with a zero.
+
+    01/02/03/05/06 are folders, so they count by subtree. The session
+    buckets are NOT folders - they are the '• S<k> •' token in the item
+    name inside 04 Sessions - so they count by name."""
+    try:
+        import eagle as _eg
+        path = _eg.LIBS["crm"][1]
+        if not os.path.isdir(path):
+            return None
+        fid, _lib = cr.eagle_folder_of(lb.get("content") or "")
+        if not fid:
+            return {}
+        node = None
+
+        def find(nodes):
+            for f in nodes:
+                if f.get("id") == fid:
+                    return f
+                hit = find(f.get("children") or [])
+                if hit:
+                    return hit
+            return None
+        node = find(_eg.disk_folder_tree(path))
+        if node is None:
+            return {}
+        kids = {c.get("name"): c.get("id") for c in node.get("children") or []}
+        subtree = _eg.disk_subtree_counts(path)
+        names = _eg.disk_names_by_folder(path)
+        out = {}
+        for key, folder, _sub in _TRIAGE_STAGES:
+            cid = kids.get(folder)
+            if key == "s":
+                continue
+            out[key] = subtree.get(cid, 0) if cid else 0
+        sess_id = kids.get("04 Sessions")
+        pool = names.get(sess_id, []) if sess_id else []
+        for k in range(1, max(n, 1) + 1):
+            out[f"s{k}"] = sum(1 for nm in pool if f"• S{k} •" in nm)
+        out["s"] = out.get(f"s{n}", 0)
+        return out
+    except Exception:
+        return None
+
+
 def _stage_rows(prefix, n, query, arg_fn, s_default, sk_default,
-                suffix="", dsuffix="", mods_fn=None, variables=None):
+                suffix="", dsuffix="", mods_fn=None, variables=None,
+                counts=None):
     """THE stage-picker skeleton (Vex simplification green 2026-07-26:
     one engine behind the three stage screens - tph / triage /
     imgstage - so a chip change lands everywhere at once). Callers
@@ -1920,19 +1972,23 @@ def _stage_rows(prefix, n, query, arg_fn, s_default, sk_default,
         if variables is not None:
             out["variables"] = variables
         return out
+    def chip(key):
+        if counts is None:
+            return ""
+        return f"  ·  🖼 {counts.get(key, 0)}"
     rows = []
     for key, folder, subtxt in _TRIAGE_STAGES:
         rows.append(alfred.item(
             uid=f"{prefix}-{key}",
             title=f"→ {folder}" + (f" · S{n}" if key == "s" else ""),
-            subtitle=(subtxt or s_default) + suffix,
+            subtitle=(subtxt or s_default) + chip(key) + suffix,
             arg=arg_fn(key), **extras(key)))
     m = re.match(r"^s?(\d+)$", (query or "").strip(), re.I)
     if m:
         k = int(m.group(1))
         rows.append(alfred.item(
             uid=f"{prefix}-sn", title=f"→ 04 Sessions · S{k}",
-            subtitle=sk_default.format(k=k) + dsuffix,
+            subtitle=sk_default.format(k=k) + chip(f"s{k}") + dsuffix,
             arg=arg_fn(f"s{k}"), **extras(f"s{k}")))
         return rows, True
     # Every EARLIER session as a real row (Vex 2026-07-28: standing on
@@ -1943,7 +1999,7 @@ def _stage_rows(prefix, n, query, arg_fn, s_default, sk_default,
     for k in range(n - 1, 0, -1):
         rows.append(alfred.item(
             uid=f"{prefix}-s{k}", title=f"→ 04 Sessions · S{k}",
-            subtitle=sk_default.format(k=k) + dsuffix,
+            subtitle=sk_default.format(k=k) + chip(f"s{k}") + dsuffix,
             arg=arg_fn(f"s{k}"), **extras(f"s{k}")))
     return rows, False
 
@@ -2006,6 +2062,7 @@ def render_triage(sub, query):
         "tris", n, query, lambda k: f"xact:triage:{sub}:{k}",
         f"Session pics · names get S{n}",
         "Older session · names get S{k}",
+        counts=_stage_counts(cr, lb, n),
         suffix="  ·  ⌥⇧ +attach to task", dsuffix="  ·  ⌥⇧ +attach",
         mods_fn=lambda k: {"alt+shift": {
             "arg": f"xact:triage:{sub}:{k}:attach",
@@ -2694,6 +2751,7 @@ def render_imgstage(query):
         "imgs", n, query, lambda k: f"xact:imgmove:{k}",
         f"Current session · name gets S{n}",
         "Older session · name gets S{k}",
+        counts=_stage_counts(cr, lb, n),
         mods_fn=lambda k: _picker_mods(),
         variables={**carry, **_record_vars(lb)})
     rows += srows

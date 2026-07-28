@@ -419,6 +419,39 @@ def disk_subtree_counts(lib_path):
     return out
 
 
+_NAMES_MEMO = {}
+
+
+def disk_names_by_folder(lib_path):
+    """{folder_id: [item names]} for a CLOSED library, ONE images/ walk,
+    memoised. The session buckets inside 04 Sessions are name-based
+    ('{base} • S3 • 2'), not folders, so counting them needs the names -
+    same single-walk discipline as disk_subtree_counts."""
+    if lib_path in _NAMES_MEMO:
+        return _NAMES_MEMO[lib_path]
+    out = {}
+    images = os.path.join(lib_path, "images")
+    try:
+        entries = os.listdir(images)
+    except Exception:
+        entries = []
+    for entry in entries:
+        if not entry.endswith(".info"):
+            continue
+        try:
+            with open(os.path.join(images, entry, "metadata.json")) as f:
+                meta = json.load(f)
+        except Exception:
+            continue
+        if meta.get("isDeleted"):
+            continue
+        nm = meta.get("name") or ""
+        for fid in meta.get("folders") or []:
+            out.setdefault(fid, []).append(nm)
+    _NAMES_MEMO[lib_path] = out
+    return out
+
+
 def disk_subtree_ids(lib_path, root_id):
     """root folder id + every descendant id, from disk."""
     def find(nodes):
