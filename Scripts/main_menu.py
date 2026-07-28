@@ -150,14 +150,12 @@ def build_items():
             subtitle="Tick, streaks, diary",
             arg="habits",
         ),
-        # arg "content" rides the same leg family (phase_pipeline):
-        # browse_ctx="content" → ALIASES → ctx:contentpl.
-        alfred.item(
-            uid="content",
-            title="🎬 Content pipeline",
-            subtitle="To edit, To post, Raw queues",
-            arg="content",
-        ),
+        # The "🎬 Content pipeline" row DIED here 2026-07-28 (Vex: "kill the
+        # main menu"). It sat directly above the CRM row, and once CRM and
+        # Content merged into one home that row was the same world twice -
+        # the row below opens the home, whose 🎬 Pipelines row is the same
+        # screen. Its conditional leg went with it (phase_contentrow); the
+        # keyword caller chain is untouched and still opens ctx:contentpl.
         # tts: rows (Quick Add / Mini Window / Pomodoro / Sticky Note) were
         # retired - they only re-fired TickTick's own global shortcuts, and
         # the task-bound sticky/pomo in ⌘ Actions are better. tt_shortcut.py
