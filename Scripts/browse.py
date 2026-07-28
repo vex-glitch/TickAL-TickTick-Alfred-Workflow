@@ -2726,7 +2726,9 @@ _MANAGE = {
         ("mg-backlog", "📕 Backlog", "Import · past session · adopt task",
          "ctx:crmback"),
     )),
-    "content": ("🎬 Content", "Eagle housekeeping", (
+    "content": ("🎬 Content", "Photos · Eagle housekeeping", (
+        ("mg-photos", "📸 Images → tattoo",
+         "Photos, Finder or clipboard · pick tattoo → stage", "ctx:tph"),
         ("mg-triage", "🦅 Eagle triage", "Eagle selection → tattoo stage",
          "ctx:triage"),
         ("mg-promote", "🎬 Promote Eagle selection", "Picked shots → To edit",
