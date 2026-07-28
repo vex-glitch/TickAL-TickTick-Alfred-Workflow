@@ -3859,8 +3859,24 @@ def eagle_sweep():
     lbs = cr.records_notes(areas.LOGBOOK_TAG)
     missing = [lb for lb in lbs
                if not cr.eagle_folder_of(lb.get("content") or "")[0]]
+    # Re-filing runs on BOTH paths. It used to sit only after the
+    # skeleton loop, so a library with nothing missing returned early
+    # and never re-filed anything (Vex smoke 2026-07-28: "folder did
+    # not move. None did").
+    moved, cands, err = _archive_refile()
+
+    def _tail():
+        if err:
+            return f" · 🗄 skipped: {err}"
+        if moved:
+            return f" · 🗄 {moved} archived folder(s) filed"
+        if cands:
+            return f" · 🗄 all {cands} archived already filed"
+        return ""
+
     if not missing:
-        _crm_say(f"🦅 All {len(lbs)} active logbooks already linked")
+        _crm_say(f"🦅 All {len(lbs)} active logbooks already linked"
+                 + _tail())
         return
     done = 0
     try:
@@ -3870,29 +3886,36 @@ def eagle_sweep():
     except Exception as e:
         _crm_say(f"🦅 {done}/{len(missing)} created, then: {e}")
         return
-    moved = _archive_refile()
     _crm_say(f"🦅 {done} skeletons created · {len(lbs) - len(missing)} "
-             "were already linked" + (f" · {moved} archived folders filed"
-                                      if moved else ""))
+             "were already linked" + _tail())
 
 
 def _archive_refile():
     """Archived in TickTick but the Eagle folder never moved (Vex smoke
     2026-07-28: 14 of them - backlog import archived the note and left
-    the folder under Customers/). Returns how many were re-filed."""
+    the folder under Customers/). Returns (moved, candidates, err) so
+    the toast can tell 'nothing to do' apart from 'Eagle was asleep' -
+    a bare 0 reads like success and hides a dead sweep."""
     import crm_records as cr
-    n = 0
+    import eagle
+    try:                       # probe ONCE - per-folder failures are mute
+        eagle.ensure_running(launch=False)
+        eagle.ensure_library("crm")
+    except eagle.EagleError as e:
+        return 0, 0, str(e)
+    n = cands = 0
     for lb in cr.logbook_notes():
         if not cr.logbook_archived(lb):
             continue
         if not cr.eagle_folder_of(lb.get("content") or "")[0]:
             continue
+        cands += 1
         try:
             if _eagle_archive_folder(lb["id"], quiet=True):
                 n += 1
         except Exception:
             pass
-    return n
+    return n, cands, ""
 
 
 def crmconvert(tid):
