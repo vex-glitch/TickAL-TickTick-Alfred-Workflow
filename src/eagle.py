@@ -35,12 +35,35 @@ import urllib.request
 RAW = "http://localhost:41595/api/"
 MCP = "http://localhost:41596/mcp"
 
-# key -> (library display name, .library path on the T9)
-LIBS = {
-    "crm": ("04 CRM Library", "/Volumes/T9/Eagle Libraries/04 CRM Library.library"),
-    "tv":  ("02 Content Library TV", "/Volumes/T9/Eagle Libraries/02 Content Library TV.library"),
-    "fm":  ("03 Content Library FM", "/Volumes/T9/Eagle Libraries/03 Content Library FM.library"),
+# key -> (library display name, .library path on the T9), resolved by
+# SUFFIX at import: the NN prefix is Vex's sort order and CHANGES
+# (renumbered 2026-07-28 when Studio arrived - hardcoded names broke
+# every Eagle road at once). Fallbacks = last-known names, only hit
+# with the T9 unplugged (ensure_running raises first anyway).
+_LIB_ROOT = "/Volumes/T9/Eagle Libraries"
+_LIB_SUFFIX = {
+    "crm":    ("CRM Library",            "02 CRM Library"),
+    "tv":     ("Content Library TV",     "03 Content Library TV"),
+    "fm":     ("Content Library FM",     "04 Content Library FM"),
+    "studio": ("Content Library Studio", "05 Content Library Studio"),
 }
+
+
+def _resolve_libs():
+    try:
+        stems = [f[:-len(".library")] for f in os.listdir(_LIB_ROOT)
+                 if f.endswith(".library")]
+    except OSError:
+        stems = []
+    out = {}
+    for key, (suf, fallback) in _LIB_SUFFIX.items():
+        pat = re.compile(r"(?:\d+\s+)?" + re.escape(suf) + r"$")
+        stem = next((s for s in stems if pat.fullmatch(s)), None) or fallback
+        out[key] = (stem, os.path.join(_LIB_ROOT, stem + ".library"))
+    return out
+
+
+LIBS = _resolve_libs()
 
 # Lightroom/PS export intake folders (iCloud ON PURPOSE: they must exist
 # even with the T9 unplugged, or LR would write into a phantom /Volumes
@@ -51,6 +74,7 @@ _ICLOUD = os.path.expanduser(
 INTAKE = {
     "tv": os.path.join(_ICLOUD, "Eagle Inbox TV"),
     "fm": os.path.join(_ICLOUD, "Eagle Inbox FM"),
+    "studio": os.path.join(_ICLOUD, "Eagle Inbox Studio"),
 }
 
 # CRM per-tattoo lifecycle skeleton (created WHOLE so consult refs can be
