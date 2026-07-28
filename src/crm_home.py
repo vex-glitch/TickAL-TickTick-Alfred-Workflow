@@ -1,100 +1,180 @@
 """
-crm_home.py - ONE source of truth for the CRM home rows.
+crm_home.py - ONE source of truth for the unified home rows.
 
-crm_menu.py (the keyword/hotkey entry) and browse.py render_crmhub
-(the in-browse home every ⌃ lands on) were near-twin lists maintained
-by hand twice - rows drifted (each home missed four of the other's),
-subtitles diverged. Vex simplification green 2026-07-26: both homes
-consume THIS list with their own arg mechanics; adding a row here
-lands in both, always.
+THE UNIFIED HOME (Vex design 2026-07-28). CRM and Content stopped being
+two workflows: one top level, eight rows, and everything that used to
+sit up here moved onto the entity it acts on (via the row chords) or
+into 🎛 Manage. Vex: "Stuff is all over the place... they are too
+similar to be in two different places."
 
-Row defs: key → (title, subtitle, kind, val)
+    📅 Calendar · 🎨 Logbooks · 👥 Customers · 🎬 Pipelines
+    🎛 Manage   · 💰 Money    · 📊 Stats     · 📕 Backlog
+
+Both homes (crm_menu.py = the keyword/hotkey entry, browse.py
+render_crmhub = the in-browse home every ⌃ lands on) consume THIS list
+with their own arg mechanics; adding a row here lands in both, always.
+
+Row defs: key → (title, static_subtitle, kind, val)
   kind "ctx"  → a browse context (menu wraps it in the conditional's
                 browse branch; the hub trampolines xact:crmbrowse)
   kind "xact" → a direct verb arg, identical in both homes.
-Per-home ORDER + UID maps preserve each home's muscle memory and
-Alfred frecency; keys one home lacked historically are appended at
-its tail (the union - the drift this file kills).
+
+Subtitles are LIVE where a number helps you decide whether to go there
+(Vex: "show stats in description"). subtitles() computes them from the
+cache only - no API call - and every row falls back to its static text
+if anything raises, so a stats bug can never blank the home.
 """
 
 ROWS = {
-    "cal":     ("📅 Calendar", "Tasks · search · row 1 opens TickTick",
+    "cal":     ("📅 Calendar", "Bookings · week · row 1 opens TickTick",
                 "ctx", "ctx:crmcal"),
-    "cust":    ("👥 Customers", "Leads too · search · row 1 opens TickTick",
-                "ctx", "ctx:crmcusts"),
-    "logs":    ("🎨 Logbooks", "Archived too · search · row 1 opens TickTick",
+    "logs":    ("🎨 Logbooks", "Tattoos · / scopes · row 1 opens TickTick",
                 "ctx", "ctx:crmlbs"),
-    "week":    ("📆 Week", "Who's coming + needs-booking radar",
-                "ctx", "ctx:crmweek"),
-    "done":    ("✅ Session done", "Tick off · log · schedule next",
-                "ctx", "ctx:crmdone"),
-    "next":    ("▶️ Next session", "Pick logbook → S<n>",
-                "ctx", "ctx:crmnew:session"),
-    "tattoo":  ("➕ New tattoo", "Customer → logbook → S1",
-                "ctx", "ctx:crmnew:tattoo"),
-    "consult": ("➕ New consultation", "Customer → logbook → schedule",
-                "ctx", "ctx:crmnew:consult"),
-    "person":  ("➕ New lead / customer", "Dialogs · lead lands in Records",
-                "xact", "xact:crmperson"),
-    "photos":  ("📸 Photos import", "Selection or clipboard → Eagle + TickTick",
-                "ctx", "ctx:tph"),
-    "triage":  ("🦅 Eagle triage", "Eagle selection → tattoo folder",
-                "ctx", "ctx:triage"),
-    "content": ("🎬 Content pipeline", "To edit · To post · Raw queues",
+    "cust":    ("👥 Customers", "People · leads too · / scopes",
+                "ctx", "ctx:crmcusts"),
+    "pipes":   ("🎬 Pipelines", "TV · FM · Studio",
                 "ctx", "ctx:contentpl"),
-    "backlog": ("📕 Backlog", "Import · past session · adopt task · image · batch",
-                "ctx", "ctx:crmback"),
-    "sched":   ("📅 Schedule", "Dormant tasks → schedule + link",
-                "ctx", "ctx:crmsched"),
-    "prep":    ("🔥 Prepare", "Pick booking → prep task",
-                "ctx", "ctx:crmprep"),
-    "search":  ("🔍 Search", "Everything CRM · / scopes",
-                "ctx", "ctx:crmsearch"),
-    "log":     ("📝 Log", "Line into a customer / logbook note",
-                "ctx", "ctx:crmlog"),
-    "stats":   ("📊 Stats", "Earnings + sessions per month",
-                "ctx", "ctx:crmstats"),
+    "manage":  ("🎛 Manage", "New things · Eagle housekeeping",
+                "ctx", "ctx:manage"),
     "money":   ("💰 Money", "Totals · periods · per customer",
                 "ctx", "ctx:crmmoney"),
-    "sweep":   ("🦅 Eagle sweep", "Skeleton folders for logbooks missing one",
-                "xact", "xact:eaglesweep"),
+    "stats":   ("📊 Stats", "CRM + content pipeline",
+                "ctx", "ctx:stats"),
+    "backlog": ("📕 Backlog", "Import · past session · adopt task",
+                "ctx", "ctx:crmback"),
 }
 
-MENU_ORDER = ("cal", "cust", "logs", "week", "done", "next", "tattoo",
-              "consult", "person", "backlog", "sched", "prep", "search",
-              "money", "stats", "log",
-              # union tail - rows the menu historically lacked
-              "photos", "triage", "content", "sweep")
+HOME_ORDER = ("cal", "logs", "cust", "pipes",
+              "manage", "money", "stats", "backlog")
 
-HUB_ORDER = ("done", "next", "tattoo", "consult", "person", "photos",
-             "triage", "content", "backlog", "sched", "search", "log",
-             "stats", "money", "week", "sweep",
-             # union tail - rows the hub historically lacked
-             "cal", "cust", "logs", "prep")
+# Old uids kept where the row survived, so Alfred frecency carries over.
+MENU_UIDS = {"cal": "crm-open-cal", "logs": "crm-open-logs",
+             "cust": "crm-open-cust", "pipes": "crm-content",
+             "manage": "crm-manage", "money": "crm-money",
+             "stats": "crm-stats", "backlog": "crm-backlog"}
 
-MENU_UIDS = {"cal": "crm-open-cal", "cust": "crm-open-cust",
-             "logs": "crm-open-logs", "week": "crm-week",
-             "done": "crm-session-done", "next": "crm-next-session",
-             "tattoo": "crm-new-tattoo", "consult": "crm-new-consult",
-             "person": "crm-person", "backlog": "crm-backlog",
-             "sched": "crm-sched", "prep": "crm-prep",
-             "search": "crm-search", "money": "crm-money",
-             "stats": "crm-stats", "log": "crm-log"}
+HUB_UIDS = {"cal": "hub-cal", "logs": "hub-logs", "cust": "hub-cust",
+            "pipes": "hub-content", "manage": "hub-manage",
+            "money": "hub-money", "stats": "hub-stats",
+            "backlog": "hub-backlog"}
 
-HUB_UIDS = {"done": "hub-done", "next": "hub-next", "tattoo": "hub-tattoo",
-            "consult": "hub-consult", "person": "hub-person",
-            "photos": "hub-photos", "triage": "hub-triage",
-            "content": "hub-content", "backlog": "hub-backlog",
-            "sched": "hub-sched", "search": "hub-search",
-            "log": "hub-log", "stats": "hub-stats", "money": "hub-money",
-            "week": "hub-week", "sweep": "hub-eaglesweep"}
+# Kept for the legacy screens that still render behind the new tree.
+MENU_ORDER = HOME_ORDER
+HUB_ORDER = HOME_ORDER
 
 
-def rows_for(order, uids, prefix):
-    """(uid, title, subtitle, kind, val) per home."""
+def _plural(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def subtitles():
+    """key → live subtitle. Cache-only, each row independently
+    guarded: one failing stat never takes the home down with it."""
+    out = {}
+    try:
+        import areas
+        import cache as cache_store
+        import crm_records as cr
+    except Exception:
+        return out
+
+    def guard(key, fn):
+        try:
+            v = fn()
+            if v:
+                out[key] = v
+        except Exception:
+            pass
+
+    def logs():
+        lbs = cr.logbook_notes()
+        active = [l for l in lbs if not cr.logbook_archived(l)]
+        sched = sum(1 for l in active if cr.next_session_task(l["id"]))
+        return (f"{_plural(len(lbs), 'tattoo')} · {len(active)} active · "
+                f"🟢 {sched} scheduled")
+
+    def cust():
+        people = cr.records_notes(areas.CUSTOMER_TAG)
+        leads = cr.records_notes(areas.LEAD_TAG)
+        seen, n = set(), 0
+        for p in people:
+            if p["id"] not in seen:
+                seen.add(p["id"])
+                n += 1
+        return (f"{_plural(n, 'customer')}"
+                + (f" · 🎣 {len(leads)} leads" if leads else ""))
+
+    def cal():
+        import datetime
+        from filtering import utc_str_to_local_date
+        today = datetime.date.today().isoformat()
+        wk_end = (datetime.date.today()
+                  + datetime.timedelta(days=7)).isoformat()
+        n_today = n_week = dormant = 0
+        for t in cache_store.get("all_tasks") or []:
+            if ((t.get("_projectId") or t.get("projectId")) != areas.CRM_ID
+                    or t.get("status", 0) != 0):
+                continue
+            due = t.get("dueDate") or t.get("startDate") or ""
+            if not due:
+                dormant += 1
+                continue
+            try:
+                day = utc_str_to_local_date(due)
+            except Exception:
+                day = due[:10]
+            if day == today:
+                n_today += 1
+            if today <= day <= wk_end:
+                n_week += 1
+        bits = [f"{n_week} this week"]
+        if n_today:
+            bits.insert(0, f"🔴 {n_today} today")
+        if dormant:
+            bits.append(f"{dormant} unscheduled")
+        return " · ".join(bits)
+
+    def pipes():
+        states = {"📸raw", "📸edit", "📸post"}
+        counts = {}
+        for t in cache_store.get("all_tasks") or []:
+            pid = t.get("_projectId") or t.get("projectId")
+            if t.get("status", 0) != 0:
+                continue
+            tags = {str(x).lower() for x in (t.get("tags") or [])}
+            if not (tags & states):
+                continue
+            counts[pid] = counts.get(pid, 0) + 1
+        bits = []
+        for key, (pid, emoji, label) in areas.CONTENT_DESTS.items():
+            bits.append(f"{emoji} {counts.get(pid, 0)}")
+        return " · ".join(bits) + " open"
+
+    def money():
+        import datetime
+        mo = datetime.date.today().isoformat()[:7]
+        hit = cr.monthly_stats().get(mo)
+        if not hit:
+            return ""
+        total, n, sym, pre = hit
+        amt = cr._fmt_money(total, sym or "€", pre)
+        return f"{amt} · {_plural(n, 'session')} this month"
+
+    guard("logs", logs)
+    guard("cust", cust)
+    guard("cal", cal)
+    guard("pipes", pipes)
+    guard("money", money)
+    return out
+
+
+def rows_for(order, uids, prefix, live=True):
+    """(uid, title, subtitle, kind, val) per home - subtitle live where
+    a number exists, static otherwise."""
+    subs = subtitles() if live else {}
     out = []
     for key in order:
         title, subtitle, kind, val = ROWS[key]
         out.append((uids.get(key, f"{prefix}{key}"),
-                    title, subtitle, kind, val))
+                    title, subs.get(key) or subtitle, kind, val))
     return out

@@ -2293,11 +2293,14 @@ def _cpl_task_row(t, tag, icon, word, lib, chip):
 
 
 def render_contentpl(ids, query):
-    """🎬 Content pipeline - three levels (Vex smoke 2026-07-26: never a
-    flat both-lists dump). Root: intake state + actions + 📺 TV / 🖋️ FM
-    rows. Per-library: Open in TickTick + the tag queues (To post /
-    To edit / Raw / Studio / All - 'basically our tags'). Queue: task
-    rows. Renders from the TickTick cache, Eagle not needed to look."""
+    """🎬 Pipelines - three levels (Vex smoke 2026-07-26: never a flat
+    both-lists dump). Root: the three boards 📺 TV / 🖋️ FM / 🏷 Studio,
+    plus the 🎬 Unclassified drain and 📥 intake row when either has
+    something to say. Per-library: Open in TickTick + the tag queues
+    (To post / To edit / Raw / All). Queue: task rows. Renders from the
+    TickTick cache, Eagle not needed to look.
+    Customers / Logbooks / stats / Manage left this screen when the home
+    unified (Vex 2026-07-28) - they are top-level rows now."""
     import areas as _ar
     import eagle as _eagle
     LIBS = {"tv": (_ar.CONTENT_TV_ID, "📺", "TV"),
@@ -2320,12 +2323,7 @@ def render_contentpl(ids, query):
                                     os.path.join(_eagle.INTAKE[k], f))])
             except OSError:
                 pass
-        chips = _cpl_counts()
-        rows = [alfred.item(
-            uid="cpl-stats", title="🎬 Content pipeline",
-            subtitle=f"📥{pending} · 🎞{chips['📸raw']} ✂️{chips['📸edit']} "
-                     f"📤{chips['📸post']}  |  ⏎ stats",
-            arg="xact:crmbrowse:ctx:cstats", mods=_picker_mods())]
+        rows = []
         # 🎬 radar: Vex rule 2026-07-28 - no logbook stays unclassified.
         # Renders ONLY while offenders exist; the mandatory at-birth
         # picker keeps new ones out, this row drains the legacy 32.
@@ -2341,19 +2339,14 @@ def render_contentpl(ids, query):
                 "cpl-unset", f"🎬 Unclassified · {len(unset)}",
                 f"{na} active · {len(unset) - na} archived · "
                 "pick tattoo → classify", "ctx:lbpick:cdest:unset"))
+        # Intake is time-sensitive, so it stays visible HERE as well as
+        # in 🎛 Manage (Vex's rows-in-both-places rule) - but only when
+        # the folders actually hold something.
         if pending:
             rows.append(alfred.item(
                 uid="cpl-file", title=f"📥 File edited shots ({pending})",
                 subtitle="Intake → To post · names · task → Post",
                 arg="xact:filedited", mods=_picker_mods()))
-        rows.append(alfred.item(
-            uid="cpl-manage", title="🎛 Manage content",
-            subtitle="All pipeline actions · photos · triage · promote",
-            arg="xact:crmbrowse:ctx:cmanage", mods=_picker_mods()))
-        rows.append(hop("cpl-cust", "👥 Customers",
-                        "Birdseye · customer → tattoos", "ctx:ccust"))
-        rows.append(hop("cpl-logs", "🎨 Logbooks",
-                        "Tattoo → 🦅 folders → images", "ctx:clbs"))
         for k, (pid, chip, word) in LIBS.items():
             n = sum(1 for t in cache_store.get("all_tasks") or []
                     if (t.get("_projectId") or t.get("projectId")) == pid
@@ -2702,6 +2695,77 @@ def render_crmhub(query):
     return add_back(rows, "ctx:crmhub")
 
 
+_MANAGE = {
+    "crm": ("🗂 CRM", "New customer · tattoo · consultation · lead", (
+        ("mg-newcust", "➕ New customer", "Name → contact → Records",
+         "xact:crmperson:customer"),
+        ("mg-tattoo", "➕ New tattoo", "Customer → logbook → S1",
+         "ctx:crmnew:tattoo"),
+        ("mg-consult", "➕ New consultation", "Customer → logbook → schedule",
+         "ctx:crmnew:consult"),
+        ("mg-lead", "➕ New lead", "Name → contact → Records",
+         "xact:crmperson:lead"),
+    )),
+    "content": ("🎬 Content", "Eagle housekeeping", (
+        ("mg-triage", "🦅 Eagle triage", "Eagle selection → tattoo stage",
+         "ctx:triage"),
+        ("mg-promote", "🎬 Promote Eagle selection", "Picked shots → To edit",
+         "xact:promotesel"),
+        ("mg-filed", "📥 File edited shots", "Intake → To post · task → Post",
+         "xact:filedited"),
+        ("mg-sweep", "🦅 Eagle sweep", "Skeletons for logbooks missing one",
+         "xact:eaglesweep"),
+    )),
+}
+
+
+def render_manage(ids, query):
+    """🎛 Manage - the honest home for verbs with no entity to hang off
+    (Vex unified home 2026-07-28: "a row that will serve as drop for all
+    those that aren't meant to be accessed from their log end point").
+    Two rows, CRM and Content, each opening its own flat list."""
+    group = ids[0] if ids else ""
+    if group not in _MANAGE:
+        rows = [alfred.item(uid=f"mg-{k}", title=t, subtitle=s,
+                            arg=f"xact:crmbrowse:ctx:manage:{k}",
+                            mods=_picker_mods())
+                for k, (t, s, _i) in _MANAGE.items()]
+        home = "ctx:crmhub"
+    else:
+        _t, _s, items = _MANAGE[group]
+        rows = [alfred.item(
+            uid=u, title=t, subtitle=s,
+            arg=(f"xact:crmbrowse:{v}" if v.startswith("ctx:") else v),
+            mods=_picker_mods()) for u, t, s, v in items]
+        home = "ctx:manage"
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, home)
+
+
+def render_stats(query):
+    """📊 Stats - two worlds, one door (Vex 2026-07-28). Each row carries
+    a live description and opens its own detail screen."""
+    import crm_home
+    subs = crm_home.subtitles()
+    chips = _cpl_counts()
+    rows = [
+        alfred.item(uid="st-crm", title="📊 CRM stats",
+                    subtitle=(subs.get("money")
+                              or "Earnings · sessions · customers"),
+                    arg="xact:crmbrowse:ctx:crmstats", mods=_picker_mods()),
+        alfred.item(uid="st-content", title="🎬 Content pipeline stats",
+                    subtitle=f"🎞 {chips['📸raw']} raw · ✂️ {chips['📸edit']} "
+                             f"editing · 📤 {chips['📸post']} to post",
+                    arg="xact:crmbrowse:ctx:cstats", mods=_picker_mods()),
+    ]
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, "ctx:crmhub")
+
+
 _CRM_SCOPES = [("ca", "Calendar",  "📅", "Session + dormant tasks"),
                ("lo", "Logbooks",  "🎨", "Active + archived"),
                ("cu", "Customers", "👥", "Customers + leads"),
@@ -2800,10 +2864,11 @@ def render_crmsearch(query):
     return add_back(out, "ctx:crmhub")
 
 
-def _crmlist_drill(uid, emoji, name, list_id, scope, query):
+def _crmlist_drill(uid, emoji, name, list_id, scope, query, extra=()):
     """Menu-row drill for one of the two CRM lists (Vex ruling 2026-07-21):
     row 1 is ALWAYS "open in TickTick" (the old ⏎), everything under it is
-    the list itself, searchable in its scope."""
+    the list itself, searchable in its scope. `extra` rows sit directly
+    under row 1 (Calendar's 📆 Week, Vex unified home 2026-07-28)."""
     gate = _records_gate()
     if gate:
         return add_back(gate, "ctx:crmhub")
@@ -2812,6 +2877,7 @@ def _crmlist_drill(uid, emoji, name, list_id, scope, query):
     rows = [alfred.item(uid=f"{uid}-open", title=f"{emoji} {name}",
                         subtitle="The whole list, in the app  |  ⏎↗️",
                         arg=f"open:ticktick:///webapp/#p/{list_id}/tasks")]
+    rows += list(extra)
     hits = _crmsearch_rows(cr, scope, term)
     if term and not hits:
         hits = [alfred.item(title=f'Nothing matching "{term}"', valid=False)]
@@ -2819,9 +2885,16 @@ def _crmlist_drill(uid, emoji, name, list_id, scope, query):
 
 
 def render_crmcal(query):
-    """📅 The calendar list: open row on top, open tasks under it."""
+    """📅 The calendar list: open row on top, 📆 Week under it (Vex moved
+    Week inside Calendar when the home unified), then the open tasks."""
+    import crm_home
+    week = alfred.item(
+        uid="crmcal-week", title="📆 Week",
+        subtitle=(crm_home.subtitles().get("cal")
+                  or "Who's coming + needs-booking radar"),
+        arg="xact:crmbrowse:ctx:crmweek", mods=_picker_mods())
     return _crmlist_drill("crmcal", "📅", "Calendar", _areas.CRM_ID,
-                          "ca", query)
+                          "ca", query, extra=(week,))
 
 
 def render_crmcusts(query):
@@ -4191,6 +4264,12 @@ def main():
 
         elif level == "cmanage":
             items = render_cmanage(query)
+
+        elif level == "manage":
+            items = render_manage(ids, query)
+
+        elif level == "stats":
+            items = render_stats(query)
 
         elif level == "cstats":
             items = render_cstats(query)

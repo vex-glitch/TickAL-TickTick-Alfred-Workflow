@@ -1774,9 +1774,12 @@ def _ask_contact_chain(name):
     return [phone, mail, bday, insta]
 
 
-def crmperson():
+def crmperson(kind=""):
     """➕ New lead / customer - standalone (backlog entry, CRM setup, walk-in
-    who hasn't booked). Leads live in RECORDS, never on the calendar."""
+    who hasn't booked). Leads live in RECORDS, never on the calendar.
+    kind 'lead'|'customer' skips the which-one dialog: 🎛 Manage offers
+    the two as separate rows (Vex unified home 2026-07-28), so asking
+    again would be a question he already answered."""
     if not _records_ready():
         return
     import areas
@@ -1789,8 +1792,11 @@ def crmperson():
     if contact is None:
         _crm_say("Cancelled · nothing created")
         return
-    kind = _dialog(f"{name} - lead or customer?",
-                   ["Cancel", "Lead", "Customer"], "Customer")
+    if kind.lower() in ("lead", "customer"):
+        kind = kind.capitalize()
+    else:
+        kind = _dialog(f"{name} - lead or customer?",
+                       ["Cancel", "Lead", "Customer"], "Customer")
     if kind == "":
         _crm_say("Cancelled · nothing created")
         return
@@ -7806,7 +7812,7 @@ def main():
         elif verb == "crmlog":
             crmlog(rest)
         elif verb == "crmperson":
-            crmperson()
+            crmperson(rest)
         elif verb == "crmimport":
             crmimport()
         elif verb == "crmpast":
