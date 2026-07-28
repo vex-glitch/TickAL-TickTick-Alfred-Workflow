@@ -28,6 +28,7 @@ test:
 	@python3 tests/test_periodic.py
 	@python3 tests/test_focus_blocks.py
 	@python3 tests/test_people.py
+	@python3 tests/test_eagle.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:

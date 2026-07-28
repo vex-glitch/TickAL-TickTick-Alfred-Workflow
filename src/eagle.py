@@ -82,6 +82,13 @@ INTAKE = {
 SKELETON = ["01 Consultation", "02 Preparation", "03 Design",
             "04 Sessions", "05 Finished", "06 Healed"]
 
+# The content libraries' WORKING folders (Vex final shape 2026-07-28):
+# four, FLAT, no "Content pipeline" parent. (suffix, name-if-we-create-it) -
+# the same shape as _LIB_SUFFIX, and for the same reason: Vex renumbers the
+# prefixes at will, so nothing may ever match the number.
+PIPELINE = (("Raw", "01 Raw"), ("Edit", "02 Edit"),
+            ("Post", "03 Post"), ("Portfolio", "04 Portfolio"))
+
 
 class EagleError(Exception):
     """Raised with a toast-ready, honest message. Every caller fails closed."""
@@ -174,6 +181,54 @@ def find_folder(name, parent_id=None, tree=None):
                 return hit
         return None
     return walk(tree if tree is not None else folder_tree(), None)
+
+
+def find_folder_suffix(suffix, tree=None, root_only=True):
+    """Folder whose name ends in `suffix`, ignoring any 'NN ' sort prefix
+    and IGNORING CASE - the same protection _resolve_libs gives the
+    library names, for the same reason (Vex renumbers prefixes; his
+    2026-07-28 renumber broke every hardcoded Eagle road at once).
+
+    Case-insensitive on purpose: `find_folder("Content pipeline")` missed
+    his existing `Content Pipeline` and minted a TWIN in the FM library,
+    which Eagle cannot delete. Never let capitalisation fork a library.
+
+    root_only (default) keeps the search at the top level, so a per-tattoo
+    child called `Raw` deep in some legacy tree can never be adopted as
+    the library's `01 Raw`. Matching is on the SUFFIX only, so `Raw` does
+    NOT match `Raw Tattoos` / `Raw Videos`, and `Portfolio` does NOT match
+    `Tattoo Portfolio` - those are legacy folders, i.e. migration material."""
+    pat = re.compile(r"(?:\d+\s*)?" + re.escape(suffix) + r"$", re.I)
+    nodes = folder_tree() if tree is None else tree
+
+    def walk(ns):
+        for f in ns:
+            if pat.fullmatch((f.get("name") or "").strip()):
+                return f
+            if not root_only:
+                hit = walk(f.get("children") or [])
+                if hit:
+                    return hit
+        return None
+    return walk(nodes)
+
+
+def pipeline_folders(create=True, tree=None):
+    """{suffix: folder id} for the OPEN content library's four working
+    folders - keyed by SUFFIX ('Raw'/'Edit'/'Post'/'Portfolio') so callers
+    never bake a sort number into code. One tree read; creates only what
+    is missing, flat at the root. create=False leaves gaps as ''."""
+    nodes = folder_tree() if tree is None else tree
+    out = {}
+    for suffix, canonical in PIPELINE:
+        hit = find_folder_suffix(suffix, tree=nodes)
+        if hit:
+            out[suffix] = hit["id"]
+        elif create:
+            out[suffix] = create_folder(canonical)
+        else:
+            out[suffix] = ""
+    return out
 
 
 def create_folder(name, parent=None):
@@ -526,6 +581,29 @@ def disk_items_in(lib_path, folder_ids):
 def item_name(base, stage, n):
     """'{Customer} - {tattoo} • S1 • 3' / '• Design • 1' / '• Edit • 2'."""
     return f"{base} • {stage} • {n}"
+
+
+# Every stage label item_name is ever called with: the five CRM shelves
+# (xact._STAGES), the session marker, and the content-library edit.
+STAGE_LABELS = ("Consult", "Prep", "Design", "Finished", "Healed", "Edit")
+_ITEM_RE = re.compile(r"^(?P<base>.+) • (?P<stage>"
+                      + "|".join(STAGE_LABELS) + r"|S\d+)"
+                      r" • (?P<n>\d+)$")
+
+
+def item_base(name):
+    """The inverse of item_name: '(base, stage, n)', or ('', '', 0) when
+    the name is not ours. Parses from the RIGHT against a CLOSED stage
+    vocabulary, so a base containing ' • ' survives - the old
+    `name.split(" • ")[0]` read 'Luka • Anubis • Edit • 1' as just 'Luka'
+    and would file a whole tattoo onto a shelf named after the client.
+    Fails closed on hand-renamed and legacy names ('IMG_3559',
+    'Asset - Color', 'Raw - Lucia 11'), which is what every caller wants:
+    never mint a junk shelf from a name we do not understand."""
+    m = _ITEM_RE.match((name or "").strip())
+    if not m:
+        return "", "", 0
+    return m.group("base").strip(), m.group("stage"), int(m.group("n"))
 
 
 def next_index(existing_names, base, stage):

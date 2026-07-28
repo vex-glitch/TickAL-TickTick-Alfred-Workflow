@@ -169,6 +169,55 @@ check("intake tv path",
 check("skeleton six", len(eagle.SKELETON) == 6
       and eagle.SKELETON[3] == "04 Sessions")
 
+# ── the four working folders, matched by SUFFIX (2026-07-28) ──────────────
+# Vex renumbers the sort prefixes; nothing may ever match the number. And
+# the match is case-insensitive because an exact "Content pipeline" lookup
+# missed his "Content Pipeline" and minted a TWIN Eagle cannot delete.
+TREE = [{"id": "raw", "name": "01 Raw", "children": []},
+        {"id": "rawtat", "name": "Raw Tattoos",
+         "children": [{"id": "nested", "name": "Raw", "children": []}]},
+        {"id": "rawvid", "name": "Raw Videos", "children": []},
+        {"id": "cp", "name": "Content Pipeline", "children": []},
+        {"id": "tport", "name": "Tattoo Portfolio", "children": []},
+        {"id": "post", "name": "1  Post", "children": []},
+        {"id": "art", "name": "05 Art", "children": []}]
+
+
+def suffix_id(s):
+    hit = eagle.find_folder_suffix(s, tree=TREE)
+    return hit["id"] if hit else None
+
+
+check("suffix: numbered prefix", suffix_id("Raw") == "raw")
+check("suffix: odd spacing", suffix_id("Post") == "post")
+check("suffix: case-insensitive", suffix_id("Content pipeline") == "cp")
+check("suffix: Raw != Raw Tattoos/Raw Videos", suffix_id("Raw") != "rawtat")
+check("suffix: root_only ignores a nested Raw", suffix_id("Raw") != "nested")
+check("suffix: Portfolio != Tattoo Portfolio", suffix_id("Portfolio") is None)
+check("suffix: Edit absent is None", suffix_id("Edit") is None)
+check("pipeline four", len(eagle.PIPELINE) == 4
+      and [c for _s, c in eagle.PIPELINE][0] == "01 Raw")
+check("pipeline_folders adopts + reports gaps",
+      eagle.pipeline_folders(create=False, tree=TREE)
+      == {"Raw": "raw", "Edit": "", "Post": "post", "Portfolio": ""})
+
+# ── item_base: the rename-proof inverse of item_name ──────────────────────
+_rt = []
+for _b in ("Bruno - Dog Portrait", "Luka - Anubis • Sleeve"):
+    for _st in list(eagle.STAGE_LABELS) + ["S1", "S10"]:
+        _rt.append(eagle.item_base(eagle.item_name(_b, _st, 7))
+                   == (_b, _st, 7))
+check("item_base round-trips every stage", all(_rt))
+check("item_base survives a base containing ' • '",
+      eagle.item_base("Luka - Anubis • Sleeve • Edit • 1")[0]
+      == "Luka - Anubis • Sleeve")
+check("item_base fails closed on hand-named files",
+      all(eagle.item_base(n) == ("", "", 0)
+          for n in ("IMG_3559", "Asset - Color", "Raw - Lucia 11",
+                    "Luca - Pharaoph Sleeve", "Video - Memento Mori", "")))
+check("item_base rejects an unknown stage word",
+      eagle.item_base("Bruno - Dog • Sketch • 1") == ("", "", 0))
+
 shutil.rmtree(TMP)
 
 print(f"\n{COUNT[0]} checks, {len(FAILS)} failed")
