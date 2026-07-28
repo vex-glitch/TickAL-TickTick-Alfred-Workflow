@@ -2839,8 +2839,10 @@ def render_lbphotos(ids, query):
                     subtitle="Already in Eagle · pick the stage · ⌘ also attaches",
                     arg=f"xact:crmbrowse:ctx:triage:{tid}",
                     mods=_picker_mods()),
-        alfred.item(uid="ph-browse", title="🖼 Browse this tattoo's images",
-                    subtitle="Folders · counts · grid · ⌥⇧ attaches one",
+        alfred.item(uid="ph-browse",
+                    title="📎 Eagle photo → TickTick session",
+                    subtitle="Grid of this tattoo · ⏎ opens in Eagle · "
+                             "⌥⇧ attaches it to its session",
                     arg=f"xact:crmbrowse:ctx:lbeagle:{tid}:hub",
                     mods=_picker_mods()),
     ]
