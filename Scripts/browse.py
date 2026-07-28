@@ -2723,6 +2723,8 @@ _MANAGE = {
          "ctx:crmnew:consult"),
         ("mg-lead", "➕ New lead", "Name → contact → Records",
          "xact:crmperson:lead"),
+        ("mg-backlog", "📕 Backlog", "Import · past session · adopt task",
+         "ctx:crmback"),
     )),
     "content": ("🎬 Content", "Eagle housekeeping", (
         ("mg-triage", "🦅 Eagle triage", "Eagle selection → tattoo stage",
@@ -2794,7 +2796,7 @@ _CRM_SCOPE_RE = re.compile(r"(?i)(calendar|logbooks|customers|archived"
                            r"|ca|lo|cu|ar)(?:\s+(.*))?$")
 
 
-def _crmsearch_rows(cr, scope, term):
+def _crmsearch_rows(cr, scope, term, filt=None):
     """Pooled, filtered, rendered rows for one scope code: '' = everything,
     'cu' customers, 'lo' logbooks+archived, 'ar' archived only, 'ca' calendar
     tasks, 're' = records (customers + logbooks) - 're' has no search-bar
@@ -2831,6 +2833,8 @@ def _crmsearch_rows(cr, scope, term):
             return False
         rows = [(k, o) for k, o in rows if _hits(k, o)]
 
+    if filt:
+        rows = [(k, o) for k, o in rows if filt(k, o)]
     out = []
     for kind, o in rows[:60]:
         if kind == "cust":
@@ -2882,6 +2886,29 @@ def render_crmsearch(query):
     return add_back(out, "ctx:crmhub")
 
 
+def _dest_is(key):
+    return lambda cr, o: cr.content_dest_of(o.get("content") or "") == key
+
+
+# Per-list "/" scopes (Vex 2026-07-28: "must have scopes under /").
+# Logbook scopes ARE the row's own status legend and dest chip, so the
+# filter and what you see on the row always tell the same story.
+_LIST_SCOPES = {
+    "lo": (("All", None),
+           ("Active", lambda cr, o: not cr.logbook_archived(o)),
+           ("Scheduled", lambda cr, o: bool(cr.next_session_task(o["id"]))),
+           ("Archived", lambda cr, o: cr.logbook_archived(o)),
+           ("TV", _dest_is("tv")),
+           ("FM", _dest_is("fm")),
+           ("Studio", _dest_is("studio")),
+           ("Unclassified",
+            lambda cr, o: not cr.content_dest_of(o.get("content") or ""))),
+    "cu": (("All", None),
+           ("Customers", lambda cr, o: not cr.is_lead(o)),
+           ("Leads", lambda cr, o: cr.is_lead(o))),
+}
+
+
 def _crmlist_drill(uid, emoji, name, list_id, scope, query, extra=()):
     """Menu-row drill for one of the two CRM lists (Vex ruling 2026-07-21):
     row 1 is ALWAYS "open in TickTick" (the old ⏎), everything under it is
@@ -2892,11 +2919,34 @@ def _crmlist_drill(uid, emoji, name, list_id, scope, query, extra=()):
         return add_back(gate, "ctx:crmhub")
     import crm_records as cr
     term = (query or "").strip()
-    rows = [alfred.item(uid=f"{uid}-open", title=f"{emoji} {name}",
-                        subtitle="The whole list, in the app  |  ⏎↗️",
-                        arg=f"open:ticktick:///webapp/#p/{list_id}/tasks")]
+    scopes = _LIST_SCOPES.get(scope) or ()
+    filt, label = None, ""
+    if scopes:
+        names = "|".join(re.escape(l) for l, _p in scopes)
+        m = re.match(rf"(?i)^({names})(?:\s+(.*))?$", term)
+        if m:
+            label = m.group(1)
+            filt = next(p for l, p in scopes if l.lower() == label.lower())
+            term = (m.group(2) or "").strip()
+        elif term.startswith("/"):
+            frag = term[1:].strip().lower()
+            menu = [alfred.item(
+                uid=f"{uid}-sc-{l}", title=f"{emoji} {l}",
+                subtitle=f"Scope {name.lower()} to {l.lower()}",
+                valid=False, autocomplete=f"{l} ")
+                for l, _p in scopes if frag in l.lower()]
+            return add_back(menu or [alfred.item(
+                title=f'No scope matching "{frag}"', valid=False)],
+                "ctx:crmhub")
+    rows = [alfred.item(
+        uid=f"{uid}-open", title=f"{emoji} {name}"
+                                 + (f" · {label}" if label else ""),
+        subtitle="The whole list, in the app  |  ⏎↗️"
+                 + ("  ·  / scopes" if scopes else ""),
+        arg=f"open:ticktick:///webapp/#p/{list_id}/tasks")]
     rows += list(extra)
-    hits = _crmsearch_rows(cr, scope, term)
+    hits = _crmsearch_rows(cr, scope, term,
+                           filt=(lambda k, o: filt(cr, o)) if filt else None)
     if term and not hits:
         hits = [alfred.item(title=f'Nothing matching "{term}"', valid=False)]
     return add_back(rows + hits, "ctx:crmhub")
@@ -3045,7 +3095,7 @@ def render_crmback(query):
                     subtitle="Old task → customer + logbook → log done",
                     arg="", valid=False, autocomplete="adopt "),
         alfred.item(uid="back-img", title="📸 Images → tattoo",
-                    subtitle="Finder selection or clipboard · pick "
+                    subtitle="Photos, Finder or clipboard · pick "
                              "logbook → stage",
                     arg="", valid=False, autocomplete="img "),
     ]

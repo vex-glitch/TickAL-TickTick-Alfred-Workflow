@@ -8,7 +8,10 @@ into 🎛 Manage. Vex: "Stuff is all over the place... they are too
 similar to be in two different places."
 
     📅 Calendar · 🎨 Logbooks · 👥 Customers · 🎬 Pipelines
-    🎛 Manage   · 💰 Money    · 📊 Stats     · 📕 Backlog
+    🎛 Manage   · 💰 Money    · 📊 Stats
+
+(📕 Backlog moved into 🎛 Manage > CRM, Vex 2026-07-28 - it is a
+retro-entry chooser, not a daily door.)
 
 Both homes (crm_menu.py = the keyword/hotkey entry, browse.py
 render_crmhub = the in-browse home every ⌃ lands on) consume THIS list
@@ -34,29 +37,26 @@ ROWS = {
                 "ctx", "ctx:crmcusts"),
     "pipes":   ("🎬 Pipelines", "TV · FM · Studio",
                 "ctx", "ctx:contentpl"),
-    "manage":  ("🎛 Manage", "New things · Eagle housekeeping",
+    "manage":  ("🎛 Manage", "New things · backlog · Eagle housekeeping",
                 "ctx", "ctx:manage"),
     "money":   ("💰 Money", "Totals · periods · per customer",
                 "ctx", "ctx:crmmoney"),
     "stats":   ("📊 Stats", "CRM + content pipeline",
                 "ctx", "ctx:stats"),
-    "backlog": ("📕 Backlog", "Import · past session · adopt task",
-                "ctx", "ctx:crmback"),
 }
 
 HOME_ORDER = ("cal", "logs", "cust", "pipes",
-              "manage", "money", "stats", "backlog")
+              "manage", "money", "stats")
 
 # Old uids kept where the row survived, so Alfred frecency carries over.
 MENU_UIDS = {"cal": "crm-open-cal", "logs": "crm-open-logs",
              "cust": "crm-open-cust", "pipes": "crm-content",
              "manage": "crm-manage", "money": "crm-money",
-             "stats": "crm-stats", "backlog": "crm-backlog"}
+             "stats": "crm-stats"}
 
 HUB_UIDS = {"cal": "hub-cal", "logs": "hub-logs", "cust": "hub-cust",
             "pipes": "hub-content", "manage": "hub-manage",
-            "money": "hub-money", "stats": "hub-stats",
-            "backlog": "hub-backlog"}
+            "money": "hub-money", "stats": "hub-stats"}
 
 # Kept for the legacy screens that still render behind the new tree.
 MENU_ORDER = HOME_ORDER
