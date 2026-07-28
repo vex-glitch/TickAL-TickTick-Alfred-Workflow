@@ -2400,8 +2400,13 @@ def _fresher_of(a, b):
 def _eagle_ensure_logbook_folder(lb):
     """CRM-library folder id for this logbook. First need CREATES the
     whole per-tattoo skeleton (01 Consultation … 06 Healed - consult
-    refs get dragged in on day one) under Customers/ and writes the
-    header 🦅 line back to the logbook. Returns the folder id."""
+    refs get dragged in on day one) and writes the header 🦅 line back
+    to the logbook. Returns the folder id.
+
+    Parent follows the note's STATE, not the calling road (Vex smoke
+    2026-07-28: creating a folder for an archived tattoo filed it under
+    Customers/, so it was born in the wrong place and only a later
+    sweep would move it). Archived → Archive/, active → Customers/."""
     import areas
     import crm_records as cr
     import eagle
@@ -2410,14 +2415,15 @@ def _eagle_ensure_logbook_folder(lb):
         return fid
     eagle.ensure_library("crm")
     tree = eagle.folder_tree()
-    cust = eagle.find_folder("Customers", tree=tree)
+    parent_name = "Archive" if cr.logbook_archived(lb) else "Customers"
+    cust = eagle.find_folder(parent_name, tree=tree)
     base = cr.logbook_base(lb)
     tat = None
     if cust:
         cust_id = cust["id"]
         tat = eagle.find_folder(base, parent_id=cust_id, tree=tree)
     else:
-        cust_id = eagle.create_folder("Customers")
+        cust_id = eagle.create_folder(parent_name)
     if tat:
         fid = tat["id"]
         have = {c.get("name") for c in (tat.get("children") or [])}
