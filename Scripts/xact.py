@@ -2095,11 +2095,15 @@ def crmbrowse(ctx):
 
 
 def crm_trash(tid):
-    """🗑 Delete a records entry OUTRIGHT (Vex ask 2026-07-27: mistakes
-    need an eraser - archive is for finished work, not typos). Confirm
-    first; TickTick's own Trash can restore it. HONEST scope: linked
-    leftovers (customer bullet, calendar tasks, Eagle folder) are NOT
-    touched - the dialog says so."""
+    """🗑 Delete a records entry AND its trail (Vex ask 2026-07-28:
+    'what is the purpose of it then' - the eraser must erase). Confirm
+    lists the full inventory FIRST, then: linked calendar tasks (S<n>,
+    Consult AND Prepare follow-ups) → TickTick Trash · Eagle items →
+    Eagle Trash + folder husk → '🗑 Deleted' bin (_eagle_trash_folder:
+    the API cannot delete folders) · the customer bullet line removed.
+    A customer/lead delete CASCADES through every logbook first. All
+    TickTick pieces restorable from TickTick's Trash, Eagle items from
+    Eagle's."""
     if not _records_ready():
         return
     import areas
@@ -2109,20 +2113,74 @@ def crm_trash(tid):
         _crm_say("Not found · run tsy")
         return
     title = t.get("title") or "Untitled"
-    if _dialog(f"🗑 Delete '{title}' completely? TickTick Trash can "
-               "restore it. Linked bullets, calendar tasks and Eagle "
-               "folders stay as they are.",
+    is_person = title.startswith(("👤", "🎣"))
+    lbs = cr.customer_logbooks(tid) if is_person else [t]
+    cal = {lb["id"]: cr.calendar_tasks_of(lb["id"]) for lb in lbs}
+    n_cal = sum(len(v) for v in cal.values())
+    n_fid = sum(1 for lb in lbs
+                if cr.eagle_folder_of(lb.get("content") or "")[0])
+    also = []
+    if is_person and lbs:
+        also.append(f"{len(lbs)} logbook{'s' if len(lbs) > 1 else ''}")
+    if n_cal:
+        also.append(f"{n_cal} calendar task{'s' if n_cal > 1 else ''}")
+    if n_fid:
+        also.append("Eagle items → Eagle Trash")
+    tail = (" Takes along: " + " · ".join(also) + ".") if also else ""
+    if _dialog(f"🗑 Delete '{title}' completely?{tail} TickTick Trash "
+               "can restore the notes and tasks.",
                ["Cancel", "Delete"], "Cancel") != "Delete":
         _crm_say("Cancelled · nothing deleted")
         return
-    pid = t.get("_projectId") or t.get("projectId") or areas.RECORDS_ID
-    try:
-        cr._api().delete_task(pid, tid)
-    except Exception as e:
-        _crm_say(f"Delete failed: {type(e).__name__}: {e}")
-        return
-    cr.purge_cache(tid)
-    _crm_say(f"🗑 Deleted · {title}")
+    api = cr._api()
+    killed_cal, done_notes, eagle_bits = 0, 0, []
+
+    def _gone():
+        """Mid-cascade abort must not hide what ALREADY went (review
+        find 2026-07-28)."""
+        return (f" Already deleted: {done_notes} note(s) · "
+                f"{killed_cal} task(s).") if (done_notes or killed_cal) \
+            else ""
+
+    for lb in lbs:
+        lb_pid = (lb.get("_projectId") or lb.get("projectId")
+                  or areas.RECORDS_ID)
+        try:
+            api.delete_task(lb_pid, lb["id"])
+        except Exception as e:
+            _crm_say(f"Delete failed on '{lb.get('title')}': "
+                     f"{type(e).__name__}: {e}.{_gone()}")
+            return
+        cr.purge_cache(lb["id"])
+        done_notes += 1
+        for ct in cal.get(lb["id"]) or []:
+            ct_pid = (ct.get("_projectId") or ct.get("projectId")
+                      or areas.CRM_ID)
+            try:
+                api.delete_task(ct_pid, ct["id"])
+                cr.purge_cache(ct["id"], ct_pid)
+                killed_cal += 1
+            except Exception:
+                pass                      # toast shows killed/planned
+        if not is_person:
+            cr.drop_customer_bullet(lb)   # cascade kills the whole note
+        bit = _eagle_trash_folder(lb)
+        if bit:
+            eagle_bits.append(bit)
+    if is_person:
+        pid = t.get("_projectId") or t.get("projectId") or areas.RECORDS_ID
+        try:
+            api.delete_task(pid, tid)
+        except Exception as e:
+            _crm_say(f"Delete failed: {type(e).__name__}: {e}.{_gone()}")
+            return
+        cr.purge_cache(tid)
+    bits = [f"🗑 Deleted · {title}"]
+    if n_cal:
+        bits.append(f"{killed_cal}/{n_cal} tasks" if killed_cal < n_cal
+                    else f"{killed_cal} task{'s' if killed_cal > 1 else ''}")
+    bits += eagle_bits
+    _crm_say(" · ".join(bits))
 
 
 def crmcold(tid):
@@ -3152,6 +3210,53 @@ def img_move(stage):
         _crm_say(f"🦅 {e}")
         return
     _crm_say(f"🖼 → {folder_name} · {label}")
+
+
+def _eagle_trash_folder(lb):
+    """🗑 delete-road Eagle erase for ONE logbook: every item in the
+    tattoo folder's subtree → Eagle Trash (restorable in-app), the empty
+    husk → a '🗑 Deleted' bin at the CRM library root. Eagle's API has
+    NO folder delete (probed 4.0 2026-07-28: folder/delete → 404) - Vex
+    empties the bin by hand, same pattern as the ✅ In Eagle album.
+    Best-effort AFTER the TickTick delete; Eagle asleep → honest skip
+    fragment, no launch (the archive-move precedent). No 🦅 line →
+    silent '' no-op."""
+    import crm_records as cr
+    fid = cr.eagle_folder_of((lb or {}).get("content") or "")[0]
+    if not fid:
+        return ""
+    import eagle
+    try:
+        eagle.ensure_running(launch=False)   # asleep = honest skip
+        eagle.ensure_library("crm")
+        tree = eagle.folder_tree()
+        node = eagle.folder_node(fid, tree=tree)
+        if node is None:
+            return "🦅 folder gone already"   # 🦅 line, no such folder
+        ids = set()
+
+        def rec(nd):
+            ids.update(i["id"] for i in eagle.items_in_folder(nd["id"]))
+            for c in nd.get("children") or []:
+                rec(c)
+        rec(node)
+        if ids:
+            eagle.trash_items(sorted(ids))
+    except Exception as e:                    # raw-API leg failed whole
+        return f"🦅 skipped: {e}"
+    # Items are ALREADY in Eagle Trash here - the husk move rides the
+    # MCP plugin channel and may fail alone (plugin off). Separate try,
+    # separate truth (review find 2026-07-28: one blanket except said
+    # 'skipped' after the items were long gone).
+    try:
+        husk = eagle.find_folder("🗑 Deleted", tree=tree)
+        husk_id = husk["id"] if husk else eagle.create_folder("🗑 Deleted")
+        eagle.move_folder(fid, husk_id)
+    except Exception as e:
+        return (f"🦅 {len(ids)} → Eagle Trash · husk stayed: {e}" if ids
+                else f"🦅 husk stayed: {e}")
+    return (f"🦅 {len(ids)} → Eagle Trash" if ids
+            else "🦅 husk → 🗑 Deleted")
 
 
 def _eagle_archive_folder(log_tid):

@@ -171,15 +171,33 @@ def lifetime(cust_tid):
     return _fmt_money(total, sym or "€", pre), k, sessions
 
 
+def calendar_tasks_of(log_tid, open_only=False):
+    """Every CRM-calendar task whose TITLE links this logbook - S<n>,
+    Consult AND 'Prepare for …' follow-ups alike (no marker gate: the
+    delete road wants the WHOLE trail). all_tasks is open-only by
+    construction; open_only=False ALSO walks the v2-fed completed_tasks
+    pool (60 days / 200 cap, sync.py - older completions are invisible),
+    deduped by id. v1 delete works on completed tasks too (probe
+    2026-07-28: gone from the completed listing; v1 GET still serves
+    trashed tasks, so a GET is NOT a liveness oracle)."""
+    pools = ("all_tasks",) if open_only else ("all_tasks", "completed_tasks")
+    out, seen = [], set()
+    for key in pools:
+        for t in cache_store.get(key) or []:
+            if ((t.get("_projectId") or t.get("projectId")) != areas.CRM_ID
+                    or t.get("id") in seen
+                    or f"/tasks/{log_tid})" not in (t.get("title") or "")):
+                continue
+            seen.add(t.get("id"))
+            out.append(t)
+    return out
+
+
 def next_session_task(log_tid):
     """(local_date_str_or_'', marker, task) of the EARLIEST open calendar
     task linking this logbook, or None."""
     best = None
-    for t in cache_store.get("all_tasks") or []:
-        if ((t.get("_projectId") or t.get("projectId")) != areas.CRM_ID
-                or t.get("status", 0) != 0
-                or f"/tasks/{log_tid})" not in (t.get("title") or "")):
-            continue
+    for t in calendar_tasks_of(log_tid, open_only=True):
         due = t.get("dueDate") or t.get("startDate") or ""
         key = due or "9999"
         if best is None or key < best[0]:
@@ -934,15 +952,20 @@ def _set_paid_line(content):
     return head + sep + tail
 
 
-def purge_cache(tid):
-    """Drop a deleted note from every cache pool (the 🗑 delete road,
-    2026-07-27) - the pickers must not resurrect it before the sync."""
+def purge_cache(tid, pid=None):
+    """Drop a deleted task from every cache pool (the 🗑 delete road,
+    2026-07-27) - the pickers must not resurrect it before the sync.
+    pid: ALSO invalidate that project's browse cache - the CRM calendar's
+    project_data_ ghosted cascade-deleted session rows until the hourly
+    sync (review find 2026-07-28; delete_action.py had the pattern)."""
     try:
-        for key in ("all_notes", "all_tasks"):
+        for key in ("all_notes", "all_tasks", "completed_tasks"):
             pool = [t for t in (cache_store.get(key) or [])
                     if t.get("id") != tid]
             cache_store.set(key, pool)
         cache_store.invalidate(f"project_data_{areas.RECORDS_ID}")
+        if pid and pid != areas.RECORDS_ID:
+            cache_store.invalidate(f"project_data_{pid}")
     except Exception:
         cache_store.invalidate()
 
@@ -1186,6 +1209,29 @@ def sync_customer_bullet(logbook):
         else _append_under(content, "## Tattoos", bullet, blank=False)
     api.update_task(cust_tid, cust_pid, current=cust, content=new)
     _patch_cache(cust_tid, content=new)
+
+
+def drop_customer_bullet(logbook):
+    """Inverse of sync_customer_bullet, for the 🗑 delete road: the dead
+    logbook's bullet leaves its customer's ## Tattoos list (a deleted
+    note would otherwise keep a corpse link forever). Best-effort."""
+    hit = parse_first_link(logbook.get("content") or "")
+    if not hit:
+        return
+    _, cust_pid, cust_tid = hit
+    try:
+        api = _api()
+        cust = api.get_task(cust_pid, cust_tid)
+        content = cust.get("content") or ""
+        needle = f"/tasks/{logbook['id']})"
+        lines = [l for l in content.split("\n")
+                 if not (needle in l and l.lstrip().startswith("-"))]
+        new = "\n".join(lines)
+        if new != content:
+            api.update_task(cust_tid, cust_pid, current=cust, content=new)
+            _patch_cache(cust_tid, content=new)
+    except Exception:
+        pass
 
 
 def _fresher_content(log_tid, live_content):

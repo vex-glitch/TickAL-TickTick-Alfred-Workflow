@@ -537,7 +537,7 @@ def main():
              f"xact:crmbrowse:ctx:lbeagle:{tid}:hub",
              "import selection stage eagle convention photos",
              _is_logbook),
-            ("🗑 Delete entry", "Mistakes only · TickTick Trash restores",
+            ("🗑 Delete entry", "Mistakes only · sessions + Eagle go too",
              f"xact:crmtrash:{tid}", "delete remove trash entry wrong",
              pid == areas.RECORDS_ID and is_note and bool(tid)),
             ("✅ Session done",    "Tick off · log · schedule next",
