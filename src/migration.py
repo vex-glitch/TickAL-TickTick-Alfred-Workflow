@@ -569,9 +569,30 @@ def pull(con=None, limit=25, lib=None, spread=True):
             log(con, "pull", "attempt", r["eid"], r["backup_path"])
             con.commit()
             try:
-                # already imported by an earlier run?
+                # THE LEDGER is the idempotency oracle, not Eagle's
+                # listing. item/list lags a fresh import by seconds
+                # (documented in eagle.py), so after a wait_imported
+                # timeout a retry would not see the item it just made and
+                # would import it AGAIN - which happened exactly once on
+                # 2026-07-28 ('Raw - Lil Crow 1'). new_eid is written the
+                # moment add_items returns, so this check cannot miss.
+                if r["new_eid"]:
+                    eagle.add_item_tags([r["eid"]], ["superseded"])
+                    con.execute("UPDATE item SET state='sourced' "
+                                "WHERE eid=?", (r["eid"],))
+                    log(con, "pull", "ok", r["eid"], "ledger says done")
+                    skipped += 1
+                    con.commit()
+                    continue
+                # belt and braces: an import from before new_eid existed
                 if fid and any((i.get("annotation") or "") == mark
                                for i in eagle.items_in_folder(fid)):
+                    # The import landed on an earlier attempt but the run
+                    # died before tagging the old one (Eagle copy timeout,
+                    # 6 real cases 2026-07-28). Tag it now - otherwise a
+                    # retry silently leaves a superseded item unmarked and
+                    # 'select by tag, then delete' misses it forever.
+                    eagle.add_item_tags([r["eid"]], ["superseded"])
                     con.execute("UPDATE item SET state='sourced' "
                                 "WHERE eid=?", (r["eid"],))
                     log(con, "pull", "ok", r["eid"], "already present")
@@ -587,10 +608,18 @@ def pull(con=None, limit=25, lib=None, spread=True):
                 ids = eagle.add_items(
                     [{"path": r["backup_path"], "name": r["name"],
                       "tags": tags, "annotation": mark}], folder_id=fid)
+                # Record the handle BEFORE waiting. add_items' returned ids
+                # are the only reliable handle on a fresh import, and
+                # wait_imported can time out on a big ProRAW while the copy
+                # is still running - losing the id there is what caused the
+                # one duplicate. Write it first, verify second.
+                con.execute("UPDATE item SET new_eid=? WHERE eid=?",
+                            (ids[0] if ids else "", r["eid"]))
+                con.commit()
                 eagle.wait_imported(ids)
                 eagle.add_item_tags([r["eid"]], ["superseded"])
-                con.execute("UPDATE item SET new_eid=?, state='sourced' "
-                            "WHERE eid=?", (ids[0] if ids else "", r["eid"]))
+                con.execute("UPDATE item SET state='sourced' WHERE eid=?",
+                            (r["eid"],))
                 log(con, "pull", "ok", r["eid"], ids[0] if ids else "")
                 done += 1
             except Exception as e:
