@@ -1298,12 +1298,9 @@ def render_crmbook(log_tid, query):
             subtitle="From the previous session · prefilled at the next one",
             valid=False))
     rows += [
-        alfred.item(uid="bk-sessphotos", title="📸 Photos import",
-                    subtitle="Selection or clipboard → Eagle + TickTick",
-                    arg=f"xact:sessphotos:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-eaglebrowse", title="🦅 Browse photos",
-                    subtitle="Folders · counts · thumbnail grid",
-                    arg=f"xact:crmbrowse:ctx:lbeagle:{log_tid}:hub",
+        alfred.item(uid="bk-sessphotos", title="📸 Photos",
+                    subtitle="Import · file an Eagle selection · browse",
+                    arg=f"xact:crmbrowse:ctx:lbphotos:{log_tid}",
                     mods=_picker_mods()),
         alfred.item(uid="bk-eagle", title="🦅 Eagle folder",
                     subtitle="Create if new · open in Eagle",
@@ -2580,13 +2577,20 @@ def render_lbeagle(ids, query):
                        arg=f"xact:eaglego:{lib}:{fid}",
                        mods=_lbe_mods(link=fid),
                        variables=_record_vars(lb))
+    # The 📸 door lives on the CONTENT side too (Vex 2026-07-28: photo
+    # work is both worlds, so it belongs under ⌥ AND ⇧).
+    photos = alfred.item(
+        uid="lbe-photos", title="📸 Photos",
+        subtitle="Import · file an Eagle selection · browse",
+        arg=f"xact:crmbrowse:ctx:lbphotos:{lb['id']}",
+        mods=_picker_mods(), variables=_record_vars(lb))
     try:
         root, all_ids = eagle.disk_subtree_ids(lib_path, fid)
         items = eagle.disk_items_in(lib_path, all_ids)
     except eagle.EagleError as e:
-        return add_back([head, alfred.item(title=f"🦅 {e}",
-                                           subtitle="T9 plugged in?",
-                                           valid=False)], back)
+        return add_back([head, photos, alfred.item(title=f"🦅 {e}",
+                                                   subtitle="T9 plugged in?",
+                                                   valid=False)], back)
     ret_ctx = "ctx:lbeagle:" + ":".join(ids)
 
     def peek_arg(cid, sess="", direct=False):
@@ -2609,7 +2613,7 @@ def render_lbeagle(ids, query):
     kids = sorted(root.get("children") or [],
                   key=lambda c: (order.get(c.get("name"), 99),
                                  c.get("name") or ""))
-    rows = [head]
+    rows = [head, photos]
     for c in kids:
         cid, name = c["id"], c.get("name") or "?"
         # count over the child's SUBTREE - matches exactly what its
@@ -2739,6 +2743,41 @@ _MANAGE = {
          "xact:eaglesweep"),
     )),
 }
+
+
+def render_lbphotos(ids, query):
+    """📸 Photos - ONE door for every image job on one tattoo (Vex
+    2026-07-28: "those three need to be under one action photos... that
+    way I will not have to think what do I need to type").
+
+    The four jobs, by where the pixels are: coming in from Photos /
+    Finder / clipboard (straight to the current session, or to a stage
+    you pick), already sitting in Eagle (file them into a stage), or
+    already filed (browse them, where ⌥⇧ attaches one to TickTick)."""
+    tid = ids[0] if ids else ""
+    if not tid:
+        return add_back([alfred.item(title="No tattoo", valid=False)],
+                        "ctx:crmhub")
+    rows = [
+        alfred.item(uid="ph-import", title="📸 Import to this session",
+                    subtitle="Photos, Finder or clipboard → Eagle + TickTick",
+                    arg=f"xact:sessphotos:{tid}", mods=_picker_mods()),
+        alfred.item(uid="ph-stage", title="📸 Import → pick stage",
+                    subtitle="Same, but you choose which folder",
+                    arg=f"xact:crmbrowse:ctx:tph:{tid}", mods=_picker_mods()),
+        alfred.item(uid="ph-triage", title="🦅 File an Eagle selection",
+                    subtitle="Already in Eagle · pick the stage · ⌘ also attaches",
+                    arg=f"xact:crmbrowse:ctx:triage:{tid}",
+                    mods=_picker_mods()),
+        alfred.item(uid="ph-browse", title="🖼 Browse this tattoo's images",
+                    subtitle="Folders · counts · grid · ⌥⇧ attaches one",
+                    arg=f"xact:crmbrowse:ctx:lbeagle:{tid}:hub",
+                    mods=_picker_mods()),
+    ]
+    if query:
+        rows = fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x["title"]) or rows
+    return add_back(rows, f"ctx:crmbook:{tid}")
 
 
 def render_manage(ids, query):
@@ -4328,6 +4367,9 @@ def main():
 
         elif level == "cmanage":
             items = render_cmanage(query)
+
+        elif level == "lbphotos":
+            items = render_lbphotos(ids, query)
 
         elif level == "manage":
             items = render_manage(ids, query)
