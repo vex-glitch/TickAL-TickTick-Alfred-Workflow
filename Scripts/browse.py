@@ -2040,7 +2040,7 @@ def render_triage(sub, query):
 
 
 _CPL_STATES = [("📸edit", "✂️", "Editing"), ("📸post", "📤", "Ready to post"),
-               ("📸raw", "🎞", "Raw · undecided"), ("📸studio", "🏷", "Studio")]
+               ("📸raw", "🎞", "Raw · undecided")]
 
 
 _LBPICK_VERBS = {
@@ -2157,7 +2157,7 @@ def render_cstats(query):
             per_lib[LIBS[t.get("_projectId") or t.get("projectId")]] += 1
     rows.append(alfred.item(
         uid="cs-now", title=f"🎞 {chips['📸raw']} raw · ✂️ {chips['📸edit']} "
-        f"editing · 📤 {chips['📸post']} to post · 🏷 {chips['📸studio']} studio",
+        f"editing · 📤 {chips['📸post']} to post",
         subtitle=f"Open now · 📺 TV {per_lib['TV']} · 🖋️ FM {per_lib['FM']}"
                  f" · 🏷 Studio {per_lib['Studio']}",
         valid=False))
@@ -2253,9 +2253,7 @@ def _cpl_task_row(t, tag, icon, word, lib, chip):
             else re.sub(r"\s*eagle://\S+", "", title).strip())
     m = (re.search(r"eagle://folder/([^)\s]+)", title)
          or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
-    # studio tasks link CRM folders - there IS no studio Eagle library
-    # (⏎ on a studio row crashed ensure_library, review find 2026-07-28)
-    open_lib = "crm" if (tag == "📸raw" or lib == "studio") else lib
+    open_lib = "crm" if tag == "📸raw" else lib
     arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
     mods = dict(_picker_mods())
     sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "") + " · ⌘⚡"
@@ -2302,7 +2300,7 @@ def render_contentpl(ids, query):
     if lib not in LIBS:
         # root: chip state row (⏎ stats) + global actions + library rows
         pending = 0
-        for k in ("tv", "fm"):
+        for k in ("tv", "fm", "studio"):
             try:
                 pending += len([f for f in os.listdir(_eagle.INTAKE[k])
                                 if not f.startswith(".") and os.path.isfile(
@@ -2313,8 +2311,23 @@ def render_contentpl(ids, query):
         rows = [alfred.item(
             uid="cpl-stats", title="🎬 Content pipeline",
             subtitle=f"📥{pending} · 🎞{chips['📸raw']} ✂️{chips['📸edit']} "
-                     f"📤{chips['📸post']} 🏷{chips['📸studio']}  |  ⏎ stats",
+                     f"📤{chips['📸post']}  |  ⏎ stats",
             arg="xact:crmbrowse:ctx:cstats", mods=_picker_mods())]
+        # 🎬 radar: Vex rule 2026-07-28 - no logbook stays unclassified.
+        # Renders ONLY while offenders exist; the mandatory at-birth
+        # picker keeps new ones out, this row drains the legacy 32.
+        try:
+            import crm_records as _cr
+            unset = [lb for lb in _cr.logbook_notes()
+                     if not _cr.content_dest_of(lb.get("content") or "")]
+        except Exception:
+            unset = []
+        if unset:
+            na = sum(1 for lb in unset if not _cr.logbook_archived(lb))
+            rows.append(hop(
+                "cpl-unset", f"🎬 Unclassified · {len(unset)}",
+                f"{na} active · {len(unset) - na} archived · "
+                "pick tattoo → classify", "ctx:lbpick:cdest"))
         if pending:
             rows.append(alfred.item(
                 uid="cpl-file", title=f"📥 File edited shots ({pending})",
@@ -2359,14 +2372,10 @@ def render_contentpl(ids, query):
             subtitle=f"The Content PL · {word} list",
             arg=f"open:https://ticktick.com/webapp/#p/{pid}/tasks",
             mods=_picker_mods())]
-        queues = (("post", "📸post", "📤", "To post"),
-                  ("edit", "📸edit", "✂️", "To edit"),
-                  ("raw", "📸raw", "🎞", "Raw"),
-                  ("studio", "📸studio", "🏷", "Studio"))
-        if lib == "studio":
-            # no Eagle shelves - To post / To edit can never fill here
-            queues = tuple(q for q in queues if q[0] in ("raw", "studio"))
-        for key, tag, icon, label in queues:
+        for key, tag, icon, label in (
+                ("post", "📸post", "📤", "To post"),
+                ("edit", "📸edit", "✂️", "To edit"),
+                ("raw", "📸raw", "🎞", "Raw")):
             rows.append(hop(f"cpq-{key}", f"{icon} {label}",
                             f"{count(tag)} here",
                             f"ctx:contentpl:{lib}:{key}"))
@@ -2379,8 +2388,7 @@ def render_contentpl(ids, query):
         return add_back(rows, "ctx:contentpl")
 
     # queue screen: task rows for one tag (or all, grouped by state)
-    KEY2TAG = {"post": "📸post", "edit": "📸edit",
-               "raw": "📸raw", "studio": "📸studio"}
+    KEY2TAG = {"post": "📸post", "edit": "📸edit", "raw": "📸raw"}
     rows = []
     for tag, icon, wrd in _CPL_STATES:
         if queue != "all" and KEY2TAG.get(queue) != tag:

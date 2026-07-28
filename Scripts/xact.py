@@ -1383,6 +1383,7 @@ def _crmnew_continue(kind, cust):
         if deposit.strip():
             cr.append_session(areas.RECORDS_ID, lb["id"], "payment",
                               charged=deposit, text="Deposit.")
+        content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
     _crmnew_photos_catch(lb)
     if kind == "consult":
         _crm_session_prefill(lb.get("title") or "", "Consult")
@@ -1830,6 +1831,7 @@ def crmimport():
         _crm_say("Cancelled · nothing created")
         return
     lb = cr.create_logbook(cust, tattoo, started=when)
+    content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
     cr.append_session(areas.RECORDS_ID, lb["id"], f"S{k}",
                       charged=total, text="Backlog import.", when=when)
     if state == "Finished":
@@ -2406,17 +2408,13 @@ def _content_task_for(log_tid):
     """The open Content-PL task whose BODY links this logbook (mint
     writes that link exactly so this lookup works), or None. The
     DISPOSABLE studio errand carries the same link but is NOT the
-    content task - its '🏷 Studio edit' body prefix hides it here
-    (review find 2026-07-28: the errand's lifecycle must survive dest
-    flips and slides, so no mover may ever grab it)."""
+    content task - one task per tattoo, whatever its list."""
     import areas
     for t in cache_store.get("all_tasks") or []:
         if (t.get("status", 0) == 0
                 and (t.get("_projectId") or t.get("projectId"))
                 in areas.CONTENT_PIDS
-                and f"/tasks/{log_tid})" in (t.get("content") or "")
-                and not (t.get("content") or "").startswith(
-                    "🏷 Studio edit")):
+                and f"/tasks/{log_tid})" in (t.get("content") or "")):
             return t
     return None
 
@@ -2472,12 +2470,14 @@ def _content_retag(t, drop, add, **fields):
         cache_store.invalidate("all_tasks")
 
 
-def content_dest(log_tid):
+def content_dest(log_tid, mandatory=False):
     """🎬 picker on a logbook: TV / FM / Studio / ➖ (third location
     Vex 2026-07-28). A dest writes the header line, ensures the Eagle
     folder (best-effort - field sticks even with Eagle asleep) and
     mints/moves the 📸Raw task into ITS list; ➖ completes an open
-    📸Raw task (ONLY that tag - never in-edit work)."""
+    📸Raw task (ONLY that tag - never in-edit work). mandatory=True =
+    the at-birth call (Vex: NO logbook may exist unclassified) - Esc
+    does not skip, it writes ➖ explicitly."""
     if not _records_ready():
         return
     import areas
@@ -2493,8 +2493,10 @@ def content_dest(log_tid):
             "-": OPTS[3]}.get(cur)
     pick = _choose("🎬 Content potential?", OPTS, default=dflt)
     if pick is None:
-        _crm_say("Cancelled")
-        return
+        if not mandatory:
+            _crm_say("Cancelled")
+            return
+        pick = OPTS[3]   # Esc at birth = explicit ➖, never unclassified
     dest = ("tv" if pick.startswith("📺")
             else "fm" if pick.startswith("🖋")
             else "studio" if pick.startswith("🏷") else "-")
@@ -2551,11 +2553,6 @@ def content_dest(log_tid):
             except Exception:
                 cache_store.invalidate("all_tasks")
             note += " · 📸 task moved"
-            if "📸studio" in tags_lc and dest != "studio":
-                # flipping AWAY from studio cancels the in-flight send:
-                # 📸studio → 📸raw (mirror of edit_this's raw → studio)
-                _content_retag(t, "📸studio", "📸raw")
-                note += " · 📸Raw again"
         # backfill a linkless title once the folder exists, and upgrade
         # legacy bare-scheme titles to the clickable markdown form
         if fid and not (t.get("title") or "").startswith("["):
@@ -3140,11 +3137,8 @@ def img_post(path):
         _crm_say("🖼 Lost the logbook context · re-enter the grid")
         return
     dest = cr.content_dest_of(lb.get("content") or "")
-    if dest not in ("tv", "fm"):
-        # studio has NO Eagle library/To post shelf on purpose
-        _crm_say("🏷 Studio has no To post shelf · ⌘ Edit this"
-                 if dest == "studio"
-                 else "🎬 Set Content potential (TV · FM) first")
+    if dest not in areas.CONTENT_DESTS:
+        _crm_say("🎬 Set Content potential (TV · FM · Studio) first")
         return
     iid, _slib = _img_id_lib(path)
     base = cr.logbook_base(lb)
@@ -3345,39 +3339,6 @@ def _portfolio_folder(eagle, base):
     return hit["id"] if hit else eagle.create_folder(base, parent=pid)
 
 
-def _studio_task(lb, fid):
-    """🏷 Studio pick on Edit this: the errand lives in the STUDIO
-    list now (third location, Vex 2026-07-28 - killed the old
-    which-board question + tv/fm board ride). A studio-DEST tattoo's
-    own content task slides over instead (retag 📸raw → 📸studio -
-    its whole content life IS the studio send); tv/fm tattoos keep
-    the DISPOSABLE extra task, their content task's lifecycle must
-    survive the studio send (Vex smoke 2026-07-26). No Eagle filing
-    either way - quick basic edit straight from the CRM folder, file
-    discarded after sending."""
-    import areas
-    import crm_records as cr
-    api = cr._api()
-    if cr.content_dest_of(lb.get("content") or "") == "studio":
-        t = _content_task_for(lb["id"])
-        if t is not None:
-            if "📸raw" in {str(x).lower() for x in (t.get("tags") or [])}:
-                _content_retag(t, "📸raw", "📸studio")   # live-read swap
-            _crm_say("🏷 Task → 📸Studio · edit from the CRM folder · "
-                     "complete on sent")
-            return
-    base = cr.logbook_base(lb)
-    pid = areas.CONTENT_STUDIO_ID
-    t = api.create_task(
-        title=_eagle_title(base, fid), project_id=pid,
-        content="🏷 Studio edit · send + complete\n"
-                f"🎨 {cr.task_link(areas.RECORDS_ID, lb['id'], lb.get('title') or '')}",
-        tags=["📸studio"])
-    _person_inject_cache(t, pid)
-    _crm_say("🏷 Studio task minted · edit from the CRM folder · "
-             "complete on sent")
-
-
 def edit_this(log_tid):
     """🎬 Edit this: copy the WHOLE CRM tattoo tree (read from DISK -
     the closed CRM library is never opened, ONE switch total) into
@@ -3401,17 +3362,15 @@ def edit_this(log_tid):
         return
     cur = cr.content_dest_of(lb.get("content") or "")
     OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline",
-            "🏷 Studio - quick edit · no filing"]
+            "🏷 Studio - studio account"]
     pick = _choose(f"🎬 Edit {base} - where to?", OPTS,
                    default={"tv": OPTS[0], "fm": OPTS[1],
                             "studio": OPTS[2]}.get(cur))
     if pick is None:
         _crm_say("Cancelled")
         return
-    if pick.startswith("🏷"):
-        _studio_task(lb, fid)
-        return
-    dest = "tv" if pick.startswith("📺") else "fm"
+    dest = ("tv" if pick.startswith("📺")
+            else "fm" if pick.startswith("🖋") else "studio")
     if dest != cur:
         api = cr._api()
         live = api.get_task(areas.RECORDS_ID, log_tid)
@@ -3466,8 +3425,7 @@ def edit_this(log_tid):
     except eagle.EagleError as e:
         _crm_say(f"🎬 {e}")
         return
-    want_pid = (areas.CONTENT_TV_ID if dest == "tv"
-                else areas.CONTENT_FM_ID)
+    want_pid = areas.CONTENT_DESTS[dest][0]
     _content_slide_to_edit(lb, dest, want_pid, base_id)
     extra = f" · {skipped} already staged" if skipped else ""
     _crm_say(f"🎬 {n} files → {dest.upper()} To edit · task → 📸Edit{extra}")
@@ -3584,8 +3542,7 @@ def promote_selection():
         api.update_task(owner["id"], areas.RECORDS_ID, current=live,
                         content=new)
         _patch_content_cache(owner["id"], new)
-    want_pid = (areas.CONTENT_TV_ID if dest == "tv"
-                else areas.CONTENT_FM_ID)
+    want_pid = areas.CONTENT_DESTS[dest][0]
     _content_slide_to_edit(owner, dest, want_pid, base_id)
     _crm_say(f"🎬 {len(paths)} → {dest.upper()} To edit/{base}")
 
@@ -3601,7 +3558,7 @@ def file_edited():
     import crm_records as cr
     import eagle
     batches = {}
-    for lib in ("tv", "fm"):
+    for lib in ("tv", "fm", "studio"):
         d = eagle.INTAKE[lib]
         try:
             fs = [os.path.join(d, f) for f in sorted(os.listdir(d))
@@ -3612,12 +3569,12 @@ def file_edited():
         if fs:
             batches[lib] = fs
     if not batches:
-        _crm_say("📥 Both intake folders empty")
+        _crm_say("📥 All intake folders empty")
         return
     filed = 0
     notes = []
     for lib, files in batches.items():
-        pid = areas.CONTENT_TV_ID if lib == "tv" else areas.CONTENT_FM_ID
+        pid = areas.CONTENT_DESTS[lib][0]
         cands = {}
         for t in cache_store.get("all_tasks") or []:
             if ((t.get("_projectId") or t.get("projectId")) == pid
@@ -3702,8 +3659,9 @@ def to_portfolio():
     try:
         eagle.ensure_running(launch=False)
         lib = eagle.current_library()
-        if lib not in (eagle.LIBS["tv"][0], eagle.LIBS["fm"][0]):
-            _crm_say("⭐ Open the TV or FM library + select edits first")
+        if lib not in (eagle.LIBS[k][0] for k in ("tv", "fm", "studio")):
+            _crm_say("⭐ Open the TV, FM or Studio library + "
+                     "select edits first")
             return
         sel = eagle.selected_items()
         if not sel:
@@ -3742,14 +3700,8 @@ def content_posted(tid):
         return
     pid = t.get("_projectId") or t.get("projectId")
     base = _task_base(t.get("title") or "")
-    if pid == areas.CONTENT_STUDIO_ID:
-        # studio has no Eagle shelf - posted == sent, task just closes
-        api = cr._api()
-        api.complete_task(pid, tid)
-        _complete_cache_patch(pid, tid)
-        _crm_say(f"📤 {base} sent · task completed")
-        return
-    lib = "tv" if pid == areas.CONTENT_TV_ID else "fm"
+    lib = next((k for k, v in areas.CONTENT_DESTS.items()
+                if v[0] == pid), "fm")
     import eagle
     try:
         eagle.ensure_library(lib)
@@ -3896,6 +3848,7 @@ def crmlink(pid, tid):
             return
         quoted = _ask(f"{tattoo} - quoted price? (OK or Esc skips)") or ""
         lb = cr.create_logbook(cust, tattoo, quoted=quoted)
+        content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
     else:
         lb = next((l for l in lbs if (l.get("title") or "") == pick), None)
         if lb is None:
