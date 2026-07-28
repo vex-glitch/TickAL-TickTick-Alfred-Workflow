@@ -1868,6 +1868,7 @@ def crmimport():
                       charged=total, text="Backlog import.", when=when)
     if state == "Finished":
         cr.finish_logbook(areas.RECORDS_ID, lb["id"])
+        _eagle_archive_folder(lb["id"])   # TickTick archived → Eagle too
     _crm_say(f"📕 {lb.get('title')} imported · {k} sessions"
              + (" · archived" if state == "Finished" else ""))
 
@@ -2843,11 +2844,15 @@ def session_photos(log_tid, stage=""):
                     dup_n += 1
                     continue
                 try:
-                    # note target: keep the ORIGINAL filename - it is
-                    # the stable dedupe key across re-runs
-                    fname = (h["filename"] if a_tid == log_tid
-                             else f"{base} · {label} · {i + 1}."
-                                  f"{h['path'].rsplit('.', 1)[-1]}")
+                    # ONE naming rule for both targets (Vex 2026-07-28):
+                    # the original camera filename was NOT a stable
+                    # dedupe key - the same shot imported twice landed
+                    # once as IMG_3806.JPG and once as S1.png, so
+                    # _already_on_note could not see the twin. The
+                    # convention name is derived from the tattoo and the
+                    # session, so re-runs collide and dedupe.
+                    fname = (f"{base} · {label} · {i + 1}."
+                             f"{h['path'].rsplit('.', 1)[-1]}")
                     up = _attach_file_to(a_pid, a_tid, h["path"], fname)
                     ok_n += 1
                     if a_tid == log_tid:   # note target → plant the ref
@@ -3330,16 +3335,19 @@ def _eagle_trash_folder(lb):
             else "🦅 husk → 🗑 Deleted")
 
 
-def _eagle_archive_folder(log_tid):
+def _eagle_archive_folder(log_tid, quiet=False):
     """Post-archive weave: tattoo folder → Archive/ + 'archive' tag on
     its items. Best-effort AFTER the TickTick archive (the state owner
     is already right) - Eagle asleep → honest skip toast. No 🦅 line
-    (backlog imports) → silent no-op."""
+    (backlog imports) → silent no-op. quiet=True suppresses the toast
+    (the sweep speaks once for the whole batch). Returns True only when
+    a folder actually MOVED, so callers can count honestly; a folder
+    already under Archive/ is a no-op, not a move."""
     import crm_records as cr
     lb = _record_by_id(log_tid)
     fid = cr.eagle_folder_of((lb or {}).get("content") or "")[0]
     if not fid:
-        return
+        return False
     import eagle
     try:
         eagle.ensure_running(launch=False)   # asleep = honest skip, no launch
@@ -3349,7 +3357,9 @@ def _eagle_archive_folder(log_tid):
         arch_id = arch["id"] if arch else eagle.create_folder("Archive")
         node = eagle.folder_node(fid, tree=tree)
         if node is None:
-            return
+            return False
+        if any(c.get("id") == fid for c in (arch or {}).get("children") or []):
+            return False              # already filed - nothing to do
         eagle.move_folder(fid, arch_id)
         ids = set()
 
@@ -3360,9 +3370,13 @@ def _eagle_archive_folder(log_tid):
         rec(node)
         if ids:
             eagle.add_item_tags(sorted(ids), ["archive"])
-        _crm_say("🦅 Eagle folder → Archive")
+        if not quiet:
+            _crm_say("🦅 Eagle folder → Archive")
+        return True
     except eagle.EagleError as e:
-        _crm_say(f"🦅 archive move skipped: {e}")
+        if not quiet:
+            _crm_say(f"🦅 archive move skipped: {e}")
+        return False
 
 
 def _cp_folders(eagle, names=("To edit", "To post")):
@@ -3856,8 +3870,29 @@ def eagle_sweep():
     except Exception as e:
         _crm_say(f"🦅 {done}/{len(missing)} created, then: {e}")
         return
+    moved = _archive_refile()
     _crm_say(f"🦅 {done} skeletons created · {len(lbs) - len(missing)} "
-             "were already linked")
+             "were already linked" + (f" · {moved} archived folders filed"
+                                      if moved else ""))
+
+
+def _archive_refile():
+    """Archived in TickTick but the Eagle folder never moved (Vex smoke
+    2026-07-28: 14 of them - backlog import archived the note and left
+    the folder under Customers/). Returns how many were re-filed."""
+    import crm_records as cr
+    n = 0
+    for lb in cr.logbook_notes():
+        if not cr.logbook_archived(lb):
+            continue
+        if not cr.eagle_folder_of(lb.get("content") or "")[0]:
+            continue
+        try:
+            if _eagle_archive_folder(lb["id"], quiet=True):
+                n += 1
+        except Exception:
+            pass
+    return n
 
 
 def crmconvert(tid):

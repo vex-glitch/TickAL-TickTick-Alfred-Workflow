@@ -2158,7 +2158,7 @@ def render_cmanage(query):
                     subtitle="Edits → Tattoo Portfolio shelf",
                     arg="xact:portfolio", mods=_picker_mods()),
         alfred.item(uid="cm-sweep", title="🦅 Eagle sweep",
-                    subtitle="Skeletons for logbooks missing one",
+                    subtitle="Missing skeletons + re-file archived folders",
                     arg="xact:eaglesweep", mods=_picker_mods()),
     ]
     if query:
@@ -2809,7 +2809,7 @@ _MANAGE = {
          "xact:promotesel"),
         ("mg-filed", "📥 File edited shots", "Intake → To post · task → Post",
          "xact:filedited"),
-        ("mg-sweep", "🦅 Eagle sweep", "Skeletons for logbooks missing one",
+        ("mg-sweep", "🦅 Eagle sweep", "Missing skeletons + re-file archived folders",
          "xact:eaglesweep"),
     )),
 }
