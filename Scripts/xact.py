@@ -2404,13 +2404,19 @@ def _eagle_ensure_logbook_folder(lb):
 
 def _content_task_for(log_tid):
     """The open Content-PL task whose BODY links this logbook (mint
-    writes that link exactly so this lookup works), or None."""
+    writes that link exactly so this lookup works), or None. The
+    DISPOSABLE studio errand carries the same link but is NOT the
+    content task - its '🏷 Studio edit' body prefix hides it here
+    (review find 2026-07-28: the errand's lifecycle must survive dest
+    flips and slides, so no mover may ever grab it)."""
     import areas
     for t in cache_store.get("all_tasks") or []:
         if (t.get("status", 0) == 0
                 and (t.get("_projectId") or t.get("projectId"))
-                in (areas.CONTENT_TV_ID, areas.CONTENT_FM_ID)
-                and f"/tasks/{log_tid})" in (t.get("content") or "")):
+                in areas.CONTENT_PIDS
+                and f"/tasks/{log_tid})" in (t.get("content") or "")
+                and not (t.get("content") or "").startswith(
+                    "🏷 Studio edit")):
             return t
     return None
 
@@ -2425,7 +2431,7 @@ def _mint_raw_task(lb, dest, fid, tag="📸raw"):
     base = cr.logbook_base(lb)
     title = _eagle_title(base, fid)
     body = f"🎨 {cr.task_link(areas.RECORDS_ID, lb['id'], lb.get('title') or '')}"
-    pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
+    pid = areas.CONTENT_DESTS[dest][0]
     t = api.create_task(title=title, project_id=pid, content=body,
                         tags=[tag])
     _person_inject_cache(t, pid)
@@ -2467,10 +2473,11 @@ def _content_retag(t, drop, add, **fields):
 
 
 def content_dest(log_tid):
-    """🎬 picker on a logbook: TV / FM / ➖. TV|FM writes the header
-    line, ensures the Eagle folder (best-effort - field sticks even
-    with Eagle asleep) and mints/moves the 📸Raw task; ➖ completes an
-    open 📸Raw task (ONLY that tag - never in-edit work)."""
+    """🎬 picker on a logbook: TV / FM / Studio / ➖ (third location
+    Vex 2026-07-28). A dest writes the header line, ensures the Eagle
+    folder (best-effort - field sticks even with Eagle asleep) and
+    mints/moves the 📸Raw task into ITS list; ➖ completes an open
+    📸Raw task (ONLY that tag - never in-edit work)."""
     if not _records_ready():
         return
     import areas
@@ -2480,14 +2487,17 @@ def content_dest(log_tid):
         _crm_say("Logbook not found · run tsy")
         return
     cur = cr.content_dest_of(lb.get("content") or "")
-    OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline", "➖ None - CRM only"]
-    dflt = {"tv": OPTS[0], "fm": OPTS[1], "-": OPTS[2]}.get(cur)
+    OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline",
+            "🏷 Studio - studio account", "➖ None - CRM only"]
+    dflt = {"tv": OPTS[0], "fm": OPTS[1], "studio": OPTS[2],
+            "-": OPTS[3]}.get(cur)
     pick = _choose("🎬 Content potential?", OPTS, default=dflt)
     if pick is None:
         _crm_say("Cancelled")
         return
     dest = ("tv" if pick.startswith("📺")
-            else "fm" if pick.startswith("🖋") else "-")
+            else "fm" if pick.startswith("🖋")
+            else "studio" if pick.startswith("🏷") else "-")
     api = cr._api()
     live = api.get_task(areas.RECORDS_ID, log_tid)
     fresh = cr._fresher_content(log_tid, live.get("content") or "")
@@ -2512,14 +2522,21 @@ def content_dest(log_tid):
         fid = _eagle_ensure_logbook_folder(lb)
     except Exception as e:
         note = f" · 🦅 folder pending: {e}"
-    want_pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
+    want_pid = areas.CONTENT_DESTS[dest][0]
     t = _content_task_for(log_tid)
     if t is None:
         _mint_raw_task(lb, dest, fid)
         note += " · 📸Raw minted"
     else:
         pid_old = t.get("_projectId") or t.get("projectId")
-        if pid_old != want_pid:
+        tags_lc = {str(x).lower() for x in (t.get("tags") or [])}
+        if pid_old != want_pid and tags_lc & {"📸edit", "📸post"}:
+            # in-flight work stays where its Eagle reality lives
+            # (review find 2026-07-28: a moved 📸edit task falls out of
+            # file_edited's tv/fm scan; a moved 📸post task would
+            # complete without its shelf sweep)
+            note += " · 📸 task stays (in edit/post · finish first)"
+        elif pid_old != want_pid:
             api.move_task(t["id"], pid_old, want_pid)
             try:
                 import dispatch as _disp
@@ -2534,6 +2551,11 @@ def content_dest(log_tid):
             except Exception:
                 cache_store.invalidate("all_tasks")
             note += " · 📸 task moved"
+            if "📸studio" in tags_lc and dest != "studio":
+                # flipping AWAY from studio cancels the in-flight send:
+                # 📸studio → 📸raw (mirror of edit_this's raw → studio)
+                _content_retag(t, "📸studio", "📸raw")
+                note += " · 📸Raw again"
         # backfill a linkless title once the folder exists, and upgrade
         # legacy bare-scheme titles to the clickable markdown form
         if fid and not (t.get("title") or "").startswith("["):
@@ -2748,7 +2770,7 @@ def session_photos(log_tid, stage=""):
             cust, _, tat = base.partition(" - ")
             tags = [t for t in (cust.strip(), tat.strip()) if t] + stage_tags
             dest = cr.content_dest_of(lb.get("content") or "")
-            if dest in ("tv", "fm"):
+            if dest in ("tv", "fm", "studio"):
                 tags.append(dest)
             specs = [{"path": s["path"],
                       "name": eagle.item_name(base, label, start + i),
@@ -2926,7 +2948,7 @@ def eagle_triage(rest):
         cust, _, tat = base.partition(" - ")
         tags = [t for t in (cust.strip(), tat.strip()) if t] + stage_tags
         dest = cr.content_dest_of(lb.get("content") or "")
-        if dest in ("tv", "fm"):
+        if dest in ("tv", "fm", "studio"):
             tags.append(dest)
         eagle.add_item_tags([it["id"] for it in sel], tags)
     except eagle.EagleError as e:
@@ -3119,7 +3141,10 @@ def img_post(path):
         return
     dest = cr.content_dest_of(lb.get("content") or "")
     if dest not in ("tv", "fm"):
-        _crm_say("🎬 Set Content potential (TV · FM) first")
+        # studio has NO Eagle library/To post shelf on purpose
+        _crm_say("🏷 Studio has no To post shelf · ⌘ Edit this"
+                 if dest == "studio"
+                 else "🎬 Set Content potential (TV · FM) first")
         return
     iid, _slib = _img_id_lib(path)
     base = cr.logbook_base(lb)
@@ -3203,7 +3228,7 @@ def img_move(stage):
         cust, _, tat = base.partition(" - ")
         tags = [t for t in (cust.strip(), tat.strip()) if t] + stage_tags
         dest = cr.content_dest_of(lb.get("content") or "")
-        if dest in ("tv", "fm"):
+        if dest in ("tv", "fm", "studio"):
             tags.append(dest)
         eagle.add_item_tags([iid], tags)
     except eagle.EagleError as e:
@@ -3321,25 +3346,28 @@ def _portfolio_folder(eagle, base):
 
 
 def _studio_task(lb, fid):
-    """🏷 Studio pick on Edit this (Vex smoke 2026-07-26): a
-    DISPOSABLE 📸studio task - the studio errand never rides the
-    content task (its lifecycle must survive the studio send; a
-    studio task completes on sent). No Eagle filing - the lane's
-    spec: quick basic edit straight from the CRM folder, file
+    """🏷 Studio pick on Edit this: the errand lives in the STUDIO
+    list now (third location, Vex 2026-07-28 - killed the old
+    which-board question + tv/fm board ride). A studio-DEST tattoo's
+    own content task slides over instead (retag 📸raw → 📸studio -
+    its whole content life IS the studio send); tv/fm tattoos keep
+    the DISPOSABLE extra task, their content task's lifecycle must
+    survive the studio send (Vex smoke 2026-07-26). No Eagle filing
+    either way - quick basic edit straight from the CRM folder, file
     discarded after sending."""
     import areas
     import crm_records as cr
-    dest = cr.content_dest_of(lb.get("content") or "")
-    if dest not in ("tv", "fm"):
-        p = _choose("🏷 Studio task - which board?",
-                    ["📺 TV - neotrad", "🖋️ FM - fineline"])
-        if p is None:
-            _crm_say("Cancelled")
-            return
-        dest = "tv" if p.startswith("📺") else "fm"
     api = cr._api()
+    if cr.content_dest_of(lb.get("content") or "") == "studio":
+        t = _content_task_for(lb["id"])
+        if t is not None:
+            if "📸raw" in {str(x).lower() for x in (t.get("tags") or [])}:
+                _content_retag(t, "📸raw", "📸studio")   # live-read swap
+            _crm_say("🏷 Task → 📸Studio · edit from the CRM folder · "
+                     "complete on sent")
+            return
     base = cr.logbook_base(lb)
-    pid = areas.CONTENT_TV_ID if dest == "tv" else areas.CONTENT_FM_ID
+    pid = areas.CONTENT_STUDIO_ID
     t = api.create_task(
         title=_eagle_title(base, fid), project_id=pid,
         content="🏷 Studio edit · send + complete\n"
@@ -3375,7 +3403,8 @@ def edit_this(log_tid):
     OPTS = ["📺 TV - neotrad", "🖋️ FM - fineline",
             "🏷 Studio - quick edit · no filing"]
     pick = _choose(f"🎬 Edit {base} - where to?", OPTS,
-                   default={"tv": OPTS[0], "fm": OPTS[1]}.get(cur))
+                   default={"tv": OPTS[0], "fm": OPTS[1],
+                            "studio": OPTS[2]}.get(cur))
     if pick is None:
         _crm_say("Cancelled")
         return
@@ -3712,8 +3741,15 @@ def content_posted(tid):
         _crm_say("Not found · run tsy")
         return
     pid = t.get("_projectId") or t.get("projectId")
-    lib = "tv" if pid == areas.CONTENT_TV_ID else "fm"
     base = _task_base(t.get("title") or "")
+    if pid == areas.CONTENT_STUDIO_ID:
+        # studio has no Eagle shelf - posted == sent, task just closes
+        api = cr._api()
+        api.complete_task(pid, tid)
+        _complete_cache_patch(pid, tid)
+        _crm_say(f"📤 {base} sent · task completed")
+        return
+    lib = "tv" if pid == areas.CONTENT_TV_ID else "fm"
     import eagle
     try:
         eagle.ensure_library(lib)

@@ -1003,10 +1003,12 @@ def logbook_base(lb):
 
 
 def content_dest_of(content):
-    """Header 🎬 line → 'tv' | 'fm' | '-' (explicit ➖) | '' (never set)."""
+    """Header 🎬 line → 'tv' | 'fm' | 'studio' | '-' (explicit ➖) |
+    '' (never set)."""
     head = (content or "").partition("\n## ")[0]
-    m = re.search(r"^🎬 (TV|FM|➖)$", head, re.M)
-    return {"TV": "tv", "FM": "fm", "➖": "-"}[m.group(1)] if m else ""
+    m = re.search(r"^🎬 (TV|FM|STUDIO|➖)$", head, re.M)
+    return {"TV": "tv", "FM": "fm", "STUDIO": "studio",
+            "➖": "-"}[m.group(1)] if m else ""
 
 
 def _set_header_line(content, emoji, line):
@@ -1023,8 +1025,9 @@ def _set_header_line(content, emoji, line):
 
 
 def set_content_dest(content, dest):
-    """Write the header '🎬 TV|FM|➖' line (dest 'tv'/'fm'/'-')."""
-    label = {"tv": "TV", "fm": "FM", "-": "➖"}[dest]
+    """Write the header '🎬 TV|FM|STUDIO|➖' line (dest 'tv'/'fm'/
+    'studio'/'-')."""
+    label = {"tv": "TV", "fm": "FM", "studio": "STUDIO", "-": "➖"}[dest]
     return _set_header_line(content, "🎬", f"🎬 {label}")
 
 

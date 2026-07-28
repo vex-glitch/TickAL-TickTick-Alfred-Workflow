@@ -1338,10 +1338,11 @@ def render_crmbook(log_tid, query):
                     arg=f"xact:eaglefolder:{log_tid}", mods=_picker_mods()),
         alfred.item(uid="bk-cdest",
                     title="🎬 Content potential · "
-                          + {"tv": "TV", "fm": "FM", "-": "➖"}.get(
+                          + {"tv": "TV", "fm": "FM", "studio": "Studio",
+                             "-": "➖"}.get(
                               cr.content_dest_of(lb.get("content") or ""),
                               "unset"),
-                    subtitle="TV · FM · none",
+                    subtitle="TV · FM · Studio · none",
                     arg=f"xact:cdest:{log_tid}", mods=_picker_mods()),
         alfred.item(uid="bk-editthis", title="🎬 Edit this",
                     subtitle="Whole tree → To edit · task → Edit",
@@ -2044,7 +2045,7 @@ _CPL_STATES = [("📸edit", "✂️", "Editing"), ("📸post", "📤", "Ready to
 
 _LBPICK_VERBS = {
     "eaglefolder": ("🦅", "Create if new · open in Eagle"),
-    "cdest": ("🎬", "Set TV · FM · none"),
+    "cdest": ("🎬", "Set TV · FM · Studio · none"),
     "editthis": ("🎬", "Whole tree → To edit"),
     "sessphotos": ("📸", "Photos selection → current session"),
 }
@@ -2095,7 +2096,7 @@ def render_cmanage(query):
         hop("cm-folder", "🦅 Create Eagle folder",
             "Pick tattoo → skeleton + open", "ctx:lbpick:eaglefolder"),
         hop("cm-cdest", "🎬 Content potential",
-            "Pick tattoo → TV · FM · none", "ctx:lbpick:cdest"),
+            "Pick tattoo → TV · FM · Studio · none", "ctx:lbpick:cdest"),
         hop("cm-edit", "🎬 Edit this",
             "Pick tattoo → whole tree → To edit", "ctx:lbpick:editthis"),
         alfred.item(uid="cm-promote", title="🎬 Promote Eagle selection",
@@ -2118,9 +2119,9 @@ def render_cmanage(query):
 
 
 def _cpl_counts():
-    """Open pipeline-task counts per 📸 tag across BOTH content lists."""
+    """Open pipeline-task counts per 📸 tag across ALL content lists."""
     import areas as _ar
-    pids = (_ar.CONTENT_TV_ID, _ar.CONTENT_FM_ID)
+    pids = _ar.CONTENT_PIDS
     out = {tag: 0 for tag, _i, _w in _CPL_STATES}
     for t in cache_store.get("all_tasks") or []:
         if ((t.get("_projectId") or t.get("projectId")) not in pids
@@ -2139,7 +2140,8 @@ def render_cstats(query):
     minted-per-month, oldest item stuck in To edit. Queue counts render
     from cache; history needs the v2 login and says so when missing."""
     import areas as _ar
-    LIBS = {_ar.CONTENT_TV_ID: "TV", _ar.CONTENT_FM_ID: "FM"}
+    LIBS = {_ar.CONTENT_TV_ID: "TV", _ar.CONTENT_FM_ID: "FM",
+            _ar.CONTENT_STUDIO_ID: "Studio"}
     tasks = [t for t in cache_store.get("all_tasks") or []
              if (t.get("_projectId") or t.get("projectId")) in LIBS
              and t.get("status", 0) == 0]
@@ -2149,14 +2151,15 @@ def render_cstats(query):
 
     rows = []
     chips = _cpl_counts()
-    per_lib = {"TV": 0, "FM": 0}
+    per_lib = {"TV": 0, "FM": 0, "Studio": 0}
     for t in tasks:
         if tags_of(t) & {s[0] for s in _CPL_STATES}:
             per_lib[LIBS[t.get("_projectId") or t.get("projectId")]] += 1
     rows.append(alfred.item(
         uid="cs-now", title=f"🎞 {chips['📸raw']} raw · ✂️ {chips['📸edit']} "
         f"editing · 📤 {chips['📸post']} to post · 🏷 {chips['📸studio']} studio",
-        subtitle=f"Open now · 📺 TV {per_lib['TV']} · 🖋️ FM {per_lib['FM']}",
+        subtitle=f"Open now · 📺 TV {per_lib['TV']} · 🖋️ FM {per_lib['FM']}"
+                 f" · 🏷 Studio {per_lib['Studio']}",
         valid=False))
     # oldest thing stuck in editing - the actionable number
     oldest = None
@@ -2183,16 +2186,19 @@ def render_cstats(query):
         mine = [t for t in done or []
                 if t.get("projectId") in LIBS]
         months = {}
-        posted_all = retired_all = 0
+        posted_all = retired_all = sent_all = 0
         for t in mine:
             mo = (t.get("completedTime") or "")[:7]
             if not mo:
                 continue
             tags = {str(x).lower() for x in (t.get("tags") or [])}
-            bucket = months.setdefault(mo, [0, 0, 0])
+            bucket = months.setdefault(mo, [0, 0, 0, 0])
             if "📸post" in tags:
                 bucket[0] += 1
                 posted_all += 1
+            elif "📸studio" in tags:
+                bucket[3] += 1
+                sent_all += 1
             elif "📸raw" in tags:
                 bucket[1] += 1
                 retired_all += 1
@@ -2200,12 +2206,15 @@ def render_cstats(query):
                 bucket[2] += 1
         rows.append(alfred.item(
             uid="cs-alltime",
-            title=f"✅ {posted_all} posted · ➖ {retired_all} retired",
+            title=f"✅ {posted_all} posted"
+                  + (f" · 🏷 {sent_all} sent" if sent_all else "")
+                  + f" · ➖ {retired_all} retired",
             subtitle="Completed content tasks · last 365 days",
             valid=False))
         for mo in sorted(months, reverse=True)[:12]:
-            p, r, o = months[mo]
-            bits = [f"✅ {p} posted"] + ([f"➖ {r} retired"] if r else []) \
+            p, r, o, s = months[mo]
+            bits = [f"✅ {p} posted"] + ([f"🏷 {s} sent"] if s else []) \
+                + ([f"➖ {r} retired"] if r else []) \
                 + ([f"☑️ {o} other"] if o else [])
             rows.append(alfred.item(
                 uid=f"cs-{mo}", title=f"📅 {mo} · " + " · ".join(bits),
@@ -2244,7 +2253,9 @@ def _cpl_task_row(t, tag, icon, word, lib, chip):
             else re.sub(r"\s*eagle://\S+", "", title).strip())
     m = (re.search(r"eagle://folder/([^)\s]+)", title)
          or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
-    open_lib = "crm" if tag == "📸raw" else lib
+    # studio tasks link CRM folders - there IS no studio Eagle library
+    # (⏎ on a studio row crashed ensure_library, review find 2026-07-28)
+    open_lib = "crm" if (tag == "📸raw" or lib == "studio") else lib
     arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
     mods = dict(_picker_mods())
     sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "") + " · ⌘⚡"
@@ -2279,7 +2290,8 @@ def render_contentpl(ids, query):
     import areas as _ar
     import eagle as _eagle
     LIBS = {"tv": (_ar.CONTENT_TV_ID, "📺", "TV"),
-            "fm": (_ar.CONTENT_FM_ID, "🖋️", "FM")}
+            "fm": (_ar.CONTENT_FM_ID, "🖋️", "FM"),
+            "studio": (_ar.CONTENT_STUDIO_ID, "🏷", "Studio")}
     lib = ids[0] if ids else ""
     queue = ids[1] if len(ids) > 1 else ""
 
@@ -2347,11 +2359,14 @@ def render_contentpl(ids, query):
             subtitle=f"The Content PL · {word} list",
             arg=f"open:https://ticktick.com/webapp/#p/{pid}/tasks",
             mods=_picker_mods())]
-        for key, tag, icon, label in (
-                ("post", "📸post", "📤", "To post"),
-                ("edit", "📸edit", "✂️", "To edit"),
-                ("raw", "📸raw", "🎞", "Raw"),
-                ("studio", "📸studio", "🏷", "Studio")):
+        queues = (("post", "📸post", "📤", "To post"),
+                  ("edit", "📸edit", "✂️", "To edit"),
+                  ("raw", "📸raw", "🎞", "Raw"),
+                  ("studio", "📸studio", "🏷", "Studio"))
+        if lib == "studio":
+            # no Eagle shelves - To post / To edit can never fill here
+            queues = tuple(q for q in queues if q[0] in ("raw", "studio"))
+        for key, tag, icon, label in queues:
             rows.append(hop(f"cpq-{key}", f"{icon} {label}",
                             f"{count(tag)} here",
                             f"ctx:contentpl:{lib}:{key}"))
@@ -2391,7 +2406,8 @@ def _content_logbook_row(cr, lb, ret=""):
     (':cu:<custId>' from the customer birdseye; review find)."""
     base = cr.logbook_base(lb)
     dest = cr.content_dest_of(lb.get("content") or "")
-    dchip = {"tv": "🎬 TV", "fm": "🎬 FM", "-": "🎬 ➖"}.get(dest, "🎬 unset")
+    dchip = {"tv": "🎬 TV", "fm": "🎬 FM", "studio": "🎬 Studio",
+             "-": "🎬 ➖"}.get(dest, "🎬 unset")
     fid, _l = cr.eagle_folder_of(lb.get("content") or "")
     archived = _areas.ARCHIVE_TAG in {str(t).lower()
                                       for t in (lb.get("tags") or [])}

@@ -512,7 +512,7 @@ def main():
         # 📸 content-task rows (both-places rule: posted/retire live on
         # the queue rows' ⌥⇧ AND here)
         _ct_tags = set()
-        if (pid in (areas.CONTENT_TV_ID, areas.CONTENT_FM_ID)
+        if (pid in areas.CONTENT_PIDS
                 and is_task_like and bool(tid)):
             _ct_tags = {str(x).lower()
                         for x in ((task or {}).get("tags") or [])}
@@ -608,8 +608,8 @@ def main():
             ("🦅 Eagle folder",    "Create if new · open in Eagle",
              f"xact:eaglefolder:{tid}", "eagle folder open create skeleton",
              _is_logbook),
-            ("🎬 Content potential", "TV · FM · none",
-             f"xact:cdest:{tid}", "content potential tv fm dest",
+            ("🎬 Content potential", "TV · FM · Studio · none",
+             f"xact:cdest:{tid}", "content potential tv fm studio dest",
              _is_logbook),
             ("🎬 Edit this",       "Whole tree → To edit",
              f"xact:editthis:{tid}", "edit this promote content tree",

@@ -88,8 +88,22 @@ LEAD_TAG           = _role(_rec, "lead") \
 # ── Content pipeline (editing pipeline 2026-07-25) ───────────────────────────
 # Content PL lists mirror the Eagle content libraries: TV = neotrad,
 # FM = fineline. Env-overridable; defaults = Vex's live list ids.
+# STUDIO (third location, Vex 2026-07-28) is TickTick-ONLY on purpose:
+# no Eagle library, no To post shelf - studio work is quick-edit/
+# no-filing, the CRM folder link IS the material.
 CONTENT_TV_ID = os.environ.get("content_tv_list_id") or "6a268ea28f081f1de80eaedd"
 CONTENT_FM_ID = os.environ.get("content_fm_list_id") or "6a64d5798f08bf71b4203ba1"
+CONTENT_STUDIO_ID = (os.environ.get("content_studio_list_id")
+                     or "6a6856198f08cc25a09727d6")
+
+# dest key -> (list id, emoji, label). THE content-destination table -
+# every dest branch rides this, never a hand-rolled tv/fm pair.
+CONTENT_DESTS = {
+    "tv":     (CONTENT_TV_ID, "📺", "TV"),
+    "fm":     (CONTENT_FM_ID, "🖋️", "FM"),
+    "studio": (CONTENT_STUDIO_ID, "🏷", "Studio"),
+}
+CONTENT_PIDS = tuple(v[0] for v in CONTENT_DESTS.values())
 
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
