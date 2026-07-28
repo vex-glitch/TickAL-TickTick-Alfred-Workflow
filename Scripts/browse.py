@@ -2051,20 +2051,29 @@ _LBPICK_VERBS = {
 }
 
 
-def render_lbpick(verb, query):
+def render_lbpick(verb, query, scope=""):
     """Generic logbook picker: one screen, any pipeline verb - the
     'Manage content' road so everything Eagle is reachable from the
-    Content pipeline too, not just from CRM."""
+    Content pipeline too, not just from CRM.
+
+    scope='unset' = the 🎬 Unclassified drain (Vex smoke 2026-07-28:
+    the radar row promised unclassified and delivered ALL logbooks, so
+    a just-classified tattoo still sat in the list and the drain looked
+    broken). Filtered screens back out to the Content root they came
+    from, not to Manage."""
+    home = "ctx:contentpl" if scope == "unset" else "ctx:cmanage"
     gate = _records_gate()
     if gate:
-        return add_back(gate, "ctx:cmanage")
+        return add_back(gate, home)
     icon, subt = _LBPICK_VERBS.get(verb, ("", ""))
     if not icon:
         return add_back([alfred.item(title=f"Unknown action {verb!r}",
-                                     valid=False)], "ctx:cmanage")
+                                     valid=False)], home)
     import crm_records as cr
     rows = []
     for lb in cr.logbook_notes():
+        if scope == "unset" and cr.content_dest_of(lb.get("content") or ""):
+            continue
         rows.append(alfred.item(
             uid=f"lbp-{lb['id']}",
             title=f"{icon} {cr.logbook_base(lb)}",
@@ -2073,12 +2082,14 @@ def render_lbpick(verb, query):
             arg=f"xact:{verb}:{lb['id']}",
             match=f"{cr.logbook_base(lb)}"))
     if not rows:
-        rows = [alfred.item(title="No logbooks yet",
-                            subtitle="➕ New tattoo mints one", valid=False)]
+        rows = [alfred.item(
+            title="🎬 All classified" if scope == "unset" else "No logbooks yet",
+            subtitle="Nothing left to drain" if scope == "unset"
+                     else "➕ New tattoo mints one", valid=False)]
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
-    return add_back(rows, "ctx:cmanage")
+    return add_back(rows, home)
 
 
 def render_cmanage(query):
@@ -2327,7 +2338,7 @@ def render_contentpl(ids, query):
             rows.append(hop(
                 "cpl-unset", f"🎬 Unclassified · {len(unset)}",
                 f"{na} active · {len(unset) - na} archived · "
-                "pick tattoo → classify", "ctx:lbpick:cdest"))
+                "pick tattoo → classify", "ctx:lbpick:cdest:unset"))
         if pending:
             rows.append(alfred.item(
                 uid="cpl-file", title=f"📥 File edited shots ({pending})",
@@ -4183,7 +4194,8 @@ def main():
             items = render_cstats(query)
 
         elif level == "lbpick":
-            items = render_lbpick(ids[0] if ids else "", query)
+            items = render_lbpick(ids[0] if ids else "", query,
+                                  ids[1] if len(ids) > 1 else "")
 
         elif level == "tags":
             items = render_tags(ids[0], query) if ids else _missing(level, "<listId>")
