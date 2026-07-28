@@ -1078,9 +1078,21 @@ def next_snum(log_content, log_tid, include_tasks=True):
 def current_snum(log_content, log_tid):
     """The session being WORKED (photo naming/tagging): max(S in logged
     entries, S of open linked tasks already STARTED - local start date
-    today or earlier). A merely-scheduled FUTURE S must never renumber
-    today's shots (review find 2026-07-25 - sibling of the Bruno case
-    in next_snum's docstring). Min 1."""
+    today or earlier). A session that has NOT started must never
+    renumber today's shots. Two ways it can be un-started, and BOTH are
+    excluded:
+      - dated in the FUTURE (review find 2026-07-25 - sibling of the
+        Bruno case in next_snum's docstring)
+      - DATELESS, i.e. dormant (Vex smoke 2026-07-28: Luca • Pharaoph
+        had S1+S2 logged and an open UNDATED S3 reserved, so 'attach to
+        this session' filed the shots as S3 when S2 was the session he
+        had just done). A dateless CRM task is dormant BY DEFINITION -
+        it has no start date, so it cannot be "already started", and
+        📅 Schedule exists precisely to give it one.
+    Min 1, so a fresh logbook whose only S1 task is still dormant still
+    imports as S1. next_snum deliberately keeps counting dormant tasks:
+    for SCHEDULING the next session you must skip past a reserved S3,
+    which is the opposite question."""
     top = 0
     for segs in _entries(log_content):
         if len(segs) > 1:
@@ -1094,14 +1106,15 @@ def current_snum(log_content, log_tid):
                 or f"/tasks/{log_tid})" not in (t.get("title") or "")):
             continue
         due = t.get("startDate") or t.get("dueDate") or ""
-        if due:
-            try:
-                from filtering import utc_str_to_local_date
-                day = utc_str_to_local_date(due)
-            except Exception:
-                day = due[:10]
-            if day > today:
-                continue
+        if not due:
+            continue                       # dormant = never started
+        try:
+            from filtering import utc_str_to_local_date
+            day = utc_str_to_local_date(due)
+        except Exception:
+            day = due[:10]
+        if day > today:
+            continue
         sn = title_snum(t.get("title") or "")
         if sn:
             top = max(top, sn)

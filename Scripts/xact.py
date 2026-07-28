@@ -2712,6 +2712,31 @@ _STAGES = {
 }
 
 
+def _is_stage_tag(t):
+    """Does this tag encode WHICH stage a shot belongs to? The whole
+    vocabulary: the five shelf tags, the 'session' marker and s<k>."""
+    t = str(t).lower()
+    return (t == "session" or bool(re.fullmatch(r"s\d+", t))
+            or any(t in tg for _f, _l, tg in _STAGES.values()))
+
+
+def _drop_stale_stage_tags(iid, keep):
+    """Remove every stage tag the item carries that the NEW stage does
+    not want. Best effort: a tag read or removal failure must never
+    abort a move that already happened in Eagle."""
+    import eagle
+    keep_lc = {str(k).lower() for k in keep}
+    try:
+        cur = (eagle.get_items([iid]) or [{}])[0].get("tags") or []
+        stale = [t for t in cur
+                 if _is_stage_tag(t) and str(t).lower() not in keep_lc]
+        if stale:
+            eagle.remove_item_tags([iid], stale)
+        return stale
+    except Exception:
+        return []
+
+
 def _stage_spec(stage, lb, log_tid):
     """(folder_name, label, stage_tags) for a stage key. '' / 's' =
     the CURRENT session (started tasks only - never a merely-scheduled
@@ -3343,6 +3368,11 @@ def img_move(stage):
         dest = cr.content_dest_of(lb.get("content") or "")
         if dest in ("tv", "fm", "studio"):
             tags.append(dest)
+        # Drop the tag of the stage it LEFT first - add_item_tags is
+        # incremental, so without this a shot moved S3 → S2 answers to
+        # both (Vex smoke 2026-07-28, the Luca • Pharaoph mis-numbering:
+        # re-staging is exactly the road you walk to repair one).
+        _drop_stale_stage_tags(iid, tags)
         eagle.add_item_tags([iid], tags)
     except eagle.EagleError as e:
         _crm_say(f"🦅 {e}")

@@ -327,6 +327,16 @@ def add_item_tags(ids, tags):
     _mcp_call("item_add_tags", {"ids": list(ids), "tags": list(tags)})
 
 
+def remove_item_tags(ids, tags):
+    """The counterpart to add_item_tags. Re-staging a shot MUST drop the
+    tag of the stage it left, or the item ends up claiming both (Vex
+    smoke 2026-07-28: shots wrongly filed as S3 would carry s2 AND s3
+    after being moved back)."""
+    if not ids or not tags:
+        return
+    _mcp_call("item_remove_tags", {"ids": list(ids), "tags": list(tags)})
+
+
 def get_items(ids, full=True):
     """Item dicts by id (fullDetails carries filePath - the attach and
     promote roads need the real file on disk)."""
