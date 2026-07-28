@@ -72,7 +72,8 @@ CRM records (customer notes + tattoo logbooks - src/crm_records.py):
     xact:crmlog:<tid>               dialog → timestamped line under ## Notes
 
 Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
-    xact:cdest:<logTid>             🎬 TV|FM|➖ picker → header line;
+    xact:cdest:<logTid>[:drain]     🎬 TV|FM|Studio|➖ picker → header line
+                                    (:drain reopens the Unclassified list);
                                     TV|FM ensures Eagle skeleton +
                                     mints/moves 📸Raw task, ➖ completes it
     xact:eaglefolder:<logTid>       🦅 ensure per-tattoo skeleton, open
@@ -2495,14 +2496,23 @@ def _content_retag(t, drop, add, **fields):
         cache_store.invalidate("all_tasks")
 
 
-def content_dest(log_tid, mandatory=False):
+def content_dest(log_tid, mandatory=False, back=""):
     """🎬 picker on a logbook: TV / FM / Studio / ➖ (third location
     Vex 2026-07-28). A dest writes the header line, ensures the Eagle
     folder (best-effort - field sticks even with Eagle asleep) and
     mints/moves the 📸Raw task into ITS list; ➖ completes an open
     📸Raw task (ONLY that tag - never in-edit work). mandatory=True =
     the at-birth call (Vex: NO logbook may exist unclassified) - Esc
-    does not skip, it writes ➖ explicitly."""
+    does not skip, it writes ➖ explicitly.
+
+    back='drain' = came from the 🎬 Unclassified list: after a
+    classification the list REOPENS, one entry shorter, so 32 of them
+    can be machine-gunned without re-navigating (Vex 2026-07-28).
+    Esc is the way OUT of that loop - a cancel never reopens, which is
+    also why the at-birth call must never pass back."""
+    def _reenter():
+        if back == "drain":
+            crmbrowse("ctx:lbpick:cdest:unset")
     if not _records_ready():
         return
     import areas
@@ -2542,6 +2552,7 @@ def content_dest(log_tid, mandatory=False):
             _crm_say("🎬 ➖ set · 📸Raw task completed")
         else:
             _crm_say("🎬 ➖ set · CRM only")
+        _reenter()
         return
     note = ""
     fid = ""
@@ -2585,6 +2596,7 @@ def content_dest(log_tid, mandatory=False):
                            title=_eagle_title(cr.logbook_base(lb), fid))
             note += " · link backfilled"
     _crm_say(f"🎬 {dest.upper()} set{note}")
+    _reenter()
 
 
 def eagle_folder(log_tid):
@@ -7819,7 +7831,8 @@ def main():
         elif verb == "crmaftercare":
             crmaftercare(rest)
         elif verb == "cdest":
-            content_dest(rest)
+            _lb, _, _back = rest.partition(":")
+            content_dest(_lb, back=_back)
         elif verb == "eaglefolder":
             eagle_folder(rest)
         elif verb == "sessphotos":

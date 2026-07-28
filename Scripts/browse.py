@@ -2079,7 +2079,9 @@ def render_lbpick(verb, query, scope=""):
             title=f"{icon} {cr.logbook_base(lb)}",
             subtitle=("Archived · " if cr.logbook_archived(lb) else "")
                      + subt,
-            arg=f"xact:{verb}:{lb['id']}",
+            # :drain = classify, then reopen this list one shorter
+            arg=f"xact:{verb}:{lb['id']}"
+                + (":drain" if scope == "unset" else ""),
             match=f"{cr.logbook_base(lb)}"))
     if not rows:
         rows = [alfred.item(
