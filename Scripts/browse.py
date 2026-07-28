@@ -1950,6 +1950,20 @@ def _stage_counts(cr, lb, n):
         pool = names.get(sess_id, []) if sess_id else []
         for k in range(1, max(n, 1) + 1):
             out[f"s{k}"] = sum(1 for nm in pool if f"• S{k} •" in nm)
+        # Count EVERY session bucket that actually exists, not just s1..sn:
+        # a bucket numbered beyond the current session is exactly the mess
+        # you go there to fix, and it read "0 shots" while holding 7 (Vex
+        # smoke 2026-07-28, Luca's S3). Unnumbered shots bucket as s0.
+        for nm in pool:
+            m = re.search(r"• S(\d+) •", nm)
+            key = f"s{int(m.group(1))}" if m else "s0"
+            if key not in out:
+                out[key] = sum(1 for x in pool
+                               if (re.search(r"• S(\d+) •", x) is None
+                                   if key == "s0"
+                                   else f"• S{key[1:]} •" in x))
+        out["unfiled"] = subtree.get(node.get("id"), 0) - sum(
+            subtree.get(cid, 0) for cid in kids.values() if cid)
         out["s"] = out.get(f"s{n}", 0)
         return out
     except Exception:
@@ -2625,12 +2639,15 @@ def render_lbeagle(ids, query):
                        "04 Sessions": "s", "05 Finished": "finished",
                        "06 Healed": "healed"}
 
-    def _lbe_mods(stage=None, link=""):
-        # ⌥⇧ is the one free executing chord (canvas fact): on STAGE
-        # rows it imports the Photos selection INTO that stage (Vex
-        # ask 2026-07-26); the head row keeps 🎬 Edit this. ⌥⌘ rides
-        # the modURL copy chain (copies whatever arg it gets) - the
-        # folder's eagle:// link, zero canvas.
+    def _lbe_mods(stage=None, link="", bucket=""):
+        # ⌥⇧ is a free executing chord (canvas fact): on STAGE rows it
+        # imports the Photos selection INTO that stage (Vex ask
+        # 2026-07-26); the head row keeps 🎬 Edit this. ⌥⌘ rides the
+        # modURL copy chain (copies whatever arg it gets) - the
+        # folder's eagle:// link, zero canvas. ⇧ is the OTHER one
+        # (modComplete passes the arg to dispatch): on a bucket row it
+        # moves the WHOLE bucket to a stage you pick (Vex 2026-07-28).
+        # _picker_mods pins ⇧ dead, so claiming it is an override.
         m = _picker_mods()
         if stage:
             m["alt+shift"] = {"arg": f"xact:sessphotos:{log_tid}:{stage}",
@@ -2639,11 +2656,22 @@ def render_lbeagle(ids, query):
         else:
             m["alt+shift"] = {"arg": f"xact:editthis:{log_tid}",
                               "valid": True, "subtitle": "🎬 Edit this"}
+        if bucket:
+            m["shift"] = {
+                "arg": f"xact:crmbrowse:ctx:bulkstage:{log_tid}:{bucket}",
+                "valid": True, "subtitle": "⇧ Move ALL of these → a stage"}
         if link:
             m["alt+cmd"] = {"arg": f"copy:eagle://folder/{link}",
                             "valid": True,
                             "subtitle": "🔗 Copy Eagle link"}
         return m
+
+    # Which rows own a bucket the bulk move can empty. 04 Sessions is
+    # deliberately absent: it is a CONTAINER of sessions, and "move all
+    # sessions at once" is never what you mean.
+    _LBE_BUCKETS = {"01 Consultation": "consult", "02 Preparation": "prep",
+                    "03 Design": "design", "05 Finished": "finished",
+                    "06 Healed": "healed"}
 
     head = alfred.item(uid="lbe-open", title=f"🦅 {base}",
                        subtitle="Whole folder, in Eagle"
@@ -2698,13 +2726,16 @@ def render_lbeagle(ids, query):
         n = len(shots)
         skey = _LBE_STAGE_KEYS.get(name)
         chord = "⌥⇧📸" if skey else "⌥⇧🎬"
+        bucket = _LBE_BUCKETS.get(name) if n else ""
         rows.append(alfred.item(
             uid=f"lbe-{cid}", title=name,
             subtitle=f"🖼️ {n}"
-                     + (f"  |  ⏎🖼  ⌘⚡  {chord}  ⌥⌘🔗  ⌃🔙" if n
+                     + (f"  |  ⏎🖼  ⌘⚡  {chord}"
+                        + ("  ⇧➡️" if bucket else "")
+                        + "  ⌥⌘🔗  ⌃🔙" if n
                         else f"  |  {chord}  ⌥⌘🔗  ⌃🔙"),
             arg=peek_arg(cid), valid=bool(n),
-            mods=_lbe_mods(skey, cid), variables=_record_vars(lb)))
+            mods=_lbe_mods(skey, cid, bucket), variables=_record_vars(lb)))
         if name == "04 Sessions" and n:
             sess = {}
             for it in shots:
@@ -2714,9 +2745,11 @@ def render_lbeagle(ids, query):
                 label = f"S{k}" if k else "unnumbered"
                 rows.append(alfred.item(
                     uid=f"lbe-{cid}-s{k}", title=f"   · {label}",
-                    subtitle=f"🖼️ {len(sess[k])}  |  ⏎🖼  ⌥⇧📸  ⌥⌘🔗  ⌃🔙",
+                    subtitle=f"🖼️ {len(sess[k])}"
+                             "  |  ⏎🖼  ⌥⇧📸  ⇧➡️  ⌥⌘🔗  ⌃🔙",
                     arg=peek_arg(cid, f"s{k}"),
-                    mods=_lbe_mods(f"s{k}" if k else "s", cid),
+                    mods=_lbe_mods(f"s{k}" if k else "s", cid,
+                                   f"s{k}" if k else "s0"),
                     variables=_record_vars(lb)))
     # honest strays: shots dragged straight into the tattoo root folder
     # (outside the 01-06 skeleton) get their own row (review find)
@@ -2726,12 +2759,49 @@ def render_lbeagle(ids, query):
         ns = len(strays)
         rows.append(alfred.item(
             uid=f"lbe-{root['id']}-strays", title="· unfiled",
-            subtitle=f"🖼️ {ns} · folder root  |  ⏎🖼  ⌥⇧🎬  ⌃🔙",
+            subtitle=f"🖼️ {ns} · folder root  |  ⏎🖼  ⌥⇧🎬  ⇧➡️  ⌃🔙",
             arg=peek_arg(root["id"], direct=True),
-            mods=_lbe_mods(), variables=_record_vars(lb)))
+            mods=_lbe_mods(bucket="unfiled"), variables=_record_vars(lb)))
     if query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+    return add_back(rows, back)
+
+
+def render_bulkstage(ids, query):
+    """⇧ on a folder-screen bucket row: where does the WHOLE bucket go?
+    (Vex green 2026-07-28 - repairing a mis-numbered session one shot at
+    a time was the only road before this.) Same _stage_rows skeleton as
+    every other stage screen, minus the bucket you are standing in."""
+    import crm_records as cr
+    log_tid = ids[0] if ids else ""
+    src = ids[1] if len(ids) > 1 else ""
+    back = f"ctx:lbeagle:{log_tid}"
+    lb = next((l for l in cr.records_notes() if l.get("id") == log_tid), None)
+    if not (lb and src):
+        return add_back([alfred.item(title="Lost the bucket context",
+                                     subtitle="Re-enter from the folder screen",
+                                     valid=False)], back)
+    n = cr.current_snum(lb.get("content") or "", log_tid)
+    counts = _stage_counts(cr, lb, n)
+    src_label = ({"unfiled": "unfiled", "s0": "unnumbered"}.get(src)
+                 or (f"S{src[1:]}" if re.fullmatch(r"s\d+", src) else
+                     next((f for k, f, _s in _TRIAGE_STAGES if k == src), src)))
+    have = counts.get(src, 0) if counts else 0
+    rows = [alfred.item(
+        title=f"🖼 Move {src_label} · {have} shot{'' if have == 1 else 's'}",
+        subtitle=f"Everything in {src_label} → the stage you pick "
+                 f"({cr.logbook_base(lb)})", valid=False)]
+    srows, _digit = _stage_rows(
+        "bulk", n, query, lambda k: f"xact:bulkmove:{log_tid}:{src}:{k}",
+        f"Current session · names get S{n}",
+        "Older session · names get S{k}",
+        mods_fn=lambda _k: _picker_mods(), counts=counts)
+    # never offer the bucket you are already in ("s" and "s<n>" are the
+    # same target when the current session is n)
+    same = {src} | ({"s", f"s{n}"} if src in ("s", f"s{n}") else set())
+    rows += [r for r in srows
+             if (r.get("arg") or "").rsplit(":", 1)[-1] not in same]
     return add_back(rows, back)
 
 
@@ -4447,6 +4517,9 @@ def main():
 
         elif level == "lbphotos":
             items = render_lbphotos(ids, query)
+
+        elif level == "bulkstage":
+            items = render_bulkstage(ids, query)
 
         elif level == "manage":
             items = render_manage(ids, query)

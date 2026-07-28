@@ -3380,6 +3380,225 @@ def img_move(stage):
     _crm_say(f"🖼 → {folder_name} · {label}")
 
 
+_BUCKET_LABELS = {"unfiled": "unfiled", "s0": "unnumbered"}
+
+
+def _bucket_label(bucket):
+    """Human name for a source bucket key."""
+    if bucket in _STAGES:
+        return _STAGES[bucket][1]
+    if bucket in _BUCKET_LABELS:
+        return _BUCKET_LABELS[bucket]
+    m = re.fullmatch(r"s(\d+)", bucket or "")
+    return f"S{m.group(1)}" if m else (bucket or "?")
+
+
+def _bucket_items(lib_path, fid, bucket):
+    """The shots a folder-screen bucket row stands for, read from DISK
+    with the SAME rules render_lbeagle uses - so what the row counts is
+    exactly what a bulk move moves. Returns [] for an unknown bucket."""
+    import eagle
+    root, all_ids = eagle.disk_subtree_ids(lib_path, fid)
+    items = eagle.disk_items_in(lib_path, all_ids)
+
+    def sub(node):
+        out = {node["id"]}
+        for ch in node.get("children") or []:
+            out |= sub(ch)
+        return out
+
+    def child(name):
+        return next((c for c in root.get("children") or []
+                     if (c.get("name") or "") == name), None)
+
+    if bucket == "unfiled":
+        return [it for it in items if root["id"] in (it.get("folders") or [])]
+    if bucket in _STAGES:
+        c = child(_STAGES[bucket][0])
+        if not c:
+            return []
+        cset = sub(c)
+        return list({it["id"]: it for it in items
+                     if set(it.get("folders") or []) & cset}.values())
+    m = re.fullmatch(r"s(\d+)", bucket or "")
+    if not m:
+        return []
+    k = int(m.group(1))
+    c = child("04 Sessions")
+    if not c:
+        return []
+    cset = sub(c)
+    pool = {it["id"]: it for it in items
+            if set(it.get("folders") or []) & cset}.values()
+    out = []
+    for it in pool:
+        mm = re.search(r"• S(\d+) •", it.get("name") or "")
+        if (int(mm.group(1)) if mm else 0) == k:
+            out.append(it)
+    return out
+
+
+def _note_heading_index(lines, label):
+    """Index of the note heading a label owns: '### <date> · S3 · …'
+    matched per '·' segment (S<n> exactly, so S1 cannot swallow S10),
+    or the '## <Section>' that mirrors a shelf folder. None = absent."""
+    sect = _NOTE_SECTIONS.get(label)
+    exact = re.fullmatch(r"S\d+", label or "")
+    for i, l in enumerate(lines):
+        s = l.strip()
+        if sect and s == sect:
+            return i
+        if not s.startswith("### "):
+            continue
+        segs = [x.strip() for x in s.lstrip("# ").split("·")]
+        if any(seg == label or (not exact and seg.startswith(label))
+               for seg in segs):
+            return i
+    return None
+
+
+def _move_note_refs(log_tid, from_label, to_label):
+    """Take the note's image refs WITH the shots (Vex green 2026-07-28,
+    the whole-trail principle the delete road set). Every ![image] line
+    under the source heading belongs to a shot in the bucket being
+    emptied, so they all follow. ONE write: the target heading is
+    created in memory rather than through _ensure_note_heading, so a
+    lagging re-read cannot land between the two edits. Returns how many
+    refs moved (0 = nothing to do, which is the common case)."""
+    import areas
+    import crm_records as cr
+    try:
+        api = cr._api()
+        live = api.get_task(areas.RECORDS_ID, log_tid)
+        content = cr._fresher_content(log_tid, live.get("content") or "")
+        lines = content.split("\n")
+        src = _note_heading_index(lines, from_label)
+        if src is None:
+            return 0
+        end = src + 1
+        while end < len(lines) and not lines[end].lstrip().startswith("#"):
+            end += 1
+        refs = [l for l in lines[src + 1:end]
+                if l.lstrip().startswith("![image](")]
+        if not refs:
+            return 0
+        keep = [l for l in lines[src + 1:end]
+                if not l.lstrip().startswith("![image](")]
+        lines[src + 1:end] = keep
+        dst = _note_heading_index(lines, to_label)
+        if dst is None:                      # create it, in memory
+            if to_label in _NOTE_SECTIONS:
+                i = next((k for k, l in enumerate(lines)
+                          if l.strip() == "## Notes"), len(lines))
+                lines[i:i] = [_NOTE_SECTIONS[to_label], ""]
+                dst = i
+            elif re.fullmatch(r"S\d+", to_label or ""):
+                i = next((k for k, l in enumerate(lines)
+                          if l.strip() == "## Sessions"), None)
+                if i is None:
+                    return 0
+                j = i + 1
+                while j < len(lines) and not lines[j].startswith("## "):
+                    j += 1
+                while j > i + 1 and not lines[j - 1].strip():
+                    j -= 1
+                lines[j:j] = ["", f"### {to_label}"]
+                dst = j + 1
+            else:
+                return 0
+        lines[dst + 1:dst + 1] = refs
+        new = "\n".join(lines)
+        api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+        _patch_content_cache(log_tid, new)
+        return len(refs)
+    except Exception as e:
+        _att_log(f"move note refs {from_label}→{to_label} failed: "
+                 f"{type(e).__name__}: {e}")
+        return 0
+
+
+def bulk_move(rest):
+    """⇧ on a folder-screen bucket row: move EVERY shot in it to another
+    stage (Vex ask 2026-07-28, after 'attach to this session' filed 7 of
+    Luca's shots as S3 - repairing that one shot at a time was the only
+    road). rest = '<log_tid>:<from_bucket>:<to_stage>'. Renames to the
+    convention with fresh indices, refiles, retags (dropping the stage
+    it left), and the note's image refs follow. No confirm dialog by
+    design: picking the target IS the confirmation and a wrong move is
+    undone by moving back."""
+    if not _records_ready():
+        return
+    parts = (rest or "").split(":")
+    if len(parts) < 3:
+        _crm_say("🖼 Bad move request")
+        return
+    log_tid, src, dst = parts[0], parts[1], ":".join(parts[2:])
+    lb = _record_by_id(log_tid)
+    if not lb:
+        _crm_say("Logbook not found · run tsy")
+        return
+    import crm_records as cr
+    import eagle
+    base = cr.logbook_base(lb)
+    try:
+        eagle.ensure_running()
+        eagle.ensure_library("crm")
+        fid = _eagle_ensure_logbook_folder(lb)
+        lib_path = eagle.LIBS["crm"][1]
+        shots = _bucket_items(lib_path, fid, src)
+        if not shots:
+            _crm_say(f"🖼 Nothing in {_bucket_label(src)}")
+            return
+        folder_name, label, stage_tags = _stage_spec(
+            "" if dst == "s" else dst, lb, log_tid)
+        if label == _bucket_label(src):
+            _crm_say(f"🖼 Already in {label}")
+            return
+        node = eagle.folder_node(fid)
+        child = next((c for c in (node or {}).get("children") or []
+                      if c.get("name") == folder_name), None)
+        sub_id = child["id"] if child else eagle.create_folder(
+            folder_name, parent=fid)
+        # names first, all of them, so the batch cannot collide with
+        # itself - next_index only sees what is already on disk.
+        # Renumber in the ORDER THEY WERE SHOT (the trailing index of
+        # the old name), not in whatever order the disk walk returned,
+        # so S3 • 4 does not become S2 • 2.
+        def _idx(it):
+            m = re.search(r"•\s*(\d+)\s*$", it.get("name") or "")
+            return (int(m.group(1)) if m else 10 ** 6, it.get("name") or "")
+        shots = sorted(shots, key=_idx)
+        existing = eagle.list_item_names(sub_id)
+        payload, ids = [], []
+        for it in shots:
+            n = eagle.next_index(existing, base, label)
+            nm = eagle.item_name(base, label, n)
+            existing.append(nm)
+            payload.append({"id": it["id"], "name": nm, "folders": [sub_id]})
+            ids.append(it["id"])
+        eagle.update_items(payload)
+        cust, _, tat = base.partition(" - ")
+        tags = [t for t in (cust.strip(), tat.strip()) if t] + stage_tags
+        dest = cr.content_dest_of(lb.get("content") or "")
+        if dest in ("tv", "fm", "studio"):
+            tags.append(dest)
+        keep = {str(t).lower() for t in tags}
+        stale = sorted({t for it in shots for t in (it.get("tags") or [])
+                        if _is_stage_tag(t) and str(t).lower() not in keep})
+        if stale:
+            try:
+                eagle.remove_item_tags(ids, stale)
+            except Exception:
+                pass
+        eagle.add_item_tags(ids, tags)
+    except eagle.EagleError as e:
+        _crm_say(f"🦅 {e}")
+        return
+    moved = _move_note_refs(log_tid, _bucket_label(src), label)
+    _crm_say(f"🖼 {len(shots)} · {_bucket_label(src)} → {label}"
+             + (f" · {moved} note ref(s) followed" if moved else ""))
+
+
 def _eagle_trash_folder(lb):
     """🗑 delete-road Eagle erase for ONE logbook: every item in the
     tattoo folder's subtree → Eagle Trash (restorable in-app), the empty
@@ -8086,6 +8305,8 @@ def main():
             img_trash(rest)
         elif verb == "imgmove":
             img_move(rest)
+        elif verb == "bulkmove":
+            bulk_move(rest)
         elif verb == "crmbrowse":
             crmbrowse(rest)
         elif verb == "bridge_daily":
