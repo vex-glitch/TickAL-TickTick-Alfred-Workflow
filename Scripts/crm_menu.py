@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 """
-crm_menu.py - Alfred Script Filter (the 🔥CRM hub)
+crm_menu.py - Alfred Script Filter (THE home, keyword/hotkey entry)
 
-The CRM hotkey / "CRM…" main-menu row opens this: two options, both scoped to the
-🔥CRM list (its id rides on as a variable). Type "a" / "s" to pick (fuzzy).
+The CRM hotkey / "CRM / Content Pipeline…" main-menu row opens this. Since
+2026-07-28 it is the UNIFIED home: CRM and Content stopped being two
+workflows, and this screen and the in-browse home (browse.py ctx:crmhub)
+render the SAME seven rows from ONE table, src/crm_home.py.
 
-  • Add    → arg "add"  → ET "Add" with list_id=CRM → the normal add flow pinned
-             to CRM: auto-attaches a clipboard image, the [[ picker scopes to CRM
-             bookings, and a booking tag triggers the "Prepare for …" follow-up.
-  • Search → arg "tags" → the browse tag screen (browse.py, ctx:tags) scoped to
-             CRM. "tags" only routes the conditional - the ET call drops it.
+  📅 Calendar · 🎨 Logbooks · 👥 Customers · 🎬 Pipelines
+  🎛 Manage   · 💰 Money    · 📊 Stats
 
-Wiring: this filter's output → a Conditional - add → ET "Add", tags → ET
-"Browse" - both passing variables (so list_id and browse_ctx reach the target).
+Add a row to crm_home.ROWS + HOME_ORDER and it lands in both homes; edit a
+renderer instead and they drift (which is exactly what happened before the
+table existed). Subtitles come from crm_home.subtitles() - live counts, cache
+only, every row independently guarded.
+
+Wiring: this filter's output → a Conditional. ctx rows carry arg "tags" +
+browse_ctx=<ctx> and take the BROWSE branch (browse.py reads browse_ctx;
+"tags" only routes the conditional, the ET call drops it). xact rows pass
+their verb straight through. Both branches pass variables, so list_id and
+browse_ctx reach the target. The raw "Add" row is RETIRED (2026-07-17): an
+unlinked CRM task is an orphan.
 """
 import sys
 import os
