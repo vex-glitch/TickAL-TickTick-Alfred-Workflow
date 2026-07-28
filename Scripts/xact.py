@@ -2418,12 +2418,13 @@ def _eagle_ensure_logbook_folder(lb):
     parent_name = "Archive" if cr.logbook_archived(lb) else "Customers"
     cust = eagle.find_folder(parent_name, tree=tree)
     base = cr.logbook_base(lb)
-    tat = None
-    if cust:
-        cust_id = cust["id"]
-        tat = eagle.find_folder(base, parent_id=cust_id, tree=tree)
-    else:
-        cust_id = eagle.create_folder(parent_name)
+    # ADOPT an existing folder of this name from ANYWHERE in the CRM
+    # library, not just from the parent we would create under (Vex smoke
+    # 2026-07-28: the folder already sat in Archive/, the parent-scoped
+    # lookup missed it, and a twin was minted under Customers/ - Eagle
+    # has no folder delete, so a twin is permanent manual cleanup).
+    tat = eagle.find_folder(base, tree=tree)
+    cust_id = cust["id"] if cust else eagle.create_folder(parent_name)
     if tat:
         fid = tat["id"]
         have = {c.get("name") for c in (tat.get("children") or [])}
