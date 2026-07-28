@@ -367,6 +367,58 @@ def disk_folder_tree(lib_path):
         raise EagleError(f"cannot read library metadata: {e.__class__.__name__}")
 
 
+_SUBTREE_COUNT_MEMO = {}
+
+
+def disk_subtree_counts(lib_path):
+    """{folder_id: items in that folder AND all its descendants} for a
+    CLOSED library, in ONE images/ walk plus one metadata read.
+
+    The list screens want an image count per tattoo (Vex unified row
+    2026-07-28). The obvious loop - disk_items_in once per tattoo - is
+    O(tattoos x library) because every call re-walks the whole images/
+    directory: 27 tattoos measured 0.6s, far too slow for a filter that
+    re-renders on each keystroke. This walks once (~25ms) and rolls the
+    counts up the tree. Memoised per process, so a render that asks for
+    35 rows pays for one walk."""
+    if lib_path in _SUBTREE_COUNT_MEMO:
+        return _SUBTREE_COUNT_MEMO[lib_path]
+    direct = {}
+    images = os.path.join(lib_path, "images")
+    try:
+        entries = os.listdir(images)
+    except Exception:
+        entries = []
+    for entry in entries:
+        if not entry.endswith(".info"):
+            continue
+        try:
+            with open(os.path.join(images, entry, "metadata.json")) as f:
+                meta = json.load(f)
+        except Exception:
+            continue
+        if meta.get("isDeleted"):
+            continue
+        for fid in meta.get("folders") or []:
+            direct[fid] = direct.get(fid, 0) + 1
+    out = {}
+
+    def roll(node):
+        total = direct.get(node.get("id"), 0)
+        for kid in node.get("children") or []:
+            total += roll(kid)
+        out[node.get("id")] = total
+        return total
+
+    try:
+        for top in disk_folder_tree(lib_path):
+            roll(top)
+    except EagleError:
+        pass
+    _SUBTREE_COUNT_MEMO[lib_path] = out
+    return out
+
+
 def disk_subtree_ids(lib_path, root_id):
     """root folder id + every descendant id, from disk."""
     def find(nodes):

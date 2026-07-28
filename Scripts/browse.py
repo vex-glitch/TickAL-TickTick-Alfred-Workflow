@@ -1061,37 +1061,9 @@ def _cust_row(cr, c, uid_prefix="crms"):
 
 
 def _logbook_row(cr, lb, uid_prefix="crms"):
-    """Logbook search row: customer + paid + next session in the
-    subtitle. ⏎ (and ⌥) open the LOGBOOK hub (photo/payment/rename/
-    archive), ⌥⇧ opens the note in TickTick - inverted 2026-07-26,
-    Vex: drilling is the frequent move."""
-    paid = cr.paid_summary(lb.get("content") or "")
-    hit = cr.parse_first_link(lb.get("content") or "")
-    cust_name = cr.PERSON_RE.sub("", hit[0]) if hit else ""
-    archived = _areas.ARCHIVE_TAG in {str(t).lower()
-                                      for t in (lb.get("tags") or [])}
-    if archived:
-        state = "📁 archived"
-    else:
-        nxt = cr.next_session_task(lb["id"])
-        state = (f"next {nxt[1] or 'session'} 📅 {nxt[0] or 'unscheduled'}"
-                 if nxt else "▶️ nothing scheduled")
-    bits = [b for b in (cust_name,
-                        "" if paid.startswith("-") else paid,
-                        state) if b]
-    mods = _picker_mods()
-    mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
-                   "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
-    mods["alt+shift"] = {"arg": f"xact:notego:{lb['id']}", "valid": True,
-                         "subtitle": "Open in TickTick"}
-    return alfred.item(
-        uid=f"{uid_prefix}-l-{lb['id']}",
-        title=lb.get("title") or "Untitled",
-        subtitle=" · ".join(bits) + "  |  ⏎⤵️  ⌘⚡  ⌥⇧↗️  ⌃🔙",
-        arg=f"xact:crmbrowse:ctx:crmbook:{lb['id']}",
-        mods=mods,
-        variables=_record_vars(lb),
-    )
+    """CRM-list tattoo row - delegates to THE unified row builder (Vex
+    2026-07-28): one tattoo row, identical in every list."""
+    return _unified_logbook_row(cr, lb, uid_prefix)
 
 
 def _crm_task_row(cr, t, uid_prefix="crms"):
@@ -2411,37 +2383,83 @@ def render_contentpl(ids, query):
     return add_back(rows, f"ctx:contentpl:{lib}")
 
 
-def _content_logbook_row(cr, lb, ret=""):
-    """Content-world logbook row (Vex design 2026-07-26): the tattoo IS
-    the content entity here, so ⏎ drills into its 🦅 folder screen
-    (counts → grid), ⌥ the CRM logbook hub, ⌥⇧ opens the note. Same
-    entity as the CRM row, different world, different ⏎. ret = return
-    tail threaded into lbeagle so ⌃ backs to where Vex came from
-    (':cu:<custId>' from the customer birdseye; review find)."""
+def _img_counts():
+    """{eagle folder id: images in its subtree} for the CRM library, or
+    None when the T9 is unplugged (no chip beats a lying '🖼 0')."""
+    try:
+        import eagle as _eg
+        path = _eg.LIBS["crm"][1]
+        if not os.path.isdir(path):
+            return None
+        return _eg.disk_subtree_counts(path)
+    except Exception:
+        return None
+
+
+def _logbook_state(cr, lb):
+    """(circle, trailing date) - Vex's legend 2026-07-28:
+    🔴 archived · 🟡 active, nothing booked · 🟢 scheduled (+ the date)."""
+    if cr.logbook_archived(lb):
+        return "🔴", ""
+    nxt = cr.next_session_task(lb["id"])
+    if nxt and nxt[0]:
+        return "🟢", nxt[0]
+    return "🟡", ""
+
+
+def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None):
+    """THE tattoo row - one builder for every list that shows tattoos
+    (Vex unified home 2026-07-28: "one customers and logbook", the two
+    worlds reachable by chord instead of by being in a different tree).
+
+        🎨 Bruno • Dog Portrait 🟡 600€ • 2 Sess
+        🎬 TV · 🖼 13  |  ⌥ CRM  ⇧ Content  |  ⌘⚡ ⏎↗️ ⌥⌘🔗 ⌃🔙
+
+    Chords, all shipping on existing canvas: ⏎ opens the note in
+    TickTick, ⌥ drills the CRM hub (mod variables), ⇧ drills the Eagle
+    hub (⇧ rides modComplete, which passes the argument to dispatch and
+    its xact: passthrough - verified 2026-07-28), ⌘ is the full Actions
+    menu, ⌥⌘ copies the Eagle link, ⌃ backs out."""
     base = cr.logbook_base(lb)
+    name = re.sub(r"^[🎨🏛️\s]+", "", lb.get("title") or "").strip() or base
+    circle, when = _logbook_state(cr, lb)
+    money, sess = cr.totals(lb.get("content") or "")
+    head = [b for b in (money if money and money != "-" else "",
+                        f"{sess} Sess" if sess else "",
+                        when) if b]
     dest = cr.content_dest_of(lb.get("content") or "")
     dchip = {"tv": "🎬 TV", "fm": "🎬 FM", "studio": "🎬 Studio",
              "-": "🎬 ➖"}.get(dest, "🎬 unset")
     fid, _l = cr.eagle_folder_of(lb.get("content") or "")
-    archived = _areas.ARCHIVE_TAG in {str(t).lower()
-                                      for t in (lb.get("tags") or [])}
+    if counts is None:
+        counts = _img_counts()
+    n_img = (counts or {}).get(fid) if fid else None
+    sub = [dchip]
+    if n_img is not None:
+        sub.append(f"🖼 {n_img}")
+    elif not fid:
+        sub.append("🦅 no folder yet")
     mods = _picker_mods()
-    mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
+    mods["alt"] = {"arg": "", "valid": True, "subtitle": "⌥ CRM hub",
                    "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
-    mods["alt+shift"] = {"arg": f"xact:notego:{lb['id']}", "valid": True,
-                         "subtitle": "Open in TickTick"}
+    mods["shift"] = {"arg": f"xact:crmbrowse:ctx:lbeagle:{lb['id']}{ret}",
+                     "valid": True, "subtitle": "⇧ Content · Eagle folders"}
     if fid:
-        # ⌥⌘ rides the modURL copy chain - the tattoo's Eagle link
         mods["alt+cmd"] = {"arg": f"copy:eagle://folder/{fid}",
                            "valid": True, "subtitle": "🔗 Copy Eagle link"}
-    bits = [b for b in (("📁 archived" if archived else ""), dchip,
-                        "" if fid else "🦅 no folder yet") if b]
     return alfred.item(
-        uid=f"clb-{lb['id']}", title=f"🎨 {base}",
-        subtitle=" · ".join(bits) + "  |  ⏎🦅  ⌘⚡  ⌥⤵️  ⌥⇧↗️"
+        uid=f"{uid_prefix}-{lb['id']}",
+        title=f"🎨 {name}  {circle} " + " • ".join(head),
+        subtitle=" · ".join(sub) + "  |  ⌥ CRM  ⇧ Content  |  ⌘⚡ ⏎↗️"
                  + ("  ⌥⌘🔗" if fid else "") + "  ⌃🔙",
-        arg=f"xact:crmbrowse:ctx:lbeagle:{lb['id']}{ret}",
+        arg=_open_note_arg(lb["id"]),
         match=base, mods=mods, variables=_record_vars(lb))
+
+
+def _content_logbook_row(cr, lb, ret=""):
+    """Content-list tattoo row - delegates to THE unified row builder.
+    ret still threads the ⌃-back tail into the ⇧ Eagle drill."""
+    return _unified_logbook_row(cr, lb, "clb", ret)
 
 
 def render_clbs(query):
@@ -2967,13 +2985,7 @@ def render_crmcust(cust_tid, query):
     lbs = cr.customer_logbooks(cust_tid)
     lb_ids = {lb["id"] for lb in lbs}
     for lb in lbs:
-        r = _logbook_row(cr, lb, uid_prefix="hub")
-        # ⏎ opens the LOGBOOK HUB (photo/payment/summary/rename/archive all
-        # live there) - the note itself is one more ⏎ inside.
-        r["arg"] = f"xact:crmbrowse:ctx:crmbook:{lb['id']}"
-        r["subtitle"] = re.sub(r"\s*\|.*$", "",
-                               r.get("subtitle") or "") + "  |  ⏎⤵️  ⌘⚡"
-        rows.append(r)
+        rows.append(_logbook_row(cr, lb, uid_prefix="hub"))
     for t in _crm_open_tasks():
         if any(f"/tasks/{lid})" in (t.get("title") or "") for lid in lb_ids):
             rows.append(_crm_task_row(cr, t, uid_prefix="hub"))
