@@ -503,6 +503,140 @@ def recoverable(con, lib=None):
     return list(con.execute(q + " ORDER BY backup_gain DESC", a))
 
 
+def _materialise(path, timeout=180):
+    """Pull ONE file out of iCloud and wait until the bytes are really
+    there. brctl returns BEFORE the fetch finishes - the same class of
+    trap as Eagle's addFromPaths returning before its background copy -
+    so poll st_blocks rather than trusting the exit code."""
+    try:
+        subprocess.run(["brctl", "download", path],
+                       capture_output=True, timeout=60)
+    except Exception:
+        pass
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            st = os.stat(path)
+            if getattr(st, "st_blocks", 1) != 0:
+                return True
+        except OSError:
+            return False
+        time.sleep(0.4)
+    return False
+
+
+def pull(con=None, limit=25, lib=None, spread=True):
+    """Import matched originals BESIDE the derivative they supersede.
+
+    Nothing is replaced and nothing is deleted - that is the invariant.
+    The import takes the derivative's NAME (so a name sort puts the pair
+    together, and so the library still reads correctly once Vex purges
+    the old ones), the derivative's TAGS, plus 'original'. The old item
+    keeps its name and gains 'superseded'. A wrong match is therefore
+    something you can SEE next to the right one.
+
+    Idempotent: the import carries annotation 'orig:<derivative eid>', so
+    a re-run finds it already there and skips instead of duplicating."""
+    own = con is None
+    con = con or connect()
+    rows = recoverable(con, lib)
+    if spread:
+        # one per Eagle folder first, so a first batch shows MANY subjects
+        # rather than 25 shots of the same tattoo
+        seen, spread_rows, rest = set(), [], []
+        for r in rows:
+            f = (json.loads(r["folders_json"] or "[]") or [""])[0]
+            (spread_rows if f not in seen else rest).append(r)
+            seen.add(f)
+        rows = spread_rows + rest
+    rows = [r for r in rows if r["state"] != "sourced"][:limit]
+    done = skipped = failed = 0
+    notes = []
+    by_lib = {}
+    for r in rows:
+        by_lib.setdefault(r["lib"], []).append(r)
+    for lb, group in by_lib.items():
+        try:
+            eagle.ensure_running()
+            eagle.ensure_library(lb)
+        except eagle.EagleError as e:
+            notes.append(f"{lb}: {e}")
+            continue
+        for r in group:
+            mark = f"orig:{r['eid']}"
+            folders = json.loads(r["folders_json"] or "[]")
+            fid = folders[0] if folders else None
+            log(con, "pull", "attempt", r["eid"], r["backup_path"])
+            con.commit()
+            try:
+                # already imported by an earlier run?
+                if fid and any((i.get("annotation") or "") == mark
+                               for i in eagle.items_in_folder(fid)):
+                    con.execute("UPDATE item SET state='sourced' "
+                                "WHERE eid=?", (r["eid"],))
+                    log(con, "pull", "ok", r["eid"], "already present")
+                    skipped += 1
+                    con.commit()
+                    continue
+                if not _materialise(r["backup_path"]):
+                    log(con, "pull", "err", r["eid"], "icloud fetch failed")
+                    failed += 1
+                    con.commit()
+                    continue
+                tags = json.loads(r["tags_json"] or "[]") + ["original"]
+                ids = eagle.add_items(
+                    [{"path": r["backup_path"], "name": r["name"],
+                      "tags": tags, "annotation": mark}], folder_id=fid)
+                eagle.wait_imported(ids)
+                eagle.add_item_tags([r["eid"]], ["superseded"])
+                con.execute("UPDATE item SET new_eid=?, state='sourced' "
+                            "WHERE eid=?", (ids[0] if ids else "", r["eid"]))
+                log(con, "pull", "ok", r["eid"], ids[0] if ids else "")
+                done += 1
+            except Exception as e:
+                log(con, "pull", "err", r["eid"], f"{type(e).__name__}: {e}")
+                notes.append(f"{r['name'][:24]}: {e}")
+                failed += 1
+            con.commit()
+    con.commit()
+    if own:
+        con.close()
+    return {"imported": done, "already": skipped, "failed": failed,
+            "notes": notes[:5]}
+
+
+def tag_no_original(con=None, lib=None):
+    """One batched tag per library for everything we could not recover -
+    so 'what is still low-res?' is answerable forever."""
+    own = con is None
+    con = con or connect()
+    q = ("SELECT eid, lib FROM item WHERE klass IN ('derivative','suspect') "
+         "AND (backup_conf IN ('none','tie') OR backup_conf IS NULL "
+         "     OR backup_gain < ?) AND state != 'nooriginal'")
+    a = [MIN_GAIN]
+    if lib:
+        q += " AND lib=?"
+        a.append(lib)
+    by_lib = {}
+    for r in con.execute(q, a):
+        by_lib.setdefault(r["lib"], []).append(r["eid"])
+    n = 0
+    for lb, ids in by_lib.items():
+        try:
+            eagle.ensure_library(lb)
+            for i in range(0, len(ids), 200):
+                eagle.add_item_tags(ids[i:i + 200], ["no original"])
+        except eagle.EagleError:
+            continue
+        con.executemany("UPDATE item SET state='nooriginal' WHERE eid=?",
+                        [(x,) for x in ids])
+        n += len(ids)
+    con.commit()
+    if own:
+        con.close()
+    return n
+
+
 def status(con=None):
     """Everything the 📊 screen needs, in one pass."""
     own = con is None
