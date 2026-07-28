@@ -1935,6 +1935,16 @@ def _stage_rows(prefix, n, query, arg_fn, s_default, sk_default,
             subtitle=sk_default.format(k=k) + dsuffix,
             arg=arg_fn(f"s{k}"), **extras(f"s{k}")))
         return rows, True
+    # Every EARLIER session as a real row (Vex 2026-07-28: standing on
+    # S5 there was "no way to import a photo as a photo of session 3").
+    # The typed-digit row above still works and still reaches sessions
+    # beyond n - this just stops the feature being invisible. Newest
+    # first: the session you most likely mean is the one just gone.
+    for k in range(n - 1, 0, -1):
+        rows.append(alfred.item(
+            uid=f"{prefix}-s{k}", title=f"→ 04 Sessions · S{k}",
+            subtitle=sk_default.format(k=k) + dsuffix,
+            arg=arg_fn(f"s{k}"), **extras(f"s{k}")))
     return rows, False
 
 
