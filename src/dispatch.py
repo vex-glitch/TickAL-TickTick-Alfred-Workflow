@@ -191,21 +191,35 @@ def _buffer_apply(fn):
 
 def _patch_task_cache(tid, **fields):
     """Update specific fields on a task in the all_tasks cache without a full
-    wipe, then mirror into the per-list project_data cache."""
+    wipe, then mirror into the per-list project_data cache.
+
+    BOTH pools, always. An entry in a NOTE-kind list lives in all_tasks AND
+    all_notes (sync.py fills all_tasks for every non-SMART_LIST project, and
+    all_notes for every NOTE-kind one), so patching only all_tasks leaves a
+    stale twin that cache.find_task will happily return - it searches
+    all_tasks then all_notes. That went unnoticed while only CRM Records was
+    NOTE-kind; the Content PL lists became NOTE-kind on 2026-07-30 and it
+    started mattering to the whole 📸 pipeline. Same reasoning as the
+    attr_delete branch below, which has cleared both pools since 2026-07-17."""
     try:
-        cached = cache_store.get("all_tasks")
-        if cached is None:
-            return
         pid_old = pid_new = None
-        updated = []
-        for t in cached:
-            if t.get("id") == tid:
-                pid_old = t.get("projectId") or t.get("_projectId")
-                t = dict(t)
-                t.update(fields)
-                pid_new = t.get("projectId") or t.get("_projectId")
-            updated.append(t)
-        cache_store.set("all_tasks", updated)
+        touched = False
+        for key in ("all_tasks", "all_notes"):
+            cached = cache_store.get(key)
+            if cached is None:
+                continue
+            updated = []
+            for t in cached:
+                if t.get("id") == tid:
+                    touched = True
+                    pid_old = pid_old or t.get("projectId") or t.get("_projectId")
+                    t = dict(t)
+                    t.update(fields)
+                    pid_new = t.get("projectId") or t.get("_projectId")
+                updated.append(t)
+            cache_store.set(key, updated)
+        if not touched:
+            return
         _patch_project_data(tid, fields, pid_old, pid_new)
     except Exception:
         cache_store.invalidate("all_tasks")
@@ -330,9 +344,16 @@ def main():
             # Remove task from all_tasks in-place (no full cache wipe),
             # and from the per-list cache the browse screens read
             try:
-                cached = cache_store.get("all_tasks")
-                if cached is not None:
-                    cache_store.set("all_tasks", [t for t in cached if t.get("id") != tid])
+                # BOTH pools: a completed entry in a NOTE-kind list survives
+                # in all_notes otherwise, and cache.find_task searches
+                # all_tasks THEN all_notes - so it would hand back the copy
+                # we just completed. Bit the 📸 pipeline the moment the
+                # Content PL lists became NOTE-kind (2026-07-30).
+                for key in ("all_tasks", "all_notes"):
+                    cached = cache_store.get(key)
+                    if cached is not None:
+                        cache_store.set(key, [t for t in cached
+                                              if t.get("id") != tid])
                 _patch_project_data(tid, pid_old=pid, remove=True)
             except Exception:
                 cache_store.invalidate("all_tasks")

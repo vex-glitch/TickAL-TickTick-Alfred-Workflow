@@ -553,11 +553,20 @@ def _fx_rmw(pid, tid, mutate):
 
 
 def _complete_cache_patch(pid, tid):
-    """The complete-task cache mirror (clone of dispatch's complete: branch)."""
+    """The complete-task cache mirror (clone of dispatch's complete: branch).
+
+    BOTH pools. An entry in a NOTE-kind list lives in all_tasks AND
+    all_notes, and cache.find_task searches all_tasks then all_notes - so
+    dropping it from one pool only means the next lookup resurrects the
+    completed copy. Concretely: a second ⌥⇧ Posted on the same tattoo would
+    re-run the whole Eagle 03 Post sweep instead of refusing. Latent until
+    the Content PL lists became NOTE-kind (2026-07-30)."""
     try:
-        cached = cache_store.get("all_tasks")
-        if cached is not None:
-            cache_store.set("all_tasks", [t for t in cached if t.get("id") != tid])
+        for key in ("all_tasks", "all_notes"):
+            cached = cache_store.get(key)
+            if cached is not None:
+                cache_store.set(key, [t for t in cached
+                                      if t.get("id") != tid])
         from dispatch import _patch_project_data
         _patch_project_data(tid, pid_old=pid, remove=True)
     except Exception:
@@ -2592,12 +2601,16 @@ def content_dest(log_tid, mandatory=False, back=""):
             api.move_task(t["id"], pid_old, want_pid)
             try:
                 import dispatch as _disp
-                pool = cache_store.get("all_tasks") or []
-                for x in pool:
-                    if x.get("id") == t["id"]:
-                        x["projectId"] = want_pid
-                        x["_projectId"] = want_pid
-                cache_store.set("all_tasks", pool)
+                # both pools: Content PL is NOTE-kind, so the entry lives
+                # in all_notes too and a one-pool patch strands a twin
+                # still claiming the OLD list (2026-07-30)
+                for _k in ("all_tasks", "all_notes"):
+                    pool = cache_store.get(_k) or []
+                    for x in pool:
+                        if x.get("id") == t["id"]:
+                            x["projectId"] = want_pid
+                            x["_projectId"] = want_pid
+                    cache_store.set(_k, pool)
                 _disp._patch_project_data(t["id"], pid_old=pid_old,
                                           pid_new=want_pid)
             except Exception:
@@ -3826,12 +3839,14 @@ def _content_slide_to_edit(lb, dest, want_pid, base_id):
     api.update_task(t["id"], want_pid, current=live, tags=tags, title=title)
     try:
         import dispatch as _disp
-        pool = cache_store.get("all_tasks") or []
-        for x in pool:
-            if x.get("id") == t["id"]:
-                x["projectId"] = want_pid
-                x["_projectId"] = want_pid
-        cache_store.set("all_tasks", pool)
+        # both pools - see _content_retag's note; Content PL is NOTE-kind
+        for _k in ("all_tasks", "all_notes"):
+            pool = cache_store.get(_k) or []
+            for x in pool:
+                if x.get("id") == t["id"]:
+                    x["projectId"] = want_pid
+                    x["_projectId"] = want_pid
+            cache_store.set(_k, pool)
         _disp._patch_project_data(t["id"], pid_old=pid_old,
                                   pid_new=want_pid)
         _disp._patch_task_cache(t["id"], tags=tags, title=title)
