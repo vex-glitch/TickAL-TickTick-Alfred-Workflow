@@ -900,14 +900,52 @@ def bar_hide():
     print("🫥 Focus bar hidden")
 
 
+_DIALOG_MOVER = '''use framework "AppKit"
+use scripting additions
+set fr to (item 1 of (current application's NSScreen's screens()))'s frame()
+set sw to item 1 of item 2 of fr
+set sh to item 2 of item 2 of fr
+tell application "System Events"
+    repeat 75 times
+        if (count of windows of process "System Events") > 0 then
+            set win to window 1 of process "System Events"
+            set {w, h} to size of win
+            set position of win to {(sw - w) / 2 as integer, ¬
+                                    (sh - h) / 3 as integer}
+            exit repeat
+        end if
+        delay 0.04
+    end repeat
+end tell'''
+
+
 def _osa_dialog(body):
     """THE dialog runner: every AppleScript prompt goes through here.
 
-    WE own the dialog. `tell me to activate` makes this osascript
-    process frontmost for the life of the panel, so it opens holding
-    the keyboard - arrows and Return work immediately, no mouse click
-    first (Vex 2026-07-28) - and macOS hands focus back to the previous
-    app on dismiss (probed), which is the other half of that promise.
+    SYSTEM EVENTS owns the dialog, activated so it opens holding the
+    keyboard - arrows and Return work immediately, no mouse click first
+    (Vex 2026-07-28) - and macOS hands focus back on dismiss.
+
+    Host choice is a SPEED ruling (Vex 2026-07-30: "it takes 2s for the
+    prompt to appear"). Timed, 3 runs each, osascript start to return:
+    bare .043s · System Events activate .128s · `tell me to activate`
+    2.089s. Activating OUR OWN osascript is what cost the two seconds -
+    it is a background-only process, so activation sits in a fixed wait
+    that never resolves. System Events is Apple's own always-running
+    scripting agent: native, never busy, and not the roll of the dice
+    that hosting in the frontmost app was.
+
+    _DIALOG_MOVER fires ALONGSIDE the dialog and parks it on the
+    MENU-BAR screen (Vex 2026-07-30: "it always appears on my secondary
+    monitor"). System Events centres its panels on ITS notion of the
+    main screen, which on this rig is the portrait 1080x1920 to the
+    right (measured: position 4170,-419). NSScreen's screens() item 1
+    is the menu-bar screen BY DEFINITION and its AX origin is 0,0, so
+    the target is just centre-x, one-third-down. The mover reads the
+    panel's own size, so a fat `choose from list` centres too. It is a
+    separate process because `display dialog` blocks; it polls 75 x
+    0.04s then gives up, and a failure (no Accessibility) is silent -
+    the dialog still opens, just wherever System Events put it.
 
     It used to be hosted by the ALREADY-FRONTMOST app instead - `tell
     application (path to frontmost application)` - and that is the
@@ -920,14 +958,29 @@ def _osa_dialog(body):
     layout, its liveness and its response to the keyboard were all
     hostage to whatever app happened to be in front, and the old
     fallback could never save it, because it keyed on a NON-ZERO exit
-    and a mangled-but-answered dialog exits 0. Owning the dialog takes
-    the other app out of the equation entirely.
+    and a mangled-but-answered dialog exits 0. Taking the host off the
+    street removes the whole class.
 
-    The bare retry stays for the case where `activate` itself errors -
+    The bare retry stays for the case where the hosted call errors -
     but NEVER on a user cancel (-128), or pressing Esc would re-open
     the dialog in a loop."""
-    r = subprocess.run(["osascript", "-e", "tell me to activate", "-e", body],
-                       capture_output=True, text=True)
+    prog = 'tell application "System Events"\nactivate\n' + body + '\nend tell'
+    try:
+        mover = subprocess.Popen(["osascript", "-e", _DIALOG_MOVER],
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+    except Exception:
+        mover = None
+    try:
+        r = subprocess.run(["osascript", "-e", prog],
+                           capture_output=True, text=True)
+    finally:
+        if mover is not None:
+            try:
+                mover.terminate()
+                mover.wait(timeout=2)
+            except Exception:
+                pass
     if r.returncode == 0 or "-128" in (r.stderr or ""):
         return r
     return subprocess.run(["osascript", "-e", body],
