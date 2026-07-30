@@ -903,21 +903,30 @@ def bar_hide():
 def _osa_dialog(body):
     """THE dialog runner: every AppleScript prompt goes through here.
 
-    Runs the dialog with the ALREADY-FRONTMOST app as its owner, so it
-    opens holding the keyboard - arrows and Return work immediately,
-    no mouse click first (Vex 2026-07-28). A bare `osascript` dialog
-    belongs to a background process and NEVER takes focus: probed with
-    synthetic keystrokes, they landed in the app BEHIND the dialog
-    while it just sat there. Nothing is activated, so dismissing leaves
-    focus exactly where it was.
+    WE own the dialog. `tell me to activate` makes this osascript
+    process frontmost for the life of the panel, so it opens holding
+    the keyboard - arrows and Return work immediately, no mouse click
+    first (Vex 2026-07-28) - and macOS hands focus back to the previous
+    app on dismiss (probed), which is the other half of that promise.
 
-    Falls back to the bare call when the front app cannot host the
-    dialog (not scriptable, automation not granted yet, busy) - but
-    NEVER on a user cancel (-128), or pressing Esc would re-open the
-    dialog in a loop."""
-    wrapped = ("set _fa to (path to frontmost application as text)\n"
-               "tell application _fa\n" + body + "\nend tell")
-    r = subprocess.run(["osascript", "-e", wrapped],
+    It used to be hosted by the ALREADY-FRONTMOST app instead - `tell
+    application (path to frontmost application)` - and that is the
+    mechanism being removed (Vex 2026-07-30: ➕ New customer opened a
+    box with the buttons stacked at the TOP LEFT, the text field a 40px
+    stub, nothing clickable). That render was NOT reproduced here -
+    Eagle, Photos, TickTick and Alfred all drew a correct 420x166 panel
+    on demand - so the trigger is some state of the host we did not
+    catch. It does not matter: what mattered was that the panel's
+    layout, its liveness and its response to the keyboard were all
+    hostage to whatever app happened to be in front, and the old
+    fallback could never save it, because it keyed on a NON-ZERO exit
+    and a mangled-but-answered dialog exits 0. Owning the dialog takes
+    the other app out of the equation entirely.
+
+    The bare retry stays for the case where `activate` itself errors -
+    but NEVER on a user cancel (-128), or pressing Esc would re-open
+    the dialog in a loop."""
+    r = subprocess.run(["osascript", "-e", "tell me to activate", "-e", body],
                        capture_output=True, text=True)
     if r.returncode == 0 or "-128" in (r.stderr or ""):
         return r
