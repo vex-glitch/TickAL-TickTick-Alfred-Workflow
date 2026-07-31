@@ -93,7 +93,9 @@ def is_session_task(title):
     if not title_marker(t):
         return False
     hit = parse_first_link(t)
-    return bool(hit) and hit[1] == areas.RECORDS_ID
+    # records_pids, not RECORDS_ID: a logbook living in a 🗄 year list
+    # must not make ✅ Session done silently vanish (big-rock v2)
+    return bool(hit) and hit[1] in areas.records_pids()
 
 
 def _safe_name(name):
@@ -720,7 +722,10 @@ def _inject_cache(task):
         entry = dict(task)
         pid = task.get("projectId") or areas.RECORDS_ID
         entry["_projectId"] = pid
-        entry["_projectName"] = areas.records_list_name()
+        pname = next((p.get("name") for p in
+                      (cache_store.get("projects") or [])
+                      if p.get("id") == pid), None)
+        entry["_projectName"] = pname or areas.records_list_name()
         entry["tags"] = list(dict.fromkeys(
             str(t).lower() for t in (task.get("tags") or [])))
         for key, newest_first in (("all_notes", True), ("all_tasks", False)):
@@ -1207,6 +1212,19 @@ def ensure_archive_list(year):
     have = areas.archive_dests()
     if year in have:
         return have[year]
+    # cache miss: verify LIVE before minting - a kill between a landed
+    # create and the cache append would otherwise mint a twin list
+    try:
+        live = _api().get_projects()
+        for p in live or []:
+            if (p.get("name") or "").strip() == f"🗄 {year}":
+                pool = list(cache_store.get("projects") or [])
+                if not any(x.get("id") == p.get("id") for x in pool):
+                    pool.append(p)
+                    cache_store.set("projects", pool)
+                return p.get("id")
+    except Exception:
+        pass
     p = _api().create_project(f"🗄 {year}")
     pool = list(cache_store.get("projects") or [])
     pool.append(p)

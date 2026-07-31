@@ -41,8 +41,14 @@ def find_task(tid):
 
 
 def set(key, value):
-    with open(_path(key), "w") as fp:
+    # atomic: a kill mid-dump used to leave a truncated file, and every
+    # reader treats an unparseable cache as EMPTY - so one bad abort
+    # could blank all_notes for whoever read next (review 2026-07-31)
+    p = _path(key)
+    tmp = p + ".tmp"
+    with open(tmp, "w") as fp:
         json.dump({"ts": time.time(), "value": value}, fp)
+    os.replace(tmp, p)
 
 
 def invalidate(key=None):

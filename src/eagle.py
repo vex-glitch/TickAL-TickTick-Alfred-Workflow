@@ -381,10 +381,11 @@ def _mcp_call(tool, arguments, timeout=60):
 
 def rename_folder(folder_id, name):
     """Rename in place - the id is stable, so TickTick 🦅 links survive.
-    The migration engine's primitive of choice: renaming the biggest
-    member folder to convention beats minting a new one (no folder-delete
-    API - a wrong create is permanent litter)."""
-    _mcp_call("folder_update", {"id": folder_id, "name": name})
+    Payload is the plugin's folder_update shape: a `folders` ARRAY, the
+    same envelope move_folder uses (review 2026-07-31 caught the flat
+    {id,name} shape being rejected before it ever ran live)."""
+    _mcp_call("folder_update", {"folders": [{"id": folder_id,
+                                             "name": name}]})
 
 
 def move_folder(folder_id, new_parent):
