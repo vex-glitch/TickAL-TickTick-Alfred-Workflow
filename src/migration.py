@@ -1249,3 +1249,533 @@ def store_decisions(con, decisions):
             n += 1
     con.commit()
     return n
+
+
+# ─────────────────────────────────────────────── phase: execute (v2 S6)
+# The batch engine. Order per group: Eagle home folder (name final at
+# parse) → customer mint-or-adopt → logbook born in its year list with
+# the 🦅 line embedded at create → PL entry → item moves + tags. Moves
+# ride add_to_folders/remove_from_folders (incremental - cannot unfile
+# bystanders, preserves multi-shelf membership); update_items is used
+# for NOTHING here. Every mover's prior state is written from disk in
+# the same transaction that queues its batch; migundo reverses folders
+# AND tags from those rows. Never deletes anything, ever.
+
+PROTECTED_TAGS = {"superseded", "original", "no original", "archive"}
+_BRANCH_TAGS = {"healed tattoos": "healed", "healed": "healed",
+                "reel material": "reel", "raw videos": "video",
+                "videos": "video", "serious": "serious", "lines": "lines",
+                "floral": "floral", "letters": "letters"}
+_PORTFOLIO_SEG = "tattoo portfolio"
+_EDIT_SEGS = {"content pipeline", "to edit"}
+
+
+def ensure_exec_schema(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS mover (
+        eid TEXT PRIMARY KEY, gkey TEXT, lib TEXT,
+        prior_name TEXT, prior_folders_json TEXT, prior_tags_json TEXT,
+        dest_fid TEXT, added_tags_json TEXT, state TEXT DEFAULT 'queued',
+        moved_at TEXT)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS egroup (
+        gkey TEXT PRIMARY KEY, lib TEXT, road TEXT,
+        customer TEXT, tattoo TEXT, target_name TEXT,
+        home_fid TEXT, home_prior_name TEXT, home_prior_parent TEXT,
+        cust_tid TEXT, log_tid TEXT, log_pid TEXT, pl_tid TEXT,
+        days_json TEXT, n_items INTEGER,
+        state TEXT DEFAULT 'planned', executed_at TEXT)""")
+    con.commit()
+
+
+def _branch_tags_for(path_text):
+    segs = _path_segs(path_text)
+    tags = sorted({_BRANCH_TAGS[s] for s in segs if s in _BRANCH_TAGS})
+    if _PORTFOLIO_SEG in segs:
+        tags.append("portfolio")
+    return tags
+
+
+def _movers_for_folder(con, fid, lib):
+    """[(mover_eid, item_row)] honoring every corrected population:
+    sourced rows move their new_eid (the recovered original; the old
+    copy stays, superseded); dup_of rows contribute NOTHING (Vex froze
+    the redundant copies); everything else moves its own eid."""
+    out = []
+    for r in con.execute(
+            "SELECT * FROM item WHERE lib=? "
+            "AND instr(folders_json, ?) > 0", (lib, fid)):
+        if r["dup_of"]:
+            continue
+        if (r["post_scan"] or 0) == 1:
+            continue
+        eid = r["new_eid"] if r["state"] == "sourced" else r["eid"]
+        if eid:
+            out.append((eid, r))
+    return out
+
+
+def plan_execution(con):
+    """Assemble egroup rows from the stored doc decisions. Read-only
+    outside the ledger; idempotent (re-plan refreshes planned rows,
+    never touches executed ones)."""
+    ensure_exec_schema(con)
+    groups = {}
+    for f in con.execute("SELECT * FROM folder WHERE decision IN "
+                         "('named','johndoe','skip') AND direct_n>0 "
+                         "AND excluded=0"):
+        extras = json.loads(f["adopt_json"] or "{}")
+        if f["decision"] == "named":
+            key = (f["lib"], "named",
+                   _norm_name(f["dec_customer"]),
+                   _norm_name(f["dec_tattoo"] or "unknown"))
+            name = (f"{f['dec_customer']} - {f['dec_tattoo']}"
+                    if f["dec_tattoo"] else
+                    f"{f['dec_customer']} - Unknown")
+        else:
+            base = f["dec_tattoo"] or f["name"]
+            key = (f["lib"], f["decision"], _norm_name(base), "")
+            name = base
+        g = groups.setdefault(key, {
+            "lib": f["lib"], "road": f["decision"],
+            "customer": f["dec_customer"] or "",
+            "tattoo": f["dec_tattoo"] or "", "target": name,
+            "folders": [], "days": set(), "extras": []})
+        g["folders"].append(dict(f))
+        g["days"].update(extras.get("days") or [])
+        if extras:
+            g["extras"].append(extras)
+    n = 0
+    for key, g in groups.items():
+        gkey = "|".join(key)
+        row = con.execute("SELECT state FROM egroup WHERE gkey=?",
+                          (gkey,)).fetchone()
+        if row and row["state"] != "planned":
+            continue
+        n_items = len({e for f in g["folders"]
+                       for e, _ in _movers_for_folder(con, f["fid"],
+                                                      f["lib"])})
+        con.execute(
+            "INSERT INTO egroup(gkey,lib,road,customer,tattoo,target_name,"
+            "days_json,n_items,state) VALUES(?,?,?,?,?,?,?,?,'planned') "
+            "ON CONFLICT(gkey) DO UPDATE SET customer=excluded.customer,"
+            "tattoo=excluded.tattoo,target_name=excluded.target_name,"
+            "days_json=excluded.days_json,n_items=excluded.n_items",
+            (gkey, g["lib"], g["road"], g["customer"], g["tattoo"],
+             g["target"], json.dumps(sorted(g["days"])), n_items))
+        n += 1
+    con.commit()
+    return n
+
+
+class Pacer:
+    """Token bucket against the shared TickTick budget. 240/5min spend
+    ceiling (the hourly agent is PAUSED during runs, but headroom stays
+    headroom). Conservative: overcounting is fine, undercounting is a
+    500 that POSTs never retry."""
+    def __init__(self, budget=240, window=300):
+        self.budget, self.window, self.spent, self.t0 = budget, window, 0, time.time()
+
+    def spend(self, n):
+        if time.time() - self.t0 > self.window:
+            self.spent, self.t0 = 0, time.time()
+        if self.spent + n > self.budget:
+            wait = self.window - (time.time() - self.t0) + 2
+            if wait > 0:
+                time.sleep(wait)
+            self.spent, self.t0 = 0, time.time()
+        self.spent += n
+
+
+def _group_folder_rows(con, gkey):
+    lib, road, nc, nt = (gkey.split("|") + [""])[:4]
+    rows = []
+    for f in con.execute("SELECT * FROM folder WHERE decision=? AND "
+                         "direct_n>0 AND excluded=0 AND lib=?",
+                         ((road), lib)):
+        if road == "named":
+            k = (_norm_name(f["dec_customer"]),
+                 _norm_name(f["dec_tattoo"] or "unknown"))
+            if k != (nc, nt):
+                continue
+        else:
+            if _norm_name(f["dec_tattoo"] or f["name"]) != nc:
+                continue
+        rows.append(dict(f))
+    return rows
+
+
+def _dest_parent(eagle, con, g, folders):
+    """(parent_fid, kind). Content libs: 02 Edit iff EVERY member folder
+    sits under the edit branch, else 01 Raw. CRM lib: the existing
+    per-tattoo folder when adoption found one (items land inside it),
+    else Archive/'{C} - {T}' via the pipeline of the CRM tree."""
+    lib = g["lib"]
+    if lib in ("tv", "fm"):
+        pf = eagle.pipeline_folders(create=True)
+        all_edit = all(
+            any(s in _EDIT_SEGS for s in _path_segs(f["path_text"]))
+            for f in folders)
+        return (pf["Edit"] if all_edit else pf["Raw"]), "content"
+    for f in folders:
+        ad = json.loads(f["adopt_json"] or "{}")
+        if ad.get("eagle_fid"):
+            return ad["eagle_fid"], "crm-adopt"
+    tree = eagle.folder_tree()
+    for node in tree:
+        if _norm_name(node.get("name")) == "archive":
+            return node["id"], "crm-archive"
+    raise eagle.EagleError("CRM Archive/ root not found")
+
+
+def _ensure_home(eagle, con, g, folders, parent_fid, kind):
+    """The group's ONE folder. Adopt-in-place beats create (no folder
+    delete API): a member folder already carrying the target name is
+    adopted; else the LARGEST member folder is RENAMED to the target
+    (id stable → links survive); a folder is CREATED only for a group
+    with no member folder in this library. Returns (fid, prior_name,
+    prior_parent)."""
+    if kind == "crm-adopt":
+        return parent_fid, None, None      # existing live folder, untouched
+    target = g["target_name"]
+    tnorm = _norm_name(target)
+    cand = None
+    for f in sorted(folders, key=lambda x: -(x["direct_n"] or 0)):
+        if _norm_name(f["name"]) == tnorm:
+            cand = f
+            break
+    if cand is None:
+        cand = max(folders, key=lambda x: x["direct_n"] or 0)
+    prior_name, prior_parent = cand["name"], cand["parent_fid"]
+    if _norm_name(cand["name"]) != tnorm:
+        eagle.rename_folder(cand["fid"], target)
+    if cand["parent_fid"] != parent_fid:
+        eagle.move_folder(cand["fid"], parent_fid)
+        time.sleep(0.4)
+    return cand["fid"], prior_name, prior_parent
+
+
+def execute_batch(con, limit=5, notify=True):
+    """Run up to `limit` planned groups end-to-end. Every mutation is
+    evented (attempt before, ok/err after); movers get prior state from
+    DISK before anything fires; RateLimitError aborts the batch cleanly.
+    Resume = just call again: executed groups are skipped, half-done
+    groups re-verify via their event trail."""
+    import eagle
+    import areas
+    import crm_records as cr
+    ensure_exec_schema(con)
+    pacer = Pacer()
+    done = errs = 0
+    batch = [dict(r) for r in con.execute(
+        "SELECT * FROM egroup WHERE state='planned' "
+        "ORDER BY road='named' DESC, n_items DESC LIMIT ?", (limit,))]
+    for g in batch:
+        gkey = g["gkey"]
+        try:
+            folders = _group_folder_rows(con, gkey)
+            if not folders:
+                con.execute("UPDATE egroup SET state='empty' WHERE gkey=?",
+                            (gkey,))
+                con.commit()
+                continue
+            log(con, "exec", "attempt", gkey, json.dumps(
+                {"step": "eagle", "target": g["target_name"]}))
+            eagle.ensure_library(g["lib"])
+            parent_fid, kind = _dest_parent(eagle, con, g, folders)
+            home, p_name, p_parent = _ensure_home(
+                eagle, con, g, folders, parent_fid, kind)
+            _heal_parent = parent_fid if kind != "crm-adopt" else None
+            # movers with prior state from disk, in ONE transaction
+            movers = {}
+            for f in folders:
+                for eid, _r in _movers_for_folder(con, f["fid"], g["lib"]):
+                    movers[eid] = f
+            lib_path = eagle.LIBS[g["lib"]][1]
+            disk = {}
+            for eid in movers:
+                mp = os.path.join(lib_path, "images", f"{eid}.info",
+                                  "metadata.json")
+                try:
+                    disk[eid] = json.load(open(mp))
+                except Exception:
+                    disk[eid] = {}
+            for eid, f in movers.items():
+                m = disk.get(eid) or {}
+                con.execute(
+                    "INSERT OR IGNORE INTO mover(eid,gkey,lib,prior_name,"
+                    "prior_folders_json,prior_tags_json,dest_fid,"
+                    "added_tags_json) VALUES(?,?,?,?,?,?,?,?)",
+                    (eid, gkey, g["lib"], m.get("name") or "",
+                     json.dumps(m.get("folders") or []),
+                     json.dumps(m.get("tags") or []), home,
+                     json.dumps(_branch_tags_for(f["path_text"]))))
+            con.execute("UPDATE egroup SET home_fid=?, home_prior_name=?,"
+                        "home_prior_parent=? WHERE gkey=?",
+                        (home, p_name, p_parent, gkey))
+            con.commit()
+            # the moves: incremental, batched per source folder
+            member_fids = {f["fid"] for f in folders}
+            by_src = {}
+            for eid in movers:
+                cur = set((disk.get(eid) or {}).get("folders") or [])
+                srcs = tuple(sorted((cur & member_fids) - {home}))
+                by_src.setdefault(srcs, []).append(eid)
+            for srcs, eids in by_src.items():
+                if srcs:
+                    eagle.remove_from_folders(eids, list(srcs))
+                eagle.add_to_folders(eids, [home])
+            # branch tags, one call per distinct tag set
+            by_tags = {}
+            for eid, f in movers.items():
+                tg = tuple(_branch_tags_for(f["path_text"]))
+                if tg:
+                    by_tags.setdefault(tg, []).append(eid)
+            for tg, eids in by_tags.items():
+                eagle.add_item_tags(eids, list(tg))
+            # portfolio-source items ALSO join 04 Portfolio (multi-shelf)
+            pf_items = [eid for eid, f in movers.items()
+                        if _PORTFOLIO_SEG in _path_segs(f["path_text"])]
+            if pf_items and g["lib"] in ("tv", "fm"):
+                pf = eagle.pipeline_folders(create=True)
+                eagle.add_to_folders(pf_items, [pf["Portfolio"]])
+            if _heal_parent:
+                _xact_heal(eagle, [home], _heal_parent)
+            con.execute("UPDATE mover SET state='moved', moved_at=? "
+                        "WHERE gkey=?", (time.strftime("%F %T"), gkey))
+            log(con, "exec", "ok", gkey, json.dumps(
+                {"step": "eagle", "home": home, "items": len(movers)}))
+            # ---- TickTick side ----
+            days = json.loads(g["days_json"] or "[]")
+            if g["road"] == "named" and kind != "crm-adopt" \
+                    and not _adopts_live_logbook(g):
+                cust = _ensure_customer(con, cr, pacer, g["customer"])
+                tid, log_pid = _ensure_logbook(con, cr, areas, pacer, g,
+                                               cust, days, home)
+                con.execute("UPDATE egroup SET cust_tid=?, log_tid=?, "
+                            "log_pid=? WHERE gkey=?",
+                            (cust["id"], tid, log_pid, gkey))
+                log(con, "exec", "ok", gkey,
+                    json.dumps({"step": "logbook", "tid": tid}))
+            # PL entry: content-lib groups, except portfolio-only sources
+            if g["lib"] in ("tv", "fm") and not _portfolio_only(folders):
+                pacer.spend(1)
+                pl = _mint_pl_entry(cr, areas, g, folders, home,
+                                    con)
+                if pl:
+                    con.execute("UPDATE egroup SET pl_tid=? WHERE gkey=?",
+                                (pl, gkey))
+            con.execute("UPDATE egroup SET state='executed', executed_at=?"
+                        " WHERE gkey=?", (time.strftime("%F %T"), gkey))
+            con.commit()
+            done += 1
+        except Exception as e:
+            errs += 1
+            log(con, "exec", "err", gkey, f"{type(e).__name__}: {e}")
+            con.commit()
+            if "RateLimit" in type(e).__name__:
+                break
+    if notify:
+        subprocess.run(["osascript", "-e",
+                        'display notification "{} done · {} errors" '
+                        'with title "TickAL migration batch"'
+                        .format(done, errs)], capture_output=True)
+    return done, errs
+
+
+def _xact_heal(eagle, fids, parent_fid):
+    """One verification pass: anything double-parented gets re-set to the
+    intended parent (the repair that worked by hand, 3941525)."""
+    time.sleep(0.4)
+    tree = eagle.folder_tree()
+    seen = {}
+
+    def walk(nodes, parent):
+        for n in nodes:
+            seen.setdefault(n["id"], set()).add(parent)
+            walk(n.get("children") or [], n["id"])
+    walk(tree, None)
+    for fid in fids:
+        if len(seen.get(fid, set())) > 1:
+            eagle.move_folder(fid, parent_fid)
+            time.sleep(0.4)
+
+
+def _adopts_live_logbook(g):
+    """Groups whose C+T matched an EXISTING logbook (Erol • Griffin live,
+    Phillip • Samurai + Jenny • Viking Fox archived): Eagle filing only,
+    ZERO TickTick writes - auto-appending years-old sessions into a live
+    record is not the engine's call."""
+    custs, logs = _cache_records()
+    k = _norm_name(f"{g['customer']} {g['tattoo']}")
+    return any(_norm_name(l["title"]) == k for l in logs)
+
+
+def _ensure_customer(con, cr, pacer, name):
+    """Adopt by casefolded exact match, else mint ONCE (ledger-cached so
+    Clemens's two blocks share one card)."""
+    custs, _ = _cache_records()
+    k = _norm_name(name)
+    for c in custs:
+        if _norm_name(c["name"]) == k:
+            return {"id": c["tid"], "title": f"👤 {c['name']}"}
+    row = con.execute("SELECT detail FROM event WHERE phase='exec' AND "
+                      "kind='cust' AND subject=?", (k,)).fetchone()
+    if row:
+        d = json.loads(row["detail"])
+        return {"id": d["tid"], "title": d["title"]}
+    pacer.spend(2)
+    c = cr.create_customer(name)
+    log(con, "exec", "cust", k, json.dumps(
+        {"tid": c["id"], "title": c.get("title") or f"👤 {name}"}))
+    return c
+
+
+def _ensure_logbook(con, cr, areas, pacer, g, cust, days, home):
+    """ONE logbook per (customer, tattoo) across ALL libraries - ten
+    tattoos span two libs and would otherwise double-mint - and a
+    resume guard: create_task is a POST with no retry, so an unpaired
+    attempt is re-verified against the live list by TITLE before ever
+    re-firing (the Stage 3 duplicate-import lesson, applied to notes).
+    Sessions and the finish are event-guarded per step so a resumed
+    group never double-appends. Returns (log_tid, log_pid)."""
+    lkey = _norm_name(f"{g['customer']} {g['tattoo'] or 'unknown'}")
+    row = con.execute("SELECT detail FROM event WHERE phase='exec' AND "
+                      "kind='lbk' AND subject=?", (lkey,)).fetchone()
+    if row:
+        d = json.loads(row["detail"])
+        return d["tid"], d["pid"]
+    year_pid = None
+    if days:
+        pacer.spend(1)
+        year_pid = cr.ensure_archive_list(days[0][:4])
+    log_pid = year_pid or areas.RECORDS_ID
+    title = f"🎨 {g['customer']} • {g['tattoo'] or 'Unknown'}"
+    # unpaired attempt from a crashed run? verify live before re-firing
+    att = con.execute(
+        "SELECT COUNT(*) c FROM event WHERE phase='exec' AND "
+        "kind='attempt' AND subject=? ", (f"lbk:{lkey}",)).fetchone()["c"]
+    lb = None
+    if att:
+        pacer.spend(1)
+        try:
+            pd = cr._api().get_project_data(log_pid)
+            want = _norm_name(title)
+            for t in pd.get("tasks") or []:
+                tt = _norm_name(t.get("title") or "")
+                if tt == want or tt == _norm_name("🏛️ " + title[2:]):
+                    lb = t
+                    break
+        except Exception:
+            pass
+    if lb is None:
+        log(con, "exec", "attempt", f"lbk:{lkey}",
+            json.dumps({"pid": log_pid, "title": title}))
+        con.commit()
+        eagle_line = (f"🦅 [Eagle folder](eagle://folder/{home})"
+                      f" · {g['lib'].upper()}")
+        pacer.spend(3)
+        lb = cr.create_logbook(cust, g["tattoo"] or "Unknown",
+                               started=days[0] if days else None,
+                               project_id=year_pid, eagle_line=eagle_line)
+    log(con, "exec", "lbk", lkey,
+        json.dumps({"tid": lb["id"], "pid": log_pid}))
+    con.commit()
+    for i, day in enumerate(days, 1):
+        skey = f"sess:{lkey}:S{i}"
+        if con.execute("SELECT 1 FROM event WHERE phase='exec' AND "
+                       "kind='ok' AND subject=?", (skey,)).fetchone():
+            continue
+        pacer.spend(4)
+        cr.append_session(log_pid, lb["id"], f"S{i}", when=day)
+        log(con, "exec", "ok", skey, day)
+        con.commit()
+    if days and not con.execute(
+            "SELECT 1 FROM event WHERE phase='exec' AND kind='ok' AND "
+            "subject=?", (f"fin:{lkey}",)).fetchone():
+        pacer.spend(6)
+        cr.finish_logbook(log_pid, lb["id"], when=days[-1])
+        log(con, "exec", "ok", f"fin:{lkey}", days[-1])
+        con.commit()
+    return lb["id"], log_pid
+
+
+def _portfolio_only(folders):
+    return all(_PORTFOLIO_SEG in _path_segs(f["path_text"])
+               for f in folders)
+
+
+def _mint_pl_entry(cr, areas, g, folders, home_fid, con):
+    """kind=TEXT pipeline entry so the tattoo is visible on the content
+    screens (no note = invisible - load-bearing). 📸edit when the home
+    is the edit branch, else 📸raw. Body: the 🎨 logbook link when one
+    exists, else a placeholder (NEVER empty - an empty body costs the
+    hourly sync one GET per hour forever)."""
+    api = cr._api()
+    all_edit = all(any(s in _EDIT_SEGS for s in _path_segs(f["path_text"]))
+                   for f in folders)
+    tag = "📸edit" if all_edit else "📸raw"
+    title = f"[{g['target_name']}](eagle://folder/{home_fid})"
+    row = con.execute("SELECT log_tid, log_pid FROM egroup WHERE gkey=?",
+                      (g["gkey"],)).fetchone()
+    if row and row["log_tid"]:
+        body = f"🎨 {cr.task_link(row['log_pid'], row['log_tid'], '')}"
+    else:
+        body = "·"
+    pid = areas.CONTENT_DESTS[g["lib"]][0]
+    t = api.create_task(title=title, project_id=pid, content=body,
+                        tags=[tag], kind="TEXT")
+    return t.get("id")
+
+
+def migundo(con, gkey):
+    """Reverse one group's Eagle state from the mover rows: memberships
+    restored, added tags removed (protected tags never touched), the
+    home folder's rename/re-parent undone. TickTick creations are NOT
+    deleted (nothing ever is) - their tids are reported instead."""
+    import eagle
+    g = dict(con.execute("SELECT * FROM egroup WHERE gkey=?",
+                         (gkey,)).fetchone())
+    eagle.ensure_library(g["lib"])
+    n = 0
+    for m in con.execute("SELECT * FROM mover WHERE gkey=? AND "
+                         "state='moved'", (gkey,)):
+        prior = json.loads(m["prior_folders_json"] or "[]")
+        added = [t for t in json.loads(m["added_tags_json"] or "[]")
+                 if t not in PROTECTED_TAGS]
+        eagle.remove_from_folders([m["eid"]], [m["dest_fid"]])
+        if prior:
+            eagle.add_to_folders([m["eid"]], prior)
+        if added:
+            eagle.remove_item_tags([m["eid"]], added)
+        con.execute("UPDATE mover SET state='undone' WHERE eid=?",
+                    (m["eid"],))
+        n += 1
+    if g.get("home_prior_name"):
+        eagle.rename_folder(g["home_fid"], g["home_prior_name"])
+    if g.get("home_prior_parent"):
+        eagle.move_folder(g["home_fid"], g["home_prior_parent"])
+        time.sleep(0.4)
+    con.execute("UPDATE egroup SET state='undone' WHERE gkey=?", (gkey,))
+    con.commit()
+    return {"items_restored": n, "ticktick_tids_left": {
+        "customer": g.get("cust_tid"), "logbook": g.get("log_tid"),
+        "pl": g.get("pl_tid")}}
+
+
+def migcheck(con):
+    """Drag-back detector: every minted logbook must still live in its
+    recorded pid. One get_project_data per touched list."""
+    import crm_records as cr
+    api = cr._api()
+    by_pid = {}
+    for r in con.execute("SELECT log_tid, log_pid FROM egroup "
+                         "WHERE log_tid IS NOT NULL"):
+        by_pid.setdefault(r["log_pid"], set()).add(r["log_tid"])
+    bad = []
+    for pid, tids in by_pid.items():
+        try:
+            pd = api.get_project_data(pid)
+            have = {t.get("id") for t in pd.get("tasks") or []}
+            bad += [t for t in tids if t not in have]
+        except Exception as e:
+            bad.append(f"{pid}: {type(e).__name__}")
+    return bad

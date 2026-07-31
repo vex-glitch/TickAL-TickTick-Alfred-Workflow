@@ -86,13 +86,24 @@ def do_sync():
             seen_note_ids.add(t["id"])
 
     # Enrich notes with content - bulk project data doesn't return note bodies.
-    # Fetch each note individually only when content is missing.
+    # HARDENED (big-rock v2, 2026-07-31): reuse the PREVIOUS cache's body
+    # first - a note whose content did not change costs zero requests - and
+    # cap fresh GETs per run, because this loop runs UNPACED inside the
+    # hourly LaunchAgent against the shared 300/5min budget, and a
+    # genuinely-empty note used to re-fire its GET every hour forever.
+    prev_bodies = {n.get("id"): n.get("content")
+                   for n in (cache_store.get("all_notes") or [])
+                   if (n.get("content") or "").strip()}
+    enrich_budget = 30
     enriched = []
     for n in all_notes:
         if not (n.get("content") or "").strip():
+            nid = n.get("id", "")
             npid = n.get("projectId") or n.get("_projectId", "")
-            nid  = n.get("id", "")
-            if npid and nid:
+            if nid in prev_bodies:
+                n = {**n, "content": prev_bodies[nid]}
+            elif npid and nid and enrich_budget > 0:
+                enrich_budget -= 1
                 try:
                     full = api.get_task(npid, nid)
                     n = {**n, "content": full.get("content") or ""}

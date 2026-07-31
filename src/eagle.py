@@ -379,6 +379,14 @@ def _mcp_call(tool, arguments, timeout=60):
     return out
 
 
+def rename_folder(folder_id, name):
+    """Rename in place - the id is stable, so TickTick 🦅 links survive.
+    The migration engine's primitive of choice: renaming the biggest
+    member folder to convention beats minting a new one (no folder-delete
+    API - a wrong create is permanent litter)."""
+    _mcp_call("folder_update", {"id": folder_id, "name": name})
+
+
 def move_folder(folder_id, new_parent):
     """Re-parent (None = root). Raw API can't - plugin can (probe-proven)."""
     _mcp_call("folder_update",

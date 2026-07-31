@@ -313,3 +313,32 @@ def build_action(mode, pid, tid, title):
     return {"query": q, "note": note, "mode": mode, "tag": tag,
             "label": "📌 Create CTA",
             "preview": "Create and schedule Call to Action task"}
+
+# ── Archive-by-year lists (big-rock v2, 2026-07-31) ──────────────────────
+# One TickTick NOTE-holding list per year of finished old work, named
+# "🗄 <year>". STRICT match: exactly the emoji + a 4-digit year, so
+# "💫 OKRs 2026/2027" and demo lists can never be adopted. Probe P0
+# (2026-07-31) proved a kind=NOTE task born in a TASK-kind list keeps
+# kind/body/tags, so these lists are minted by plain create_project.
+_ARCHIVE_RE = re.compile(r"^🗄\s*(\d{4})$")
+
+
+def archive_dests():
+    """{year: pid} from the projects cache. Read-only; ensure_archive_list
+    (crm_records) is the writer."""
+    out = {}
+    for p in cache_store.get("projects") or []:
+        m = _ARCHIVE_RE.match((p.get("name") or "").strip())
+        if m:
+            out[m.group(1)] = p.get("id")
+    return out
+
+
+def archive_pids():
+    return tuple(archive_dests().values())
+
+
+def records_pids():
+    """Every pid a CRM records note may live in: Records + the year lists.
+    THE read-path widening - records_notes rides this."""
+    return (RECORDS_ID,) + archive_pids()

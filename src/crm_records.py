@@ -768,10 +768,10 @@ def _patch_cache(tid, **fields):
 def records_notes(tag=None):
     """Open cached notes living in the records list, newest first,
     optionally filtered by a (lower-form) tag."""
-    rid = areas.RECORDS_ID
+    rids = areas.records_pids()
     out = []
     for n in cache_store.get("all_notes") or []:
-        if (n.get("_projectId") or n.get("projectId")) != rid:
+        if (n.get("_projectId") or n.get("projectId")) not in rids:
             continue
         if n.get("status", 0) != 0:
             continue
@@ -1169,26 +1169,49 @@ def _consult_prep_lines():
         return CONSULT_PREP_DEFAULT
 
 
-def create_logbook(cust, tattoo, started=None, quoted="", prep=False):
+def create_logbook(cust, tattoo, started=None, quoted="", prep=False,
+                   project_id=None, eagle_line=""):
     """New 🎨 logbook note for a customer + its bullet in the customer note.
     started overrides the Started date (backlog imports); quoted adds the
-    'Quoted:' header line the Paid math renders progress against."""
+    'Quoted:' header line the Paid math renders progress against.
+    project_id births the note in a NON-Records list (the year lists -
+    Vex's one-write-instead-of-two refinement, gated on probe P0
+    2026-07-31: a kind=NOTE task born in a TASK-kind list keeps
+    kind/body/tags). eagle_line plants the 🦅 folder link AT CREATE so
+    the migration engine never spends a get+update pair on it."""
     cust_pid = cust.get("_projectId") or cust.get("projectId") or areas.RECORDS_ID
     title = f"🎨 {_safe_name(customer_display(cust))} • {_safe_name(tattoo)}"
     q_line = f"Quoted: {quoted.strip()}\n" if (quoted or "").strip() else ""
     prep_block = ""
     if prep:
         prep_block = "## Consult prep\n" + _consult_prep_lines() + "\n\n"
+    e_line = f"{eagle_line.rstrip()}\n" if (eagle_line or "").strip() else ""
     content = (f"👤 {task_link(cust_pid, cust['id'], (cust.get('title') or '').strip())}"
                f" · Started {started or _today()} · Finished -\n"
-               f"Paid: - · 0 sessions\n{q_line}\n"
+               f"Paid: - · 0 sessions\n{q_line}{e_line}\n"
                f"{prep_block}## Sessions\n\n## Notes\n")
     _ensure_tag(areas.LOGBOOK_TAG)
-    t = _api().create_task(title=title, project_id=areas.RECORDS_ID,
+    t = _api().create_task(title=title,
+                           project_id=project_id or areas.RECORDS_ID,
                            content=content, tags=[areas.LOGBOOK_TAG], kind="NOTE")
     _inject_cache(t)
     sync_customer_bullet({**t, "content": content})
     return t
+
+
+def ensure_archive_list(year):
+    """pid of the '🗄 <year>' list, minting it on first need and appending
+    to the projects cache IN PLACE (invalidate('projects') broke search
+    once - never again)."""
+    year = str(year)
+    have = areas.archive_dests()
+    if year in have:
+        return have[year]
+    p = _api().create_project(f"🗄 {year}")
+    pool = list(cache_store.get("projects") or [])
+    pool.append(p)
+    cache_store.set("projects", pool)
+    return p.get("id")
 
 
 def _bullet_for(logbook):
