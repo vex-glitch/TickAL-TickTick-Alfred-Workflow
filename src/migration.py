@@ -1077,3 +1077,175 @@ def naming(libs=("tv", "fm", "crm")):
     con.close()
     return doc, ties, {"dated": nd, "clusters": ng, "adopted": na,
                        "sections": stats}
+
+
+# ──────────────────────────────────────────────── phase: parse (v2 S5, day 1)
+# Vex returned the doc 2026-07-31 ("consider it all done" - the cut line was
+# NOT used, everything parses). His edits carry more than C:/T: values:
+# merge directives ("these are one tattoo"), renames, ignores, a John Doe
+# placeholder customer, venting parentheticals ("ANDY (8th time)"), and a
+# few lines that lost their T: prefix. The mechanical parser handles the
+# grammar; _FIXUPS carries the per-block interpretation of every ⚠️/merge
+# directive, keyed by the block's fid comment (stable under any heading
+# edit). Every fixup is LISTED in the dry-run report - nothing silent.
+
+_TIME_VENT = re.compile(r"\s*\((?:for the )?\d*\s*\w*\s*time\)\s*$", re.I)
+_NTH_VENT = re.compile(r"\s*\(\d+(?:st|nd|rd|th) time\)\s*$", re.I)
+
+# fid-comment → overrides. C/T replace the typed values; "decision" forces
+# a road. Derived from Vex's own annotations, one entry per directive.
+_FIXUPS = {
+    # Erol - Stare: "⚠️ Rename to Erol Old Ones"
+    "MJH57AZCPVAWH,MJH56QFHK11GB": {"C": "Erol", "T": "Old Ones"},
+    # Ivona - Ruka: "⚠️ Rename to Ivona Hand"
+    "MJAEK9EXR9TAQ,MJABS5OQK5Y10": {"C": "Ivona", "T": "Hand"},
+    # Ivona skull/snake/snail cluster: "These all are one tattoo
+    # 'Skull and Snail'" + "same as above one"
+    "MJ4SLSUEH6E6J": {"C": "Ivona", "T": "Skull and Snail"},
+    "MJACMOWZXE1XJ": {"C": "Ivona", "T": "Skull and Snail"},
+    "MJAEXM8KFZIIU,MJAFR1O83US0R,MJAAAQUPPORQ8":
+        {"C": "Ivona", "T": "Skull and Snail"},
+    # PROPOSED in the report (same words, flipped order), veto-able:
+    "MJAA58XJG90CB": {"C": "Ivona", "T": "Skull and Snail",
+                      "proposed": "Snake & Skull reads as the same tattoo"},
+    # Jurij: "Space chick, girl, lady are all one tattoo 'Jurij - Space Girl'"
+    "MJ4SBMRN4GDKJ,MJAA1WUWW5O7V": {"C": "Jurij", "T": "Space Girl"},
+    "MJAELGX0IAJVK": {"C": "Jurij", "T": "Space Girl"},
+    "MJACTUP6MKPF2,MJAFV9BW2IGS2": {"C": "Jurij", "T": "Space Girl"},
+    # Russell: "these three are the same tattoo 'Russell Sacred Heart'"
+    "MJ4SHUN4AZ4VA": {"C": "Russell", "T": "Sacred Heart"},
+    "MJACLQPKA1VDF,MJA9WDG377FAC": {"C": "Russell", "T": "Sacred Heart"},
+    "MJAF1K2VZ8ORD": {"C": "Russell", "T": "Sacred Heart"},
+    # PROPOSED: Tarot (5 folders) + Tarot Card (1) same tattoo
+    "MJADHP9R3HRHK": {"C": "Russell", "T": "Tarot",
+                      "proposed": "Tarot Card = the Tarot tattoo"},
+    # Pantera: "These two pantera and panther are the same. Call them
+    # Pantera" + Black Panther "This is 'Pantera' from above"
+    "MJAFED8M6FTUH": {"C": "John Doe", "T": "Pantera"},
+    "MJ4S1QGIFV843": {"C": "John Doe", "T": "Pantera"},
+    "MJ8Z2E2MKPPBB": {"C": "John Doe", "T": "Pantera"},
+    # Spider: "These two are the same. Call them Spider Lady"
+    "MJICDD59F9956,MJAA6GP9XIMVM": {"C": "John Doe", "T": "Spider Lady"},
+    "MJAFYAS9WXLTT": {"C": "John Doe", "T": "Spider Lady"},
+    # Vampire: "These three are the same. Call them 'Vampire Girl
+    # Unfinished'" (one C line was botched to 'T: Vampire (Unfinished)')
+    "MJAFH9DLM6U22": {"C": "John Doe", "T": "Vampire Girl Unfinished"},
+    "MJIDL4D03JQJN": {"C": "John Doe", "T": "Vampire Girl Unfinished"},
+    "MJH7K1BZQGMCD": {"C": "John Doe", "T": "Vampire Girl Unfinished"},
+    # Andy's two fists ("There are two tattoos. Bad fist and Good fist.
+    # Both on customer Andy"; 'Tommy' blocks are Andy's too, his note)
+    "MJ4SMQY1XV5NZ": {"C": "Andy", "T": "Bad Fist"},
+    "MJH47AXX58E3V": {"C": "Andy", "T": "Bad Fist"},
+    "MJAACJ8LP3OXH": {"C": "Andy", "T": "Bad Fist"},
+    "MJAG421GCQBIX,MJABDYF0TOM3A": {"C": "Andy", "T": "Good Fist"},
+    "MJJOB4P27TN2K": {"C": "Andy", "T": "Good Fist"},
+    "MJ4SJ0192GH0T": {"C": "Andy", "T": "Good Fist"},
+    # shots showing BOTH fists → membership in BOTH folders (multi-shelf),
+    # PROPOSED in the report
+    "MJACOVDCJWKY1": {"C": "Andy", "T": "Bad Fist",
+                      "also_folder_of": "Andy - Good Fist",
+                      "proposed": "healed shots show both fists → member "
+                                  "of both folders"},
+    "MJABBDORUXXDT": {"C": "Andy", "T": "Bad Fist",
+                      "also_folder_of": "Andy - Good Fist",
+                      "proposed": "Good & Evil Fists shows both → member "
+                                  "of both folders"},
+    # Wolf blocks: "⚠️ Customer Clemens" / "⚠️ Customer Unknown. Tattoo
+    # Small Wolf Neotrad"
+    "MJAEG0AXSD4AE,MJICFIMLT28QA,MJIBGW0M6S9WI,MJABP6CIDUN82":
+        {"C": "Clemens", "T": "Wolf Chestpiece"},
+    "MJADOCOJ24DEB,MJAF68Y6HYYU2": {"C": "John Doe",
+                                    "T": "Small Wolf Neotrad"},
+    # botched C line ('T: Rose Fist' typed into C:) → unknown customer
+    "MJL57MLWBBCI2": {"C": "John Doe", "T": "Rose Fist"},
+    # explicit ignores
+    "MJE7QEIER0M6G": {"decision": "ignored"},          # Blueprint
+    "MJAC8K46ZK51Y": {"decision": "ignored"},          # Evil From the Needle
+    # my structural leak, his catch ("you took the parent folder and put
+    # it as a tattoo folder") - stray items stay in place
+    "MJ4S6RYIGPX26": {"decision": "structural"},       # To Edit
+    "MJ4S6YDLZ4PWY": {"decision": "structural"},       # To Post
+    # live-spelling adoptions (typed vs live CRM)
+    "MJGTWSAZ4JTT0": {"C": "Professor", "T": ""},      # 'Proffesor' + xy
+    "MJJPJT05YXGZ2": {"C": "Russell", "T": ""},        # 'Russel' + xy
+}
+
+_UNKNOWN_T = {"xy", "?", "", "xy (means i do not know which tattoo of "
+              "them all)"}
+
+
+def parse_doc(text):
+    """→ (decisions, notes). decisions = [{fids, heading, C, T, S, road,
+    proposed, also_folder_of}]. road: named | johndoe | skip | ignored |
+    structural. T may be '' (unknown tattoo)."""
+    decisions, notes = [], []
+    blocks = re.split(r"(?=^### )", text, flags=re.M)
+    for b in blocks:
+        m = re.search(r"<!-- mig:([A-Z0-9,]+) -->", b)
+        if not m:
+            continue
+        fids_key = m.group(1)
+        heading = (re.match(r"### (.+)", b) or [None, ""])[1].strip()
+        cm = re.search(r"^C:\s*(.*)$", b, re.M)
+        tm = re.search(r"^T:\s*(.*)$", b, re.M)
+        c = (cm.group(1) if cm else "").strip()
+        t = (tm.group(1) if tm else "").strip()
+        # a value line that lost its T: prefix (e.g. 'Underboob') sits
+        # between C: and S:/folder lines
+        if not t and cm:
+            after = b[cm.end():]
+            bare = re.search(r"^(?!C:|T:|S:|[-<#⚠\s])(.\S.*)$", after, re.M)
+            if bare and not bare.group(1).startswith("⎯"):
+                t = bare.group(1).strip()
+        sdays = re.findall(r"\d{4}-\d{2}-\d{2}",
+                           (re.search(r"^S:\s*(.*)$", b, re.M) or
+                            [None, ""])[1])
+        fix = _FIXUPS.get(fids_key, {})
+        c, t = fix.get("C", c), fix.get("T", t)
+        # venting/case cleanup
+        c = _TIME_VENT.sub("", _NTH_VENT.sub("", c)).strip()
+        if c.isupper() and len(c) > 2:
+            c = c.title()
+        if c.startswith("⚠") or c.lower().startswith("t:"):
+            c = ""                      # botched cell not covered by a fixup
+        road = fix.get("decision")
+        if not road:
+            if c.casefold() == "ignore":
+                road = "ignored"
+            elif c.casefold() in ("john doe", "?"):
+                road = "johndoe"
+            elif c:
+                road = "named"
+            else:
+                road = "skip"
+        if t.casefold() in _UNKNOWN_T:
+            t = ""
+        decisions.append({"fids": fids_key.split(","), "heading": heading,
+                          "C": c, "T": t, "S": sdays, "road": road,
+                          "proposed": fix.get("proposed"),
+                          "also_folder_of": fix.get("also_folder_of")})
+    return decisions, notes
+
+
+def store_decisions(con, decisions):
+    """Write every block's ruling onto its folder rows."""
+    n = 0
+    for d in decisions:
+        extras = {}
+        if d["proposed"]:
+            extras["proposed"] = d["proposed"]
+        if d["also_folder_of"]:
+            extras["also_folder_of"] = d["also_folder_of"]
+        if d["S"]:
+            extras["days"] = d["S"]
+        for fid in d["fids"]:
+            con.execute(
+                "UPDATE folder SET decision=?, dec_customer=?, dec_tattoo=?,"
+                " decided_at=?, adopt_json=COALESCE(adopt_json, ?)"
+                " WHERE fid=?",
+                (d["road"], d["C"], d["T"], time.strftime("%F %T"),
+                 json.dumps(extras, ensure_ascii=False) if extras else None,
+                 fid))
+            n += 1
+    con.commit()
+    return n
