@@ -67,8 +67,15 @@ LIBS = _resolve_libs()
 
 # Lightroom/PS export intake folders (iCloud ON PURPOSE: they must exist
 # even with the T9 unplugged, or LR would write into a phantom /Volumes
-# path on the boot drive). Our filing action reads these directly - the
-# global "Eagle Inbox" auto-import folder is the open-library trap.
+# path on the boot drive). Our filing action reads these directly.
+# CORRECTED FACT (Vex 2026-07-31): Eagle's auto-import is NOT one global
+# open-library trap - "Eagle Inbox/<NN Library Name>/" holds one watch
+# folder PER LIBRARY and each imports into its own library regardless of
+# which is open. These separate folders therefore exist only because
+# file_edited is script-driven (import + name + file + tag in one pass);
+# pointing INTAKE at the real watch folders would DOUBLE-import. Queued
+# redesign: retire these, let Eagle's own inboxes import, and turn
+# file_edited into find-the-fresh-unfiled-items + name/file/tag.
 _ICLOUD = os.path.expanduser(
     "~/Library/Mobile Documents/com~apple~CloudDocs")
 INTAKE = {
