@@ -163,9 +163,11 @@ os.makedirs(P3)
 check("empty export dir → None", photos_bridge._primary_file(P3) is None)
 check("missing dir → None", photos_bridge._primary_file(P3 + "zzz") is None)
 
-# intake constants sanity
+# intake = Eagle's OWN per-library inbox (Vex 2026-07-31); path derives
+# from the LIBS stem so renumbering cannot strand it
 check("intake tv path",
-      eagle.INTAKE["tv"].endswith("Eagle Inbox TV"))
+      eagle.INTAKE["tv"].endswith(
+          os.path.join("Eagle Inbox", eagle.LIBS["tv"][0])))
 check("skeleton six", len(eagle.SKELETON) == 6
       and eagle.SKELETON[3] == "04 Sessions")
 

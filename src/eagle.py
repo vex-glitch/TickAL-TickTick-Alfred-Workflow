@@ -65,24 +65,48 @@ def _resolve_libs():
 
 LIBS = _resolve_libs()
 
-# Lightroom/PS export intake folders (iCloud ON PURPOSE: they must exist
-# even with the T9 unplugged, or LR would write into a phantom /Volumes
-# path on the boot drive). Our filing action reads these directly.
-# CORRECTED FACT (Vex 2026-07-31): Eagle's auto-import is NOT one global
-# open-library trap - "Eagle Inbox/<NN Library Name>/" holds one watch
-# folder PER LIBRARY and each imports into its own library regardless of
-# which is open. These separate folders therefore exist only because
-# file_edited is script-driven (import + name + file + tag in one pass);
-# pointing INTAKE at the real watch folders would DOUBLE-import. Queued
-# redesign: retire these, let Eagle's own inboxes import, and turn
-# file_edited into find-the-fresh-unfiled-items + name/file/tag.
+# Lightroom/PS export intake = Eagle's OWN per-library inbox folders
+# (Vex 2026-07-31: "Each library has its own inbox" - one watch folder
+# per library under "Eagle Inbox/<library stem>/", settings
+# preferences.autoImport enable=true path=.../Eagle Inbox). The old
+# separate "Eagle Inbox TV/FM/Studio" folders were built on the WRONG
+# belief that auto-import is one global open-library trap; they are
+# retired (2026-07-31, folders deleted on Vex's instruction).
+# PROBED semantics (3 probes, Eagle 4.0.0): a file landing in a watch
+# folder did NOT import live - not backgrounded, not frontmost, not
+# with a plain ASCII name - so the sweep is likely launch-time only.
+# file_edited therefore still imports script-side, with a twin guard:
+# if Eagle DID import a stem first (whenever its sweep fires), the
+# unfiled twin is adopted instead of re-imported, so both semantics
+# are safe. Paths derive from LIBS stems so Vex's renumbering cannot
+# strand them.
 _ICLOUD = os.path.expanduser(
     "~/Library/Mobile Documents/com~apple~CloudDocs")
-INTAKE = {
-    "tv": os.path.join(_ICLOUD, "Eagle Inbox TV"),
-    "fm": os.path.join(_ICLOUD, "Eagle Inbox FM"),
-    "studio": os.path.join(_ICLOUD, "Eagle Inbox Studio"),
-}
+INTAKE = {k: os.path.join(_ICLOUD, "Eagle Inbox", LIBS[k][0])
+          for k in ("tv", "fm", "studio")}
+
+
+def disk_unfiled(lib_path):
+    """{casefolded name-stem: item id} of live items in NO folder, read
+    from disk metadata (no API, no library switch). The twin guard for
+    file_edited: an auto-imported watch file keeps its filename as the
+    item name, so a stem hit = Eagle already imported it."""
+    out = {}
+    imgs = os.path.join(lib_path, "images")
+    try:
+        infos = os.listdir(imgs)
+    except OSError:
+        return out
+    for d in infos:
+        mp = os.path.join(imgs, d, "metadata.json")
+        try:
+            m = json.load(open(mp))
+        except Exception:
+            continue
+        if m.get("isDeleted") or (m.get("folders") or []):
+            continue
+        out[(m.get("name") or "").casefold()] = m.get("id")
+    return out
 
 # CRM per-tattoo lifecycle skeleton (created WHOLE so consult refs can be
 # dragged in on day one). Order = sidebar order.

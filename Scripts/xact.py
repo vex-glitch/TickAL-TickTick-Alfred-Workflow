@@ -3996,12 +3996,18 @@ def promote_selection():
 
 
 def file_edited():
-    """📥 File edited shots: read the iCloud intake folders DIRECTLY
-    (Eagle's global auto-import is the open-library trap) → import into
-    the right library's flat 03 Post + '{base} • Edit • n' names →
+    """📥 File edited shots: sweep Eagle's OWN per-library inbox folders
+    (eagle.INTAKE - "Eagle Inbox/<library>/", Vex 2026-07-31) → import
+    into the right library's flat 03 Post + '{base} • Edit • n' names →
     source files removed → task slides 📸Edit → 📸Post → optional ⭐
     hero to Portfolio → optional 'editing finished' folder move
-    02 Edit/{base} → Raw/ (same folder id - task links survive)."""
+    02 Edit/{base} → Raw/ (same folder id - task links survive).
+
+    TWIN GUARD: Eagle's auto-import sweep may fire on its own schedule
+    (probed: not live in 4.0.0, likely at launch). If a stem already
+    exists as an UNFILED live item, Eagle beat us to it - that item is
+    adopted (renamed/tagged/filed in place) instead of re-imported, so
+    the shot can never double no matter when Eagle's sweep runs."""
     import areas
     import crm_records as cr
     import eagle
@@ -4047,6 +4053,7 @@ def file_edited():
             continue
         try:
             eagle.ensure_library(lib)
+            unfiled = eagle.disk_unfiled(eagle.LIBS[lib][1])
             cp_kids = _cp_folders(eagle)
             tpost_id = cp_kids["Post"]
             existing = eagle.list_item_names(tpost_id)
@@ -4055,12 +4062,35 @@ def file_edited():
                 cust, _, tat = base.partition(" - ")
                 tags = [x for x in (cust.strip(), tat.strip()) if x]
                 tags.append("edited")
-                specs = [{"path": p,
-                          "name": eagle.item_name(base, "Edit", start + i),
-                          "tags": tags} for i, p in enumerate(paths)]
-                ids = eagle.add_items(specs, folder_id=tpost_id)
-                # sources are DELETED below - verify the copy landed first
-                eagle.wait_imported(ids)
+                # twin guard: split Eagle-already-imported from fresh
+                adopt, fresh = [], []
+                for p in paths:
+                    stem = os.path.splitext(os.path.basename(p))[0]
+                    eid = unfiled.get(stem.casefold())
+                    (adopt if eid else fresh).append((p, eid))
+                ids, names = [], []
+                if adopt:
+                    ups = [{"id": eid,
+                            "name": eagle.item_name(base, "Edit",
+                                                    start + i),
+                            "tags": tags, "folders": [tpost_id]}
+                           for i, (_p, eid) in enumerate(adopt)]
+                    eagle.update_items(ups)
+                    ids += [eid for _p, eid in adopt]
+                    names += [u["name"] for u in ups]
+                    start += len(adopt)
+                    notes.append(f"{len(adopt)} adopted (Eagle beat us)")
+                if fresh:
+                    specs = [{"path": p,
+                              "name": eagle.item_name(base, "Edit",
+                                                      start + i),
+                              "tags": tags}
+                             for i, (p, _e) in enumerate(fresh)]
+                    new_ids = eagle.add_items(specs, folder_id=tpost_id)
+                    # sources are DELETED below - verify the copy landed
+                    eagle.wait_imported(new_ids)
+                    ids += new_ids
+                    names += [s["name"] for s in specs]
                 for p in paths:
                     try:
                         os.remove(p)
@@ -4073,7 +4103,6 @@ def file_edited():
                 if t and "📸edit" in {str(x).lower()
                                       for x in (t.get("tags") or [])}:
                     _content_retag(t, "📸edit", "📸post")
-                names = [s["name"] for s in specs]
                 hero = _choose(f"⭐ {base}: hero to Portfolio?",
                                ["None"] + names, default="None")
                 if hero and hero != "None":
