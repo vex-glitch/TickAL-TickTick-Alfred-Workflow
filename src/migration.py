@@ -713,3 +713,367 @@ def analyse(libs=("tv", "fm", "crm")):
     con.close()
     return {"items": ni, "folders": nf, "dated": nd,
             "backup_files": nb, "matched": nm, "status": st}
+
+
+# ──────────────────────────────────────────────────── phase: naming (v2 S1+S2)
+# Re-evaluation 2026-07-30 (11-agent workflow, plan v2): the naming doc is
+# generated per NORMALIZED NAME GROUP, not per folder - 76 names span 2-5
+# source branches and per-folder blocks would ask the same tattoo five times
+# and mint twins (zero dedupe downstream, no Eagle folder delete). Dates are
+# corrected first: 44.7% of capture epochs are bulk-export artifacts.
+
+# The 5 bulk-copy days that poison capture dates (2,114 items). An item whose
+# capture date falls on one of these is treated as DATELESS unless its backup
+# match supplies the real instant.
+BULK_DATES = {"2026-03-19", "2026-03-20",
+              "2025-07-20", "2025-07-28", "2025-07-30"}
+
+# Whole path SEGMENTS (casefolded) that mark a subtree as not-migration
+# material. Segment equality, never substring - "05 Art" must not eat
+# "Sacred Heart". Rulings: Brand/Reference/Personal excluded (2026-07-28);
+# Creative Outputs/Research = editing workbench, excluded in place
+# (default adopted 2026-07-30); pipeline destination folders are
+# destinations, not sources; 🗑 bins stay dead.
+_EXCLUDE_SEGS = {"brand", "content ideas", "reference", "personal 2",
+                 "07 creative outputs", "05 art", "01 raw", "02 edit",
+                 "03 post", "04 portfolio", "🗑 deleted", "🗑️ deleted"}
+# CRM library: only Review/ is migration material; Customers/ and Archive/
+# are the LIVE CRM (they feed adoption instead).
+_CRM_INCLUDE_SEG = "review"
+
+
+def _path_segs(path_text):
+    return [s.strip().casefold() for s in (path_text or "").split("/") if s]
+
+
+def _folder_excluded(lib, path_text):
+    segs = _path_segs(path_text)
+    if any(s in _EXCLUDE_SEGS for s in segs):
+        return True
+    if lib == "crm" and (not segs or segs[0] != _CRM_INCLUDE_SEG):
+        return True
+    return False
+
+
+def _norm_name(s):
+    """Group key: casefold, separators unified, punctuation to space.
+    'Harriet - Hanya', 'Harriet · Hanya' and 'harriet hanya' collide -
+    which is the point. Diacritics kept (Ljuljačka != Ljuljacka is fine;
+    alphabetical sort still lands near-dupes adjacent for the eye)."""
+    s = (s or "").casefold()
+    s = s.replace("•", " ").replace("·", " ")
+    s = re.sub(r"[^\w\s]", " ", s, flags=re.UNICODE)
+    s = re.sub(r"[\d_]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _split_ct(name):
+    """'Customer - Tattoo' → (C, T); single part → ('', part)."""
+    for sep in (" - ", " • ", " · "):
+        if sep in name:
+            c, t = name.split(sep, 1)
+            return c.strip(), t.strip()
+    return "", name.strip()
+
+
+_JUNK_RE = re.compile(
+    r"^(img[_ ]?\d+|dsc\w*\d+|\d{4}[-. ]\d{2}[-. ]\d{2}.*|\d+|untitled.*|"
+    r"new folder.*|random.*)$", re.I)
+
+
+def ensure_naming_columns(con):
+    for ddl in ("ALTER TABLE item ADD COLUMN usable_epoch INTEGER",
+                "ALTER TABLE item ADD COLUMN post_scan INTEGER DEFAULT 0",
+                "ALTER TABLE folder ADD COLUMN group_key TEXT",
+                "ALTER TABLE folder ADD COLUMN excluded INTEGER DEFAULT 0",
+                "ALTER TABLE folder ADD COLUMN adopt_json TEXT"):
+        try:
+            con.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
+
+
+def usable_dates(con):
+    """item.usable_epoch: the capture instant we actually TRUST.
+    sourced → the matched backup's birth instant (immune to drag pollution);
+    else capture_epoch unless its day is a bulk-export day."""
+    con.execute("""
+        UPDATE item SET usable_epoch = (
+          SELECT b.birth_epoch FROM backup b WHERE b.path = item.backup_path)
+        WHERE state='sourced' AND backup_path IS NOT NULL""")
+    rows = con.execute(
+        "SELECT eid, capture_epoch FROM item "
+        "WHERE usable_epoch IS NULL AND capture_epoch IS NOT NULL").fetchall()
+    ok = []
+    for r in rows:
+        day = time.strftime("%Y-%m-%d", time.gmtime(r["capture_epoch"]))
+        if day not in BULK_DATES:
+            ok.append((r["capture_epoch"], r["eid"]))
+    con.executemany("UPDATE item SET usable_epoch=? WHERE eid=?", ok)
+    con.commit()
+    return con.execute("SELECT COUNT(*) c FROM item "
+                       "WHERE usable_epoch IS NOT NULL").fetchone()["c"]
+
+
+def mark_clusters(con):
+    """folder.excluded + group_key for every folder that directly holds
+    migration items. Cluster membership rides folders_json (ALL of an
+    item's folders, so a two-shelf item names both)."""
+    for f in con.execute("SELECT fid, lib, name, path_text FROM folder"):
+        exc = 1 if _folder_excluded(f["lib"], f["path_text"]) else 0
+        gk = _norm_name(f["name"]) or None
+        con.execute("UPDATE folder SET excluded=?, group_key=? WHERE fid=?",
+                    (exc, gk, f["fid"]))
+    # capture span per folder from usable epochs
+    con.execute("""
+        UPDATE folder SET
+          first_capture = (SELECT MIN(i.usable_epoch) FROM item i
+                           WHERE i.lib = folder.lib
+                             AND instr(i.folders_json, folder.fid) > 0),
+          last_capture  = (SELECT MAX(i.usable_epoch) FROM item i
+                           WHERE i.lib = folder.lib
+                             AND instr(i.folders_json, folder.fid) > 0)""")
+    con.commit()
+
+
+def guess_names(con):
+    """Prefill from the folder's own name. Never minted, only rendered."""
+    n = 0
+    for f in con.execute("SELECT fid, name FROM folder "
+                         "WHERE excluded=0 AND direct_n>0"):
+        c, t = _split_ct(f["name"])
+        conf = 0.9 if c else (0.1 if _JUNK_RE.match(f["name"] or "") else 0.5)
+        con.execute("UPDATE folder SET guess_customer=?, guess_tattoo=?, "
+                    "guess_conf=? WHERE fid=?", (c, t, conf, f["fid"]))
+        n += 1
+    con.commit()
+    return n
+
+
+def _cache_records():
+    """Live customers/logbooks from the runtime cache, casefolded tags.
+    Cache staleness is acceptable here: adoption only PREFILLS spelling;
+    the execution engine re-verifies live before any write."""
+    import config as _cfg  # noqa: F401  (path setup)
+    p = os.path.expanduser("~/.ticktick_alfred/cache/all_notes.json")
+    try:
+        notes = json.load(open(p)).get("value") or []
+    except Exception:
+        return [], []
+    rid = os.environ.get("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
+    custs, logs = [], []
+    for nte in notes:
+        if nte.get("projectId") != rid:
+            continue
+        tags = {(t or "").casefold() for t in (nte.get("tags") or [])}
+        title = (nte.get("title") or "").strip()
+        if "\U0001F5C2️".casefold() + "customer" in tags or \
+           any(t.endswith("customer") for t in tags):
+            custs.append({"tid": nte.get("id"),
+                          "name": re.sub(r"^\U0001F464\s*", "", title)})
+        if any(t.endswith("logbook") or t.endswith("archive") for t in tags):
+            m = re.sub(r"^[\U0001F3A8\U0001F3DB️]+\s*", "", title)
+            logs.append({"tid": nte.get("id"), "title": m,
+                         "archived": any(t.endswith("archive")
+                                         for t in tags)})
+    return custs, logs
+
+
+def adopt_pass(con):
+    """Exact-normalized matches against live CRM + Eagle CRM folders.
+    Fuzzy NEVER adopts (Lucia==Luca at 0.96 says why); it only prefills."""
+    custs, logs = _cache_records()
+    cmap = {_norm_name(c["name"]): c for c in custs if _norm_name(c["name"])}
+    lmap = {}
+    for lg in logs:
+        lmap[_norm_name(lg["title"])] = lg
+    # Eagle CRM live folders (Customers/, Archive/) - adoption targets
+    emap = {}
+    for f in con.execute("SELECT fid, name, path_text FROM folder "
+                         "WHERE lib='crm'"):
+        segs = _path_segs(f["path_text"])
+        if segs and segs[0] in ("customers", "archive") and len(segs) == 2:
+            emap[_norm_name(f["name"])] = {"fid": f["fid"],
+                                           "name": f["name"]}
+    n = 0
+    for f in con.execute("SELECT fid, name, group_key, guess_customer "
+                         "FROM folder WHERE excluded=0 AND direct_n>0"):
+        gk = f["group_key"] or ""
+        ad = {}
+        if gk in lmap:
+            ad["log_tid"] = lmap[gk]["tid"]
+            ad["log_title"] = lmap[gk]["title"]
+            ad["archived"] = lmap[gk]["archived"]
+        if gk in emap:
+            ad["eagle_fid"] = emap[gk]["fid"]
+            ad["eagle_name"] = emap[gk]["name"]
+        ck = _norm_name(f["guess_customer"] or "")
+        if ck and ck in cmap:
+            ad["cust_tid"] = cmap[ck]["tid"]
+            ad["cust_name"] = cmap[ck]["name"]
+        if ad:
+            con.execute("UPDATE folder SET adopt_json=? WHERE fid=?",
+                        (json.dumps(ad, ensure_ascii=False), f["fid"]))
+            n += 1
+    con.commit()
+    return n
+
+
+def _group_rows(con):
+    """{group_key: {folders:[...], items:n, days:[...], prefill:(C,T,src)}}"""
+    groups = {}
+    for f in con.execute(
+            "SELECT * FROM folder WHERE excluded=0 AND direct_n>0 "
+            "AND group_key IS NOT NULL ORDER BY lib, path_text"):
+        g = groups.setdefault(f["group_key"], {
+            "folders": [], "items": 0, "adopt": None,
+            "guess": ("", "", 0.0), "display": f["name"]})
+        g["folders"].append(dict(f))
+        g["items"] += f["direct_n"]
+        if f["adopt_json"] and not g["adopt"]:
+            g["adopt"] = json.loads(f["adopt_json"])
+        if (f["guess_conf"] or 0) > g["guess"][2]:
+            g["guess"] = (f["guess_customer"] or "", f["guess_tattoo"] or "",
+                          f["guess_conf"] or 0)
+            g["display"] = f["name"]
+    # session days per group
+    for gk, g in groups.items():
+        fids = [f["fid"] for f in g["folders"]]
+        marks = " OR ".join(f"instr(folders_json, '{fid}') > 0"
+                            for fid in fids)
+        days = [r["d"] for r in con.execute(
+            f"SELECT DISTINCT strftime('%Y-%m-%d', usable_epoch, "
+            f"'unixepoch') d FROM item WHERE usable_epoch IS NOT NULL "
+            f"AND ({marks}) ORDER BY 1")]
+        g["days"] = days
+    return groups
+
+
+CUT_LINE = "--- REVIEWED ABOVE THIS LINE (drag me down as you go) ---"
+
+
+def gen_doc(con):
+    """The naming doc. One block per group, four sections, cut line on top.
+    Blocks are keyed by fids in an HTML comment - headings are Vex's to
+    mangle freely. Returns (doc_md, ties_md, stats)."""
+    groups = _group_rows(con)
+    sec = {"A": [], "B": [], "C": [], "D": []}
+    for gk, g in sorted(groups.items(), key=lambda kv: kv[0]):
+        c, t, conf = g["guess"]
+        ad = g["adopt"] or {}
+        # live spelling wins over folder spelling
+        if ad.get("log_title") and " • " in ad["log_title"]:
+            c, t = ad["log_title"].split(" • ", 1)
+        elif ad.get("cust_name"):
+            c = ad["cust_name"]
+        if g["items"] == 1:
+            s = "D"
+        elif c:
+            s = "A"
+        elif not _JUNK_RE.match(g["display"] or ""):
+            s = "B"
+        else:
+            s = "C"
+        sec[s].append((gk, g, c, t))
+
+    L = []
+    L.append("# Naming - old tattoo material (2026-07-30)")
+    L.append("")
+    L.append("**How this works (2 minutes):**")
+    L.append("- One block = one tattoo. All its folders are listed in it.")
+    L.append("- Fix `C:` (customer) and `T:` (tattoo name). That is all.")
+    L.append("- `C:` left EMPTY = no customer, stays a plain folder. Fine.")
+    L.append("- `S:` = session days I found. Delete a date if it is wrong.")
+    L.append("- Work top to bottom. **Drag the line below down as you go** -")
+    L.append("  I only act on blocks ABOVE it. Save whenever. No deadline.")
+    L.append("- Do NOT touch the `<!-- mig:... -->` comments.")
+    L.append("")
+    L.append(CUT_LINE)
+    L.append("")
+    heads = {
+        "A": ("## A · Just nod (names look complete - fix only if wrong)"),
+        "B": ("## B · Name the customer (tattoo name is prefilled)"),
+        "C": ("## C · Unknown (both empty - name what you recognise)"),
+        "D": ("## D · Single-photo folders (skip unless you care)"),
+    }
+    stats = {}
+    for s in ("A", "B", "C", "D"):
+        stats[s] = len(sec[s])
+        if not sec[s]:
+            continue
+        L.append(heads[s])
+        L.append("")
+        for gk, g, c, t in sec[s]:
+            fids = ",".join(f["fid"] for f in g["folders"])
+            L.append(f"### {g['display']}")
+            L.append(f"<!-- mig:{fids} -->")
+            for f in g["folders"]:
+                L.append(f"- \U0001F4C1 {f['direct_n']}\U0001F5BC "
+                         f"{f['lib']} {f['path_text']}")
+            ad = g["adopt"] or {}
+            if ad.get("log_title"):
+                mark = "\U0001F3DB archived" if ad.get("archived") \
+                    else "\U0001F3A8 LIVE"
+                L.append(f"- ↔ already in CRM: {mark} "
+                         f"‘{ad['log_title']}’ (will attach, "
+                         "not duplicate)")
+            elif ad.get("cust_name"):
+                L.append(f"- ↔ customer exists: {ad['cust_name']}")
+            L.append(f"C: {c}")
+            L.append(f"T: {t}")
+            if g["days"]:
+                shown = " · ".join(g["days"][:15])
+                more = f" (+{len(g['days'])-15} more)" \
+                    if len(g["days"]) > 15 else ""
+                L.append(f"S: {shown}{more}")
+            else:
+                L.append("S: (no dates found)")
+            L.append("")
+
+    # ties sidecar - optional, zero mandatory decisions
+    T = []
+    T.append("# Ties - optional side quest (43 photos)")
+    T.append("")
+    T.append("These had TWO+ possible originals at the same instant, so I")
+    T.append("pulled nothing and kept the snapshot (tagged 'no original').")
+    T.append("That is already the safe end state. If you want me to try a")
+    T.append("specific one, write `pull` in its Pick column and tell me.")
+    T.append("")
+    T.append("| # | Photo | Folder | Size | Pick |")
+    T.append("|---|---|---|---|---|")
+    i = 0
+    for r in con.execute(
+            "SELECT i.name, i.size, i.folders_json, i.lib FROM item i "
+            "WHERE i.backup_conf='tie' ORDER BY i.lib, i.name"):
+        i += 1
+        fid = (json.loads(r["folders_json"] or "[]") or [""])[0]
+        fr = con.execute("SELECT path_text FROM folder WHERE fid=?",
+                         (fid,)).fetchone()
+        T.append(f"| {i} | {r['name']} | {r['lib']} "
+                 f"{(fr['path_text'] if fr else '?')} | "
+                 f"{(r['size'] or 0)//1024} KB |  |")
+    return "\n".join(L) + "\n", "\n".join(T) + "\n", stats
+
+
+def naming(libs=("tv", "fm", "crm")):
+    """S1+S2 driver: refresh scan (new rows flagged post_scan), correct
+    dates, cluster, guess, adopt, generate the doc. Read-only outside the
+    ledger. Idempotent."""
+    con = connect()
+    ensure_naming_columns(con)
+    before = {r["eid"] for r in con.execute("SELECT eid FROM item")}
+    scan(libs, con=con)
+    con.execute("UPDATE item SET post_scan=1 WHERE eid NOT IN (%s)" %
+                ",".join("?" * len(before)), tuple(before)) if before else None
+    nd = usable_dates(con)
+    mark_clusters(con)
+    ng = guess_names(con)
+    na = adopt_pass(con)
+    doc, ties, stats = gen_doc(con)
+    log(con, "naming", "generated", "doc",
+        json.dumps({"dated": nd, "clusters": ng, "adopted": na,
+                    "sections": stats}))
+    con.commit()
+    con.close()
+    return doc, ties, {"dated": nd, "clusters": ng, "adopted": na,
+                       "sections": stats}
