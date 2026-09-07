@@ -1481,6 +1481,7 @@ class Pacer:
 
 
 _PACER = None
+_SWITCH_STUCK = False       # set when Eagle refuses a library switch
 
 
 def _shared_pacer():
@@ -1621,9 +1622,14 @@ def execute_batch(con, limit=5, notify=True, gkeys=None):
             f"SELECT * FROM egroup WHERE state='planned' AND gkey IN "
             f"({marks})", tuple(gkeys))]
     else:
+        # ONE library at a time (tv, then fm, then crm): every library
+        # switch is a moment Eagle may refuse with its "tasks still in
+        # progress - force switch?" dialog (autopilot 2026-09-07). Two
+        # switches for the whole run beat one per tattoo.
         batch = [dict(r) for r in con.execute(
             "SELECT * FROM egroup WHERE state='planned' "
-            "ORDER BY road='named' DESC, n_items DESC LIMIT ?", (limit,))]
+            "ORDER BY lib DESC, road='named' DESC, n_items DESC LIMIT ?",
+            (limit,))]
     for g in batch:
         gkey = g["gkey"]
         try:
@@ -1635,7 +1641,24 @@ def execute_batch(con, limit=5, notify=True, gkeys=None):
                 continue
             log(con, "exec", "attempt", gkey, json.dumps(
                 {"step": "eagle", "target": g["target_name"]}))
-            eagle.ensure_library(g["lib"])
+            if eagle.current_library() != eagle.LIBS[g["lib"]][0]:
+                # let Eagle drain its own queue before asking it to
+                # switch, and give the switch itself a long leash
+                time.sleep(120)
+                try:
+                    eagle.ensure_library(g["lib"], wait=90)
+                except eagle.EagleError as e:
+                    if "switching" in str(e):
+                        global _SWITCH_STUCK
+                        _SWITCH_STUCK = True
+                        log(con, "exec", "warn", gkey,
+                            "Eagle refused the library switch - batch "
+                            "paused, will retry")
+                        con.commit()
+                        break
+                    raise
+            else:
+                eagle.ensure_library(g["lib"])
             parent_fid, kind = _dest_parent(eagle, con, g, folders)
             home, p_name, p_parent, created = _ensure_home(
                 eagle, con, g, folders, parent_fid, kind)
@@ -2148,7 +2171,7 @@ def run_autopilot(batch=15, log_path=None):
             time.sleep(75 - age)
     except OSError:
         pass
-    zero_runs = 0
+    zero_runs = switch_waits = 0
     total_done = total_err = 0
     try:
         while not stop["now"]:
@@ -2184,6 +2207,18 @@ def run_autopilot(batch=15, log_path=None):
                 say("migcheck flagged drag-backs - stopping for a human")
                 notify("STOPPED: migcheck flagged a note out of place")
                 break
+            global _SWITCH_STUCK
+            if _SWITCH_STUCK:
+                _SWITCH_STUCK = False
+                switch_waits += 1
+                if switch_waits > 8:
+                    say("Eagle refused the library switch 8 times - stopping")
+                    notify("STOPPED: Eagle will not switch library - "
+                           "click Cancel on its dialog and tell Fable")
+                    break
+                say("Eagle busy - waiting 2 min before retrying the switch")
+                notify("Eagle busy - waiting before switching library")
+                continue
             if done == 0:
                 zero_runs += 1
                 if zero_runs >= 2:
