@@ -2094,8 +2094,12 @@ def render_triage(sub, query):
     return add_back(rows, "ctx:triage")
 
 
+# Raw rows used to read "Raw · undecided" ("promotion undecided" in the
+# state model). After the migration filled the queue with 270 tattoos
+# Vex read the word as "unclassified" (2026-09-07) - the stage word
+# alone says it.
 _CPL_STATES = [("📸edit", "✂️", "Editing"), ("📸post", "📤", "Ready to post"),
-               ("📸raw", "🎞", "Raw · undecided")]
+               ("📸raw", "🎞", "Raw")]
 
 
 _LBPICK_VERBS = {
@@ -2321,6 +2325,10 @@ def _cpl_task_row(t, tag, icon, word, lib, chip):
             else re.sub(r"\s*eagle://\S+", "", title).strip())
     m = (re.search(r"eagle://folder/([^)\s]+)", title)
          or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
+    # a Raw row's folder is the CRM skeleton for live bookings but a
+    # content-library home for the 312 migrated tattoos (2026-09-07);
+    # the guess here is only a PREFERENCE - eagle_open resolves the
+    # library that really holds the folder before switching
     open_lib = "crm" if tag == "📸raw" else lib
     arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
     mods = dict(_picker_mods())

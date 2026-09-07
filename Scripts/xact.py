@@ -4244,6 +4244,10 @@ def eagle_open(rest):
     deep link (raw eagle:// clicks can't switch - this row always can)."""
     lib, _, fid = rest.partition(":")
     import eagle
+    # the row only GUESSES the library (Raw rows say crm); the migrated
+    # homes live in TV/FM, so find the folder on disk first - one
+    # metadata read per library, no switch to look (2026-09-07)
+    lib = eagle.lib_of_folder(fid, prefer=lib) or lib
     try:
         eagle.ensure_library(lib)
     except eagle.EagleError as e:

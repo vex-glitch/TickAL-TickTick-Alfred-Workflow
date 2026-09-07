@@ -472,6 +472,28 @@ def disk_folder_tree(lib_path):
         raise EagleError(f"cannot read library metadata: {e.__class__.__name__}")
 
 
+def lib_of_folder(fid, prefer=None):
+    """Library key whose CLOSED-or-open tree holds folder `fid`, checking
+    `prefer` first; None when no library has it. Disk reads only - a
+    pipeline row can name the wrong library (Raw rows assume the CRM
+    skeleton, migrated homes sit in TV/FM) and a switch to the wrong one
+    opens nothing."""
+    def has(nodes):
+        for f in nodes:
+            if f.get("id") == fid or has(f.get("children") or []):
+                return True
+        return False
+    keys = ([prefer] if prefer in LIBS else []) + \
+        [k for k in LIBS if k != prefer]
+    for k in keys:
+        try:
+            if has(disk_folder_tree(LIBS[k][1])):
+                return k
+        except EagleError:
+            continue
+    return None
+
+
 _SUBTREE_COUNT_MEMO = {}
 
 
