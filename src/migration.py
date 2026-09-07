@@ -1148,6 +1148,18 @@ _FIXUPS = {
     "MJAFH9DLM6U22": {"C": "John Doe", "T": "Vampire Girl Unfinished"},
     "MJIDL4D03JQJN": {"C": "John Doe", "T": "Vampire Girl Unfinished"},
     "MJH7K1BZQGMCD": {"C": "John Doe", "T": "Vampire Girl Unfinished"},
+    # 2026-09-07 afternoon audit (15 agents, wf_d992b19f): byte-identical
+    # shots proved four doc names to be ONE tattoo each. Merged the same
+    # day (scratch audit_fixes.py, ledger phase 'audit'); pinned here so
+    # a re-parse can never resurrect the twins (rulings-in-_FIXUPS rule).
+    "MJ4SDQ3COVZMF": {"C": "Clemens", "T": "Dragon Sleeve",
+                      "proposed": "Clemens - Dragon = 18/18 identical Dragon Sleeve shots"},
+    "MJAA2L9IRMN9K,MJAEYGW5NR4KH": {"C": "Tfb", "T": "Zeus",
+                      "proposed": "Zeus = Tfb - Zeus (11 identical, same days)"},
+    "MJABOP28OTQ9S": {"C": "Bradonja", "T": "Yoda",
+                      "proposed": "Baby Yoda finals ARE the Yoda thigh piece"},
+    "MJACJ70B5JDL2": {"C": "Liam", "T": "Skull & Snake",
+                      "proposed": "the one 'Skull' raw is a Skull & Snake final"},
     # Andy's two fists ("There are two tattoos. Bad fist and Good fist.
     # Both on customer Andy"; 'Tommy' blocks are Andy's too, his note)
     "MJ4SMQY1XV5NZ": {"C": "Andy", "T": "Bad Fist"},

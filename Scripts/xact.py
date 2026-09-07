@@ -3835,6 +3835,20 @@ def edit_this(log_tid):
     # edit. Picking ANOTHER content library than the one holding the
     # raws takes the copy road from that library, the CRM way.
     src_lib = _lib if _lib in ("tv", "fm", "studio") else "crm"
+    if src_lib == "crm":
+        # an EMPTY skeleton with a content row that already links a home
+        # in the chosen library (Svicarac, Erol - Griffin, Phillip -
+        # Samurai after the 2026-09-07 repairs): the raws are there, not
+        # in CRM - take the move road on the row's folder
+        try:
+            _cnt = eagle.disk_subtree_counts(eagle.LIBS["crm"][1]).get(fid, 0)
+        except eagle.EagleError:
+            _cnt = 1
+        if _cnt == 0:
+            _t = _content_task_for(log_tid)
+            _m = re.search(r"eagle://folder/([^)\s]+)", (_t or {}).get("title") or "")
+            if _m and eagle.lib_of_folder(_m.group(1), prefer=dest) == dest:
+                fid, src_lib = _m.group(1), dest
     if src_lib == dest:
         try:
             eagle.ensure_library(dest)
