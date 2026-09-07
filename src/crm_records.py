@@ -1217,7 +1217,8 @@ def ensure_archive_list(year):
     try:
         live = _api().get_projects()
         for p in live or []:
-            if (p.get("name") or "").strip() == f"🗄 {year}":
+            if areas._ARCHIVE_RE.match((p.get("name") or "").strip()) and \
+                    areas._ARCHIVE_RE.match(p["name"].strip()).group(1) == year:
                 pool = list(cache_store.get("projects") or [])
                 if not any(x.get("id") == p.get("id") for x in pool):
                     pool.append(p)
@@ -1225,11 +1226,30 @@ def ensure_archive_list(year):
                 return p.get("id")
     except Exception:
         pass
-    p = _api().create_project(f"🗄 {year}")
+    p = _api().create_project(archive_list_name(year),
+                              group_id=archive_group_id())
     pool = list(cache_store.get("projects") or [])
     pool.append(p)
     cache_store.set("projects", pool)
     return p.get("id")
+
+
+def archive_list_name(year):
+    return f"🗄 {year} · Logbooks"
+
+
+def archive_group_id():
+    """The TickTick folder the year lists live in. Vex parked the first
+    two in 📦Archives (2026-09-07); new years follow whatever group an
+    existing year list sits in, else a group whose name says archive."""
+    for pid in areas.archive_pids():
+        for p in cache_store.get("projects") or []:
+            if p.get("id") == pid and p.get("groupId"):
+                return p["groupId"]
+    for g in cache_store.get("folder_groups") or []:
+        if isinstance(g, dict) and "archive" in (g.get("name") or "").casefold():
+            return g.get("id")
+    return None
 
 
 def _bullet_for(logbook):

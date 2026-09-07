@@ -920,8 +920,16 @@ def adopt_pass(con):
             ad["cust_tid"] = cmap[ck]["tid"]
             ad["cust_name"] = cmap[ck]["name"]
         if ad:
+            # MERGE: adopt_json also carries the doc's days/proposals
+            # after store_decisions - a re-run (drift rescan) must never
+            # clobber them
+            old = con.execute("SELECT adopt_json FROM folder WHERE fid=?",
+                              (f["fid"],)).fetchone()
+            merged = json.loads((old["adopt_json"] if old else None)
+                                or "{}")
+            merged.update(ad)
             con.execute("UPDATE folder SET adopt_json=? WHERE fid=?",
-                        (json.dumps(ad, ensure_ascii=False), f["fid"]))
+                        (json.dumps(merged, ensure_ascii=False), f["fid"]))
             n += 1
     con.commit()
     return n
@@ -1291,7 +1299,8 @@ def store_decisions(con, decisions):
 # AND tags from those rows. Never deletes anything, ever.
 
 PROTECTED_TAGS = {"superseded", "original", "no original", "archive"}
-_BRANCH_TAGS = {"healed tattoos": "healed", "healed": "healed",
+_BRANCH_TAGS = {"to edit": "edit", "to post": "post",
+                "healed tattoos": "healed", "healed": "healed",
                 "reel material": "reel", "raw videos": "video",
                 "videos": "video", "serious": "serious", "lines": "lines",
                 "floral": "floral", "letters": "letters"}
@@ -1482,11 +1491,11 @@ def _dest_parent(eagle, con, g, folders):
     else Archive/'{C} - {T}' via the pipeline of the CRM tree."""
     lib = g["lib"]
     if lib in ("tv", "fm"):
+        # EVERYTHING old lands in 01 Raw (Vex smoke 2026-09-07: "Muriel
+        # is in edit. Not sure why?"). The old To Edit branch was a
+        # retired queue, not live intent - it survives as the 'edit' tag.
         pf = eagle.pipeline_folders(create=True)
-        all_edit = all(
-            any(s in _EDIT_SEGS for s in _path_segs(f["path_text"]))
-            for f in folders)
-        return (pf["Edit"] if all_edit else pf["Raw"]), "content"
+        return pf["Raw"], "content"
     for f in folders:
         ad = json.loads(f["adopt_json"] or "{}")
         if ad.get("eagle_fid"):
@@ -1539,20 +1548,30 @@ def _ensure_home(eagle, con, g, folders, parent_fid, kind):
         for root in tree:
             if _norm_name(root.get("name")) in ("archive", "customers"):
                 scan += root.get("children") or []
+    def _exact(fid, name):
+        # adoption matched LOOSELY (punctuation-blind); the folder must
+        # still carry the exact convention name (Vex smoke 2026-09-07:
+        # FM 'Lucia Medusa' kept its missing hyphen)
+        if (name or "") != target:
+            eagle.rename_folder(fid, target)
+            return name
+        return None
     for node in scan:
         if _norm_name(node.get("name")) == tnorm:
-            return node["id"], None, _NOMOVE, 0
+            return node["id"], _exact(node["id"], node.get("name")), \
+                _NOMOVE, 0
     cand = next((f for f in sorted(folders,
                                    key=lambda x: -(x["direct_n"] or 0))
                  if _norm_name(f["name"]) == tnorm
                  and _folder_is_clean(con, f["fid"], f["lib"])), None)
     if cand:
+        prior_name = _exact(cand["fid"], cand["name"])
         prior_parent = cand["parent_fid"]
         if prior_parent != parent_fid:
             eagle.move_folder(cand["fid"], parent_fid)
             time.sleep(0.4)
-            return cand["fid"], cand["name"], prior_parent or "", 0
-        return cand["fid"], cand["name"], _NOMOVE, 0
+            return cand["fid"], prior_name, prior_parent or "", 0
+        return cand["fid"], prior_name, _NOMOVE, 0
     fid = eagle.create_folder(target, parent=parent_fid)
     return fid, None, _NOMOVE, 1
 
@@ -1898,9 +1917,7 @@ def _mint_pl_entry(cr, areas, g, folders, home_fid, con, pacer):
                       "WHERE gkey=?", (g["gkey"],)).fetchone()
     if row and row["pl_tid"]:
         return row["pl_tid"]
-    all_edit = all(any(s in _EDIT_SEGS for s in _path_segs(f["path_text"]))
-                   for f in folders)
-    tag = "📸edit" if all_edit else "📸raw"
+    tag = "📸raw"                  # everything old is raw (2026-09-07)
     title = f"[{g['target_name']}](eagle://folder/{home_fid})"
     pid = areas.CONTENT_DESTS[g["lib"]][0]
     att = con.execute("SELECT 1 FROM event WHERE phase='exec' AND "

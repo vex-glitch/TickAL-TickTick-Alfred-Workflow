@@ -320,7 +320,11 @@ def build_action(mode, pid, tid, title):
 # "💫 OKRs 2026/2027" and demo lists can never be adopted. Probe P0
 # (2026-07-31) proved a kind=NOTE task born in a TASK-kind list keeps
 # kind/body/tags, so these lists are minted by plain create_project.
-_ARCHIVE_RE = re.compile(r"^🗄\s*(\d{4})$")
+# "🗄 <year> · Logbooks" (Vex 2026-09-07: a bare year "might get
+# confusing") - the match is PREFIX-strict (emoji + 4-digit year at
+# the start) and suffix-free, so the description can evolve without
+# orphaning a list; "💫 OKRs 2026" still cannot match.
+_ARCHIVE_RE = re.compile(r"^🗄\s*(\d{4})\b")
 
 
 def archive_dests():
