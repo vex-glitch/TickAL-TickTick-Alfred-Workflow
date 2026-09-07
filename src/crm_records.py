@@ -103,7 +103,10 @@ def _safe_name(name):
     links - strip the grammar/link-breaking characters at the single choke
     point (a ']' broke LINK_RE round-trips; # ~ ! * = & % > | trip the add
     parser's token triggers)."""
-    return re.sub(r'[\[\]()#~!*=&%>|"]', "", name or "").strip()
+    # collapse the gap a stripped '&' or '(' leaves ('Skull  Snake' -
+    # migration audit 2026-09-07 found five double-spaced titles)
+    return re.sub(r"\s{2,}", " ",
+                  re.sub(r'[\[\]()#~!*=&%>|"]', "", name or "")).strip()
 
 
 def _ensure_tag(tag):

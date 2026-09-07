@@ -1181,8 +1181,17 @@ _FIXUPS = {
     # it as a tattoo folder") - stray items stay in place
     "MJ4S6RYIGPX26": {"decision": "structural"},       # To Edit
     "MJ4S6YDLZ4PWY": {"decision": "structural"},       # To Post
-    # live-spelling adoptions (typed vs live CRM)
-    "MJGTWSAZ4JTT0": {"C": "Professor", "T": ""},      # 'Proffesor' + xy
+    # live-spelling adoptions (typed vs live CRM). LIVE SPELLING WINS -
+    # these were once applied as ad-hoc SQL and a later re-parse of the
+    # doc silently restored the typed spellings, minting twins (audit
+    # 2026-09-07). A ruling that is not in this table does not exist.
+    "MJGTWSAZ4JTT0": {"C": "Profesor", "T": ""},       # live 👤 Profesor
+    "MJABQWQTBNGR1": {"C": "Phillip", "T": "Samurai"}, # live Phillip
+    "MJFEXUYJ1NXUM": {"C": "Phillip", "T": "Samurai"},
+    "MJFGBNYOWU3QR": {"C": "Phillip", "T": "Samurai"},
+    "MJH54LLVNOH29": {"C": "Chimba", "T": "Octopus"},  # Octopuss = Octopus
+    "MJAC3STO0XPEA": {"C": "Chimba", "T": "Octopus"},
+    "MJFGILHGHJSXZ": {"C": "Chimba", "T": "Octopus"},
     "MJJPJT05YXGZ2": {"C": "Russell", "T": ""},        # 'Russel' + xy
     # near-dupe twin groups the engine review caught (2026-07-31) -
     # each would have made TWO homes + two logbooks; PROPOSED, veto-able
