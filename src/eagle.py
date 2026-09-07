@@ -624,8 +624,14 @@ def item_name(base, stage, n):
 
 
 # Every stage label item_name is ever called with: the five CRM shelves
-# (xact._STAGES), the session marker, and the content-library edit.
-STAGE_LABELS = ("Consult", "Prep", "Design", "Finished", "Healed", "Edit")
+# (xact._STAGES), the session marker, the content-library edit, and the
+# two migration labels (2026-09-07, Vex: "name images by folder name and
+# then increase the numbers") - 'Raw' for a shot in a tattoo's raw home
+# (01 Raw / 02 Edit / CRM Archive), 'Portfolio' for a final in its
+# 04 Portfolio child. Closed vocabulary on purpose: item_base fails
+# closed on anything else.
+STAGE_LABELS = ("Consult", "Prep", "Design", "Finished", "Healed", "Edit",
+                "Raw", "Portfolio")
 _ITEM_RE = re.compile(r"^(?P<base>.+) • (?P<stage>"
                       + "|".join(STAGE_LABELS) + r"|S\d+)"
                       r" • (?P<n>\d+)$")
