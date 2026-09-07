@@ -1866,11 +1866,18 @@ def _ensure_logbook(con, cr, areas, pacer, g, cust, days, home):
     # a two-library tattoo's day sets differ - review 2026-07-31); days
     # here is already the cross-library UNION from plan_execution
     live_body = None
-    for i, day in enumerate(days, 1):
+    for day in days:
         skey = f"sess:{lkey}:{day}"
         if con.execute("SELECT 1 FROM event WHERE phase='exec' AND "
                        "kind='ok' AND subject=?", (skey,)).fetchone():
             continue
+        # S-number = order of APPENDING (count of sessions already landed
+        # + 1), never the day's sorted position: a delta run on an
+        # executed group (Muriel's second folder, 2026-09-07) may bring a
+        # middle day, and a positional marker would collide with S<k>
+        i = con.execute("SELECT COUNT(*) c FROM event WHERE phase='exec' "
+                        "AND kind='ok' AND subject LIKE ?",
+                        (f"sess:{lkey}:%",)).fetchone()["c"] + 1
         if row and live_body is None:
             # resumed/shared logbook: read the note ONCE and skip days
             # whose heading already landed (the POST may have won a race
@@ -1889,14 +1896,27 @@ def _ensure_logbook(con, cr, areas, pacer, g, cust, days, home):
         cr.append_session(log_pid, lb["id"], f"S{i}", when=day)
         log(con, "exec", "ok", skey, day)
         con.commit()
-    if days and not con.execute(
-            "SELECT 1 FROM event WHERE phase='exec' AND kind='ok' AND "
-            "subject=?", (f"fin:{lkey}",)).fetchone():
+    fin = con.execute("SELECT detail FROM event WHERE phase='exec' AND "
+                      "kind='ok' AND subject=?", (f"fin:{lkey}",)).fetchone()
+    # first finish, or a delta that brought a LATER last day: re-stamp
+    # (finish_logbook is idempotent on tags/title, only the date moves)
+    if days and (not fin or (fin["detail"] or "") < days[-1]):
         pacer.spend(6)
         cr.finish_logbook(log_pid, lb["id"], when=days[-1])
         log(con, "exec", "ok", f"fin:{lkey}", days[-1])
         con.commit()
     return lb["id"], log_pid
+
+
+def reopen(con, gkey):
+    """Executed → planned, for a DELTA run: a ruling after execution
+    folded more folders into the group (Muriel's Backpiece = her Back).
+    Safe because every step is idempotent and event-guarded: existing
+    movers keep their prior state, already-home items are no-ops, the
+    logbook/sessions/finish/PL entry all short-circuit on their events."""
+    con.execute("UPDATE egroup SET state='planned' WHERE gkey=? AND "
+                "state='executed'", (gkey,))
+    con.commit()
 
 
 def _portfolio_only(folders):
