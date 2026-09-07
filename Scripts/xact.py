@@ -3791,7 +3791,9 @@ def edit_this(log_tid):
     {dest}/02 Edit/{base}, then slide the content task
     to 📸Edit with its link retargeted to the 02 Edit folder. From that
     folder id on, the link NEVER changes - editing-done re-parents the
-    same folder under Raw/, and Eagle re-parenting keeps ids."""
+    same folder under Raw/, and Eagle re-parenting keeps ids.
+    MIGRATED tattoos (2026-09-07) skip the copy: their raws already sit
+    in a content library's 01 Raw, so the folder slides to 02 Edit."""
     if not _records_ready():
         return
     import areas
@@ -3824,10 +3826,44 @@ def edit_this(log_tid):
         new = cr.set_content_dest(fresh, dest)
         api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
         _patch_content_cache(log_tid, new)
+    # WHERE the raws live decides the road (2026-09-07). Live bookings:
+    # the 🦅 line names the CRM skeleton - copy it across. Migrated
+    # tattoos: the 🦅 line names a home INSIDE a content library
+    # (01 Raw/{base}) - no copy, the folder itself slides to 02 Edit
+    # (same id, the row link survives) and the task follows. A
+    # finals-only tattoo (🦅 → its 04 Portfolio child) has nothing to
+    # edit. Picking ANOTHER content library than the one holding the
+    # raws takes the copy road from that library, the CRM way.
+    src_lib = _lib if _lib in ("tv", "fm", "studio") else "crm"
+    if src_lib == dest:
+        try:
+            eagle.ensure_library(dest)
+            cp_kids = _cp_folders(eagle)
+            tree = eagle.folder_tree()
+            if eagle.folder_node(fid, tree=tree) is None:
+                _crm_say("🎬 Folder missing in Eagle · run 🦅 first")
+                return
+            parent = _folder_parent(tree, fid)
+            if parent == cp_kids.get("Portfolio"):
+                _crm_say(f"🎬 {base}: only Portfolio finals exist · "
+                         "nothing to edit")
+                return
+            if parent != cp_kids["Edit"]:
+                eagle.move_folder(fid, cp_kids["Edit"])
+                time.sleep(0.4)
+                _heal_double_parents([fid], cp_kids["Edit"])
+            n = len(eagle.list_item_names(fid))
+        except eagle.EagleError as e:
+            _crm_say(f"🎬 {e}")
+            return
+        _content_slide_to_edit(lb, dest, areas.CONTENT_DESTS[dest][0], fid)
+        _crm_say(f"🎬 {base} → {dest.upper()} 02 Edit ({n} raws) · "
+                 "task → 📸Edit")
+        return
     try:
-        crm_path = eagle.LIBS["crm"][1]
-        root, sub_ids = eagle.disk_subtree_ids(crm_path, fid)
-        items = [i for i in eagle.disk_items_in(crm_path, sub_ids)
+        src_path = eagle.LIBS[src_lib][1]
+        root, sub_ids = eagle.disk_subtree_ids(src_path, fid)
+        items = [i for i in eagle.disk_items_in(src_path, sub_ids)
                  if i.get("path")]
         eagle.ensure_library(dest)
         cp_kids = _cp_folders(eagle)
@@ -4344,6 +4380,20 @@ def _archive_refile():
             pass
     _heal_double_parents(touched)
     return n, cands, ""
+
+
+def _folder_parent(tree, fid):
+    """Parent id of folder `fid` in a folder tree (None at root or when
+    absent) - one walk, no API call."""
+    def walk(nodes, parent):
+        for n in nodes:
+            if n.get("id") == fid:
+                return parent
+            hit = walk(n.get("children") or [], n.get("id"))
+            if hit is not None:
+                return hit
+        return None
+    return walk(tree, None)
 
 
 def _heal_double_parents(fids, parent_id=None):
