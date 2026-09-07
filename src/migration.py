@@ -1466,6 +1466,19 @@ class Pacer:
         self.spent += n
 
 
+_PACER = None
+
+
+def _shared_pacer():
+    """ONE bucket for the whole process: back-to-back batches must not
+    each start with a fresh 240 - two batches inside one 5-minute
+    window is exactly the 500 that POSTs never retry."""
+    global _PACER
+    if _PACER is None:
+        _PACER = Pacer()
+    return _PACER
+
+
 def _group_folder_rows(con, gkey):
     lib, road, nc, nt = (gkey.split("|") + [""])[:4]
     rows = []
@@ -1586,7 +1599,7 @@ def execute_batch(con, limit=5, notify=True, gkeys=None):
     import areas
     import crm_records as cr
     ensure_exec_schema(con)
-    pacer = Pacer()
+    pacer = _shared_pacer()
     done = errs = 0
     if gkeys:
         marks = ",".join("?" * len(gkeys))
@@ -2063,3 +2076,97 @@ def migcheck(con):
         except Exception as e:
             bad.append(f"{pid}: {type(e).__name__}")
     return bad
+
+
+# ──────────────────────────────────────────────── autopilot (v2 S6, one press)
+def run_autopilot(batch=15, log_path=None):
+    """Vex's one Start press (🟢 2026-09-07). Loops execute_batch until no
+    planned group remains; per batch: migcheck (drag-back detector) and a
+    macOS notification; RateLimitError → 5-minute nap; two consecutive
+    zero-progress batches → stop and say so. The hourly cachesync agent
+    is booted out for the run and re-bootstrapped in the finally, so a
+    crash cannot leave it parked. State file for a status glance:
+    run_path('migration_state.json')."""
+    import signal
+    log_path = log_path or os.path.join(run_path(""), "migration_run.log")
+    state_path = os.path.join(run_path(""), "migration_state.json")
+    stop = {"now": False}
+    signal.signal(signal.SIGTERM, lambda *_: stop.__setitem__("now", True))
+
+    def say(msg):
+        with open(log_path, "a") as fp:
+            fp.write(time.strftime("%F %T ") + msg + "\n")
+
+    def notify(msg):
+        subprocess.run(["osascript", "-e",
+                        'display notification "{}" with title '
+                        '"TickAL migration"'.format(msg.replace('"', ""))],
+                       capture_output=True)
+
+    def state(**kw):
+        con = connect()
+        rows = {r["state"]: (r["c"], r["i"]) for r in con.execute(
+            "SELECT state, COUNT(*) c, SUM(n_items) i FROM egroup "
+            "GROUP BY 1")}
+        con.close()
+        kw.update({"groups": rows, "at": time.strftime("%F %T")})
+        with open(state_path, "w") as fp:
+            json.dump(kw, fp, ensure_ascii=False, indent=1)
+
+    plist = os.path.expanduser(
+        "~/Library/LaunchAgents/com.vex.tickal.cachesync.plist")
+    subprocess.run(["launchctl", "bootout", "gui/501/com.vex.tickal.cachesync"],
+                   capture_output=True)
+    say("autopilot start - cachesync booted out")
+    zero_runs = 0
+    total_done = total_err = 0
+    try:
+        while not stop["now"]:
+            con = connect()
+            left = con.execute("SELECT COUNT(*) c FROM egroup WHERE "
+                               "state='planned'").fetchone()["c"]
+            if not left:
+                con.close()
+                break
+            try:
+                done, errs = execute_batch(con, limit=batch, notify=False)
+            except Exception as e:
+                say(f"batch raised {type(e).__name__}: {e}")
+                done, errs = 0, 1
+            bad = []
+            try:
+                bad = migcheck(con)
+            except Exception as e:
+                say(f"migcheck raised {type(e).__name__}: {e}")
+            con.close()
+            total_done += done
+            total_err += errs
+            left2 = left - done
+            say(f"batch: {done} done, {errs} err, {left2} left, "
+                f"migcheck bad={bad}")
+            state(phase="running", last_batch={"done": done, "err": errs},
+                  left=left2, migcheck_bad=bad)
+            notify(f"{done} done · {errs} err · {left2} to go")
+            if bad:
+                say("migcheck flagged drag-backs - stopping for a human")
+                notify("STOPPED: migcheck flagged a note out of place")
+                break
+            if done == 0:
+                zero_runs += 1
+                if zero_runs >= 2:
+                    say("two zero-progress batches - stopping")
+                    notify("STOPPED: no progress twice, check the log")
+                    break
+                time.sleep(300)      # a RateLimit abort - let the window pass
+            else:
+                zero_runs = 0
+    finally:
+        subprocess.run(["launchctl", "bootstrap", "gui/501", plist],
+                       capture_output=True)
+        say(f"autopilot end - {total_done} groups done, {total_err} errors, "
+            "cachesync re-bootstrapped")
+        state(phase="finished" if not stop["now"] else "stopped",
+              total_done=total_done, total_err=total_err)
+        notify(f"Migration finished: {total_done} groups, "
+               f"{total_err} errors")
+    return total_done, total_err
