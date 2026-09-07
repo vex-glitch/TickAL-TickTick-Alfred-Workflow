@@ -1491,6 +1491,9 @@ class Pacer:
 
 _PACER = None
 _SWITCH_STUCK = False       # set when Eagle refuses a library switch
+# logbook 🎬 header per home library: content libraries by name, the CRM
+# library is "➖ None - CRM only" in the live picker's words
+_CDEST_LABEL = {"tv": "TV", "fm": "FM", "studio": "STUDIO", "crm": "➖"}
 
 
 def _shared_pacer():
@@ -1912,8 +1915,13 @@ def _ensure_logbook(con, cr, areas, pacer, g, cust, days, home):
             log(con, "exec", "attempt", f"lbk:{lkey}",
                 json.dumps({"pid": log_pid, "title": title}))
             con.commit()
+            # 🦅 home + 🎬 destination together: the live workflow's
+            # at-birth picker makes 🎬 mandatory (Vex 2026-07-28: no
+            # logbook stays unclassified) and the engine minted 92
+            # without it - his "90 uncategorized" radar row (2026-09-07)
             eagle_line = (f"🦅 [Eagle folder](eagle://folder/{home})"
-                          f" · {g['lib'].upper()}")
+                          f" · {g['lib'].upper()}\n"
+                          f"🎬 {_CDEST_LABEL.get(g['lib'], '➖')}")
             pacer.spend(3)
             lb = cr.create_logbook(cust, g["tattoo"] or "Unknown",
                                    started=days[0] if days else None,
@@ -2127,6 +2135,235 @@ def migcheck(con):
     if unknown:
         migcheck.last_unknown = unknown
     return bad
+
+
+# ─────────────────────────────────────── old-folder sweep (post-execution)
+def _disk_live_by_folder(lib_path):
+    """{folder_id: [item ids]} of LIVE (not isDeleted) items, one walk."""
+    out = {}
+    images = os.path.join(lib_path, "images")
+    for entry in os.listdir(images):
+        if not entry.endswith(".info"):
+            continue
+        try:
+            with open(os.path.join(images, entry, "metadata.json")) as f:
+                m = json.load(f)
+        except Exception:
+            continue
+        if m.get("isDeleted"):
+            continue
+        for fid in m.get("folders") or []:
+            out.setdefault(fid, []).append(m.get("id"))
+    return out
+
+
+_SWEEP_DECISIONS = {"named", "johndoe", "skip"}   # roads the engine drove
+
+
+def _sweep_decided(row):
+    """A ledger folder row the engine actually migrated FROM."""
+    return (row is not None and not row["excluded"]
+            and (row["decision"] or "open") in _SWEEP_DECISIONS)
+
+
+def migsweep(con, execute=False, libs=("tv", "fm", "crm")):
+    """Old source folders → each library's `🗑 Deleted` bin. NOTHING is
+    deleted: the bin is an ordinary root folder, every move is an
+    id-stable move_folder, and every swept folder is evented with its
+    prior parent so putting it back is mechanical (migsweep_undo).
+
+    A folder is SWEEPABLE when it was migration material (ledger row,
+    excluded=0, a decision that is not 'open'), it is not a home and not
+    above one, every live item still DIRECTLY in it is accounted for -
+    a superseded snapshot whose original moved (item.new_eid) or a
+    frozen duplicate import (item.dup_of) - and every child folder on
+    disk is sweepable too. A container with no ledger decision but no
+    own items and only sweepable children rides along, so the bin keeps
+    the old tree shape. Any live item the ledger cannot account for (a
+    drag-in after the scan, an unknown import) PINS the folder in place
+    and is reported - the sweep never guesses.
+
+    Only the TOPMOST sweepable folders move (a parent carries its
+    subtree). Dry run (execute=False) reads disk only: no Eagle call,
+    no library switch. Vex's decision 2026-09-07."""
+    import eagle
+    report = {}
+    homes = {r["home_fid"] for r in con.execute(
+        "SELECT home_fid FROM egroup WHERE home_fid IS NOT NULL")}
+    # libraries in current-first order: one switch fewer when executing
+    cur = eagle.current_library() if execute else ""
+    order = sorted(libs, key=lambda k: 0 if eagle.LIBS[k][0] == cur else 1)
+    for lib in order:
+        lib_path = eagle.LIBS[lib][1]
+        tree = eagle.disk_folder_tree(lib_path)
+        parent, kids, names = {}, {}, {}
+
+        def walk(nodes, pid):
+            for f in nodes:
+                parent[f["id"]] = pid
+                names[f["id"]] = f.get("name") or ""
+                kids[f["id"]] = [c["id"] for c in f.get("children") or []]
+                walk(f.get("children") or [], f["id"])
+        walk(tree, None)
+
+        def path_of(fid):
+            segs = []
+            while fid:
+                segs.append(names.get(fid, fid))
+                fid = parent.get(fid)
+            return "/" + "/".join(reversed(segs))
+
+        live = _disk_live_by_folder(lib_path)
+        rows = {r["fid"]: r for r in con.execute(
+            "SELECT fid, excluded, decision FROM folder WHERE lib=?", (lib,))}
+        klass = {}
+        for r in con.execute("SELECT eid, new_eid, dup_of FROM item "
+                             "WHERE lib=?", (lib,)):
+            if r["new_eid"]:
+                klass[r["eid"]] = "sup"
+                if r["dup_of"]:
+                    # a duplicate snapshot's pulled original: the pull
+                    # imported the backup file once per snapshot, so this
+                    # copy is byte-identical to the one that moved (20
+                    # of them, the frozen duplicates of HANDOFF §0)
+                    klass[r["new_eid"]] = "dupimp"
+            elif r["dup_of"]:
+                klass[r["eid"]] = "dup"
+        above = set()
+        for h in homes:
+            p = parent.get(h)
+            while p:
+                above.add(p)
+                p = parent.get(p)
+        # already binned (the repair husks) - nothing to do there
+        binned = set()
+        for f in parent:
+            p = parent.get(f)
+            while p:
+                if _norm_name(names.get(p)) == "deleted":
+                    binned.add(f)
+                    break
+                p = parent.get(p)
+        verdict, why = {}, {}
+
+        def sweepable(fid):
+            if fid in verdict:
+                return verdict[fid]
+            ok, reason = True, ""
+            row = rows.get(fid)
+            if fid in binned or _norm_name(names.get(fid)) == "deleted":
+                ok, reason = False, "already in the bin"
+            elif fid in homes or fid in above:
+                ok, reason = False, "home or above a home"
+            elif not _sweep_decided(row):
+                # ignored / structural / open / unknown: rides along ONLY
+                # as an empty container (Vex's Ignore rulings stay put)
+                if live.get(fid) or not kids.get(fid):
+                    ok, reason = False, (
+                        "excluded" if row is not None and row["excluded"]
+                        else "decision " + (row["decision"] or "open"
+                                            if row is not None else "none"))
+            if ok:
+                bad = [e for e in live.get(fid, []) if klass.get(e) is None]
+                if bad:
+                    ok, reason = False, f"{len(bad)} unaccounted live items"
+            if ok:
+                for c in kids.get(fid, []):
+                    if not sweepable(c):
+                        ok, reason = False, f"child pinned: {names.get(c)}"
+                        break
+            verdict[fid], why[fid] = ok, reason
+            return ok
+
+        for fid in list(parent):
+            sweepable(fid)
+        swept = [f for f, v in verdict.items() if v]
+        top = [f for f in swept if not verdict.get(parent.get(f), False)]
+        # a ROOT container without its own decision stays as the empty
+        # shell it is (Vex's own top-level structure); its decided
+        # children go one by one
+        expanded = []
+        for f in top:
+            if parent.get(f) is None and not _sweep_decided(rows.get(f)):
+                expanded += [c for c in kids.get(f, []) if verdict.get(c)]
+                verdict[f] = False
+            else:
+                expanded.append(f)
+        top = expanded
+        swept = [f for f, v in verdict.items() if v]
+        pinned = [f for f in verdict if not verdict[f]
+                  and _sweep_decided(rows.get(f)) and f not in binned
+                  and f not in homes and f not in above]
+        n_items = sum(len(live.get(f, [])) for f in swept)
+        empty = [f for f in swept if not live.get(f)]
+        # migration-material folders that STAY with photos in them: Vex's
+        # Ignore / structural rulings and anything never decided
+        stays = [f for f, r in rows.items() if not r["excluded"]
+                 and not _sweep_decided(r) and live.get(f)
+                 and f in parent and f not in binned
+                 and f not in homes and f not in above]
+        rep = {"sweepable": len(swept), "empty": len(empty),
+               "items_inside": n_items, "topmost": len(top),
+               "top_paths": sorted(path_of(f) for f in top),
+               "pinned": sorted(f"{path_of(f)} · {why[f]}" for f in pinned),
+               "stays": sorted(f"{path_of(f)} · {rows[f]['decision'] or 'open'}"
+                               f" · {len(live[f])} items" for f in stays),
+               "moved": 0}
+        if execute and top:
+            eagle.ensure_library(lib, wait=90)
+            # the bin is a ROOT folder Eagle names "🗑 Deleted"; match by
+            # normalized name (find_folder_suffix would miss the emoji
+            # prefix and mint a twin bin - caught before first run)
+            bin_ = next((n for n in eagle.folder_tree()
+                         if _norm_name(n.get("name")) == "deleted"), None)
+            bin_id = (bin_["id"] if bin_ else
+                      eagle.create_folder("🗑 Deleted"))
+            for fid in top:
+                key = f"sweep:{fid}"
+                if con.execute("SELECT 1 FROM event WHERE phase='sweep' AND "
+                               "kind='ok' AND subject=?", (key,)).fetchone():
+                    continue
+                log(con, "sweep", "attempt", key,
+                    json.dumps({"lib": lib, "path": path_of(fid),
+                                "prior_parent": parent.get(fid) or _NOMOVE}))
+                con.commit()
+                eagle.move_folder(fid, bin_id)
+                time.sleep(0.4)
+                log(con, "sweep", "ok", key,
+                    json.dumps({"bin": bin_id, "items": len(live.get(fid, [])),
+                                "prior_parent": parent.get(fid) or _NOMOVE}))
+                con.commit()
+                rep["moved"] += 1
+        report[lib] = rep
+    return report
+
+
+def migsweep_undo(con, lib):
+    """Put every swept folder of one library back under its prior parent
+    (root when the sentinel says it lived there). Evented."""
+    import eagle
+    eagle.ensure_library(lib, wait=90)
+    n = 0
+    for r in con.execute("SELECT subject, detail FROM event WHERE "
+                         "phase='sweep' AND kind='ok'"):
+        d = json.loads(r["detail"])
+        fid = r["subject"].split(":", 1)[1]
+        if con.execute("SELECT 1 FROM event WHERE phase='sweep' AND "
+                       "kind='undone' AND subject=?", (r["subject"],)
+                       ).fetchone():
+            continue
+        att = con.execute("SELECT detail FROM event WHERE phase='sweep' AND "
+                          "kind='attempt' AND subject=?", (r["subject"],)
+                          ).fetchone()
+        if not att or json.loads(att["detail"]).get("lib") != lib:
+            continue
+        pp = d.get("prior_parent")
+        eagle.move_folder(fid, None if pp == _NOMOVE else pp)
+        time.sleep(0.4)
+        log(con, "sweep", "undone", r["subject"], json.dumps({"to": pp}))
+        con.commit()
+        n += 1
+    return n
 
 
 # ──────────────────────────────────────────────── autopilot (v2 S6, one press)
