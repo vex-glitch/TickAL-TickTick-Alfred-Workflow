@@ -2565,10 +2565,27 @@ def render_plhub(ids, query):
         uid="plh-portfolio", title="⭐ Portfolio",
         subtitle="Eagle selection → 04 Portfolio/{tattoo}",
         arg="xact:portfolio", mods=_picker_mods(), variables=tvars))
-    if log_tid:
+    if fid and flib:
+        # flat folder → the grid at once; subfolders → the folder browser
+        try:
+            _root, _ = _eg.disk_subtree_ids(_eg.LIBS[flib][1], fid)
+            has_kids = bool(_root.get("children"))
+        except Exception:
+            has_kids = False
+        here = f"ctx:plhub:{tid}:{lib}:{queue}"
         rows.append(alfred.item(
             uid="plh-photos", title="🖼 Browse photos",
-            subtitle="Grid · stage · hero", mods=_picker_mods(),
+            subtitle=("Folders → grid · ⏎ drills" if has_kids
+                      else f"Grid · {n_img or 0} shots · ⏎ opens in Eagle")
+                     + "  |  ⏎  ⌃🔙",
+            arg=(f"xact:crmbrowse:ctx:plfolder:{flib}:{fid}:{tid}:{queue}::{lib}"
+                 if has_kids else _peek_payload(fid, flib, log_tid, here)),
+            valid=bool(has_kids or n_img), mods=_picker_mods(), variables=tvars))
+    if log_tid:
+        rows.append(alfred.item(
+            uid="plh-jobs", title="📸 Photo jobs",
+            subtitle="Import · file a selection · attach to session",
+            mods=_picker_mods(),
             arg=f"xact:crmbrowse:ctx:lbphotos:{log_tid}", variables=tvars))
         rows.append(alfred.item(
             uid="plh-book", title="🎨 Logbook hub",
@@ -2583,6 +2600,92 @@ def render_plhub(ids, query):
             uid="plh-retire", title="➖ Retire",
             subtitle="Row done · logbook 🎬 → ➖ · photos stay",
             arg=f"xact:cretire:{tid}", mods=_picker_mods(), variables=tvars))
+    if query:
+        rows = rows[:1] + (fuzz.filter_and_score(
+            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+    return add_back(rows, back)
+
+
+def _peek_payload(fid, lib, lb, ret, direct=False, sess=""):
+    """b64 payload for the Grid View trampoline (xact:peek) - same shape
+    render_lbeagle's peek_arg builds; lb may be '' for a John Doe row
+    (grid chords that need a logbook toast instead)."""
+    import base64
+    payload = json.dumps({"fid": fid, "sess": sess, "lib": lib, "lb": lb,
+                          "ret": ret, "direct": direct})
+    return "xact:peek:" + base64.b64encode(payload.encode()).decode()
+
+
+def render_plfolder(ids, query):
+    """🖼 Folder browser for ONE pipeline row (Vex 2026-09-07: "I should
+    be able to drill down folders if it is an 02 Edit folder and it has
+    subfolders until I get to photos"). Straight from DISK, any library.
+    Rows: 🖼 all shots (⏎ grid of the whole subtree), one 📁 per child
+    (⏎ drills, ⌥⇧ grids just that child), · unfiled when shots sit in
+    this folder beside subfolders. Works for John Doe rows: the logbook
+    is optional. ⌃ backs up one level, then to the PL hub."""
+    lib = ids[0] if ids else ""
+    fid = ids[1] if len(ids) > 1 else ""
+    tid = ids[2] if len(ids) > 2 else ""
+    queue = ids[3] if len(ids) > 3 else "all"
+    up = ids[4] if len(ids) > 4 else ""          # parent folder id, if any
+    plib = ids[5] if len(ids) > 5 else lib
+    hub = f"ctx:plhub:{tid}:{plib}:{queue}"
+    back = f"ctx:plfolder:{lib}:{up}:{tid}:{queue}" if up else hub
+    import eagle
+    import crm_records as cr
+    try:
+        lib_path = eagle.LIBS[lib][1]
+        root, sub_ids = eagle.disk_subtree_ids(lib_path, fid)
+        items = eagle.disk_items_in(lib_path, sub_ids)
+    except Exception as e:
+        return add_back([alfred.item(title="🦅 Folder unreadable",
+                                     subtitle=str(e), valid=False)], back)
+    t = cache_store.find_task(tid) if tid else None
+    hit = cr.parse_first_link((t or {}).get("content") or "")
+    lb = hit[2] if hit else ""
+    here = f"ctx:plfolder:{':'.join(ids)}"
+    tvars = ({"task_id": t["id"], "task_list_id": t.get("_projectId") or t.get("projectId") or "",
+              "list_id": t.get("_projectId") or t.get("projectId") or "",
+              "task_title": t.get("title") or "", "item_type": "task"} if t else {})
+
+    def _sub(node):
+        out = {node["id"]}
+        for ch in node.get("children") or []:
+            out |= _sub(ch)
+        return out
+    kids = sorted(root.get("children") or [], key=lambda c: c.get("name") or "")
+    n_all = len(items)
+    rows = [alfred.item(
+        uid=f"plf-all-{fid}", title=f"🖼 {root.get('name') or fid}",
+        subtitle=f"{n_all} shot{'' if n_all == 1 else 's'} in all"
+                 + ("  |  ⏎🖼 grid  ⌥⌘🔗  ⌃🔙" if n_all else "  |  ⌥⌘🔗  ⌃🔙"),
+        arg=_peek_payload(fid, lib, lb, here), valid=bool(n_all),
+        mods={**_picker_mods(), "alt+cmd": {"arg": f"copy:eagle://folder/{fid}",
+                                            "valid": True, "subtitle": "🔗 Copy Eagle link"}},
+        variables=tvars)]
+    for c in kids:
+        cset = _sub(c)
+        n = len({it["id"] for it in items if set(it.get("folders") or []) & cset})
+        deeper = bool(c.get("children"))
+        m = _picker_mods()
+        if n:
+            m["alt+shift"] = {"arg": _peek_payload(c["id"], lib, lb, here),
+                              "valid": True, "subtitle": "🖼 Grid of this folder"}
+        rows.append(alfred.item(
+            uid=f"plf-{c['id']}", title=f"📁 {c.get('name') or '?'}",
+            subtitle=f"🖼 {n}" + (" · has subfolders" if deeper else "")
+                     + "  |  ⏎⤵️" + ("  ⌥⇧🖼" if n else "") + "  ⌃🔙",
+            arg=f"xact:crmbrowse:ctx:plfolder:{lib}:{c['id']}:{tid}:{queue}:{fid}:{plib}",
+            mods=m, variables=tvars))
+    if kids:
+        strays = [it for it in items if fid in (it.get("folders") or [])]
+        if strays:
+            rows.append(alfred.item(
+                uid=f"plf-strays-{fid}", title="· unfiled",
+                subtitle=f"🖼 {len(strays)} · in this folder, not in a subfolder  |  ⏎🖼  ⌃🔙",
+                arg=_peek_payload(fid, lib, lb, here, direct=True),
+                mods=_picker_mods(), variables=tvars))
     if query:
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
@@ -3038,9 +3141,9 @@ def render_lbphotos(ids, query):
                     arg=f"xact:crmbrowse:ctx:triage:{tid}",
                     mods=_picker_mods()),
         alfred.item(uid="ph-browse",
-                    title="📎 Eagle photo → TickTick session",
-                    subtitle="Grid of this tattoo · ⏎ opens in Eagle · "
-                             "⌥⇧ attaches it to its session",
+                    title="🖼 Browse photos",
+                    subtitle="Folders → grid · ⏎ opens in Eagle · "
+                             "⌥⇧ attaches a shot to its session",
                     arg=f"xact:crmbrowse:ctx:lbeagle:{tid}:hub",
                     mods=_picker_mods()),
     ]
@@ -4637,6 +4740,9 @@ def main():
 
         elif level == "plhub":
             items = render_plhub(ids, query)
+
+        elif level == "plfolder":
+            items = render_plfolder(ids, query)
 
         elif level == "cmanage":
             items = render_cmanage(query)
