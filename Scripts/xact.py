@@ -105,6 +105,9 @@ Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
     xact:posted:<tid>               📤 leave 03 Post (Portfolio stays,
                                     rest → trash), task completes
     xact:cretire:<tid>              ➖ complete 📸Raw task + logbook 🎬→➖
+    xact:pledit:<tid>               🎬 Edit this from a PIPELINE ROW (⌥ PL
+                                    hub): logbook road when linked, else
+                                    the row's folder → 02 Edit + 📸edit
     xact:eaglego:<lib>:<fid>      ↗️ switch library, open folder
 
 Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
@@ -4260,6 +4263,60 @@ def content_posted(tid):
     _complete_cache_patch(pid, tid)
     _crm_say(f"📤 {base} posted · {kept} kept in Portfolio · "
              f"{trashed} → Eagle trash")
+
+
+def content_edit_row(tid):
+    """🎬 Edit this FROM A PIPELINE ROW (⌥ PL hub, Vex 2026-09-07: "How do
+    I promote one of the folders for editing?"). A row that links a
+    logbook takes the logbook road (edit_this: CRM copy or migrated
+    move, its call). A John Doe row has no logbook, so the road is the
+    row itself: its folder slides to 02 Edit in the row's library and
+    the tag flips 📸raw → 📸edit. The link never changes (folder id)."""
+    import areas
+    import crm_records as cr
+    import eagle
+    t = cache_store.find_task(tid)
+    if not t:
+        _crm_say("Row not found · run tsy")
+        return
+    hit = cr.parse_first_link(t.get("content") or "")
+    if hit:
+        edit_this(hit[2])
+        return
+    title = t.get("title") or ""
+    m = (re.search(r"eagle://folder/([^)\s]+)", title)
+         or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
+    if not m:
+        _crm_say("🎬 Row has no Eagle folder link")
+        return
+    fid = m.group(1)
+    pid = t.get("_projectId") or t.get("projectId")
+    lib = next((k for k, v in areas.CONTENT_DESTS.items() if v[0] == pid), "")
+    if not lib:
+        _crm_say("🎬 Row is not in a content list")
+        return
+    base = _task_base(title)
+    try:
+        if eagle.lib_of_folder(fid, prefer=lib) != lib:
+            _crm_say(f"🎬 {base}: folder is not in the {lib.upper()} library")
+            return
+        eagle.ensure_library(lib)
+        cp_kids = _cp_folders(eagle)
+        tree = eagle.folder_tree()
+        parent = _folder_parent(tree, fid)
+        if parent == cp_kids.get("Portfolio"):
+            _crm_say(f"🎬 {base}: only Portfolio finals exist · nothing to edit")
+            return
+        if parent != cp_kids["Edit"]:
+            eagle.move_folder(fid, cp_kids["Edit"])
+            time.sleep(0.4)
+            _heal_double_parents([fid], cp_kids["Edit"])
+        n = len(eagle.list_item_names(fid))
+    except eagle.EagleError as e:
+        _crm_say(f"🎬 {e}")
+        return
+    _content_retag(t, "📸raw", "📸edit")
+    _crm_say(f"🎬 {base} → {lib.upper()} 02 Edit ({n} raws) · row → Editing")
 
 
 def content_retire(tid):
@@ -8466,6 +8523,8 @@ def main():
             content_posted(rest)
         elif verb == "cretire":
             content_retire(rest)
+        elif verb == "pledit":
+            content_edit_row(rest)
         elif verb == "eaglego":
             eagle_open(rest)
         elif verb == "peek":

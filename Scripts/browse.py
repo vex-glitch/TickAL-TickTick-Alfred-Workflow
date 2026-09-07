@@ -2315,9 +2315,12 @@ def render_cstats(query):
     return add_back(rows, "ctx:contentpl")
 
 
-def _cpl_task_row(t, tag, icon, word, lib, chip):
+def _cpl_task_row(t, tag, icon, word, lib, chip, queue="all"):
     """One content-task row: ⏎ opens the Eagle folder cross-library,
-    ⌥⇧ = posted (Post rows) / retire (Raw rows)."""
+    ⌥ drills the PL hub (this tattoo's content verbs on one screen -
+    Vex 2026-09-07: "specific actions for content pipelines live under
+    ⌥, the legend says ⌥ PL hub like ⌥ CRM hub"), ⌥⇧ = posted (Post
+    rows) / retire (Raw rows)."""
     title = (t.get("title") or "").strip()
     # markdown of ANY scheme - legacy tasks link http://localhost:41595
     mk = re.match(r"^\[(.*?)\]\(\S+?\)$", title)
@@ -2332,7 +2335,11 @@ def _cpl_task_row(t, tag, icon, word, lib, chip):
     open_lib = "crm" if tag == "📸raw" else lib
     arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
     mods = dict(_picker_mods())
-    sub = f"{word} · {chip}" + (" · ⏎ folder" if m else "") + " · ⌘⚡"
+    mods["alt"] = {"arg": "", "valid": True, "subtitle": "⌥ PL hub",
+                   "variables": {"browse_ctx":
+                                 f"ctx:plhub:{t['id']}:{lib}:{queue}"}}
+    sub = (f"{word} · {chip}" + (" · ⏎ folder" if m else "")
+           + " · ⌥ PL hub · ⌘⚡")
     if tag == "📸post":
         mods["alt+shift"] = {"arg": f"xact:posted:{t['id']}",
                              "subtitle": "Mark POSTED · shelf clears",
@@ -2462,7 +2469,7 @@ def render_contentpl(ids, query):
     for tag, icon, wrd in _CPL_STATES:
         if queue != "all" and KEY2TAG.get(queue) != tag:
             continue
-        rows += [_cpl_task_row(t, tag, icon, wrd, lib, chip)
+        rows += [_cpl_task_row(t, tag, icon, wrd, lib, chip, queue=queue)
                  for t in tasks if tag in tags_of(t)]
     if not rows:
         rows = [alfred.item(title="Queue empty",
@@ -2472,6 +2479,114 @@ def render_contentpl(ids, query):
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
     return add_back(rows, f"ctx:contentpl:{lib}")
+
+
+def render_plhub(ids, query):
+    """🎬 PL hub - ONE pipeline row's content verbs on one screen, the
+    content twin of the ⌥ CRM hub (Vex 2026-09-07). Works for John Doe
+    rows too: the verbs key on the ROW (its folder link, its list), the
+    logbook rows appear only when the row links one. Back = the queue
+    the row came from."""
+    tid = ids[0] if ids else ""
+    lib = ids[1] if len(ids) > 1 else ""
+    queue = ids[2] if len(ids) > 2 else "all"
+    back = f"ctx:contentpl:{lib}:{queue}" if lib else "ctx:contentpl"
+    import crm_records as cr
+    import eagle as _eg
+    t = cache_store.find_task(tid)
+    if not t:
+        return add_back([alfred.item(title="Row not found",
+                                     subtitle="Run tsy", valid=False)], back)
+    title = (t.get("title") or "").strip()
+    mk = re.match(r"^\[(.*?)\]\(\S+?\)$", title)
+    base = (mk.group(1).strip() if mk
+            else re.sub(r"\s*eagle://\S+", "", title).strip())
+    m = (re.search(r"eagle://folder/([^)\s]+)", title)
+         or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
+    fid = m.group(1) if m else ""
+    tags = {str(x).lower() for x in (t.get("tags") or [])}
+    stage = next((s for s in ("📸post", "📸edit", "📸raw") if s in tags), "")
+    icon, word = {"📸raw": ("🎞", "Raw"), "📸edit": ("✂️", "Editing"),
+                  "📸post": ("📤", "Ready to post")}.get(stage, ("📸", ""))
+    pid = t.get("_projectId") or t.get("projectId") or ""
+    hit = cr.parse_first_link(t.get("content") or "")
+    log_tid = hit[2] if hit else ""
+    # where the folder really is + how many shots (disk reads only)
+    flib, n_img = "", None
+    if fid:
+        try:
+            flib = _eg.lib_of_folder(fid, prefer=lib) or ""
+            if flib:
+                n_img = _eg.disk_subtree_counts(_eg.LIBS[flib][1]).get(fid, 0)
+        except Exception:
+            pass
+    head_sub = [word] + ([f"🦅 {flib.upper()}"] if flib else ["🦅 no folder"])
+    if n_img is not None:
+        head_sub.append(f"🖼 {n_img}")
+    tvars = {"task_id": t["id"], "task_list_id": pid, "list_id": pid,
+             "task_title": t.get("title") or "", "item_type": "task"}
+    hmods = _picker_mods()
+    if fid:
+        hmods["alt+cmd"] = {"arg": f"copy:eagle://folder/{fid}",
+                            "valid": True, "subtitle": "🔗 Copy Eagle link"}
+    rows = [alfred.item(
+        uid="plh-open", title=f"{icon} {base}",
+        subtitle=" · ".join(head_sub) + ("  |  ⏎ folder" if fid else "")
+                 + "  ⌘⚡  ⌥⌘🔗  ⌃🔙",
+        arg=f"xact:eaglego:{flib or lib}:{fid}" if fid else "",
+        valid=bool(fid), mods=hmods, variables=tvars)]
+    if stage == "📸raw":
+        rows.append(alfred.item(
+            uid="plh-edit", title="🎬 Edit this",
+            subtitle="Folder → 02 Edit · row → Editing",
+            arg=f"xact:pledit:{tid}", mods=_picker_mods(), variables=tvars))
+    if stage == "📸edit":
+        rows.append(alfred.item(
+            uid="plh-edit", title="✂️ In edit",
+            subtitle="Export edits to the Eagle Inbox, then 📥 below",
+            valid=False))
+    pending = 0
+    try:
+        d = _eg.INTAKE.get(lib) or ""
+        pending = len([f for f in os.listdir(d) if not f.startswith(".")
+                       and os.path.isfile(os.path.join(d, f))]) if d else 0
+    except OSError:
+        pending = 0
+    rows.append(alfred.item(
+        uid="plh-filed", title=f"📥 File edited shots ({pending})",
+        subtitle="Eagle Inbox → 03 Post · row → Ready to post",
+        arg="xact:filedited", mods=_picker_mods(), variables=tvars))
+    if stage == "📸post":
+        rows.append(alfred.item(
+            uid="plh-posted", title="📤 Posted",
+            subtitle="Shelf clears · Portfolio keeps · row done",
+            arg=f"xact:posted:{tid}", mods=_picker_mods(), variables=tvars))
+    rows.append(alfred.item(
+        uid="plh-portfolio", title="⭐ Portfolio",
+        subtitle="Eagle selection → 04 Portfolio/{tattoo}",
+        arg="xact:portfolio", mods=_picker_mods(), variables=tvars))
+    if log_tid:
+        rows.append(alfred.item(
+            uid="plh-photos", title="🖼 Browse photos",
+            subtitle="Grid · stage · hero", mods=_picker_mods(),
+            arg=f"xact:crmbrowse:ctx:lbphotos:{log_tid}", variables=tvars))
+        rows.append(alfred.item(
+            uid="plh-book", title="🎨 Logbook hub",
+            subtitle="Sessions · money · CRM verbs", mods=_picker_mods(),
+            arg=f"xact:crmbrowse:ctx:crmbook:{log_tid}", variables=tvars))
+    rows.append(alfred.item(
+        uid="plh-tt", title="↗️ Open in TickTick", subtitle="The row itself",
+        arg=f"open:https://ticktick.com/webapp/#p/{pid}/tasks/{tid}",
+        mods=_picker_mods(), variables=tvars))
+    if stage == "📸raw":
+        rows.append(alfred.item(
+            uid="plh-retire", title="➖ Retire",
+            subtitle="Row done · logbook 🎬 → ➖ · photos stay",
+            arg=f"xact:cretire:{tid}", mods=_picker_mods(), variables=tvars))
+    if query:
+        rows = rows[:1] + (fuzz.filter_and_score(
+            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
+    return add_back(rows, back)
 
 
 def _img_counts():
@@ -4519,6 +4634,9 @@ def main():
 
         elif level == "contentpl":
             items = render_contentpl(ids, query)
+
+        elif level == "plhub":
+            items = render_plhub(ids, query)
 
         elif level == "cmanage":
             items = render_cmanage(query)
