@@ -1736,8 +1736,12 @@ def execute_batch(con, limit=5, notify=True, gkeys=None):
                     by_tags.setdefault(tg, []).append(eid)
             for tg, eids in by_tags.items():
                 eagle.add_item_tags(eids, list(tg))
-            # portfolio-source items ALSO join 04 Portfolio/{target}
-            # (the per-base child, matching live to_portfolio convention)
+            # portfolio-source items live ONLY in 04 Portfolio/{target}
+            # (the per-base child). Vex ruling 2026-09-07: "no portfolio
+            # (final edited photos) in raw albums" - the first run
+            # dual-filed 165 shots into their 01 Raw homes and 29
+            # portfolio-only homes had to be binned afterwards
+            # (scratch portfolio_only.py, ledger phase 'repair').
             pf_items = [eid for eid, fl in movers.items()
                         if any(_PORTFOLIO_SEG in _path_segs(f["path_text"])
                                for f in fl)]
@@ -1750,6 +1754,11 @@ def execute_batch(con, limit=5, notify=True, gkeys=None):
                     eagle.create_folder(g["target_name"],
                                         parent=pf["Portfolio"])
                 eagle.add_to_folders(pf_items, [pchild])
+                eagle.remove_from_folders(pf_items, [home])
+                con.execute(
+                    "UPDATE mover SET dest_fid=? WHERE gkey=? AND eid IN (%s)"
+                    % ",".join("?" * len(pf_items)),
+                    (pchild, gkey, *pf_items))
             if _heal_parent:
                 _xact_heal(eagle, [home], _heal_parent)
             con.execute("UPDATE mover SET state='moved', moved_at=? "
