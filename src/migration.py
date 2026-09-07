@@ -1448,22 +1448,36 @@ def migredo(con, gkey):
 
 
 class Pacer:
-    """Token bucket against the shared TickTick budget. 240/5min spend
-    ceiling (the hourly agent is PAUSED during runs, but headroom stays
-    headroom). Conservative: overcounting is fine, undercounting is a
-    500 that POSTs never retry."""
-    def __init__(self, budget=240, window=300):
-        self.budget, self.window, self.spent, self.t0 = budget, window, 0, time.time()
+    """Sliding 60-second window. TickTick's REAL limit is 100 requests
+    per MINUTE - the 500 body says so verbatim (autopilot 2026-09-07:
+    four big tattoos, 500 inside a minute). The inherited '300 per 5
+    minutes' was the wrong granularity: 240 fired in one burst is a 500
+    that POSTs never retry. 55/min leaves room for anything else Vex's
+    apps do. Counts are the engine's cost ESTIMATES per cr call, which
+    err high on purpose."""
+    def __init__(self, per_minute=55):
+        from collections import deque
+        self.per_minute = per_minute
+        self.stamps = deque()
+
+    def _trim(self, now):
+        while self.stamps and now - self.stamps[0] > 60:
+            self.stamps.popleft()
 
     def spend(self, n):
-        if time.time() - self.t0 > self.window:
-            self.spent, self.t0 = 0, time.time()
-        if self.spent + n > self.budget:
-            wait = self.window - (time.time() - self.t0) + 2
-            if wait > 0:
-                time.sleep(wait)
-            self.spent, self.t0 = 0, time.time()
-        self.spent += n
+        now = time.time()
+        self._trim(now)
+        while len(self.stamps) + n > self.per_minute and self.stamps:
+            time.sleep(max(60 - (now - self.stamps[0]) + 0.5, 0.5))
+            now = time.time()
+            self._trim(now)
+        self.stamps.extend([now] * n)
+
+    def exhausted(self):
+        """A 500 landed: treat the whole minute as spent."""
+        now = time.time()
+        self.stamps.clear()
+        self.stamps.extend([now] * self.per_minute)
 
 
 _PACER = None
@@ -1736,6 +1750,7 @@ def execute_batch(con, limit=5, notify=True, gkeys=None):
             log(con, "exec", "err", gkey, f"{type(e).__name__}: {e}")
             con.commit()
             if "RateLimit" in type(e).__name__:
+                pacer.exhausted()
                 break
     try:
         apply_also_links(con)
@@ -2067,14 +2082,18 @@ def migcheck(con):
     for r in con.execute("SELECT log_tid, log_pid FROM egroup "
                          "WHERE log_tid IS NOT NULL"):
         by_pid.setdefault(r["log_pid"], set()).add(r["log_tid"])
-    bad = []
+    bad, unknown = [], []
     for pid, tids in by_pid.items():
         try:
             pd = api.get_project_data(pid)
             have = {t.get("id") for t in pd.get("tasks") or []}
             bad += [t for t in tids if t not in have]
         except Exception as e:
-            bad.append(f"{pid}: {type(e).__name__}")
+            # a RateLimit here is NOT a drag-back (autopilot 2026-09-07
+            # stopped on exactly this) - report it separately
+            unknown.append(f"{pid}: {type(e).__name__}")
+    if unknown:
+        migcheck.last_unknown = unknown
     return bad
 
 
@@ -2118,6 +2137,17 @@ def run_autopilot(batch=15, log_path=None):
     subprocess.run(["launchctl", "bootout", "gui/501/com.vex.tickal.cachesync"],
                    capture_output=True)
     say("autopilot start - cachesync booted out")
+    # the hourly agent bursts ~250 requests unpaced; if it ran inside the
+    # current window, that budget is GONE - wait the window out first
+    # (first launch 2026-09-07: sync at 10:44, start at 10:50, 500 in a
+    # minute)
+    try:
+        age = time.time() - os.path.getmtime("/tmp/tickal_cachesync.log")
+        if age < 75:
+            say(f"sync ran {int(age)}s ago - waiting {int(75-age)}s")
+            time.sleep(75 - age)
+    except OSError:
+        pass
     zero_runs = 0
     total_done = total_err = 0
     try:
@@ -2134,10 +2164,13 @@ def run_autopilot(batch=15, log_path=None):
                 say(f"batch raised {type(e).__name__}: {e}")
                 done, errs = 0, 1
             bad = []
+            migcheck.last_unknown = []
             try:
                 bad = migcheck(con)
             except Exception as e:
                 say(f"migcheck raised {type(e).__name__}: {e}")
+            if migcheck.last_unknown:
+                say(f"migcheck could not verify: {migcheck.last_unknown}")
             con.close()
             total_done += done
             total_err += errs
@@ -2157,7 +2190,7 @@ def run_autopilot(batch=15, log_path=None):
                     say("two zero-progress batches - stopping")
                     notify("STOPPED: no progress twice, check the log")
                     break
-                time.sleep(300)      # a RateLimit abort - let the window pass
+                time.sleep(65)       # a RateLimit abort - let the minute pass
             else:
                 zero_runs = 0
     finally:
