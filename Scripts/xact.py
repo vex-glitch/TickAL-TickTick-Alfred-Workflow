@@ -2834,8 +2834,11 @@ def session_photos(log_tid, stage=""):
     ('' = current session, s<k> = older, consult|prep|design|
     finished|healed = shelves) - each import annotated 'ph:<photos
     id>' and NEVER reimported; ♥ heroes → TickTick planted (stem
-    guard, never duplicated); album + Photos delete for Photos
-    sources only. Every surface rides THIS verb."""
+    guard, never duplicated); ✅ album for Photos sources only.
+    Photos road = the DIRECT-DISK snapshot (2026-09-08): metadata in
+    one osascript, originals linked off the library (Alfred has FDA),
+    chunked export only for iCloud stragglers. Every surface rides
+    THIS verb."""
     if not _records_ready():
         return False
     import shutil
@@ -2852,13 +2855,17 @@ def session_photos(log_tid, stage=""):
     try:
         src = "photos"
         shots = []
-        if pb.photos_running() and pb.selection_count():
+        if pb.photos_running():
+            # ONE osascript reads the selection (no separate count
+            # peek); an empty selection falls through to Finder/clip
             try:
                 shots = pb.selection_snapshot_export(tmp)
+            except pb.NoSelection:
+                shots = []
             except pb.PhotosError as e:
                 _crm_say(f"📸 {e}")
                 return False
-        else:
+        if not shots:
             try:
                 files = [p for p in _finder_selection()
                          if os.path.splitext(p)[1].lower() in _MEDIA_EXTS]
@@ -2926,7 +2933,9 @@ def session_photos(log_tid, stage=""):
                      for i, s in enumerate(new_shots)]
             if specs:
                 ids = eagle.add_items(specs, folder_id=sub_id)
-                # background copy MUST finish before the tmp exports die
+                # background copy MUST finish before the tmp links and
+                # exports die (a link unlinks the tmp name only - the
+                # Photos original is never touched)
                 eagle.wait_imported(ids)
         except eagle.EagleError as e:
             _crm_say(f"📸 Eagle trouble: {e} · shots safe in Photos")
@@ -2980,8 +2989,10 @@ def session_photos(log_tid, stage=""):
                 alb = " · ✅ album"
             except pb.PhotosError:
                 alb = " · album skipped"
+        exp_n = sum(1 for s in shots if s.get("id") and not s.get("direct"))
         head = (f"📸 {len(new_shots)} → {base} · {label}"
                 + (f" · {esk} already in Eagle" if esk else "")
+                + (f" · {exp_n} via export" if exp_n else "")
                 + {"clip": " · from clipboard",
                    "finder": " · from Finder"}.get(src, ""))
         _crm_say(f"{head}{att}{alb}")
