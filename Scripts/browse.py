@@ -1138,6 +1138,30 @@ def render_crmweek(query):
         if d and today <= d.date() <= horizon:
             pool.append((d, t))
     pool.sort(key=lambda x: x[0])
+
+    # 💰 the money glance on a booking row (Vex 2026-09-08: "every row on
+    # CRM should show my percentage"): the linked logbook's open quote
+    # remainder, else its last charged entry, each with the 🫵 cut chip.
+    # Nothing derivable = nothing shown (no lying "0€").
+    _lb_by_id = {}
+    def _glance(log_tid):
+        if not log_tid:
+            return ""
+        if not _lb_by_id:
+            _lb_by_id.update((l.get("id"), l) for l in cr.records_notes())
+        content = (_lb_by_id.get(log_tid) or {}).get("content") or ""
+        rem = cr.quote_remainder(content)
+        if rem:
+            return f"{rem} open{cr.cut_chip(cr._num(rem), rem)}"
+        for segs in reversed(cr._entries(content)):
+            if len(segs) > 3 and cr.is_gratis(segs[3]):
+                continue
+            amt, sym, pre = cr._amount_of(segs)
+            if amt:
+                shown = cr._fmt_money(amt, sym or "€", pre)
+                return f"last {shown}{cr.cut_chip(amt, shown)}"
+        return ""
+
     for d, t in pool:
         disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
         when = ("Today" if d.date() == today else
@@ -1159,6 +1183,9 @@ def render_crmweek(query):
                                  "subtitle": "Open in TickTick"}
             arg = f"xact:crmbrowse:ctx:crmbook:{_l[2]}"
             chips = "Session done in ⌘  |  ⏎⤵️  ⌘⚡  ⌥⇧↗️"
+            g = _glance(_l[2])
+            if g:
+                chips = f"{g} · {chips}"
         else:
             arg = f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}"
             chips = "Session done in ⌘  |  ⏎↗️  ⌘⚡"
@@ -1193,8 +1220,9 @@ def render_crmweek(query):
     booked_bit = (f"{bk_n} booked" + (f" · {bk_h:g}h" if bk_h else "")
                   if bk_n else "nothing booked")
     # zero state says 0€ - a bare "-" on Monday morning reads like the
-    # money display vanished (Vex smoke 2026-07-27)
-    rows.insert(0, alfred.item(
+    # money display vanished (Vex smoke 2026-07-27). The ledger sits UNDER
+    # the session rows, totals last (Vex 2026-09-08), radar below it.
+    rows.append(alfred.item(
         uid="wk-money",
         title=f"💰 {wk_money if wk_money != '-' else '0€'}"
               f"{cr.cut_chip(wk_raw, wk_money)} this week",
@@ -1443,6 +1471,15 @@ def render_crmmoney(sub, query):
             return "-"
         return f"{x['amount']:g}{x['sym'] or '€'}"
 
+    def _entry_money_cut(x):
+        """'600€ · 🫵 300€' - the entry's money with the artist's share
+        (Vex 2026-09-08: every row shows the percentage); gratis and
+        unpriced entries carry no chip."""
+        shown = _entry_money(x)
+        if x["gratis"] or not x["amount"]:
+            return shown
+        return shown + cr.cut_chip(x["amount"], shown)
+
     def _hub_alt(tid):
         return {"arg": "", "valid": True, "subtitle": "Logbook hub",
                 "variables": {"browse_ctx": f"ctx:crmbook:{tid}"}}
@@ -1495,29 +1532,32 @@ def render_crmmoney(sub, query):
         wend = w0 + _td(days=6)
         m2, n2, h2, r2 = cr.sum_entries(cr.all_entries(), w0.isoformat(),
                                         wend.isoformat())
-        rows = [alfred.item(
-            uid="wk-sum",
-            title=f"💰 {m2}{cr.cut_chip(r2, m2)}"
-                  f" · {n2} session{'s' if n2 != 1 else ''}"
-                  + (f" · {h2:g}h" if h2 else ""),
-            subtitle=f"Mon {w0.strftime('%d %b')} → Sun "
-                     f"{wend.strftime('%d %b')}",
-            valid=False)]
         det = sorted((x for x in cr.entries_detailed()
                       if w0.isoformat() <= x["date"] <= wend.isoformat()
                       and (x["amount"] is not None or x["is_s"])),
                      key=lambda x: x["date"])
+        rows = []
         for x in det:
             tid = x["lb"].get("id")
             hrs = f" · {x['minutes'] / 60:g}h" if x["minutes"] else ""
             d = _date.fromisoformat(x["date"])
             rows.append(alfred.item(
                 uid=f"wke-{tid}-{x['date']}-{x['marker']}",
-                title=f"{_entry_money(x)} · {x['lb'].get('title') or ''}"
+                title=f"{_entry_money_cut(x)} · {x['lb'].get('title') or ''}"
                       f" · {x['marker']}",
                 subtitle=f"{d.strftime('%a %d %b')}{hrs}  |  ⏎⤵️  ⌥⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:lb:{tid}",
                 mods={**_picker_mods(), "alt": _hub_alt(tid)}))
+        # totals LAST, under the entries (Vex 2026-09-08: "in the last row
+        # should be totals")
+        rows.append(alfred.item(
+            uid="wk-sum",
+            title=f"💰 {m2}{cr.cut_chip(r2, m2)}"
+                  f" · {n2} session{'s' if n2 != 1 else ''}"
+                  + (f" · {h2:g}h" if h2 else ""),
+            subtitle=f"Mon {w0.strftime('%d %b')} → Sun "
+                     f"{wend.strftime('%d %b')}",
+            valid=False))
         if query:
             rows = fuzz.filter_and_score(query, rows,
                                          key_fn=lambda x: x["title"]) or rows
@@ -1573,17 +1613,19 @@ def render_crmmoney(sub, query):
                 r = total / (mins / 60.0)
                 head += (f" · ~{int(r)}{sym2 or '€'}/h"
                          + cr.cut_rate_chip(r, sym2 or "€"))
-        rows = [alfred.item(
-            uid="lb-head", title=lb.get("title") or "Logbook",
-            subtitle=head + "  |  ⏎⤵️",
-            arg=f"xact:crmbrowse:ctx:crmbook:{tid}",
-            mods=_picker_mods())]
+        rows = []
         for x in det:
             hrs = f" · {x['minutes'] / 60:g}h" if x["minutes"] else ""
             rows.append(alfred.item(
                 uid=f"lbe-{x['date']}-{x['marker']}",
-                title=f"{x['marker']} · {_entry_money(x)}",
+                title=f"{x['marker']} · {_entry_money_cut(x)}",
                 subtitle=f"{x['date']}{hrs}", valid=False))
+        # totals LAST (the wk: shape); ⏎ still drills the logbook hub
+        rows.append(alfred.item(
+            uid="lb-head", title=f"💰 {head}",
+            subtitle=(lb.get("title") or "Logbook") + "  |  ⏎⤵️",
+            arg=f"xact:crmbrowse:ctx:crmbook:{tid}",
+            mods=_picker_mods()))
         return add_back(rows, "ctx:crmmoney")
 
     # root: all-time + this-month + this-week + customers + tattoos - five
