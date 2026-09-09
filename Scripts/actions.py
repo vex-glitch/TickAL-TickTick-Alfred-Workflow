@@ -501,8 +501,11 @@ def main():
         # hub. Same cheap-gate-first rule as above.
         _phone = _mail = _insta = ""
         _is_logbook = False
-        if (pid and areas.records_configured() and pid == areas.RECORDS_ID
-                and is_note and bool(tid)):
+        # records notes live in Records OR the archive list (2026-09-09)
+        _is_record = bool(pid and areas.records_configured()
+                          and pid in areas.records_pids() and is_note
+                          and bool(tid))
+        if _is_record:
             try:
                 import crm_records as _cr2
                 _phone, _mail, _bd, _insta = _cr2.contact_of(task or {})
@@ -527,7 +530,7 @@ def main():
         _is_customer = _is_lead = False
         _archived_lb = False
         _n_next = 0
-        if pid == areas.RECORDS_ID and is_note and bool(tid):
+        if _is_record:
             _is_lead = (name or "").startswith("🎣")
             _is_customer = (name or "").startswith("👤") or _is_lead
             if _is_logbook:
@@ -584,6 +587,8 @@ def main():
                  f"xact:crmrename:{tid}", "rename tattoo title", True),
                 ("📁 Archive", "Close without a session",
                  f"xact:crmclose:{tid}", "archive close finish", not _archived_lb),
+                ("🗄 Set year", "Its 📦 kanban column",
+                 f"xact:crmyear:{tid}", "year archive column set", _archived_lb),
             ]
         elif _is_customer:
             entity_rows = [
@@ -658,7 +663,7 @@ def main():
              _is_logbook),
             ("🗑 Delete entry", "Mistakes only · sessions + Eagle go too",
              f"xact:crmtrash:{tid}", "delete remove trash entry wrong",
-             pid == areas.RECORDS_ID and is_note and bool(tid)),
+             _is_record),
             ("🔗 Link to logbook", "Pick logbook · title gains link + S<n>",
              f"xact:crmlink:{pid}:{tid}", "link logbook customer records crm", _link_row),
             ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and has_kids),

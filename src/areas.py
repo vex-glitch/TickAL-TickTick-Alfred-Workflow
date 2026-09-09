@@ -319,22 +319,81 @@ def build_action(mode, pid, tid, title):
             "label": "📌 Create CTA",
             "preview": "Create and schedule Call to Action task"}
 
-# ── Archive-by-year lists (big-rock v2, 2026-07-31) ──────────────────────
-# One TickTick NOTE-holding list per year of finished old work, named
-# "🗄 <year>". STRICT match: exactly the emoji + a 4-digit year, so
-# "💫 OKRs 2026/2027" and demo lists can never be adopted. Probe P0
-# (2026-07-31) proved a kind=NOTE task born in a TASK-kind list keeps
-# kind/body/tags, so these lists are minted by plain create_project.
-# "🗄 <year> · Logbooks" (Vex 2026-09-07: a bare year "might get
-# confusing") - the match is PREFIX-strict (emoji + 4-digit year at
-# the start) and suffix-free, so the description can evolve without
-# orphaning a list; "💫 OKRs 2026" still cannot match.
+# ── CRM Archive: ONE list + year tags (Vex 2026-09-09) ────────────────────
+# Finished logbooks (and cold leads) live in ONE archive list, kanban
+# grouped by tag: every archived note wears ARCHIVE_TAG (the state the
+# whole records code keys on) plus a year tag nested under the archive
+# parent tag (📦crmarchive → 📦crm2025). Assigning a year in TickTick is
+# a drag between kanban columns; a note without a year tag sits in the
+# 🗂️archive column = "year unknown" (the 32 migration-born logbooks
+# whose photos carry no capture date). The per-year "🗄 <year> ·
+# Logbooks" lists of the big-rock migration (2026-09-07) are LEGACY:
+# still read (a note left there stays visible) but never written.
+ARCHIVE_ID         = os.environ.get("crm_archive_list_id") or ""
+ARCHIVE_LIST_NAME  = "📦CRM Archive"
+ARCHIVE_PARENT_TAG = (os.environ.get("crm_archive_parent_tag")
+                      or "📦crmarchive").strip().lower()
+_YEAR_TAG_FMT      = (os.environ.get("crm_archive_year_tag")
+                      or "📦crm{year}").strip().lower()
+_yt_pre, _yt_post  = (_YEAR_TAG_FMT.split("{year}", 1)
+                      if "{year}" in _YEAR_TAG_FMT else (_YEAR_TAG_FMT, ""))
+_YEAR_TAG_RE       = re.compile(rf"^{re.escape(_yt_pre)}(\d{{4}}){re.escape(_yt_post)}$")
+
+
+def year_tag(year):
+    """'📦crm2025' - the lowercase tag name for a year."""
+    return f"{_yt_pre}{str(year).strip()}{_yt_post}"
+
+
+_YEAR_TAG_LABEL = (os.environ.get("crm_archive_year_label")
+                   or "📦CRM{year}").strip()
+
+
+def year_tag_label(year):
+    """'📦CRM2025' - the display label a NEW year tag is minted with
+    (Vex's casing; the name TickTick keys on is the lowercase form)."""
+    return _YEAR_TAG_LABEL.format(year=str(year).strip())
+
+
+def year_of_tags(tags):
+    """The 4-digit year a note's tags carry, or '' (no year tag = year
+    unknown - the kanban's 🗂️archive column)."""
+    for t in tags or []:
+        m = _YEAR_TAG_RE.match(str(t).strip().lower())
+        if m:
+            return m.group(1)
+    return ""
+
+
+def is_year_tag(tag):
+    return bool(_YEAR_TAG_RE.match(str(tag or "").strip().lower()))
+
+
+def archive_id():
+    """pid of the ONE archive list: the Configure field first, else the
+    projects cache by name (casefold 'crm archive'). '' = none yet -
+    crm_records.ensure_archive_list mints it."""
+    if ARCHIVE_ID:
+        return ARCHIVE_ID
+    for p in cache_store.get("projects") or []:
+        if "crm archive" in (p.get("name") or "").casefold():
+            return p.get("id") or ""
+    return ""
+
+
+def archive_configured():
+    return bool(archive_id())
+
+
+# LEGACY read path - the migration's per-year lists ("🗄 <year> · Logbooks",
+# PREFIX-strict: emoji + 4-digit year, so "💫 OKRs 2026" never matches).
+# Emptied 2026-09-09 (their notes moved into the ONE archive list); the
+# pids stay readable so a note Vex parks there is still a record.
 _ARCHIVE_RE = re.compile(r"^🗄\s*(\d{4})\b")
 
 
 def archive_dests():
-    """{year: pid} from the projects cache. Read-only; ensure_archive_list
-    (crm_records) is the writer."""
+    """{year: pid} of the LEGACY year lists in the projects cache."""
     out = {}
     for p in cache_store.get("projects") or []:
         m = _ARCHIVE_RE.match((p.get("name") or "").strip())
@@ -344,10 +403,14 @@ def archive_dests():
 
 
 def archive_pids():
-    return tuple(archive_dests().values())
+    """Every pid archived records may live in: the ONE archive list +
+    the legacy year lists."""
+    aid = archive_id()
+    return ((aid,) if aid else ()) + tuple(archive_dests().values())
 
 
 def records_pids():
-    """Every pid a CRM records note may live in: Records + the year lists.
-    THE read-path widening - records_notes rides this."""
+    """Every pid a CRM records note may live in: Records + the archive
+    list (+ legacy year lists). THE read-path widening - records_notes
+    rides this, and so does every locate()."""
     return (RECORDS_ID,) + archive_pids()

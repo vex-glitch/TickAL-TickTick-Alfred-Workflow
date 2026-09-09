@@ -193,12 +193,20 @@ class TickTickAPI:
         payload["id"] = task_id
         # Preserve explicit projectId override (for move operations)
         if "projectId" not in fields:
-            payload["projectId"] = project_id
+            # The object's OWN list wins over the positional pid when the
+            # caller handed us the live object: records notes live in
+            # Records OR the archive list (2026-09-09), and a write under
+            # the wrong pid is answered with an EMPTY body - probe-verified,
+            # never a silent move. Moves pass projectId in fields.
+            payload["projectId"] = current.get("projectId") or project_id
         # Moving to a new project: clear columnId - it belongs to the old project
         if "projectId" in fields and fields["projectId"] != project_id:
             payload["columnId"] = None
         r = self.session.post(f"{BASE_URL}/task/{task_id}", json=payload)
         _check(r)
+        if not (r.text or "").strip():
+            raise RuntimeError(f"update_task {task_id}: empty reply - the task "
+                               f"is not in list {payload.get('projectId')}")
         return r.json()
 
     def move_task(self, task_id, from_project_id, to_project_id):

@@ -13,7 +13,9 @@ What exists now:
   exact), CRM: 9 homes under `Archive/`. Superseded snapshots (1,011) and
   the 20 frozen duplicate imports stay in their OLD folders untouched.
 - TickTick: 7 year lists `🗄 <year> · Logbooks` in 📦Archives holding 61+
-  archived logbooks; 32 undated logbooks open in Records; 44 customers (5
+  archived logbooks (RETIRED 2026-09-09: every archived note moved into
+  the ONE `📦CRM Archive` list wearing a `📦crm<year>` tag, HANDOFF_CRM
+  §10; the empty lists stay readable via `areas.archive_dests`); 32 undated logbooks open in Records; 44 customers (5
   adopted, 39 minted); 273 pipeline entries (📸raw, kind TEXT).
 - Ledger `~/.ticktick_alfred/run/migration.sqlite3`: egroup (309 executed,
   3 merged), mover (3,822, prior state for undo), event (full trail).

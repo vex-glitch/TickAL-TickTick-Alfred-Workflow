@@ -118,13 +118,15 @@ def _safe_name(name):
                   re.sub(r'[\[\]()#~!*=&%>|"]', "", name or "")).strip()
 
 
-def _ensure_tag(tag):
+def _ensure_tag(tag, parent=None):
     """Records tags become REAL tag entities like every other tag-writing
     path (dispatch._ensure_tags_exist: emoji-blind twin guard, v2-token
-    best-effort, never blocks the write)."""
+    best-effort, never blocks the write). parent nests a new tag (the
+    📦crm<year> tags under 📦crmarchive)."""
     try:
         import dispatch as _disp
-        _disp._ensure_tags_exist([tag])
+        _disp._ensure_tags_exist(
+            [tag], parents={str(tag).lower(): parent} if parent else None)
     except Exception:
         pass
 
@@ -684,12 +686,12 @@ def _swap_link_text_in_note(note_tid, target_tid, new_text):
     """Same swap inside a records note's content."""
     try:
         api = _api()
-        live = api.get_task(areas.RECORDS_ID, note_tid)
+        live = get_note(note_tid)
         pat = _link_text_pat(target_tid)
         new_c = pat.sub(lambda m: f"[{new_text}]{m.group(2)}",
                         live.get("content") or "")
         if new_c != (live.get("content") or ""):
-            api.update_task(note_tid, areas.RECORDS_ID, current=live,
+            api.update_task(note_tid, live["projectId"], current=live,
                             content=new_c)
             _patch_cache(note_tid, content=new_c)
     except Exception:
@@ -700,11 +702,11 @@ def rename_logbook(log_tid, new_tattoo):
     """Rename the tattoo with full ripple: note title, customer bullet,
     every open task's link text."""
     api = _api()
-    lb = api.get_task(areas.RECORDS_ID, log_tid)
+    lb = get_note(log_tid)
     old = lb.get("title") or ""
     m = re.match(r"^((?:🎨|🏛️) .*? • )", old)
     new_title = (m.group(1) if m else "🎨 ") + _safe_name(new_tattoo)
-    api.update_task(log_tid, areas.RECORDS_ID, current=lb, title=new_title)
+    api.update_task(log_tid, lb["projectId"], current=lb, title=new_title)
     _patch_cache(log_tid, title=new_title)
     _ripple_task_link_text(log_tid, new_title)
     sync_customer_bullet({**lb, "title": new_title})
@@ -715,13 +717,13 @@ def rename_customer(cust_tid, new_name):
     """Rename the human with full ripple: customer note, every logbook title
     carrying the old name, the links inside them, open task link texts."""
     api = _api()
-    cust = api.get_task(areas.RECORDS_ID, cust_tid)
+    cust = get_note(cust_tid)
     old_disp = customer_display(cust)
     new_disp = _safe_name(new_name)
     # Keep whichever person marker the note wears (🎣 lead vs 👤 customer).
     old_mark = "🎣" if (cust.get("title") or "").startswith("🎣") else "👤"
     new_title = f"{old_mark} {new_disp}"
-    api.update_task(cust_tid, areas.RECORDS_ID, current=cust, title=new_title)
+    api.update_task(cust_tid, cust["projectId"], current=cust, title=new_title)
     _patch_cache(cust_tid, title=new_title)
     for lb in customer_logbooks(cust_tid):
         _swap_link_text_in_note(lb["id"], cust_tid, new_title)
@@ -732,9 +734,9 @@ def rename_customer(cust_tid, new_name):
             tattoo_part = lt[len(f"{emo} {old_disp} • "):]
             new_lt = f"{emo} {new_disp} • {tattoo_part}"
             try:
-                live_lb = api.get_task(areas.RECORDS_ID, lb["id"])
-                api.update_task(lb["id"], areas.RECORDS_ID, current=live_lb,
-                                title=new_lt)
+                live_lb = get_note(lb["id"])
+                api.update_task(lb["id"], live_lb["projectId"],
+                                current=live_lb, title=new_lt)
                 _patch_cache(lb["id"], title=new_lt)
                 _ripple_task_link_text(lb["id"], new_lt)
                 sync_customer_bullet({**live_lb, "title": new_lt})
@@ -748,13 +750,13 @@ def reopen_logbook(log_pid, log_tid):
     back to 🎨), with a dated trace line. The next Session-done final
     archives it back."""
     api = _api()
-    lb = api.get_task(log_pid, log_tid)
+    lb, log_pid = locate(log_tid, log_pid)
     content = re.sub(r"Finished \S+", "Finished -",
                      lb.get("content") or "", count=1)
     content = _append_under(content, "## Notes",
                             f"- {_today()} - reopened (touch-up)", blank=False)
     _ensure_tag(areas.LOGBOOK_TAG)
-    tags = [t for t in (lb.get("tags") or [])
+    tags = [t for t in _year_tags_stripped(lb.get("tags") or [])
             if str(t).lower() not in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG)] \
         + [areas.LOGBOOK_TAG]
     title = lb.get("title") or ""
@@ -763,12 +765,17 @@ def reopen_logbook(log_pid, log_tid):
         fields["title"] = "🎨 " + title[len("🏛️ "):]
     api.update_task(log_tid, log_pid, current=lb, **fields)
     _patch_cache(log_tid, **fields)
+    # home again: out of the archive list (Vex 2026-09-09)
+    new_pid = unarchive_note(log_tid, live={**lb, **fields,
+                                            "projectId": log_pid})
     if "title" in fields:
         _ripple_task_link_text(log_tid, fields["title"])
     sync_customer_bullet({**lb, "content": content,
-                          "title": fields.get("title") or title})
+                          "title": fields.get("title") or title,
+                          "projectId": new_pid, "_projectId": new_pid})
     return {**lb, "content": content, "tags": tags,
-            "title": fields.get("title") or title}
+            "title": fields.get("title") or title,
+            "projectId": new_pid, "_projectId": new_pid}
 
 
 def convert_lead(cust):
@@ -777,7 +784,7 @@ def convert_lead(cust):
     if not is_lead(cust):
         return cust
     api = _api()
-    live = api.get_task(areas.RECORDS_ID, cust["id"])
+    live = get_note(cust["id"])
     tags = [t for t in (live.get("tags") or [])
             if str(t).lower() not in (areas.LEAD_TAG, areas.CUSTOMER_TAG)] \
         + [areas.CUSTOMER_TAG]
@@ -786,7 +793,7 @@ def convert_lead(cust):
     title = live.get("title") or ""
     if title.startswith("🎣 "):
         fields["title"] = "👤 " + title[len("🎣 "):]
-    api.update_task(cust["id"], areas.RECORDS_ID, current=live, **fields)
+    api.update_task(cust["id"], live["projectId"], current=live, **fields)
     _patch_cache(cust["id"], **fields)
     if "title" in fields:
         for lb in customer_logbooks(cust["id"]):
@@ -828,7 +835,9 @@ def _inject_cache(task):
 
 
 def _patch_cache(tid, **fields):
-    """Mirror content/tag updates into every cache that holds the note."""
+    """Mirror content/tag updates into every cache that holds the note -
+    all_notes / all_tasks and the project_data pool of EVERY records
+    list (a note lives in Records OR the archive list)."""
     try:
         if "tags" in fields:
             fields = dict(fields, tags=list(dict.fromkeys(
@@ -841,14 +850,97 @@ def _patch_cache(tid, **fields):
                     t.update(fields); hit = True
             if hit:
                 cache_store.set(key, pool)
-        pd_key = f"project_data_{areas.RECORDS_ID}"
-        pd = cache_store.get(pd_key)
-        if pd is not None:
+        for pid in areas.records_pids():
+            pd_key = f"project_data_{pid}"
+            pd = cache_store.get(pd_key)
+            if pd is None:
+                continue
             pd = dict(pd)
+            hit = False
             for t in pd.get("tasks", []):
                 if t.get("id") == tid:
-                    t.update(fields)
-            cache_store.set(pd_key, pd)
+                    t.update(fields); hit = True
+            if hit:
+                cache_store.set(pd_key, pd)
+    except Exception:
+        pass
+
+
+# ── where does a records note live? (ONE archive list, 2026-09-09) ────────
+# A note is in Records OR the archive list (OR a legacy year list). Every
+# read/write road resolves the pid HERE instead of assuming RECORDS_ID:
+# the open API 404s a GET with the wrong pid and answers an update with
+# an empty body (probe 2026-09-09) - loud, but every road died on an
+# archived note until this.
+
+def pid_of(note_or_tid):
+    """The list a records note lives in, from the note dict or the cache;
+    RECORDS_ID when unknown."""
+    n = note_or_tid if isinstance(note_or_tid, dict) \
+        else (cache_store.find_task(str(note_or_tid)) or {})
+    return (n.get("_projectId") or n.get("projectId") or areas.RECORDS_ID)
+
+
+def locate(tid, hint=None):
+    """(live_note, pid): the live read tried at the hinted pid, the cached
+    pid, then every other records pid. Raises the last error when the
+    note is nowhere."""
+    api = _api()
+    tried, last = [], None
+    for pid in (hint, pid_of(tid), *areas.records_pids()):
+        if not pid or pid in tried:
+            continue
+        tried.append(pid)
+        try:
+            live = api.get_task(pid, tid)
+            if live.get("projectId") and live["projectId"] != pid:
+                pid = live["projectId"]
+            return live, pid
+        except Exception as e:
+            last = e
+    raise last or KeyError(tid)
+
+
+def get_note(tid, hint=None):
+    """Live records note wherever it lives (projectId set)."""
+    live, pid = locate(tid, hint)
+    live.setdefault("projectId", pid)
+    return live
+
+
+def _move_cache(tid, new_pid):
+    """Mirror a list move: the note's pid fields in both pools, and the
+    entry hops between the project_data pools that are cached."""
+    try:
+        pname = next((p.get("name") for p in
+                      (cache_store.get("projects") or [])
+                      if p.get("id") == new_pid), None) or ""
+        entry = None
+        for key in ("all_notes", "all_tasks"):
+            pool = cache_store.get(key) or []
+            hit = False
+            for t in pool:
+                if t.get("id") == tid:
+                    t["projectId"] = t["_projectId"] = new_pid
+                    if pname:
+                        t["_projectName"] = pname
+                    t.pop("columnId", None)
+                    entry = entry or dict(t)
+                    hit = True
+            if hit:
+                cache_store.set(key, pool)
+        for pid in areas.records_pids():
+            pd_key = f"project_data_{pid}"
+            pd = cache_store.get(pd_key)
+            if pd is None:
+                continue
+            pd = dict(pd)
+            tasks = [t for t in pd.get("tasks", []) if t.get("id") != tid]
+            if pid == new_pid and entry is not None:
+                tasks.append(entry)
+            if len(tasks) != len(pd.get("tasks", [])) or pid == new_pid:
+                pd["tasks"] = tasks
+                cache_store.set(pd_key, pd)
     except Exception:
         pass
 
@@ -1065,8 +1157,9 @@ def purge_cache(tid, pid=None):
             pool = [t for t in (cache_store.get(key) or [])
                     if t.get("id") != tid]
             cache_store.set(key, pool)
-        cache_store.invalidate(f"project_data_{areas.RECORDS_ID}")
-        if pid and pid != areas.RECORDS_ID:
+        for rp in areas.records_pids():
+            cache_store.invalidate(f"project_data_{rp}")
+        if pid and pid not in areas.records_pids():
             cache_store.invalidate(f"project_data_{pid}")
     except Exception:
         cache_store.invalidate()
@@ -1091,7 +1184,9 @@ def logbook_notes(include_archived=True):
 
 
 def logbook_archived(lb):
-    """Archived? - from the note's own tags."""
+    """Archived? - from the note's own tags (the LIST it sits in is a
+    consequence, never the oracle: a note Vex drags by hand keeps its
+    state through its tags)."""
     return areas.ARCHIVE_TAG in {str(t).lower()
                                  for t in (lb.get("tags") or [])}
 
@@ -1301,21 +1396,21 @@ def create_logbook(cust, tattoo, started=None, quoted="", prep=False,
     return t
 
 
-def ensure_archive_list(year):
-    """pid of the '🗄 <year>' list, minting it on first need and appending
-    to the projects cache IN PLACE (invalidate('projects') broke search
-    once - never again)."""
-    year = str(year)
-    have = areas.archive_dests()
-    if year in have:
-        return have[year]
+def ensure_archive_list(year=None):
+    """pid of THE archive list (📦CRM Archive), minting it beside Records
+    on first need and appending to the projects cache IN PLACE
+    (invalidate('projects') broke search once - never again). `year` is
+    accepted for the migration engine's call shape and ignored: the year
+    is a TAG now, not a list."""
+    aid = areas.archive_id()
+    if aid:
+        return aid
     # cache miss: verify LIVE before minting - a kill between a landed
     # create and the cache append would otherwise mint a twin list
     try:
         live = _api().get_projects()
         for p in live or []:
-            if areas._ARCHIVE_RE.match((p.get("name") or "").strip()) and \
-                    areas._ARCHIVE_RE.match(p["name"].strip()).group(1) == year:
+            if "crm archive" in (p.get("name") or "").casefold():
                 pool = list(cache_store.get("projects") or [])
                 if not any(x.get("id") == p.get("id") for x in pool):
                     pool.append(p)
@@ -1323,30 +1418,110 @@ def ensure_archive_list(year):
                 return p.get("id")
     except Exception:
         pass
-    p = _api().create_project(archive_list_name(year),
-                              group_id=archive_group_id())
+    group = (areas._project(areas.RECORDS_ID) or {}).get("groupId")
+    p = _api().create_project(areas.ARCHIVE_LIST_NAME, group_id=group)
     pool = list(cache_store.get("projects") or [])
     pool.append(p)
     cache_store.set("projects", pool)
     return p.get("id")
 
 
-def archive_list_name(year):
-    return f"🗄 {year} · Logbooks"
+def ensure_year_tag(year):
+    """The 📦crm<year> tag exists, nested under the archive parent tag."""
+    tag = areas.year_tag(year)
+    _ensure_tag(areas.ARCHIVE_PARENT_TAG)
+    _ensure_tag(areas.year_tag_label(year), parent=areas.ARCHIVE_PARENT_TAG)
+    return tag
 
 
-def archive_group_id():
-    """The TickTick folder the year lists live in. Vex parked the first
-    two in 📦Archives (2026-09-07); new years follow whatever group an
-    existing year list sits in, else a group whose name says archive."""
-    for pid in areas.archive_pids():
-        for p in cache_store.get("projects") or []:
-            if p.get("id") == pid and p.get("groupId"):
-                return p["groupId"]
-    for g in cache_store.get("folder_groups") or []:
-        if isinstance(g, dict) and "archive" in (g.get("name") or "").casefold():
-            return g.get("id")
-    return None
+def started_year(content):
+    """The Started year from a logbook header ('' when unknown)."""
+    m = re.search(r"Started (\d{4})-\d\d-\d\d", content or "")
+    return m.group(1) if m else ""
+
+
+def archive_year(content, when=None):
+    """THE year rule (Vex 2026-09-09, the year lists keyed the same way):
+    the year the tattoo STARTED; a backlog finish date or today when the
+    header carries no date; '' = unknown (no year tag)."""
+    y = started_year(content)
+    if y:
+        return y
+    m = re.match(r"(\d{4})", when or "")
+    return m.group(1) if m else ""
+
+
+def note_year(note):
+    """A note's archive year: its year tag first, else the Started year."""
+    return (areas.year_of_tags(note.get("tags") or [])
+            or started_year(note.get("content") or ""))
+
+
+def _year_tags_stripped(tags):
+    return [t for t in (tags or []) if not areas.is_year_tag(t)]
+
+
+def archive_note(tid, year="", live=None, drop=()):
+    """THE archive road: ARCHIVE_TAG on (state), the year tag on when a
+    year is known (kanban column), the note MOVED into the archive list.
+    `drop` = extra tags to shed (a cold lead loses lead/customer).
+    Returns the pid it lives in now. Idempotent - a note already there
+    only gets its tags aligned."""
+    if live is None:
+        live = get_note(tid)
+    pid = live.get("projectId") or pid_of(live)
+    dest = ensure_archive_list()
+    shed = {areas.ARCHIVE_TAG, *(str(t).lower() for t in drop)}
+    tags = [t for t in _year_tags_stripped(live.get("tags") or [])
+            if str(t).lower() not in shed]
+    tags.append(areas.ARCHIVE_TAG)
+    _ensure_tag(areas.ARCHIVE_TAG)
+    if year:
+        tags.append(ensure_year_tag(year))
+    api = _api()
+    if [str(t).lower() for t in tags] != \
+            [str(t).lower() for t in (live.get("tags") or [])]:
+        api.update_task(tid, pid, current=live, tags=tags)
+        live = {**live, "tags": tags}
+        _patch_cache(tid, tags=tags)
+    if dest and pid != dest:
+        api.move_task(tid, pid, dest)
+        _move_cache(tid, dest)
+        pid = dest
+    return pid
+
+
+def unarchive_note(tid, live=None):
+    """Back to Records: year tag off, the note moved home. The caller
+    owns the state tags (reopen_logbook swaps archive → logbook)."""
+    if live is None:
+        live = get_note(tid)
+    pid = live.get("projectId") or pid_of(live)
+    tags = _year_tags_stripped(live.get("tags") or [])
+    api = _api()
+    if len(tags) != len(live.get("tags") or []):
+        api.update_task(tid, pid, current=live, tags=tags)
+        live = {**live, "tags": tags}
+        _patch_cache(tid, tags=tags)
+    if pid != areas.RECORDS_ID:
+        api.move_task(tid, pid, areas.RECORDS_ID)
+        _move_cache(tid, areas.RECORDS_ID)
+        pid = areas.RECORDS_ID
+    return pid
+
+
+def set_year(tid, year, live=None):
+    """Retag an archived note's year (the workflow's answer to the kanban
+    drag). Returns the tag written."""
+    if live is None:
+        live = get_note(tid)
+    pid = live.get("projectId") or pid_of(live)
+    tags = _year_tags_stripped(live.get("tags") or [])
+    tag = ensure_year_tag(year)
+    tags.append(tag)
+    _api().update_task(tid, pid, current=live, tags=tags)
+    _patch_cache(tid, tags=tags)
+    return tag
 
 
 def _bullet_for(logbook):
@@ -1431,7 +1606,7 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
     the title is the CURRENT one (a rename must not leave the S<n+1> prefill
     holding the stale link text frozen in the completed task's title)."""
     api = _api()
-    lb = api.get_task(log_pid, log_tid)   # live - dialogs are slow, cache lags
+    lb, log_pid = locate(log_tid, log_pid)   # live - dialogs are slow, cache lags
     day = when or _today()
     entry = f"### {day} · {marker} · {_seg(duration)} · {_seg(charged)}"
     if (text or "").strip():
@@ -1490,7 +1665,7 @@ def insert_session_images(log_pid, log_tid, items):
     a Finder-roll's worth of photos must not burn a rate-limit window.
     Occurrences stay stable across inserts (refs never add ### lines)."""
     api = _api()
-    lb = api.get_task(log_pid, log_tid)
+    lb, log_pid = locate(log_tid, log_pid)
     content = lb.get("content") or ""
     for heading, occurrence, ref in items:
         content = _plant_image_ref(content, heading, occurrence, ref)
@@ -1504,7 +1679,7 @@ def finish_logbook(log_pid, log_tid, when=None):
     2026-07-20: the archive wears its own emoji), sync the customer bullet.
     when = ISO date for backlog imports (the last session's day); None = today."""
     api = _api()
-    lb = api.get_task(log_pid, log_tid)
+    lb, log_pid = locate(log_tid, log_pid)
     content = re.sub(r"Finished \S+", f"Finished {when or _today()}",
                      _fresher_content(log_tid, lb.get("content") or ""), count=1)
     _ensure_tag(areas.ARCHIVE_TAG)
@@ -1517,17 +1692,23 @@ def finish_logbook(log_pid, log_tid, when=None):
         fields["title"] = "🏛️ " + title[len("🎨 "):]
     api.update_task(log_tid, log_pid, current=lb, **fields)
     _patch_cache(log_tid, **fields)
+    # the move: year tag + the ONE archive list (Vex 2026-09-09)
+    year = archive_year(content, when)
+    new_pid = archive_note(log_tid, year, live={**lb, **fields,
+                                                "projectId": log_pid})
     if "title" in fields:
         _ripple_task_link_text(log_tid, fields["title"])
     sync_customer_bullet({**lb, "content": content,
-                          "title": fields.get("title") or title})
+                          "title": fields.get("title") or title,
+                          "projectId": new_pid, "_projectId": new_pid})
+    return new_pid
 
 
 def append_note_line(pid, tid, text, section="## Notes", stamp=True):
     """Free-text line under a section (## Notes timestamped by default;
     ## Fun facts takes bare bullets - facts don't age)."""
     api = _api()
-    note = api.get_task(pid, tid)
+    note, pid = locate(tid, pid)
     if stamp:
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         line = f"- {ts} - {text.strip()}"

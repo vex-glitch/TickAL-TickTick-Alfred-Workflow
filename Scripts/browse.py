@@ -825,9 +825,17 @@ def _records_gate():
     return None
 
 
+def _note_pid(x):
+    """The list a records note lives in - Records OR the archive list
+    (2026-09-09). Takes the note dict (cheap) or an id (cache scan)."""
+    import crm_records as cr
+    return cr.pid_of(x)
+
+
 def _record_vars(note):
-    return {"task_id": note["id"], "task_list_id": _areas.RECORDS_ID,
-            "list_id": _areas.RECORDS_ID, "task_title": note.get("title") or "",
+    pid = _note_pid(note)
+    return {"task_id": note["id"], "task_list_id": pid,
+            "list_id": pid, "task_title": note.get("title") or "",
             "item_type": "note"}
 
 
@@ -879,8 +887,7 @@ def render_crmnew(kind, query):
                     state = (f"{nxt[1] or 'session'} scheduled 📅 {nxt[0] or '?'}"
                              if nxt else "nothing scheduled")
                 mods = _picker_mods()
-                mods["shift"] = {"arg": f"open:ticktick:///webapp/#p/"
-                                        f"{_areas.RECORDS_ID}/tasks/{lb['id']}",
+                mods["shift"] = {"arg": _open_note_arg(lb),
                                  "valid": True, "subtitle": "Open the logbook"}
                 rows.append(alfred.item(
                     uid=f"crmnew-s-{lb['id']}",
@@ -1022,8 +1029,10 @@ def render_crmlog(query):
 
 # ── Levels: crmsearch / crmcust / crmback / crmsched (round-2 surfaces) ──────
 
-def _open_note_arg(tid):
-    return f"open:ticktick:///webapp/#p/{_areas.RECORDS_ID}/tasks/{tid}"
+def _open_note_arg(note_or_tid):
+    """⏎ open-in-TickTick arg for a records note, wherever it lives."""
+    tid = note_or_tid["id"] if isinstance(note_or_tid, dict) else note_or_tid
+    return f"open:ticktick:///webapp/#p/{_note_pid(note_or_tid)}/tasks/{tid}"
 
 
 def _cust_row(cr, c, uid_prefix="crms"):
@@ -2645,7 +2654,8 @@ def _logbook_state(cr, lb):
     """(circle, trailing date) - Vex's legend 2026-07-28:
     🔴 archived · 🟡 active, nothing booked · 🟢 scheduled (+ the date)."""
     if cr.logbook_archived(lb):
-        return "🔴", ""
+        return "🔴", (f"📦 {cr.note_year(lb)}" if cr.note_year(lb)
+                      else "📦 year?")
     nxt = cr.next_session_task(lb["id"])
     if nxt and nxt[0]:
         return "🟢", nxt[0]
@@ -2697,14 +2707,14 @@ def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None):
     # ⌥⌘ copies the TICKTICK link here (Vex 2026-07-28) - the Eagle link
     # is one step deeper, on ⇧ Content, where Eagle is what you are
     # looking at. Same chord, right link for the world you are in.
-    mods["alt+cmd"] = {"arg": f"copy:{_open_note_arg(lb['id'])[5:]}",
+    mods["alt+cmd"] = {"arg": f"copy:{_open_note_arg(lb)[5:]}",
                        "valid": True, "subtitle": "🔗 Copy TickTick link"}
     return alfred.item(
         uid=f"{uid_prefix}-{lb['id']}",
         title=f"🎨 {name}  {circle} " + " • ".join(head),
         subtitle=" · ".join(sub) + "  |  ⌥ hub  ⇧ photos  ⌥⇧ book  |  ⌘⚡ ⏎↗️"
                  + ("  ⌥⌘🔗" if fid else "") + "  ⌃🔙",
-        arg=_open_note_arg(lb["id"]),
+        arg=_open_note_arg(lb),
         match=base, mods=mods, variables=_record_vars(lb))
 
 
@@ -3276,6 +3286,7 @@ def _crmlist_drill(uid, emoji, name, list_id, scope, query, extra=()):
     term = (query or "").strip()
     scopes = _LIST_SCOPES.get(scope) or ()
     filt, label = None, ""
+    year = ""
     if scopes:
         names = "|".join(re.escape(l) for l, _p in scopes)
         m = re.match(rf"(?i)^({names})(?:\s+(.*))?$", term)
@@ -3283,6 +3294,17 @@ def _crmlist_drill(uid, emoji, name, list_id, scope, query, extra=()):
             label = m.group(1)
             filt = next(p for l, p in scopes if l.lower() == label.lower())
             term = (m.group(2) or "").strip()
+            # "Archived 2023" = one kanban column of 📦CRM Archive;
+            # "Archived ?" = the notes still without a year (2026-09-09)
+            if label.lower() == "archived":
+                ym = re.match(r"^(\d{4}|\?)(?:\s+(.*))?$", term)
+                if ym:
+                    year = ym.group(1)
+                    term = (ym.group(2) or "").strip()
+                    base_f = filt
+                    want = "" if year == "?" else year
+                    filt = (lambda cr, o, _b=base_f, _w=want:
+                            _b(cr, o) and cr.note_year(o) == _w)
         elif term.startswith("/"):
             frag = term[1:].strip().lower()
             menu = [alfred.item(
@@ -3290,12 +3312,30 @@ def _crmlist_drill(uid, emoji, name, list_id, scope, query, extra=()):
                 subtitle=f"Scope {name.lower()} to {l.lower()}",
                 valid=False, autocomplete=f"{l} ")
                 for l, _p in scopes if frag in l.lower()]
+            if scope == "lo":
+                years = {}
+                for lb in cr.logbook_notes():
+                    if cr.logbook_archived(lb):
+                        y = cr.note_year(lb) or "?"
+                        years[y] = years.get(y, 0) + 1
+                for y in sorted(years, reverse=True):
+                    if frag and frag not in y and frag not in "archived":
+                        continue
+                    menu.append(alfred.item(
+                        uid=f"{uid}-sc-y{y}",
+                        title=f"📦 {y if y != '?' else 'year unknown'}"
+                              f" · {years[y]}",
+                        subtitle="One archive column",
+                        valid=False, autocomplete=f"Archived {y} "))
             return add_back(menu or [alfred.item(
                 title=f'No scope matching "{frag}"', valid=False)],
                 "ctx:crmhub")
+    if label.lower() == "archived" and _areas.archive_id():
+        list_id = _areas.archive_id()
     rows = [alfred.item(
         uid=f"{uid}-open", title=f"{emoji} {name}"
-                                 + (f" · {label}" if label else ""),
+                                 + (f" · {label}" if label else "")
+                                 + (f" · 📦 {year}" if year else ""),
         subtitle="The whole list, in the app  |  ⏎↗️"
                  + ("  ·  / scopes" if scopes else ""),
         arg=f"open:ticktick:///webapp/#p/{list_id}/tasks")]
@@ -3365,7 +3405,7 @@ def render_crmcust(cust_tid, query):
     rows.append(alfred.item(
         uid="hub-open", title=cust.get("title") or name,
         subtitle=(info or "New customer") + "  |  ⏎↗️",
-        arg=_open_note_arg(cust_tid), mods=_picker_mods(),
+        arg=_open_note_arg(cust), mods=_picker_mods(),
         variables=_record_vars(cust)))
     if phone:
         rows.append(alfred.item(uid="hub-phone", title=f"📞 {phone}",

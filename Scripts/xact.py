@@ -1435,6 +1435,13 @@ def _records_ready():
     return True
 
 
+def _records_pid(x):
+    """The list a records note lives in (Records OR the archive list,
+    2026-09-09) - never assume RECORDS_ID for a logbook."""
+    import crm_records as cr
+    return cr.pid_of(x)
+
+
 def _record_by_id(tid):
     import areas
     import crm_records as cr
@@ -1442,7 +1449,7 @@ def _record_by_id(tid):
         if n.get("id") == tid:
             return n
     try:   # cache can lag behind a hand-created note - fall back to live
-        return cr._api().get_task(areas.RECORDS_ID, tid)
+        return cr.get_note(tid)
     except Exception:
         return None
 
@@ -2000,7 +2007,7 @@ def crmimport():
         # skeleton, and its parent follows the note's tags - with the
         # archive tag already on, it is born under Archive/ instead of
         # Customers/ + a later move. Re-read so the tag is visible.
-        cr.finish_logbook(areas.RECORDS_ID, lb["id"])
+        cr.finish_logbook(areas.RECORDS_ID, lb["id"], when=when)
         lb = _record_by_id(lb["id"]) or lb
     content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
     if state == "Finished":
@@ -2246,7 +2253,7 @@ def crmedit(tid):
     import areas
     try:
         with open("/tmp/ticktick_reattribute.txt", "w") as f:
-            f.write(f"{areas.RECORDS_ID}:{tid}")
+            f.write(f"{_records_pid(tid)}:{tid}")
     except OSError as e:
         _crm_say(f"Edit failed: {e}")
         return
@@ -2404,19 +2411,44 @@ def crmcold(tid):
         _crm_say("Cancelled")
         return
     try:
+        import datetime as _dt
         cr.append_note_line(areas.RECORDS_ID, tid,
                             f"cold: {reason.strip() or 'no reason given'}")
-        api = cr._api()
-        live = api.get_task(areas.RECORDS_ID, tid)
-        tags = [t for t in (live.get("tags") or [])
-                if str(t).lower() not in (areas.LEAD_TAG, areas.CUSTOMER_TAG,
-                                          areas.ARCHIVE_TAG)] \
-            + [areas.ARCHIVE_TAG]
-        api.update_task(tid, areas.RECORDS_ID, current=live, tags=tags)
-        cr._patch_cache(tid, tags=tags)
-        _crm_say(f"🥶 {cr.customer_display(cust)} archived")
+        # ONE archive road (2026-09-09): archive tag + this year's tag +
+        # the move into 📦CRM Archive, lead/customer tags dropped
+        year = str(_dt.date.today().year)
+        cr.archive_note(tid, year, drop=(areas.LEAD_TAG, areas.CUSTOMER_TAG))
+        _crm_say(f"🥶 {cr.customer_display(cust)} archived · 📦 {year}")
     except Exception as e:
         _crm_say(f"🥶 Failed: {type(e).__name__}: {e}")
+
+
+def crmyear(tid):
+    """🗄 Set an archived note's year (its kanban column in 📦CRM Archive):
+    the workflow's answer to the drag. 4 digits, prefilled with the year
+    it wears (or the Started year)."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    note = _record_by_id(tid)
+    if not note:
+        _crm_say("Not found · run tsy")
+        return
+    title = note.get("title") or "note"
+    raw = _ask(f"{title} - archive year? (4 digits · Esc cancels)",
+               default=cr.note_year(note))
+    if raw is None:
+        _crm_say("Cancelled")
+        return
+    year = re.sub(r"\D", "", raw or "")
+    if len(year) != 4:
+        _crm_say("Need a 4-digit year · nothing changed")
+        return
+    try:
+        cr.set_year(tid, year)
+        _crm_say(f"🗄 {title} → 📦 {year}")
+    except Exception as e:
+        _crm_say(f"🗄 Failed: {type(e).__name__}: {e}")
 
 
 def crmrename(tid):
@@ -2538,7 +2570,9 @@ def crmclose(log_tid):
         return
     try:
         cr.finish_logbook(areas.RECORDS_ID, log_tid, when=when)
-        _crm_say(f"📁 {title} archived · finished {when or 'today'}")
+        year = cr.archive_year((lb or {}).get("content") or "", when)
+        _crm_say(f"📁 {title} archived · finished {when or 'today'}"
+                 f" · 📦 {year or 'year?'}")
         _eagle_archive_folder(log_tid)
     except Exception as e:
         _crm_say(f"📁 Archive failed: {type(e).__name__}: {e}")
@@ -2605,11 +2639,11 @@ def _eagle_ensure_logbook_folder(lb):
         if name not in have:
             eagle.create_folder(name, parent=fid)
     api = cr._api()
-    live = api.get_task(areas.RECORDS_ID, lb["id"])
+    live = cr.get_note(lb["id"])
     base_content = _fresher_of(lb.get("content") or "",
                                live.get("content") or "")
     new = cr.set_eagle_folder(base_content, fid)
-    api.update_task(lb["id"], areas.RECORDS_ID, current=live, content=new)
+    api.update_task(lb["id"], live["projectId"], current=live, content=new)
     _patch_content_cache(lb["id"], new)
     return fid
 
@@ -2638,7 +2672,7 @@ def _mint_raw_task(lb, dest, fid, tag="📸raw"):
     api = cr._api()
     base = cr.logbook_base(lb)
     title = _eagle_title(base, fid)
-    body = f"🎨 {cr.task_link(areas.RECORDS_ID, lb['id'], lb.get('title') or '')}"
+    body = f"🎨 {cr.task_link(_records_pid(lb), lb['id'], lb.get('title') or '')}"
     pid = areas.CONTENT_DESTS[dest][0]
     t = api.create_task(title=title, project_id=pid, content=body,
                         tags=[tag])
@@ -2720,10 +2754,10 @@ def content_dest(log_tid, mandatory=False, back=""):
             else "fm" if pick.startswith("🖋")
             else "studio" if pick.startswith("🏷") else "-")
     api = cr._api()
-    live = api.get_task(areas.RECORDS_ID, log_tid)
+    live = cr.get_note(log_tid)
     fresh = cr._fresher_content(log_tid, live.get("content") or "")
     new = cr.set_content_dest(fresh, dest)
-    api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+    api.update_task(log_tid, live["projectId"], current=live, content=new)
     _patch_content_cache(log_tid, new)
     lb = dict(lb)
     lb["content"] = new
@@ -3064,7 +3098,7 @@ def session_photos(log_tid, stage=""):
                          or nxt[2].get("projectId") or areas.CRM_ID)
                 a_tid, target = nxt[2]["id"], nxt[1]
             else:
-                a_pid, a_tid, target = areas.RECORDS_ID, log_tid, "logbook"
+                a_pid, a_tid, target = _records_pid(log_tid), log_tid, "logbook"
             ok_n = dup_n = 0
             for i, h in enumerate(heroes):
                 if (a_tid == log_tid
@@ -3132,7 +3166,7 @@ def photo_attach(pid, tid):
             return
         import areas
         _is_lb_note = False
-        if pid == areas.RECORDS_ID:
+        if pid in areas.records_pids():
             t = cache_store.find_task(tid) or {}
             _is_lb_note = (t.get("title") or "").startswith(("🎨", "🏛️"))
         _att_log(f"photo_attach pid={pid} tid={tid} lb_note={_is_lb_note} "
@@ -3240,7 +3274,7 @@ def eagle_triage(rest):
                          or nxt[2].get("projectId") or areas.CRM_ID)
                 a_tid, target = nxt[2]["id"], nxt[1]
             else:
-                a_pid, a_tid, target = areas.RECORDS_ID, log_tid, "logbook"
+                a_pid, a_tid, target = _records_pid(log_tid), log_tid, "logbook"
             _attach_file_to(a_pid, a_tid, path)
             att = f" · 📎 → {target}"
         except Exception as e:
@@ -3337,7 +3371,7 @@ def _ensure_note_heading(log_tid, heading, anchor=None):
     import crm_records as cr
     try:
         api = cr._api()
-        live = api.get_task(areas.RECORDS_ID, log_tid)
+        live = cr.get_note(log_tid)
         content = cr._fresher_content(log_tid, live.get("content") or "")
         if re.search(rf"^{re.escape(heading)}\s*$", content, re.M):
             return heading
@@ -3356,7 +3390,7 @@ def _ensure_note_heading(log_tid, heading, anchor=None):
                       if l.strip() == "## Notes"), len(lines))
             lines[i:i] = [heading, ""]
         new = "\n".join(lines)
-        api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+        api.update_task(log_tid, live["projectId"], current=live, content=new)
         _patch_content_cache(log_tid, new)
         return heading
     except Exception as e:
@@ -3431,7 +3465,7 @@ def img_attach(path):
         _crm_say("📎 Already on the note")
         return
     try:
-        up = _attach_file_to(areas.RECORDS_ID, log_tid, path)
+        up = _attach_file_to(_records_pid(log_tid), log_tid, path)
     except Exception as e:
         _crm_say(f"📎 {e}")
         return
@@ -3668,7 +3702,7 @@ def _move_note_refs(log_tid, from_label, to_label):
     import crm_records as cr
     try:
         api = cr._api()
-        live = api.get_task(areas.RECORDS_ID, log_tid)
+        live = cr.get_note(log_tid)
         content = cr._fresher_content(log_tid, live.get("content") or "")
         lines = content.split("\n")
         src = _note_heading_index(lines, from_label)
@@ -3707,7 +3741,7 @@ def _move_note_refs(log_tid, from_label, to_label):
                 return 0
         lines[dst + 1:dst + 1] = refs
         new = "\n".join(lines)
-        api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+        api.update_task(log_tid, live["projectId"], current=live, content=new)
         _patch_content_cache(log_tid, new)
         return len(refs)
     except Exception as e:
@@ -3950,10 +3984,10 @@ def edit_this(log_tid):
             else "fm" if pick.startswith("🖋") else "studio")
     if dest != cur:
         api = cr._api()
-        live = api.get_task(areas.RECORDS_ID, log_tid)
+        live = cr.get_note(log_tid)
         fresh = cr._fresher_content(log_tid, live.get("content") or "")
         new = cr.set_content_dest(fresh, dest)
-        api.update_task(log_tid, areas.RECORDS_ID, current=live, content=new)
+        api.update_task(log_tid, live["projectId"], current=live, content=new)
         _patch_content_cache(log_tid, new)
     # WHERE the raws live decides the road (2026-09-07). Live bookings:
     # the 🦅 line names the CRM skeleton - copy it across. Migrated
@@ -4163,10 +4197,10 @@ def promote_selection():
     import crm_records as cr
     if dest != cur:
         api = cr._api()
-        live = api.get_task(areas.RECORDS_ID, owner["id"])
+        live = cr.get_note(owner["id"])
         fresh = cr._fresher_content(owner["id"], live.get("content") or "")
         new = cr.set_content_dest(fresh, dest)
-        api.update_task(owner["id"], areas.RECORDS_ID, current=live,
+        api.update_task(owner["id"], live["projectId"], current=live,
                         content=new)
         _patch_content_cache(owner["id"], new)
     want_pid = areas.CONTENT_DESTS[dest][0]
@@ -4461,10 +4495,10 @@ def content_retire(tid):
     hit = cr.parse_first_link(t.get("content") or "")
     if hit:
         try:
-            live = api.get_task(areas.RECORDS_ID, hit[2])
+            live = cr.get_note(hit[2])
             fresh = cr._fresher_content(hit[2], live.get("content") or "")
             new = cr.set_content_dest(fresh, "-")
-            api.update_task(hit[2], areas.RECORDS_ID, current=live,
+            api.update_task(hit[2], live["projectId"], current=live,
                             content=new)
             _patch_content_cache(hit[2], new)
         except Exception:
@@ -4692,7 +4726,7 @@ def _retitle_session_task(pid, tid, lb, mk):
     import crm_records as cr
     api = cr._api()
     live = api.get_task(pid, tid)
-    link = cr.task_link(areas.RECORDS_ID, lb["id"], lb.get("title") or "")
+    link = cr.task_link(_records_pid(lb), lb["id"], lb.get("title") or "")
     new_title = f"{link} {mk}"
     api.update_task(tid, pid, current=live, title=new_title, priority=5)
     try:   # mirror into the task caches so gates/pickers see it immediately
@@ -8792,6 +8826,8 @@ def main():
             crmcold(rest)
         elif verb == "crmclose":
             crmclose(rest)
+        elif verb == "crmyear":
+            crmyear(rest)
         elif verb == "crmrename":
             crmrename(rest)
         elif verb == "crmsummary":
