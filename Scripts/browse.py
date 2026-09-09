@@ -965,7 +965,9 @@ def render_crmdone(query):
             _lb2 = next((x for x in cr.records_notes()
                          if x.get("id") == _l[2]), None)
             if _lb2:
-                dep_s, _dv = cr.payments_sum(_lb2.get("content") or "")
+                # what the next price will absorb, not every payment
+                # ever (deposit ruling 2026-09-08)
+                dep_s = cr.unapplied_deposit_text(_lb2.get("content") or "")
                 if dep_s:
                     dep = f" · 💶 {dep_s} on file"
         rows.append(alfred.item(
@@ -1187,21 +1189,31 @@ def render_crmweek(query):
         # rows ⏎ → logbook hub, ⌥ drills too (muscle memory), ⌥⇧
         # opens the task in TickTick; unlinked rows keep ⏎↗️ (nothing
         # to drill into)
+        linked = cr.is_session_task(t.get("title") or "")
         if _l:
             mods["alt"] = {"arg": "", "valid": True,
                            "subtitle": "Logbook hub",
                            "variables": {"browse_ctx": f"ctx:crmbook:{_l[2]}"}}
-            mods["alt+shift"] = {"arg": f"xact:notego:{t['id']}",
-                                 "valid": True,
-                                 "subtitle": "Open in TickTick"}
             arg = f"xact:crmbrowse:ctx:crmbook:{_l[2]}"
-            chips = "Session done in ⌘  |  ⏎⤵️  ⌘⚡  ⌥⇧↗️"
+            # chord map 2026-09-08: ⇧ Session done · ⌥⇧ Reschedule on a
+            # real session task (same as every other session row)
+            if linked:
+                mods["shift"] = {"arg": f"xact:sessiondone:{CRM_ID}:{t['id']}",
+                                 "valid": True, "subtitle": "✅ Session done"}
+                mods["alt+shift"] = {"arg": f"xact:crmsched:{CRM_ID}:{t['id']}",
+                                     "valid": True, "subtitle": "📅 Reschedule"}
+                chips = "⏎⤵️  ⇧✅  ⌥⇧📅  ⌘⚡"
+            else:
+                mods["alt+shift"] = {"arg": f"xact:notego:{t['id']}",
+                                     "valid": True,
+                                     "subtitle": "Open in TickTick"}
+                chips = "⏎⤵️  ⌘⚡  ⌥⇧↗️"
             g = _glance(_l[2])
             if g:
-                chips = f"{g} · {chips}"
+                chips = f"{g}  |  {chips}"
         else:
             arg = f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}"
-            chips = "Session done in ⌘  |  ⏎↗️  ⌘⚡"
+            chips = "⏎↗️  ⌘⚡"
         emo = ("💬" if (t.get("title") or "").rstrip().endswith("Consult")
                else "📆")
         rows.append(alfred.item(
