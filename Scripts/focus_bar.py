@@ -529,18 +529,22 @@ class BarController(NSObject):
                 if api is None:
                     api = api_mod.TickTickAPI(cfg.get_token())
                 seq = self.mutation_seq
-                # ONE project-data GET: open children (titles + sortOrder)
-                # plus the focus task's childIds - completed children stay
-                # in childIds (verified), so done = childIds minus open.
+                # ONE project-data GET: the open SUBTREE (fsub.descendants -
+                # titles + sortOrder + _depth, grandchildren included since
+                # 2026-09-09) plus childIds - completed children stay in
+                # childIds (verified), so done = childIds minus open; an
+                # open descendant's childIds add its completed children.
                 data = api.get_project_data(pid)
                 tasks = data.get("tasks") or []
-                open_children = [t for t in tasks
-                                 if t.get("parentId") == tid]
+                open_children = fsub.descendants(tasks, tid)
                 focus = next((t for t in tasks if t.get("id") == tid), None)
                 if focus is None:   # completed mid-session stays GET-able
                     focus = api.get_task(pid, tid)
-                summary = fsub.children_summary(
-                    open_children, focus.get("childIds") or [])
+                child_ids = list(focus.get("childIds") or [])
+                for t in open_children:
+                    child_ids += [c for c in (t.get("childIds") or [])
+                                  if c not in child_ids]
+                summary = fsub.children_summary(open_children, child_ids)
                 self._reconcile_cache(tid, open_children)
                 AppHelper.callAfter(self.applyBlock_, (summary, seq))
             except Exception as e:
@@ -555,34 +559,35 @@ class BarController(NSObject):
     def _reconcile_cache(self, ftid, open_children):
         """Sticky/app-side subtask edits reach the workflow cache within one
         POLL instead of the hourly sync - the picker's tasks/remove screens
-        and the 🎯 marks read cache. Scoped to children of the focus task,
-        best-effort (a lost write race heals on the next poll); all_tasks
-        only, project_data waits for the sync. Caveat: a child DETACHED
-        app-side is indistinguishable from a completed one here and drops
-        from the cache until the sync - rare, un-staging normally runs
-        through fx_unstage which patches properly."""
+        and the 🎯 marks read cache. Scoped to the focus task's open
+        SUBTREE (open_children = fsub.descendants of the poll), best-effort
+        (a lost write race heals on the next poll); all_tasks only,
+        project_data waits for the sync. Caveat: a child DETACHED app-side
+        is indistinguishable from a completed one here and drops from the
+        cache until the sync - rare, un-staging normally runs through
+        fx_unstage which patches properly."""
         try:
             import cache as cache_store
             cached = cache_store.get("all_tasks")
             if cached is None:
                 return
             open_ids = {t.get("id") for t in open_children}
-            cached_ids = {t.get("id") for t in cached
-                          if t.get("parentId") == ftid
-                          and t.get("status", 0) == 0}
+            cached_ids = {t.get("id") for t in fsub.descendants(
+                [t for t in cached if t.get("status", 0) == 0], ftid)}
             if cached_ids == open_ids:
                 return
-            keep = [t for t in cached
-                    if not (t.get("parentId") == ftid
-                            and t.get("status", 0) == 0
-                            and t.get("id") not in open_ids)]
+            stale = cached_ids - open_ids
+            keep = [t for t in cached if t.get("id") not in stale]
             have = {t.get("id") for t in keep}
             pnames = {p.get("id"): p.get("name", "")
                       for p in (cache_store.get("projects") or [])}
             for t in open_children:
                 if t.get("id") not in have:
                     pid = t.get("projectId", "")
-                    keep.append(dict(t, _projectId=pid,
+                    # the DFS stamps are per-poll, not cache facts
+                    clean = {k: v for k, v in t.items()
+                             if k not in ("_depth", "_dfs")}
+                    keep.append(dict(clean, _projectId=pid,
                                      _projectName=pnames.get(pid, "")))
             cache_store.set("all_tasks", keep)
         except Exception as e:
@@ -812,7 +817,8 @@ class BarController(NSObject):
                 b.setFrame_(NSMakeRect(30, ry, 26, 26))
                 b.setImage_(sym_image("circle", 15))
                 b.setContentTintColor_(GREEN)      # match the glow
-                tfull = _disp(it["title"])
+                # nested subtasks indent one ↳ per level below the child
+                tfull = "↳ " * (it.get("depth", 1) - 1) + _disp(it["title"])
                 t.setTitle_(tfull[:70])
                 t.setToolTip_(tfull + "\nOpen in TickTick")
                 t.setContentTintColor_(NSColor.secondaryLabelColor())

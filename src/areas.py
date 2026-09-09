@@ -278,6 +278,11 @@ def build_action(mode, pid, tid, title):
     everything the user then types (blocking * / and every trigger). The query
     therefore ends at the title, keeping the cursor in trigger-land.
 
+    Every query ends with a bare ' *' so the Add window opens ON the date
+    picker (2026-09-09: the CTA / Prepare exists to be scheduled - one
+    keystroke fewer, and the trailing space still closes the token once a
+    date is picked).
+
     Returns {"query", "note", "mode", "tag", "label", "preview"}.
     """
     if mode == "prepare":
@@ -287,7 +292,7 @@ def build_action(mode, pid, tid, title):
         crm_name = crm_list_name()
         tgt, wl = prepare_wikilink_target(title)
         ref = f"[[{tgt}]]" if wl else tgt
-        q = f"~l {crm_name} #{PREPARE_TAG} Prepare for {ref}"
+        q = f"~l {crm_name} #{PREPARE_TAG} Prepare for {ref} *"
         return {"query": q, "note": "", "mode": mode, "tag": PREPARE_TAG,
                 "label": "🔥 Add Prepare",
                 "preview": f"Opens {crm_name} add · Prepare for \"{tgt}\" · schedule & ⏎"}
@@ -305,9 +310,9 @@ def build_action(mode, pid, tid, title):
         # capture, so the parser would sit in the list picker forever. The 📌CTA
         # destination rides as row variables (list_id/list_name) instead -
         # exactly how the CRM Add hub pins its list.
-        q = f"{tagpart}{cta_title}"
+        q = f"{tagpart}{cta_title} *"
     else:  # task / subtask / note - link the task; parent list goes in the body
-        q = f"{tagpart}[{title}]({_task_link(pid, tid)}) 🔗"
+        q = f"{tagpart}[{title}]({_task_link(pid, tid)}) 🔗 *"
         list_name = (proj or {}).get("name", "")
         note = f"[{list_name}]({_list_link(pid)})" if list_name else ""
     return {"query": q, "note": note, "mode": mode, "tag": tag,
