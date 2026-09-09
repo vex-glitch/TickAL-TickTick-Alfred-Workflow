@@ -2561,6 +2561,18 @@ def render_contentpl(ids, query):
     return add_back(rows, f"ctx:contentpl:{lib}")
 
 
+def _peek_payload(fid, lib, lb, ret, direct=False, sess=""):
+    """b64 payload for the Grid View trampoline (xact:peek) - same shape
+    render_lbeagle's peek_arg builds; lb may be '' for a John Doe row
+    (grid chords that need a logbook toast instead). Deleted by mistake
+    with the ⌥ PL hub (4270dc2, 2026-09-09) while render_plfolder kept
+    calling it - every ⌥ on a pipeline row died on a NameError."""
+    import base64
+    payload = json.dumps({"fid": fid, "sess": sess, "lib": lib, "lb": lb,
+                          "ret": ret, "direct": direct})
+    return "xact:peek:" + base64.b64encode(payload.encode()).decode()
+
+
 def render_plfolder(ids, query):
     """🖼 Folder browser for ONE pipeline row (Vex 2026-09-07: "I should
     be able to drill down folders if it is an 02 Edit folder and it has
