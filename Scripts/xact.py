@@ -70,6 +70,15 @@ CRM records (customer notes + tattoo logbooks - src/crm_records.py):
                                     Paid recomputed, clipboard 📷 attached,
                                     archive or chain S<n+1>
     xact:crmlog:<tid>               dialog → timestamped line under ## Notes
+    xact:crmlink:<pid>:<tid>        🔗 adopt a hand-made calendar task: title
+                                    → [logbook](link) S<n>/Consult, then the
+                                    happened / schedule / just-link fork
+    xact:crmrelink:<pid>:<tid>      🔁 move a session task to ANOTHER logbook
+                                    (booked under the wrong customer): picker
+                                    minus the current one, Consult stays
+                                    Consult, else S<next of target>; an old
+                                    logbook left with no tasks and no entries
+                                    gets the 🗑 delete offer (crm_trash)
 
 Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
     xact:cdest:<logTid>[:drain]     🎬 TV|FM|Studio|➖ picker → header line
@@ -1943,14 +1952,45 @@ def crmimport():
         _crm_say("Cancelled · nothing created")
         return
     lb = cr.create_logbook(cust, tattoo, started=when)
-    content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
     cr.append_session(areas.RECORDS_ID, lb["id"], f"S{k}",
                       charged=total, text="Backlog import.", when=when)
     if state == "Finished":
+        # Archive FIRST (2026-09-08): the 🎬 picker births the Eagle
+        # skeleton, and its parent follows the note's tags - with the
+        # archive tag already on, it is born under Archive/ instead of
+        # Customers/ + a later move. Re-read so the tag is visible.
         cr.finish_logbook(areas.RECORDS_ID, lb["id"])
-        _eagle_archive_folder(lb["id"])   # TickTick archived → Eagle too
+        lb = _record_by_id(lb["id"]) or lb
+    content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
+    if state == "Finished":
+        _eagle_archive_folder(lb["id"])   # safety net: a pre-existing
+        #                                   folder adopted from Customers/
     _crm_say(f"📕 {lb.get('title')} imported · {k} sessions"
              + (" · archived" if state == "Finished" else ""))
+    # ONE import verb (Vex rule): Photos selection → Finder → clipboard
+    # and the stage from the archive tag live inside session_photos.
+    # Gated on a real selection - a stray clipboard image must not ride
+    # a backlog import uninvited.
+    if _media_selected():
+        session_photos(lb["id"])
+
+
+def _media_selected():
+    """True when Photos (running) has a selection or the Finder selection
+    holds media files - the honest 'there is something to import' gate
+    for roads that import as a side step. Read-only probes; any
+    scripting trouble reads as nothing selected."""
+    try:
+        import photos_bridge as pb
+        if pb.photos_running() and pb.selection_count():
+            return True
+    except Exception:
+        pass
+    try:
+        return any(os.path.splitext(p)[1].lower() in _MEDIA_EXTS
+                   for p in _finder_selection())
+    except Exception:
+        return False
 
 
 def _ask_date(prompt):
@@ -2209,7 +2249,7 @@ def crmbrowse(ctx):
     _run_trigger("BrowseCtx", ctx)
 
 
-def crm_trash(tid):
+def crm_trash(tid, why=""):
     """🗑 Delete a records entry AND its trail (Vex ask 2026-07-28:
     'what is the purpose of it then' - the eraser must erase). Confirm
     lists the full inventory FIRST, then: linked calendar tasks (S<n>,
@@ -2218,7 +2258,9 @@ def crm_trash(tid):
     the API cannot delete folders) · the customer bullet line removed.
     A customer/lead delete CASCADES through every logbook first. All
     TickTick pieces restorable from TickTick's Trash, Eagle items from
-    Eagle's."""
+    Eagle's. why = a short reason prefixed to the confirm ('now empty
+    after the move · ') when another road offers the delete - ONE dialog,
+    never a why-then-confirm pair."""
     if not _records_ready():
         return
     import areas
@@ -2242,7 +2284,7 @@ def crm_trash(tid):
     if n_fid:
         also.append("Eagle items → Eagle Trash")
     tail = (" Takes along: " + " · ".join(also) + ".") if also else ""
-    if _dialog(f"🗑 Delete '{title}' completely?{tail} TickTick Trash "
+    if _dialog(f"🗑 {why}Delete '{title}' completely?{tail} TickTick Trash "
                "can restore the notes and tasks.",
                ["Cancel", "Delete"], "Cancel") != "Delete":
         _crm_say("Cancelled · nothing deleted")
@@ -3735,10 +3777,11 @@ def _eagle_archive_folder(log_tid, quiet=False):
     """Post-archive weave: tattoo folder → Archive/ + 'archive' tag on
     its items. Best-effort AFTER the TickTick archive (the state owner
     is already right) - Eagle asleep → honest skip toast. No 🦅 line
-    (backlog imports) → silent no-op. quiet=True suppresses the toast
-    (the sweep speaks once for the whole batch). Returns True only when
-    a folder actually MOVED, so callers can count honestly; a folder
-    already under Archive/ is a no-op, not a move."""
+    → silent no-op. quiet=True suppresses EVERY toast (the sweep speaks
+    once for the whole batch); quiet=False also voices the two no-move
+    outcomes (folder not in the library · already under Archive), so a
+    caller never wonders whether anything happened. Returns True only
+    when a folder actually MOVED, so callers can count honestly."""
     import crm_records as cr
     lb = _record_by_id(log_tid)
     fid = cr.eagle_folder_of((lb or {}).get("content") or "")[0]
@@ -3753,9 +3796,14 @@ def _eagle_archive_folder(log_tid, quiet=False):
         arch_id = arch["id"] if arch else eagle.create_folder("Archive")
         node = eagle.folder_node(fid, tree=tree)
         if node is None:
+            if not quiet:
+                _crm_say("🦅 folder from the 🦅 line is not in the CRM "
+                         "library · archive move skipped")
             return False
         if any(c.get("id") == fid for c in (arch or {}).get("children") or []):
-            return False              # already filed - nothing to do
+            if not quiet:             # already filed - nothing to do
+                _crm_say("🦅 Eagle folder already under Archive")
+            return False
         eagle.move_folder(fid, arch_id)
         ids = set()
 
@@ -4528,6 +4576,68 @@ def crmconvert(tid):
     _crm_say(f"👤 {cr.customer_display(cust)} is a customer now")
 
 
+def _pick_logbook(prompt, exclude_tid=""):
+    """Shared logbook picker for crmlink / crmrelink: every active logbook
+    plus 🆕 New logbook… (customer pick → tattoo name → quoted price →
+    born classified). exclude_tid hides one note (the relink road must
+    not offer the logbook the task already sits on). Returns the logbook
+    dict, or None on cancel / not found (toasted here)."""
+    import areas
+    import crm_records as cr
+    NEW = "🆕 New logbook…"
+    lbs = [l for l in cr.records_notes(areas.LOGBOOK_TAG)
+           if l.get("id") != exclude_tid]
+    pick = _choose(prompt, [NEW] + [l.get("title") or "" for l in lbs])
+    if pick is None:
+        _crm_say("Cancelled")
+        return None
+    if pick == NEW:
+        cust = _choose_customer()
+        if cust is None:
+            _crm_say("Cancelled")
+            return None
+        tattoo = _ask(f"{cr.customer_display(cust)} - tattoo / project name?")
+        if not (tattoo or "").strip():
+            _crm_say("Cancelled")
+            return None
+        quoted = _ask(f"{tattoo} - quoted price? (OK or Esc skips)") or ""
+        lb = cr.create_logbook(cust, tattoo, quoted=quoted)
+        content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
+        return lb
+    lb = next((l for l in lbs if (l.get("title") or "") == pick), None)
+    if lb is None:
+        _crm_say("Logbook not found")
+    return lb
+
+
+def _retitle_session_task(pid, tid, lb, mk):
+    """The link write both roads share: title → '[logbook](link) <mk>',
+    priority 5 (every CRM calendar task is high priority - the same ruling
+    the dispatch create hook enforces), then the task caches mirrored so
+    gates / pickers / next_snum see the new link at once. Returns the
+    new title."""
+    import areas
+    import crm_records as cr
+    api = cr._api()
+    live = api.get_task(pid, tid)
+    link = cr.task_link(areas.RECORDS_ID, lb["id"], lb.get("title") or "")
+    new_title = f"{link} {mk}"
+    api.update_task(tid, pid, current=live, title=new_title, priority=5)
+    try:   # mirror into the task caches so gates/pickers see it immediately
+        for key in ("all_tasks",):
+            pool = cache_store.get(key) or []
+            for t in pool:
+                if t.get("id") == tid:
+                    t["title"] = new_title
+            cache_store.set(key, pool)
+        import dispatch as _disp
+        _disp._patch_project_data(tid, fields={"title": new_title},
+                                  pid_old=pid, pid_new=pid)
+    except Exception:
+        pass
+    return new_title
+
+
 def crmlink(pid, tid):
     """🔗 Link an existing calendar task to a logbook: the title is REPLACED
     by the convention - [logbook](link) S<n>/Consult - making it a records
@@ -4535,32 +4645,10 @@ def crmlink(pid, tid):
     logbook name carries the identity, task content/images stay untouched."""
     if not _records_ready():
         return
-    import areas
     import crm_records as cr
-    NEW = "🆕 New logbook…"
-    lbs = cr.records_notes(areas.LOGBOOK_TAG)
-    pick = _choose("Link to which logbook?",
-                   [NEW] + [l.get("title") or "" for l in lbs])
-    if pick is None:
-        _crm_say("Cancelled")
+    lb = _pick_logbook("Link to which logbook?")
+    if lb is None:
         return
-    if pick == NEW:
-        cust = _choose_customer()
-        if cust is None:
-            _crm_say("Cancelled")
-            return
-        tattoo = _ask(f"{cr.customer_display(cust)} - tattoo / project name?")
-        if not (tattoo or "").strip():
-            _crm_say("Cancelled")
-            return
-        quoted = _ask(f"{tattoo} - quoted price? (OK or Esc skips)") or ""
-        lb = cr.create_logbook(cust, tattoo, quoted=quoted)
-        content_dest(lb["id"], mandatory=True)   # born classified (Vex rule)
-    else:
-        lb = next((l for l in lbs if (l.get("title") or "") == pick), None)
-        if lb is None:
-            _crm_say("Logbook not found")
-            return
     n = cr.next_snum(lb.get("content") or "", lb["id"])
     mk = _dialog("Link as?", ["Other S#…", "Consult", f"S{n}"], f"S{n}")
     if mk == "":
@@ -4575,25 +4663,7 @@ def crmlink(pid, tid):
             _crm_say("Cancelled · not a number")
             return
         mk = f"S{int(num)}"
-    api = cr._api()
-    live = api.get_task(pid, tid)
-    link = cr.task_link(areas.RECORDS_ID, lb["id"], lb.get("title") or "")
-    new_title = f"{link} {mk}"
-    # priority 5: every CRM calendar task is high priority (same ruling the
-    # dispatch create hook enforces for new adds).
-    api.update_task(tid, pid, current=live, title=new_title, priority=5)
-    try:   # mirror into the task caches so gates/pickers see it immediately
-        for key in ("all_tasks",):
-            pool = cache_store.get(key) or []
-            for t in pool:
-                if t.get("id") == tid:
-                    t["title"] = new_title
-            cache_store.set(key, pool)
-        import dispatch as _disp
-        _disp._patch_project_data(tid, fields={"title": new_title},
-                                  pid_old=pid, pid_new=pid)
-    except Exception:
-        pass
+    _retitle_session_task(pid, tid, lb, mk)
     # Adopting an old task forks three ways (Vex ruling 2026-07-20):
     #   Happened          - the backlog case: log it, complete it, offer next
     #   Not yet - schedule - an UPCOMING session (Lisa S3): task stays open,
@@ -4618,6 +4688,50 @@ def crmlink(pid, tid):
             reopen_actions(pid, tid)
         return
     _crm_say(f"🔗 Linked · {lb.get('title')} {mk}")
+
+
+def crmrelink(pid, tid):
+    """🔁 Move a session task to ANOTHER logbook (Vex 2026-09-08: a session
+    booked under the wrong NEW customer had to become S2 of the OLD one).
+    Picker minus the logbook the task sits on; the marker is decided, not
+    asked - Consult stays Consult, anything else becomes S<next_snum of
+    the target> (the target's own count, the whole point of the move).
+    No happened/schedule fork: the task keeps its date and state, only
+    its home changes. Afterwards the OLD logbook is inspected: no other
+    calendar task links it AND its ## Sessions has no entry at all → the
+    🗑 delete offer (crm_trash, one confirm, the cascade erases the
+    Eagle skeleton too). A deposit or any other entry keeps it alive -
+    money lines are never touched here."""
+    if not _records_ready():
+        return
+    import crm_records as cr
+    title = _title("")
+    if not cr.is_session_task(title):
+        try:
+            title = cr._api().get_task(pid, tid).get("title") or ""
+        except Exception:
+            title = ""
+        if not cr.is_session_task(title):
+            _crm_say("Not a session task · use 🔗 Link to logbook first")
+            return
+    old_title, _old_pid, old_tid = cr.parse_first_link(title)
+    lb = _pick_logbook(f"Move '{cr.title_marker(title)}' to which logbook?",
+                       exclude_tid=old_tid)
+    if lb is None:
+        return
+    if lb["id"] == old_tid:
+        _crm_say("Same logbook · nothing to move")
+        return
+    mk = "Consult" if cr.title_marker(title) == "Consult" \
+        else f"S{cr.next_snum(lb.get('content') or '', lb['id'])}"
+    _retitle_session_task(pid, tid, lb, mk)
+    _crm_say(f"🔁 {lb.get('title')} {mk} · was {old_title}")
+    old_lb = _record_by_id(old_tid)
+    if not old_lb:
+        return
+    if cr.calendar_tasks_of(old_tid) or cr._entries(old_lb.get("content") or ""):
+        return                        # still has a trail - stays
+    crm_trash(old_tid, why="now empty after the move · ")
 
 
 def v2login():
@@ -8490,6 +8604,9 @@ def main():
         elif verb == "crmlink":
             pid, tid = rest.split(":", 1)
             crmlink(pid, tid)
+        elif verb == "crmrelink":
+            pid, tid = rest.split(":", 1)
+            crmrelink(pid, tid)
         elif verb == "crmconvert":
             crmconvert(rest)
         elif verb == "crmcopy":
