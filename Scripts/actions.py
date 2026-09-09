@@ -520,8 +520,125 @@ def main():
             _ct_tags = {str(x).lower()
                         for x in ((task or {}).get("tags") or [])}
 
+        # ── Entity menus (Vex 2026-09-08: "⌘ = do things, ⌥ = go places",
+        # hubs lost their verb rows, everything an entity can DO lives
+        # here, first; the generic task verbs that make no sense on a
+        # logbook, a customer, a session or a pipeline row are pruned).
+        _is_customer = _is_lead = False
+        _archived_lb = False
+        _n_next = 0
+        if pid == areas.RECORDS_ID and is_note and bool(tid):
+            _is_lead = (name or "").startswith("🎣")
+            _is_customer = (name or "").startswith("👤") or _is_lead
+            if _is_logbook:
+                _tl = {str(x).lower() for x in ((task or {}).get("tags") or [])}
+                _archived_lb = areas.ARCHIVE_TAG in _tl
+                try:
+                    import crm_records as _cr3
+                    _n_next = _cr3.next_snum((task or {}).get("content") or "", tid)
+                except Exception:
+                    _n_next = 0
+        _is_content = bool(_ct_tags)
+        _content_fid = _content_lib = _content_log = ""
+        if _is_content:
+            import re as _cre
+            _m = (_cre.search(r"eagle://folder/([^)\s]+)", name or "")
+                  or _cre.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", name or ""))
+            _content_fid = _m.group(1) if _m else ""
+            _content_lib = next((k for k, v in areas.CONTENT_DESTS.items() if v[0] == pid), "")
+            _lm = _cre.search(r"/tasks/([0-9a-f]{24})\)", (task or {}).get("content") or "")
+            _content_log = _lm.group(1) if _lm else ""
+            if _content_fid:
+                try:
+                    import eagle as _eg
+                    _content_flib = _eg.lib_of_folder(_content_fid, prefer=_content_lib) or _content_lib
+                except Exception:
+                    _content_flib = _content_lib
+        _entity = _is_logbook or _is_customer or _sess_done or _is_content
+        _generic = not _entity
+
+        entity_rows = []
+        if _is_logbook:
+            entity_rows = [
+                (f"▶️ Schedule S{_n_next or ''}".rstrip(), "Add window prefilled · forecast asked",
+                 f"xact:crmnew_go:session::{tid}", "schedule next session book", not _archived_lb),
+                ("📸 Photos", "Import · file a selection · browse",
+                 f"xact:crmbrowse:ctx:lbphotos:{tid}", "photos import browse grid", True),
+                ("🦅 Eagle folder", "Create if new · open in Eagle",
+                 f"xact:eaglefolder:{tid}", "eagle folder skeleton open", True),
+                ("🎬 Content potential", "TV · FM · Studio · none",
+                 f"xact:cdest:{tid}", "content destination tv fm studio", True),
+                ("🎬 Edit this", "Raws → 02 Edit · row → Editing",
+                 f"xact:editthis:{tid}", "edit this promote content", True),
+                ("💶 Log payment", "Deposit · remainder · minus = refund",
+                 f"xact:crmpay:{tid}", "payment deposit pay money", True),
+                ("🕰 Log past session", "Dated entry, no task",
+                 f"xact:crmpast:{tid}", "past session backdate log", True),
+                ("🧾 Copy money summary", "Sessions + amounts + total → clipboard",
+                 f"xact:crmsummary:{tid}", "money summary copy", True),
+                ("📝 Log a line", "Timestamped · lands under ## Notes",
+                 f"xact:crmlog:{tid}", "log line note", True),
+                ("✏️ Edit note", "Alfred text view",
+                 f"xact:crmedit:{tid}", "edit note text", True),
+                ("✏️ Rename tattoo", "Ripples through titles, links, bullets",
+                 f"xact:crmrename:{tid}", "rename tattoo title", True),
+                ("📁 Archive", "Close without a session",
+                 f"xact:crmclose:{tid}", "archive close finish", not _archived_lb),
+            ]
+        elif _is_customer:
+            entity_rows = [
+                ("➕ New tattoo", "Logbook + S1 → scheduling",
+                 f"xact:crmnew_go:tattoo:{tid}", "new tattoo book logbook", True),
+                ("➕ New consultation", "Consult → scheduling",
+                 f"xact:crmnew_go:consult:{tid}", "new consultation consult book", True),
+                ("📝 Log a line", "Timestamped · lands under ## Notes",
+                 f"xact:crmlog:{tid}", "log line note", True),
+                ("✏️ Edit note", "Alfred text view · contact line is line 1",
+                 f"xact:crmedit:{tid}", "edit note contact", True),
+                ("✏️ Rename", "Ripples through logbooks, links, bullets",
+                 f"xact:crmrename:{tid}", "rename customer name", True),
+                ("🩹 Copy aftercare", "Template + name → clipboard",
+                 f"xact:crmaftercare:{tid}", "aftercare copy template", True),
+                ("👤 Make customer", "Lead → customer",
+                 f"xact:crmconvert:{tid}", "convert lead customer", _is_lead),
+                ("🥶 Cold lead · archive", "One-line reason → ## Notes",
+                 f"xact:crmcold:{tid}", "cold lead archive", _is_lead),
+            ]
+        elif _sess_done:
+            entity_rows = [
+                ("✅ Session done", "Tick off · log · schedule next",
+                 f"xact:sessiondone:{pid}:{tid}", "session done log crm tattoo", True),
+                ("📅 Reschedule", "Schedule picker",
+                 f"xact:crmsched:{pid}:{tid}", "reschedule schedule picker date", True),
+                ("🔁 Move to other logbook", "Wrong customer · title re-links · S# recount",
+                 f"xact:crmrelink:{pid}:{tid}", "relink move logbook wrong customer", True),
+            ]
+        elif _is_content:
+            _photos_arg = (f"xact:crmbrowse:ctx:plfolder:{_content_flib}:{_content_fid}:{tid}:all::{_content_lib}"
+                           if _content_fid else "")
+            entity_rows = [
+                ("🎬 Edit this", "Folder → 02 Edit · row → Editing",
+                 f"xact:pledit:{tid}", "edit this promote content", "📸raw" in _ct_tags),
+                ("📥 File edited shots", "Eagle Inbox → 03 Post · row → Ready to post",
+                 "xact:filedited", "file edited intake export", True),
+                ("📤 Posted", "Shelf clears · Portfolio keeps · row done",
+                 f"xact:posted:{tid}", "posted done shelf", "📸post" in _ct_tags),
+                ("⭐ Portfolio", "Eagle selection → 04 Portfolio/{tattoo}",
+                 "xact:portfolio", "portfolio star final", True),
+                ("🖼 Browse photos", "Folders → grid",
+                 _photos_arg, "browse photos grid folders", bool(_photos_arg)),
+                ("📸 Photo jobs", "Import · file a selection · attach",
+                 f"xact:crmbrowse:ctx:lbphotos:{_content_log}", "photo jobs import attach",
+                 bool(_content_log)),
+                ("🎨 Logbook hub", "Sessions · money · photos",
+                 f"xact:crmbrowse:ctx:crmbook:{_content_log}", "logbook hub crm", bool(_content_log)),
+                ("➖ Retire", "Row done · logbook 🎬 → ➖ · photos stay",
+                 f"xact:cretire:{tid}", "retire remove content", True),
+            ]
+
         rows = [
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
+        ] + entity_rows + [
             ("📋 Copy name",       "Task name → clipboard",
              f"xact:task_copy:{pid}:{tid}", "copy name clipboard",
              is_task_like),
@@ -534,17 +651,14 @@ def main():
             ("📎 Attach Photos pick", "♥ → attachment on this task",
              f"xact:photoattach:{pid}:{tid}",
              "photo attach picture image photos",
-             is_task_like and not _is_logbook),
-            ("📸 Import → pick stage",
-             "Folder screen · ⌥⇧📸 on the stage",
+             is_task_like and _generic),
+            ("🦅 Folders", "Stage folders · counts · grid",
              f"xact:crmbrowse:ctx:lbeagle:{tid}:hub",
-             "import selection stage eagle convention photos",
+             "folders stage eagle grid photos",
              _is_logbook),
             ("🗑 Delete entry", "Mistakes only · sessions + Eagle go too",
              f"xact:crmtrash:{tid}", "delete remove trash entry wrong",
              pid == areas.RECORDS_ID and is_note and bool(tid)),
-            ("✅ Session done",    "Tick off · log · schedule next",
-             f"xact:sessiondone:{pid}:{tid}", "session done log crm tattoo", _sess_done),
             ("🔗 Link to logbook", "Pick logbook · title gains link + S<n>",
              f"xact:crmlink:{pid}:{tid}", "link logbook customer records crm", _link_row),
             ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and has_kids),
@@ -580,46 +694,30 @@ def main():
              f"xact:crmbrowse:ctx:people:attach:{pid}:{tid}",
              "person people attach cta assign",
              is_task_like and not is_note and _people_ok
-             and not _is_person_card),
+             and not _is_person_card and _generic),
             ("🎁 Gift idea for person", "Title + link → a card's 🎁 stash",
              f"xact:crmbrowse:ctx:people:idea:{pid}:{tid}",
              "gift idea person people present",
-             is_task_like and _people_ok and not _is_person_card),
+             is_task_like and _people_ok and not _is_person_card and _generic),
             ("⤵️ Browse tasks",    "Drill into tasks",     "browse",        "browse tasks drill", itype == "section"),
-            (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like),
+            (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like and (_generic or _sess_done)),
             ("☀️ Add to today",    "Land it on today",     f"xact:pn_sched:today|{pid}|{tid}",
-             "today add schedule now day", is_task_like and bool(tid) and bool(task)),
+             "today add schedule now day", is_task_like and bool(tid) and bool(task) and _generic),
             ("🌙 Add to tomorrow", "Land it on tomorrow",  f"xact:pn_sched:tomorrow|{pid}|{tid}",
-             "tomorrow add schedule next day", is_task_like and bool(tid) and bool(task)),
+             "tomorrow add schedule next day", is_task_like and bool(tid) and bool(task) and _generic),
             ("☀️ Make day goal",   "Today's one thing · pinned in 💫",
              f"xact:pn_day_goal:{pid}:{tid}", "day goal one thing periodic pin",
-             is_task_like and bool(tid) and bool(task) and _pn_on),
-            ("🔔 Reminder",        "Set a reminder…",      "reminder",      "reminder remind alert", is_task_like),
+             is_task_like and bool(tid) and bool(task) and _pn_on and _generic),
+            ("🔔 Reminder",        "Set a reminder…",      "reminder",      "reminder remind alert", is_task_like and _generic),
             (tags,                 "Tags…",                "tags",          "tags tag",          is_task_like),
-            (prio,                 "Priority…",            "priority",      "priority",          is_task_like and not is_note),
+            (prio,                 "Priority…",            "priority",      "priority",          is_task_like and not is_note and _generic),
             (crumb,                "Move…",                "move",          "move list section", is_task_like),
-            ("➕ Add task",        add_sub,                "add",           "add new task",      True),
+            ("➕ Add task",        add_sub,                "add",           "add new task",      _generic),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
             ("🆔 Copy id",         "List id → clipboard",  f"copy:{pid}",   "id copy identifier configure", itype == "list"),
-            ("📸 Photos", "Import · file an Eagle selection · browse",
-             f"xact:crmbrowse:ctx:lbphotos:{tid}",
-             "session photos eagle send import browse grid triage attach",
-             _is_logbook),
-            ("🦅 Eagle folder",    "Create if new · open in Eagle",
-             f"xact:eaglefolder:{tid}", "eagle folder open create skeleton",
-             _is_logbook),
-            ("🎬 Content potential", "TV · FM · Studio · none",
-             f"xact:cdest:{tid}", "content potential tv fm studio dest",
-             _is_logbook),
-            ("🎬 Edit this",       "Whole tree → To edit",
-             f"xact:editthis:{tid}", "edit this promote content tree",
-             _is_logbook),
             ("✅ Posted",          "Shelf clears · task completes",
              f"xact:posted:{tid}", "posted done shelf content",
              "📸post" in _ct_tags),
-            ("➖ Retire",          "Logbook 🎬 → ➖ · task completes",
-             f"xact:cretire:{tid}", "retire content raw backlog",
-             "📸raw" in _ct_tags),
             (f"📞 Copy {_phone}",  "Number → clipboard",   f"copy:{_phone}", "phone copy number contact call", bool(_phone)),
             (f"✉️ Copy {_mail}",   "Mail → clipboard",     f"copy:{_mail}",  "mail copy email contact", bool(_mail)),
             (f"📸 Open {_insta}",  "Instagram profile (DMs)",
@@ -630,8 +728,8 @@ def main():
             ("📂 Go to list",      f"Open {lname or 'this list'} in TickTick",
              f"open:{list_link}",  "go to list open project folder",        is_task_like and bool(pid)),
             ("🌐 Open link",       open_link_sub,          open_link_arg, "link url web open", has_links),
-            ("📝 Note",            note_sub,               "note",          "note description body edit", is_task_like),
-            ("🖼️ Add image",       "Clipboard link → description", "attach", "attach add image clipboard screenshot link", is_task_like),
+            ("📝 Note",            note_sub,               "note",          "note description body edit", is_task_like and _generic),
+            ("🖼️ Add image",       "Clipboard link → description", "attach", "attach add image clipboard screenshot link", is_task_like and _generic),
             # One dynamic row - whatever the item is, offer the other
             # kind. Gated on a CACHED (= open) item: completed rows carry a
             # tid too, and converting one mints a status-2 "note" that
@@ -639,16 +737,16 @@ def main():
             (f"🔃 Convert to {'task' if is_note else 'note'}",
              "Keeps title, dates, tags",
              f"xact:convert:{pid}:{tid}", "convert note task kind switch turn",
-             is_task_like and bool(tid) and bool(task)),
+             is_task_like and bool(tid) and bool(task) and _generic),
             # ONE 🎯 Focus row replaces Start-focus / Focus
             # (sticky+timer) / Start-pomo - ⏎ opens the ⏱/🍅 flow for THIS task.
             ("🎯 Focus",           "Timer or Pomodoro, sticky optional",
              f"xact:focus_open:{pid}:{tid}", "focus timer pomo pomodoro start track time",
-             is_task_like and bool(tid)),
+             is_task_like and bool(tid) and _generic),
             ("🗒️ Sticky note",     "Open as desktop sticky",
              f"xact:sticky:{pid}:{tid}", "sticky note desktop pin", is_task_like and bool(tid)),
             ("🅿️ Add to buffer",   "Collect tasks, act on all (🅿️ in search)",
-             f"xact:buffer_add:{pid}:{tid}", "buffer collect batch", is_task_like and bool(tid)),
+             f"xact:buffer_add:{pid}:{tid}", "buffer collect batch", is_task_like and bool(tid) and _generic),
             # Focus staging (subtasks): direct add when a task-bound session
             # runs; the stage screen (both directions) always; live-link only
             # while a session runs unattributed.
@@ -659,16 +757,18 @@ def main():
              and _sess[2] != tid),
             ("🎯 Merge/Stage for Focus", "Subtask it under another task, or into a note…",
              f"xact:stage_open:{pid}:{tid}", "merge stage focus link checkbox block",
-             is_task_like and bool(tid)),
+             is_task_like and bool(tid) and _generic),
             ("🔗 Link to running focus", "Attribute the RUNNING session to this task",
              f"xact:fx_link:{pid}:{tid}", "link focus attribute session running",
              is_task_like and bool(tid) and bool(_sess) and _sess[0] == "bare"),
-            ("✔️ Complete",        "Mark this done",       f"complete:{pid}:{tid}:{title}", "complete done", is_task_like and not is_note),
+            ("✔️ Complete",        "Mark this done",       f"complete:{pid}:{tid}:{title}", "complete done", is_task_like and not is_note and _generic),
             # TickTick's third status - off the lists, kept on record
-            ("🚫 Won't do",        "Abandon task",         f"xact:wontdo:{pid}:{tid}", "wont do abandon skip cancel", is_task_like and not is_note and bool(tid)),
+            ("🚫 Won't do",        "Abandon task",         f"xact:wontdo:{pid}:{tid}", "wont do abandon skip cancel", is_task_like and not is_note and bool(tid) and _generic),
             (md_links_display(name) if is_task_like else (lname or "Rename"),
-                                   "Rename…",              "rename",        "rename title name", is_task_like or itype == "list"),
-            ("🗑️ Delete",          "Delete this item",     "delete",        "delete remove",     is_task_like),
+                                   "Rename…",              "rename",        "rename title name",
+             (is_task_like and not (_is_logbook or _is_customer)) or itype == "list"),
+            ("🗑️ Delete",          "Delete this item",     "delete",        "delete remove",
+             is_task_like and not (_is_logbook or _is_customer)),
             ("🔙 Go back",         "Back to search",       "back",          "back",              True),
         ]
 

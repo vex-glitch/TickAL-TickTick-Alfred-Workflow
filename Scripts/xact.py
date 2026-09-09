@@ -1442,7 +1442,13 @@ def _crm_session_prefill(lb_title, marker):
     every CRM handoff is a scheduling - don't make him type the star)."""
     import areas
     tag = areas.CONSULT_TAG if marker == "Consult" else areas.SESSION_TAG
-    _run_trigger("Add", f"~l {areas.crm_list_name()} #{tag} [[{lb_title}]] {marker} *")
+    # Forecast (Vex 2026-09-08): "what I think that session will be
+    # charged", glanceable in the calendar - rides the title as a
+    # ' - 400' tail after the marker and nowhere else (the marker regex
+    # tolerates it; the Add grammar has no meaning for '-'). Esc/OK = none.
+    fc = re.sub(r"[^\d]", "", _ask(f"{marker} forecast? (expected price · OK skips)") or "")
+    tail = f"{marker} - {fc}" if fc else marker
+    _run_trigger("Add", f"~l {areas.crm_list_name()} #{tag} [[{lb_title}]] {tail} *")
 
 
 def _crmnew_continue(kind, cust):

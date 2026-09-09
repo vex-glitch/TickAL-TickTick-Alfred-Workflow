@@ -421,6 +421,23 @@ def filter_rows(fragment):
     return items
 
 
+
+def _shift_complete(pid, tid, name):
+    """⇧ on a task row: complete - EXCEPT a CRM session task, where a
+    bare complete would skip the logbook entry (bug 6a9b1321 trap,
+    2026-09-08): those get ✅ Session done, the logging road."""
+    try:
+        import areas as _ar
+        if pid and pid == _ar.CRM_ID:
+            import crm_records as _cr
+            if _cr.is_session_task(name):
+                return {"arg": f"xact:sessiondone:{pid}:{tid}", "valid": True,
+                        "subtitle": "✅ Session done"}
+    except Exception:
+        pass
+    return {"arg": f"complete:{pid}:{tid}:{name}"}
+
+
 def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
     """Task row for a locked v/f view - search-convention mods (⏎ open,
     ⇧ complete/uncomplete, ⌘ Actions, ⌥ browse subtasks, ⌥⌘ copy).
@@ -440,14 +457,15 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
                  "subtitle": "Reopen" if wontdo else "Uncomplete"}
         alt   = {"valid": False, "subtitle": ""}
         altshift = {"valid": False, "subtitle": ""}   # buffering done tasks = nonsense
-        ctrlshift = {"valid": False, "subtitle": ""}  # focusing them, too
+        ctrlshift = {"valid": False, "subtitle": ""}  # sticky of a done task, too
+        ctrlcmd = {"valid": False, "subtitle": ""}    # focusing them, too
     else:
         sub_count = sum(1 for s in pool
                         if s.get("parentId") == tid and s.get("status", 0) == 0)
         subtitle = build_subtitle(sub_count, "Task", breadcrumb=breadcrumb, actions=True,
                                   note=note_snippet(t.get("content"))
                                   if t.get("kind") != "NOTE" else "")
-        shift = {"arg": f"complete:{pid}:{tid}:{name}"}
+        shift = _shift_complete(pid, tid, name)
         alt   = {"arg": "", "subtitle": "Browse subtasks",
                  "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{tid}"}}
         # ⌥⇧ → buffer
@@ -455,13 +473,18 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
                     "subtitle": "🅿️ Add to buffer",
                     "variables": {"task_title": name, "task_id": tid,
                                   "task_list_id": pid, "item_type": "task"}}
-        # ⌃⇧ → the ⏱/🍅 start flow; notes don't focus
-        ctrlshift = ({"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
-                      "subtitle": "Start focus",
-                      "variables": {"task_title": name, "task_id": tid,
-                                    "task_list_id": pid, "item_type": "task"}}
-                     if t.get("kind") != "NOTE"
-                     else {"valid": False, "subtitle": ""})
+        # ⌃⇧ → desktop sticky (Vex 2026-09-08); ⌃⌘ → the ⏱/🍅 start
+        # flow; notes don't focus
+        ctrlshift = {"valid": True, "arg": f"xact:sticky:{pid}:{tid}",
+                     "subtitle": "🗒️ Sticky note",
+                     "variables": {"task_title": name, "task_id": tid,
+                                   "task_list_id": pid, "item_type": "task"}}
+        ctrlcmd = ({"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
+                    "subtitle": "Start focus",
+                    "variables": {"task_title": name, "task_id": tid,
+                                  "task_list_id": pid, "item_type": "task"}}
+                   if t.get("kind") != "NOTE"
+                   else {"valid": False, "subtitle": ""})
     return alfred.item(
         title=build_title(t, buffered=tid in buffered_ids()),
         subtitle=subtitle,
@@ -472,6 +495,7 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
             "alt":        alt,
             "alt+shift":  altshift,
             "ctrl+shift": ctrlshift,
+            "ctrl+cmd":   ctrlcmd,
             "alt+cmd":    {"arg": f"copy:{link}"},
             "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
         },
@@ -1232,7 +1256,7 @@ def main():
                     arg=f"open:{link}",
                     mods={
                         "cmd":       {"arg": ""},
-                        "shift":     {"arg": f"complete:{pid}:{tid}:{name}"},
+                        "shift":     _shift_complete(pid, tid, name),
                         # ⌥ → unified Browse box (this task's subtasks)
                         "alt":       {"arg": "", "subtitle": "Browse subtasks",
                                       "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{tid}"}},
@@ -1244,14 +1268,22 @@ def main():
                                                     "task_id": tid,
                                                     "task_list_id": pid,
                                                     "item_type": "task"}},
-                        # ⌃⇧ → the ⏱/🍅 start flow
+                        # ⌃⇧ → desktop sticky (Vex 2026-09-08: the verb he
+                        # reaches for most), ⌃⌘ → the ⏱/🍅 start flow
                         "ctrl+shift": {"valid": True,
-                                       "arg": f"xact:focus_open:{pid}:{tid}",
-                                       "subtitle": "Start focus",
+                                       "arg": f"xact:sticky:{pid}:{tid}",
+                                       "subtitle": "🗒️ Sticky note",
                                        "variables": {"task_title": name,
                                                      "task_id": tid,
                                                      "task_list_id": pid,
                                                      "item_type": "task"}},
+                        "ctrl+cmd": {"valid": True,
+                                     "arg": f"xact:focus_open:{pid}:{tid}",
+                                     "subtitle": "Start focus",
+                                     "variables": {"task_title": name,
+                                                   "task_id": tid,
+                                                   "task_list_id": pid,
+                                                   "item_type": "task"}},
                         "alt+cmd":   {"arg": f"copy:{link}"},
                         "ctrl":      {"arg": "", "subtitle": "🔙 Main menu"},
                     },

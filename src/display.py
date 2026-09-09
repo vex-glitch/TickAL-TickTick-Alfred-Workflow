@@ -301,7 +301,7 @@ def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb=
                 parts += ["⇧✅", MOD_BUFFER]
             parts += [MOD_URL, "⌘⇧➕"]
             if item_type == "Task":
-                parts.append("⌃⇧🎯")   # Start focus - search task rows
+                parts.append("⌃⇧🗒️ ⌃⌘🎯")   # sticky · start focus - search task rows
         else:
             # Compact set - browse rows; buffer_mod=True only on task rows
             # (⌥⇧🅿️ is a task/subtask-only chord)

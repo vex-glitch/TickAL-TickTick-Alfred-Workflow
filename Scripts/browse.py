@@ -1049,13 +1049,17 @@ def _cust_row(cr, c, uid_prefix="crms"):
         uid=f"{uid_prefix}-c-{c['id']}",
         title=c.get("title") or "Untitled",
         subtitle=(" · ".join(bits) or "No contact yet")
-                 + "  |  ⏎⤵️  ⌘⚡  ⌥⇧↗️  ⌃🔙",
+                 + "  |  ⏎⤵️  ⇧➕🎨  ⌥⇧➕💬  ⌘⚡  ⌃🔙",
         arg=f"xact:crmbrowse:ctx:crmcust:{c['id']}",
+        # chord map 2026-09-08: ⌥ drills, ⇧/⌥⇧ book (the frequent verbs),
+        # ↗️ open lives on the hub's head row and in ⌘
         mods={**_picker_mods(),
               "alt": {"arg": "", "valid": True, "subtitle": "Customer hub",
                       "variables": {"browse_ctx": f"ctx:crmcust:{c['id']}"}},
-              "alt+shift": {"arg": f"xact:notego:{c['id']}", "valid": True,
-                            "subtitle": "Open in TickTick"}},
+              "shift": {"arg": f"xact:crmnew_go:tattoo:{c['id']}", "valid": True,
+                        "subtitle": "➕ New tattoo"},
+              "alt+shift": {"arg": f"xact:crmnew_go:consult:{c['id']}", "valid": True,
+                            "subtitle": "➕ New consultation"}},
         variables=_record_vars(c),
     )
 
@@ -1083,13 +1087,22 @@ def _crm_task_row(cr, t, uid_prefix="crms"):
     if hit:
         mods["alt"] = {"arg": "", "valid": True, "subtitle": "Logbook hub",
                        "variables": {"browse_ctx": f"ctx:crmbook:{hit[2]}"}}
-    emo = ("💬" if (t.get("title") or "").rstrip().endswith("Consult")
+    # chord map 2026-09-08 (bug 6a9b1321 'Shift Enter needs to be session
+    # done'): ⇧ = the lifecycle advance, ⌥⇧ = the schedule picker. Only
+    # on a real session task - a hand-made CRM task keeps ⇧ dead.
+    if linked:
+        mods["shift"] = {"arg": f"xact:sessiondone:{CRM_ID}:{t['id']}",
+                         "valid": True, "subtitle": "✅ Session done"}
+        mods["alt+shift"] = {"arg": f"xact:crmsched:{CRM_ID}:{t['id']}",
+                             "valid": True, "subtitle": "📅 Reschedule"}
+    emo = ("💬" if cr.title_marker(t.get("title") or "") == "Consult"
            else "📅")
     return alfred.item(
         uid=f"{uid_prefix}-t-{t['id']}",
         title=f"{emo} {disp}",
         subtitle=f"{day or 'Dormant · not scheduled'}{chip}"
-                 + ("  |  ⏎↗️  ⌘⚡  ⌥⤵️  ⌃🔙" if hit
+                 + ("  |  ⏎↗️  ⇧✅  ⌥⇧📅  ⌥⤵️  ⌘⚡  ⌃🔙" if linked
+                    else "  |  ⏎↗️  ⌘⚡  ⌥⤵️  ⌃🔙" if hit
                     else "  |  ⏎↗️  ⌘⚡  ⌃🔙"),
         arg=f"open:ticktick:///webapp/#p/{CRM_ID}/tasks/{t['id']}",
         mods=mods,
@@ -1279,17 +1292,30 @@ def render_crmbook(log_tid, query):
     back = f"ctx:crmcust:{hit[2]}" if hit else "ctx:crmhub"
     n = cr.next_snum(lb.get("content") or "", log_tid)
     g = cr.gratis_count(lb.get("content") or "")
+    # Vex 2026-09-08: a hub is where you GO, ⌘ is what you DO - every verb
+    # this screen used to list (schedule, pay, past session, summary,
+    # rename, log a line, edit, archive, delete, content potential, edit
+    # this) lives in ⌘ Actions on any logbook row now; here: status, the
+    # next booked session (⇧ Session done · ⌥⇧ reschedule), photos, folders.
     rows = [alfred.item(
         uid="bk-open", title=lb.get("title") or "Logbook",
         subtitle=cr.paid_summary(lb.get("content") or "")
                  + (f" · 🖤 {g} gratis" if g else "")
-                 + (" · 📁 archived" if archived else "") + "  |  ⏎↗️",
-        arg=_open_note_arg(log_tid), mods=_picker_mods(),
+                 + (" · 📁 archived" if archived else "")
+                 + f"  |  ⏎↗️  ⌘⚡  ⌥⇧▶️S{n}",
+        arg=_open_note_arg(log_tid),
+        mods={**_picker_mods(),
+              "alt+shift": {"arg": f"xact:crmnew_go:session::{log_tid}",
+                            "valid": True,
+                            "subtitle": f"▶️ Schedule S{n}"}},
         variables=_record_vars(lb))]
-    if not archived:
+    nt = cr.next_session_task(log_tid)
+    if nt:
+        rows.append(_crm_task_row(cr, nt[2], uid_prefix="bk"))
+    elif not archived:
         rows.append(alfred.item(
             uid="bk-next", title=f"▶️ Schedule S{n}",
-            subtitle="Add window · prefilled",
+            subtitle="Nothing booked · Add window prefilled",
             arg=f"xact:crmnew_go:session::{log_tid}", mods=_picker_mods()))
     setup = cr.last_setup(lb.get("content") or "")
     if setup:
@@ -1299,51 +1325,14 @@ def render_crmbook(log_tid, query):
             valid=False))
     rows += [
         alfred.item(uid="bk-sessphotos", title="📸 Photos",
-                    subtitle="Import · file an Eagle selection · browse",
+                    subtitle="Import · file a selection · browse",
                     arg=f"xact:crmbrowse:ctx:lbphotos:{log_tid}",
                     mods=_picker_mods()),
-        alfred.item(uid="bk-eagle", title="🦅 Eagle folder",
-                    subtitle="Create if new · open in Eagle",
-                    arg=f"xact:eaglefolder:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-cdest",
-                    title="🎬 Content potential · "
-                          + {"tv": "TV", "fm": "FM", "studio": "Studio",
-                             "-": "➖"}.get(
-                              cr.content_dest_of(lb.get("content") or ""),
-                              "unset"),
-                    subtitle="TV · FM · Studio · none",
-                    arg=f"xact:cdest:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-editthis", title="🎬 Edit this",
-                    subtitle="Whole tree → To edit · task → Edit",
-                    arg=f"xact:editthis:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-pay", title="💶 Log payment",
-                    subtitle="Deposit · remainder · minus = refund",
-                    arg=f"xact:crmpay:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-past", title="🕰 Log past session",
-                    subtitle="Dated entry, no task",
-                    arg=f"xact:crmpast:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-summary", title="🧾 Copy money summary",
-                    subtitle="Sessions + amounts + total → clipboard",
-                    arg=f"xact:crmsummary:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-rename", title="✏️ Rename tattoo",
-                    subtitle="Ripples through titles, links, bullets",
-                    arg=f"xact:crmrename:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-log", title="📝 Log a line",
-                    subtitle="Timestamped · lands under ## Notes",
-                    arg=f"xact:crmlog:{log_tid}", mods=_picker_mods()),
-        alfred.item(uid="bk-edit", title="✏️ Edit note",
-                    subtitle="Alfred text view",
-                    arg=f"xact:crmedit:{log_tid}", mods=_picker_mods()),
+        alfred.item(uid="bk-folders", title="🦅 Folders",
+                    subtitle="Stage folders · counts · grid",
+                    arg=f"xact:crmbrowse:ctx:lbeagle:{log_tid}:hub",
+                    mods=_picker_mods()),
     ]
-    if not archived:
-        rows.append(alfred.item(
-            uid="bk-close", title="📁 Archive",
-            subtitle="Close without a session",
-            arg=f"xact:crmclose:{log_tid}", mods=_picker_mods()))
-    rows.append(alfred.item(
-        uid="bk-trash", title="🗑 Delete entry",
-        subtitle="Mistakes only · sessions + Eagle go too",
-        arg=f"xact:crmtrash:{log_tid}", mods=_picker_mods()))
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
@@ -2315,12 +2304,39 @@ def render_cstats(query):
     return add_back(rows, "ctx:contentpl")
 
 
+_FID_LIB = None
+
+
+def _fid_lib_index():
+    """{folder id: library key} across the four libraries, one disk read
+    each, memoised per render - a pipeline row must name the library
+    that REALLY holds its folder (Raw rows link CRM skeletons for live
+    bookings and TV/FM homes for the migrated ones)."""
+    global _FID_LIB
+    if _FID_LIB is None:
+        import eagle as _eg
+        idx = {}
+        for key, (_nm, path) in _eg.LIBS.items():
+            try:
+                tree = _eg.disk_folder_tree(path)
+            except Exception:
+                continue
+
+            def walk(nodes):
+                for f in nodes:
+                    idx.setdefault(f.get("id"), key)
+                    walk(f.get("children") or [])
+            walk(tree)
+        _FID_LIB = idx
+    return _FID_LIB
+
+
 def _cpl_task_row(t, tag, icon, word, lib, chip, queue="all"):
-    """One content-task row: ⏎ opens the Eagle folder cross-library,
-    ⌥ drills the PL hub (this tattoo's content verbs on one screen -
-    Vex 2026-09-07: "specific actions for content pipelines live under
-    ⌥, the legend says ⌥ PL hub like ⌥ CRM hub"), ⌥⇧ = posted (Post
-    rows) / retire (Raw rows)."""
+    """One content-task row. Chord map 2026-09-08 (Vex: ⌘ = do, ⌥ =
+    drill, the frequent verbs on ⇧/⌥⇧): ⏎ opens the Eagle folder,
+    ⇧ advances the stage (Edit this · File edited · Posted), ⌥ drills
+    into the photos (folders, then the grid), ⌥⇧ retires, ⌥⌘ copies
+    the Eagle link, ⌘ Actions carries every content verb."""
     title = (t.get("title") or "").strip()
     # markdown of ANY scheme - legacy tasks link http://localhost:41595
     mk = re.match(r"^\[(.*?)\]\(\S+?\)$", title)
@@ -2328,28 +2344,29 @@ def _cpl_task_row(t, tag, icon, word, lib, chip, queue="all"):
             else re.sub(r"\s*eagle://\S+", "", title).strip())
     m = (re.search(r"eagle://folder/([^)\s]+)", title)
          or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
-    # a Raw row's folder is the CRM skeleton for live bookings but a
-    # content-library home for the 312 migrated tattoos (2026-09-07);
-    # the guess here is only a PREFERENCE - eagle_open resolves the
-    # library that really holds the folder before switching
-    open_lib = "crm" if tag == "📸raw" else lib
-    arg = f"xact:eaglego:{open_lib}:{m.group(1)}" if m else ""
+    fid = m.group(1) if m else ""
+    flib = (_fid_lib_index().get(fid) if fid else "") or \
+        ("crm" if tag == "📸raw" else lib)
+    arg = f"xact:eaglego:{flib}:{fid}" if fid else ""
     mods = dict(_picker_mods())
-    mods["alt"] = {"arg": "", "valid": True, "subtitle": "⌥ PL hub",
-                   "variables": {"browse_ctx":
-                                 f"ctx:plhub:{t['id']}:{lib}:{queue}"}}
-    sub = (f"{word} · {chip}" + (" · ⏎ folder" if m else "")
-           + " · ⌥ PL hub · ⌘⚡")
-    if tag == "📸post":
-        mods["alt+shift"] = {"arg": f"xact:posted:{t['id']}",
-                             "subtitle": "Mark POSTED · shelf clears",
-                             "valid": True}
-        sub += " · ⌥⇧ posted"
-    elif tag == "📸raw":
-        mods["alt+shift"] = {"arg": f"xact:cretire:{t['id']}",
-                             "subtitle": "Retire · logbook 🎬 → ➖",
-                             "valid": True}
-        sub += " · ⌥⇧ retire"
+    legend = ["⏎ folder" if fid else ""]
+    if fid:
+        mods["alt"] = {"arg": "", "valid": True, "subtitle": "🖼 Photos",
+                       "variables": {"browse_ctx":
+                                     f"ctx:plfolder:{flib}:{fid}:{t['id']}:{queue}::{lib}"}}
+        legend.append("⌥ photos")
+        mods["alt+cmd"] = {"arg": f"copy:eagle://folder/{fid}", "valid": True,
+                           "subtitle": "🔗 Copy Eagle link"}
+    adv = {"📸raw": (f"xact:pledit:{t['id']}", "🎬 Edit this", "⇧ edit"),
+           "📸edit": ("xact:filedited", "📥 File edited shots", "⇧ file edits"),
+           "📸post": (f"xact:posted:{t['id']}", "📤 Posted", "⇧ posted")}.get(tag)
+    if adv:
+        mods["shift"] = {"arg": adv[0], "valid": True, "subtitle": adv[1]}
+        legend.append(adv[2])
+    mods["alt+shift"] = {"arg": f"xact:cretire:{t['id']}", "valid": True,
+                         "subtitle": "➖ Retire · row done"}
+    legend += ["⌥⇧ retire", "⌘⚡"]
+    sub = f"{word} · {chip} · " + " · ".join(x for x in legend if x)
     pid = t.get("_projectId") or t.get("projectId") or ""
     return alfred.item(uid=f"cpl-{t['id']}", title=f"{icon} {base}",
                        subtitle=sub, arg=arg, valid=bool(arg),
@@ -2481,141 +2498,6 @@ def render_contentpl(ids, query):
     return add_back(rows, f"ctx:contentpl:{lib}")
 
 
-def render_plhub(ids, query):
-    """🎬 PL hub - ONE pipeline row's content verbs on one screen, the
-    content twin of the ⌥ CRM hub (Vex 2026-09-07). Works for John Doe
-    rows too: the verbs key on the ROW (its folder link, its list), the
-    logbook rows appear only when the row links one. Back = the queue
-    the row came from."""
-    tid = ids[0] if ids else ""
-    lib = ids[1] if len(ids) > 1 else ""
-    queue = ids[2] if len(ids) > 2 else "all"
-    back = f"ctx:contentpl:{lib}:{queue}" if lib else "ctx:contentpl"
-    import crm_records as cr
-    import eagle as _eg
-    t = cache_store.find_task(tid)
-    if not t:
-        return add_back([alfred.item(title="Row not found",
-                                     subtitle="Run tsy", valid=False)], back)
-    title = (t.get("title") or "").strip()
-    mk = re.match(r"^\[(.*?)\]\(\S+?\)$", title)
-    base = (mk.group(1).strip() if mk
-            else re.sub(r"\s*eagle://\S+", "", title).strip())
-    m = (re.search(r"eagle://folder/([^)\s]+)", title)
-         or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
-    fid = m.group(1) if m else ""
-    tags = {str(x).lower() for x in (t.get("tags") or [])}
-    stage = next((s for s in ("📸post", "📸edit", "📸raw") if s in tags), "")
-    icon, word = {"📸raw": ("🎞", "Raw"), "📸edit": ("✂️", "Editing"),
-                  "📸post": ("📤", "Ready to post")}.get(stage, ("📸", ""))
-    pid = t.get("_projectId") or t.get("projectId") or ""
-    hit = cr.parse_first_link(t.get("content") or "")
-    log_tid = hit[2] if hit else ""
-    # where the folder really is + how many shots (disk reads only)
-    flib, n_img = "", None
-    if fid:
-        try:
-            flib = _eg.lib_of_folder(fid, prefer=lib) or ""
-            if flib:
-                n_img = _eg.disk_subtree_counts(_eg.LIBS[flib][1]).get(fid, 0)
-        except Exception:
-            pass
-    head_sub = [word] + ([f"🦅 {flib.upper()}"] if flib else ["🦅 no folder"])
-    if n_img is not None:
-        head_sub.append(f"🖼 {n_img}")
-    tvars = {"task_id": t["id"], "task_list_id": pid, "list_id": pid,
-             "task_title": t.get("title") or "", "item_type": "task"}
-    hmods = _picker_mods()
-    if fid:
-        hmods["alt+cmd"] = {"arg": f"copy:eagle://folder/{fid}",
-                            "valid": True, "subtitle": "🔗 Copy Eagle link"}
-    rows = [alfred.item(
-        uid="plh-open", title=f"{icon} {base}",
-        subtitle=" · ".join(head_sub) + ("  |  ⏎ folder" if fid else "")
-                 + "  ⌘⚡  ⌥⌘🔗  ⌃🔙",
-        arg=f"xact:eaglego:{flib or lib}:{fid}" if fid else "",
-        valid=bool(fid), mods=hmods, variables=tvars)]
-    if stage == "📸raw":
-        rows.append(alfred.item(
-            uid="plh-edit", title="🎬 Edit this",
-            subtitle="Folder → 02 Edit · row → Editing",
-            arg=f"xact:pledit:{tid}", mods=_picker_mods(), variables=tvars))
-    if stage == "📸edit":
-        rows.append(alfred.item(
-            uid="plh-edit", title="✂️ In edit",
-            subtitle="Export edits to the Eagle Inbox, then 📥 below",
-            valid=False))
-    pending = 0
-    try:
-        d = _eg.INTAKE.get(lib) or ""
-        pending = len([f for f in os.listdir(d) if not f.startswith(".")
-                       and os.path.isfile(os.path.join(d, f))]) if d else 0
-    except OSError:
-        pending = 0
-    rows.append(alfred.item(
-        uid="plh-filed", title=f"📥 File edited shots ({pending})",
-        subtitle="Eagle Inbox → 03 Post · row → Ready to post",
-        arg="xact:filedited", mods=_picker_mods(), variables=tvars))
-    if stage == "📸post":
-        rows.append(alfred.item(
-            uid="plh-posted", title="📤 Posted",
-            subtitle="Shelf clears · Portfolio keeps · row done",
-            arg=f"xact:posted:{tid}", mods=_picker_mods(), variables=tvars))
-    rows.append(alfred.item(
-        uid="plh-portfolio", title="⭐ Portfolio",
-        subtitle="Eagle selection → 04 Portfolio/{tattoo}",
-        arg="xact:portfolio", mods=_picker_mods(), variables=tvars))
-    if fid and flib:
-        # flat folder → the grid at once; subfolders → the folder browser
-        try:
-            _root, _ = _eg.disk_subtree_ids(_eg.LIBS[flib][1], fid)
-            has_kids = bool(_root.get("children"))
-        except Exception:
-            has_kids = False
-        here = f"ctx:plhub:{tid}:{lib}:{queue}"
-        rows.append(alfred.item(
-            uid="plh-photos", title="🖼 Browse photos",
-            subtitle=("Folders → grid · ⏎ drills" if has_kids
-                      else f"Grid · {n_img or 0} shots · ⏎ opens in Eagle")
-                     + "  |  ⏎  ⌃🔙",
-            arg=(f"xact:crmbrowse:ctx:plfolder:{flib}:{fid}:{tid}:{queue}::{lib}"
-                 if has_kids else _peek_payload(fid, flib, log_tid, here)),
-            valid=bool(has_kids or n_img), mods=_picker_mods(), variables=tvars))
-    if log_tid:
-        rows.append(alfred.item(
-            uid="plh-jobs", title="📸 Photo jobs",
-            subtitle="Import · file a selection · attach to session",
-            mods=_picker_mods(),
-            arg=f"xact:crmbrowse:ctx:lbphotos:{log_tid}", variables=tvars))
-        rows.append(alfred.item(
-            uid="plh-book", title="🎨 Logbook hub",
-            subtitle="Sessions · money · CRM verbs", mods=_picker_mods(),
-            arg=f"xact:crmbrowse:ctx:crmbook:{log_tid}", variables=tvars))
-    rows.append(alfred.item(
-        uid="plh-tt", title="↗️ Open in TickTick", subtitle="The row itself",
-        arg=f"open:https://ticktick.com/webapp/#p/{pid}/tasks/{tid}",
-        mods=_picker_mods(), variables=tvars))
-    if stage == "📸raw":
-        rows.append(alfred.item(
-            uid="plh-retire", title="➖ Retire",
-            subtitle="Row done · logbook 🎬 → ➖ · photos stay",
-            arg=f"xact:cretire:{tid}", mods=_picker_mods(), variables=tvars))
-    if query:
-        rows = rows[:1] + (fuzz.filter_and_score(
-            query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
-    return add_back(rows, back)
-
-
-def _peek_payload(fid, lib, lb, ret, direct=False, sess=""):
-    """b64 payload for the Grid View trampoline (xact:peek) - same shape
-    render_lbeagle's peek_arg builds; lb may be '' for a John Doe row
-    (grid chords that need a logbook toast instead)."""
-    import base64
-    payload = json.dumps({"fid": fid, "sess": sess, "lib": lib, "lb": lb,
-                          "ret": ret, "direct": direct})
-    return "xact:peek:" + base64.b64encode(payload.encode()).decode()
-
-
 def render_plfolder(ids, query):
     """🖼 Folder browser for ONE pipeline row (Vex 2026-09-07: "I should
     be able to drill down folders if it is an 02 Edit folder and it has
@@ -2630,8 +2512,8 @@ def render_plfolder(ids, query):
     queue = ids[3] if len(ids) > 3 else "all"
     up = ids[4] if len(ids) > 4 else ""          # parent folder id, if any
     plib = ids[5] if len(ids) > 5 else lib
-    hub = f"ctx:plhub:{tid}:{plib}:{queue}"
-    back = f"ctx:plfolder:{lib}:{up}:{tid}:{queue}" if up else hub
+    hub = f"ctx:contentpl:{plib}:{queue}" if plib else "ctx:contentpl"
+    back = f"ctx:plfolder:{lib}:{up}:{tid}:{queue}::{plib}" if up else hub
     import eagle
     import crm_records as cr
     try:
@@ -2752,7 +2634,12 @@ def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None):
     mods["alt"] = {"arg": "", "valid": True, "subtitle": "⌥ CRM hub",
                    "variables": {"browse_ctx": f"ctx:crmbook:{lb['id']}"}}
     mods["shift"] = {"arg": f"xact:crmbrowse:ctx:lbeagle:{lb['id']}{ret}",
-                     "valid": True, "subtitle": "⇧ Content · Eagle folders"}
+                     "valid": True, "subtitle": "⇧ Photos · folders"}
+    # chord map 2026-09-08: ⌥⇧ books the next session (the Add window
+    # prefilled, forecast asked); archived logbooks get the reopen ask
+    # inside crmnew_go, so the chord stays live everywhere
+    mods["alt+shift"] = {"arg": f"xact:crmnew_go:session::{lb['id']}",
+                         "valid": True, "subtitle": "▶️ Schedule next session"}
     # ⌥⌘ copies the TICKTICK link here (Vex 2026-07-28) - the Eagle link
     # is one step deeper, on ⇧ Content, where Eagle is what you are
     # looking at. Same chord, right link for the world you are in.
@@ -2761,7 +2648,7 @@ def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None):
     return alfred.item(
         uid=f"{uid_prefix}-{lb['id']}",
         title=f"🎨 {name}  {circle} " + " • ".join(head),
-        subtitle=" · ".join(sub) + "  |  ⌥ CRM  ⇧ Content  |  ⌘⚡ ⏎↗️"
+        subtitle=" · ".join(sub) + "  |  ⌥ hub  ⇧ photos  ⌥⇧ book  |  ⌘⚡ ⏎↗️"
                  + ("  ⌥⌘🔗" if fid else "") + "  ⌃🔙",
         arg=_open_note_arg(lb["id"]),
         match=base, mods=mods, variables=_record_vars(lb))
@@ -3375,8 +3262,12 @@ def render_crmcal(query):
         subtitle=(crm_home.subtitles().get("cal")
                   or "Who's coming + needs-booking radar"),
         arg="xact:crmbrowse:ctx:crmweek", mods=_picker_mods())
+    new = alfred.item(
+        uid="crmcal-new", title="➕ New entry",
+        subtitle="Tattoo · consultation · customer · lead",
+        arg="xact:crmbrowse:ctx:manage:crm", mods=_picker_mods())
     return _crmlist_drill("crmcal", "📅", "Calendar", _areas.CRM_ID,
-                          "ca", query, extra=(week,))
+                          "ca", query, extra=(week, new))
 
 
 def render_crmcusts(query):
@@ -3453,39 +3344,14 @@ def render_crmcust(cust_tid, query):
     for t in _crm_open_tasks():
         if any(f"/tasks/{lid})" in (t.get("title") or "") for lid in lb_ids):
             rows.append(_crm_task_row(cr, t, uid_prefix="hub"))
-    rows.append(alfred.item(
-        uid="hub-newtattoo", title=f"➕ New tattoo for {name}",
-        subtitle="Logbook + S1 → scheduling",
-        arg=f"xact:crmnew_go:tattoo:{cust_tid}", mods=_picker_mods()))
-    rows.append(alfred.item(
-        uid="hub-log", title="📝 Log a line",
-        subtitle="Timestamped · lands under ## Notes",
-        arg=f"xact:crmlog:{cust_tid}", mods=_picker_mods()))
-    rows.append(alfred.item(
-        uid="hub-edit", title="✏️ Edit note",
-        subtitle="Alfred text view · contact line is line 1",
-        arg=f"xact:crmedit:{cust_tid}", mods=_picker_mods()))
-    rows.append(alfred.item(
-        uid="hub-rename", title=f"✏️ Rename {name}",
-        subtitle="Ripples through logbooks, links, bullets",
-        arg=f"xact:crmrename:{cust_tid}", mods=_picker_mods()))
-    rows.append(alfred.item(
-        uid="hub-aftercare", title="🩹 Copy aftercare",
-        subtitle="Template + name → clipboard",
-        arg=f"xact:crmaftercare:{cust_tid}", mods=_picker_mods()))
-    if cr.is_lead(cust):
+    # Vex 2026-09-08: verbs (new tattoo, log a line, edit, rename,
+    # aftercare, make customer, cold lead, delete) live in ⌘ Actions on
+    # any customer row; the hub is the person: contact, tattoos, sessions.
+    if not lbs:
         rows.append(alfred.item(
-            uid="hub-convert", title="👤 Make customer",
-            subtitle="Lead → customer (bookings do this automatically)",
-            arg=f"xact:crmconvert:{cust_tid}", mods=_picker_mods()))
-        rows.append(alfred.item(
-            uid="hub-cold", title="🥶 Cold lead · archive",
-            subtitle="One-line reason → ## Notes · out of the pickers",
-            arg=f"xact:crmcold:{cust_tid}", mods=_picker_mods()))
-    rows.append(alfred.item(
-        uid="hub-trash", title="🗑 Delete entry",
-        subtitle="Mistakes only · sessions + Eagle go too",
-        arg=f"xact:crmtrash:{cust_tid}", mods=_picker_mods()))
+            uid="hub-newtattoo", title=f"➕ New tattoo for {name}",
+            subtitle="Logbook + S1 → scheduling",
+            arg=f"xact:crmnew_go:tattoo:{cust_tid}", mods=_picker_mods()))
     if query:
         rows = fuzz.filter_and_score(query, rows,
                                      key_fn=lambda x: x["title"]) or rows
@@ -4737,9 +4603,6 @@ def main():
 
         elif level == "contentpl":
             items = render_contentpl(ids, query)
-
-        elif level == "plhub":
-            items = render_plhub(ids, query)
 
         elif level == "plfolder":
             items = render_plfolder(ids, query)

@@ -42,7 +42,16 @@ LINK_RE = re.compile(
 ENTRY_RE = re.compile(r"^### (\d{4}-\d{2}-\d{2}[^\n]*)$", re.M)
 # Session tasks carry their marker as a SUFFIX ("<logbook link> S2",
 # Vex ruling 2026-07-17); the prefix form is tolerated as legacy.
-SESSION_MARKER_RE = re.compile(r"^(S\d+|Consult)\s|\b(S\d+|Consult)\s*$")
+# ... optionally followed by the booking FORECAST tail ' - 400' (Vex
+# 2026-09-08: a glance figure for the calendar, nothing else reads it).
+SESSION_MARKER_RE = re.compile(
+    r"^(S\d+|Consult)\s|\b(S\d+|Consult)(?:\s*-\s*\d[\d.,]*\s*€?)?\s*$")
+
+
+def title_forecast(title):
+    """The ' - 400' forecast tail of a session-task title as text, else ''."""
+    m = re.search(r"\b(?:S\d+|Consult)\s*-\s*(\d[\d.,]*\s*€?)\s*$", title or "")
+    return m.group(1).strip() if m else ""
 
 
 def title_marker(title):

@@ -24,6 +24,21 @@ rulings caused (Philip, Octopuss, Professor vs live Profesor) trashed
 five double-spaced titles fixed. **Lesson: a ruling that is not in
 `migration._FIXUPS` does not exist** - a doc re-parse overwrites SQL.
 
+**Afternoon 2026-09-07 (after the compact):** old folders swept to the bins
+(291), 92 logbooks given their 🎬 line, 13 To Edit backlog rows folded
+into their migration rows (homes → 02 Edit), portfolio finals pulled out
+of raw homes (Vex ruling: finals ONLY in 04 Portfolio; 29 finals-only
+homes binned), every migrated shot renamed `{folder} • Raw|Portfolio • n`,
+Edit this learned the migrated road. A 15-agent audit then found what
+rules cannot: 635 byte-identical twins inside tattoos' own folders (the
+July pull re-imported backup originals that already existed - now in
+`🗑 Deleted/Duplicates`, item.dup_of set) and four doc names that were one
+tattoo (merged, pinned in `_FIXUPS`). Cross-tattoo identical shots that
+need Vex's ruling are listed in the session's last report (Lil Crow,
+Germany - Crow, Wing/Wings/Eye Neck, Bradonja-Yoda⇄Clemens dual placement,
+FM Rose Coverup⇄Shoulder Mandala Germany). Tools: scratch `audit_fixes.py`
+(dedupe / merges / renumber, guarded by ledger phase 'audit').
+
 Open decisions (Vex's, nothing pending on the engine):
 1. 282 old source folders now hold only superseded/frozen copies (113 are
    empty): sweep to each library's `🗑 Deleted` bin, or leave. Nothing
