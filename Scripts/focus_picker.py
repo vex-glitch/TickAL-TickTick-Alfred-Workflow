@@ -75,6 +75,7 @@ try:
     import alfred
     import cache as cache_store
     import xact                       # Scripts sibling: focus state + defaults
+    import focus_subtasks as fsub     # pure: descendants (nested subtasks)
     from display import search_key, md_links_display
     from fuzzy import filter_and_score
 except Exception as e:
@@ -193,11 +194,18 @@ def _staged_tids(tid):
 
 
 def _staged_children(tid):
-    """Open subtask dicts of the focus task, display order (sortOrder
-    ascending) - the remove-from-focus pool."""
-    kids = [t for t in (cache_store.get("all_tasks") or [])
-            if t.get("parentId") == tid and t.get("status", 0) == 0]
-    return sorted(kids, key=lambda t: t.get("sortOrder") or 0)
+    """Open subtask dicts of the focus task - the whole open SUBTREE in
+    display order (fsub.descendants: DFS, siblings by sortOrder, _depth
+    stamped; 2026-09-09: grandchildren staged app-side were invisible) -
+    the tasks-screen + remove-from-focus pool."""
+    pool = [t for t in (cache_store.get("all_tasks") or [])
+            if t.get("status", 0) == 0]
+    return fsub.descendants(pool, tid)
+
+
+def _indent(t):
+    """'↳ ' per nesting level below a direct child."""
+    return "↳ " * (t.get("_depth", 1) - 1)
 
 
 def _buffer_count():
@@ -354,7 +362,7 @@ def _subtask_rows(frag, fpid, ftid):
         pid = t.get("projectId") or t.get("_projectId", "") or fpid
         items.append(alfred.item(
             uid=f"fp-sub-{t['id']}",
-            title=md_links_display(t.get("title", ""))[:60],
+            title=_indent(t) + md_links_display(t.get("title", ""))[:60],
             subtitle="⏎✅ done  ⌥➖ un-stage  ⌘↗️ open  ⌃🔙",
             arg=f"xact:fx_tick:{fpid}:{ftid}:{t['id']}", valid=True,
             mods={"alt": {"valid": True,
@@ -391,7 +399,7 @@ def _remove_search(frag, fpid, ftid):
         pid = t.get("projectId") or t.get("_projectId", "") or fpid
         items.append(alfred.item(
             uid=f"fp-rm-{t['id']}",
-            title=md_links_display(t.get("title", ""))[:60],
+            title=_indent(t) + md_links_display(t.get("title", ""))[:60],
             subtitle="Un-stage · send it home  ⌃🔙",
             arg=f"xact:fx_unstage:{pid}:{t['id']}", valid=True, mods=BACK))
     if not items:
@@ -460,7 +468,17 @@ def _session_rows(pid, tid):
             uid="fp-bar", title="👁 Show bar",
             subtitle="Bring back the pill  ⌃🔙",
             arg="xact:bar_show", valid=True, mods=BACK))
+    rows.append(_focus_app_row())
     return rows
+
+
+def _focus_app_row():
+    """↗️ Focus in TickTick - ONE row on every focus screen (timer, pomo,
+    idle, for): opens the app's Pomodoro view (xact.view_open pomo)."""
+    return alfred.item(
+        uid="fp-app-focus", title="↗️ Focus in TickTick",
+        subtitle="Open Pomodoro view  ⌃🔙",
+        arg="xact:view_open:pomo", valid=True, mods=BACK)
 
 
 # ── Running-timer screens (R/R2/R3/R4) ───────────────────────────────────────
@@ -576,6 +594,7 @@ def render_running(st, raw):
                 uid="fp-bar", title="👁 Show bar",
                 subtitle="Bring back the pill  ⌃🔙",
                 arg="xact:bar_show", valid=True, mods=BACK))
+        items.append(_focus_app_row())
     items.append(alfred.item(
         uid="fp-backlog", title="🕰️ Log past focus",
         subtitle="When it started, when it ended - task or random…",
@@ -684,6 +703,7 @@ def render_idle(raw):
         alfred.item(uid="fp-backlog", title="🕰️ Log past focus",
                     subtitle="When it started, when it ended - task or random…",
                     arg="", valid=False, autocomplete="log ", mods=BACK),
+        _focus_app_row(),
     ]
     frag = raw.strip().lower()
     hits = [r for r in rows if not frag or frag in r["title"].lower()]
@@ -740,21 +760,19 @@ def render_pomo(state, remaining, raw):
                     title="🚮 End pomo",
                     subtitle="End it now  ⌃🔙",
                     arg="xact:pomo_abandon", valid=True, mods=BACK),
-        alfred.item(uid="fp-pomo-view",
-                    title="↗️ Pomodoro view",
-                    subtitle="Open in TickTick  ⌃🔙",
-                    arg="xact:view_open:pomo", valid=True, mods=BACK),
         alfred.item(uid="fp-backlog", title="🕰️ Log past focus",
                     subtitle="When it started, when it ended - task or random…",
                     arg="", valid=False, autocomplete="log ", mods=BACK),
     ]
     if bound:
+        # _session_rows carries the one ↗️ Focus in TickTick row
         rows[1:1] = _session_rows(bound.get("pid", ""), bound["tid"])
     else:
         rows.insert(1, alfred.item(
             uid="fp-live-link", title="🔗 Link a task",
             subtitle="Attribute the running session  ⌃🔙",
             arg="", valid=False, autocomplete="link ", mods=BACK))
+        rows.append(_focus_app_row())
     frag = raw.strip().lower()
     hits = [r for r in rows if not frag or frag in r["title"].lower()]
     print(alfred.output(hits or rows, skipknowledge=True))
@@ -1079,6 +1097,7 @@ def render_for(raw):
             alfred.item(uid="fp-for-pomo", title="🍅 Start Pomodoro",
                         subtitle="Link a task, open focus bar, log, pause...",
                         arg="", valid=False, autocomplete="for pomo ", mods=BACK),
+            _focus_app_row(),
         ]
         frag = rest.strip().lower()
         rows = [r for r in rows if not frag or frag in r["title"].lower()] or rows

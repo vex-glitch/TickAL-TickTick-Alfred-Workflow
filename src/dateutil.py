@@ -19,10 +19,33 @@ for _i, _mn in enumerate(MONTHS, 1):
 
 
 # ── Normaliser ────────────────────────────────────────────────────────────────
+def _bare_day_phrase(day, now=None):
+    """'9' → '9 September' (this month), or the NEXT month once the day is
+    past - today itself still counts as this month. A day the month lacks
+    (31 in September) walks forward to the first month that has it. The
+    year rides along only when the walk crosses December."""
+    now = now or datetime.now()
+    y, m = now.year, now.month
+    if day < now.day or day > _cal.monthrange(y, m)[1]:
+        for _ in range(3):
+            m += 1
+            if m > 12:
+                m, y = 1, y + 1
+            if day <= _cal.monthrange(y, m)[1]:
+                break
+    phrase = f"{day} {MONTHS[m - 1].capitalize()}"
+    return phrase if y == now.year else f"{phrase} {y}"
+
+
 def _normalise_date(date_str):
     """Normalise a raw date/time string before handing it to parsedatetime.
 
     Steps (in order):
+      0. Bare day-of-month ("9", "9 at 14", "9 14") → "9 <Month>" - the
+         current month, or the next one when that day is already past
+         (Vex 2026-09-09: "assume 9th of current month"; parsedatetime
+         read a bare "9" as 09:00 today, and a silent jump to next YEAR
+         would be worse than next month)
       1. Weekend aliases → saturday
       2. "Xth of Month" → "X Month"
       3. Ordinal suffixes stripped: "21st" → "21"
@@ -33,6 +56,11 @@ def _normalise_date(date_str):
       8. Bare hour at end of date phrase → am (N<12) or :00 (12-23)
     """
     s = date_str.strip()
+
+    # 0. Bare day-of-month: "9" (optionally + a time: "9 at 14", "9 14").
+    _bare = re.match(r'^(\d{1,2})(?=$|\s+at\b|\s+\d{1,2}(?::\d{2})?\s*$)', s)
+    if _bare and 1 <= int(_bare.group(1)) <= 31:
+        s = _bare_day_phrase(int(_bare.group(1))) + s[_bare.end():]
 
     # 1. Weekend aliases. Mid-weekend (Sat/Sun) "this weekend" means NOW -
     # "this saturday" would resolve to the PAST on a Sunday.

@@ -41,7 +41,37 @@ check("summary-url-shape",
 check("summary-idx-1based", [i["idx"] for i in s["items"]] == [1, 2, 3, 4])
 check("summary-shape-keys", set(s) == {"done", "total", "items", "date"})
 check("summary-item-keys",
-      set(s["items"][0]) == {"idx", "title", "url", "tid", "pid", "checked"})
+      set(s["items"][0]) == {"idx", "title", "url", "tid", "pid", "checked",
+                             "depth"})
+check("summary-depth-default", [i["depth"] for i in s["items"]] == [1, 1, 1, 1])
+
+# ── descendants ──────────────────────────────────────────────────────────
+TREE = [T("c1", 20, parent="root"), T("c0", 10, parent="root"),
+        T("g0", 5, parent="c1"), T("g1", 6, parent="c1"),
+        T("gg", 1, parent="g0"), T("other", 1, parent="elsewhere"),
+        T("root", 0)]
+d = fs.descendants(TREE, "root")
+check("desc-dfs-order", [t["id"] for t in d] == ["c0", "c1", "g0", "gg", "g1"],
+      [t["id"] for t in d])
+check("desc-depths", [t["_depth"] for t in d] == [1, 1, 2, 3, 2])
+check("desc-dfs-stamp", [t["_dfs"] for t in d] == [0, 1, 2, 3, 4])
+check("desc-copies", "_depth" not in TREE[0])
+check("desc-display-key-sorts",
+      [t["id"] for t in sorted(reversed(d), key=fs.display_key)]
+      == ["c0", "c1", "g0", "gg", "g1"])
+check("desc-max-depth", [t["id"] for t in fs.descendants(TREE, "root", 2)]
+      == ["c0", "c1", "g0", "g1"])
+check("desc-none-root", fs.descendants(TREE, "") == [])
+check("desc-no-kids", fs.descendants(TREE, "gg") == [])
+LOOPY = [T("a", 1, parent="r"), T("b", 2, parent="a"), T("r", 0, parent="b")]
+check("desc-cycle-safe", [t["id"] for t in fs.descendants(LOOPY, "r")] == ["a", "b"])
+# summary keeps the tree order + depth through the DFS stamp
+s = fs.children_summary(d, ["c0", "c1", "done"])
+check("summary-tree-order",
+      [i["tid"] for i in s["items"]] == ["c0", "c1", "g0", "gg", "g1", "done"])
+check("summary-tree-depths",
+      [i["depth"] for i in s["items"]] == [1, 1, 2, 3, 2, 1])
+check("summary-tree-done", s["done"] == 1 and s["total"] == 6)
 
 s = fs.children_summary([], [], None)
 check("summary-empty", s["done"] == 0 and s["total"] == 0 and s["items"] == [])

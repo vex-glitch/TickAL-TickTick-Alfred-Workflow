@@ -578,18 +578,25 @@ def _children_state(fpid, ftid):
     (open children live there with titles + sortOrder); get_task fallback
     for childIds when the focus task itself left the data (completed
     mid-session stays GET-able). childIds keeps completed children -
-    live-verified 2026-07-21 - so done = childIds minus the open set."""
+    live-verified 2026-07-21 - so done = childIds minus the open set.
+    open_children is the whole open SUBTREE (fsub.descendants, DFS display
+    order, _depth stamped - 2026-09-09: grandchildren tick too), child_ids
+    the root's childIds plus every open descendant's, so a completed
+    grandchild counts as done as well."""
     api = _api()
     data = api.get_project_data(fpid)
     tasks = data.get("tasks") or []
-    open_children = [t for t in tasks if t.get("parentId") == ftid]
+    open_children = fsub.descendants(tasks, ftid)
     focus = next((t for t in tasks if t.get("id") == ftid), None)
     if focus is None:
         try:
             focus = api.get_task(fpid, ftid)
         except Exception:
             focus = {}
-    return open_children, focus.get("childIds") or []
+    child_ids = list(focus.get("childIds") or [])
+    for t in open_children:
+        child_ids += [c for c in (t.get("childIds") or []) if c not in child_ids]
+    return open_children, child_ids
 
 
 def _done_children_snapshot(pid, tid):
@@ -684,8 +691,7 @@ def _close_session(st):
             entries = [(titles.get(c, ""), True) for c in session_done
                        if titles.get(c)]
             entries += [(t.get("title", ""), False) for t in
-                        sorted(open_children,
-                               key=lambda x: x.get("sortOrder") or 0)]
+                        sorted(open_children, key=fsub.display_key)]
             note = fsub.record_note(_today(), entries) or None
         except Exception:
             note = None
@@ -6107,7 +6113,7 @@ def fx_tick(pid, tid, ctid=None):
     as_json = os.environ.get("TICKAL_JSON") == "1"
     try:
         open_children, child_ids = _children_state(pid, tid)
-        ordered = sorted(open_children, key=lambda t: t.get("sortOrder") or 0)
+        ordered = sorted(open_children, key=fsub.display_key)
         if ctid:
             target = next((t for t in ordered if t.get("id") == ctid), None)
         else:
@@ -6242,11 +6248,13 @@ def fx_copy(pid=None, tid=None):
             return
         pid, tid = cur[0], cur[1]
     open_children, _cids = _children_state(pid, tid)
-    ordered = sorted(open_children, key=lambda t: t.get("sortOrder") or 0)
+    ordered = sorted(open_children, key=fsub.display_key)
     if not ordered:
         print("📋 No open subtasks")
         return
-    text = "\n".join("- " + " ".join((t.get("title") or "(untitled)").split())
+    # nested subtasks paste as nested bullets (two spaces per level)
+    text = "\n".join("  " * (t.get("_depth", 1) - 1) + "- "
+                     + " ".join((t.get("title") or "(untitled)").split())
                      for t in ordered)
     subprocess.run(["pbcopy"], input=text.encode())
     print(f"📋 {len(ordered)} subtask{'s' if len(ordered) != 1 else ''}"
@@ -8164,7 +8172,15 @@ def fx_move(tid, direction):
         return
     fpid, ftid = cur[0], cur[1]
     open_children, _cids = _children_state(fpid, ftid)
-    ordered = sorted(open_children, key=lambda t: t.get("sortOrder") or 0)
+    # sortOrder ranks SIBLINGS - a nested subtask moves among its own
+    # parent's open children, a direct child among the focus task's
+    me = next((t for t in open_children if t.get("id") == tid), None)
+    if me is None:
+        print("")
+        return
+    ordered = sorted((t for t in open_children
+                      if t.get("parentId") == me.get("parentId")),
+                     key=lambda t: t.get("sortOrder") or 0)
     pos = next((i for i, t in enumerate(ordered) if t.get("id") == tid), None)
     if pos is None:
         print("")

@@ -670,7 +670,9 @@ def main():
                 # swallowing the title - same trick as the CRM prepare prefill.
                 # The CTA itself is created by the normal create: path on ⏎,
                 # which also handles the all_tasks cache.
-                _fire_add_prefill(f"~l {areas.cta_list_name()} #{tag} {cta_title}")
+                # Trailing ' *' lands the window on the date picker (the
+                # CTA exists to be scheduled) - same as areas.build_action.
+                _fire_add_prefill(f"~l {areas.cta_list_name()} #{tag} {cta_title} *")
                 print(f"💼 {name} created · schedule its 📌CTA")
             else:
                 # No tag to close the ~l token safely - create the CTA directly.
@@ -827,7 +829,7 @@ def main():
                 _ref = f"[[{_tgt}]]" if _wl else _tgt
                 _fire_add_prefill(
                     f"~l {areas.crm_list_name()} #{areas.PREPARE_TAG} "
-                    f"Prepare for {_ref}")
+                    f"Prepare for {_ref} *")   # ' *' = open on the date picker
 
             notif = payload.get("_notif_text") or f"Task added to {payload.get('listName') or 'Inbox'}"
             print(notif + attach_note)

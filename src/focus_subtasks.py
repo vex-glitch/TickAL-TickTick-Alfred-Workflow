@@ -22,18 +22,58 @@ API facts the design leans on (live-verified 2026-07-21 on scratch tasks):
 
 SORT_STEP = 65536
 RESPREAD = "respread"          # move_order sentinel: midpoint collapsed
+MAX_DEPTH = 4                  # descendants() default reach (TickTick nests ~4)
+
+
+def descendants(tasks, root_tid, max_depth=MAX_DEPTH):
+    """Every task under root_tid, DFS in DISPLAY order (siblings by
+    sortOrder ascending, a child right after its parent), each a shallow
+    copy stamped _depth (1 = direct child) and _dfs (its display ordinal -
+    display_key sorts on it). tasks: any task-dict pool (project data, the
+    cache); the caller filters status. Cycle-safe (a corrupt parent loop
+    visits each id once) and depth-capped (2026-09-09: fx_tick / the bar /
+    the picker used to see direct children only - grandchildren staged
+    app-side were invisible)."""
+    if not root_tid:
+        return []
+    kids = {}
+    for t in tasks or []:
+        p = t.get("parentId")
+        if p:
+            kids.setdefault(p, []).append(t)
+    out, seen = [], {root_tid}
+
+    def walk(pid, depth):
+        if depth > max_depth:
+            return
+        for t in sorted(kids.get(pid, []), key=lambda t: t.get("sortOrder") or 0):
+            tid = t.get("id")
+            if not tid or tid in seen:
+                continue
+            seen.add(tid)
+            out.append(dict(t, _depth=depth, _dfs=len(out)))
+            walk(tid, depth + 1)
+
+    walk(root_tid, 1)
+    return out
+
+
+def display_key(t):
+    """Sort key for a child list: the DFS ordinal when descendants() stamped
+    one, sortOrder otherwise (a flat direct-children list)."""
+    return (t.get("_dfs", 0), t.get("sortOrder") or 0)
 
 
 def children_summary(open_children, child_ids, done_titles=None):
     """The focus bar / fx_tick model - the EXACT dict shape block_summary
-    produced: {done, total, items: [{idx, title, url, tid, pid, checked}],
-    date}. open_children: open child task dicts (sorted here by sortOrder
-    ascending = app display order). child_ids: the focus task's childIds
-    (completed included). Done rows carry a title only when done_titles
-    ({tid: title}) knows one - the bar renders unchecked rows and counts,
-    so blank done titles cost nothing."""
-    open_sorted = sorted(open_children or [],
-                         key=lambda t: t.get("sortOrder") or 0)
+    produced: {done, total, items: [{idx, title, url, tid, pid, checked,
+    depth}], date}. open_children: open child task dicts (sorted here by
+    display_key - descendants() DFS order when stamped, else sortOrder
+    ascending = app display order; depth = _depth, 1 when unstamped).
+    child_ids: the focus task's childIds (completed included). Done rows
+    carry a title only when done_titles ({tid: title}) knows one - the bar
+    renders unchecked rows and counts, so blank done titles cost nothing."""
+    open_sorted = sorted(open_children or [], key=display_key)
     open_ids = {t.get("id") for t in open_sorted}
     done_ids = [c for c in (child_ids or []) if c not in open_ids]
     items = []
@@ -43,11 +83,13 @@ def children_summary(open_children, child_ids, done_titles=None):
         pid = t.get("projectId") or t.get("_projectId", "")
         items.append({"idx": idx, "title": t.get("title", ""),
                       "url": f"https://ticktick.com/webapp/#p/{pid}/tasks/{t.get('id')}",
-                      "tid": t.get("id"), "pid": pid, "checked": False})
+                      "tid": t.get("id"), "pid": pid, "checked": False,
+                      "depth": t.get("_depth", 1)})
     for c in done_ids:
         idx += 1
         items.append({"idx": idx, "title": (done_titles or {}).get(c, ""),
-                      "url": None, "tid": c, "pid": "", "checked": True})
+                      "url": None, "tid": c, "pid": "", "checked": True,
+                      "depth": 1})
     return {"done": len(done_ids), "total": len(items), "items": items,
             "date": None}
 

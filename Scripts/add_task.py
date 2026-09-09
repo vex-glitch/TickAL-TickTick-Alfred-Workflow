@@ -1951,25 +1951,64 @@ def note_preview(query):
 
 
 # ── List creation mode ────────────────────────────────────────────────────────
-def list_create_items(name):
+def list_create_items(fragment):
+    """'l <name>' → 📂 No folder plus one row per folder (config.get_folders,
+    the v2 auto-names overlaid by manual ones) - ⏎ creates the list THERE
+    (payload {name, groupId}; dispatch create_list: forwards groupId to
+    api.create_project). Optional 'l <name>><text>' narrows the folder rows,
+    tag_create_items' parent-picker grammar (2026-09-09: lists were born
+    folderless, the folder was an app-side drag afterwards)."""
+    # '>' splits the name from the folder filter
+    base, _sep, ffrag = fragment.partition(">")
+    name = base.strip()
     if not name:
         return [alfred.item(
             title="Type a list name…",
             subtitle="Create list  ⌃ 🔙",
             valid=False,
         )]
-    payload = {"name": name}
-    encoded = base64.b64encode(json.dumps(payload).encode()).decode()
     # Chorded ⏎ must NOT silently fall through the ⌘/⇧⌘ canvas edges
     # and create the list anyway - the focus chords are a preview-row thing.
     _no_chord = {"cmd": {"valid": False, "subtitle": ""},
                  "cmd+shift": {"valid": False, "subtitle": ""}}
-    return [alfred.item(
-        title="Create list",
-        subtitle="⌃ 🔙",
-        arg=f"create_list:{encoded}",
-        valid=True,
-        mods=_no_chord,
+
+    def _arg(group_id=None):
+        payload = {"name": name}
+        if group_id:
+            payload["groupId"] = group_id
+        return "create_list:" + base64.b64encode(
+            json.dumps(payload).encode()).decode()
+
+    ffrag_l = ffrag.strip().lower()
+    items = []
+    if not ffrag_l:
+        items.append(alfred.item(
+            uid="ladd-create-plain",
+            title=f"📂 No folder · {name}",
+            subtitle="Create list  ⌃ 🔙",
+            arg=_arg(),
+            valid=True,
+            mods=_no_chord,
+        ))
+    try:
+        folders = cfg.get_folders()
+    except Exception:
+        folders = {}
+    for gid, fname in sorted(folders.items(), key=lambda kv: kv[1].lower()):
+        if ffrag_l and ffrag_l not in fname.lower():
+            continue
+        items.append(alfred.item(
+            uid=f"ladd-create-{gid}",
+            title=f"📁 {fname} · {name}",
+            subtitle="Create list in folder  ⌃ 🔙",
+            arg=_arg(gid),
+            valid=True,
+            mods=_no_chord,
+        ))
+    return items or [alfred.item(
+        title=f'No folder matching "{ffrag.strip()}"',
+        subtitle="⌫ 🔙",
+        valid=False,
     )]
 
 
