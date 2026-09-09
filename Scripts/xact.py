@@ -1587,7 +1587,9 @@ def crmnew_go(rest):
 def sessiondone(pid, tid, when=None):
     """The heart of the records flow: complete today's task (the calendar
     keeps the record - never reschedule), log the entry, recompute Paid,
-    attach a clipboard photo, then archive or chain the next session.
+    then archive or chain the next session. Photos land through ONE
+    verb (session_photos: Eagle + planted hero + dedupe) - a Photos
+    selection OR a clipboard image is caught BEFORE the questions.
     when = ISO date for backdated entries (the adopt chain asks); None = today."""
     if not _records_ready():
         return
@@ -1687,33 +1689,36 @@ def sessiondone(pid, tid, when=None):
     # flow with the task untouched. Consultations catch too (Sarah
     # smoke: consult day IS reference-shot day) - they file to
     # 01 Consultation, heroes → the logbook note.
-    try:
-        import photos_bridge as pb
-        n_sel = pb.selection_count() if pb.photos_running() else 0
-    except Exception:
-        n_sel = 0
-    if n_sel:
-        pick = _dialog(f"📸 {n_sel} selected in Photos - import to "
-                       f"{marker} first?",
+    # The clipboard counts too (2026-09-09: the old bare upload after
+    # the entry silently missed jpeg / copied files and never planted).
+    src_desc, photo = _photo_source(), " · no clipboard image"
+    if src_desc:
+        pick = _dialog(f"📸 {src_desc} - import to {marker} first?",
                        ["Cancel", "Skip", "Import"], "Import")
         if pick == "":
             _crm_say("Cancelled · task untouched")
             return
-        if (pick == "Import"
-                and not session_photos(log_tid, "" if is_s else "consult")):
-            _crm_say("📸 Import failed · task untouched - fix and "
-                     "re-run Session done")
-            return
-    d_dur = cr.last_duration(lb_cached.get("content") or "")
-    d_chg = cr.quote_remainder(lb_cached.get("content") or "")
-    d_setup = cr.last_setup(lb_cached.get("content") or "")
+        if pick == "Import":
+            if not session_photos(log_tid, "" if is_s else "consult"):
+                _crm_say("📸 Import failed · task untouched - fix and "
+                         "re-run Session done")
+                return
+            photo = " · 📸 imported"
+        else:
+            photo = " · 📸 skipped"
+    lb_content = lb_cached.get("content") or ""
+    d_dur = cr.last_duration(lb_content)
+    d_chg = cr.quote_remainder(lb_content)
+    d_setup = cr.last_setup(lb_content)
+    d_next = cr.last_next(lb_content)
     # Consultations skip duration/charged/setup (Vex 2026-07-26) - one
-    # question, prep-flavored; needle sessions keep the full four.
+    # question, prep-flavored; needle sessions keep the full five.
     prompts = ((
         (f"How long was the {word}? (OK skips · Esc cancels)", d_dur),
-        ("Charged? (gift = free friend · OK skips · Esc cancels)", d_chg),
+        (_price_prompt(lb_content), d_chg),
         ("What did you do? (OK skips · Esc cancels)", ""),
         ("Setup? needles · inks · machine (OK skips)", d_setup),
+        ("What is next? (OK skips)", d_next),
     ) if is_s else (
         ("What was discussed · anything to remember for the prep? "
          "(OK skips · Esc cancels)", ""),
@@ -1726,10 +1731,9 @@ def sessiondone(pid, tid, when=None):
             return
         answers.append(v)
     if is_s:
-        dur, charged, did, setup = answers
-        if (setup or "").strip():
-            did = (did.strip() + ("\n" if did.strip() else "")
-                   + f"Setup: {setup.strip()}")
+        dur, charged, did, setup, nxt_txt = answers
+        charged, did = _fold_entry_text(lb_content, charged, did, setup,
+                                        nxt_txt)
     else:
         dur = charged = setup = ""
         did = answers[0]
@@ -1755,21 +1759,6 @@ def sessiondone(pid, tid, when=None):
     except Exception as e:
         _crm_say(f"✅ done · logbook update FAILED: {type(e).__name__}: {e}")
         return
-
-    photo = ""
-    try:   # no PyObjC / empty clipboard = simply no photo, not an error
-        import clipboard as clip_util
-        img = clip_util.png_bytes()
-    except Exception:
-        img = None
-    if img:
-        try:
-            import api_v2
-            api_v2.TickTickV2().upload_attachment(log_pid, log_tid, img,
-                                                  "session.png")
-            photo = " · 📷 attached"
-        except Exception:
-            photo = " · 📷 upload failed"
 
     if not is_s:
         # Consultation outcome: book / wait / didn't-book (lead lost).
@@ -1815,6 +1804,52 @@ def sessiondone(pid, tid, when=None):
     elif pick == "Open logbook":
         subprocess.run(["open", lb_deeplink], check=False)
     _crm_say(f"✅ {marker} done · {money} / {n} total{photo}")
+
+
+def _photo_source():
+    """What the photo catch can import right now, as dialog text: 'N
+    selected in Photos' or 'Clipboard image' - '' when nothing. Read-
+    only probes; scripting trouble reads as nothing."""
+    try:
+        import photos_bridge as pb
+        n_sel = pb.selection_count() if pb.photos_running() else 0
+        if n_sel:
+            return f"{n_sel} selected in Photos"
+    except Exception:
+        pass
+    try:
+        import clipboard as clip_util
+        if clip_util.has_image():
+            return "Clipboard image"
+    except Exception:
+        pass
+    return ""
+
+
+def _price_prompt(content):
+    """The Charged ask. The answer IS the session price (Vex ruling
+    2026-09-08); with a deposit on file the prompt says what happens
+    to it."""
+    import crm_records as cr
+    dep = cr.unapplied_deposit_text(content)
+    if dep:
+        return (f"Price of this session? ({dep} deposit on file is "
+                "subtracted · gift = free friend · OK skips · Esc cancels)")
+    return "Charged? (gift = free friend · OK skips · Esc cancels)"
+
+
+def _fold_entry_text(content, charged, did, setup="", nxt=""):
+    """(charged_segment, entry_text) for a needle-session entry: the
+    price answer becomes the logged amount (deposit math in
+    cr.session_charge, its audit line folded in), then the Setup: and
+    Next: lines the next session's defaults read back."""
+    import crm_records as cr
+    charged, audit = cr.session_charge(content, charged)
+    lines = [l for l in ((did or "").strip(), audit,
+                         f"Setup: {setup.strip()}" if (setup or "").strip() else "",
+                         f"Next: {nxt.strip()}" if (nxt or "").strip() else "")
+             if l]
+    return charged, "\n".join(lines)
 
 
 def crmlog(tid):
@@ -2055,32 +2090,39 @@ def crmpast(log_tid):
         _crm_say("Cancelled")
         return
     marker = "consultation" if marker == "Consultation" else f"S{n}"
+    # Same photo catch as Session done (Photos selection OR clipboard
+    # image, ONE verb); the import runs AFTER the entry is written so
+    # the hero plants into the dated block it belongs to.
+    src_desc, photo = _photo_source(), " · no clipboard image"
+    want_import = False
+    if src_desc:
+        pick = _dialog(f"📸 {src_desc} - import to {marker} too?",
+                       ["Cancel", "Skip", "Import"], "Import")
+        if pick == "":
+            _crm_say("Cancelled · nothing logged")
+            return
+        want_import = pick == "Import"
+        photo = "" if want_import else " · 📸 skipped"
+    lb_content = lb.get("content") or ""
+    prompts = (("How long? (OK skips · Esc cancels)", ""),
+               (_price_prompt(lb_content), ""),
+               ("What did you do? (OK skips · Esc cancels)", ""),
+               ("What is next? (OK skips)", cr.last_next(lb_content)))
     answers = []
-    for prompt in ("How long? (OK skips · Esc cancels)",
-                   "Charged? (gift = free friend · OK skips · Esc cancels)",
-                   "What did you do? (OK skips · Esc cancels)"):
-        v = _ask(prompt)
+    for prompt, dflt in prompts:
+        v = _ask(prompt, default=dflt)
         if v is None:
             _crm_say("Cancelled · nothing logged")
             return
         answers.append(v)
-    dur, charged, did = answers
+    dur, charged, did, nxt_txt = answers
+    charged, did = _fold_entry_text(lb_content, charged, did, nxt=nxt_txt)
     content, money, n_total, live_title = cr.append_session(
         areas.RECORDS_ID, log_tid, marker, dur, charged, did, when=when)
-    photo = ""
-    try:   # clipboard photo → logbook attachment, same as Session done
-        import clipboard as clip_util
-        img = clip_util.png_bytes()
-    except Exception:
-        img = None
-    if img:
-        try:
-            import api_v2
-            api_v2.TickTickV2().upload_attachment(areas.RECORDS_ID, log_tid,
-                                                  img, "session.png")
-            photo = " · 📷 attached"
-        except Exception:
-            photo = " · 📷 upload failed"
+    if want_import:
+        stage = "consult" if marker == "consultation" else f"s{n}"
+        photo = (" · 📸 imported" if session_photos(log_tid, stage)
+                 else " · 📸 import failed")
     _crm_say(f"📕 {marker} logged · {money} / {n_total} total{photo}")
     # A linked OPEN task wearing this exact marker is now history (the Bruno
     # strand: adopted as S1, logged here as past S1, task left open forever).
@@ -2939,10 +2981,20 @@ def session_photos(log_tid, stage=""):
             else:
                 try:
                     import clipboard as clip_util
-                    img = clip_util.png_bytes()
+                    cpath = clip_util.image_file()
+                    img = None if cpath else clip_util.png_bytes()
                 except Exception:
-                    img = None
-                if img:
+                    cpath, img = None, None
+                if cpath:
+                    # a copied FILE (Finder ⌘C - HEIC / RAW included)
+                    # rides whole: Eagle keeps the original, the hero
+                    # gets sips-rendered by _attach_file_to; filename =
+                    # the dedupe identity, like the Finder road
+                    shots = [{"id": "", "path": cpath,
+                              "filename": os.path.basename(cpath),
+                              "favorite": True}]
+                    src = "clip"
+                elif img:
                     import hashlib
                     stem = "clip-" + hashlib.sha1(img).hexdigest()[:10]
                     p = os.path.join(tmp, f"{stem}.png")
@@ -3002,8 +3054,11 @@ def session_photos(log_tid, stage=""):
         if heroes:
             # consult refs are PERMANENT logbook material - never on
             # the (about-to-complete) consult task (Sarah smoke)
-            nxt = None if label == "Consult" \
-                else cr.next_session_task(log_tid)
+            # ... and so is a backlog session (s<k>): its hero must not
+            # ride the NEXT open booking's task
+            nxt = (None if (label == "Consult"
+                            or re.fullmatch(r"s\d+", stage or ""))
+                   else cr.next_session_task(log_tid))
             if nxt:
                 a_pid = (nxt[2].get("_projectId")
                          or nxt[2].get("projectId") or areas.CRM_ID)

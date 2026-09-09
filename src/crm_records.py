@@ -570,14 +570,85 @@ def last_setup(content):
     return hits[-1].strip() if hits else ""
 
 
+def last_next(content):
+    """The most recent 'Next:' line from the session entries ('' when none)
+    - what the last session left for the next one, surfaced as the
+    Session-done 'What is next?' default."""
+    hits = re.findall(r"^Next: (.+)$", content or "", re.M)
+    return hits[-1].strip() if hits else ""
+
+
+def unapplied_deposit(content):
+    """Money already in hand that the NEXT session's price absorbs: the sum
+    of 'payment' entries logged AFTER the last S<n> entry (all of them when
+    no session is logged yet). Floor 0 - a refund never turns into a
+    surcharge. Vex ruling 2026-09-08: "if I say 400 and a deposit of 100
+    was previously logged, the price is still 400, not 500"."""
+    total = 0.0
+    for segs in _entries(content):
+        mk = (segs[1] if len(segs) > 1 else "") or ""
+        if re.fullmatch(r"S\d+", mk):
+            total = 0.0          # the session absorbed what came before
+            continue
+        if mk.lower() == "payment" and len(segs) > 3:
+            v = _num(segs[3])
+            if v is not None:
+                total += v
+    return max(total, 0.0)
+
+
+def unapplied_deposit_text(content):
+    """unapplied_deposit as display text in the logbook's currency, '' when
+    nothing is on file."""
+    dep = unapplied_deposit(content)
+    if dep <= 0:
+        return ""
+    sym, pre = money_sym(content)
+    return _fmt_money(dep, sym, pre)
+
+
+def money_sym(content):
+    """(sym, is_prefix) the logbook writes money in - the first symbol its
+    entries carry, € suffix when none."""
+    _t, _n, sym, pre = _totals_raw(content)
+    return (sym, pre) if sym else ("€", False)
+
+
+def session_charge(content, answer):
+    """The Charged answer IS the session PRICE (Vex ruling 2026-09-08).
+    Returns (charged_segment, audit_line): the amount the entry logs =
+    price minus the unapplied deposit (floor 0), and
+    '(price 400€ · 100€ deposit applied)' so the header stays auditable -
+    Paid totals (S entries + payments) then equal the prices. Gratis,
+    blank and non-numeric answers pass through untouched with no line;
+    so does a price when no deposit is on file."""
+    a = (answer or "").strip()
+    price = _num(a)
+    if not a or is_gratis(a) or price is None:
+        return a, ""
+    dep = unapplied_deposit(content)
+    if dep <= 0:
+        return a, ""
+    sym, pre = _seg_sym(a)
+    if not sym:
+        sym, pre = money_sym(content)
+    logged = max(price - dep, 0.0)
+    return (_fmt_money(logged, sym, pre),
+            f"(price {_fmt_money(price, sym, pre)} · "
+            f"{_fmt_money(dep, sym, pre)} deposit applied)")
+
+
 def quote_remainder(content):
     """Open remainder against the quote as display text ('' when no quote or
-    settled) - the Session-done charged default."""
+    settled) - the Session-done charged default. Counted in PRICES: the
+    money logged so far minus the deposit not yet absorbed by a session
+    (that deposit is subtracted from the next session's price, so the
+    quote is still open for it)."""
     q = quoted_of(content)
     if q is None:
         return ""
     total, _n, sym, pre = _totals_raw(content)
-    rem = q[0] - total
+    rem = q[0] - (total - unapplied_deposit(content))
     return _fmt_money(rem, sym or "€", pre) if rem > 0 else ""
 
 
@@ -882,6 +953,16 @@ def lifetime_gratis(cust_tid):
                for lb in customer_logbooks(cust_tid))
 
 
+def _seg_sym(seg):
+    """(sym, is_prefix) of a clean money segment ('$300', '250€',
+    '250 EUR' - a SHORT pre/suffix), ('', False) for free text."""
+    m = re.fullmatch(r"\s*([^\d\s.,\-]{1,3})?\s*-?[\d.,]+\s*([^\d\s.,\-]{1,3})?\s*",
+                     seg or "")
+    if m and (m.group(1) or m.group(2)):
+        return (m.group(1), True) if m.group(1) else (m.group(2), False)
+    return "", False
+
+
 def _totals_raw(content):
     """(total_float, session_count, sym, sym_is_prefix) - the numeric core.
     Money sums segment 4 of every entry (consultation charges count); the
@@ -945,8 +1026,12 @@ def paid_summary(content):
         return f"{_fmt_money(total, sym or '€', pre)} · {n} {word}"
     remaining = q[0] - total
     money = _fmt_money(total, sym or "€", pre) if (total or n) else "-"
-    open_s = (_fmt_money(remaining, sym or "€", pre) + " open"
-              if remaining > 0 else "settled")
+    if remaining > 0:
+        open_s = _fmt_money(remaining, sym or "€", pre) + " open"
+    elif remaining < 0:   # paid past the quote - say so, never 'settled'
+        open_s = _fmt_money(-remaining, sym or "€", pre) + " over"
+    else:
+        open_s = "settled"
     return f"{money} of {q[1]} · {open_s} · {n} {word}"
 
 
