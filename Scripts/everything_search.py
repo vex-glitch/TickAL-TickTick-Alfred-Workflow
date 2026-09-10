@@ -141,8 +141,15 @@ def get_hint_items(raw_query):
         if n:
             rows.insert(0, alfred.item(
                 title=f"🅿️ Buffer · {n} task{'s' if n != 1 else ''}",
-                subtitle="Open the buffer  |  ⏎⤵️",
+                subtitle="Open the buffer  |  ⏎⤵️ ⌘⚡",
                 valid=True, arg="xact:crmbrowse:ctx:buffer",
+                # ⌘ = the buffer BATCH menu (🧹 Clear, tag/move/complete all).
+                # Without item_type the ⌘ Actions menu fell through to the
+                # generic menu of whatever task was acted on last - no Clear
+                # anywhere (Vex bug 2026-09-10, 'Bugs • Focus').
+                variables={"item_type": "buffer_item", "task_id": "",
+                           "task_list_id": "", "list_id": "", "section_id": "",
+                           "task_title": f"🅿️ Buffer ({n})"},
                 mods={"alt": {"valid": True, "arg": "", "subtitle": "Open buffer",
                               "variables": {"browse_ctx": "ctx:buffer"}}},
             ))

@@ -3657,7 +3657,9 @@ def render_buffer(query):
     from display import buffer_pairs
     pairs = buffer_pairs()   # self-healed: dead lines drop, file rewrites
     all_tasks = cache_store.get("all_tasks") or []
-    by_id = {t["id"]: t for t in all_tasks}
+    # notes too - buffer_pairs counts a buffered NOTE alive, so a tasks-only
+    # lookup showed "Buffer is empty" while search still said "Buffer · 1"
+    by_id = {t["id"]: t for t in all_tasks + (cache_store.get("all_notes") or [])}
     items = []
     for pid, tid in pairs:
         t = by_id.get(tid)
