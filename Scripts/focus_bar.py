@@ -65,7 +65,9 @@ CHK_H  = 25      # expanded subtask rows pack tight (28 → 25, Vex 2026-09-10)
 SUB_H  = 23      # nested (sub-subtask) rows sit a little tighter
 PAD_V  = 10      # breathing room above the first and below the last row (zoomed; 6 → 10)
 CLOCK_PT  = 18   # header clock digits (23 → 18, Vex 2026-09-10: prominent, not huge)
-CLOCK_GAP = 6    # space before the clock (was 18) - the title gets the room
+CLOCK_GAP = 2    # clock → first icon (was 18, then 6; halved again, Vex 2026-09-10)
+ICON_BOX  = 20   # header icon boxes, edge to edge (were 26-29 px: the gaps halved)
+CLOCK_DY  = -0.75  # optical nudge for the clock digits (+ = up), measured on a 2x capture
 RADIUS = 20.0
 IDLE_EXIT_S = 10
 
@@ -781,6 +783,24 @@ class BarController(NSObject):
             return 72.0
 
     @objc.python_method
+    def _clock_frame_y(self, y1):
+        """(height, y) for the clock: a text field draws its text from the
+        TOP of its frame, so the 18 pt digits sat high in the old 28 px
+        frame. The frame hugs the text's cell height and is placed so the
+        digits' CAP-HEIGHT centre lands on the icon row's centre (y1 + 14)."""
+        try:
+            f = self.l_clock.font()
+            ch = float(self.l_clock.cell().cellSizeForBounds_(
+                NSMakeRect(0, 0, 1000, 1000)).height)
+            top_pad = max(0.0, ch - (f.ascender() - f.descender()))   # above the line box
+            baseline_from_top = top_pad + f.ascender()
+            centre = y1 + 14.0 + CLOCK_DY
+            top = centre + f.capHeight() / 2.0 + baseline_from_top - f.capHeight()
+            return ch, top - ch
+        except Exception:
+            return 28.0, y1
+
+    @objc.python_method
     def on_magnify(self, event):
         try:
             ph = event.phase()
@@ -1166,7 +1186,7 @@ class BarController(NSObject):
             self.t_title.setTitle_(full[:60])
             self.t_title.setToolTip_(full + "\nOpen in TickTick")
             natural = max(60.0, self.t_title.intrinsicContentSize().width + 10)
-        btn_w = 29 + 29 + ((29 + 29) if att else 0) + 27 + (27 if items else 0)
+        btn_w = ICON_BOX * (3 + (2 if att else 0) + (1 if items else 0))
         clock_w = self._clock_w()   # the digits' real width, not a fixed 96 px box
         fixed = 16 + ((30 + 8 + 12) if att else 0) + clock_w + CLOCK_GAP + btn_w + 14
         min_w = max(420.0, fixed + (60.0 if att else 0.0))
@@ -1227,27 +1247,29 @@ class BarController(NSObject):
             x += 38
             self.t_title.setFrame_(NSMakeRect(x, y1, title_w, 28))
             x += title_w + 12
-        # right side, right→left - near-touching button run, clock set apart
+        # right side, right→left - a tight run of ICON_BOX icons, edge to
+        # edge, the clock just left of it (Vex 2026-09-10: both gaps halved)
         rx = w - 14
-        rx -= 26
+        rx -= ICON_BOX
         self.b_chev.setHidden_(not items)
         if items:
             self.b_chev.setImage_(sym_image("chevron.up" if expanded else "chevron.down", 14))
             self.b_chev.setToolTip_("Collapse" if expanded else "Show every subtask")
-            self.b_chev.setFrame_(NSMakeRect(rx, y1, 26, 28))
-            rx -= 27
-        self.b_min.setFrame_(NSMakeRect(rx, y1, 26, 28))
-        rx -= 29
+            self.b_chev.setFrame_(NSMakeRect(rx, y1, ICON_BOX, 28))
+            rx -= ICON_BOX
+        self.b_min.setFrame_(NSMakeRect(rx, y1, ICON_BOX, 28))
+        rx -= ICON_BOX
         self.b_sticky.setHidden_(not att)
         if att:
-            self.b_sticky.setFrame_(NSMakeRect(rx, y1, 28, 28))
-            rx -= 29
-        self.b_stop.setFrame_(NSMakeRect(rx, y1, 28, 28))
-        rx -= 29
-        self.b_pause.setFrame_(NSMakeRect(rx, y1, 28, 28))
+            self.b_sticky.setFrame_(NSMakeRect(rx, y1, ICON_BOX, 28))
+            rx -= ICON_BOX
+        self.b_stop.setFrame_(NSMakeRect(rx, y1, ICON_BOX, 28))
+        rx -= ICON_BOX
+        self.b_pause.setFrame_(NSMakeRect(rx, y1, ICON_BOX, 28))
         self.b_pause.setImage_(sym_image("play.fill" if m["paused"] else "pause.fill", 15))
         rx -= CLOCK_GAP + clock_w                # a small gap before the clock
-        self.l_clock.setFrame_(NSMakeRect(rx, y1, clock_w, 28))
+        ch, cy = self._clock_frame_y(y1)         # digits centred on the icon row
+        self.l_clock.setFrame_(NSMakeRect(rx, cy, clock_w, ch))
 
         # collapsed row 2: first unchecked + counter ("All done 🎉" needs the
         # UNfiltered list - with every row ticked, `items` is empty)
