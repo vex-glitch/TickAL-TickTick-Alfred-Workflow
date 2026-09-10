@@ -64,6 +64,8 @@ ROW2_H = 34
 CHK_H  = 25      # expanded subtask rows pack tight (28 → 25, Vex 2026-09-10)
 SUB_H  = 23      # nested (sub-subtask) rows sit a little tighter
 PAD_V  = 10      # breathing room above the first and below the last row (zoomed; 6 → 10)
+CLOCK_PT  = 18   # header clock digits (23 → 18, Vex 2026-09-10: prominent, not huge)
+CLOCK_GAP = 6    # space before the clock (was 18) - the title gets the room
 RADIUS = 20.0
 IDLE_EXIT_S = 10
 
@@ -565,10 +567,10 @@ class BarController(NSObject):
         self.t_title.cell().setLineBreakMode_(NSLineBreakByTruncatingTail)
         self.t_title.setToolTip_("Open in TickTick")
         fx.addSubview_(self.t_title)
-        self.l_clock = label(23, mono=True,   # dominant but not shiny
+        self.l_clock = label(CLOCK_PT, mono=True,   # prominent, not huge
                              color=NSColor.colorWithWhite_alpha_(0.68, 1.0))
         self.l_clock.setFont_(NSFont.monospacedDigitSystemFontOfSize_weight_(
-            23, NSFontWeightSemibold))
+            CLOCK_PT, NSFontWeightSemibold))
         self.l_clock.setAlignment_(NSTextAlignmentRight)
         self.l_clock.setToolTip_("Session time")
         self.b_pause = btn("pause.fill", "onPauseResume:")
@@ -759,6 +761,24 @@ class BarController(NSObject):
         self._flash_until = time.monotonic() + 1.2    # tick_ leaves the clock alone
         self._relayout()
         self.l_clock.setStringValue_(f"{int(round(z * 100))}%")
+
+    @objc.python_method
+    def _clock_w(self):
+        """The clock box = the width of its CURRENT shape at its font (a
+        template like '88:88' / '8:88:88' / '120%' - tabular digits keep it
+        steady as the seconds tick) + a small cushion. A fixed 96 px box
+        right-aligned the digits and starved the title ('St...' with room
+        to spare, Vex 2026-09-10)."""
+        try:
+            from Foundation import NSString
+            from AppKit import NSFontAttributeName
+            cur = str(self.l_clock.stringValue() or "") or "88:88"
+            tmpl = "".join("8" if ch.isdigit() else ch for ch in cur)
+            size = NSString.stringWithString_(tmpl).sizeWithAttributes_(
+                {NSFontAttributeName: self.l_clock.font()})
+            return float(size.width) + 8.0
+        except Exception:
+            return 72.0
 
     @objc.python_method
     def on_magnify(self, event):
@@ -1147,8 +1167,8 @@ class BarController(NSObject):
             self.t_title.setToolTip_(full + "\nOpen in TickTick")
             natural = max(60.0, self.t_title.intrinsicContentSize().width + 10)
         btn_w = 29 + 29 + ((29 + 29) if att else 0) + 27 + (27 if items else 0)
-        clock_w = 96
-        fixed = 16 + ((30 + 8 + 12) if att else 0) + clock_w + 18 + btn_w + 14
+        clock_w = self._clock_w()   # the digits' real width, not a fixed 96 px box
+        fixed = 16 + ((30 + 8 + 12) if att else 0) + clock_w + CLOCK_GAP + btn_w + 14
         min_w = max(420.0, fixed + (60.0 if att else 0.0))
         fr = self.panel.frame()
         if live:
@@ -1226,7 +1246,7 @@ class BarController(NSObject):
         rx -= 29
         self.b_pause.setFrame_(NSMakeRect(rx, y1, 28, 28))
         self.b_pause.setImage_(sym_image("play.fill" if m["paused"] else "pause.fill", 15))
-        rx -= 18 + clock_w                       # separation before the clock
+        rx -= CLOCK_GAP + clock_w                # a small gap before the clock
         self.l_clock.setFrame_(NSMakeRect(rx, y1, clock_w, 28))
 
         # collapsed row 2: first unchecked + counter ("All done 🎉" needs the
