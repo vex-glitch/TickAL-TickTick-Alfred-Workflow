@@ -409,7 +409,7 @@ def main():
         # ☑️ TickTick Internals item links target _lt (grammar:
         # src/routine_link.py): the cached task, or for a completed/won't-do
         # instance of a repeating task its SERIES (the instance id is dead).
-        # Any other uncached item: None → destinations + journals only.
+        # Any other uncached item: None → destinations + periodic rows only.
         _lt = task if tid and task else None
         if tid and not task:
             _sid = routine_link.series_id(tid, cache_store.get("completed_tasks"),
@@ -663,7 +663,7 @@ def main():
         if is_task_like and _generic and query.startswith(INTERNALS_Q.strip()):
             _il = routine_link.internal_links(
                 (_lt or {}).get("title") or name, (_lt or {}).get("id", ""),
-                (_lt or {}).get("projectId") or pid, journals=bool(_pn_on))
+                (_lt or {}).get("projectId") or pid, periodic=bool(_pn_on))
             items = [alfred.item(title=t, subtitle=s, arg=f"copy:{md}",
                                  variables=dict(vars_, task_title=t), match=f"{k} {t}")
                      for (k, t, s, md) in _il]

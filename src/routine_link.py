@@ -24,6 +24,9 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     view:<calendar|countdowns>  destinations the app has NO link for:
                           calendar = ET OpenCalendar's List-menu flow,
                           countdowns = the Alfred ⏳ hub
+    note:daily            TODAY's daily note on whatever day the click
+                          happens (lazy-mints it). A pasted note link
+                          would be stuck on one day; this one never is
 
 Destinations the app routes itself (APP_LINKS) are plain ticktick://
 links, no Alfred at all. ⌘ Actions "☑️ TickTick Internals" lists every
@@ -44,7 +47,8 @@ MAX_LEN = 200
 TASK_VERBS = ("focus", "sticky", "timer")
 BARE_VERBS = ("ping", "pause", "resume")
 SLOT_VERBS = {"journal": ("morning", "evening"),
-              "view": ("calendar", "countdowns")}
+              "view": ("calendar", "countdowns"),
+              "note": ("daily",)}
 
 # Plain app links. Probed live 2026-09-10 on TickTick 8.0.75: habit, matrix,
 # focus and v1/show smartlists navigate; ticktick://calendar, countdown,
@@ -140,10 +144,11 @@ def _task_md(title, verb, tid, pid):
         return markdown(title, verb, tid)      # pid is only a hint
 
 
-def internal_links(title="", tid="", pid="", journals=True):
+def internal_links(title="", tid="", pid="", periodic=True):
     """The ☑️ TickTick Internals list: [(key, row title, subtitle, markdown)].
     Item rows only for a valid tid (callers heal a completed instance to
-    its series first); destinations + journals are item-free. 🖥 in the
+    its series first); destinations + periodic rows (daily note, journals:
+    only when periodic notes are set up) are item-free. 🖥 in the
     link text = rides Alfred, Mac only."""
     rows = []
     if tid:
@@ -166,8 +171,10 @@ def internal_links(title="", tid="", pid="", journals=True):
          f"[🖥 Countdowns]({url('view', 'countdowns')})"),
         ("tasks", "✅ Tasks", "App Today list", f"[✅ Tasks]({APP_LINKS['tasks']})"),
     ]
-    if journals:
-        rows += [("morning", "🌅 Morning journal", "Journal dialogs",
+    if periodic:
+        rows += [("daily", "💫 Daily note", "Always today's",
+                  f"[🖥 Daily note]({url('note', 'daily')})"),
+                 ("morning", "🌅 Morning journal", "Journal dialogs",
                   f"[🖥 Morning journal]({url('journal', 'morning')})"),
                  ("evening", "🌙 Evening journal", "Journal dialogs",
                   f"[🖥 Evening journal]({url('journal', 'evening')})")]

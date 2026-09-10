@@ -152,6 +152,8 @@ def run(verb, tid, pid_hint):
         # this sequential node (a focus/pause click would queue behind it)
         xact._pn_bg(f"xact:pn_journal:{tid}")
         return "", True
+    if verb == "note":                   # TODAY's daily: resolve/lazy-mint, open,
+        return _quiet(xact.pn_open, tid), True    # refresh in the background
     if verb == "view":                   # no ticktick:// route for these two
         if tid == "calendar":
             xact._run_trigger("OpenCalendar")                 # its List-menu flow

@@ -120,10 +120,16 @@ il = rl.internal_links("🌅 Startup", TID, PID)
 keys = [r[0] for r in il]
 check("full list order", keys == ["focus", "sticky", "timer", "calendar", "habits",
                                   "focusview", "matrix", "countdowns", "tasks",
-                                  "morning", "evening"], keys)
+                                  "daily", "morning", "evening"], keys)
 check("no item → destinations + journals only",
       [r[0] for r in rl.internal_links()] == keys[3:])
-check("journals off", "morning" not in [r[0] for r in rl.internal_links(journals=False)])
+check("periodic off drops daily + journals",
+      not {"daily", "morning", "evening"} & {r[0] for r in rl.internal_links(periodic=False)})
+check("note daily", rl.parse("note:daily") == ("note", "daily", ""))
+check("note weekly refused (daily only)", refused("note:weekly") is not None)
+check("note without slot refused", refused("note") is not None)
+check("daily link is dynamic (no note id inside)",
+      dict((r[0], r[3]) for r in il)["daily"].endswith("?argument=note%3Adaily)"))
 check("bad tid → no item rows", rl.internal_links("x", "nothex", PID)[0][0] == "calendar")
 check("bad pid hint dropped, item rows kept",
       rl.internal_links("x", TID, "../x")[0][3].endswith(f"focus%3A{TID})"))
@@ -134,7 +140,7 @@ for k, _t, _s, md in il:
     if target.startswith("alfred://"):
         arg = parse_qs(urlsplit(target).query)["argument"][0]
         check(f"{k} link parses back", rl.parse(arg)[0] in ("focus", "sticky", "timer",
-                                                            "view", "journal"), arg)
+                                                            "view", "journal", "note"), arg)
 check("every row is markdown", all(r[3].startswith("[") and r[3].endswith(")") for r in il))
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
