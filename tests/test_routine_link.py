@@ -120,13 +120,23 @@ il = rl.internal_links("🌅 Startup", TID, PID)
 keys = [r[0] for r in il]
 check("full list order", keys == ["focus", "sticky", "timer", "calendar", "habits",
                                   "focusview", "matrix", "countdowns", "tasks",
-                                  "daily", "morning", "evening"], keys)
+                                  "daily", "daily_sticky", "weekly", "weekly_sticky",
+                                  "monthly", "monthly_sticky", "quarterly",
+                                  "quarterly_sticky", "yearly", "yearly_sticky",
+                                  "morning", "evening"], keys)
 check("no item → destinations + journals only",
       [r[0] for r in rl.internal_links()] == keys[3:])
 check("periodic off drops daily + journals",
       not {"daily", "morning", "evening"} & {r[0] for r in rl.internal_links(periodic=False)})
 check("note daily", rl.parse("note:daily") == ("note", "daily", ""))
-check("note weekly refused (daily only)", refused("note:weekly") is not None)
+check("note weekly", rl.parse("note:weekly") == ("note", "weekly", ""))
+check("note yesterday refused", refused("note:yesterday") is not None)
+check("notesticky yearly", rl.parse("notesticky:yearly") == ("notesticky", "yearly", ""))
+check("notesticky bad spec refused", refused("notesticky:hourly") is not None)
+check("weekly sticky link is dynamic",
+      dict((r[0], r[3]) for r in il)["weekly_sticky"].endswith("?argument=notesticky%3Aweekly)"))
+check("sticky row labels", dict((r[0], r[1]) for r in il)["quarterly_sticky"]
+      == "🗒️ Quarterly note sticky")
 check("note without slot refused", refused("note") is not None)
 check("daily link is dynamic (no note id inside)",
       dict((r[0], r[3]) for r in il)["daily"].endswith("?argument=note%3Adaily)"))
@@ -140,7 +150,8 @@ for k, _t, _s, md in il:
     if target.startswith("alfred://"):
         arg = parse_qs(urlsplit(target).query)["argument"][0]
         check(f"{k} link parses back", rl.parse(arg)[0] in ("focus", "sticky", "timer",
-                                                            "view", "journal", "note"), arg)
+                                                            "view", "journal", "note",
+                                                            "notesticky"), arg)
 check("every row is markdown", all(r[3].startswith("[") and r[3].endswith(")") for r in il))
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")

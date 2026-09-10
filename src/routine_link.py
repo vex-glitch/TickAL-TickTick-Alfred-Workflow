@@ -24,9 +24,11 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     view:<calendar|countdowns>  destinations the app has NO link for:
                           calendar = ET OpenCalendar's List-menu flow,
                           countdowns = the Alfred ⏳ hub
-    note:daily            TODAY's daily note on whatever day the click
-                          happens (lazy-mints it). A pasted note link
-                          would be stuck on one day; this one never is
+    note:<spec>           the CURRENT periodic note (daily|weekly|monthly|
+                          quarterly|yearly) on whatever day the click
+                          happens, lazy-minted. A pasted note link would
+                          be stuck on one period; this one never is
+    notesticky:<spec>     the same note, opened as a desktop sticky
 
 Destinations the app routes itself (APP_LINKS) are plain ticktick://
 links, no Alfred at all. ⌘ Actions "☑️ TickTick Internals" lists every
@@ -46,9 +48,14 @@ MAX_LEN = 200
 
 TASK_VERBS = ("focus", "sticky", "timer")
 BARE_VERBS = ("ping", "pause", "resume")
+PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
+          ("monthly", "this month's"), ("quarterly", "this quarter's"),
+          ("yearly", "this year's"))
+PN_SPECS = tuple(s for s, _ in PN_NOW)
 SLOT_VERBS = {"journal": ("morning", "evening"),
               "view": ("calendar", "countdowns"),
-              "note": ("daily",)}
+              "note": PN_SPECS,
+              "notesticky": PN_SPECS}
 
 # Plain app links. Probed live 2026-09-10 on TickTick 8.0.75: habit, matrix,
 # focus and v1/show smartlists navigate; ticktick://calendar, countdown,
@@ -172,9 +179,14 @@ def internal_links(title="", tid="", pid="", periodic=True):
         ("tasks", "✅ Tasks", "App Today list", f"[✅ Tasks]({APP_LINKS['tasks']})"),
     ]
     if periodic:
-        rows += [("daily", "💫 Daily note", "Always today's",
-                  f"[🖥 Daily note]({url('note', 'daily')})"),
-                 ("morning", "🌅 Morning journal", "Journal dialogs",
+        for spec, now in PN_NOW:        # each note: open + sticky, side by side
+            name = f"{spec.capitalize()} note"
+            rows += [(spec, f"💫 {name}", f"Always {now}",
+                      f"[🖥 {name}]({url('note', spec)})"),
+                     (f"{spec}_sticky", f"🗒️ {name} sticky",
+                      f"{now[0].upper()}{now[1:]}, as sticky",
+                      f"[🖥 {name} sticky]({url('notesticky', spec)})")]
+        rows += [("morning", "🌅 Morning journal", "Journal dialogs",
                   f"[🖥 Morning journal]({url('journal', 'morning')})"),
                  ("evening", "🌙 Evening journal", "Journal dialogs",
                   f"[🖥 Evening journal]({url('journal', 'evening')})")]

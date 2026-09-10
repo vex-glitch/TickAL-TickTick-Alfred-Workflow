@@ -4940,8 +4940,12 @@ def pn_open(spec):
     print(f"💫 {pm.title(p)} {'minted' if minted else 'open'}")
 
 
-def pn_sticky(spec):
+def pn_sticky(spec, assist=True):
+    """assist=False (the link road) skips sticky()'s row-click retry."""
     if not _pn_gate():
+        return
+    if spec not in _PN_SPECS:
+        print(f"💫 Unknown period {spec!r}")
         return
     pe = _pn()
     p, task, minted = pe.resolve(spec)
@@ -4952,7 +4956,7 @@ def pn_sticky(spec):
         _pn_bg(f"xact:pn_refresh:{spec}")     # sticky opens NOW, note catches up
     pid = task.get("projectId") or task.get("_projectId") or ""
     os.environ["task_title"] = task.get("title") or "Note"
-    sticky(pid, task.get("id"))
+    sticky(pid, task.get("id"), assist=assist)
 
 
 def _pn_decode(rest):
