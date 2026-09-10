@@ -30,6 +30,7 @@ test:
 	@python3 tests/test_people.py
 	@python3 tests/test_eagle.py
 	@python3 tests/test_routine_link.py
+	@python3 tests/test_api_update.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:

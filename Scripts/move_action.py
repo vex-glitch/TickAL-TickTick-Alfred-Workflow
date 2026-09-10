@@ -54,12 +54,11 @@ from dispatch import _patch_task_cache
 
 
 def _buffer_lines():
-    try:
-        with open(run_path("tickal_buffer.txt")) as f:
-            return [ln.strip().split(":", 1) for ln in f
-                    if ln.strip() and ":" in ln]
-    except OSError:
-        return []
+    """The HEALED buffer pairs (display.buffer_pairs): dead lines drop and a
+    stale pid follows the task's current list - a raw pid from before the
+    task moved made every GET/move below hit the wrong list."""
+    from display import buffer_pairs
+    return buffer_pairs()
 
 
 def _clear_buffer():
@@ -106,7 +105,9 @@ def _buffer_move(api, rest):
                 live = api.get_task(bpid, btid)   # BEFORE any move (race)
                 if list_id != bpid:
                     api.move_task(btid, bpid, list_id)
-                api.update_task(btid, list_id, current=live, columnId=col_id)
+                # projectId explicit: `live` is PRE-move (api.update_task)
+                api.update_task(btid, list_id, current=live, columnId=col_id,
+                                projectId=list_id)
                 _patch_task_cache(btid, projectId=list_id, _projectId=list_id,
                                   _projectName=lname, columnId=col_id,
                                   parentId=None)
@@ -138,6 +139,7 @@ def _buffer_move(api, rest):
                 if parent_pid != bpid:
                     api.move_task(btid, bpid, parent_pid)
                     fields["columnId"] = None
+                    fields["projectId"] = parent_pid   # `live` is PRE-move
                 api.update_task(btid, parent_pid, current=live, **fields)
                 _patch_task_cache(btid, projectId=parent_pid,
                                   _projectId=parent_pid, _projectName=lname,
@@ -212,7 +214,9 @@ def main():
             if list_id != old_pid:
                 # Cross-list: move first, then set column
                 api.move_task(tid, old_pid, list_id)
-            api.update_task(tid, list_id, current=live, columnId=col_id)
+            # projectId explicit: `live` is PRE-move (api.update_task)
+            api.update_task(tid, list_id, current=live, columnId=col_id,
+                            projectId=list_id)
             # Resolve section name for notification
             section_name = ""
             pdata = cache_store.get(f"project_data_{list_id}")
@@ -253,6 +257,7 @@ def main():
                 # Cross-list: move task to parent's list first
                 api.move_task(tid, old_pid, parent_pid)
                 fields["columnId"] = None
+                fields["projectId"] = parent_pid   # `live` is PRE-move
             api.update_task(tid, parent_pid, current=live, **fields)
             lname = _list_name(parent_pid)
             _patch_task_cache(tid,

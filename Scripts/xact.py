@@ -280,7 +280,10 @@ def app_sync_after_write():
 def buffer_add(pid, tid):
     lines = buffer_ids()
     key = f"{pid}:{tid}"
-    if key in lines:
+    # dedupe by TASK, not the pid:tid string: a line's pid can differ from
+    # the row's (display.buffer_pairs heals stale pids; Inbox rows carry
+    # the 'inbox' alias) - an exact-key miss buffered one task twice
+    if any(ln.split(":", 1)[-1] == tid for ln in lines):
         # honest toast - the silent dedupe read as "buffer broken" when
         # the same task was added twice (Vex 2026-07-24)
         print(f"🅿️ {_title()} already in buffer ({len(lines)} total)")
@@ -292,7 +295,7 @@ def buffer_add(pid, tid):
 
 
 def buffer_remove(pid, tid):
-    lines = [ln for ln in buffer_ids() if ln != f"{pid}:{tid}"]
+    lines = [ln for ln in buffer_ids() if ln.split(":", 1)[-1] != tid]   # by task
     _write_buffer(lines)
     print(f"🅿️ removed · {len(lines)} left in buffer")
 
@@ -5916,14 +5919,13 @@ def view_buffer(key):
         print(f"View {key!r} can't be buffered")
         return
     lines = buffer_ids()
-    have = set(lines)
+    have = {ln.split(":", 1)[-1] for ln in lines}   # dedupe by TASK (see buffer_add)
     added = 0
     for t in tasks:
         pid = t.get("projectId") or t.get("_projectId", "")
-        k = f"{pid}:{t.get('id')}"
-        if t.get("id") and k not in have:
-            lines.append(k)
-            have.add(k)
+        if t.get("id") and t["id"] not in have:
+            lines.append(f"{pid}:{t['id']}")
+            have.add(t["id"])
             added += 1
     _write_buffer(lines)
     print(f"🅿️ {added} from {label} buffered · {len(lines)} in buffer")
@@ -6305,15 +6307,18 @@ def _stage_into(tpid, ttid, items):
         except Exception:
             return None
 
-    todo, skipped = [], 0
+    todo, skipped, seen = [], 0, set()
     for pid, tid, title in items:
         known = cache_store.find_task(tid)
-        if (not tid or tid == ttid
+        if (not tid or tid == ttid or tid in seen    # one job per task: twin
+                                                     # jobs race each other's move
+                                                     # and rollback in the pool
                 or (known and known.get("parentId") == ttid)
                 or fsub.would_cycle(ttid, tid, _lk)):
             skipped += 1
             continue
         todo.append((pid, tid, title))
+        seen.add(tid)
     if not todo:
         return 0, skipped, 0
     orders = fsub.stage_orders(
@@ -6321,6 +6326,7 @@ def _stage_into(tpid, ttid, items):
 
     def _one(job):
         (pid, tid, _title), so = job
+        api, moved = None, False
         try:
             api = _api()
             live = api.get_task(pid, tid)
@@ -6329,10 +6335,20 @@ def _stage_into(tpid, ttid, items):
             fields = {"parentId": ttid, "sortOrder": so}
             if pid != tpid:
                 api.move_task(tid, pid, tpid)
+                moved = True
                 fields["columnId"] = None   # the old list's section id
+                fields["projectId"] = tpid  # `live` is PRE-move (api.update_task)
             api.update_task(tid, tpid, current=live, **fields)
             return tid, pid, live.get("parentId"), so
         except Exception:
+            # A failed parent-set must not strand the task in the target
+            # list (Vex 2026-09-10: "tasks in buffer disappear from their
+            # original place") - send it home, so failed = nothing changed.
+            if moved:
+                try:
+                    api.move_task(tid, tpid, pid)
+                except Exception:
+                    pass
             return None
 
     from concurrent.futures import ThreadPoolExecutor
@@ -6542,8 +6558,8 @@ def fx_unstage(pid, tid):
             # `live` from BEFORE the move - a fresh GET from the new project
             # races replication (empty-200); the full-object post with the
             # projectId/parentId overrides is what counts
-            api.update_task(tid, dest_pid, current=live,
-                            parentId=origin["parent"])
+            api.update_task(tid, dest_pid, current=live,   # `live` is PRE-move
+                            parentId=origin["parent"], projectId=dest_pid)
             applied_parent = origin["parent"]
         except Exception:
             pass
@@ -6840,14 +6856,16 @@ def _fx_send(items, label):
 
 def buffer_focus():
     """The whole buffer → today's block, in buffer order (first buffered =
-    first checkbox); clears the buffer once sent."""
-    lines = buffer_ids()
-    if not lines:
+    first checkbox); clears the buffer once sent. Reads the HEALED pairs:
+    a raw line's pid goes stale when the task moved after buffering, and
+    staging then GETs under the wrong list (Vex 2026-09-10)."""
+    from display import buffer_pairs
+    pairs = buffer_pairs()
+    if not pairs:
         print("🅿️ Buffer is empty")
         return
     items = []
-    for ln in lines:
-        pid, tid = ln.split(":", 1)
+    for pid, tid in pairs:
         t = cache_store.find_task(tid) or {}
         items.append((pid, tid, t.get("title", "Untitled")))
     if _fx_send(items, "buffer"):
@@ -7684,8 +7702,8 @@ def person_attach(rest):
     try:
         if spid != areas.PEOPLE_ID:
             api.move_task(stid, spid, areas.PEOPLE_ID)
-        api.update_task(stid, areas.PEOPLE_ID, current=live,
-                        parentId=ptid, columnId=None)
+        api.update_task(stid, areas.PEOPLE_ID, current=live,   # `live` is PRE-move
+                        parentId=ptid, columnId=None, projectId=areas.PEOPLE_ID)
     except Exception as e:
         _crm_say(f"Error: {e}")
         return

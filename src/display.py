@@ -230,12 +230,30 @@ def buffer_pairs():
     import cache as cache_store
     tasks = cache_store.get("all_tasks")
     notes = cache_store.get("all_notes")
-    if tasks is None and notes is None:
+    if tasks is None:
+        # all_tasks holds every non-smart list's items (NOTE-kind lists land
+        # in both pools), so without it nothing can be judged dead - a
+        # notes-only judgement (all_tasks invalidated, e.g. dispatch's
+        # _patch_task_cache fallback) would drop every buffered TASK
         return pairs
-    alive = {t.get("id") for t in (tasks or []) + (notes or [])
-             if t.get("status", 0) == 0}
-    healed = [p for p in pairs if p[1] in alive]
-    if len(healed) < len(pairs):
+    # id → the task's CURRENT list: a line's pid goes stale when the task
+    # moves after buffering (app-side, or a half-done stage), and every
+    # buffer verb then GETs/moves under the wrong list (Vex 2026-09-10)
+    latest = {}
+    for t in (notes or []) + tasks:          # all_tasks LAST = it wins its NOTE
+        latest[t.get("id")] = t              # twin, cache.find_task's order
+    alive = {i: (t.get("projectId") or t.get("_projectId") or "")
+             for i, t in latest.items() if t.get("status", 0) == 0}
+    healed, seen = [], set()
+    for p, t in pairs:
+        if t not in alive or t in seen:      # dead, or a second line of one task
+            continue
+        seen.add(t)
+        cur = alive[t] or p
+        if p.startswith("inbox") and cur.startswith("inbox"):
+            cur = p                          # the 'inbox' alias IS the inbox: no churn
+        healed.append([cur, t])
+    if healed != pairs:
         try:
             with open(run_path("tickal_buffer.txt"), "w") as f:
                 f.write("".join(f"{p}:{t}\n" for p, t in healed))

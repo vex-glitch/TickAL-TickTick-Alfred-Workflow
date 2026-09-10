@@ -204,6 +204,19 @@ class TickTickAPI:
             payload["columnId"] = None
         r = self.session.post(f"{BASE_URL}/task/{task_id}", json=payload)
         _check(r)
+        if not (r.text or "").strip() and "projectId" not in fields:
+            # A wrong-list write is answered EMPTY and changes nothing
+            # (probe-verified), so the OTHER candidate list is a safe retry.
+            # Move-then-update callers hand a PRE-move `current` (its list =
+            # the old one) with the new list positional; the current-wins
+            # rule above broke staging, ⌘ Move to a subtask and 👽 attach
+            # (Vex bugs 2026-09-10). Callers should still pass projectId.
+            other = (project_id if payload["projectId"] != project_id
+                     else current.get("projectId"))
+            if other and other != payload["projectId"]:
+                payload["projectId"] = other
+                r = self.session.post(f"{BASE_URL}/task/{task_id}", json=payload)
+                _check(r)
         if not (r.text or "").strip():
             raise RuntimeError(f"update_task {task_id}: empty reply - the task "
                                f"is not in list {payload.get('projectId')}")
