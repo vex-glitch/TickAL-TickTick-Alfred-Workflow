@@ -18,7 +18,9 @@ Link-road rules (research 2026-09-10 against xact sticky/focus_start):
   • TickTick is launched and awaited before the sticky's window count,
     and the row-click retry is skipped (Vex's hand is in the app).
   • xact runs in-process on this node's own queue, never re-fired
-    through the sequential ET XAct.
+    through the sequential ET XAct. Exception: journal dialog runs spawn
+    DETACHED (xact._pn_bg, output → /tmp/tickal_periodic.log) so minutes
+    of dialogs never hold this node.
   • the same argument within 5 s of the last run's START or FINISH is
     dropped (double clicks queue behind a slow sticky run on this
     sequential node); a refusal clears the stamp so a retry goes through.
@@ -145,6 +147,17 @@ def run(verb, tid, pid_hint):
         return _quiet(xact.focus_pause), True
     if verb == "resume":
         return _quiet(xact.focus_resume), True
+    if verb == "journal":                # tid carries the (allowlisted) slot
+        # DETACHED: the dialog run can last minutes and must never hold
+        # this sequential node (a focus/pause click would queue behind it)
+        xact._pn_bg(f"xact:pn_journal:{tid}")
+        return "", True
+    if verb == "view":                   # no ticktick:// route for these two
+        if tid == "calendar":
+            xact._run_trigger("OpenCalendar")                 # its List-menu flow
+        else:
+            xact._run_trigger("BrowseCtx", "ctx:countdowns")  # the Alfred ⏳ hub
+        return "", True
     got = _resolve(xact, tid, pid_hint)
     if not got:
         return "🔗 Task not found · sync, then retry", False
@@ -192,7 +205,8 @@ def main():
         _stamp(arg)      # finish stamp: a twin QUEUED behind a slow run lands inside the window
     else:
         _unstamp()       # a refusal never eats the retry
-    print(out)
+    if out:              # a bare "\n" would still post a blank End banner
+        print(out)
     _log(arg, out)
 
 

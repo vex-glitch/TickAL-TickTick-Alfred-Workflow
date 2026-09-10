@@ -2,7 +2,7 @@
 """
 routine_link.py - the clickable-link grammar (PURE: stdlib only, no I/O).
 One contract shared by the executor (Scripts/link.py, behind ET "Link")
-and the generator (⌘ Actions "🖥 Copy focus link").
+and the generator (⌘ Actions > ☑️ TickTick Internals).
 
     alfred://runtrigger/com.vex.tickal/Link/?argument=<verb>[:<tid>[:<pid>]]
 
@@ -17,6 +17,17 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     sticky:<tid>[:<pid>]  sticky only
     timer:<tid>[:<pid>]   timer only
     pause | resume        the running timer
+    journal:<morning|evening>  the periodic journal dialogs. Even with zero
+                          input it lazy-mints today's daily and seeds its
+                          journal Qs (like any pn open); answers are only
+                          what Vex types, the link carries no text
+    view:<calendar|countdowns>  destinations the app has NO link for:
+                          calendar = ET OpenCalendar's List-menu flow,
+                          countdowns = the Alfred ⏳ hub
+
+Destinations the app routes itself (APP_LINKS) are plain ticktick://
+links, no Alfred at all. ⌘ Actions "☑️ TickTick Internals" lists every
+link (internal_links) - ONE row, never a row per link (Vex 2026-09-10).
 
 pid is a HINT (the cache's projectId wins), so a list move never breaks a
 pasted link. A repeating task keeps its series id through every
@@ -32,7 +43,18 @@ MAX_LEN = 200
 
 TASK_VERBS = ("focus", "sticky", "timer")
 BARE_VERBS = ("ping", "pause", "resume")
-LABELS = {"focus": "🖥 Focus", "sticky": "🖥 Sticky", "timer": "🖥 Timer"}
+SLOT_VERBS = {"journal": ("morning", "evening"),
+              "view": ("calendar", "countdowns")}
+
+# Plain app links. Probed live 2026-09-10 on TickTick 8.0.75: habit, matrix,
+# focus and v1/show smartlists navigate; ticktick://calendar, countdown,
+# task and tasks are DEAD (the window stays put) - calendar + countdowns
+# ride view: instead.
+APP_LINKS = {"habits": "ticktick://habit",
+             "focus": "ticktick://focus",
+             "matrix": "ticktick://matrix",
+             "tasks": "ticktick://v1/show?smartlist=today"}
+LABELS = {"focus": "🖥 Focus + sticky", "sticky": "🖥 Sticky", "timer": "🖥 Focus"}
 
 _TID = re.compile(r"[0-9a-f]{24}")
 _PID = re.compile(r"[0-9a-f]{24}|inbox\d{6,12}")
@@ -41,9 +63,10 @@ _MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 
 def parse(arg):
     """'<verb>[:<tid>[:<pid>]]' → (verb, tid, pid). tid/pid are '' when
-    absent. Raises ValueError with a short toast-safe reason (never the
-    link's own text). Alfred percent-decodes the argument; a still-encoded
-    one is decoded ONCE here, anything double-encoded stays invalid."""
+    absent; a slot verb carries its slot in the tid position. Raises
+    ValueError with a short toast-safe reason (never the link's own text).
+    Alfred percent-decodes the argument; a still-encoded one is decoded
+    ONCE here, anything double-encoded stays invalid."""
     arg = (arg or "").strip()
     if "%" in arg:
         arg = unquote(arg)
@@ -56,6 +79,10 @@ def parse(arg):
         if fields:
             raise ValueError(f"{verb} takes no id")
         return verb, "", ""
+    if verb in SLOT_VERBS:
+        if len(fields) != 1 or fields[0] not in SLOT_VERBS[verb]:
+            raise ValueError(f"{verb} needs {' or '.join(SLOT_VERBS[verb])}")
+        return verb, fields[0], ""
     if verb not in TASK_VERBS:
         raise ValueError("unknown verb")
     if not 1 <= len(fields) <= 2:
@@ -104,3 +131,44 @@ def markdown(title, verb, tid, pid=""):
     label = LABELS.get(verb, "🖥 " + verb)
     text = f"{label} {t}" if t else label
     return f"[{text}]({url(verb, tid, pid)})"
+
+
+def _task_md(title, verb, tid, pid):
+    try:
+        return markdown(title, verb, tid, pid)
+    except ValueError:
+        return markdown(title, verb, tid)      # pid is only a hint
+
+
+def internal_links(title="", tid="", pid="", journals=True):
+    """The ☑️ TickTick Internals list: [(key, row title, subtitle, markdown)].
+    Item rows only for a valid tid (callers heal a completed instance to
+    its series first); destinations + journals are item-free. 🖥 in the
+    link text = rides Alfred, Mac only."""
+    rows = []
+    if tid:
+        try:
+            rows += [("focus", "🖥 Focus + sticky", "Sticky + timer",
+                      _task_md(title, "focus", tid, pid)),
+                     ("sticky", "🗒️ Sticky", "Sticky only",
+                      _task_md(title, "sticky", tid, pid)),
+                     ("timer", "⏱ Focus", "Timer only",
+                      _task_md(title, "timer", tid, pid))]
+        except ValueError:
+            rows = []
+    rows += [
+        ("calendar", "📅 Calendar", "App calendar",
+         f"[🖥 Calendar]({url('view', 'calendar')})"),
+        ("habits", "🔄 Habits", "App habits", f"[🔄 Habits]({APP_LINKS['habits']})"),
+        ("focusview", "🍅 Focus view", "App focus tab", f"[🍅 Focus]({APP_LINKS['focus']})"),
+        ("matrix", "🧭 Matrix", "App matrix", f"[🧭 Matrix]({APP_LINKS['matrix']})"),
+        ("countdowns", "⏳ Countdowns", "Alfred hub, app has no link",
+         f"[🖥 Countdowns]({url('view', 'countdowns')})"),
+        ("tasks", "✅ Tasks", "App Today list", f"[✅ Tasks]({APP_LINKS['tasks']})"),
+    ]
+    if journals:
+        rows += [("morning", "🌅 Morning journal", "Journal dialogs",
+                  f"[🖥 Morning journal]({url('journal', 'morning')})"),
+                 ("evening", "🌙 Evening journal", "Journal dialogs",
+                  f"[🖥 Evening journal]({url('journal', 'evening')})")]
+    return rows

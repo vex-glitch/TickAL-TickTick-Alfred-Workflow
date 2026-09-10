@@ -46,7 +46,15 @@ check("still-encoded arg decoded once",
       rl.parse(f"focus%3A{TID}%3A{PID}") == ("focus", TID, PID))
 check("surrounding whitespace stripped", rl.parse(f"  ping \n") == ("ping", "", ""))
 
+check("journal morning", rl.parse("journal:morning") == ("journal", "morning", ""))
+check("journal evening", rl.parse("journal:evening") == ("journal", "evening", ""))
+check("journal url round trip",
+      rl.url("journal", "evening").endswith("?argument=journal%3Aevening"))
+
 # ── parse: everything else is refused ───────────────────────────────────────
+check("journal weekly refused", refused("journal:weekly") is not None)
+check("journal without slot", refused("journal") is not None)
+check("journal extra field", refused("journal:morning:x") is not None)
 check("empty", refused("") == "empty link")
 check("xact passthrough", refused(f"xact:focus_sticky:{PID}:{TID}") == "unknown verb")
 check("destructive verb", refused("inboxempty") == "unknown verb")
@@ -80,16 +88,16 @@ except ValueError:
 
 # ── markdown ────────────────────────────────────────────────────────────────
 md = rl.markdown("🌅 Startup", "focus", TID, PID)
-check("markdown shape", md == f"[🖥 Focus 🌅 Startup]({u})", md)
+check("markdown shape", md == f"[🖥 Focus + sticky 🌅 Startup]({u})", md)
 md2 = rl.markdown("Read [the doc](https://x.y/z) now", "focus", TID)
-check("md link in title flattened", md2.startswith("[🖥 Focus Read the doc now]("), md2)
+check("md link in title flattened", md2.startswith("[🖥 Focus + sticky Read the doc now]("), md2)
 md3 = rl.markdown("a ] b [ c", "sticky", TID)
 check("brackets dropped", md3.startswith("[🖥 Sticky a  b  c]("), md3)
 md4 = rl.markdown("x" * 80, "timer", TID)
-check("title capped at 40", md4.startswith("[🖥 Timer " + "x" * 40 + "]("), md4)
-check("empty title", rl.markdown("", "focus", TID).startswith("[🖥 Focus]("))
+check("title capped at 40", md4.startswith("[🖥 Focus " + "x" * 40 + "]("), md4)
+check("empty title", rl.markdown("", "focus", TID).startswith("[🖥 Focus + sticky]("))
 md5 = rl.markdown("Path C:\\", "focus", TID)
-check("trailing backslash dropped", md5.startswith("[🖥 Focus Path C:]("), md5)
+check("trailing backslash dropped", md5.startswith("[🖥 Focus + sticky Path C:]("), md5)
 md6 = rl.markdown("y" * 39 + "\\z", "focus", TID)
 check("backslash at the cut dropped", "\\" not in md6.split("](")[0], md6)
 
@@ -102,6 +110,32 @@ check("non-repeating completed → ''", rl.series_id("b" * 24, done) == "")
 check("unknown → ''", rl.series_id("c" * 24, done) == "")
 check("self-reference → ''", rl.series_id(TID, [{"id": TID, "repeatTaskId": TID}]) == "")
 check("junk repeatTaskId → ''", rl.series_id(INST, [{"id": INST, "repeatTaskId": "x:y"}]) == "")
+
+# ── view verb + internal_links ──────────────────────────────────────────────
+check("view calendar", rl.parse("view:calendar") == ("view", "calendar", ""))
+check("view countdowns", rl.parse("view:countdowns") == ("view", "countdowns", ""))
+check("view habits refused (it has an app link)", refused("view:habits") is not None)
+
+il = rl.internal_links("🌅 Startup", TID, PID)
+keys = [r[0] for r in il]
+check("full list order", keys == ["focus", "sticky", "timer", "calendar", "habits",
+                                  "focusview", "matrix", "countdowns", "tasks",
+                                  "morning", "evening"], keys)
+check("no item → destinations + journals only",
+      [r[0] for r in rl.internal_links()] == keys[3:])
+check("journals off", "morning" not in [r[0] for r in rl.internal_links(journals=False)])
+check("bad tid → no item rows", rl.internal_links("x", "nothex", PID)[0][0] == "calendar")
+check("bad pid hint dropped, item rows kept",
+      rl.internal_links("x", TID, "../x")[0][3].endswith(f"focus%3A{TID})"))
+check("app links are plain ticktick://",
+      all("(ticktick://" in r[3] for r in il if r[0] in ("habits", "focusview", "matrix", "tasks")))
+for k, _t, _s, md in il:
+    target = md[md.rindex("(") + 1:-1]
+    if target.startswith("alfred://"):
+        arg = parse_qs(urlsplit(target).query)["argument"][0]
+        check(f"{k} link parses back", rl.parse(arg)[0] in ("focus", "sticky", "timer",
+                                                            "view", "journal"), arg)
+check("every row is markdown", all(r[3].startswith("[") and r[3].endswith(")") for r in il))
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 sys.exit(1 if FAILS else 0)

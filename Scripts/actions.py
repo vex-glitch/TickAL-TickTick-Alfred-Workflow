@@ -130,6 +130,11 @@ def section_name(task):
     return ""
 
 
+# ☑️ TickTick Internals sub-list sentinel: the parent row autocompletes the
+# bar to this and the SF re-runs with it (alfredfiltersresults is off).
+INTERNALS_Q = "☑️ "
+
+
 # Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row
 # (mod-level valid=True lets it fire even from invalid prompt/hint rows).
 _orig_output = alfred.output
@@ -401,26 +406,15 @@ def main():
         tags  = fmt_tags(task.get("tags")) or "🏷️ No tags"
         prio  = PRIO.get(task.get("priority", 0), PRIO[0])
         name  = task.get("title") or title
-        # 🖥 Copy focus link: paste-ready markdown for a routine/review
-        # description (grammar: src/routine_link.py). A completed/won't-do
-        # instance of a repeating task mints its SERIES (the instance id is
-        # dead); any other uncached item gets no row. pid is only a hint:
-        # the real projectId beats the view's 'inbox' alias, and a hint
-        # the grammar refuses is dropped rather than hiding the row.
-        focus_md = ""
+        # ☑️ TickTick Internals item links target _lt (grammar:
+        # src/routine_link.py): the cached task, or for a completed/won't-do
+        # instance of a repeating task its SERIES (the instance id is dead).
+        # Any other uncached item: None → destinations + journals only.
         _lt = task if tid and task else None
         if tid and not task:
             _sid = routine_link.series_id(tid, cache_store.get("completed_tasks"),
                                           cache_store.get("wontdo_tasks"))
             _lt = find_task(_sid) if _sid else None
-        if _lt:
-            for _hint in (_lt.get("projectId") or pid, ""):
-                try:
-                    focus_md = routine_link.markdown(_lt.get("title") or name, "focus",
-                                                     _lt.get("id", ""), _hint)
-                    break
-                except ValueError:
-                    continue
         has_kids = bool(tid) and any(
             s.get("parentId") == tid and s.get("status", 0) == 0
             for s in (cache_store.get("all_tasks") or []))
@@ -662,6 +656,28 @@ def main():
                  f"xact:cretire:{tid}", "retire remove content", True),
             ]
 
+        # ☑️ TickTick Internals sub-list: every copy-a-link row lives HERE,
+        # behind ONE parent row (Vex 2026-09-10: ⌘ Actions is crowded
+        # enough). ⏎ = copy: markdown → modURL → pbcopy; the real projectId
+        # beats the view's 'inbox' alias (a refused hint is dropped).
+        if is_task_like and _generic and query.startswith(INTERNALS_Q.strip()):
+            _il = routine_link.internal_links(
+                (_lt or {}).get("title") or name, (_lt or {}).get("id", ""),
+                (_lt or {}).get("projectId") or pid, journals=bool(_pn_on))
+            items = [alfred.item(title=t, subtitle=s, arg=f"copy:{md}",
+                                 variables=dict(vars_, task_title=t), match=f"{k} {t}")
+                     for (k, t, s, md) in _il]
+            _rest = query[len(INTERNALS_Q.strip()):].strip()
+            if _rest:
+                items = fuzz.filter_and_score(_rest, items,
+                                              key_fn=lambda x: x.get("match", x["title"]))
+            _back = alfred.item(title="🔙 Back to actions", subtitle="All actions",
+                                arg="", valid=False, match="back", variables=vars_)
+            _back["autocomplete"] = ""
+            items.append(_back)
+            print(alfred.output(items, skipknowledge=True))
+            return
+
         rows = [
             ("↗️ Open",            "Open in TickTick",     f"open:{link}",  "open",              True),
         ] + entity_rows + [
@@ -740,9 +756,10 @@ def main():
             (crumb,                "Move…",                "move",          "move list section", is_task_like),
             ("➕ Add task",        add_sub,                "add",           "add new task",      _generic),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
-            ("🖥 Copy focus link", "Paste in TickTick · sticky + timer",
-             f"copy:{focus_md}", "routine review link focus sticky timer click",
-             is_task_like and bool(focus_md) and _generic),
+            ("☑️ TickTick Internals", "Copy a link · open · sticky · focus · journal",
+             "internals", "internals link copy routine review sticky focus timer "
+             "journal calendar habits matrix countdowns tasks",
+             is_task_like and _generic),
             ("🆔 Copy id",         "List id → clipboard",  f"copy:{pid}",   "id copy identifier configure", itype == "list"),
             ("✅ Posted",          "Shelf clears · task completes",
              f"xact:posted:{tid}", "posted done shelf content",
@@ -823,6 +840,8 @@ def main():
                 row_vars.update({"task_title": lname, "list_name": lname})
             items.append(alfred.item(title=t, subtitle=s, arg=a, variables=row_vars,
                                      match=f"{kw} {t}", **extra))
+            if a == "internals":      # drill row: ⏎ fills the bar, never fires
+                items[-1].update(arg="", valid=False, autocomplete=INTERNALS_Q)
 
         # 🗑️ Delete list - typed confirm, zero canvas: the first row
         # is invalid and autocompletes the bar to "delete list yes"; only then
