@@ -6118,7 +6118,7 @@ def inboxempty():
     print(msg)
 
 
-def sticky(pid, tid):
+def sticky(pid, tid, assist=True):
     """Open the task as a TickTick desktop sticky note: deep link → navigate
     to the list, then find + CLICK the task's row (guaranteed selection),
     then fire the app's own 'Open as Sticky Note' shortcut
@@ -6136,7 +6136,9 @@ def sticky(pid, tid):
     `before` is counted AFTER the link settles - the link opens the task
     DETAIL pane, itself an AXSystemDialog, which would false-positive the
     appeared-check. Toast is honest either way (the old one claimed
-    'opened' off a fragile count and lied)."""
+    'opened' off a fragile count and lied). assist=False skips the
+    row-click retry (link.py: a clicked link means Vex's hand is in the
+    app, and a CGEvent click there races him)."""
     import time
     import tt_shortcut
     from display import _MD_LINK_RE
@@ -6171,7 +6173,7 @@ def sticky(pid, tid):
     if err:
         print(err)
         return False
-    if not shown:
+    if not shown and assist:
         # selection assist for views the deep link can't settle (kanban,
         # collapsed subtask), then one slower attempt
         _click_task_row(title)

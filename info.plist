@@ -4081,6 +4081,32 @@
 				<false/>
 			</dict>
 		</array>
+		<key>E1B10001-0000-4000-9000-2026091000AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E1B10002-0000-4000-9000-2026091000AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>E1B10002-0000-4000-9000-2026091000AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>E1B10003-0000-4000-9000-2026091000AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>E48E5384-D8CD-47FA-9ED0-4E1B41C0AD09</key>
 		<array>
 			<dict>
@@ -13743,6 +13769,63 @@ esac</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<true/>
+				<key>triggerid</key>
+				<string>Link</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>E1B10001-0000-4000-9000-2026091000AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/link.py" "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>E1B10002-0000-4000-9000-2026091000AA</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>End</string>
+				<key>passinputasargument</key>
+				<true/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>E1B10003-0000-4000-9000-2026091000AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -17321,6 +17404,39 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<real>410.0</real>
 			<key>ypos</key>
 			<real>5345.0</real>
+		</dict>
+		<key>E1B10001-0000-4000-9000-2026091000AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>3</integer>
+			<key>note</key>
+			<string>LINK (alfred:// URL handler ON · routine links · never clean, never rename)</string>
+			<key>xpos</key>
+			<real>3795.0</real>
+			<key>ypos</key>
+			<real>2530.0</real>
+		</dict>
+		<key>E1B10002-0000-4000-9000-2026091000AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>note</key>
+			<string>link.py - clickable routine links</string>
+			<key>xpos</key>
+			<real>3960.0</real>
+			<key>ypos</key>
+			<real>2530.0</real>
+		</dict>
+		<key>E1B10003-0000-4000-9000-2026091000AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>9</integer>
+			<key>note</key>
+			<string>End</string>
+			<key>xpos</key>
+			<real>4115.0</real>
+			<key>ypos</key>
+			<real>2530.0</real>
 		</dict>
 		<key>E21B489A-27E0-4AA1-B720-876B3F1067B5</key>
 		<dict>

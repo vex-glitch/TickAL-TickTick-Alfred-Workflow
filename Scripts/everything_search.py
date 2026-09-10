@@ -308,8 +308,10 @@ def tag_scope_rows(all_tasks, fragment, only=None):
 # (key, emoji, name, kind, browse ctx, app-open URL). kind "alfred" renders
 # inline on ⏎ (locked scope, G-scope pattern); kind "app" opens the view in
 # TickTick on ⏎ via its deep-link route (ticktick://habit|matrix|focus -
-# verified against the app; the alfred://runtrigger URL scheme does NOT fire
-# from modOpen, don't go back to it).
+# verified against the app). alfred://runtrigger only fires ETs with
+# "Available via URL Handler" ticked - the 2026-07-12 "does NOT fire" verdict
+# was every ET unticked. The one ticked ET is Link (src/routine_link.py);
+# never tick it on XAct or any other ET.
 VIEWS = [
     ("today",     "☀️", "Today",       "alfred", "ctx:smart:today",
      "ticktick://v1/show?smartlist=today"),

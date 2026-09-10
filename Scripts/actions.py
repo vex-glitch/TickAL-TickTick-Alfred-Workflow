@@ -46,6 +46,7 @@ try:
     import cache as cache_store
     import links as links_util
     import areas
+    import routine_link
     from display import (fmt_date, fmt_tags, join_breadcrumb, list_name_for,
                          tag_link, md_links_display)
 except Exception as e:
@@ -400,6 +401,26 @@ def main():
         tags  = fmt_tags(task.get("tags")) or "🏷️ No tags"
         prio  = PRIO.get(task.get("priority", 0), PRIO[0])
         name  = task.get("title") or title
+        # 🖥 Copy focus link: paste-ready markdown for a routine/review
+        # description (grammar: src/routine_link.py). A completed/won't-do
+        # instance of a repeating task mints its SERIES (the instance id is
+        # dead); any other uncached item gets no row. pid is only a hint:
+        # the real projectId beats the view's 'inbox' alias, and a hint
+        # the grammar refuses is dropped rather than hiding the row.
+        focus_md = ""
+        _lt = task if tid and task else None
+        if tid and not task:
+            _sid = routine_link.series_id(tid, cache_store.get("completed_tasks"),
+                                          cache_store.get("wontdo_tasks"))
+            _lt = find_task(_sid) if _sid else None
+        if _lt:
+            for _hint in (_lt.get("projectId") or pid, ""):
+                try:
+                    focus_md = routine_link.markdown(_lt.get("title") or name, "focus",
+                                                     _lt.get("id", ""), _hint)
+                    break
+                except ValueError:
+                    continue
         has_kids = bool(tid) and any(
             s.get("parentId") == tid and s.get("status", 0) == 0
             for s in (cache_store.get("all_tasks") or []))
@@ -719,6 +740,9 @@ def main():
             (crumb,                "Move…",                "move",          "move list section", is_task_like),
             ("➕ Add task",        add_sub,                "add",           "add new task",      _generic),
             ("🔗 Copy link",       "Copy item URL",        f"copy:{link}",  "copy url",          True),
+            ("🖥 Copy focus link", "Paste in TickTick · sticky + timer",
+             f"copy:{focus_md}", "routine review link focus sticky timer click",
+             is_task_like and bool(focus_md) and _generic),
             ("🆔 Copy id",         "List id → clipboard",  f"copy:{pid}",   "id copy identifier configure", itype == "list"),
             ("✅ Posted",          "Shelf clears · task completes",
              f"xact:posted:{tid}", "posted done shelf content",
