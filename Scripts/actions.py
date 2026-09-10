@@ -663,7 +663,9 @@ def main():
         if is_task_like and _generic and query.startswith(INTERNALS_Q.strip()):
             _il = routine_link.internal_links(
                 (_lt or {}).get("title") or name, (_lt or {}).get("id", ""),
-                (_lt or {}).get("projectId") or pid, periodic=bool(_pn_on))
+                (_lt or {}).get("projectId") or pid, periodic=bool(_pn_on),
+                money=any(p.get("id") == routine_link.MONEY_LIST
+                          for p in (cache_store.get("projects") or [])))
             items = [alfred.item(title=t, subtitle=s, arg=f"copy:{md}",
                                  variables=dict(vars_, task_title=t), match=f"{k} {t}")
                      for (k, t, s, md) in _il]

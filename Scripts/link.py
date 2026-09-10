@@ -137,6 +137,42 @@ def _tt_ready(xact, timeout=8.0):
     return False
 
 
+# view:<slot> → the Alfred screen BrowseCtx opens (calendar rides OpenCalendar)
+VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
+            "crmcal": "ctx:crmcal"}           # exactly what CRM home > Calendar opens
+
+
+def _money(xact):
+    """Open THIS month's money note (routine_link.money_note): the cache
+    first, a LIVE read of the list when the cache has no current-month note
+    (made within the last sync hour), else the newest one, said out loud."""
+    from datetime import date
+    today = date.today()
+    pid, cs = rl.MONEY_LIST, xact.cache_store
+    pool = [t for k in ("all_tasks", "all_notes") for t in (cs.get(k) or [])
+            if t.get("projectId") == pid]
+    cur, newest = rl.money_note(pool, today.year, today.month)
+    live_ok = True                # only a read that WORKED may say "no note yet"
+    if not cur:
+        try:
+            live = xact._api().get_project_data(pid).get("tasks") or []
+        except Exception:         # rate limit, offline, token: say so, never "missing"
+            live, live_ok = [], False
+        if live:
+            cur, live_newest = rl.money_note(live, today.year, today.month)
+            newest = live_newest or newest
+    target = cur or newest
+    if not target:
+        return "💰 No money note found" if live_ok else "💰 Live read failed · sync, then retry"
+    subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{target['id']}"],
+                   check=False)
+    month = rl.MONTHS[today.month - 1]
+    if cur:
+        return f"💰 {month} open"
+    why = f"No {month} note yet" if live_ok else f"{month} not cached, live read failed"
+    return f"💰 {why} · opened {(target.get('title') or '')[:30]}"
+
+
 def run(verb, tid, pid_hint):
     """→ (toast, acted). acted=False = refused before touching anything,
     so main() lets an immediate retry through."""
@@ -158,12 +194,14 @@ def run(verb, tid, pid_hint):
         if not _tt_ready(xact):
             return "🗒️ TickTick not up · no sticky", False
         return _quiet(xact.pn_sticky, tid, assist=False), True
-    if verb == "view":                   # no ticktick:// route for these two
+    if verb == "view":                   # no ticktick:// route for these
         if tid == "calendar":
             xact._run_trigger("OpenCalendar")                 # its List-menu flow
         else:
-            xact._run_trigger("BrowseCtx", "ctx:countdowns")  # the Alfred ⏳ hub
+            xact._run_trigger("BrowseCtx", VIEW_CTX[tid])     # an Alfred screen
         return "", True
+    if verb == "money":
+        return _money(xact), True
     got = _resolve(xact, tid, pid_hint)
     if not got:
         return "🔗 Task not found · sync, then retry", False

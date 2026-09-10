@@ -120,6 +120,7 @@ il = rl.internal_links("🌅 Startup", TID, PID)
 keys = [r[0] for r in il]
 check("full list order", keys == ["focus", "sticky", "timer", "calendar", "habits",
                                   "focusview", "matrix", "countdowns", "tasks",
+                                  "inbox", "crmcal",
                                   "daily", "daily_sticky", "weekly", "weekly_sticky",
                                   "monthly", "monthly_sticky", "quarterly",
                                   "quarterly_sticky", "yearly", "yearly_sticky",
@@ -151,8 +152,32 @@ for k, _t, _s, md in il:
         arg = parse_qs(urlsplit(target).query)["argument"][0]
         check(f"{k} link parses back", rl.parse(arg)[0] in ("focus", "sticky", "timer",
                                                             "view", "journal", "note",
-                                                            "notesticky"), arg)
+                                                            "notesticky", "money"), arg)
 check("every row is markdown", all(r[3].startswith("[") and r[3].endswith(")") for r in il))
+
+# ── money + crmcal + inbox ──────────────────────────────────────────────────
+check("money bare", rl.parse("money") == ("money", "", ""))
+check("money takes no id", refused("money:6a955950b4839102c549b053") is not None)
+check("view crmcal", rl.parse("view:crmcal") == ("view", "crmcal", ""))
+check("inbox app link", rl.APP_LINKS["inbox"] == "ticktick:///webapp/#p/inbox/tasks")
+N = lambda i, t, k="NOTE": {"id": i, "title": t, "kind": k}
+SEP, AUG, JUL = (N("s" * 24, "2026 September • MT - 2,150"),
+                 N("a" * 24, "2026 August • MT - 3490"), N("j" * 24, "2026 July • MT - 5390"))
+pool = [JUL, SEP, AUG, N("p" * 24, "Money Priorities"), N("t" * 24, "2026 October • MT", "TEXT")]
+check("current month found", rl.money_note(pool, 2026, 9) == (SEP, SEP))
+check("older month found", rl.money_note(pool, 2026, 8)[0] is AUG)
+check("month not made yet → None + newest",
+      rl.money_note(pool, 2026, 10) == (None, SEP))        # the TEXT October is ignored
+check("nothing dated", rl.money_note([N("x" * 24, "Money Priorities")], 2026, 9) == (None, None))
+check("year boundary newest", rl.money_note(
+    [N("d" * 24, "2025 December • MT"), N("n" * 24, "2026 January • MT")], 2026, 2)[1]["id"] == "n" * 24)
+check("case-insensitive month", rl.money_note([N("c" * 24, "2026 september • MT")], 2026, 9)[0] is not None)
+check("empty pool", rl.money_note(None, 2026, 9) == (None, None))
+check("money row gated off by default", "money" not in [r[0] for r in il])
+ilm = rl.internal_links("x", TID, PID, money=True)
+check("money row after crmcal when on",
+      [r[0] for r in ilm].index("money") == [r[0] for r in ilm].index("crmcal") + 1)
+check("money link", dict((r[0], r[3]) for r in ilm)["money"].endswith("?argument=money)"))
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 sys.exit(1 if FAILS else 0)

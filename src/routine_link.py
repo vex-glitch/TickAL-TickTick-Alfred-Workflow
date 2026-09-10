@@ -21,9 +21,13 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
                           input it lazy-mints today's daily and seeds its
                           journal Qs (like any pn open); answers are only
                           what Vex types, the link carries no text
-    view:<calendar|countdowns>  destinations the app has NO link for:
-                          calendar = ET OpenCalendar's List-menu flow,
-                          countdowns = the Alfred ⏳ hub
+    view:<calendar|countdowns|crmcal>  destinations the app has NO link
+                          for: calendar = ET OpenCalendar's List-menu flow,
+                          countdowns = the Alfred ⏳ hub, crmcal = the
+                          Alfred CRM calendar (what CRM > Calendar opens)
+    money                 THIS month's money-tracking note, found by its
+                          title date at click time (money_note); the newest
+                          one until the month's note exists
     note:<spec>           the CURRENT periodic note (daily|weekly|monthly|
                           quarterly|yearly) on whatever day the click
                           happens, lazy-minted. A pasted note link would
@@ -47,13 +51,13 @@ TRIGGER = "Link"
 MAX_LEN = 200
 
 TASK_VERBS = ("focus", "sticky", "timer")
-BARE_VERBS = ("ping", "pause", "resume")
+BARE_VERBS = ("ping", "pause", "resume", "money")
 PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
           ("monthly", "this month's"), ("quarterly", "this quarter's"),
           ("yearly", "this year's"))
 PN_SPECS = tuple(s for s, _ in PN_NOW)
 SLOT_VERBS = {"journal": ("morning", "evening"),
-              "view": ("calendar", "countdowns"),
+              "view": ("calendar", "countdowns", "crmcal"),
               "note": PN_SPECS,
               "notesticky": PN_SPECS}
 
@@ -64,8 +68,17 @@ SLOT_VERBS = {"journal": ("morning", "evening"),
 APP_LINKS = {"habits": "ticktick://habit",
              "focus": "ticktick://focus",
              "matrix": "ticktick://matrix",
-             "tasks": "ticktick://v1/show?smartlist=today"}
-LABELS = {"focus": "🖥 Focus + sticky", "sticky": "🖥 Sticky", "timer": "🖥 Focus"}
+             "tasks": "ticktick://v1/show?smartlist=today",
+             "inbox": "ticktick:///webapp/#p/inbox/tasks"}   # the Search Inbox row's route
+
+# 💰 Money tracking: one NOTE per month in the 💰Money list, titled
+# "<YYYY> <Month> • MT - <total>" (Vex 2026-09-10). The money link resolves
+# the CURRENT month's note at click time - title-dated, never id-pinned.
+MONEY_LIST = "6a4bd07e4e3c910368319b6d"
+MONTHS = ("January", "February", "March", "April", "May", "June", "July",
+          "August", "September", "October", "November", "December")
+_MONEY_RE = re.compile(r"(\d{4})\s+(" + "|".join(MONTHS) + r")\b", re.I)
+LABELS ={"focus": "🖥 Focus + sticky", "sticky": "🖥 Sticky", "timer": "🖥 Focus"}
 
 _TID = re.compile(r"[0-9a-f]{24}")
 _PID = re.compile(r"[0-9a-f]{24}|inbox\d{6,12}")
@@ -120,6 +133,22 @@ def series_id(tid, *pools):
     return ""
 
 
+def money_note(notes, year, month):
+    """(current, newest) among money-tracking NOTEs: current = the one
+    titled '<year> <Month>...' for year/month (None until it is made),
+    newest = the latest-dated one (the fallback at a month's start)."""
+    dated = []
+    for t in notes or ():
+        if t.get("kind") != "NOTE":
+            continue
+        m = _MONEY_RE.match((t.get("title") or "").strip())
+        if m:
+            dated.append(((int(m.group(1)), MONTHS.index(m.group(2).capitalize()) + 1), t))
+    cur = next((t for k, t in dated if k == (year, month)), None)
+    newest = max(dated, key=lambda kt: kt[0])[1] if dated else None
+    return cur, newest
+
+
 def url(verb, tid="", pid=""):
     """The clickable URL. Round-trips through parse() first, so the
     generator can never mint a link the executor refuses. The argument is
@@ -151,7 +180,7 @@ def _task_md(title, verb, tid, pid):
         return markdown(title, verb, tid)      # pid is only a hint
 
 
-def internal_links(title="", tid="", pid="", periodic=True):
+def internal_links(title="", tid="", pid="", periodic=True, money=False):
     """The ☑️ TickTick Internals list: [(key, row title, subtitle, markdown)].
     Item rows only for a valid tid (callers heal a completed instance to
     its series first); destinations + periodic rows (daily note, journals:
@@ -177,7 +206,13 @@ def internal_links(title="", tid="", pid="", periodic=True):
         ("countdowns", "⏳ Countdowns", "Alfred hub, app has no link",
          f"[🖥 Countdowns]({url('view', 'countdowns')})"),
         ("tasks", "✅ Tasks", "App Today list", f"[✅ Tasks]({APP_LINKS['tasks']})"),
+        ("inbox", "📥 Inbox", "App inbox", f"[📥 Inbox]({APP_LINKS['inbox']})"),
+        ("crmcal", "📅 CRM calendar", "Alfred, like CRM > Calendar",
+         f"[🖥 CRM calendar]({url('view', 'crmcal')})"),
     ]
+    if money:
+        rows += [("money", "💰 Money note", "Always this month's",
+                  f"[🖥 Money note]({url('money')})")]
     if periodic:
         for spec, now in PN_NOW:        # each note: open + sticky, side by side
             name = f"{spec.capitalize()} note"
