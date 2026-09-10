@@ -28,6 +28,7 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     money                 THIS month's money-tracking note, found by its
                           title date at click time (money_note); the newest
                           one until the month's note exists
+    moneysticky           the same note, opened as a desktop sticky
     note:<spec>           the CURRENT periodic note (daily|weekly|monthly|
                           quarterly|yearly) on whatever day the click
                           happens, lazy-minted. A pasted note link would
@@ -51,7 +52,7 @@ TRIGGER = "Link"
 MAX_LEN = 200
 
 TASK_VERBS = ("focus", "sticky", "timer")
-BARE_VERBS = ("ping", "pause", "resume", "money")
+BARE_VERBS = ("ping", "pause", "resume", "money", "moneysticky")
 PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
           ("monthly", "this month's"), ("quarterly", "this quarter's"),
           ("yearly", "this year's"))
@@ -212,7 +213,9 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
     ]
     if money:
         rows += [("money", "💰 Money note", "Always this month's",
-                  f"[🖥 Money note]({url('money')})")]
+                  f"[🖥 Money note]({url('money')})"),
+                 ("money_sticky", "🗒️ Money note sticky", "This month's, as sticky",
+                  f"[🖥 Money note sticky]({url('moneysticky')})")]
     if periodic:
         for spec, now in PN_NOW:        # each note: open + sticky, side by side
             name = f"{spec.capitalize()} note"

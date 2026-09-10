@@ -152,7 +152,8 @@ for k, _t, _s, md in il:
         arg = parse_qs(urlsplit(target).query)["argument"][0]
         check(f"{k} link parses back", rl.parse(arg)[0] in ("focus", "sticky", "timer",
                                                             "view", "journal", "note",
-                                                            "notesticky", "money"), arg)
+                                                            "notesticky", "money",
+                                                            "moneysticky"), arg)
 check("every row is markdown", all(r[3].startswith("[") and r[3].endswith(")") for r in il))
 
 # ── money + crmcal + inbox ──────────────────────────────────────────────────
@@ -178,6 +179,12 @@ ilm = rl.internal_links("x", TID, PID, money=True)
 check("money row after crmcal when on",
       [r[0] for r in ilm].index("money") == [r[0] for r in ilm].index("crmcal") + 1)
 check("money link", dict((r[0], r[3]) for r in ilm)["money"].endswith("?argument=money)"))
+check("moneysticky bare", rl.parse("moneysticky") == ("moneysticky", "", ""))
+check("moneysticky takes no id", refused("moneysticky:x") is not None)
+check("money sticky row right after money",
+      [r[0] for r in ilm].index("money_sticky") == [r[0] for r in ilm].index("money") + 1)
+check("money sticky link",
+      dict((r[0], r[3]) for r in ilm)["money_sticky"].endswith("?argument=moneysticky)"))
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 sys.exit(1 if FAILS else 0)

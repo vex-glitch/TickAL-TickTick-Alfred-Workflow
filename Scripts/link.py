@@ -142,10 +142,11 @@ VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
             "crmcal": "ctx:crmcal"}           # exactly what CRM home > Calendar opens
 
 
-def _money(xact):
+def _money(xact, as_sticky=False):
     """Open THIS month's money note (routine_link.money_note): the cache
     first, a LIVE read of the list when the cache has no current-month note
-    (made within the last sync hour), else the newest one, said out loud."""
+    (made within the last sync hour), else the newest one, said out loud.
+    as_sticky = the same note as a desktop sticky (no row-click retry)."""
     from datetime import date
     today = date.today()
     pid, cs = rl.MONEY_LIST, xact.cache_store
@@ -164,12 +165,19 @@ def _money(xact):
     target = cur or newest
     if not target:
         return "💰 No money note found" if live_ok else "💰 Live read failed · sync, then retry"
+    month = rl.MONTHS[today.month - 1]
+    why = ("" if cur else
+           f"No {month} note yet" if live_ok else f"{month} not cached, live read failed")
+    if as_sticky:
+        if not _tt_ready(xact):
+            return "🗒️ TickTick not up · no sticky"
+        os.environ["task_title"] = target.get("title") or "Money"
+        done = _quiet(xact.sticky, pid, target["id"], assist=False)
+        return f"💰 {why} · {done}" if why else done
     subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{target['id']}"],
                    check=False)
-    month = rl.MONTHS[today.month - 1]
     if cur:
         return f"💰 {month} open"
-    why = f"No {month} note yet" if live_ok else f"{month} not cached, live read failed"
     return f"💰 {why} · opened {(target.get('title') or '')[:30]}"
 
 
@@ -200,8 +208,8 @@ def run(verb, tid, pid_hint):
         else:
             xact._run_trigger("BrowseCtx", VIEW_CTX[tid])     # an Alfred screen
         return "", True
-    if verb == "money":
-        return _money(xact), True
+    if verb in ("money", "moneysticky"):
+        return _money(xact, as_sticky=verb == "moneysticky"), True
     got = _resolve(xact, tid, pid_hint)
     if not got:
         return "🔗 Task not found · sync, then retry", False
