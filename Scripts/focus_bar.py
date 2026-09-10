@@ -222,6 +222,10 @@ def sym_image(name, pt=None, weight=None):
 # against the HUD chrome.
 GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.18, 0.75, 0.47, 0.95)
 
+# Expanded list: px each nesting level below the direct child shifts its
+# checkbox + title - just enough to read as nested (Vex 2026-09-10)
+INDENT = 14
+
 
 def _dot_cgimage(color, d=8):
     img = NSImage.alloc().initWithSize_(NSMakeSize(d, d))
@@ -791,6 +795,8 @@ class BarController(NSObject):
             self.l_count.setFrame_(NSMakeRect(w - 72, y2 + 3, 56, 20))
             self.l_count.setStringValue_(f"{done}/{total}")
             if nxt:
+                self.b_tick.setImage_(sym_image(   # nested next item: square box
+                    "square" if nxt.get("depth", 1) > 1 else "circle", 15))
                 nfull = _disp(nxt["title"])
                 self.t_item.setTitle_(nfull[:70])
                 self.t_item.setToolTip_(nfull + "\nOpen in TickTick")
@@ -814,15 +820,20 @@ class BarController(NSObject):
                     v.setHidden_(False)
                     v._tid = it.get("tid") or ""   # click-time re-resolution
                 ry = H - ROW1_H - CHK_H * (i + 1) + (CHK_H - 26) / 2.0
-                b.setFrame_(NSMakeRect(30, ry, 26, 26))
-                b.setImage_(sym_image("circle", 15))
+                # nested subtasks: checkbox AND title shift one INDENT per
+                # level below the direct child, and their box goes SQUARE
+                # (Vex 2026-09-10: the old '↳' text prefix left the boxes
+                # unaligned and every level looked the same)
+                depth = max(1, it.get("depth", 1))
+                dx = INDENT * (depth - 1)
+                b.setFrame_(NSMakeRect(30 + dx, ry, 26, 26))
+                b.setImage_(sym_image("square" if depth > 1 else "circle", 15))
                 b.setContentTintColor_(GREEN)      # match the glow
-                # nested subtasks indent one ↳ per level below the child
-                tfull = "↳ " * (it.get("depth", 1) - 1) + _disp(it["title"])
+                tfull = _disp(it["title"])
                 t.setTitle_(tfull[:70])
                 t.setToolTip_(tfull + "\nOpen in TickTick")
                 t.setContentTintColor_(NSColor.secondaryLabelColor())
-                t.setFrame_(NSMakeRect(64, ry + 1, w - 64 - 70, 24))
+                t.setFrame_(NSMakeRect(64 + dx, ry + 1, w - 64 - 70 - dx, 24))
                 abs_i = self.scroll_off + i
                 for k, v in enumerate((top, up, dn, bot)):
                     v.setFrame_(NSMakeRect(w - 63 + 14 * k, ry + 3, 14, 20))

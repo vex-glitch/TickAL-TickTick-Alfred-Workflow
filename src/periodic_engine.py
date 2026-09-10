@@ -231,24 +231,35 @@ def _load_template(kind):
 # verified against the app in everything_search; routes not in that table
 # are dead. If the app doesn't hyperlink ticktick:// inside note bodies,
 # drop row 1 - row 2 (https task-anchors) still works.
-def _nav_lines():
-    row1 = [("📅 Today", "ticktick://v1/show?smartlist=today"),
-            ("🌄 Tomorrow", "ticktick://v1/show?smartlist=tomorrow"),
-            ("7️⃣ Next 7", "ticktick://v1/show?smartlist=next_7_days"),
+def _nav_lines(p=None, index=None):
+    """Two rows, three links each (Vex 2026-09-10 - the old second row held
+    ONE lonely link, 💫 Periodic, now dropped: ▲ on the crumb climbs the
+    ladder): ⏪ Yesterday · 📅 Today · 🌄 Tomorrow, then 7️⃣ Next 7 ·
+    ✔️ Completed · 🔄 Habits (+ 👥 CRM / ♻️ Review when set up). Yesterday =
+    the daily note before THIS note on a daily, before today elsewhere -
+    plain text until that note exists (a later refresh links it)."""
+    yday = None
+    if index is not None:
+        try:
+            from datetime import date, timedelta
+            yp = (pm.prev_period(p) if p is not None and p.kind == "daily"
+                  else pm.period_for("daily", date.today() - timedelta(days=1)))
+            yday = _note_url(lookup(index, yp))
+        except Exception:
+            yday = None
+    row1 = [("⏪ Yesterday", yday),
+            ("📅 Today", "ticktick://v1/show?smartlist=today"),
+            ("🌄 Tomorrow", "ticktick://v1/show?smartlist=tomorrow")]
+    row2 = [("7️⃣ Next 7", "ticktick://v1/show?smartlist=next_7_days"),
             ("✔️ Completed", "ticktick://v1/show?smartlist=completed"),
             ("🔄 Habits", "ticktick://habit")]
-    lines = [" · ".join(f"[{t}]({u})" for t, u in row1)]
-    row2 = []
     if areas.crm_configured():
         row2.append((f"👥 {areas.crm_list_name()}",
                      f"https://ticktick.com/webapp/#p/{areas.CRM_ID}/tasks"))
-    row2.append(("💫 Periodic",
-                 f"https://ticktick.com/webapp/#p/{areas.PERIODIC_LIST_ID}/tasks"))
     rv = _review_target()
     if rv:
         row2.append(("♻️ Review", rv[0]))
-    lines.append(" · ".join(f"[{t}]({u})" for t, u in row2))
-    return lines
+    return [pm.render_breadcrumb(row1), pm.render_breadcrumb(row2)]
 
 
 def _review_target():
@@ -292,7 +303,7 @@ def _compose_lead(doc, p, index, refetch):
             q_lines = [q]
         if w:
             w_line = w
-    out = [_crumb(p, index)] + _nav_lines() + ["---"]
+    out = [_crumb(p, index)] + _nav_lines(p, index) + ["---"]
     if p.kind == "daily":
         tail = [x for x in [w_line] + q_lines + [mood, day] if x]
         if tail:
@@ -347,7 +358,7 @@ def create_note(p, index):
     tpl = _load_template(p.kind)
     content = pm.render_template(tpl, {
         "breadcrumbs": _crumb(p, index),
-        "navlinks": "\n".join(_nav_lines()),
+        "navlinks": "\n".join(_nav_lines(p, index)),
     })
     # Child tag ONLY - TickTick's group-by-tag prefers the PARENT when both
     # are attached, which would collapse the kanban into one 💫Periodic
