@@ -63,6 +63,7 @@ ROW1_H = 50
 ROW2_H = 34
 CHK_H  = 25      # expanded subtask rows pack tight (28 → 25, Vex 2026-09-10)
 SUB_H  = 23      # nested (sub-subtask) rows sit a little tighter
+PAD_V  = 10      # breathing room above the first and below the last row (zoomed; 6 → 10)
 RADIUS = 20.0
 IDLE_EXIT_S = 10
 
@@ -145,12 +146,12 @@ try:
         NSVisualEffectStateActive, NSEdgeInsetsMake, NSImageResizingModeStretch,
         NSFontWeightSemibold, NSFontWeightBold, NSLineBreakByTruncatingTail,
         NSTextAlignmentLeft, NSTextAlignmentRight, NSWindowStyleMaskResizable,
-        NSImageView, NSCursor,
+        NSImageView, NSCursor, NSEvent,
     )
     from AppKit import NSView            # noqa: E402
     from Quartz import (                 # noqa: E402
         CAEmitterLayer, CAEmitterCell, CACurrentMediaTime, kCAEmitterLayerPoint,
-        CALayer, CATransaction, CAGradientLayer,
+        CALayer, CATransaction, CAGradientLayer, CAKeyframeAnimation,
     )
     from PyObjCTools import AppHelper    # noqa: E402
 except ImportError as e:
@@ -198,10 +199,104 @@ class NonActivatingPanel(NSPanel):
         if bar is not None:
             bar.onScroll_(event)
 
+    def magnifyWithEvent_(self, event):
+        # trackpad pinch over the bar = zoom the task rows
+        bar = getattr(self, "_bar", None)
+        if bar is not None:
+            bar.on_magnify(event)
+
 
 class PillButton(NSButton):
     def acceptsFirstMouse_(self, event):  # act on the first click
         return True
+
+
+def _saved_zooms():
+    """{monitor name: zoom} from the bar file - each monitor keeps its own
+    ⌘+/⌘− level (Vex 2026-09-10: perfect on the main screen, barely
+    readable on the secondary one)."""
+    try:
+        with open(BAR_STATE) as f:
+            raw = json.load(f).get("zoom") or {}
+        return {str(k): float(v) for k, v in raw.items()
+                if ZOOM_MIN <= float(v) <= ZOOM_MAX}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {}
+
+
+def _fourcc(s):
+    return int.from_bytes(s.encode("mac_roman"), "big")
+
+
+class _HoverHotkeys:
+    """⌘+ / ⌘− / ⌘0 zoom the bar ONLY while the pointer is over it. The
+    panel never takes keyboard focus (by design: ticking a box must not
+    pull you out of your app), so no ordinary key binding can reach it -
+    Carbon hotkeys armed on mouse-enter and dropped on mouse-exit can, and
+    ⌘+ keeps zooming every other app everywhere else. No permissions
+    needed. on_key(direction) gets +1 / -1 / 0 (reset)."""
+    # (virtual key code, modifiers, direction) - U.S. positions; cmd = 256
+    KEYS = ((24, 256, 1), (24, 256 | 512, 1), (69, 256, 1),    # ⌘= ⇧⌘= ⌘keypad+
+            (27, 256, -1), (78, 256, -1),                       # ⌘- ⌘keypad-
+            (29, 256, 0))                                       # ⌘0
+
+    def __init__(self, on_key):
+        import ctypes
+        self.ct = ctypes
+        c = self.c = ctypes.cdll.LoadLibrary(
+            "/System/Library/Frameworks/Carbon.framework/Carbon")
+        self.on_key = on_key
+        self.refs = []
+
+        class EventTypeSpec(ctypes.Structure):
+            _fields_ = [("eventClass", ctypes.c_uint32), ("eventKind", ctypes.c_uint32)]
+
+        class EventHotKeyID(ctypes.Structure):
+            _fields_ = [("signature", ctypes.c_uint32), ("id", ctypes.c_uint32)]
+        self.HKID = EventHotKeyID
+        Proc = ctypes.CFUNCTYPE(ctypes.c_int32, ctypes.c_void_p, ctypes.c_void_p,
+                                ctypes.c_void_p)
+        c.GetApplicationEventTarget.restype = ctypes.c_void_p
+        c.GetEventParameter.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32,
+                                        ctypes.c_void_p, ctypes.c_size_t,
+                                        ctypes.c_void_p, ctypes.c_void_p]
+        c.InstallEventHandler.argtypes = [ctypes.c_void_p, Proc, ctypes.c_uint32,
+                                          ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        c.RegisterEventHotKey.argtypes = [ctypes.c_uint32, ctypes.c_uint32, EventHotKeyID,
+                                          ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p]
+        c.UnregisterEventHotKey.argtypes = [ctypes.c_void_p]
+
+        def handler(_next, event, _user):
+            hk = EventHotKeyID()
+            c.GetEventParameter(event, _fourcc("----"), _fourcc("hkid"), None,
+                                ctypes.sizeof(hk), None, ctypes.byref(hk))
+            try:
+                self.on_key(self.KEYS[hk.id][2])
+            except Exception as e:
+                _log(f"hotkey: {e}")
+            return 0
+        self._proc = Proc(handler)        # keep a reference: ctypes won't
+        self.target = c.GetApplicationEventTarget()
+        spec = EventTypeSpec(_fourcc("keyb"), 5)       # kEventHotKeyPressed
+        self._href = ctypes.c_void_p()
+        c.InstallEventHandler(self.target, self._proc, 1, ctypes.byref(spec),
+                              None, ctypes.byref(self._href))
+
+    def arm(self):
+        if self.refs:
+            return
+        for n, (code, mods, _d) in enumerate(self.KEYS):
+            ref = self.ct.c_void_p()
+            if self.c.RegisterEventHotKey(code, mods, self.HKID(_fourcc("TkAL"), n),
+                                          self.target, 0, self.ct.byref(ref)) == 0:
+                self.refs.append(ref)
+        if len(self.refs) < len(self.KEYS):     # another app owns a chord
+            _log(f"hover hotkeys: {len(self.refs)}/{len(self.KEYS)} armed")
+
+    def disarm(self):
+        for ref in self.refs:
+            self.c.UnregisterEventHotKey(ref)
+        self.refs = []
 
 
 class GripView(NSImageView):
@@ -284,9 +379,12 @@ SQUARE_PT = 12     # sub-subtask checkbox glyph - matches the 14 pt text
 ROW_TEXT = NSColor.labelColor()
 
 
-def _row_h(it):
-    """An expanded row's height: nested rows sit tighter."""
-    return CHK_H if (it or {}).get("depth", 1) <= 1 else SUB_H
+ZOOM_MIN, ZOOM_MAX = 0.7, 2.0   # ⌘+/⌘− range for the task rows, per monitor
+
+
+def _row_h(it, z=1.0):
+    """An expanded row's height at zoom z: nested rows sit tighter."""
+    return (CHK_H if (it or {}).get("depth", 1) <= 1 else SUB_H) * z
 # A user resize counts as IN PROGRESS until the frame holds still this long:
 # Moom's modifier-drag is a STREAM of AX size sets with no live-resize
 # bracket, and snapping each one made the bar fight Moom (it shook)
@@ -325,6 +423,14 @@ class BarController(NSObject):
         self._drag = None               # a grip drag in progress (grip_down)
         self._relayout_pending = False  # a relayout deferred by that drag
         self._gap_y = []                # y of each visible row's top edge (+ the bottom)
+        self._x0 = 30.0                 # the checkbox column (slides right only when a zoomed grip needs room)
+        self._zooms = _saved_zooms()    # {monitor name: zoom}
+        self.zoom = 1.0                 # this monitor's, applied in _build
+        self._zoom_accum = 0.0          # ⌘-scroll accumulator (scroll points)
+        self._pinch_accum = 0.0         # pinch accumulator (magnification) - its OWN:
+                                        # a shared one let scroll leftovers slam a pinch to 200%
+        self._flash_until = 0.0         # the zoom % owns the clock until then
+        self._hot = None                # hover hotkeys (⌘+ / ⌘− / ⌘0)
         self.user_w, self.user_h = _saved_size()   # edge drag / Moom size
         self.row_pool = []              # lazily-built expanded item rows
         self.visible_items = []         # the filtered+scrolled window
@@ -500,9 +606,18 @@ class BarController(NSObject):
         # thin + translucent, both ends fading to clear (Vex 2026-09-10)
         self.drop_line = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 10, 2))
         self.drop_line.setWantsLayer_(True)
+        dl = self.drop_line.layer()        # the neon halo of _pulse_drop_line
+        dl.setShadowColor_(GREEN.CGColor())
+        dl.setShadowRadius_(6.0)
+        dl.setShadowOffset_((0, 0))
+        dl.setShadowOpacity_(0.0)
+        dl.setMasksToBounds_(False)
         grad = CAGradientLayer.layer()
         solid = GREEN.colorWithAlphaComponent_(0.55).CGColor()
         clear = GREEN.colorWithAlphaComponent_(0.0).CGColor()
+        bright = GREEN.colorWithAlphaComponent_(1.0).CGColor()
+        self._drop_colors = [clear, solid, solid, clear]
+        self._drop_bright = [clear, bright, bright, clear]
         grad.setColors_([clear, solid, solid, clear])
         grad.setLocations_([0.0, 0.2, 0.8, 1.0])
         grad.setStartPoint_((0.0, 0.5))
@@ -522,6 +637,21 @@ class BarController(NSObject):
             self, "windowResized:", "NSWindowDidResizeNotification", panel)
         NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
             self, "windowEndResize:", "NSWindowDidEndLiveResizeNotification", panel)
+        # a monitor change picks up THAT monitor's zoom
+        NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+            self, "screenChanged:", "NSWindowDidChangeScreenNotification", panel)
+        # hover = arm ⌘+/⌘−/⌘0 (a non-key panel still gets enter/exit)
+        from AppKit import NSTrackingArea
+        area = NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+            NSMakeRect(0, 0, 0, 0),
+            0x01 | 0x80 | 0x200,   # EnteredAndExited | ActiveAlways | InVisibleRect
+            self, None)
+        panel.contentView().addTrackingArea_(area)
+        try:
+            self._hot = _HoverHotkeys(lambda d: AppHelper.callAfter(self._zoom_step, d))
+        except Exception as e:     # ⌘-scroll + pinch still zoom
+            _log(f"hover hotkeys unavailable: {e}")
+        self.zoom = self._zooms.get(self._screen_key(), 1.0)
         NSWorkspace.sharedWorkspace().notificationCenter(
         ).addObserver_selector_name_object_(
             self, "didWake:", "NSWorkspaceDidWakeNotification", None)
@@ -572,6 +702,82 @@ class BarController(NSObject):
     def windowMoved_(self, note):
         self._move_save_at = time.monotonic() + 0.6   # debounce; saved by tick
 
+    # ── zoom (⌘+ / ⌘− / ⌘0 on hover, ⌘-scroll, pinch) - per monitor ───────
+    def mouseEntered_(self, event):
+        if self._hot is not None:
+            self._hot.arm()
+
+    def mouseExited_(self, event):
+        if self._hot is not None:
+            self._hot.disarm()
+
+    def screenChanged_(self, note):
+        if self._self_frame:           # our own zoom-driven resize, not a move
+            return
+        z = self._zooms.get(self._screen_key(), 1.0)
+        if z != self.zoom:
+            self.zoom = z
+            self._zoom_accum = self._pinch_accum = 0.0
+            self._relayout()
+
+    @objc.python_method
+    def _screen_key(self):
+        """The monitor under the bar's TOP-left corner - the anchor zoom
+        never moves. panel.screen() is the majority-area screen, and zoom
+        changes the height: between two STACKED monitors each zoom handed
+        the majority to the other, forever (zoom review 2026-09-10)."""
+        fr = self.panel.frame()
+        ax, ay = fr.origin.x + 1, fr.origin.y + fr.size.height - 1
+        scr = next((s for s in NSScreen.screens()
+                    if s.frame().origin.x <= ax < s.frame().origin.x + s.frame().size.width
+                    and s.frame().origin.y <= ay < s.frame().origin.y + s.frame().size.height),
+                   None) or self.panel.screen() or NSScreen.mainScreen()
+        try:
+            return str(scr.localizedName())
+        except Exception:
+            return str(scr.deviceDescription().get("NSScreenNumber"))
+
+    @objc.python_method
+    def _pointer_inside(self):
+        p, f = NSEvent.mouseLocation(), self.panel.frame()
+        return (f.origin.x <= p.x <= f.origin.x + f.size.width
+                and f.origin.y <= p.y <= f.origin.y + f.size.height)
+
+    @objc.python_method
+    def _zoom_step(self, direction):
+        """+1 / -1 = 10% steps, 0 = back to 100% - for THIS monitor only."""
+        if self._hot is not None and not self._pointer_inside():
+            self._hot.disarm()     # a missed mouse-exit must never keep ⌘+ captive
+            return
+        z = 1.0 if direction == 0 else self.zoom + 0.1 * direction
+        z = round(max(ZOOM_MIN, min(ZOOM_MAX, z)), 2)
+        if direction == 0:
+            self._zoom_accum = self._pinch_accum = 0.0
+        self.zoom = z
+        self._zooms[self._screen_key()] = z
+        self._move_save_at = time.monotonic() + 0.6   # persisted by tick
+        self._flash_until = time.monotonic() + 1.2    # tick_ leaves the clock alone
+        self._relayout()
+        self.l_clock.setStringValue_(f"{int(round(z * 100))}%")
+
+    @objc.python_method
+    def on_magnify(self, event):
+        try:
+            ph = event.phase()
+        except Exception:
+            ph = 0
+        if ph & 0x1:                              # NSEventPhaseBegan: a fresh pinch
+            self._pinch_accum = 0.0
+        self._pinch_accum += event.magnification()
+        if self._pinch_accum >= 0.12:             # one step per event at most
+            self._pinch_accum -= 0.12
+            self._zoom_step(1)
+        elif self._pinch_accum <= -0.12:
+            self._pinch_accum += 0.12
+            self._zoom_step(-1)
+        if ph & (0x8 | 0x10):                     # ended / cancelled
+            self._pinch_accum = 0.0
+
     def windowResized_(self, note):
         """A size change WE didn't make is the user's: an edge drag (AppKit
         live resize) or Moom's modifier-drag (a rapid STREAM of AX size
@@ -614,7 +820,8 @@ class BarController(NSObject):
         # pin the capacity to the rows on screen - even to ONE row on a
         # fresh setup, or while the block was still loading)
         if self._last_rows and abs(fr.size.height - self._last_H) >= 1:
-            self.user_h = max(float(fr.size.height), ROW1_H + CHK_H)
+            h = max(float(fr.size.height), ROW1_H + (CHK_H + 2 * PAD_V) * self.zoom)
+            self.user_h = ROW1_H + (h - ROW1_H) / self.zoom   # saved at 100% scale (_cap)
         self._adopted_at = self._user_rs_at
         self._user_rs_at = 0.0                        # the resize is over
         self._move_save_at = time.monotonic() + 0.6   # persisted by tick
@@ -625,7 +832,15 @@ class BarController(NSObject):
         mid-drag, else the user's saved height, else MAX_ROWS. Rows differ
         in height (nested ones sit tighter, _row_h); the 16 px overflow
         strip only counts when the rest won't all fit."""
-        h = self.panel.frame().size.height if live else self.user_h
+        if live:
+            h = self.panel.frame().size.height
+        elif self.user_h:
+            # user_h is saved at 100% scale (the header isn't zoomed): the
+            # same ROWS fit at any zoom and the bar grows with it - zooming
+            # in to READ must not hide rows behind the scroll strip
+            h = ROW1_H + (self.user_h - ROW1_H) * self.zoom
+        else:
+            h = None
         if not h:
             return self.MAX_ROWS
         rest = list(items)[self.scroll_off:] or [{}]
@@ -633,14 +848,15 @@ class BarController(NSObject):
         def fit(avail):
             n, used = 0, 0.0
             for it in rest:
-                used += _row_h(it)
+                used += _row_h(it, self.zoom)
                 if used > avail:
                     break
                 n += 1
             return n
-        k = fit(h - ROW1_H)
+        pad = 2 * PAD_V * self.zoom                # room above + below the rows
+        k = fit(h - ROW1_H - pad)
         if k < len(rest):
-            k = fit(h - ROW1_H - 16)
+            k = fit(h - ROW1_H - pad - 16)
         return max(1, k)
 
     def _persist_origin(self):
@@ -658,6 +874,8 @@ class BarController(NSObject):
             st["top_left"] = [o.x, o.y + fr.size.height]
             if self.user_w or self.user_h:               # each axis alone
                 st["size"] = [self.user_w, self.user_h]
+            if self._zooms:
+                st["zoom"] = self._zooms                 # per monitor
             tmp = BAR_STATE + ".tmp"
             with open(tmp, "w") as f:
                 json.dump(st, f)
@@ -680,7 +898,9 @@ class BarController(NSObject):
         """1 s UI repaint from timestamps only + housekeeping."""
         try:
             m = self.state
-            if m["kind"] == "timer" and m["focus_st"]:
+            if time.monotonic() < self._flash_until:
+                pass                              # the zoom % flash owns the clock
+            elif m["kind"] == "timer" and m["focus_st"]:
                 self.l_clock.setStringValue_(
                     "⏸ " + fmt_timer(xact.focus_elapsed(m["focus_st"]))
                     if m["paused"] else fmt_timer(xact.focus_elapsed(m["focus_st"])))
@@ -689,6 +909,8 @@ class BarController(NSObject):
                 left = rem if m["paused"] else rem - (time.monotonic() - at)
                 self.l_clock.setStringValue_(
                     ("⏸ " if m["paused"] else "") + fmt_pomo(left))
+            if self._hot is not None and self._hot.refs and not self._pointer_inside():
+                self._hot.disarm()          # safety net for a missed mouse-exit
             if self._move_save_at and time.monotonic() > self._move_save_at:
                 self._move_save_at = 0
                 self._persist_origin()
@@ -826,6 +1048,8 @@ class BarController(NSObject):
                 self.panel.orderFrontRegardless()
         else:
             if self.panel.isVisible():
+                if self._hot is not None:
+                    self._hot.disarm()
                 self.panel.orderOut_(None)
         self._relayout()
 
@@ -907,8 +1131,9 @@ class BarController(NSObject):
         window = items[self.scroll_off:self.scroll_off + cap] if expanded else []
         self.visible_items = window
         n_rows = len(window) if expanded else (1 if all_items else 0)
-        H = (ROW1_H + (sum(_row_h(it) for it in window) if expanded
-                       else ROW2_H * n_rows)
+        H = (ROW1_H + (sum(_row_h(it, self.zoom) for it in window) if expanded
+                       else ROW2_H * self.zoom * n_rows)
+             + (2 * PAD_V * self.zoom if expanded else 0)   # room at both ends
              + (16 if overflow else 0))
 
         # width: fit title + clock + buttons - unless the user sized it (edge
@@ -936,7 +1161,7 @@ class BarController(NSObject):
             title_w = max(60.0, min(natural, w - fixed))
         self.W = w
         if expanded:            # rows showing: the height is the user's
-            self.panel.setMinSize_(NSMakeSize(min_w, ROW1_H + CHK_H))
+            self.panel.setMinSize_(NSMakeSize(min_w, ROW1_H + (CHK_H + 2 * PAD_V) * self.zoom))
             self.panel.setMaxSize_(NSMakeSize(10000, 10000))
         else:                   # collapsed / no rows: width-only resizing (a
             self.panel.setMinSize_(NSMakeSize(min_w, H))    # top-edge drag
@@ -1012,26 +1237,37 @@ class BarController(NSObject):
             v.setHidden_(not show)
         if two:
             # lower rows sit indented (~25%) under the title
-            y2 = (ROW2_H - 26) / 2.0
-            self.b_tick.setFrame_(NSMakeRect(30, y2, 26, 26))
+            z = self.zoom
+            bt = 26 * z                            # the tick box, zoomed
+            y2 = (ROW2_H * z - bt) / 2.0
+            self.b_tick.setFrame_(NSMakeRect(30, y2, bt, bt))
             done, total = self.block["done"], self.block["total"]
-            self.l_count.setFrame_(NSMakeRect(w - 72, y2 + 3, 56, 20))
+            lc_pt = getattr(self, "_lc_pt", None) or self.l_count.font().pointSize()
+            self._lc_pt = lc_pt                    # the un-zoomed size, captured once
+            self.l_count.setFont_(NSFont.fontWithDescriptor_size_(
+                self.l_count.font().fontDescriptor(), lc_pt * z))
+            ch = 20 * z                            # centred on the zoomed row
+            self.l_count.setFrame_(NSMakeRect(w - 72 - 16 * (z - 1), (ROW2_H * z - ch) / 2.0,
+                                              56 * z, ch))
             self.l_count.setStringValue_(f"{done}/{total}")
             if nxt:
                 nested = nxt.get("depth", 1) > 1
                 self.b_tick.setImage_(sym_image(   # nested next item: square box
                     "square" if nested else "circle",
-                    SQUARE_PT if nested else CIRCLE_PT))
-                self.t_item.setFont_(NSFont.systemFontOfSize_(SUB_FONT if nested else TASK_FONT))
+                    (SQUARE_PT if nested else CIRCLE_PT) * z))
+                self.t_item.setFont_(NSFont.systemFontOfSize_(
+                    (SUB_FONT if nested else TASK_FONT) * z))
                 nfull = _disp(nxt["title"])
                 self.t_item.setTitle_(nfull[:70])
                 self.t_item.setToolTip_(nfull + "\nOpen in TickTick")
                 self.t_item.setContentTintColor_(ROW_TEXT)
             else:
-                self.t_item.setFont_(NSFont.systemFontOfSize_(TASK_FONT))
+                self.t_item.setFont_(NSFont.systemFontOfSize_(TASK_FONT * z))
                 self.t_item.setTitle_("All done 🎉")
                 self.t_item.setContentTintColor_(GREEN)
-            self.t_item.setFrame_(NSMakeRect(64, y2 + 1, w - 64 - 76, 24))
+            ix = 30 + bt + 8
+            ih = 24 * z
+            self.t_item.setFrame_(NSMakeRect(ix, (ROW2_H * z - ih) / 2.0, w - ix - 76, ih))
 
         # expanded: the scrolled window of UNchecked boxes, top→bottom, each
         # with ⤒↑↓⤓ reorder buttons
@@ -1040,7 +1276,7 @@ class BarController(NSObject):
             for v in views:
                 v.setHidden_(not show)
         if expanded:
-            y_top = H - ROW1_H                      # rows stack down from here
+            y_top = H - ROW1_H - PAD_V * self.zoom  # rows stack down from here
             self._gap_y = [y_top]                   # drop-line y per gap (grip)
             for i in range(n_rows):
                 it = window[i]
@@ -1054,26 +1290,29 @@ class BarController(NSObject):
                 # (Vex 2026-09-10)
                 depth = max(1, it.get("depth", 1))
                 nested = depth > 1
-                dx = INDENT * (depth - 1)
-                rh = _row_h(it)
+                z = self.zoom                          # this monitor's ⌘+/⌘− level
+                x0 = self._x0 = max(30.0, 12 + 18 * z) # boxes slide right only if a zoomed grip needs it
+                dx = INDENT * z * (depth - 1)
+                rh = _row_h(it, z)
                 mid = y_top - rh / 2.0                 # this row's centre line
-                bw = 21 if nested else 24              # checkbox hit box
-                b.setFrame_(NSMakeRect(30 + dx, mid - bw / 2.0, bw, bw))
+                bw = (21 if nested else 24) * z        # checkbox hit box
+                b.setFrame_(NSMakeRect(x0 + dx, mid - bw / 2.0, bw, bw))
                 b.setImage_(sym_image("square" if nested else "circle",
-                                      SQUARE_PT if nested else CIRCLE_PT))
+                                      (SQUARE_PT if nested else CIRCLE_PT) * z))
                 b.setContentTintColor_(GREEN)      # match the glow
                 tfull = _disp(it["title"])
-                t.setFont_(NSFont.systemFontOfSize_(SUB_FONT if nested else TASK_FONT))
+                t.setFont_(NSFont.systemFontOfSize_((SUB_FONT if nested else TASK_FONT) * z))
                 t.setTitle_(tfull[:70])
                 t.setToolTip_(tfull + "\nOpen in TickTick")
                 t.setContentTintColor_(ROW_TEXT)
-                th = 19 if nested else 22
-                tx = 30 + dx + bw + 8
+                th = (19 if nested else 22) * z
+                tx = x0 + dx + bw + 8
                 t.setFrame_(NSMakeRect(tx, mid - th / 2.0, w - tx - 12, th))
                 # grip: a fixed column in the free space LEFT of the
-                # checkboxes (x 7..25 - the boxes start at 30, unmoved;
-                # Vex 2026-09-10: the right-hand grips ate title room)
-                g.setFrame_(NSMakeRect(7, mid - 10, 18, 20))
+                # checkboxes (x 7.. - the boxes start at 30, unmoved at
+                # 100%; Vex 2026-09-10: the right-hand grips ate title room)
+                g.setImage_(sym_image("line.3.horizontal", 11 * z))
+                g.setFrame_(NSMakeRect(7, mid - 10 * z, 18 * z, 20 * z))
                 y_top -= rh
                 self._gap_y.append(y_top)
                 # no siblings = nowhere to go: the grip dims
@@ -1087,7 +1326,7 @@ class BarController(NSObject):
             below = len(items) - self.scroll_off - n_rows
             bits = ([f"↑ {above}"] if above else []) + ([f"↓ {below}"] if below else [])
             self.l_more.setStringValue_("scroll  " + " · ".join(bits))
-            self.l_more.setFrame_(NSMakeRect(64, 1, w - 84, 13))
+            self.l_more.setFrame_(NSMakeRect(64, PAD_V * self.zoom + 1, w - 84, 13))
         self.tick_(None)
 
     # ── verbs ────────────────────────────────────────────────────────────
@@ -1158,6 +1397,8 @@ class BarController(NSObject):
                            check=False)
 
     def onHide_(self, sender):
+        if self._hot is not None:
+            self._hot.disarm()          # hidden: no exit event will come
         self.panel.orderOut_(None)
         try:
             st = {}
@@ -1255,8 +1496,9 @@ class BarController(NSObject):
         if best is None:
             return
         _dist, g, tgt, gy = best
+        changed = d["pick"] != (g, tgt)          # a NEW landing spot → flare
         d["pick"] = (g, tgt)
-        x0 = 30 + INDENT * (d["depth"] - 1)        # at the siblings' indent
+        x0 = self._x0 + INDENT * self.zoom * (d["depth"] - 1)   # at the siblings' indent
         CATransaction.begin()
         CATransaction.setDisableActions_(True)
         try:
@@ -1265,6 +1507,31 @@ class BarController(NSObject):
             self.drop_line.setHidden_(False)
         finally:
             CATransaction.commit()
+        if changed:
+            self._pulse_drop_line()
+
+    @objc.python_method
+    def _pulse_drop_line(self):
+        """A brief neon flare each time the line lands on a NEW gap (Vex
+        2026-09-10): the halo blooms, the line thickens and goes full green,
+        then all three settle (~0.45 s) - 'this is a valid drop'."""
+        try:
+            times = [0.0, 0.2, 1.0]
+
+            def kf(path, values):
+                a = CAKeyframeAnimation.animationWithKeyPath_(path)
+                a.setValues_(values)
+                a.setKeyTimes_(times)
+                a.setDuration_(0.45)
+                return a
+            layer = self.drop_line.layer()
+            layer.addAnimation_forKey_(kf("shadowOpacity", [0.0, 1.0, 0.0]), "flareGlow")
+            layer.addAnimation_forKey_(kf("transform.scale.y", [1.0, 2.2, 1.0]), "flareThick")
+            self._drop_grad.addAnimation_forKey_(
+                kf("colors", [self._drop_colors, self._drop_bright, self._drop_colors]),
+                "flareColor")
+        except Exception as e:
+            _log(f"drop flare: {e}")
 
     @objc.python_method
     def grip_up(self, grip, event):
@@ -1337,6 +1604,23 @@ class BarController(NSObject):
     def onScroll_(self, event):
         """Wheel over the bar: slide the expanded checkbox window."""
         if self._drag is not None:      # the window is frozen mid-drag
+            return
+        if event.modifierFlags() & (1 << 20):     # ⌘ held: zoom, not scroll
+            try:
+                if event.momentumPhase():         # a flick's coast must not sweep 70-200%
+                    return
+                if event.phase() & 0x1:           # a fresh scroll gesture
+                    self._zoom_accum = 0.0
+                dy = event.scrollingDeltaY()
+            except Exception:
+                dy = event.deltaY() * 10
+            self._zoom_accum += dy
+            if self._zoom_accum >= 12:            # one step per event at most
+                self._zoom_accum -= 12
+                self._zoom_step(1)
+            elif self._zoom_accum <= -12:
+                self._zoom_accum += 12
+                self._zoom_step(-1)
             return
         items = self._open_items()
         cap = self._cap(False, items)
@@ -1445,6 +1729,8 @@ class BarController(NSObject):
     # ── shutdown ─────────────────────────────────────────────────────────
     def shutdown(self):
         try:
+            if self._hot is not None:
+                self._hot.disarm()
             self._persist_origin()
             if self.timer:
                 self.timer.invalidate()
