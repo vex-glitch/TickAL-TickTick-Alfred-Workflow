@@ -29,6 +29,7 @@ Run `focus_bar.py --probe` to print the model JSON headlessly (test hook).
 """
 import fcntl
 import json
+import math
 import os
 import signal
 import subprocess
@@ -70,6 +71,22 @@ ICON_BOX  = 20   # header icon boxes, edge to edge (were 26-29 px: the gaps halv
 CLOCK_DY  = -0.75  # optical nudge for the clock digits (+ = up), measured on a 2x capture
 RADIUS = 20.0
 IDLE_EXIT_S = 10
+# Drifting smoke inside the body (Vex 2026-09-10, the smoke workflow:
+# drifting-smoke won 3 of 3 judges). Assets baked ONCE by
+# tools/focus_smoke_bake.py - SMOKE_SLICE / SMOKE_SIDE / SMOKE_TILE must
+# match its SLICE / SIDE / TILE_PT.
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+SMOKE_SLICE, SMOKE_SIDE = 54.0, 110.0   # mask 9-slice: fixed corner patch, mask square (pt)
+SMOKE_TILE = 384.0      # grid A period (pt); grid B = SMOKE_B x, mirrored
+SMOKE_B = 1.4
+SMOKE_LOOP = 75.0       # s for grid A to rise one period (~5 pt/s: felt, not watched)
+SMOKE_B_SPEED = 0.6     # grid B drifts sideways at 0.6x A's speed: the layers shear
+SMOKE_OPACITY = (0.50, 0.36)   # grid A, grid B
+SMOKE_ALPHA = 0.90      # the whole smoke container (short bodies go lower). 0.72 (the
+                        # judges' pick) measured a bottom-band green lift of 22 live:
+                        # a faint vignette, not smoke. 0.9 keeps the rim >= 2.4x brighter
+SMOKE_MOTION = True     # False = a still frame (SMOKE_STILL_T), same look
+SMOKE_STILL_T = 25.0
 
 
 # ── model (pure - probe-testable) ────────────────────────────────────────────
@@ -156,6 +173,9 @@ try:
     from Quartz import (                 # noqa: E402
         CAEmitterLayer, CAEmitterCell, CACurrentMediaTime, kCAEmitterLayerPoint,
         CALayer, CATransaction, CAGradientLayer, CAKeyframeAnimation,
+        CAReplicatorLayer, CABasicAnimation, CAMediaTimingFunction,
+        CATransform3DMakeTranslation, CATransform3DMakeScale,
+        kCAMediaTimingFunctionLinear,
     )
     from PyObjCTools import AppHelper    # noqa: E402
 except ImportError as e:
@@ -495,17 +515,16 @@ class BarController(NSObject):
         bg_bot.layer().setCornerRadius_(RADIUS)
         bg_bot.layer().setMaskedCorners_(3)      # bottom corners only
         bg_bot.layer().setMasksToBounds_(True)
+        self._build_smoke(bg_bot.layer())      # under the rim, under the rows
+        # the 1 px rim, drawn ABOVE the smoke at its exact colour. Its old
+        # inner shadow is gone: the smoke is the glow now, and a shadow
+        # under the line brightened the corners past the line itself
         glow = CALayer.layer()
         glow.setBorderWidth_(1.0)
         glow.setBorderColor_(
             NSColor.colorWithSRGBRed_green_blue_alpha_(0.15, 0.72, 0.45, 0.4).CGColor())
         glow.setCornerRadius_(RADIUS)
         glow.setMaskedCorners_(3)
-        glow.setShadowColor_(
-            NSColor.colorWithSRGBRed_green_blue_alpha_(0.15, 0.8, 0.45, 1.0).CGColor())
-        glow.setShadowOpacity_(0.5)
-        glow.setShadowRadius_(5.0)
-        glow.setShadowOffset_((0, 0))
         bg_bot.layer().addSublayer_(glow)
         container.addSubview_(bg_bot)
 
@@ -644,6 +663,9 @@ class BarController(NSObject):
         # a monitor change picks up THAT monitor's zoom
         NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
             self, "screenChanged:", "NSWindowDidChangeScreenNotification", panel)
+        # hidden / covered / other Space = the smoke drift stops (GPU idle)
+        NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+            self, "windowOcclusion:", "NSWindowDidChangeOcclusionStateNotification", panel)
         # hover = arm ⌘+/⌘−/⌘0 (a non-key panel still gets enter/exit)
         from AppKit import NSTrackingArea
         area = NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
@@ -663,6 +685,162 @@ class BarController(NSObject):
         self._activity = NSProcessInfo.processInfo(
         ).beginActivityWithOptions_reason_(0x00FFFFFF, "focus bar timers")
         self._move_save_at = 0
+
+    # ── drifting smoke (body chrome) ─────────────────────────────────────
+    @objc.python_method
+    def _build_smoke(self, host):
+        """The body's smoke, under the rim and the rows: a static rim floor
+        (never an empty edge), then a container masked by a 9-slice edge
+        falloff holding two CAReplicator grids of one seamless tile - A
+        rises, B (mirrored, 1.4x) drifts sideways slower, so the smoke
+        morphs instead of sliding. Both drifts are render-server
+        animations: no Python timer, no re-render, ever. A missing asset
+        or layer class = the plain rim, never a crash."""
+        self.smoke = self.smoke_mask = self.smoke_rim = None
+        self.smoke_grids = []
+        self._smoke_on = False
+        self._smoke_want = False
+        self._occl_visible = True
+        self._smoke_motion = SMOKE_MOTION
+        try:
+            from Foundation import NSURL
+            from Quartz import (CGImageSourceCreateWithURL,
+                                CGImageSourceCreateImageAtIndex)
+
+            def img(name):
+                src = CGImageSourceCreateWithURL(
+                    NSURL.fileURLWithPath_(os.path.join(ASSETS, name)), None)
+                return CGImageSourceCreateImageAtIndex(src, 0, None) if src else None
+
+            tile, mimg, rimg = (img("focus_smoke_tile.png"), img("focus_smoke_mask.png"),
+                                img("focus_smoke_rim.png"))
+            if tile is None or mimg is None:
+                _log("smoke assets missing - plain rim")
+                return
+            u = SMOKE_SLICE / SMOKE_SIDE
+            centre = ((u, u), (1 - 2 * u, 1 - 2 * u))   # the middle 2 pt stretch
+            if rimg is not None:
+                rim = CALayer.layer()
+                rim.setAnchorPoint_((0, 0))
+                rim.setContents_(rimg)
+                rim.setContentsScale_(2.0)
+                rim.setContentsCenter_(centre)
+                host.addSublayer_(rim)
+                self.smoke_rim = rim
+            smoke = CALayer.layer()
+            smoke.setAnchorPoint_((0, 0))
+            mask = CALayer.layer()            # a mask reads ALPHA only
+            mask.setAnchorPoint_((0, 0))
+            mask.setContents_(mimg)
+            mask.setContentsScale_(2.0)
+            mask.setContentsCenter_(centre)
+            smoke.setMask_(mask)
+            lin = CAMediaTimingFunction.functionWithName_(kCAMediaTimingFunctionLinear)
+            b = SMOKE_TILE * SMOKE_B
+            for period, op, mirror, axis, dur in (
+                    (b, SMOKE_OPACITY[1], True, "x", SMOKE_LOOP * SMOKE_B / SMOKE_B_SPEED),
+                    (SMOKE_TILE, SMOKE_OPACITY[0], False, "y", SMOKE_LOOP)):
+                t = CALayer.layer()
+                t.setContents_(tile)
+                t.setContentsScale_(2.0)
+                t.setFrame_(((0, 0), (period, period)))
+                if mirror:
+                    t.setTransform_(CATransform3DMakeScale(-1, 1, 1))
+                row = CAReplicatorLayer.layer()
+                row.setInstanceTransform_(CATransform3DMakeTranslation(period, 0, 0))
+                row.addSublayer_(t)
+                grid = CAReplicatorLayer.layer()
+                grid.setInstanceTransform_(CATransform3DMakeTranslation(0, period, 0))
+                grid.addSublayer_(row)
+                # origin one period below-left of the BOTTOM-left corner: a
+                # height change (tick, zoom) never re-seeds the bottom band
+                grid.setAnchorPoint_((0, 0))
+                grid.setFrame_(((-period, -period), (period, period)))
+                grid.setOpacity_(op)
+                a = CABasicAnimation.animationWithKeyPath_("transform.translation." + axis)
+                a.setFromValue_(0.0)
+                a.setToValue_(period)            # one period = a seamless loop
+                a.setDuration_(dur)
+                a.setRepeatCount_(1e9)
+                a.setTimingFunction_(lin)
+                a.setRemovedOnCompletion_(False)    # survives hide / show
+                # a FIXED begin (not 0 = "at commit"): the phase is then the
+                # layer's own clock, so a still frame's timeOffset picks it
+                a.setBeginTime_(1e-6)
+                try:     # ~0.4 pt per frame: smooth, and the display never runs 120 Hz for it
+                    from Quartz import CAFrameRateRangeMake
+                    a.setPreferredFrameRateRange_(CAFrameRateRangeMake(8, 15, 12))
+                except Exception:
+                    pass
+                grid.addAnimation_forKey_(a, "drift")
+                smoke.addSublayer_(grid)
+                self.smoke_grids.append((grid, row, period))
+            host.addSublayer_(smoke)
+            self.smoke, self.smoke_mask = smoke, mask
+            self._smoke_on = True
+            try:
+                if NSWorkspace.sharedWorkspace().accessibilityDisplayShouldReduceMotion():
+                    self._smoke_motion = False
+            except Exception:
+                pass
+            if not self._smoke_motion:       # a still frame, same look
+                smoke.setSpeed_(0.0)
+                smoke.setTimeOffset_(SMOKE_STILL_T)
+                self._smoke_on = False
+        except Exception as e:
+            _log(f"smoke unavailable: {e}")
+            self.smoke = None
+
+    @objc.python_method
+    def _layout_smoke(self, w, h):
+        """Inside _relayout's no-actions transaction: frames + replicator
+        counts only (~0.005 ms) - live resize and Moom never lag, and the
+        9-slice keeps the band glued to the edge in the same commit.
+        Short bodies (1-2 rows) thin the smoke so it never drowns them."""
+        if self.smoke is None:
+            return
+        for lyr in (self.smoke, self.smoke_mask, self.smoke_rim):
+            if lyr is not None:
+                lyr.setFrame_(((0, 0), (w, h)))
+        for grid, row, p in self.smoke_grids:
+            row.setInstanceCount_(int(math.ceil(w / p)) + 2)
+            grid.setInstanceCount_(int(math.ceil(h / p)) + 2)
+        self.smoke.setOpacity_(SMOKE_ALPHA * min(1.0, max(0.55, h / 160.0)))
+
+    @objc.python_method
+    def _smoke_sync(self):
+        self._smoke_run(self._smoke_want and self._occl_visible)
+
+    @objc.python_method
+    def _smoke_run(self, on):
+        """Drift on / off, keeping the phase: a paused layer's clock stops
+        at timeOffset, and resuming re-bases beginTime so nothing jumps."""
+        s = self.smoke
+        if s is None or not self._smoke_motion or bool(on) == self._smoke_on:
+            return
+        self._smoke_on = bool(on)
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)
+        try:
+            if on:
+                paused = s.timeOffset()
+                s.setSpeed_(1.0)
+                s.setTimeOffset_(0.0)
+                s.setBeginTime_(0.0)
+                s.setBeginTime_(s.convertTime_fromLayer_(CACurrentMediaTime(), None) - paused)
+            else:
+                t = s.convertTime_fromLayer_(CACurrentMediaTime(), None)
+                s.setSpeed_(0.0)
+                s.setTimeOffset_(t)
+        finally:
+            CATransaction.commit()
+
+    def windowOcclusion_(self, note):
+        try:        # NSWindowOcclusionStateVisible = 1 << 1
+            self._occl_visible = bool(int(self.panel.occlusionState()) & 2)
+        except Exception:
+            self._occl_visible = True
+        self._smoke_sync()
 
     # ── geometry / visibility ────────────────────────────────────────────
     def _restore_origin(self):
@@ -1236,8 +1414,13 @@ class BarController(NSObject):
             if not one:
                 self.bg_bot.setFrame_(NSMakeRect(0, 0, w, H - ROW1_H))
                 self.glow.setFrame_(NSMakeRect(0, 0, w, H - ROW1_H))
+                self._layout_smoke(w, H - ROW1_H)
         finally:
             CATransaction.commit()
+        # the drift runs only while it is worth watching: rows showing, the
+        # timer running (the smoke stills with it), the window on screen
+        self._smoke_want = (not one) and expanded and not m["paused"]
+        self._smoke_sync()
 
         x = 16
         for v, show in ((self.b_done, att), (self.t_title, att)):

@@ -80,9 +80,11 @@ sync-pull:
 	@cp "$(LIVE)/info.plist" info.plist
 	@git status --short info.plist
 
-# Push ONE .py file repo→live:  make sync-push FILE=Scripts/foo.py
+# Push ONE .py file (or a baked Scripts/assets/*.png) repo→live:
+#   make sync-push FILE=Scripts/foo.py
 sync-push:
 	@test -n "$(FILE)" || (echo "usage: make sync-push FILE=Scripts/foo.py" && exit 1)
-	@case "$(FILE)" in *.py) ;; *) echo "REFUSED: only .py files sync repo→live"; exit 1;; esac
+	@case "$(FILE)" in *.py|Scripts/assets/*.png) ;; *) echo "REFUSED: only .py files and Scripts/assets/*.png sync repo→live"; exit 1;; esac
+	@mkdir -p "$(LIVE)/$(dir $(FILE))"
 	@cp "$(FILE)" "$(LIVE)/$(FILE)"
 	@echo "synced $(FILE) → live"
