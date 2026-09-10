@@ -155,4 +155,7 @@ finally:
     display.run_path, cache.get = real_run_path, real_get
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
-sys.exit(1 if FAILS else 0)
+if __name__ == "__main__":            # make test / python3 tests/...: exit code
+    sys.exit(1 if FAILS else 0)
+if FAILS:                             # imported by unittest discover: still red on failure
+    raise AssertionError(f"{len(FAILS)} checks failed: {FAILS}")
