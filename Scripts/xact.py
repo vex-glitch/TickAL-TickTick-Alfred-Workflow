@@ -8575,7 +8575,8 @@ def stage_pick():
 
 
 def fx_move(tid, direction):
-    """Bar ⤒↑↓⤓ reorder: restamp the subtask's sortOrder among the OPEN
+    """Bar reorder - direction 'at:<k>' = the grip's drag-drop (sibling
+    slot k, fsub.order_at), up/down/top/bottom kept: restamp the subtask's sortOrder among the OPEN
     children (midpoint insertion; a collapsed gap re-spreads the lot -
     sortOrder IS the display order, childIds is creation order). Prints
     "reordered" on success - the bar greps stdout for it."""
@@ -8599,7 +8600,28 @@ def fx_move(tid, direction):
         print("")
         return
     orders = [t.get("sortOrder") or 0 for t in ordered]
-    new = fsub.move_order(orders, pos, direction)
+    if direction.startswith(("after:", "before:")):   # bar drag-drop ANCHOR
+        kind, _, anchor = direction.partition(":")
+        rest = [t.get("id") for t in ordered if t.get("id") != tid]
+        tgt = fsub.anchor_slot(rest, kind, anchor)
+        if tgt is None:
+            print("🎯 Move skipped · the list changed, try again")
+            return
+        new = fsub.order_at(orders, pos, tgt)
+        if new is None:                      # already there: nothing to write
+            print("reordered")
+            return
+    elif direction.startswith("at:"):        # sibling slot k (kept for callers)
+        try:
+            tgt = int(direction[3:])
+        except ValueError:
+            print("")
+            return
+        new = fsub.order_at(orders, pos, tgt)
+    else:
+        tgt = {"up": pos - 1, "down": pos + 1, "top": 0,
+               "bottom": len(ordered) - 1}.get(direction, pos)
+        new = fsub.move_order(orders, pos, direction)
     if new is None:
         print("")
         return
@@ -8607,8 +8629,6 @@ def fx_move(tid, direction):
     from dispatch import _patch_task_cache
     if new == fsub.RESPREAD:
         seq = list(ordered)
-        tgt = {"up": pos - 1, "down": pos + 1, "top": 0,
-               "bottom": len(seq) - 1}[direction]
         seq.insert(tgt, seq.pop(pos))
         for t, so in zip(seq, fsub.respread(len(seq),
                                             min(orders) - fsub.SORT_STEP)):

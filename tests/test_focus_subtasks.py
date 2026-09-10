@@ -125,6 +125,65 @@ check("note-empty", fs.record_note("2026-07-21", []) == "")
 check("note-untitled",
       fs.record_note("d", [("", True)]) == "### d\n- [x] (untitled)")
 
+# ── drag-drop: order_at / sibling_gaps / move_block ─────────────────────────
+O4 = [100, 200, 300, 400]
+for pos, d in ((1, "up"), (2, "up"), (2, "down"), (0, "down"), (3, "top"), (0, "bottom")):
+    tgt = {"up": pos - 1, "down": pos + 1, "top": 0, "bottom": 3}[d]
+    check(f"order_at == move_order {pos} {d}", fs.order_at(O4, pos, tgt) == fs.move_order(O4, pos, d))
+check("order_at no-op", fs.order_at(O4, 2, 2) is None)
+check("order_at oob", fs.order_at(O4, 1, 9) is None)
+check("order_at jump 0→2", fs.order_at(O4, 0, 2) == 350)       # between 300 and 400
+check("order_at jump 3→1", fs.order_at(O4, 3, 1) == 150)       # between 100 and 200
+check("order_at collapse", fs.order_at([100, 101, 102], 0, 1) == fs.RESPREAD)
+check("order_at single", fs.order_at([100], 0, 0) is None)
+
+# A, B(b1, b2), C, D(d1) - depth-coded DFS display list
+R = lambda tid, depth=1: {"tid": tid, "depth": depth}
+L = [R("A"), R("B"), R("b1", 2), R("b2", 2), R("C"), R("D"), R("d1", 2)]
+check("parents inferred", fs._parents(L) == [None, None, "B", "B", None, None, "D"])
+check("subtree end", fs._subtree_end(L, 1) == 4 and fs._subtree_end(L, 5) == 7)
+gA = fs.sibling_gaps(L, 0)             # siblings A B C D
+check("gaps top-level", gA == [(0, 0), (1, 0), (4, 1), (5, 2), (7, 3)], gA)
+gb2 = fs.sibling_gaps(L, 3)            # siblings b1 b2 only
+check("gaps nested stay among siblings", gb2 == [(2, 0), (3, 1), (4, 1)], gb2)
+check("gaps oob", fs.sibling_gaps(L, 99) == [])
+tids = lambda xs: [x["tid"] for x in xs]
+check("move_block A below C", tids(fs.move_block(L, 0, 5)) == ["B", "b1", "b2", "C", "A", "D", "d1"])
+check("move_block B+kids to end", tids(fs.move_block(L, 1, 7)) == ["A", "C", "D", "d1", "B", "b1", "b2"])
+check("move_block D+kid to top", tids(fs.move_block(L, 5, 0)) == ["D", "d1", "A", "B", "b1", "b2", "C"])
+check("move_block b2 above b1", tids(fs.move_block(L, 3, 2)) == ["A", "B", "b2", "b1", "C", "D", "d1"])
+check("move_block hugging gap = no-op", tids(fs.move_block(L, 1, 4)) == tids(L))
+# the drop's local result agrees with the backend's sibling slot
+for i in range(len(L)):
+    for g, tgt in fs.sibling_gaps(L, i):
+        moved = fs.move_block(L, i, g)
+        par = fs._parents(moved)
+        me = [k for k, t in enumerate(moved) if t["tid"] == L[i]["tid"]][0]
+        slot = [k for k in range(len(moved)) if par[k] == par[me]].index(me)
+        check(f"slot agrees {L[i]['tid']}@{g}", slot == tgt, (slot, tgt))
+
+# ── review fixes: open_rows / drop_anchor / anchor_slot ─────────────────────
+C = lambda tid, depth=1, checked=False: {"tid": tid, "depth": depth, "checked": checked}
+M = [C("B", 1, True), C("b1", 2), C("b2", 2), C("C"), C("D"), C("x", 1, True)]
+check("open_rows drops a ticked parent's subtree", tids(fs.open_rows(M)) == ["C", "D"], tids(fs.open_rows(M)))
+M2 = [C("A"), C("a1", 2, True), C("a1x", 3), C("a2", 2), C("B")]
+check("open_rows keeps the ticked row's siblings", tids(fs.open_rows(M2)) == ["A", "a2", "B"], tids(fs.open_rows(M2)))
+check("open_rows plain list", tids(fs.open_rows(L)) == tids(L))
+rest = ["A", "C", "D"]                      # siblings without the mover
+check("drop_anchor top", fs.drop_anchor(rest, 0) == ("before", "A"))
+check("drop_anchor middle", fs.drop_anchor(rest, 2) == ("after", "C"))
+check("drop_anchor end", fs.drop_anchor(rest, 3) == ("after", "D"))
+check("drop_anchor alone", fs.drop_anchor([], 0) == ("at", "0"))
+for tgt in range(len(rest) + 1):           # same list both sides → same slot
+    kind, anc = fs.drop_anchor(rest, tgt)
+    check(f"anchor round trip {tgt}", fs.anchor_slot(rest, kind, anc) == min(tgt, len(rest)))
+check("anchor gone → None", fs.anchor_slot(["A", "D"], "after", "C") is None)
+# the stale-list case the review reproduced: a sibling added server-side
+# above the anchor still lands the row right after its anchor
+srv = ["NEW", "A", "C", "D"]
+k = fs.anchor_slot(srv, *fs.drop_anchor(rest, 2))
+check("stale server list still lands after the anchor", srv[k - 1] == "C", k)
+
 print()
 if FAILS:
     print(f"{len(FAILS)} FAILURES: {FAILS}")

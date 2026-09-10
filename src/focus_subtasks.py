@@ -152,6 +152,119 @@ def respread(n, anchor=0):
     return [anchor + (i + 1) * SORT_STEP for i in range(n)]
 
 
+# ── drag-drop reorder (focus bar grip, Vex 2026-09-10) ───────────────────────
+def order_at(orders, pos, tgt):
+    """New sortOrder moving the item at index pos of an ASCENDING orders
+    list to index tgt of the list WITHOUT it (0..n-1) - the drag-drop form
+    of move_order (up/down/top/bottom are tgt pos-1/pos+1/0/n-1). None when
+    nothing moves, RESPREAD when the midpoint gap collapsed."""
+    n = len(orders)
+    if not (0 <= pos < n and 0 <= tgt < n) or tgt == pos:
+        return None
+    rest = orders[:pos] + orders[pos + 1:]
+    prev = rest[tgt - 1] if tgt > 0 else None
+    nxt = rest[tgt] if tgt < len(rest) else None
+    if prev is None:
+        return nxt - SORT_STEP
+    if nxt is None:
+        return prev + SORT_STEP
+    return RESPREAD if nxt - prev < 2 else (prev + nxt) // 2
+
+
+def _subtree_end(items, k):
+    """Index just past items[k]'s contiguous subtree in a DFS display list
+    (the rows after it that sit deeper)."""
+    d = items[k].get("depth", 1)
+    j = k + 1
+    while j < len(items) and items[j].get("depth", 1) > d:
+        j += 1
+    return j
+
+
+def _parents(items):
+    """Each row's parent tid, inferred from DFS order + depth (children_summary
+    carries depth, not parentId): the nearest earlier row one level up;
+    None = a direct child of the focus task."""
+    out, stack = [], []
+    for t in items:
+        d = t.get("depth", 1)
+        while stack and stack[-1][0] >= d:
+            stack.pop()
+        out.append(stack[-1][1] if stack else None)
+        stack.append((d, t.get("tid")))
+    return out
+
+
+def sibling_gaps(items, i):
+    """Drop gaps for dragging items[i] in a DFS display list: [(g, tgt)] -
+    g = the flat row index the drop line sits ABOVE (len(items) = below the
+    last row), tgt = the sibling slot without the dragged item (order_at /
+    xact fx_move at:<tgt>). ONLY its own siblings take it: sortOrder ranks
+    siblings, so a drop never reparents. The two gaps hugging the item map
+    to its own slot (a no-op drop)."""
+    if not (0 <= i < len(items)):
+        return []
+    par = _parents(items)
+    sibs = [k for k in range(len(items)) if par[k] == par[i]]
+    p = sibs.index(i)
+    gaps = [(k, n if n <= p else n - 1) for n, k in enumerate(sibs)]
+    gaps.append((_subtree_end(items, sibs[-1]), len(sibs) - 1))
+    return gaps
+
+
+def open_rows(items):
+    """The bar's live rows: unchecked items MINUS every row inside a checked
+    row's subtree (depth contiguity). A ticked parent's open children drop
+    out of reach on the next poll (descendants() walks open parents only),
+    so the bar hides them now - left in, _parents re-homed them under the
+    wrong parent and a drag wrote the wrong slot (drag review 2026-09-10)."""
+    out, skip_d = [], None
+    for it in items or []:
+        d = it.get("depth", 1)
+        if skip_d is not None:
+            if d > skip_d:
+                continue
+            skip_d = None
+        if it.get("checked"):
+            skip_d = d
+            continue
+        out.append(it)
+    return out
+
+
+def drop_anchor(rest, tgt):
+    """A drop as an ANCHOR, not a slot: ('after', tid) of the sibling it
+    lands after, or ('before', tid) for the top slot. rest = sibling tids
+    WITHOUT the mover, in display order. A bar list gone stale between
+    polls can then never land the row somewhere the line didn't show."""
+    if tgt <= 0:
+        return ("before", rest[0]) if rest else ("at", "0")
+    return ("after", rest[min(tgt, len(rest)) - 1])
+
+
+def anchor_slot(rest, kind, anchor):
+    """Server side of drop_anchor: slot k in rest (the server's siblings
+    WITHOUT the mover, sortOrder ascending - order_at's tgt), or None when
+    the anchor is no longer a sibling (the list changed)."""
+    if anchor not in rest:
+        return None
+    k = rest.index(anchor)
+    return k + 1 if kind == "after" else k
+
+
+def move_block(items, i, g):
+    """items with items[i] AND its subtree moved to flat gap g (sibling_gaps'
+    g, original indexing) - the bar's optimistic local reorder. A gap inside
+    or hugging the block moves nothing."""
+    j = _subtree_end(items, i)
+    if i <= g <= j:
+        return list(items)
+    block = items[i:j]
+    rest = items[:i] + items[j:]
+    at = g if g < i else g - (j - i)
+    return rest[:at] + block + rest[at:]
+
+
 def record_note(date, entries):
     """The focus record's note - the children snapshot at stop time,
     today_note's successor. entries: [(title, checked)] in display order.

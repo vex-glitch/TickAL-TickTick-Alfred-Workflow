@@ -60,8 +60,9 @@ XACT = os.path.join(WF_DIR, "Scripts", "xact.py")
 
 W = 620          # initial only - width is dynamic per relayout
 ROW1_H = 50
-ROW2_H = 38
-CHK_H  = 28      # expanded subtask rows pack tight
+ROW2_H = 34
+CHK_H  = 25      # expanded subtask rows pack tight (28 → 25, Vex 2026-09-10)
+SUB_H  = 23      # nested (sub-subtask) rows sit a little tighter
 RADIUS = 20.0
 IDLE_EXIT_S = 10
 
@@ -143,12 +144,13 @@ try:
         NSVisualEffectMaterialHUDWindow, NSVisualEffectBlendingModeBehindWindow,
         NSVisualEffectStateActive, NSEdgeInsetsMake, NSImageResizingModeStretch,
         NSFontWeightSemibold, NSFontWeightBold, NSLineBreakByTruncatingTail,
-        NSTextAlignmentLeft, NSTextAlignmentRight,
+        NSTextAlignmentLeft, NSTextAlignmentRight, NSWindowStyleMaskResizable,
+        NSImageView, NSCursor,
     )
     from AppKit import NSView            # noqa: E402
     from Quartz import (                 # noqa: E402
         CAEmitterLayer, CAEmitterCell, CACurrentMediaTime, kCAEmitterLayerPoint,
-        CALayer,
+        CALayer, CATransaction, CAGradientLayer,
     )
     from PyObjCTools import AppHelper    # noqa: E402
 except ImportError as e:
@@ -159,6 +161,27 @@ except ImportError as e:
 def _log(msg):
     sys.stderr.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
     sys.stderr.flush()
+
+
+def _saved_size():
+    """The user's last drag/Moom size (w, h) from the bar file, each axis
+    validated ON ITS OWN (a width set while collapsed has no height - the
+    old all-or-nothing check threw the width away too); None = the bar
+    sizes that axis itself."""
+    try:
+        with open(BAR_STATE) as f:
+            raw = json.load(f).get("size") or [None, None]
+        w, h = (list(raw) + [None, None])[:2]
+    except (OSError, ValueError, TypeError):
+        return None, None
+
+    def ok(v, lo):
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return None
+        return v if lo <= v <= 4000 else None
+    return ok(w, 300), ok(h, ROW1_H)
 
 
 class NonActivatingPanel(NSPanel):
@@ -179,6 +202,33 @@ class NonActivatingPanel(NSPanel):
 class PillButton(NSButton):
     def acceptsFirstMouse_(self, event):  # act on the first click
         return True
+
+
+class GripView(NSImageView):
+    """A row's drag handle (≡, far right - replaced the ⤒↑↓⤓ arrows, Vex
+    2026-09-10): press, drag, drop. The controller does the work; the grip
+    never drags the WINDOW (the panel is movable by its background)."""
+
+    def acceptsFirstMouse_(self, event):
+        return True
+
+    def mouseDownCanMoveWindow(self):
+        return False
+
+    def mouseDown_(self, event):
+        bar = getattr(self, "_bar", None)
+        if bar is not None:
+            bar.grip_down(self, event)
+
+    def mouseDragged_(self, event):
+        bar = getattr(self, "_bar", None)
+        if bar is not None:
+            bar.grip_dragged(self, event)
+
+    def mouseUp_(self, event):
+        bar = getattr(self, "_bar", None)
+        if bar is not None:
+            bar.grip_up(self, event)
 
 
 class PassThroughView(NSView):
@@ -225,6 +275,22 @@ GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.18, 0.75, 0.47, 0.95)
 # Expanded list: px each nesting level below the direct child shifts its
 # checkbox + title - just enough to read as nested (Vex 2026-09-10)
 INDENT = 14
+TASK_FONT = 15     # row titles (17 → 15, Vex 2026-09-10: the task/sub gap read too big)
+SUB_FONT = 14      # sub-subtask titles (13 → 14, Vex 2026-09-10: ~7% under tasks)
+CIRCLE_PT = 13     # task checkbox glyph (was 15)
+SQUARE_PT = 12     # sub-subtask checkbox glyph - matches the 14 pt text
+# Row text: the primary label color (~85% white) - the old secondary grey
+# (~55%) on the near-black chrome was the hard-to-read part
+ROW_TEXT = NSColor.labelColor()
+
+
+def _row_h(it):
+    """An expanded row's height: nested rows sit tighter."""
+    return CHK_H if (it or {}).get("depth", 1) <= 1 else SUB_H
+# A user resize counts as IN PROGRESS until the frame holds still this long:
+# Moom's modifier-drag is a STREAM of AX size sets with no live-resize
+# bracket, and snapping each one made the bar fight Moom (it shook)
+RESIZE_QUIET = 0.45
 
 
 def _dot_cgimage(color, d=8):
@@ -249,7 +315,17 @@ class BarController(NSObject):
             return None
         self.state = read_state()
         self.block = None               # block_summary dict
-        self.expanded = False           # chevron: full subtask list
+        self.expanded = True            # chevron: full subtask list - OPEN by
+                                        # default + per new session (Vex 2026-09-10)
+        self._self_frame = False        # our own setFrame, not a user resize
+        self._user_rs_at = 0.0          # monotonic stamp of the last user resize step
+        self._adopted_at = -1.0         # which step was last adopted
+        self._last_H = 0.0              # the height the bar itself last showed
+        self._last_rows = False         # ...and whether that layout drew rows
+        self._drag = None               # a grip drag in progress (grip_down)
+        self._relayout_pending = False  # a relayout deferred by that drag
+        self._gap_y = []                # y of each visible row's top edge (+ the bottom)
+        self.user_w, self.user_h = _saved_size()   # edge drag / Moom size
         self.row_pool = []              # lazily-built expanded item rows
         self.visible_items = []         # the filtered+scrolled window
         self.scroll_off = 0             # first visible row index
@@ -270,7 +346,10 @@ class BarController(NSObject):
     def _build(self):
         rect = NSMakeRect(0, 0, W, ROW1_H)
         panel = NonActivatingPanel.alloc().initWithContentRect_styleMask_backing_defer_(
-            rect, NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel,
+            # Resizable: edge drag like any window, and an AX-settable size
+            # for Moom's modifier-drag (Vex 2026-09-10)
+            rect, NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
+            | NSWindowStyleMaskResizable,
             NSBackingStoreBuffered, False)
         panel.setLevel_(NSStatusWindowLevel)
         panel.setCollectionBehavior_(
@@ -417,11 +496,32 @@ class BarController(NSObject):
         self.l_more.setAlignment_(NSTextAlignmentLeft)
         self.l_more.setHidden_(True)
 
+        # drag-drop landing line: on the overlay so it draws ABOVE the rows
+        # thin + translucent, both ends fading to clear (Vex 2026-09-10)
+        self.drop_line = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 10, 2))
+        self.drop_line.setWantsLayer_(True)
+        grad = CAGradientLayer.layer()
+        solid = GREEN.colorWithAlphaComponent_(0.55).CGColor()
+        clear = GREEN.colorWithAlphaComponent_(0.0).CGColor()
+        grad.setColors_([clear, solid, solid, clear])
+        grad.setLocations_([0.0, 0.2, 0.8, 1.0])
+        grad.setStartPoint_((0.0, 0.5))
+        grad.setEndPoint_((1.0, 0.5))
+        self.drop_line.layer().addSublayer_(grad)
+        self._drop_grad = grad
+        self.drop_line.setHidden_(True)
+        self.overlay.addSubview_(self.drop_line)
+
         self._restore_origin()
 
         from Foundation import NSNotificationCenter, NSProcessInfo
         NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
             self, "windowMoved:", "NSWindowDidMoveNotification", panel)
+        # edge drags (live) and Moom (a one-shot AX size set) both land here
+        NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+            self, "windowResized:", "NSWindowDidResizeNotification", panel)
+        NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+            self, "windowEndResize:", "NSWindowDidEndLiveResizeNotification", panel)
         NSWorkspace.sharedWorkspace().notificationCenter(
         ).addObserver_selector_name_object_(
             self, "didWake:", "NSWorkspaceDidWakeNotification", None)
@@ -432,39 +532,132 @@ class BarController(NSObject):
 
     # ── geometry / visibility ────────────────────────────────────────────
     def _restore_origin(self):
+        """Put the bar back where it was: the saved TOP-left corner - the
+        corner _relayout keeps fixed while the bar grows downward. Restoring
+        the bottom-left 'origin' (legacy files still fall back to it) walked
+        the bar down by its expanded height on every respawn (Vex
+        2026-09-10). Off every screen → top-center of the main screen."""
         try:
             with open(BAR_STATE) as f:
-                ox, oy = json.load(f).get("origin", [None, None])
-        except (OSError, ValueError, TypeError):
-            ox = oy = None
-        scr = NSScreen.mainScreen()
-        vf = scr.visibleFrame() if scr else None
+                st = json.load(f)
+        except (OSError, ValueError):
+            st = {}
+        try:
+            tl = st.get("top_left")
+            if tl:
+                x, top = float(tl[0]), float(tl[1])
+            else:
+                ox, oy = st.get("origin") or [None, None]
+                x, top = float(ox), float(oy) + ROW1_H
+        except (TypeError, ValueError, IndexError):
+            x = top = None
         ok = False
-        if ox is not None and oy is not None:
+        if x is not None:
             for s in NSScreen.screens():
                 f = s.frame()
-                if (f.origin.x - 10 <= ox <= f.origin.x + f.size.width - 60
-                        and f.origin.y - 10 <= oy <= f.origin.y + f.size.height):
+                if (f.origin.x - 10 <= x <= f.origin.x + f.size.width - 60
+                        and f.origin.y + ROW1_H - 10 <= top <= f.origin.y + f.size.height + 10):
                     ok = True
                     break
-        if not ok and vf:
-            ox = vf.origin.x + (vf.size.width - W) / 2.0
-            oy = vf.origin.y + vf.size.height - 70
-        self.panel.setFrameOrigin_((ox or 100, oy or 100))
+        if not ok:
+            scr = NSScreen.mainScreen()
+            vf = scr.visibleFrame() if scr else None
+            if vf:
+                x = vf.origin.x + (vf.size.width - W) / 2.0
+                top = vf.origin.y + vf.size.height - 20
+            else:
+                x, top = 100.0, 800.0
+        self.panel.setFrameTopLeftPoint_((x, top))
 
     def windowMoved_(self, note):
         self._move_save_at = time.monotonic() + 0.6   # debounce; saved by tick
 
+    def windowResized_(self, note):
+        """A size change WE didn't make is the user's: an edge drag (AppKit
+        live resize) or Moom's modifier-drag (a rapid STREAM of AX size
+        sets, no live-resize bracket). Either way the content just follows
+        the frame; the size is adopted - saved + snapped to whole rows -
+        only once the frame holds still (_settle_resize / end of live)."""
+        if self._self_frame:
+            return
+        self._user_rs_at = time.monotonic()
+        self._relayout()                          # follow, never fight
+        if not self.panel.inLiveResize():
+            AppHelper.callLater(RESIZE_QUIET + 0.05, self._settle_resize)
+
+    def windowEndResize_(self, note):
+        if not self._self_frame:
+            self._adopt_user_size()
+
+    def _settle_resize(self):
+        """Fires after every Moom step; only the one that finds the stream
+        quiet (and not yet adopted) adopts."""
+        if (self.panel.inLiveResize() or self._adopted_at == self._user_rs_at
+                or time.monotonic() - self._user_rs_at < RESIZE_QUIET):
+            return
+        self._adopt_user_size()
+
+    def _resizing(self):
+        """True mid-drag (mouse live resize) or within RESIZE_QUIET of the
+        last user resize step (Moom's stream): the frame is the authority."""
+        return bool(self.panel.inLiveResize()) or (
+            time.monotonic() - self._user_rs_at < RESIZE_QUIET)
+
+    def _adopt_user_size(self):
+        """Width always; height only while expanded - it sets how many rows
+        show before scrolling (a collapsed-mode height means nothing)."""
+        fr = self.panel.frame()
+        self.user_w = float(fr.size.width)
+        # the height becomes the row capacity ONLY when rows were drawn and
+        # the height really moved: an unchanged height is the bar's own
+        # fitted content height, not a choice (a width-only drag used to
+        # pin the capacity to the rows on screen - even to ONE row on a
+        # fresh setup, or while the block was still loading)
+        if self._last_rows and abs(fr.size.height - self._last_H) >= 1:
+            self.user_h = max(float(fr.size.height), ROW1_H + CHK_H)
+        self._adopted_at = self._user_rs_at
+        self._user_rs_at = 0.0                        # the resize is over
+        self._move_save_at = time.monotonic() + 0.6   # persisted by tick
+        AppHelper.callAfter(self._relayout)           # snap to whole rows
+
+    def _cap(self, live=False, items=()):
+        """Expanded rows that fit from scroll_off down: the live frame
+        mid-drag, else the user's saved height, else MAX_ROWS. Rows differ
+        in height (nested ones sit tighter, _row_h); the 16 px overflow
+        strip only counts when the rest won't all fit."""
+        h = self.panel.frame().size.height if live else self.user_h
+        if not h:
+            return self.MAX_ROWS
+        rest = list(items)[self.scroll_off:] or [{}]
+
+        def fit(avail):
+            n, used = 0, 0.0
+            for it in rest:
+                used += _row_h(it)
+                if used > avail:
+                    break
+                n += 1
+            return n
+        k = fit(h - ROW1_H)
+        if k < len(rest):
+            k = fit(h - ROW1_H - 16)
+        return max(1, k)
+
     def _persist_origin(self):
         try:
-            o = self.panel.frame().origin
+            fr = self.panel.frame()
+            o = fr.origin
             st = {}
             try:
                 with open(BAR_STATE) as f:
                     st = json.load(f)
             except (OSError, ValueError):
                 pass
-            st["origin"] = [o.x, o.y]
+            st["origin"] = [o.x, o.y]                    # legacy readers
+            # the TOP-left is what the bar keeps fixed (see _restore_origin)
+            st["top_left"] = [o.x, o.y + fr.size.height]
+            if self.user_w or self.user_h:               # each axis alone
+                st["size"] = [self.user_w, self.user_h]
             tmp = BAR_STATE + ".tmp"
             with open(tmp, "w") as f:
                 json.dump(st, f)
@@ -625,6 +818,8 @@ class BarController(NSObject):
 
         if task_changed:
             self.block = None
+            self.expanded = True        # every new session opens fully expanded
+            self.scroll_off = 0
             self.content_dirty.set()
         if m["visible"] and m["kind"] != "idle":
             if not self.panel.isVisible():
@@ -655,14 +850,14 @@ class BarController(NSObject):
         return None
 
     def _row_views(self, i):
-        """Lazily-built (circle, title, top, up, down, bottom) 6-tuple for
-        expanded item row i - the last four are the ⤒↑↓⤓ reorder arrows."""
+        """Lazily-built (circle, title, grip) 3-tuple for expanded item row
+        i - the grip is the drag-drop reorder handle."""
         while len(self.row_pool) <= i:
             idx = len(self.row_pool)
             b = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 26, 26))
             b.setBordered_(False)
             b.setTitle_("")
-            b.setImage_(sym_image("circle", 15))
+            b.setImage_(sym_image("circle", CIRCLE_PT))
             b.setContentTintColor_(NSColor.secondaryLabelColor())
             b.setTarget_(self)
             b.setAction_("onTickRow:")
@@ -680,76 +875,104 @@ class BarController(NSObject):
             t.cell().setLineBreakMode_(NSLineBreakByTruncatingTail)
             t.setToolTip_("Open this task in TickTick")
             self.fx.addSubview_(t)
-            arrows = []
-            for sym, action, tip in (
-                    ("arrow.up.to.line", "onRowTop:", "Send to top"),
-                    ("chevron.up", "onRowUp:", "Move up"),
-                    ("chevron.down", "onRowDown:", "Move down"),
-                    ("arrow.down.to.line", "onRowBottom:", "Send to bottom")):
-                btn = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 14, 20))
-                btn.setBordered_(False)
-                btn.setTitle_("")
-                btn.setImage_(sym_image(sym, 9, weight=NSFontWeightBold))
-                btn.setContentTintColor_(NSColor.tertiaryLabelColor())
-                btn.setTarget_(self)
-                btn.setAction_(action)
-                btn.setTag_(idx)
-                btn.setToolTip_(tip)
-                self.fx.addSubview_(btn)
-                arrows.append(btn)
-            self.row_pool.append((b, t, *arrows))
+            grip = GripView.alloc().initWithFrame_(NSMakeRect(0, 0, 18, 20))
+            grip.setImage_(sym_image("line.3.horizontal", 11))
+            grip.setContentTintColor_(NSColor.tertiaryLabelColor())
+            grip.setTag_(idx)
+            grip.setToolTip_("Drag to reorder")
+            grip._bar = self
+            self.fx.addSubview_(grip)
+            self.row_pool.append((b, t, grip))
         return self.row_pool[i]
 
     MAX_ROWS = 10
 
     def _relayout(self):
+        if self._drag is not None:    # a grip drag owns the rows: a poll or
+            self._relayout_pending = True    # the 1 s state tick would snap
+            return                           # the lifted row back mid-drag
         m = self.state
         if m["kind"] == "idle":
             return
         att = m["attributed"]
         all_items = (self.block or {}).get("items", []) if att else []
         # ticked rows leave the BAR - the description keeps them
-        items = [it for it in all_items if not it["checked"]]
+        items = fsub.open_rows(all_items)   # minus a ticked parent's children
         nxt = self._first_unchecked() if att else None
         expanded = self.expanded and bool(items)
-        overflow = expanded and len(items) > self.MAX_ROWS
-        self.scroll_off = max(0, min(self.scroll_off,
-                                     max(0, len(items) - self.MAX_ROWS)))
-        window = items[self.scroll_off:self.scroll_off + self.MAX_ROWS] if expanded else []
+        live = self._resizing()      # edge drag or Moom stream: frame rules
+        cap = self._cap(live, items)
+        overflow = expanded and len(items) > cap
+        self.scroll_off = max(0, min(self.scroll_off, max(0, len(items) - cap)))
+        window = items[self.scroll_off:self.scroll_off + cap] if expanded else []
         self.visible_items = window
         n_rows = len(window) if expanded else (1 if all_items else 0)
-        H = (ROW1_H + (CHK_H if expanded else ROW2_H) * n_rows
+        H = (ROW1_H + (sum(_row_h(it) for it in window) if expanded
+                       else ROW2_H * n_rows)
              + (16 if overflow else 0))
 
-        # dynamic width: fit title + clock + buttons
+        # width: fit title + clock + buttons - unless the user sized it (edge
+        # drag / Moom): then theirs wins, never narrower than the buttons,
+        # and the title takes the extra room
         title_w = 0.0
+        natural = 0.0
         if att:
             full = _disp(m["title"]) or "Task"   # links render as [name]🔗
             self.t_title.setTitle_(full[:60])
             self.t_title.setToolTip_(full + "\nOpen in TickTick")
-            title_w = min(340.0, max(60.0, self.t_title.intrinsicContentSize().width + 10))
+            natural = max(60.0, self.t_title.intrinsicContentSize().width + 10)
         btn_w = 29 + 29 + ((29 + 29) if att else 0) + 27 + (27 if items else 0)
-        left_w = 16 + ((30 + 8 + title_w + 12) if att else 0)
         clock_w = 96
-        W_new = max(420.0, min(880.0, left_w + clock_w + 18 + btn_w + 14))
-        self.W = W_new
-        w = W_new
-
+        fixed = 16 + ((30 + 8 + 12) if att else 0) + clock_w + 18 + btn_w + 14
+        min_w = max(420.0, fixed + (60.0 if att else 0.0))
         fr = self.panel.frame()
-        if int(fr.size.height) != H or int(fr.size.width) != int(w):
+        if live:
+            w = max(min_w, float(fr.size.width))
+        elif self.user_w:
+            w = max(min_w, self.user_w)
+        else:
+            w = max(420.0, min(880.0, fixed + min(340.0, natural)))
+        if att:
+            title_w = max(60.0, min(natural, w - fixed))
+        self.W = w
+        if expanded:            # rows showing: the height is the user's
+            self.panel.setMinSize_(NSMakeSize(min_w, ROW1_H + CHK_H))
+            self.panel.setMaxSize_(NSMakeSize(10000, 10000))
+        else:                   # collapsed / no rows: width-only resizing (a
+            self.panel.setMinSize_(NSMakeSize(min_w, H))    # top-edge drag
+            self.panel.setMaxSize_(NSMakeSize(10000, H))    # used to MOVE it)
+
+        if live:
+            H = float(fr.size.height)            # never fight the drag
+        elif int(fr.size.height) != int(H) or int(fr.size.width) != int(w):
             # grow/shrink DOWNWARD + rightward: keep the top-left corner put
             top = fr.origin.y + fr.size.height
-            self.panel.setFrame_display_(NSMakeRect(fr.origin.x, top - H, w, H), True)
+            self._self_frame = True              # not a user resize
+            try:
+                self.panel.setFrame_display_(NSMakeRect(fr.origin.x, top - H, w, H), True)
+            finally:
+                self._self_frame = False
+        if not live:
+            self._last_H = float(H)              # see _adopt_user_size
+            self._last_rows = expanded           # rows actually drawn
         y1 = H - ROW1_H + (ROW1_H - 28) / 2.0   # row-1 controls baseline
 
         # two-tone chrome
         one = (n_rows == 0)
-        self.bg_top.setFrame_(NSMakeRect(0, H - ROW1_H, w, ROW1_H))
-        self.bg_top.layer().setMaskedCorners_(15 if one else 12)  # all / top only
-        self.bg_bot.setHidden_(one)
-        if not one:
-            self.bg_bot.setFrame_(NSMakeRect(0, 0, w, H - ROW1_H))
-            self.glow.setFrame_(NSMakeRect(0, 0, w, H - ROW1_H))
+        # no implicit animation: the glow is a bare CALayer, and Core
+        # Animation eased every frame change over ~0.25 s - it trailed the
+        # window edge during a resize (Vex 2026-09-10)
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)
+        try:
+            self.bg_top.setFrame_(NSMakeRect(0, H - ROW1_H, w, ROW1_H))
+            self.bg_top.layer().setMaskedCorners_(15 if one else 12)  # all / top only
+            self.bg_bot.setHidden_(one)
+            if not one:
+                self.bg_bot.setFrame_(NSMakeRect(0, 0, w, H - ROW1_H))
+                self.glow.setFrame_(NSMakeRect(0, 0, w, H - ROW1_H))
+        finally:
+            CATransaction.commit()
 
         x = 16
         for v, show in ((self.b_done, att), (self.t_title, att)):
@@ -795,13 +1018,17 @@ class BarController(NSObject):
             self.l_count.setFrame_(NSMakeRect(w - 72, y2 + 3, 56, 20))
             self.l_count.setStringValue_(f"{done}/{total}")
             if nxt:
+                nested = nxt.get("depth", 1) > 1
                 self.b_tick.setImage_(sym_image(   # nested next item: square box
-                    "square" if nxt.get("depth", 1) > 1 else "circle", 15))
+                    "square" if nested else "circle",
+                    SQUARE_PT if nested else CIRCLE_PT))
+                self.t_item.setFont_(NSFont.systemFontOfSize_(SUB_FONT if nested else TASK_FONT))
                 nfull = _disp(nxt["title"])
                 self.t_item.setTitle_(nfull[:70])
                 self.t_item.setToolTip_(nfull + "\nOpen in TickTick")
-                self.t_item.setContentTintColor_(NSColor.secondaryLabelColor())
+                self.t_item.setContentTintColor_(ROW_TEXT)
             else:
+                self.t_item.setFont_(NSFont.systemFontOfSize_(TASK_FONT))
                 self.t_item.setTitle_("All done 🎉")
                 self.t_item.setContentTintColor_(GREEN)
             self.t_item.setFrame_(NSMakeRect(64, y2 + 1, w - 64 - 76, 24))
@@ -813,34 +1040,45 @@ class BarController(NSObject):
             for v in views:
                 v.setHidden_(not show)
         if expanded:
+            y_top = H - ROW1_H                      # rows stack down from here
+            self._gap_y = [y_top]                   # drop-line y per gap (grip)
             for i in range(n_rows):
                 it = window[i]
-                b, t, top, up, dn, bot = self._row_views(i)
-                for v in (b, t, top, up, dn, bot):
+                b, t, g = self._row_views(i)
+                for v in (b, t, g):
                     v.setHidden_(False)
                     v._tid = it.get("tid") or ""   # click-time re-resolution
-                ry = H - ROW1_H - CHK_H * (i + 1) + (CHK_H - 26) / 2.0
                 # nested subtasks: checkbox AND title shift one INDENT per
-                # level below the direct child, and their box goes SQUARE
-                # (Vex 2026-09-10: the old '↳' text prefix left the boxes
-                # unaligned and every level looked the same)
+                # level below the direct child; their box goes SQUARE and
+                # small (matching the 13 pt text) and their row sits tighter
+                # (Vex 2026-09-10)
                 depth = max(1, it.get("depth", 1))
+                nested = depth > 1
                 dx = INDENT * (depth - 1)
-                b.setFrame_(NSMakeRect(30 + dx, ry, 26, 26))
-                b.setImage_(sym_image("square" if depth > 1 else "circle", 15))
+                rh = _row_h(it)
+                mid = y_top - rh / 2.0                 # this row's centre line
+                bw = 21 if nested else 24              # checkbox hit box
+                b.setFrame_(NSMakeRect(30 + dx, mid - bw / 2.0, bw, bw))
+                b.setImage_(sym_image("square" if nested else "circle",
+                                      SQUARE_PT if nested else CIRCLE_PT))
                 b.setContentTintColor_(GREEN)      # match the glow
                 tfull = _disp(it["title"])
+                t.setFont_(NSFont.systemFontOfSize_(SUB_FONT if nested else TASK_FONT))
                 t.setTitle_(tfull[:70])
                 t.setToolTip_(tfull + "\nOpen in TickTick")
-                t.setContentTintColor_(NSColor.secondaryLabelColor())
-                t.setFrame_(NSMakeRect(64 + dx, ry + 1, w - 64 - 70 - dx, 24))
-                abs_i = self.scroll_off + i
-                for k, v in enumerate((top, up, dn, bot)):
-                    v.setFrame_(NSMakeRect(w - 63 + 14 * k, ry + 3, 14, 20))
-                for v in (top, up):
-                    v.setEnabled_(abs_i > 0)
-                for v in (dn, bot):
-                    v.setEnabled_(abs_i < len(items) - 1)
+                t.setContentTintColor_(ROW_TEXT)
+                th = 19 if nested else 22
+                tx = 30 + dx + bw + 8
+                t.setFrame_(NSMakeRect(tx, mid - th / 2.0, w - tx - 12, th))
+                # grip: a fixed column in the free space LEFT of the
+                # checkboxes (x 7..25 - the boxes start at 30, unmoved;
+                # Vex 2026-09-10: the right-hand grips ate title room)
+                g.setFrame_(NSMakeRect(7, mid - 10, 18, 20))
+                y_top -= rh
+                self._gap_y.append(y_top)
+                # no siblings = nowhere to go: the grip dims
+                g.setAlphaValue_(1.0 if len(fsub.sibling_gaps(
+                    items, self.scroll_off + i)) > 2 else 0.35)
 
         # overflow strip: "scroll ↑2 · ↓4" under the last row
         self.l_more.setHidden_(not overflow)
@@ -962,43 +1200,117 @@ class BarController(NSObject):
                             f"ticktick:///webapp/#p/{it['pid']}/tasks/{it['tid']}"],
                            check=False)
 
-    def onRowUp_(self, sender):
-        self._move_row(sender, "up")
+    # ── drag-drop reorder (the grip) ─────────────────────────────────────
+    def _open_items(self):
+        """The rows the bar shows (and drags): fsub.open_rows."""
+        return fsub.open_rows((self.block or {}).get("items") or [])
 
-    def onRowDown_(self, sender):
-        self._move_row(sender, "down")
-
-    def onRowTop_(self, sender):
-        self._move_row(sender, "top")
-
-    def onRowBottom_(self, sender):
-        self._move_row(sender, "bottom")
-
-    def _move_row(self, sender, direction):
-        """⤒↑↓⤓ reorder: OPTIMISTIC local move first - the bar
-        moves the instant you click, same trick as _do_tick - then the
-        authoritative xact fx_move write lands in the background (serialized
-        on _rmw_lock so rapid clicks stack instead of racing) and a fresh
-        poll reconciles. Unchecked items permute among their own slots."""
-        it = self._row_item(sender)
-        if not (it and it.get("tid")):
+    @objc.python_method
+    def grip_down(self, grip, event):
+        """Lift the row: remember its frames + the gaps its SIBLINGS allow
+        (fsub.sibling_gaps - a drop never reparents), dim it, grab cursor."""
+        if self._drag is not None or not self.expanded:
             return
-        tid = it["tid"]
-        items = (self.block or {}).get("items") or []
-        un = [k for k, it in enumerate(items) if not it["checked"]]
-        pos = next((p for p, k in enumerate(un) if items[k].get("tid") == tid), None)
-        if pos is None:
+        items = self._open_items()
+        tid = getattr(grip, "_tid", "")
+        i = next((k for k, x in enumerate(items) if x.get("tid") == tid), None)
+        if i is None:
             return
-        tgt = {"up": pos - 1, "down": pos + 1,
-               "top": 0, "bottom": len(un) - 1}[direction]
-        if tgt == pos or tgt < 0 or tgt >= len(un):
+        row = self._row_views(grip.tag())
+        self._drag = {"i": i, "tid": tid, "row": row,
+                      "frames": [v.frame() for v in row],
+                      # the window is FROZEN for the drag: a wheel scroll
+                      # mid-drag shifted scroll_off under the drawn line
+                      "so": self.scroll_off, "gap_y": list(self._gap_y),
+                      "y0": event.locationInWindow().y,
+                      "gaps": fsub.sibling_gaps(items, i),
+                      "depth": max(1, items[i].get("depth", 1)),
+                      "order": tuple(x.get("tid") for x in items),
+                      "pick": None}
+        for v in row:
+            v.setAlphaValue_(0.55)
+        NSCursor.closedHandCursor().push()
+
+    @objc.python_method
+    def grip_dragged(self, grip, event):
+        """The lifted row follows the pointer (clamped to the list); the
+        green line snaps to the nearest VISIBLE gap its siblings allow."""
+        d = self._drag
+        if d is None:
             return
-        vals = [items[k] for k in un]
-        vals.insert(tgt, vals.pop(pos))
-        for k, v in zip(un, vals):
-            items[k] = v
-        self.mutation_seq += 1          # drop in-flight stale polls
+        y = event.locationInWindow().y
+        H = self.panel.frame().size.height
+        dy = y - d["y0"]
+        for v, fr in zip(d["row"], d["frames"]):
+            ny = max(-6.0, min(H - ROW1_H - fr.size.height + 6.0, fr.origin.y + dy))
+            v.setFrameOrigin_((fr.origin.x, ny))
+        best = None
+        for g, tgt in d["gaps"]:
+            gv = g - d["so"]
+            if gv < 0 or gv >= len(d["gap_y"]):
+                continue
+            gy = d["gap_y"][gv]                   # the top edge of visible row gv
+            if best is None or abs(gy - y) < best[0]:
+                best = (abs(gy - y), g, tgt, gy)
+        if best is None:
+            return
+        _dist, g, tgt, gy = best
+        d["pick"] = (g, tgt)
+        x0 = 30 + INDENT * (d["depth"] - 1)        # at the siblings' indent
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)
+        try:
+            self.drop_line.setFrame_(NSMakeRect(x0, gy - 0.75, max(20.0, self.W - x0 - 12), 1.5))
+            self._drop_grad.setFrame_(self.drop_line.bounds())
+            self.drop_line.setHidden_(False)
+        finally:
+            CATransaction.commit()
+
+    @objc.python_method
+    def grip_up(self, grip, event):
+        """Drop: a real move → _reorder_to; a no-op drop, a drag with no
+        gap, or a list that CHANGED mid-drag (a poll landed) just re-lays
+        out - never guess a slot on a reshuffled list."""
+        d, self._drag = self._drag, None
+        if d is None:
+            return
+        NSCursor.pop()
+        self.drop_line.setHidden_(True)
+        for v in d["row"]:
+            v.setAlphaValue_(1.0)
+        items = self._open_items()
+        pick = d["pick"]
+        if pick and tuple(x.get("tid") for x in items) == d["order"]:
+            g, tgt = pick
+            par = fsub._parents(items)
+            sibs = [k for k in range(len(items)) if par[k] == par[d["i"]]]
+            cur = sibs.index(d["i"])
+            if tgt != cur:
+                rest = [items[k].get("tid") for k in sibs if k != d["i"]]
+                self._reorder_to(d["i"], g, fsub.drop_anchor(rest, tgt))
+                return
+        self._relayout_pending = False
         self._relayout()
+
+    @objc.python_method
+    def _reorder_to(self, i, g, anchor):
+        """OPTIMISTIC local move first (the row + its subtree land the
+        instant you let go, same trick as _do_tick), then the authoritative
+        xact fx_move <after|before>:<anchor tid> write in the background -
+        an ANCHOR, not a slot, so a list changed server-side between polls
+        can't misplace it - serialized on _rmw_lock so quick drags stack
+        instead of racing; a fresh poll reconciles."""
+        items = (self.block or {}).get("items") or []
+        open_ = fsub.open_rows(items)
+        others = [x for x in items if not any(x is o for o in open_)]
+        tid = open_[i].get("tid")
+        if not tid:
+            return
+        self.block["items"] = fsub.move_block(open_, i, g) + others
+        self.mutation_seq += 1          # drop in-flight stale polls
+        self._relayout_pending = False
+        self._relayout()
+        direction = f"{anchor[0]}:{anchor[1]}"
         runner = self._xact_direct(f"fx_move:{tid}:{direction}")
 
         def work():
@@ -1010,8 +1322,11 @@ class BarController(NSObject):
                 # printed its error to a discarded stdout while the poll
                 # faithfully restored the server's unchanged order)
                 _log(f"move {direction} {tid[:8]}: {(out or 'no output')[:120]!r}")
-                self._xact_et("notify:🎯 Move didn't stick · TickTick "
-                              "rate limit, try again in a minute")
+                last = (out or "").strip().splitlines()[-1:] or [""]
+                self._xact_et("notify:" + (
+                    last[0] if last[0].startswith("🎯")   # the backend said why
+                    else "🎯 Move didn't stick · TickTick rate limit, try "
+                         "again in a minute"))
             # either way: polls that READ before this point are stale - bump
             # so they drop at apply, then force one authoritative re-read
             self.mutation_seq += 1
@@ -1021,9 +1336,11 @@ class BarController(NSObject):
 
     def onScroll_(self, event):
         """Wheel over the bar: slide the expanded checkbox window."""
-        items = [it for it in ((self.block or {}).get("items") or [])
-                 if not it["checked"]]
-        if not (self.expanded and len(items) > self.MAX_ROWS):
+        if self._drag is not None:      # the window is frozen mid-drag
+            return
+        items = self._open_items()
+        cap = self._cap(False, items)
+        if not (self.expanded and len(items) > cap):
             return
         try:
             dy = event.scrollingDeltaY()
@@ -1038,8 +1355,7 @@ class BarController(NSObject):
             step += 1
             self._scroll_accum += 12
         if step:
-            self.scroll_off = max(0, min(self.scroll_off + step,
-                                         len(items) - self.MAX_ROWS))
+            self.scroll_off = max(0, min(self.scroll_off + step, len(items) - cap))
             self._relayout()
 
     def onExpand_(self, sender):
