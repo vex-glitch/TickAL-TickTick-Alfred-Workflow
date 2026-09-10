@@ -5571,6 +5571,38 @@ def view_open(which):
         print(f"↗️ TickTick {menu} opened")
 
 
+HIDDEN_WARN = 20   # fresh launch holds ~8 hidden windows; the stuck state had 37
+
+
+def _hidden_tt_windows():
+    """TickTick windows the app HOLDS but never shows (CGWindowList
+    onscreen=False, 'Untitled', >=100px). A fresh launch holds ~8; keystroke
+    races and closed stickies pile them up until 'Open as Sticky Note'
+    re-focuses an invisible sticky or hits a stale task - Vex 2026-09-10:
+    37 hidden, Focus Startup opened 'Routines', a TickTick restart fixed it.
+    -1 when Quartz (PyObjC) is missing."""
+    try:
+        import Quartz
+        ws = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionAll,
+                                               Quartz.kCGNullWindowID)
+    except Exception:
+        return -1
+    return sum(1 for w in ws
+               if w.get("kCGWindowOwnerName") == "TickTick"
+               and not w.get("kCGWindowIsOnscreen")
+               and (w.get("kCGWindowName") or "") == "Untitled"
+               and w["kCGWindowBounds"]["Width"] >= 100
+               and w["kCGWindowBounds"]["Height"] >= 100)
+
+
+def _hidden_hint():
+    """Toast suffix once hidden windows pile up (a wrong-task sticky looks
+    like success from outside, so every sticky outcome carries it)."""
+    n = _hidden_tt_windows()
+    return (f" · {n} hidden TickTick windows, restart TickTick if the wrong "
+            "sticky opened") if n >= HIDDEN_WARN else ""
+
+
 def _sticky_count():
     """Open sticky notes present as AXSystemDialog windows of TickTick."""
     r = subprocess.run(
@@ -6173,8 +6205,19 @@ def sticky(pid, tid, assist=True):
 
     subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{tid}"],
                    check=False)
-    time.sleep(1.2)
-    before = _sticky_count()
+    # settle until the dialog count holds still for 0.5 s (min 1.25 s, max
+    # ~3 s): on a KANBAN list the link opens the task as a popup (itself an
+    # AXSystemDialog) ~0.75 s in - a fixed 1.2 s sample could land before
+    # it, and the popup then passed for "the new sticky" (Vex 2026-09-10)
+    time.sleep(0.75)
+    before, still = _sticky_count(), 0
+    for _ in range(9):
+        time.sleep(0.25)
+        n = _sticky_count()
+        still = still + 1 if n == before else 0
+        before = n
+        if still >= 2:
+            break
     err, shown = _fire_and_wait(0.4, before)
     if err:
         print(err)
@@ -6188,10 +6231,11 @@ def sticky(pid, tid, assist=True):
         if err:
             print(err)
             return False
+    hint = _hidden_hint()
     if shown:
-        print(f"🗒️ Sticky opened: {short}")
+        print(f"🗒️ Sticky opened: {short}{hint}")
         return True
-    print(f"🗒️ No new sticky · “{short}” may already have one open")
+    print(f"🗒️ No new sticky · “{short}” may already have one open{hint}")
     return False
 
 
