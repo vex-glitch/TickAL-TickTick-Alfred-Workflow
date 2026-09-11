@@ -1874,15 +1874,69 @@ def _swap_customer_link(content, new_link):
     return content[:m.start()] + new_link + content[m.end():]
 
 
-def merge_logbooks(a_tid, b_tid, keep_customer=None):
+def _customer_bullets_rmw(cust_pid, cust_tid, drop=(), sync=None):
+    """ONE read-modify-write of a customer note's ## Tattoos list: the
+    bullets of every logbook in `drop` leave, `sync`'s bullet is rebuilt
+    (replace-by-link-match, appended when missing). A verb that both
+    drops and syncs on the same person posts ONCE - two back-to-back
+    GET+POST pairs on one note let a lagging read resurrect the dropped
+    line (review 2026-09-11). Drop-only is best-effort like
+    drop_customer_bullet; a sync failure raises like sync_customer_bullet."""
+    api = _api()
+    try:
+        cust = api.get_task(cust_pid, cust_tid)
+    except Exception:
+        if sync is None:
+            return
+        raise
+    content = cust.get("content") or ""
+    lines = content.split("\n")
+    needles = [f"/tasks/{t})" for t in drop if t]
+    if needles:
+        lines = [l for l in lines
+                 if not (l.lstrip().startswith("-")
+                         and any(n in l for n in needles))]
+    new = "\n".join(lines)
+    if sync is not None:
+        bullet = _bullet_for(sync)
+        needle = f"/tasks/{sync['id']})"
+        out, replaced = [], False
+        for l in lines:
+            if not replaced and needle in l and l.lstrip().startswith("-"):
+                out.append(bullet)
+                replaced = True
+            else:
+                out.append(l)
+        new = "\n".join(out) if replaced \
+            else _append_under("\n".join(out), "## Tattoos", bullet, blank=False)
+    if new == content:
+        return
+    try:
+        api.update_task(cust_tid, cust_pid, current=cust, content=new)
+        _patch_cache(cust_tid, content=new)
+    except Exception:
+        if sync is None:
+            return
+        raise
+
+
+def merge_logbooks(a_tid, b_tid, keep_customer=None, title=None):
     """LIVE: fold logbook B into A and retire B (ALBUMS §5 albmergeinto).
     keep_customer: None / 'a' / A's customer tid = A's customer keeps the
     tattoo; 'b' / B's customer tid = B's customer takes it (A's header
-    link rewritten, A's old bullet dropped). Order: A updated under ITS
-    list (projectId explicit - HANDOFF trap 16), B's bullet dropped, B →
-    TickTick Trash (delete_task, restorable) + cache purge, A's bullet
-    synced. An archived A absorbing an active B is reopened. Returns
-    {"pid", "content", "customer", "reopened"}."""
+    link rewritten, A's old bullet dropped). title: A's FINAL title
+    (the verb knows the name it settled on) - rides the same write, its
+    🎨/🏛️ marker aligned to A's state. Order: an archived A absorbing an
+    active B is reopened FIRST (reopen_logbook returns the state it
+    wrote - no re-read between writes), then ONE update of A under ITS
+    list (projectId explicit - HANDOFF trap 16): content + the year tag
+    when both are archived (the merged Started decides, HANDOFF_CRM §10)
+    + the title; every customer note touched ONCE (drop + sync in one
+    RMW); B → TickTick Trash (delete_task, restorable) + cache purge.
+    Returns {"pid", "content", "customer", "reopened", "live" (A as
+    written - the carried state for every later write), "prior"
+    ({content, title, tags} of A before), "b_prior" ({content, title,
+    tags, pid} of B)}."""
     if not a_tid or not b_tid or a_tid == b_tid:
         raise ValueError("merge needs two different logbooks")
     api = _api()
@@ -1892,6 +1946,21 @@ def merge_logbooks(a_tid, b_tid, keep_customer=None):
     b_pid = b.get("projectId") or pid_of(b)
     a_c = _fresher_content(a_tid, a.get("content") or "")
     b_c = _fresher_content(b_tid, b.get("content") or "")
+    prior = {"content": a_c, "title": a.get("title") or "",
+             "tags": list(a.get("tags") or [])}
+    b_prior = {"content": b_c, "title": b.get("title") or "",
+               "tags": list(b.get("tags") or []), "pid": b_pid}
+    reopened = False
+    if logbook_archived(a) and not logbook_archived(b):
+        try:
+            back = reopen_logbook(a_pid, a_tid)
+            reopened = True
+            if isinstance(back, dict):
+                a = back
+                a_pid = a.get("projectId") or a_pid
+                a_c = a.get("content") or a_c
+        except Exception:
+            pass
     a_cust = parse_first_link(a_c)
     b_cust = parse_first_link(b_c)
     stamp = (f"- {_today()} - merged {(b.get('title') or b_tid).strip()}"
@@ -1900,24 +1969,43 @@ def merge_logbooks(a_tid, b_tid, keep_customer=None):
     want_b = bool(b_cust) and (
         keep_customer == "b" or (keep_customer not in (None, "", "a")
                                  and keep_customer == b_cust[2]))
-    if want_b and (not a_cust or a_cust[2] != b_cust[2]):
+    swapped = bool(want_b and (not a_cust or a_cust[2] != b_cust[2]))
+    if swapped:
         merged = _swap_customer_link(
             merged, task_link(b_cust[1], b_cust[2], b_cust[0]))
-        drop_customer_bullet({**a, "content": a_c})
-    api.update_task(a_tid, a_pid, current=a, content=merged, projectId=a_pid)
-    _patch_cache(a_tid, content=merged)
-    drop_customer_bullet({**b, "content": b_c})
+    fields = {"content": merged}
+    if logbook_archived(a) and logbook_archived(b):
+        y = archive_year(merged)
+        if y and y != areas.year_of_tags(a.get("tags") or []):
+            fields["tags"] = _year_tags_stripped(a.get("tags") or []) \
+                + [ensure_year_tag(y)]
+    if title:
+        marker = "🏛️" if logbook_archived(a) else "🎨"
+        title = f"{marker} " + re.sub(r"^(?:🎨|🏛️)\s*", "", title.strip())
+        if title != (a.get("title") or ""):
+            fields["title"] = title
+    api.update_task(a_tid, a_pid, current=a, projectId=a_pid, **fields)
+    _patch_cache(a_tid, **fields)
+    live_a = {**a, **fields, "projectId": a_pid, "_projectId": a_pid}
+    if "title" in fields:
+        _ripple_task_link_text(a_tid, fields["title"])
+    # customer notes: one RMW per person (drop + sync together)
+    final = parse_first_link(merged)
+    edits = {}
+    if swapped and a_cust:
+        edits.setdefault(a_cust[2], {"pid": a_cust[1], "drop": set(),
+                                     "sync": None})["drop"].add(a_tid)
+    if b_cust:
+        edits.setdefault(b_cust[2], {"pid": b_cust[1], "drop": set(),
+                                     "sync": None})["drop"].add(b_tid)
+    if final:
+        edits.setdefault(final[2], {"pid": final[1], "drop": set(),
+                                    "sync": None})["sync"] = live_a
+    for cust_tid, e in edits.items():
+        _customer_bullets_rmw(e["pid"], cust_tid, drop=e["drop"],
+                              sync=e["sync"])
     api.delete_task(b_pid, b_tid)
     purge_cache(b_tid, b_pid)
-    live_a = {**a, "content": merged, "projectId": a_pid, "_projectId": a_pid}
-    sync_customer_bullet(live_a)
-    reopened = False
-    if logbook_archived(a) and not logbook_archived(b):
-        try:
-            reopen_logbook(a_pid, a_tid)
-            reopened = True
-        except Exception:
-            pass
-    cust = parse_first_link(merged)
     return {"pid": a_pid, "content": merged,
-            "customer": cust[2] if cust else "", "reopened": reopened}
+            "customer": final[2] if final else "", "reopened": reopened,
+            "live": live_a, "prior": prior, "b_prior": b_prior}
