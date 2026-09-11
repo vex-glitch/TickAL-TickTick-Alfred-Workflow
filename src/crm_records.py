@@ -1375,7 +1375,12 @@ def create_logbook(cust, tattoo, started=None, quoted="", prep=False,
     Vex's one-write-instead-of-two refinement, gated on probe P0
     2026-07-31: a kind=NOTE task born in a TASK-kind list keeps
     kind/body/tags). eagle_line plants the 🦅 folder link AT CREATE so
-    the migration engine never spends a get+update pair on it."""
+    the migration engine never spends a get+update pair on it.
+    started: an ISO day, None = today, '-' = UNKNOWN (the album verbs,
+    2026-09-11: a tattoo whose shots carry no capture date) - the
+    header reads 'Started -' like the migration's undated logbooks,
+    and archive_year then falls back to the finish day."""
+    started = (str(started).strip() if started else "") or _today()
     cust_pid = cust.get("_projectId") or cust.get("projectId") or areas.RECORDS_ID
     title = f"🎨 {_safe_name(customer_display(cust))} • {_safe_name(tattoo)}"
     q_line = f"Quoted: {quoted.strip()}\n" if (quoted or "").strip() else ""
@@ -1384,7 +1389,7 @@ def create_logbook(cust, tattoo, started=None, quoted="", prep=False,
         prep_block = "## Consult prep\n" + _consult_prep_lines() + "\n\n"
     e_line = f"{eagle_line.rstrip()}\n" if (eagle_line or "").strip() else ""
     content = (f"👤 {task_link(cust_pid, cust['id'], (cust.get('title') or '').strip())}"
-               f" · Started {started or _today()} · Finished -\n"
+               f" · Started {started} · Finished -\n"
                f"Paid: - · 0 sessions\n{q_line}{e_line}\n"
                f"{prep_block}## Sessions\n\n## Notes\n")
     _ensure_tag(areas.LOGBOOK_TAG)

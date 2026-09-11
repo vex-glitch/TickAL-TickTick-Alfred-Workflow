@@ -2760,6 +2760,15 @@ def render_albpick(ids, query):
                                 subtitle=str(e), valid=False))
         albs = []
     by_fid = {a.get("fid"): a for a in albs}
+    # a copied CRM skeleton's empty stage children (01 Consultation …
+    # 06 Healed under an 02 Edit album, FM: Shteffi - Ker) are not
+    # albums: hidden when deeper than level 1 AND empty; every other
+    # row stays (albums 📦 move, 2026-09-11)
+    try:
+        import eagle as _eg
+        skel = {s.casefold() for s in _eg.SKELETON}
+    except Exception:
+        skel = set()
 
     def under_survivor(a):
         seen, p = set(), a.get("parent")
@@ -2774,6 +2783,9 @@ def render_albpick(ids, query):
     for a in albs:
         fid = a.get("fid", "")
         if mode == "merge" and (fid == sur_fid or under_survivor(a)):
+            continue
+        if (a.get("depth", 1) > 1 and not a.get("n")
+                and (a.get("name") or "").casefold() in skel):
             continue
         stage = a.get("stage", "")
         sub = f"{a.get('path') or stage} · 🖼 {a.get('n', 0)}"

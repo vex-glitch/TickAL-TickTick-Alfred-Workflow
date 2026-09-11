@@ -4573,22 +4573,415 @@ def album_cust_pick(tid):
 
 
 # ── Albums: move ─────────────────────────────────────────────────────────
+# 📦 Move Eagle selection (ALBUMS_SPEC §5 albmove / albmoveto / albnew,
+# built 2026-09-11). Three verbs + their private helpers, all INSIDE this
+# block. Every Eagle call rides `albums.eagle` (the substrate's binding),
+# so ONE monkeypatch proves the whole road over the fake library in
+# tests/test_alb_move.py; every TickTick write rides `cr._api()`. Each
+# verb fails CLOSED with an honest toast, appends ONE ledger op once the
+# Eagle side changed (undo needs it even after a later TickTick failure)
+# and clears the stash it consumed. Every dialog comes BEFORE the first
+# mutation - an Esc leaves nothing behind.
+_ALB_CDEST = {"tv": "TV", "fm": "FM", "studio": "STUDIO"}   # migration._CDEST_LABEL
+_ALB_STAGE_DIR = {"Raw": "01 Raw", "Edit": "02 Edit", "Portfolio": "04 Portfolio"}
+_ALB_BIN_BTN = "Bin + retire"
+
+
+def _alb_finals_check(items, stage):
+    """The FINALS rule (spec §5): a shot whose name label is Portfolio
+    never lands in a Raw/Edit album (AlbumError - the toast says 'finals
+    live in 04 Portfolio'); raws into a Portfolio album ask first.
+    Returns False when the ask was cancelled."""
+    import albums
+    labels = [albums.eagle.item_base(it.get("name") or "")[1] for it in items]
+    finals = sum(1 for lab in labels if lab == "Portfolio")
+    if finals and stage != "Portfolio":
+        raise albums.AlbumError(
+            f"finals live in 04 Portfolio · {finals} of {len(items)} shots are finals")
+    if stage == "Portfolio" and finals < len(items):
+        raws = len(items) - finals
+        ans = _dialog(f"Move raws into a Portfolio album? ({raws} of {len(items)}"
+                      " shots are not finals)", ["Cancel", "Move"], "Move")
+        if ans != "Move":
+            return False
+    return True
+
+
+def _alb_groups(items, albs, dest_fid):
+    """The stashed shots keyed by SOURCE album: [(src_fid, src_name,
+    [items])] in first-seen order. src = the first of a shot's folders
+    that is an album of the library (albums.library_albums) and not the
+    destination; '' = no album (the 03 Post shelf, an inbox, the root).
+    The name rides move_items as old_base so hand-named shots shed the
+    source's tags; only real albums get the emptied-source offer."""
+    by_fid = {a.get("fid"): a for a in albs}
+    groups, order = {}, []
+    for it in items:
+        src = next((f for f in it.get("folders") or []
+                    if f in by_fid and f != dest_fid), "")
+        if src not in groups:
+            groups[src] = []
+            order.append(src)
+        groups[src].append(it)
+    return [(s, (by_fid.get(s) or {}).get("name") or "", groups[s])
+            for s in order]
+
+
+def _alb_split_home(items, dest_fid):
+    """(to_move, already_home): a shot that already sits in the
+    destination album is not moved (moving it onto itself would only
+    renumber it - its own name counts as taken)."""
+    home = [it for it in items if dest_fid in (it.get("folders") or [])]
+    return [it for it in items if it not in home], home
+
+
+def _alb_move_groups(lib, groups, dest_fid, dest_base, label, op):
+    """albums.move_items once per source group (old_base = that album's
+    name, None for the no-album group). Returns (moved, renamed)."""
+    import albums
+    moved = renamed = 0
+    for _src, name, grp in groups:
+        r = albums.move_items(lib, grp, dest_fid, dest_base, label, op,
+                              old_base=name or None)
+        moved += r.get("moved", 0)
+        renamed += r.get("renamed", 0)
+    return moved, renamed
+
+
+def _alb_live_count(fid):
+    """Shots in a folder's whole subtree in the OPEN library (the
+    metadata on disk lags a fresh move); None when unreadable."""
+    import albums
+    eg = albums.eagle
+    try:
+        node = eg.folder_node(fid)
+        if node is None:
+            return None
+
+        def walk(n):
+            return len(eg.items_in_folder(n["id"])) + sum(
+                walk(c) for c in n.get("children") or [])
+        return walk(node)
+    except Exception:
+        return None
+
+
+def _alb_capture_days(lib, items, groups):
+    """capture_days over the stashed shots (they carry 'path'; ids
+    without one are looked up live); when THAT knows no day, the whole
+    source album's disk items (a selection of dateless screenshots still
+    belongs to a dated tattoo). [] = unknown."""
+    import albums
+    days = albums.capture_days(lib, items)
+    if days:
+        return days
+    pool = []
+    for src, _name, _grp in groups:
+        if not src:
+            continue
+        try:
+            pool += albums.items_of_album(lib, src)
+        except Exception:
+            pass
+    return albums.capture_days(lib, pool) if pool else []
+
+
+def _alb_mint_doe_row(lib, base, fid, tag):
+    """A John Doe pipeline row - migration._mint_pl_entry's shape: title
+    '[base](eagle://folder/<fid>)', body '·' (NEVER empty: an empty body
+    costs the hourly sync one GET per hour forever), ONE state tag, kind
+    TEXT, cache-injected like _mint_raw_task's row."""
+    import areas
+    import crm_records as cr
+    pid = areas.CONTENT_DESTS[lib][0]
+    t = cr._api().create_task(title=_eagle_title(base, fid), project_id=pid,
+                              content="·", tags=[tag], kind="TEXT")
+    _person_inject_cache(t, pid)
+    return t
+
+
+def _alb_retire_row(lib, row, husk_fid, dest_fid, op):
+    """The emptied album's pipeline row. John Doe (no 🎨 link in the
+    body) → TickTick Trash (delete_task + purge_cache). Logbook-linked →
+    content_retire (row done, logbook 🎬 → ➖) and the logbook's 🦅 line
+    repointed at the destination album when it pointed at the husk -
+    updated under ITS list with projectId explicit (HANDOFF trap 16).
+    Records every piece in op['ticktick']; returns the toast bit."""
+    import crm_records as cr
+    tid = row.get("id") or ""
+    pid = row.get("_projectId") or row.get("projectId") or ""
+    prior = {"title": row.get("title") or ""}
+    hit = cr.parse_first_link(row.get("content") or "")
+    if not hit:
+        cr._api().delete_task(pid, tid)
+        cr.purge_cache(tid, pid)
+        op["ticktick"].append({"kind": "row", "id": tid, "pid": pid,
+                               "action": "trashed", "prior": prior})
+        return "row → Trash"
+    content_retire(tid)
+    op["ticktick"].append({"kind": "row", "id": tid, "pid": pid,
+                           "action": "retired", "prior": prior})
+    log_tid = hit[2]
+    try:
+        live = cr.get_note(log_tid)
+        cur, _lib = cr.eagle_folder_of(live.get("content") or "")
+        if cur != husk_fid or not dest_fid:
+            return "row retired"
+        fresh = cr._fresher_content(log_tid, live.get("content") or "")
+        new = cr.set_eagle_folder(fresh, dest_fid, lib)
+        cr._api().update_task(log_tid, live["projectId"], current=live,
+                              content=new, projectId=live["projectId"])
+        _patch_content_cache(log_tid, new)
+        op["ticktick"].append({"kind": "logbook", "id": log_tid,
+                               "pid": live["projectId"], "action": "repointed",
+                               "prior": {"eagle": husk_fid}})
+        return "row retired · logbook 🦅 → destination"
+    except Exception as e:
+        return f"row retired · 🦅 not repointed: {e}"
+
+
+def _alb_retire_sources(lib, groups, dest_fid, op):
+    """The SOURCE side after a move: every source album whose live
+    subtree is empty now is offered - '{name} is empty now · bin it and
+    retire its row?' (Keep / Bin + retire) - then albums.husk_to_bin +
+    its row via _alb_retire_row. Each step fails soft into the toast;
+    returns the toast bits."""
+    import albums
+    bits = []
+    for src, name, _grp in groups:
+        if not src or src == dest_fid:
+            continue
+        if _alb_live_count(src) != 0:
+            continue
+        ans = _dialog(f"{name} is empty now · bin it and retire its row?",
+                      ["Keep", _ALB_BIN_BTN], _ALB_BIN_BTN)
+        if ans != _ALB_BIN_BTN:
+            bits.append(f"{name} kept")
+            continue
+        try:
+            binned = albums.husk_to_bin(lib, src, op)
+        except Exception as e:
+            bits.append(f"{name} not binned: {e}")
+            continue
+        if not binned:
+            bits.append(f"{name} kept (not empty)")
+            continue
+        bits.append(f"{name} → bin")
+        row = albums.row_for_folder(lib, src)
+        if row:
+            try:
+                bits.append(_alb_retire_row(lib, row, src, dest_fid, op))
+            except Exception as e:
+                bits.append(f"row not retired: {e}")
+    return bits
+
+
 def album_move(lib):
-    """📦 albmove:<lib>: albums.selection(lib or open_lib()) → stash →
-    reopen at ctx:albpick:move:<lib>: (crmbrowse). STUB."""
-    _crm_say("albmove · not built yet")
+    """📦 albmove:<lib>: the Eagle selection (lib '' = whichever content
+    library is open) → stash → the album picker at
+    ctx:albpick:move:<lib>: through the crmbrowse trampoline. Toast on
+    AlbumError (nothing selected, wrong library, Eagle asleep)."""
+    try:
+        import albums
+        sel = albums.selection(lib or None)
+        albums.stash(sel)
+        lib = sel.get("lib") or lib
+    except Exception as e:
+        _crm_say(f"📦 {e}")
+        return
+    crmbrowse(f"ctx:albpick:move:{lib}:")
 
 
 def album_move_to(lib, fid):
-    """📦 albmoveto:<lib>:<fid>: unstash → finals rule → move_items →
-    ledger → emptied-source offer → toast. STUB."""
-    _crm_say("albmoveto · not built yet")
+    """📦 albmoveto:<lib>:<fid>: the stashed shots → that album. The
+    picker WAS the confirm: finals rule, move_items per source group
+    (names + customer/tattoo tags rebased, numbering continues the
+    destination's), the emptied-source offer, ONE ledger op, the stash
+    cleared, toast '📦 12 shots → {base} · 02 Edit' + the retire outcome.
+    A refusal (finals into Raw/Edit, cancelled ask) keeps the stash so
+    another target can be picked."""
+    try:
+        import albums
+        st = albums.unstash()
+        if not st:
+            raise albums.AlbumError("Nothing to move · select shots in Eagle first")
+        lib = lib or st.get("lib") or ""
+        items = st.get("items") or []
+        albs = albums.library_albums(lib)
+        dest = next((a for a in albs if a.get("fid") == fid), None)
+        if dest is None:
+            raise albums.AlbumError("That album is not in the library any more")
+        stage, base = dest.get("stage") or "", dest.get("name") or ""
+        if not _alb_finals_check(items, stage):
+            _crm_say("Cancelled")
+            return
+        label = albums.stage_label(stage)
+        items, home = _alb_split_home(items, fid)
+        groups = _alb_groups(items, albs, fid)
+        op = albums.new_op("move", lib, note=f"{len(items)} shots → {base}")
+    except Exception as e:
+        _crm_say(f"📦 {e}")
+        return
+    where = (dest.get("path") or stage).split("/")[0]
+    if not items:
+        albums.clear_stash()
+        _crm_say(f"📦 all {len(home)} shots already in {base} · {where}")
+        return
+    try:
+        moved, _renamed = _alb_move_groups(lib, groups, fid, base, label, op)
+    except Exception as e:
+        if op.get("items"):
+            albums.Ledger().append(dict(op, note=op["note"] + " · partial"))
+        _crm_say(f"📦 {e}")
+        return
+    bits = _alb_retire_sources(lib, groups, fid, op)
+    if home:
+        bits.append(f"{len(home)} already there")
+    albums.Ledger().append(op)
+    albums.clear_stash()
+    _crm_say(" · ".join([f"📦 {moved} shots → {base} · {where}"] + bits))
 
 
 def album_new(lib, stage, who):
-    """➕ albnew:<lib>:<stage>:<cust|new|none>: new album (+ logbook +
-    row) for the stashed shots, then the move. STUB."""
-    _crm_say("albnew · not built yet")
+    """➕ albnew:<lib>:<stage>:<cust|new|none>: a NEW album for the
+    stashed shots. who: none → John Doe (album named after the tattoo,
+    row body '·', no logbook - so no date/state prompts, nothing to
+    stamp); new → 'New customer name?' → cr.create_customer; a customer
+    or lead tid → that person. Dialogs FIRST (finals rule; tattoo name
+    prefilled with the first source album's name, its tattoo part for a
+    known customer; dates from capture_days over the shots, else 'When
+    was it?' where OK = unknown → Started '-'; state Still active /
+    Finished), then the mutations: albums.new_album (an adopted
+    same-name album keeps its row: nothing re-minted) → logbook
+    (eagle_line 🦅 + 🎬 like migration._ensure_logbook) → 📸 row for
+    Raw/Edit (_mint_raw_task, or the John Doe shape) → finish_logbook
+    when Finished (when = the last capture day / the asked day) →
+    move_items → the emptied-source offer → ONE ledger op → stash
+    cleared → toast."""
+    import crm_records as cr
+    try:
+        import albums
+        st = albums.unstash()
+        if not st:
+            raise albums.AlbumError("Nothing to move · select shots in Eagle first")
+        lib = lib or st.get("lib") or ""
+        if stage not in albums.STAGES:
+            raise albums.AlbumError(f"No such stage {stage!r}")
+        if lib not in _ALB_CDEST:
+            raise albums.AlbumError(f"Unknown library {lib!r}")
+        items = st.get("items") or []
+        albs = albums.library_albums(lib)
+        groups = _alb_groups(items, albs, "")
+        if not _alb_finals_check(items, stage):
+            _crm_say("Cancelled")
+            return
+        cust, new_name, display = None, "", ""
+        if who == "new":
+            if not _records_ready():
+                return
+            new_name = (_ask("New customer name?") or "").strip()
+            if not new_name:
+                _crm_say("Cancelled")
+                return
+            display = new_name
+        elif who and who != "none":
+            if not _records_ready():
+                return
+            cust = _record_by_id(who)
+            if not cust:
+                raise albums.AlbumError("Customer not found · run tsy")
+            display = cr.customer_display(cust)
+        known = bool(display)
+        src_name = next((n for _s, n, _g in groups if n), "")
+        default = src_name
+        if known and src_name:
+            default = albums.base_tags(src_name)[-1]
+        prompt = (f"Tattoo name for {display}?" if known
+                  else "Album name (the tattoo)?")
+        tattoo = (_ask(prompt, default=default) or "").strip()
+        if not tattoo:
+            _crm_say("Cancelled")
+            return
+        safe = cr._safe_name
+        base = f"{safe(display)} - {safe(tattoo)}" if known else safe(tattoo)
+        started, when, state = None, None, ""
+        if known:
+            days = _alb_capture_days(lib, items, groups)
+            if days:
+                started, when = days[0], days[-1]
+            else:
+                asked = _ask_date("When was it? Date or year (OK = unknown · Esc cancels)")
+                if asked == "CANCEL":
+                    _crm_say("Cancelled")
+                    return
+                started, when = (asked or "-"), asked
+            state = _dialog("Tattoo state?", ["Cancel", "Still active", "Finished"],
+                            "Finished")
+            if state not in ("Still active", "Finished"):
+                _crm_say("Cancelled")
+                return
+    except Exception as e:
+        _crm_say(f"➕ {e}")
+        return
+    import areas
+    op = albums.new_op("new", lib, note=f"{base} in {stage}")
+    where = next((a["path"].split("/")[0] for a in albs
+                  if a.get("stage") == stage and a.get("path")),
+                 _ALB_STAGE_DIR.get(stage, stage))
+    bits = []
+    try:
+        if who == "new":
+            cust = cr.create_customer(new_name)
+            op["ticktick"].append({
+                "kind": "customer", "id": cust["id"],
+                "pid": cust.get("projectId") or areas.RECORDS_ID, "action": "minted"})
+            bits.append("👤 customer")
+        fid = albums.new_album(lib, stage, base, op)
+        made = op["folders"][-1] if op.get("folders") else {}
+        adopted = not (made.get("id") == fid and made.get("created"))
+        row = albums.row_for_folder(lib, fid) if adopted else None
+        lb = None
+        if adopted:
+            # the loose-matched folder's REAL spelling names the shots
+            base = made.get("name") or base
+            items, home = _alb_split_home(items, fid)
+            groups = _alb_groups(items, albs, fid)
+            if home:
+                bits.append(f"{len(home)} already there")
+        if row:
+            bits.append("existing album adopted · its row kept")
+        else:
+            if cust:
+                eagle_line = (f"🦅 [Eagle folder](eagle://folder/{fid}) · {lib.upper()}"
+                              f"\n🎬 {_ALB_CDEST[lib]}")
+                lb = cr.create_logbook(cust, tattoo, started=started,
+                                       eagle_line=eagle_line)
+                lb_pid = lb.get("projectId") or areas.RECORDS_ID
+                op["ticktick"].append({"kind": "logbook", "id": lb["id"],
+                                       "pid": lb_pid, "action": "minted"})
+                bits.append("🎨 logbook")
+            tag = albums.stage_tag(stage)
+            if tag:
+                row = (_mint_raw_task(lb, lib, fid, tag=tag) if lb
+                       else _alb_mint_doe_row(lib, base, fid, tag))
+                op["ticktick"].append({"kind": "row", "id": row["id"],
+                                       "pid": areas.CONTENT_DESTS[lib][0],
+                                       "action": "minted"})
+                bits.append(f"{tag} row")
+            if lb and state == "Finished":
+                cr.finish_logbook(lb_pid, lb["id"], when=when)
+                bits[bits.index("🎨 logbook")] = "🎨 logbook · finished"
+        moved, _renamed = _alb_move_groups(lib, groups, fid, base,
+                                           albums.stage_label(stage), op)
+    except Exception as e:
+        if op.get("items") or op.get("folders") or op.get("ticktick"):
+            albums.Ledger().append(dict(op, note=op["note"] + " · partial"))
+        _crm_say(f"➕ {e}")
+        return
+    bits += _alb_retire_sources(lib, groups, fid, op)
+    albums.Ledger().append(op)
+    albums.clear_stash()
+    _crm_say(" · ".join([f"➕ {base} · {where} · {moved} shots"] + bits))
 
 
 # ── Albums: rename + merge ───────────────────────────────────────────────
