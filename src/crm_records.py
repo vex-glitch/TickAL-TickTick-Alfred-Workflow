@@ -1719,3 +1719,200 @@ def append_note_line(pid, tid, text, section="## Notes", stamp=True):
     api.update_task(tid, pid, current=note, content=content)
     _patch_cache(tid, content=content)
     return content
+
+
+# ── merge two logbooks (ALBUMS 2026-09-11: 🔗 Merge album into this) ────────
+# Pure core + live wrapper, kept apart like every other writer here: the
+# content merge is unit-tested over fixture notes, the wrapper is the only
+# place TickTick is touched.
+
+def _split_sections(content):
+    """(header, [(heading, body_lines)]) - the header is the text before
+    the first '## ' line, sections keep their order."""
+    lines = (content or "").split("\n")
+    idx = [i for i, l in enumerate(lines) if l.startswith("## ")]
+    if not idx:
+        return "\n".join(lines), []
+    header = "\n".join(lines[:idx[0]])
+    secs = []
+    for j, i in enumerate(idx):
+        end = idx[j + 1] if j + 1 < len(idx) else len(lines)
+        secs.append((lines[i].strip(), lines[i + 1:end]))
+    return header, secs
+
+
+def _trim(lines):
+    """Body lines without leading/trailing blanks."""
+    out = list(lines or [])
+    while out and not out[0].strip():
+        out.pop(0)
+    while out and not out[-1].strip():
+        out.pop()
+    return out
+
+
+def _session_blocks(body):
+    """(preamble_lines, [block_lines]) of a ## Sessions body: a block is
+    one '### …' heading plus everything under it (image refs and text
+    travel with their session)."""
+    pre, blocks, cur = [], [], None
+    for l in body or []:
+        if l.startswith("### "):
+            if cur is not None:
+                blocks.append(_trim(cur))
+            cur = [l]
+        elif cur is None:
+            pre.append(l)
+        else:
+            cur.append(l)
+    if cur is not None:
+        blocks.append(_trim(cur))
+    return _trim(pre), [b for b in blocks if b]
+
+
+def _block_day(block):
+    m = re.match(r"^### (\d{4}-\d{2}-\d{2})", block[0] if block else "")
+    return m.group(1) if m else "9999-99-99"
+
+
+def merge_logbook_content(a_content, b_content, stamp=""):
+    """PURE: logbook B folded into logbook A. Sessions appended in date
+    order (A's first on a tie, markers untouched, image refs inside their
+    blocks carried), ## Notes lines carried (+ `stamp` appended when
+    given), every other '## ' section of B carried into A's same-named
+    section or inserted before ## Notes, Started = the earlier date,
+    Finished = the later date when BOTH are finished else '-', Quoted
+    kept from A (B's adopted only when A has none), 🦅 / 🎬 / 👤 header
+    lines A's, Paid recomputed."""
+    a_head, a_secs = _split_sections(a_content)
+    b_head, b_secs = _split_sections(b_content)
+    a_map = {h: list(b) for h, b in a_secs}
+    b_map = {h: list(b) for h, b in b_secs}
+    order = [h for h, _b in a_secs]
+    if "## Sessions" not in a_map:
+        order.insert(0, "## Sessions")
+        a_map["## Sessions"] = []
+    if "## Notes" not in a_map:
+        order.append("## Notes")
+        a_map["## Notes"] = []
+    # sessions: both preambles, then every block by date
+    a_pre, a_blocks = _session_blocks(a_map["## Sessions"])
+    b_pre, b_blocks = _session_blocks(b_map.get("## Sessions", []))
+    blocks = sorted(a_blocks + b_blocks, key=_block_day)   # stable: A first
+    sess = []
+    pre = a_pre + [l for l in b_pre if l.strip()]
+    if pre:
+        sess += pre
+        if blocks:
+            sess.append("")
+    for i, blk in enumerate(blocks):
+        sess += blk
+        if i + 1 < len(blocks):
+            sess.append("")
+    a_map["## Sessions"] = sess
+    # notes: A's lines, then B's, then the stamp
+    notes = _trim(a_map["## Notes"])
+    notes += [l for l in _trim(b_map.get("## Notes", [])) if l.strip()]
+    if (stamp or "").strip():
+        notes.append(stamp.strip())
+    a_map["## Notes"] = notes
+    # other sections of B: into A's same-named one, else before ## Notes
+    for h, body in b_secs:
+        if h in ("## Sessions", "## Notes"):
+            continue
+        extra = [l for l in _trim(body) if l.strip()]
+        if not extra:
+            continue
+        if h in a_map:
+            a_map[h] = _trim(a_map[h]) + extra
+        else:
+            order.insert(order.index("## Notes"), h)
+            a_map[h] = extra
+    # header: dates + quote
+    head = a_head
+    a_st = re.search(r"Started (\d{4}-\d{2}-\d{2})", a_head)
+    b_st = re.search(r"Started (\d{4}-\d{2}-\d{2})", b_head)
+    starts = [m.group(1) for m in (a_st, b_st) if m]
+    if starts:
+        head = re.sub(r"Started \S+", lambda _m: f"Started {min(starts)}",
+                      head, count=1)
+    a_fi = re.search(r"Finished (\d{4}-\d{2}-\d{2})", a_head)
+    b_fi = re.search(r"Finished (\d{4}-\d{2}-\d{2})", b_head)
+    fin = max(a_fi.group(1), b_fi.group(1)) if (a_fi and b_fi) else "-"
+    head = re.sub(r"Finished \S+", lambda _m: f"Finished {fin}", head, count=1)
+    if not re.search(r"^Quoted: .+$", head, re.M):
+        bq = re.search(r"^Quoted: .+$", b_head, re.M)
+        if bq:
+            hl = head.split("\n")
+            at = next((i + 1 for i, l in enumerate(hl)
+                       if l.startswith("Paid: ")), 1)
+            hl.insert(at, bq.group(0))
+            head = "\n".join(hl)
+    # render: header, then each section as 'heading / blank / body / blank'
+    out = [head.rstrip("\n"), ""]
+    for h in order:
+        body = _trim(a_map.get(h, []))
+        out.append(h)
+        out.append("")
+        if body:
+            out += body
+            out.append("")
+    merged = "\n".join(out).rstrip("\n") + "\n"
+    return _set_paid_line(merged)
+
+
+def _swap_customer_link(content, new_link):
+    """The header's 👤 link (the FIRST task link) → new_link."""
+    m = LINK_RE.search(content or "")
+    if not m:
+        return content
+    return content[:m.start()] + new_link + content[m.end():]
+
+
+def merge_logbooks(a_tid, b_tid, keep_customer=None):
+    """LIVE: fold logbook B into A and retire B (ALBUMS §5 albmergeinto).
+    keep_customer: None / 'a' / A's customer tid = A's customer keeps the
+    tattoo; 'b' / B's customer tid = B's customer takes it (A's header
+    link rewritten, A's old bullet dropped). Order: A updated under ITS
+    list (projectId explicit - HANDOFF trap 16), B's bullet dropped, B →
+    TickTick Trash (delete_task, restorable) + cache purge, A's bullet
+    synced. An archived A absorbing an active B is reopened. Returns
+    {"pid", "content", "customer", "reopened"}."""
+    if not a_tid or not b_tid or a_tid == b_tid:
+        raise ValueError("merge needs two different logbooks")
+    api = _api()
+    a = get_note(a_tid)
+    b = get_note(b_tid)
+    a_pid = a.get("projectId") or pid_of(a)
+    b_pid = b.get("projectId") or pid_of(b)
+    a_c = _fresher_content(a_tid, a.get("content") or "")
+    b_c = _fresher_content(b_tid, b.get("content") or "")
+    a_cust = parse_first_link(a_c)
+    b_cust = parse_first_link(b_c)
+    stamp = (f"- {_today()} - merged {(b.get('title') or b_tid).strip()}"
+             " into this logbook")
+    merged = merge_logbook_content(a_c, b_c, stamp=stamp)
+    want_b = bool(b_cust) and (
+        keep_customer == "b" or (keep_customer not in (None, "", "a")
+                                 and keep_customer == b_cust[2]))
+    if want_b and (not a_cust or a_cust[2] != b_cust[2]):
+        merged = _swap_customer_link(
+            merged, task_link(b_cust[1], b_cust[2], b_cust[0]))
+        drop_customer_bullet({**a, "content": a_c})
+    api.update_task(a_tid, a_pid, current=a, content=merged, projectId=a_pid)
+    _patch_cache(a_tid, content=merged)
+    drop_customer_bullet({**b, "content": b_c})
+    api.delete_task(b_pid, b_tid)
+    purge_cache(b_tid, b_pid)
+    live_a = {**a, "content": merged, "projectId": a_pid, "_projectId": a_pid}
+    sync_customer_bullet(live_a)
+    reopened = False
+    if logbook_archived(a) and not logbook_archived(b):
+        try:
+            reopen_logbook(a_pid, a_tid)
+            reopened = True
+        except Exception:
+            pass
+    cust = parse_first_link(merged)
+    return {"pid": a_pid, "content": merged,
+            "customer": cust[2] if cust else "", "reopened": reopened}
