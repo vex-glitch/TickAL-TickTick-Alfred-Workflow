@@ -139,11 +139,15 @@ if "--probe" in sys.argv:
 
 
 # ── singleton ────────────────────────────────────────────────────────────────
-_lock_f = open(BAR_LOCK, "w")
+# open WITHOUT truncating, lock, THEN rewrite: a racing twin (two _bar_wake
+# spawns in the same second) used to blank the winner's pid on its way out
+_lock_f = os.fdopen(os.open(BAR_LOCK, os.O_RDWR | os.O_CREAT, 0o644), "r+")
 try:
     fcntl.flock(_lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
 except OSError:
     sys.exit(0)          # another bar already runs - correct outcome
+_lock_f.seek(0)
+_lock_f.truncate()
 _lock_f.write(str(os.getpid()))
 _lock_f.flush()
 
