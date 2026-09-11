@@ -33,6 +33,7 @@ test:
 	@python3 tests/test_api_update.py
 	@python3 tests/test_albums.py
 	@python3 tests/test_alb_move.py
+	@python3 tests/test_alb_merge.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:
