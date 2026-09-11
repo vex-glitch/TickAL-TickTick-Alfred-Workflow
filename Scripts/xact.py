@@ -4572,6 +4572,52 @@ def album_cust_pick(tid):
     crmbrowse(f"ctx:albcust:{lib}:{stage}:adopt:{tid}")
 
 
+def _alb_existing_logbook(cust_tid, base):
+    """The customer's logbook ALREADY named for this base ('{C} - {T}',
+    casefold; open or archived) - the one ➕ New album and 👤 Customer
+    LINK instead of minting a twin (review 2026-09-11: nothing on those
+    roads looked at cr.customer_logbooks, so a tattoo whose album sat in
+    the other stage, or whose logbook came from the booking road, got a
+    second '🎨 C • T'). None when the customer has none; a cache-only
+    read (records_notes) so it can never fail the road."""
+    import crm_records as cr
+    want = (base or "").casefold()
+    if not cust_tid or not want:
+        return None
+    try:
+        pool = cr.customer_logbooks(cust_tid)
+    except Exception:
+        return None
+    return next((lb for lb in pool
+                 if cr.logbook_base(lb).casefold() == want), None)
+
+
+def _alb_link_logbook_folder(lb, fid, lib, op):
+    """Point an EXISTING logbook at the album: its 🦅 line is written
+    ONLY when it has none (a logbook already living on another album -
+    the 01 Raw twin of a 02 Edit album - keeps it), the 🎬 line set to
+    the library when it names none. Live GET, written under ITS list
+    with projectId explicit (HANDOFF trap 16), cache patched, ledger
+    piece 'logbook repointed' (prior eagle ''). Returns (live logbook
+    dict with projectId, True when the header was written)."""
+    import crm_records as cr
+    live = cr.get_note(lb["id"])
+    content = cr._fresher_content(lb["id"], live.get("content") or "")
+    if cr.eagle_folder_of(content)[0]:
+        return dict(live, content=content), False
+    new = cr.set_eagle_folder(content, fid, lib)
+    if cr.content_dest_of(new) not in ("tv", "fm", "studio"):
+        new = cr.set_content_dest(new, lib)
+    pid = live["projectId"]
+    cr._api().update_task(lb["id"], pid, current=live, content=new,
+                          projectId=pid)
+    _patch_content_cache(lb["id"], new)
+    op.setdefault("ticktick", []).append({
+        "kind": "logbook", "id": lb["id"], "pid": pid,
+        "action": "repointed", "prior": {"eagle": ""}})
+    return dict(live, content=new), True
+
+
 # ── Albums: move ─────────────────────────────────────────────────────────
 # 📦 Move Eagle selection (ALBUMS_SPEC §5 albmove / albmoveto / albnew,
 # built 2026-09-11). Three verbs + their private helpers, all INSIDE this
@@ -4607,18 +4653,36 @@ def _alb_finals_check(items, stage):
     return True
 
 
+def _alb_album_of(albs, fid):
+    """The ALBUM a library_albums entry belongs to: itself at depth 1,
+    else its depth-1 ancestor under the stage root (02 Edit albums have
+    children - '02 Edit/X/Video' is a child of album X, never an album
+    of its own: shots there are named after X and only X has a row).
+    None when fid is not in albs."""
+    by_fid = {a.get("fid"): a for a in albs}
+    cur, seen = by_fid.get(fid), set()
+    while (cur and (cur.get("depth") or 1) > 1
+           and cur.get("parent") in by_fid and cur.get("fid") not in seen):
+        seen.add(cur.get("fid"))
+        cur = by_fid[cur["parent"]]
+    return cur
+
+
 def _alb_groups(items, albs, dest_fid):
     """The stashed shots keyed by SOURCE album: [(src_fid, src_name,
-    [items])] in first-seen order. src = the first of a shot's folders
-    that is an album of the library (albums.library_albums) and not the
-    destination; '' = no album (the 03 Post shelf, an inbox, the root).
-    The name rides move_items as old_base so hand-named shots shed the
-    source's tags; only real albums get the emptied-source offer."""
+    [items])] in first-seen order. src = the ALBUM (_alb_album_of, so a
+    shot in '02 Edit/X/Video' belongs to X) of the first of a shot's
+    folders that is an album of the library (albums.library_albums)
+    and not the destination; '' = no album (the 03 Post shelf, an
+    inbox, the root). The name rides move_items as old_base so
+    hand-named shots shed the source's tags; only real albums get the
+    emptied-source offer."""
     by_fid = {a.get("fid"): a for a in albs}
     groups, order = {}, []
     for it in items:
-        src = next((f for f in it.get("folders") or []
-                    if f in by_fid and f != dest_fid), "")
+        alb = next((_alb_album_of(albs, f) for f in it.get("folders") or []
+                    if f in by_fid and f != dest_fid), None)
+        src = (alb or {}).get("fid") or ""
         if src not in groups:
             groups[src] = []
             order.append(src)
@@ -4741,16 +4805,22 @@ def _alb_retire_row(lib, row, husk_fid, dest_fid, op):
 
 
 def _alb_retire_sources(lib, groups, dest_fid, op):
-    """The SOURCE side after a move: every source album whose live
+    """The SOURCE side after a move: every source ALBUM whose live
     subtree is empty now is offered - '{name} is empty now · bin it and
     retire its row?' (Keep / Bin + retire) - then albums.husk_to_bin +
-    its row via _alb_retire_row. Each step fails soft into the toast;
+    its row via _alb_retire_row. Groups are keyed by album
+    (_alb_groups), so an emptied child of album X is never offered on
+    its own: X goes to the bin with the child inside once the WHOLE
+    album is empty, and while X still holds shots the child husk stays
+    put (review 2026-09-11: the child offer tore Video out of its
+    already-binned parent). Each step fails soft into the toast;
     returns the toast bits."""
     import albums
-    bits = []
+    bits, seen = [], set()
     for src, name, _grp in groups:
-        if not src or src == dest_fid:
+        if not src or src == dest_fid or src in seen:
             continue
+        seen.add(src)
         if _alb_live_count(src) != 0:
             continue
         ans = _dialog(f"{name} is empty now · bin it and retire its row?",
@@ -4811,21 +4881,27 @@ def album_move_to(lib, fid):
         dest = next((a for a in albs if a.get("fid") == fid), None)
         if dest is None:
             raise albums.AlbumError("That album is not in the library any more")
-        stage, base = dest.get("stage") or "", dest.get("name") or ""
+        # the BASE is the album's name, never a child's: shots landing
+        # in '02 Edit/X/Video' are '{X} • Raw • n' with X's tags (review
+        # 2026-09-11: the child's own name made 'Video • Raw • 1')
+        album = _alb_album_of(albs, fid) or dest
+        stage, base = dest.get("stage") or "", album.get("name") or ""
         if not _alb_finals_check(items, stage):
             _crm_say("Cancelled")
             return
         label = albums.stage_label(stage)
         items, home = _alb_split_home(items, fid)
         groups = _alb_groups(items, albs, fid)
-        op = albums.new_op("move", lib, note=f"{len(items)} shots → {base}")
+        path = (dest.get("path") or "").split("/")
+        where = path[0] if path[0] else stage
+        target = "/".join(path[1:]) or base          # 'X' or 'X/Video'
+        op = albums.new_op("move", lib, note=f"{len(items)} shots → {target}")
     except Exception as e:
         _crm_say(f"📦 {e}")
         return
-    where = (dest.get("path") or stage).split("/")[0]
     if not items:
         albums.clear_stash()
-        _crm_say(f"📦 all {len(home)} shots already in {base} · {where}")
+        _crm_say(f"📦 all {len(home)} shots already in {target} · {where}")
         return
     try:
         moved, _renamed = _alb_move_groups(lib, groups, fid, base, label, op)
@@ -4839,7 +4915,7 @@ def album_move_to(lib, fid):
         bits.append(f"{len(home)} already there")
     albums.Ledger().append(op)
     albums.clear_stash()
-    _crm_say(" · ".join([f"📦 {moved} shots → {base} · {where}"] + bits))
+    _crm_say(" · ".join([f"📦 {moved} shots → {target} · {where}"] + bits))
 
 
 def album_new(lib, stage, who):
@@ -4852,8 +4928,11 @@ def album_new(lib, stage, who):
     known customer; dates from capture_days over the shots, else 'When
     was it?' where OK = unknown → Started '-'; state Still active /
     Finished), then the mutations: albums.new_album (an adopted
-    same-name album keeps its row: nothing re-minted) → logbook
-    (eagle_line 🦅 + 🎬 like migration._ensure_logbook) → 📸 row for
+    same-name album keeps its row: nothing re-minted; the adoption is
+    ALWAYS in the toast) → logbook (eagle_line 🦅 + 🎬 like
+    migration._ensure_logbook; the customer's EXISTING logbook of that
+    tattoo is linked instead - _alb_existing_logbook +
+    _alb_link_logbook_folder, no date/state prompt then) → 📸 row for
     Raw/Edit (_mint_raw_task, or the John Doe shape) → finish_logbook
     when Finished (when = the last capture day / the asked day) →
     move_items → the emptied-source offer → ONE ledger op → stash
@@ -4904,8 +4983,12 @@ def album_new(lib, stage, who):
             return
         safe = cr._safe_name
         base = f"{safe(display)} - {safe(tattoo)}" if known else safe(tattoo)
+        # the customer's logbook of THIS tattoo already exists → it is
+        # LINKED, never twinned, and its dates/state are its own: no
+        # date or state prompt (review 2026-09-11)
+        existing = _alb_existing_logbook(cust["id"], base) if cust else None
         started, when, state = None, None, ""
-        if known:
+        if known and existing is None:
             days = _alb_capture_days(lib, items, groups)
             if days:
                 started, when = days[0], days[-1]
@@ -4950,10 +5033,19 @@ def album_new(lib, stage, who):
             groups = _alb_groups(items, albs, fid)
             if home:
                 bits.append(f"{len(home)} already there")
-        if row:
-            bits.append("existing album adopted · its row kept")
-        else:
-            if cust:
+        if adopted:
+            # ALWAYS said (review 2026-09-11): without a row the toast
+            # read like a clean create while the shots joined an old
+            # folder and a logbook + row were minted for it
+            bits.append("existing album adopted"
+                        + (" · its row kept" if row else ""))
+        if not row:
+            if existing is not None:
+                lb, wrote = _alb_link_logbook_folder(existing, fid, lib, op)
+                lb_pid = lb.get("projectId") or cr.pid_of(lb)
+                bits.append("🎨 existing logbook linked"
+                            + (" · 🦅 → album" if wrote else ""))
+            elif cust:
                 eagle_line = (f"🦅 [Eagle folder](eagle://folder/{fid}) · {lib.upper()}"
                               f"\n🎬 {_ALB_CDEST[lib]}")
                 lb = cr.create_logbook(cust, tattoo, started=started,
@@ -5555,12 +5647,12 @@ def _alb_adopt_dates(lib, fid):
     decide SILENTLY (first / last day, albums.capture_days over the
     album's disk items); with none known, ONE date prompt: an ISO day =
     a one-day tattoo, OK = unknown ('-' Started, no year tag - never
-    today), Esc → ('CANCEL', None)."""
+    today), Esc → ('CANCEL', None). A failed disk read RAISES
+    (AlbumError) so the verb stops before its first write - it used to
+    become a date prompt and the TickTick writes landed on a folder the
+    ripple could not find (review 2026-09-11)."""
     import albums
-    try:
-        days = albums.capture_days(lib, albums.items_of_album(lib, fid))
-    except Exception:
-        days = []
+    days = albums.capture_days(lib, albums.items_of_album(lib, fid))
     if days:
         return days[0], days[-1]
     when = _ask_date(_ALB_ADOPT_DATE_PROMPT)
@@ -5605,9 +5697,14 @@ def album_adopt(tid, who):
     day / the typed day / '-' unknown) → _alb_rename_ripple(lib, fid,
     '{C} - {T}', op, log_tid=, row=) (album + shots + row title) → the
     row body's 🎨 link via _content_retag → ledger op 'adopt' → toast.
+    The customer's EXISTING logbook of that tattoo is LINKED instead of
+    minted (🦅 line set only when it has none; no date/state prompt).
     Refuses: a row that already links a logbook (✏️ Rename / 🔗 Merge
     are the verbs then), a row without an Eagle folder link, a missing
-    ripple (the rename branch not merged) - all BEFORE any write."""
+    ripple (the rename branch not merged), Eagle asleep / the folder
+    not in the open library (preflight BEFORE the asks), a sibling
+    album already named '{C} - {T}' under the same stage (🔗 Merge) -
+    all BEFORE any write."""
     if not _records_ready():
         return
     try:
@@ -5630,6 +5727,21 @@ def album_adopt(tid, who):
     if ripple is None:
         _crm_say("👤 Rename ripple missing · merge the rename branch first")
         return
+    # ── Eagle preflight BEFORE the asks (review 2026-09-11): the ripple's
+    # own check (ensure_library + the folder in the open tree) used to
+    # come after the customer + logbook writes, so a drive-not-mounted
+    # stop left an unlinked row and the retry minted a twin logbook
+    try:
+        eg = albums.eagle
+        eg.ensure_library(lib)
+        if eg.folder_node(fid) is None:
+            raise albums.AlbumError(f"Eagle folder {fid} not in {lib.upper()}")
+        albs = albums.library_albums(lib)
+        stage = next((a.get("stage") for a in albs if a.get("fid") == fid),
+                     None) or albums.album_stage(lib, fid)
+    except Exception as e:
+        _crm_say(f"👤 {base} · {e}")
+        return
     # ── ask everything first: no write before the last answer
     cust, new_name = None, ""
     if who == "new":
@@ -5651,15 +5763,36 @@ def album_adopt(tid, who):
     if not tattoo:
         _crm_say("Cancelled")
         return
-    started, finished = _alb_adopt_dates(lib, fid)
-    if started == "CANCEL":
-        _crm_say("Cancelled")
+    # a sibling album already wearing '{C} - {T}' under this stage: the
+    # ripple would rename this one NEXT to it (Eagle keeps both forever)
+    # - 🔗 Merge is the verb (review 2026-09-11)
+    want_base = f"{cdisp} - {cr._safe_name(tattoo)}"
+    twin = next((a for a in albs
+                 if a.get("fid") != fid and a.get("stage") == stage
+                 and albums._norm(a.get("name")) == albums._norm(want_base)),
+                None)
+    if twin:
+        where = (twin.get("path") or "").split("/")[0] or stage
+        _crm_say(f"👤 {want_base} already exists in {where} · 🔗 Merge instead")
         return
-    state = _dialog("Tattoo state?", ["Cancel", "Still active", "Finished"],
-                    "Finished")
-    if state not in ("Still active", "Finished"):
-        _crm_say("Cancelled")
-        return
+    # the customer's logbook of this tattoo already exists → LINKED,
+    # never twinned; its dates/state are its own, so no prompts
+    existing = _alb_existing_logbook(cust["id"], want_base) if cust else None
+    started, finished, state = "-", None, ""
+    if existing is None:
+        try:
+            started, finished = _alb_adopt_dates(lib, fid)
+        except Exception as e:
+            _crm_say(f"👤 {base} · {e}")
+            return
+        if started == "CANCEL":
+            _crm_say("Cancelled")
+            return
+        state = _dialog("Tattoo state?", ["Cancel", "Still active", "Finished"],
+                        "Finished")
+        if state not in ("Still active", "Finished"):
+            _crm_say("Cancelled")
+            return
     # ── write: customer → logbook (→ archive) → ripple → row body → ledger
     op = albums.new_op("adopt", lib, note=f"{base} → {cdisp} - {tattoo}")
     landed = []
@@ -5674,17 +5807,22 @@ def album_adopt(tid, who):
                                    "pid": cr.pid_of(cust),
                                    "action": "minted"})
             landed.append("customer")
-        label = _alb_lib_label(lib)
-        eagle_line = (f"🦅 [Eagle folder](eagle://folder/{fid}) · {label}\n"
-                      f"🎬 {label}")
-        lb = cr.create_logbook(cust, tattoo, started=started,
-                               eagle_line=eagle_line)
-        if started == "-":
-            lb = _alb_started_guard(lb)
-        lb_pid = cr.pid_of(lb)
-        op["ticktick"].append({"kind": "logbook", "id": lb["id"],
-                               "pid": lb_pid, "action": "minted"})
-        landed.append("logbook")
+        if existing is not None:
+            lb, _wrote = _alb_link_logbook_folder(existing, fid, lib, op)
+            lb_pid = lb.get("projectId") or cr.pid_of(lb)
+            landed.append("logbook linked")
+        else:
+            label = _alb_lib_label(lib)
+            eagle_line = (f"🦅 [Eagle folder](eagle://folder/{fid}) · {label}\n"
+                          f"🎬 {label}")
+            lb = cr.create_logbook(cust, tattoo, started=started,
+                                   eagle_line=eagle_line)
+            if started == "-":
+                lb = _alb_started_guard(lb)
+            lb_pid = cr.pid_of(lb)
+            op["ticktick"].append({"kind": "logbook", "id": lb["id"],
+                                   "pid": lb_pid, "action": "minted"})
+            landed.append("logbook")
         if state == "Finished":
             lb_pid = cr.finish_logbook(lb_pid, lb["id"], when=finished or "-")
             # the cache carries the archived truth (🏛️ title, new list)
@@ -5710,8 +5848,9 @@ def album_adopt(tid, who):
                  + (f" · landed: {', '.join(landed)}" if landed else ""))
         return
     n = len(op.get("items") or [])
-    _crm_say(f"👤 {new_base} · logbook"
-             f"{' archived' if state == 'Finished' else ''}"
+    _crm_say(f"👤 {new_base} · "
+             + ("existing logbook linked" if existing is not None else "logbook")
+             + f"{' archived' if state == 'Finished' else ''}"
              f" · album + row{f' + {n} shots' if n else ''} renamed")
 
 
