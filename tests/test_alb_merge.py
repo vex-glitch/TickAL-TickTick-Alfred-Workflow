@@ -291,7 +291,7 @@ class Merge(AlbBase):
         self.assertEqual(self.prompts[1][2], ["Cancel", "Zeus (other)", "Phillip (this)"])
         confirm = self.prompts[2][1]
         self.assertIn("2 shots → Phillip - Samurai · 1 twins → Duplicates", confirm)
-        self.assertIn("its row → TickTick Trash · this row → 📸edit", confirm)
+        self.assertIn("its row → TickTick Trash · this row stays 📸raw", confirm)
         self.assertIn(f"logbook {B_TITLE} → folded into {A_TITLE} · Phillip keeps it", confirm)
         self.assertIn("Zeus husk → 🗑 Deleted", confirm)
         self.assertNotIn("renamed", confirm)
@@ -308,8 +308,9 @@ class Merge(AlbBase):
         self.assertEqual(self.api.tasks["cS"]["priority"], 5)
         self.assertEqual(self.api.tasks["cP"]["title"], f"Prepare for {LINK_A}")
         self.assertEqual(cache.find_task("cS")["title"], f"{LINK_A} S3")
-        # (2) rows: A takes the later stage tag
-        self.assertEqual(self.api.tasks["tA"]["tags"], ["📸edit"])
+        # (2) rows: the tag follows the FOLDER - A keeps its own stage
+        # (merge-time ruling 2026-09-11: a 01 Raw album must not wear 📸edit)
+        self.assertEqual(self.api.tasks["tA"]["tags"], ["📸raw"])
         self.assertEqual(self.api.tasks["tA"]["title"], "[Phillip - Samurai](eagle://folder/A1)")
         self.assertIsNone(cache.find_task("tB"))
         # (3) Eagle: twin → Duplicates, the rest continue A's numbering
@@ -340,7 +341,7 @@ class Merge(AlbBase):
         self.assertEqual(op["folders"][-1]["parent"], "BIN")
         tt = sorted((p["kind"], p["action"], p["id"]) for p in op["ticktick"])
         self.assertEqual(tt, [("logbook", "merged", "A"), ("logbook", "merged", "B"),
-                              ("row", "retagged", "tA"), ("row", "trashed", "tB"),
+                              ("row", "trashed", "tB"),
                               ("task", "retitled", "cP"), ("task", "retitled", "cS")])
         trashed = next(p for p in op["ticktick"] if p["action"] == "trashed")
         self.assertEqual(trashed["prior"]["title"], "[Zeus](eagle://folder/B1)")
@@ -348,7 +349,7 @@ class Merge(AlbBase):
         toast = self.toasts[0]
         self.assertTrue(toast.startswith("🔗 Zeus → Phillip - Samurai · 2 shots · 1 twins → Duplicates"))
         for bit in ("logbook merged", "2 calendar task(s) → this logbook", "row trashed",
-                    "row → 📸edit", "husk → 🗑",
+                    "B was 📸edit · this row stays 📸raw", "husk → 🗑",
                     "2 image refs point at the trashed note - re-plant from Eagle if needed"):
             self.assertIn(bit, toast)
 
@@ -385,7 +386,7 @@ class Merge(AlbBase):
         # row: title + 🎨 text, tag from B
         self.assertEqual(self.api.tasks["tA"]["title"], "[Dragon](eagle://folder/A1)")
         self.assertEqual(self.api.tasks["tA"]["content"], f"🎨 {link}")
-        self.assertEqual(self.api.tasks["tA"]["tags"], ["📸edit"])
+        self.assertEqual(self.api.tasks["tA"]["tags"], ["📸raw"])   # tag follows the folder
         # ledger: a moved-then-rebased shot keeps its FIRST prior state
         op = self.ops()[0]
         self.assertEqual(op["note"], "Zeus → Phillip - Samurai → Dragon")
@@ -521,7 +522,7 @@ class Merge(AlbBase):
         self.assertEqual(len(ops), 1)
         self.assertIn("STOPPED: plugin off", ops[0]["note"])
         acts = sorted(p["action"] for p in ops[0]["ticktick"])
-        self.assertEqual(acts, ["merged", "merged", "retagged", "retitled", "retitled",
+        self.assertEqual(acts, ["merged", "merged", "retitled", "retitled",
                                 "trashed"])
 
 

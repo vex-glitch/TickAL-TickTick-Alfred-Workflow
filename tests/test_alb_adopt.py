@@ -344,8 +344,10 @@ class AdoptRefuses(AdoptBase):
         self.assert_nothing_written()
 
     def test_missing_ripple_refuses_before_any_write(self):
+        # tearDown restores the REAL ripple from self.saved - overwriting
+        # the saved slot with _missing deleted it for every later test
+        # module under unittest discover (the merge suite silently no-oped)
         delattr(xact, "_alb_rename_ripple")
-        self.saved[(xact, "_alb_rename_ripple")] = self._missing
         xact.album_adopt("R1", "ca")
         self.assertIn("Rename ripple missing", self.toasts[0])
         self.assert_nothing_written()

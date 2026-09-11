@@ -4914,7 +4914,9 @@ def album_new(lib, stage, who):
                 if asked == "CANCEL":
                     _crm_say("Cancelled")
                     return
-                started, when = (asked or "-"), asked
+                # unknown date = unknown finish too: "Finished -", no
+                # year tag (the archived-undated convention, 2026-09-09)
+                started, when = (asked or "-"), (asked or "-")
             state = _dialog("Tattoo state?", ["Cancel", "Still active", "Finished"],
                             "Finished")
             if state not in ("Still active", "Finished"):
@@ -5403,7 +5405,8 @@ def album_merge(tid, other_fid):
              + (f" · new: {', '.join(new_children)}" if new_children else "")]
     if b_row:
         lines.append("• its row → TickTick Trash"
-                     + (f" · this row → {b_tag}" if later else ""))
+                     + (f" · this row stays {a_tag or 'untagged'} - the album"
+                        f" stays where it is" if later else ""))
     if both:
         lines.append(f"• logbook {(b_lb or {}).get('title') or b_log} → folded into "
                      f"{(a_lb or {}).get('title') or a_log}"
@@ -5461,12 +5464,11 @@ def album_merge(tid, other_fid):
                           "tags": list(b_row.get("tags") or [])}})
             notes.append("row trashed")
             if later:
-                _content_retag(t, a_tag or None, b_tag)
-                op["ticktick"].append({
-                    "kind": "row", "id": t["id"],
-                    "pid": t.get("_projectId") or t.get("projectId") or "",
-                    "action": "retagged", "prior": {"tags": list(t.get("tags") or [])}})
-                notes.append(f"row → {b_tag}")
+                # the 📸 tag follows the FOLDER (a 01 Raw album wearing
+                # 📸edit would lie): A keeps its own stage; B's later
+                # stage is only reported. Pick the 02 Edit album as the
+                # survivor when the editing work should live on.
+                notes.append(f"B was {b_tag} · this row stays {a_tag or 'untagged'}")
         eg = _alb_eagle()
         try:
             eg.ensure_library(lib)
