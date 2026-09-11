@@ -24,7 +24,7 @@ os.environ.setdefault("crm_archive_list_id", "ARCHIVE")
 os.environ.setdefault("crm_records_tags",
                       "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
-from test_albums import Base, REC, TV_PID, _cust  # noqa: E402
+from test_albums import Base, REC, TV_PID, _cust, real_eagle  # noqa: E402
 import albums  # noqa: E402
 import cache  # noqa: E402
 import crm_records as cr  # noqa: E402
@@ -386,6 +386,121 @@ class AdoptRefuses(AdoptBase):
         self.assertIn("landed: logbook", self.toasts[-1])
         self.assertEqual(self.ledger_ops(), [])              # no op on failure
         self.assertEqual(self.api.tasks["R1"]["content"], "·")   # body untouched
+
+    def test_eagle_preflight_refuses_before_any_ask_or_write(self):
+        """Review B2: the ripple's own Eagle check (ensure_library + the
+        folder in the open tree) runs BEFORE the asks - a drive-not-
+        mounted stop used to land customer + logbook (+ archive) and
+        the retry minted a twin."""
+        def boom(*a, **k):
+            raise real_eagle.EagleError("T9 drive not mounted")
+        self.fake.ensure_library = boom
+        xact.album_adopt("R1", "ca")
+        self.assertEqual(self.toasts[-1], "👤 Zeus · T9 drive not mounted")
+        self.assertEqual(self.asked, [])                     # nothing asked
+        self.assert_nothing_written()
+        # the folder is not in the open library (a row pointing at the
+        # other library's folder): refused the same way
+        del self.fake.ensure_library
+        self.rows.append(_row("R4", "Ghost", "GHOST"))
+        cache.set("all_tasks", [dict(r) for r in self.rows])
+        self.api.tasks["R4"] = dict(self.rows[-1])
+        self.toasts.clear()
+        xact.album_adopt("R4", "ca")
+        self.assertEqual(self.toasts[-1], "👤 Ghost · Eagle folder GHOST not in TV")
+        self.assertEqual(self.asked, [])
+        self.assert_nothing_written()
+
+    def test_dates_read_failure_is_closed(self):
+        """A failed disk read of the album's shots RAISES (no date
+        prompt, no write) - it used to become 'When was it?'."""
+        real = albums.items_of_album
+
+        def broken(lib, fid):
+            raise albums.AlbumError("metadata unreadable")
+        albums.items_of_album = broken
+        try:
+            xact.album_adopt("R1", "ca")
+        finally:
+            albums.items_of_album = real
+        self.assertEqual(self.toasts[-1], "👤 Zeus · metadata unreadable")
+        self.assertNotIn(xact._ALB_ADOPT_DATE_PROMPT, [p for p, _d in self.asked])
+        self.assert_nothing_written()
+
+    def test_same_named_album_under_the_stage_refuses(self):
+        """Review B3 (adopt half): Zeus renamed to 'Phillip - Samurai'
+        would sit NEXT to 01 Raw/Phillip - Samurai (A1) forever - the
+        verb refuses and names 🔗 Merge; nothing minted."""
+        self.answers = {"Tattoo name?": "samurai"}           # loose match
+        xact.album_adopt("R1", "ca")
+        self.assertEqual(self.toasts[-1],
+                         "👤 Phillip - samurai already exists in 01 Raw · 🔗 Merge instead")
+        self.assert_nothing_written()
+        # the same name under ANOTHER stage is no twin: Griffin (02 Edit)
+        # may become Phillip - Samurai there... but Phillip already has
+        # that logbook, so it is LINKED (see the next test), never minted
+        self.toasts.clear()
+        self.answers = {"Tattoo name?": "Dragon"}            # no sibling, no logbook
+        xact.album_adopt("R1", "ca")
+        self.assertEqual(self.logbook()["title"], "🎨 Phillip • Dragon")
+
+
+class AdoptLinksExistingLogbook(AdoptBase):
+    def _logbook(self, tid, title, eagle="", tags=("🗂️logbook",)):
+        ca_link = f"[👤 Phillip](https://ticktick.com/webapp/#p/{REC}/tasks/ca)"
+        lb = {"id": tid, "projectId": REC, "_projectId": REC, "kind": "NOTE",
+              "title": title, "tags": list(tags), "status": 0,
+              "content": (f"👤 {ca_link} · Started 2024-02-03 · Finished -\n"
+                          "Paid: - · 0 sessions\n" + eagle +
+                          "\n## Sessions\n\n## Notes\n")}
+        cache.set("all_notes", [dict(self.ca), dict(lb)])
+        self.api.tasks[tid] = dict(lb)
+        return lb
+
+    def test_existing_logbook_is_linked_not_minted(self):
+        """Review B3: Phillip already has '🎨 Phillip • Zeus' (no album -
+        the booking road) → 👤 Customer LINKS it: no twin, no date/state
+        prompt, 🦅 → the album under ITS list (trap 16), the ripple and
+        the row body ride that logbook."""
+        self._logbook("LBZ", "🎨 Phillip • Zeus")
+        xact.album_adopt("R1", "ca")
+        self.assertEqual(self.api.created, [])                 # nothing minted
+        prompts = [p for p, _d in self.asked]
+        self.assertEqual(prompts, ["Tattoo name?"])
+        ups = [u for u in self.api.updates if u[0] == "LBZ"]
+        self.assertEqual(len(ups), 1)
+        self.assertEqual((ups[0][1], ups[0][2]["projectId"]), (REC, REC))
+        body = self.api.tasks["LBZ"]["content"]
+        self.assertIn(EAGLE_LINE_B1, body)
+        self.assertIn("Started 2024-02-03", body)              # its own dates kept
+        self.assertEqual(cache.find_task("LBZ")["content"], body)
+        self.assertEqual(self.ripples, [{"lib": "tv", "fid": "B1",
+                                         "new_base": "Phillip - Zeus",
+                                         "log_tid": "LBZ", "row": "R1"}])
+        self.assertEqual(self.api.tasks["R1"]["content"],
+                         f"🎨 [🎨 Phillip • Zeus](https://ticktick.com/webapp/#p/{REC}/tasks/LBZ)")
+        self.assertEqual(self.api.moves, [])
+        op = self.ledger_ops()[0]
+        self.assertEqual([(p["kind"], p["action"]) for p in op["ticktick"]],
+                         [("logbook", "repointed"), ("row", "retitled")])
+        self.assertEqual(op["ticktick"][0]["prior"], {"eagle": ""})
+        self.assertIn("existing logbook linked", self.toasts[0])
+        self.assertIn("Phillip - Zeus", self.toasts[0])
+
+    def test_linked_logbook_on_another_album_keeps_its_eagle_line(self):
+        """An archived logbook already living on the 04 Portfolio album
+        is linked as is: header untouched, the row links the 🏛️ note."""
+        self._logbook("LBZ", "🏛️ Phillip • Zeus", tags=("🗂️archive",),
+                      eagle="🦅 [Eagle folder](eagle://folder/P1) · TV\n🎬 TV\n")
+        xact.album_adopt("R1", "ca")
+        self.assertEqual(self.api.created, [])
+        self.assertEqual([u for u in self.api.updates if u[0] == "LBZ"], [])
+        self.assertIn("eagle://folder/P1", self.api.tasks["LBZ"]["content"])
+        self.assertEqual(self.api.tasks["R1"]["content"],
+                         f"🎨 [🏛️ Phillip • Zeus](https://ticktick.com/webapp/#p/{REC}/tasks/LBZ)")
+        self.assertEqual([(p["kind"], p["action"]) for p in self.ledger_ops()[0]["ticktick"]],
+                         [("row", "retitled")])
+        self.assertNotIn("archived", self.toasts[0])           # nothing archived NOW
 
 
 # ─────────────────────────────────────────────────────── ↩️ undo

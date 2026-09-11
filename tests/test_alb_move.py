@@ -335,6 +335,77 @@ class AlbumMoveTo(MoveBase):
         self.assertEqual(self.api.deleted, [])
         self.assertIsNotNone(albums.unstash())
 
+    def test_child_target_takes_the_album_base(self):
+        """Review B1: '02 Edit/Erol - Griffin/Video' is a CHILD of the
+        album - shots landing there are named after Erol - Griffin
+        (continuing the child's numbering) and wear its tags, never
+        'Video • Raw • 1' with a bogus 'Video' tag."""
+        self.stash("I3", "I4")
+        xact.album_move_to("tv", "E1V")
+        it = self.fake.items
+        self.assertEqual(it["I3"]["name"], "Erol - Griffin • Raw • 3")
+        self.assertEqual(it["I4"]["name"], "Erol - Griffin • Raw • 4")
+        self.assertEqual(it["I3"]["folders"], ["E1V"])
+        self.assertEqual(it["I3"]["tags"], ["x", "Erol", "Griffin"])
+        self.assertEqual(it["I4"]["tags"], ["Erol", "Griffin"])
+        self.assertNotIn("Video", it["I3"]["tags"] + it["I4"]["tags"])
+        toast = self.toasts[-1]
+        self.assertTrue(toast.startswith("📦 2 shots → Erol - Griffin/Video · 02 Edit"), toast)
+        self.assertEqual(self.ledger()[0]["note"], "2 shots → Erol - Griffin/Video")
+        # a shot of the album root moved into its own child: same base,
+        # the album is not "emptied" (the child holds the shots now)
+        self.prompts = []
+        self.stash("I6")
+        xact.album_move_to("tv", "E1V")
+        self.assertEqual(self.prompted("dialog"), [])
+        self.assertEqual(it["I6"]["folders"], ["E1V"])
+        self.assertTrue(it["I6"]["name"].startswith("Erol - Griffin • Raw • "))
+        self.assertEqual(it["I6"]["tags"], ["Erol", "Griffin"])
+        # and the depth-1 resolver itself
+        albs = albums.library_albums("tv")
+        self.assertEqual(xact._alb_album_of(albs, "E1V")["fid"], "E1")
+        self.assertEqual(xact._alb_album_of(albs, "E1")["fid"], "E1")
+        self.assertEqual(xact._alb_album_of(albs, "A1")["fid"], "A1")
+        self.assertIsNone(xact._alb_album_of(albs, "post"))
+
+    def test_emptied_child_rides_its_album(self):
+        """Review B1: the album root + its Video child emptied together
+        → ONE offer for the album, the husk binned WITH the child inside
+        (the child was offered again and torn out of its binned parent);
+        a child emptied while the album still holds shots → no offer."""
+        cache.set("all_tasks", [_row("te", "[Erol - Griffin](eagle://folder/E1)")])
+        self.stash("I6", "I7")                              # E1 root + Video child
+        self.answers = ["Bin + retire"]
+        xact.album_move_to("tv", "A1")
+        self.assertEqual(self.prompts, [("dialog", "Erol - Griffin is empty now · bin it and retire its row?")])
+        moves = [c for c in self.fake.calls if c[0] == "move_folder"]
+        self.assertEqual(moves, [("move_folder", "E1", "BIN")])
+        husk = self.fake.folder_node("E1")
+        self.assertEqual([c["id"] for c in husk["children"]], ["E1V"])   # still inside
+        self.assertIn("E1", [c["id"] for c in self.fake.folder_node("BIN")["children"]])
+        self.assertEqual(self.api.deleted, [(TV_PID, "te")])
+        op = self.ledger()[0]
+        self.assertEqual([f["id"] for f in op["folders"]], ["E1"])
+        self.assertEqual({i["id"] for i in op["items"]}, {"I6", "I7"})
+        toast = self.toasts[-1]
+        self.assertIn("Erol - Griffin → bin", toast)
+        self.assertNotIn("Video", toast)
+
+    def test_child_only_emptied_is_not_offered(self):
+        """Review B1: only the Video child emptied while the album still
+        holds I6 → nothing offered, the child husk stays inside; the
+        group is keyed by the ALBUM so old_base = its name."""
+        self.stash("I7")
+        xact.album_move_to("tv", "A1")
+        self.assertEqual(self.prompted("dialog"), [])
+        self.assertEqual([c for c in self.fake.calls if c[0] == "move_folder"], [])
+        self.assertEqual([c["id"] for c in self.fake.folder_node("E1")["children"]], ["E1V"])
+        self.assertNotIn("kept", self.toasts[-1])
+        self.assertNotIn("Video", self.toasts[-1])
+        # the group is keyed by the ALBUM: old_base = its name, so the
+        # child's shot shed the album's tags for the destination's
+        self.assertEqual(self.fake.items["I7"]["tags"], ["Phillip", "Samurai"])
+
 
 # ───────────────────────────────────────────────── albnew (new album)
 
@@ -522,6 +593,94 @@ class AlbumNew(MoveBase):
         self.assertEqual(self.ledger()[0]["note"].split(" · ")[0], "zeus in Raw")
         self.assertIn("existing album adopted · its row kept", self.toasts[-1])
         self.assertIn("adopted existing Zeus", self.ledger()[0]["note"])
+
+    def test_adopted_album_without_a_row_says_so(self):
+        """Review B4: an adopted folder with no open row gets a row
+        minted, and the toast still says the album was adopted."""
+        self.stash("I1")
+        self.answers = ["zeus"]                                # loose match → B1 adopted
+        xact.album_new("tv", "Raw", "none")
+        self.assertEqual([c for c in self.fake.calls if c[0] == "create_folder"], [])
+        rows = self.api.rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["title"], "[Zeus](eagle://folder/B1)")
+        self.assertEqual(self.fake.items["I1"]["folders"], ["B1"])
+        toast = self.toasts[-1]
+        self.assertTrue(toast.startswith("➕ Zeus · 01 Raw · 1 shots"), toast)
+        self.assertIn("existing album adopted", toast)
+        self.assertNotIn("its row kept", toast)
+        self.assertIn("📸raw row", toast)
+
+    def _logbook(self, tid, title, eagle=""):
+        lb = {"id": tid, "projectId": REC, "_projectId": REC, "kind": "NOTE",
+              "title": title, "tags": ["🗂️logbook"], "status": 0,
+              "content": (f"👤 {CUST_A} · Started 2026-03-01 · Finished -\n"
+                          "Paid: - · 0 sessions\n" + eagle +
+                          "\n## Sessions\n\n## Notes\n")}
+        cache.set("all_notes", [dict(lb)])
+        self.api.tasks[tid] = dict(lb)
+        return lb
+
+    def test_existing_logbook_is_linked_not_minted(self):
+        """Review B3: Phillip already has '🎨 Phillip • Dragon' (no
+        album yet - the booking road) → the new album LINKS it: no
+        twin logbook, no date/state prompt, its 🦅 line → the album
+        under ITS list (trap 16), the row body carries its link."""
+        self._logbook("LBD", "🎨 Phillip • Dragon")
+        self.stash("I3")
+        self.answers = ["dragon"]                              # casefold match
+        xact.album_new("tv", "Edit", "ca")
+        self.assertEqual(self.api.logbooks(), [])              # nothing minted
+        self.assertEqual(self.prompted("date"), [])
+        self.assertEqual(self.prompted("dialog"), [])
+        self.assertIn(("create_folder", "Phillip - dragon", "edit"), self.fake.calls)
+        ups = [u for u in self.api.updates if u[0] == "LBD"]
+        self.assertEqual(len(ups), 1)
+        self.assertEqual((ups[0][1], ups[0][2]["projectId"]), (REC, REC))
+        body = self.api.tasks["LBD"]["content"]
+        self.assertIn("🦅 [Eagle folder](eagle://folder/NEW1) · TV", body)
+        self.assertIn("🎬 TV", body)
+        self.assertIn("## Sessions", body)
+        self.assertEqual(cache.find_task("LBD")["content"], body)
+        rows = self.api.rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["content"],
+                         f"🎨 [🎨 Phillip • Dragon](https://ticktick.com/webapp/#p/{REC}/tasks/LBD)")
+        self.assertEqual(rows[0]["tags"], ["📸edit"])
+        self.assertEqual(self.api.moves, [])                    # never archived
+        op = self.ledger()[0]
+        self.assertEqual([(t["kind"], t["action"]) for t in op["ticktick"]],
+                         [("logbook", "repointed"), ("row", "minted")])
+        self.assertEqual(op["ticktick"][0]["prior"], {"eagle": ""})
+        toast = self.toasts[-1]
+        self.assertIn("🎨 existing logbook linked · 🦅 → album", toast)
+        self.assertNotIn("🎨 logbook", toast)                  # the mint's bit
+
+    def test_existing_logbook_on_another_album_keeps_its_eagle_line(self):
+        """The 01 Raw album's logbook stays pointed there when the
+        02 Edit album is born for the same tattoo."""
+        self._logbook("LBD", "🏛️ Phillip • Dragon",
+                      eagle="🦅 [Eagle folder](eagle://folder/A1) · TV\n🎬 TV\n")
+        self.api.tasks["LBD"]["tags"] = ["🗂️archive"]
+        cache.set("all_notes", [dict(self.api.tasks["LBD"])])
+        self.stash("I3")
+        self.answers = ["Dragon"]
+        xact.album_new("tv", "Edit", "ca")
+        self.assertEqual(self.api.logbooks(), [])
+        self.assertEqual([u for u in self.api.updates if u[0] == "LBD"], [])
+        self.assertIn("eagle://folder/A1", self.api.tasks["LBD"]["content"])
+        rows = self.api.rows()
+        self.assertIn("[🏛️ Phillip • Dragon](https://ticktick.com/webapp/#p/%s/tasks/LBD)" % REC,
+                      rows[0]["content"])
+        self.assertEqual([(t["kind"], t["action"]) for t in self.ledger()[0]["ticktick"]],
+                         [("row", "minted")])
+        self.assertIn("🎨 existing logbook linked", self.toasts[-1])
+        self.assertNotIn("🦅 → album", self.toasts[-1])
+        # a different tattoo of the same customer still mints
+        self.stash("I4")
+        self.answers = ["Phoenix", None, "Still active"]
+        xact.album_new("tv", "Edit", "ca")
+        self.assertEqual([t["title"] for t in self.api.logbooks()], ["🎨 Phillip • Phoenix"])
 
     def test_bad_args_fail_closed(self):
         xact.album_new("tv", "Raw", "none")
