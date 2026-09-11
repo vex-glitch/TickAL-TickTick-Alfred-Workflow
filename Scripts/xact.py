@@ -5518,16 +5518,206 @@ def album_merge(tid, other_fid):
 
 
 # ── Albums: customer later + undo ────────────────────────────────────────
+# 👤 Customer later (ALBUMS_SPEC §5 albcust / albadopt, 2026-09-11): a
+# John Doe pipeline row (body '·', no 🎨 link - the migration minted no
+# logbook because nobody knew the customer) gains its customer AFTER the
+# fact. Everything is ASKED first - customer name (new) · tattoo name ·
+# ONE date when the shots carry none · state - and only then written:
+# customer note (new only) → logbook ('🦅 [Eagle folder](eagle://folder/
+# <fid>) · LIB' + '🎬 LIB', the migration's _ensure_logbook shape;
+# Finished → cr.finish_logbook, archived under the Started year) → the
+# album + row title + shots renamed '{C} - {T}' through the SHARED rename
+# ripple the rename block ships (_alb_rename_ripple, resolved at call
+# time and NEVER defined here) → the row body's 🎨 link (the
+# _mint_raw_task body shape) → ONE ledger op. Fails CLOSED: a cancel
+# before the first write is a plain 'Cancelled'; an exception after it
+# toasts what landed and writes no ledger op. Proven over fakes in
+# tests/test_alb_adopt.py - nothing here runs live in tests.
+_ALB_ADOPT_DATE_PROMPT = ("When was it? Date or year "
+                         "(OK = unknown · Esc cancels)")
+
+
+def _alb_lib_label(lib):
+    """The header label of a content library ('TV' / 'FM' / 'STUDIO'):
+    migration._CDEST_LABEL (the 🎬 vocabulary) when importable, else
+    upper() - identical for the three content libraries."""
+    try:
+        from migration import _CDEST_LABEL as labels
+    except Exception:
+        labels = {}
+    return labels.get(lib) or (lib or "").upper()
+
+
+def _alb_adopt_dates(lib, fid):
+    """(started, finished) for the adopted tattoo. The shots' capture days
+    decide SILENTLY (first / last day, albums.capture_days over the
+    album's disk items); with none known, ONE date prompt: an ISO day =
+    a one-day tattoo, OK = unknown ('-' Started, no year tag - never
+    today), Esc → ('CANCEL', None)."""
+    import albums
+    try:
+        days = albums.capture_days(lib, albums.items_of_album(lib, fid))
+    except Exception:
+        days = []
+    if days:
+        return days[0], days[-1]
+    when = _ask_date(_ALB_ADOPT_DATE_PROMPT)
+    if when == "CANCEL":
+        return "CANCEL", None
+    if when is None:
+        return "-", None
+    return when, when
+
+
+def _alb_started_guard(lb):
+    """'Started -' MUST land for an unknown date. create_logbook writes
+    `started or _today()` - the literal '-' is truthy and lands as is
+    today, but a sibling change may re-sign that road - so the header is
+    verified after the create and patched (plus the customer bullet
+    re-synced) when the literal is missing. The patch writes under the
+    note's OWN list with projectId explicit (HANDOFF trap 16)."""
+    import crm_records as cr
+    content = lb.get("content") or ""
+    if " · Started - · " in content.partition("\n")[0]:
+        return lb
+    fixed = re.sub(r"Started \S+", "Started -", content, count=1)
+    if fixed == content:
+        return lb
+    pid = cr.pid_of(lb)
+    cr._api().update_task(lb["id"], pid, current=lb, content=fixed,
+                          projectId=pid)
+    cr._patch_cache(lb["id"], content=fixed)
+    lb = {**lb, "content": fixed}
+    cr.sync_customer_bullet(lb)
+    return lb
+
+
 def album_adopt(tid, who):
-    """👤 albadopt:<tid>:<cust|new>: a John Doe row gains a customer -
-    logbook minted, album + row + shots renamed. STUB."""
-    _crm_say("albadopt · not built yet")
+    """👤 albadopt:<tid>:<cust|new>: a John Doe row gains a customer.
+    who = 'new' (name asked, 👤 note minted) or a customer / lead note
+    id. Asks: tattoo name (default = the album name, the customer's
+    '{C} - ' prefix stripped when typed twice), a date only when the
+    shots carry none (_alb_adopt_dates), state (Still active /
+    Finished). Writes: customer → logbook (🦅 = the row's album, 🎬 =
+    its library; Finished → cr.finish_logbook, when = the last capture
+    day / the typed day / '-' unknown) → _alb_rename_ripple(lib, fid,
+    '{C} - {T}', op, log_tid=, row=) (album + shots + row title) → the
+    row body's 🎨 link via _content_retag → ledger op 'adopt' → toast.
+    Refuses: a row that already links a logbook (✏️ Rename / 🔗 Merge
+    are the verbs then), a row without an Eagle folder link, a missing
+    ripple (the rename branch not merged) - all BEFORE any write."""
+    if not _records_ready():
+        return
+    try:
+        import albums
+        import crm_records as cr
+    except Exception as e:
+        _crm_say(f"👤 albums module missing: {e}")
+        return
+    row, lib, fid, base = _alb_row(tid)
+    if not row or not lib:
+        _crm_say("Not a pipeline row · run tsy")
+        return
+    if not fid:
+        _crm_say(f"👤 {base or 'Row'} carries no Eagle folder link")
+        return
+    if cr.parse_first_link(row.get("content") or ""):
+        _crm_say(f"👤 {base} already has a logbook · ✏️ Rename or 🔗 Merge")
+        return
+    ripple = globals().get("_alb_rename_ripple")
+    if ripple is None:
+        _crm_say("👤 Rename ripple missing · merge the rename branch first")
+        return
+    # ── ask everything first: no write before the last answer
+    cust, new_name = None, ""
+    if who == "new":
+        new_name = (_ask("New customer name?") or "").strip()
+        if not new_name:
+            _crm_say("Cancelled")
+            return
+        cdisp = cr._safe_name(new_name)
+    else:
+        cust = _record_by_id(who)
+        if not cust:
+            _crm_say("Customer not found · run tsy")
+            return
+        cdisp = cr.customer_display(cust)
+    default = base
+    if cdisp and default.startswith(f"{cdisp} - "):
+        default = default[len(cdisp) + 3:]
+    tattoo = (_ask("Tattoo name?", default=default) or "").strip()
+    if not tattoo:
+        _crm_say("Cancelled")
+        return
+    started, finished = _alb_adopt_dates(lib, fid)
+    if started == "CANCEL":
+        _crm_say("Cancelled")
+        return
+    state = _dialog("Tattoo state?", ["Cancel", "Still active", "Finished"],
+                    "Finished")
+    if state not in ("Still active", "Finished"):
+        _crm_say("Cancelled")
+        return
+    # ── write: customer → logbook (→ archive) → ripple → row body → ledger
+    op = albums.new_op("adopt", lib, note=f"{base} → {cdisp} - {tattoo}")
+    landed = []
+    row_pid = row.get("_projectId") or row.get("projectId") or ""
+    prior = {"title": row.get("title") or "",
+             "content": row.get("content") or ""}
+    new_base = base
+    try:
+        if cust is None:
+            cust = cr.create_customer(new_name)
+            op["ticktick"].append({"kind": "customer", "id": cust["id"],
+                                   "pid": cr.pid_of(cust),
+                                   "action": "minted"})
+            landed.append("customer")
+        label = _alb_lib_label(lib)
+        eagle_line = (f"🦅 [Eagle folder](eagle://folder/{fid}) · {label}\n"
+                      f"🎬 {label}")
+        lb = cr.create_logbook(cust, tattoo, started=started,
+                               eagle_line=eagle_line)
+        if started == "-":
+            lb = _alb_started_guard(lb)
+        lb_pid = cr.pid_of(lb)
+        op["ticktick"].append({"kind": "logbook", "id": lb["id"],
+                               "pid": lb_pid, "action": "minted"})
+        landed.append("logbook")
+        if state == "Finished":
+            lb_pid = cr.finish_logbook(lb_pid, lb["id"], when=finished or "-")
+            # the cache carries the archived truth (🏛️ title, new list)
+            lb = dict(cache_store.find_task(lb["id"]) or lb,
+                      projectId=lb_pid, _projectId=lb_pid)
+            landed.append("archived")
+        new_base = cr.logbook_base(lb)
+        ripple(lib, fid, new_base, op, log_tid=lb["id"], row=row)
+        landed.append("renamed")
+        body = f"🎨 {cr.task_link(lb_pid, lb['id'], lb.get('title') or '')}"
+        _content_retag(row, None, None, content=body)
+        piece = next((p for p in op["ticktick"]
+                      if p.get("kind") == "row" and p.get("id") == tid), None)
+        if piece is None:
+            piece = {"kind": "row", "id": tid, "pid": row_pid,
+                     "action": "retitled", "prior": {}}
+            op["ticktick"].append(piece)
+        for k, v in prior.items():
+            piece.setdefault("prior", {}).setdefault(k, v)
+        albums.Ledger().append(op)
+    except Exception as e:
+        _crm_say(f"👤 {base} · stopped: {e}"
+                 + (f" · landed: {', '.join(landed)}" if landed else ""))
+        return
+    n = len(op.get("items") or [])
+    _crm_say(f"👤 {new_base} · logbook"
+             f"{' archived' if state == 'Finished' else ''}"
+             f" · album + row{f' + {n} shots' if n else ''} renamed")
 
 
 def album_undo():
     """↩️ albundo → albums.undo_last(): reverses the Eagle side of the
     last ledger op; the toast lists the TickTick pieces to restore by
-    hand. Guarded: a missing substrate toasts instead of crashing."""
+    hand ('↩️ Nothing to undo' on an empty ledger - Eagle untouched).
+    Guarded: a missing substrate or an AlbumError toasts, never crashes."""
     try:
         import albums
     except Exception as e:
