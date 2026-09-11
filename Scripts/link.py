@@ -17,6 +17,10 @@ Link-road rules (research 2026-09-10 against xact sticky/focus_start):
     generator healed it) resolves to the repeating series.
   • TickTick is launched and awaited before the sticky's window count,
     and the row-click retry is skipped (Vex's hand is in the app).
+  • the FIRST sticky after a TickTick launch fails whichever task it is
+    (TickTick still loading). While TickTick is younger than COLD_S, a
+    "No new sticky" gets ONE retry (_cold_retry; KM routine macros start
+    TickTick cold - Shutdown • Start, 2026-09-11).
   • xact runs in-process on this node's own queue, never re-fired
     through the sequential ET XAct. Exception: journal dialog runs spawn
     DETACHED (xact._pn_bg, output → /tmp/tickal_periodic.log) so minutes
@@ -137,6 +141,41 @@ def _tt_ready(xact, timeout=8.0):
     return False
 
 
+COLD_S = 60        # TickTick younger than this (s) = still warming up
+COLD_WAIT = 1.5    # pause before the one cold-start retry
+
+
+def _tt_age():
+    """Seconds since TickTick launched; None when it isn't running."""
+    try:
+        pid = subprocess.run(["pgrep", "-x", "TickTick"], capture_output=True,
+                             text=True).stdout.split()[0]
+        et = subprocess.run(["ps", "-o", "etime=", "-p", pid], capture_output=True,
+                            text=True).stdout.strip()        # [[dd-]hh:]mm:ss
+        days, _, hms = et.rpartition("-")
+        secs = 0
+        for part in hms.split(":"):
+            secs = secs * 60 + int(part)
+        return secs + (int(days) * 86400 if days else 0)
+    except (IndexError, ValueError, OSError):
+        return None
+
+
+def _cold_retry(call):
+    """Run a sticky-opening call; when TickTick is fresh from launch and no
+    sticky appeared, run it ONCE more after COLD_WAIT. The FIRST sticky
+    after a TickTick launch fails whichever task it is (TickTick still
+    loading: cold-start tests 2026-09-11, 4 of 4, the next one works). On
+    a warm TickTick "No new sticky" means one is already open: no retry."""
+    out = call() or ""
+    if "No new sticky" in out:
+        age = _tt_age()
+        if age is not None and age < COLD_S:
+            time.sleep(COLD_WAIT)
+            out = call() or ""
+    return out
+
+
 # view:<slot> → the Alfred screen BrowseCtx opens (calendar rides OpenCalendar)
 VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
             "crmcal": "ctx:crmcal"}           # exactly what CRM home > Calendar opens
@@ -201,7 +240,7 @@ def run(verb, tid, pid_hint):
     if verb == "notesticky":             # same note as a sticky, no row-click retry
         if not _tt_ready(xact):
             return "🗒️ TickTick not up · no sticky", False
-        return _quiet(xact.pn_sticky, tid, assist=False), True
+        return _cold_retry(lambda: _quiet(xact.pn_sticky, tid, assist=False)), True
     if verb == "view":                   # no ticktick:// route for these
         if tid == "calendar":
             xact._run_trigger("OpenCalendar")                 # its List-menu flow
@@ -209,7 +248,7 @@ def run(verb, tid, pid_hint):
             xact._run_trigger("BrowseCtx", VIEW_CTX[tid])     # an Alfred screen
         return "", True
     if verb in ("money", "moneysticky"):
-        return _money(xact, as_sticky=verb == "moneysticky"), True
+        return _cold_retry(lambda: _money(xact, as_sticky=verb == "moneysticky")), True
     got = _resolve(xact, tid, pid_hint)
     if not got:
         return "🔗 Task not found · sync, then retry", False
@@ -222,7 +261,7 @@ def run(verb, tid, pid_hint):
     parts = []
     if verb in ("focus", "sticky"):
         if _tt_ready(xact):
-            parts.append(_quiet(xact.sticky, pid, tid, assist=False))
+            parts.append(_cold_retry(lambda: _quiet(xact.sticky, pid, tid, assist=False)))
         elif verb == "sticky":
             return "🗒️ TickTick not up · no sticky", False
         else:
