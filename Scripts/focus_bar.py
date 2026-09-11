@@ -94,11 +94,13 @@ def read_state():
     """One snapshot of the session world (no AppKit)."""
     m = {"kind": "idle", "attributed": False, "pid": "", "tid": "",
          "title": "", "paused": False, "visible": True, "focus_st": None,
-         "pomo_remaining": 0}
+         "pomo_remaining": 0, "place_at": None}
     try:
         with open(BAR_STATE) as f:
-            m["visible"] = bool(json.load(f).get("visible", True))
-    except (OSError, ValueError):
+            bs = json.load(f)
+        m["visible"] = bool(bs.get("visible", True))
+        m["place_at"] = bs.get("place_at")      # link.py TICKAL_BAR_AT one-shot
+    except (OSError, ValueError, AttributeError):
         pass
     st = xact._focus_state()
     if st:
@@ -854,6 +856,13 @@ class BarController(NSObject):
                 st = json.load(f)
         except (OSError, ValueError):
             st = {}
+        try:                        # a routine macro's one-shot spot first (_place_at)
+            pa = st.get("place_at")
+            if pa and self._on_screen(float(pa[0]), float(pa[1])):
+                self.panel.setFrameTopLeftPoint_((float(pa[0]), float(pa[1])))
+                return
+        except (TypeError, ValueError, IndexError):
+            pass
         try:
             tl = st.get("top_left")
             if tl:
@@ -863,15 +872,7 @@ class BarController(NSObject):
                 x, top = float(ox), float(oy) + ROW1_H
         except (TypeError, ValueError, IndexError):
             x = top = None
-        ok = False
-        if x is not None:
-            for s in NSScreen.screens():
-                f = s.frame()
-                if (f.origin.x - 10 <= x <= f.origin.x + f.size.width - 60
-                        and f.origin.y + ROW1_H - 10 <= top <= f.origin.y + f.size.height + 10):
-                    ok = True
-                    break
-        if not ok:
+        if x is None or not self._on_screen(x, top):
             scr = NSScreen.mainScreen()
             vf = scr.visibleFrame() if scr else None
             if vf:
@@ -880,6 +881,39 @@ class BarController(NSObject):
             else:
                 x, top = 100.0, 800.0
         self.panel.setFrameTopLeftPoint_((x, top))
+
+    def _on_screen(self, x, top):
+        """This TOP-left keeps the bar grabbable on some screen."""
+        for s in NSScreen.screens():
+            f = s.frame()
+            if (f.origin.x - 10 <= x <= f.origin.x + f.size.width - 60
+                    and f.origin.y + ROW1_H - 10 <= top <= f.origin.y + f.size.height + 10):
+                return True
+        return False
+
+    def _place_at(self, tl):
+        """A routine macro's one-shot spot (link.py TICKAL_BAR_AT writes it
+        as place_at next to top_left): move there, shown or hidden, clear
+        the key, save the spot. A spot on no screen is dropped. Covers the
+        bar that was already up, hidden, or in its idle grace when the macro
+        ran - an AX move can't see an ordered-out panel (Vex 2026-09-11)."""
+        try:
+            x, top = float(tl[0]), float(tl[1])
+            if self._on_screen(x, top):
+                self.panel.setFrameTopLeftPoint_((x, top))
+        except (TypeError, ValueError, IndexError):
+            pass
+        try:
+            with open(BAR_STATE) as f:
+                st = json.load(f)
+            st.pop("place_at", None)
+            tmp = BAR_STATE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(st, f)
+            os.replace(tmp, BAR_STATE)
+        except (OSError, ValueError, AttributeError) as e:
+            _log(f"place_at: {e}")
+        self._persist_origin()
 
     def windowMoved_(self, note):
         self._move_save_at = time.monotonic() + 0.6   # debounce; saved by tick
@@ -1246,6 +1280,8 @@ class BarController(NSObject):
             self._pomo_anchor = (m["pomo_remaining"], time.monotonic())
         task_changed = (m["tid"] != prev.get("tid")) or (m["kind"] != prev.get("kind"))
         self.state = m
+        if m.get("place_at"):
+            self._place_at(m["place_at"])
 
         if m["kind"] == "idle":
             if self.idle_since is None:

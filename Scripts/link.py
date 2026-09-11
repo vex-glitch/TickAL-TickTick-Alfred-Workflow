@@ -24,7 +24,8 @@ Link-road rules (research 2026-09-10 against xact sticky/focus_start):
     already-open sticky); and TICKAL_STICKY_FRAME="x,y,w,h" in the
     environment (KM shell steps only; a URL can't set env) moves the
     step's sticky there, so routine macros land every sticky on Vex's
-    layout (2026-09-11, Shutdown • Start).
+    layout (2026-09-11, Shutdown • Start). TICKAL_BAR_AT="x,y" does the
+    same for the focus bar on focus/timer steps (_bar_call).
   • xact runs in-process on this node's own queue, never re-fired
     through the sequential ET XAct. Exception: journal dialog runs spawn
     DETACHED (xact._pn_bg, output → /tmp/tickal_periodic.log) so minutes
@@ -284,6 +285,62 @@ def _dialogs():
     return [r for r in rows if len(r) == 6]
 
 
+BAR_ENV = "TICKAL_BAR_AT"           # "x,y": where a KM routine macro wants the focus bar
+
+
+def _bar_at():
+    """TICKAL_BAR_AT as (x, y), the bar's TOP-left in AX coords (main
+    screen top-left = 0,0, y down), or None. KM shell steps only, like
+    FRAME_ENV."""
+    try:
+        x, y = (int(float(p)) for p in os.environ.get(BAR_ENV, "").split(","))
+        return x, y
+    except ValueError:
+        return None
+
+
+def _main_h():
+    """Main display height in points (Cocoa y runs UP from its bottom)."""
+    import ctypes
+    import ctypes.util
+
+    class _Rect(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double),
+                    ("w", ctypes.c_double), ("h", ctypes.c_double)]
+    cg = ctypes.cdll.LoadLibrary(ctypes.util.find_library("CoreGraphics"))
+    cg.CGMainDisplayID.restype = ctypes.c_uint32
+    cg.CGDisplayBounds.restype = _Rect
+    cg.CGDisplayBounds.argtypes = [ctypes.c_uint32]
+    return cg.CGDisplayBounds(cg.CGMainDisplayID()).h
+
+
+def _bar_call(xact, call):
+    """Run focus_start / focus_resume; with TICKAL_BAR_AT set the focus bar
+    lands there (Vex 2026-09-11: it came up wherever he last dragged it,
+    not on the Shutdown layout). The spot goes into the bar's state file
+    (Cocoa, y up from the main screen's bottom) as place_at, a one-shot: a
+    spawning bar tries it before its saved top_left (_restore_origin), a
+    RUNNING bar applies it on its next 1 s state tick, shown or hidden;
+    either way it is then cleared (focus_bar _place_at). A spot on no
+    screen changes nothing, and the saved top_left is never overwritten
+    here. Then _bar_wake, so a hidden or dead bar comes back even when the
+    timer was already running. No pid, no AX, no race with a bar in its
+    idle grace (reviews 2026-09-11)."""
+    at = _bar_at()
+    if at is None:
+        return call()
+    try:
+        xact._bar_write(place_at=[float(at[0]), _main_h() - at[1]])
+    except Exception:
+        pass
+    out = call()
+    try:
+        xact._bar_wake()
+    except Exception:
+        pass
+    return out
+
+
 # view:<slot> → the Alfred screen BrowseCtx opens (calendar rides OpenCalendar)
 VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
             "crmcal": "ctx:crmcal"}           # exactly what CRM home > Calendar opens
@@ -356,7 +413,9 @@ def run(verb, tid, pid_hint):
             xact._run_trigger("BrowseCtx", VIEW_CTX[tid])     # an Alfred screen
         return "", True
     if verb in ("money", "moneysticky"):
-        if verb == "moneysticky":
+        if verb == "moneysticky":        # TickTick up BEFORE the snapshots (like notesticky):
+            if not _tt_ready(xact):      # else stickies it reopens at launch look new
+                return "🗒️ TickTick not up · no sticky", False
             return _sticky_call(lambda: _money(xact, as_sticky=True)), True
         return _money(xact), True
     got = _resolve(xact, tid, pid_hint)
@@ -378,10 +437,10 @@ def run(verb, tid, pid_hint):
             parts.append("🗒️ TickTick not up · no sticky")
     if verb in ("focus", "timer"):
         st = xact._focus_state()
-        if st and st.get("tid") == tid and st.get("paused_at"):
-            parts.append(_quiet(xact.focus_resume))    # "focus" on a paused timer = resume it
+        if st and st.get("tid") == tid and st.get("paused_at"):     # "focus" on a paused timer = resume it
+            parts.append(_bar_call(xact, lambda: _quiet(xact.focus_resume)))
         else:
-            parts.append(_quiet(xact.focus_start, pid, tid))
+            parts.append(_bar_call(xact, lambda: _quiet(xact.focus_start, pid, tid)))
     return " · ".join(p for p in parts if p), True
 
 

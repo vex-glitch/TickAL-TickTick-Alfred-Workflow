@@ -9,12 +9,21 @@ third-party tools required.
 
 $1 = tts:<action>   action ∈ quick_add | mini_window | pomo | sticky
 """
+import os
 import sys
 import time
 import plistlib
 import subprocess
 
 DOMAIN = "com.TickTick.task.mac"
+# TickTick is sandboxed: its prefs live in its container. CFPreferences given
+# that plist's PATH as the app id reads ONE key through cfprefsd in ~0.05 s.
+# `defaults export` of the whole domain reads the container file itself and
+# can block behind macOS's app-data gate (hung for minutes from a Claude
+# shell 2026-09-11), so it is only the fallback, and time-boxed.
+CONTAINER_PREFS = os.path.expanduser(
+    f"~/Library/Containers/{DOMAIN}/Data/Library/Preferences/{DOMAIN}")
+EXPORT_TIMEOUT = 5
 
 PREF_KEYS = {
     "quick_add":   "TKQuickAddTaskHotkeyIdentifier",
@@ -39,13 +48,59 @@ MOD_FLAGS = [
 ]
 
 
+def _cf_data(key):
+    """The key's raw bytes via CFPreferences (container path first, then
+    the plain domain), or None."""
+    try:
+        import ctypes
+        import ctypes.util
+        cf = ctypes.cdll.LoadLibrary(ctypes.util.find_library("CoreFoundation"))
+        cf.CFStringCreateWithCString.restype = ctypes.c_void_p
+        cf.CFStringCreateWithCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_uint32]
+        cf.CFPreferencesCopyAppValue.restype = ctypes.c_void_p
+        cf.CFPreferencesCopyAppValue.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        cf.CFGetTypeID.restype = ctypes.c_ulong
+        cf.CFGetTypeID.argtypes = [ctypes.c_void_p]
+        cf.CFDataGetTypeID.restype = ctypes.c_ulong
+        cf.CFDataGetLength.restype = ctypes.c_long
+        cf.CFDataGetLength.argtypes = [ctypes.c_void_p]
+        cf.CFDataGetBytePtr.restype = ctypes.c_void_p
+        cf.CFDataGetBytePtr.argtypes = [ctypes.c_void_p]
+        cf.CFRelease.argtypes = [ctypes.c_void_p]
+
+        def cfstr(s):
+            return cf.CFStringCreateWithCString(None, s.encode(), 0x08000100)   # UTF-8
+
+        k = cfstr(key)
+        try:
+            for app in (CONTAINER_PREFS, DOMAIN):
+                a = cfstr(app)
+                v = cf.CFPreferencesCopyAppValue(k, a)
+                cf.CFRelease(a)
+                if not v:
+                    continue
+                try:
+                    if cf.CFGetTypeID(v) == cf.CFDataGetTypeID():
+                        return ctypes.string_at(cf.CFDataGetBytePtr(v), cf.CFDataGetLength(v))
+                finally:
+                    cf.CFRelease(v)
+        finally:
+            cf.CFRelease(k)
+    except Exception:
+        pass
+    return None
+
+
 def read_shortcut(pref_key):
     """Returns (keycode, [modifier strings]) or None if not assigned."""
-    out = subprocess.run(
-        ["defaults", "export", DOMAIN, "-"],
-        capture_output=True,
-    ).stdout
-    blob = plistlib.loads(out).get(pref_key)
+    blob = _cf_data(pref_key)
+    if blob is None:
+        try:
+            out = subprocess.run(["defaults", "export", DOMAIN, "-"],
+                                 capture_output=True, timeout=EXPORT_TIMEOUT).stdout
+            blob = plistlib.loads(out).get(pref_key)
+        except (subprocess.TimeoutExpired, OSError, ValueError, plistlib.InvalidFileException):
+            blob = None
     if not blob:
         return None
     inner = plistlib.loads(blob)
