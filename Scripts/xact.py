@@ -5086,9 +5086,14 @@ def album_new(lib, stage, who):
 # toasts the error and, when anything was already changed, ledgers the
 # partial op with a STOPPED note so ↩️ Undo can still reverse the Eagle
 # side (the toast lists the TickTick pieces). _alb_rename_ripple is the
-# shared ripple the customer-later road calls too - keep its signature.
+# shared ripple the customer-later road calls too - keep its signature
+# (the live= / body= kwargs are optional: the carried logbook state and
+# the row body so a verb writes each TickTick task ONCE - a re-GET
+# between two writes can serve the pre-write object and revert the
+# first, review 2026-09-11).
 
 _ALB_STAGE_RANK = {"📸raw": 1, "📸edit": 2, "📸post": 3}
+_ALB_LB_TITLE_RE = re.compile(r"^(🎨|🏛️)\s*(?:(.*?) • )?(.*)$")
 
 
 def _alb_eagle():
@@ -5109,18 +5114,58 @@ def _alb_split_base(base):
     return (cust.strip(), tat.strip()) if sep else ("", cust.strip())
 
 
-def _alb_resolve_base(ref_base, typed, known):
+def _alb_resolve_base(ref_base, typed, known, safe=True):
     """The typed name as a full base. known = a logbook is linked, so the
     customer part of ref_base stays: 'Dragon' → 'Phillip - Dragon',
     'Phillip - Dragon' as typed, 'Anubis - Sleeve' → 'Luka - Anubis -
-    Sleeve'. John Doe (or a ref without ' - '): typed is the whole base."""
+    Sleeve'. John Doe (or a ref without ' - '): typed is the whole base.
+    safe: the typed text goes through cr._safe_name first (album_new's
+    rule - a ']' or '(' in the name breaks the row's [title](eagle://)
+    link and the logbook would sanitise on its own, leaving three
+    spellings); a PICKED existing name passes safe=False."""
     typed = " ".join((typed or "").split())
+    if safe:
+        import crm_records as cr
+        typed = cr._safe_name(typed)
     cust, _t = _alb_split_base(ref_base)
     if known and cust:
         if typed.startswith(cust + " - "):
             return typed
         return f"{cust} - {typed}"
     return typed
+
+
+def _alb_lb_parts(title):
+    """('🎨'|'🏛️', customer, tattoo) of a logbook title; ('🎨', '', text)
+    when it is not shaped '{marker} C • T'."""
+    m = _ALB_LB_TITLE_RE.match((title or "").strip())
+    if not m:
+        return "🎨", "", (title or "").strip()
+    return m.group(1), (m.group(2) or "").strip(), (m.group(3) or "").strip()
+
+
+def _alb_lb_title(old_title, tattoo):
+    """cr.rename_logbook's title rule: the '{marker} {C} • ' prefix kept,
+    the tattoo part replaced (sanitised)."""
+    import crm_records as cr
+    m = re.match(r"^((?:🎨|🏛️) .*? • )", old_title or "")
+    return (m.group(1) if m else "🎨 ") + cr._safe_name(tattoo)
+
+
+def _alb_name_taken(alb, fid, new_base, skip=()):
+    """The SIBLING album (same parent, loose name match) that already
+    carries new_base - a rename onto it would mint a twin folder Eagle
+    can never delete. None when free. skip = fids that do not count
+    (the album a merge is about to bin)."""
+    import albums
+    me = alb.get(fid) or {}
+    want = albums._norm(new_base)
+    for a in alb.values():
+        if a.get("fid") in (fid, *skip):
+            continue
+        if a.get("parent") == me.get("parent") and albums._norm(a.get("name") or "") == want:
+            return a
+    return None
 
 
 def _alb_stage_tag(row):
@@ -5175,15 +5220,88 @@ def _alb_subtree_items(eg, node):
     return out
 
 
-def _alb_rename_ripple(lib, fid, new_base, op, log_tid="", row=None):
+def _alb_live_items(eg, node):
+    """LIVE shots of an album subtree in the shape albums.items_of_album
+    gives (child / child_fid = the level-1 subfolder holding the shot,
+    '' at the root; path = the file on disk, from get_items(full=True)
+    when the list is shallow) - what plan_merge and the finals rule read."""
+    out, seen = [], set()
+
+    def take(it, child, child_fid):
+        if not it.get("id") or it.get("id") in seen:
+            return
+        seen.add(it["id"])
+        d = dict(it)
+        d["child"], d["child_fid"] = child, child_fid
+        out.append(d)
+
+    def walk(n, child, child_fid):
+        for it in eg.items_in_folder(n["id"]):
+            take(it, child, child_fid)
+        for c in n.get("children") or []:
+            walk(c, child, child_fid)
+    for c in node.get("children") or []:
+        walk(c, c.get("name") or "", c.get("id") or "")
+    for it in eg.items_in_folder(node["id"]):
+        take(it, "", "")
+    need = [d["id"] for d in out if not (d.get("path") or d.get("filePath"))]
+    if need:
+        for f in eg.get_items(need, full=True) or []:
+            for d in out:
+                if d["id"] == f.get("id"):
+                    d.setdefault("filePath", f.get("filePath") or "")
+                    for k in ("folders", "tags", "name"):
+                        if k not in d and k in f:
+                            d[k] = f[k]
+    for d in out:
+        d["path"] = d.get("path") or d.get("filePath") or ""
+        d.setdefault("folders", [])
+        d.setdefault("tags", [])
+    return out
+
+
+def _alb_album_items(lib, fid):
+    """(items, source) of an album for the merge plan: LIVE when Eagle
+    has that library open (disk metadata lags a fresh move - the ledger
+    would otherwise record stale prior folders), else the disk read;
+    source = 'live' | 'disk'."""
+    import albums
+    eg = _alb_eagle()
+    try:
+        if albums.open_lib() == lib:
+            node = eg.folder_node(fid)
+            if node is not None:
+                return _alb_live_items(eg, node), "live"
+    except eg.EagleError:
+        pass
+    return albums.items_of_album(lib, fid), "disk"
+
+
+def _alb_row_link_swap(row, log_tid, lb_title, body=None):
+    """The row body with the 🎨 link's TEXT set to lb_title (None when
+    nothing changes). body = the body to start from (the cached one
+    otherwise)."""
+    import crm_records as cr
+    cur = body if body is not None else (row.get("content") or "")
+    swapped = cr._link_text_pat(log_tid).sub(
+        lambda m: f"[{lb_title}]{m.group(2)}", cur)
+    return swapped if swapped != cur else None
+
+
+def _alb_rename_ripple(lib, fid, new_base, op, log_tid="", row=None,
+                       live=None, body=None):
     """THE rename ripple (shared with the customer-later road): the Eagle
     folder → new_base, every shot in its subtree rebased by name
     (rebase_name keeps label + number; hand-named shots keep their name)
     and by customer/tattoo tags - ONE update_items, prior state into
-    op['items'] - then the logbook's tattoo part (cr.rename_logbook;
-    the customer part of the note title stays) and the pipeline row's
-    title (+ its 🎨 link text) through _content_retag with a no-op tag
-    swap. row = the cached row dict (looked up by fid when None).
+    op['items'] - then the logbook's tattoo part (the customer part of
+    the note title stays) and the pipeline row's title (+ its 🎨 link
+    text) through _content_retag with a no-op tag swap. row = the cached
+    row dict (looked up by fid when None). live = the logbook's CARRIED
+    state (a verb that already wrote it this run passes what it wrote:
+    the retitle rides on that object, no re-GET; None = cr.rename_logbook
+    reads live). body = a row body the caller built and has NOT written
+    yet: it rides the title write (one write per row).
     Returns {"shots": n, "row": bool, "logbook": bool}."""
     import albums
     import crm_records as cr
@@ -5224,23 +5342,30 @@ def _alb_rename_ripple(lib, fid, new_base, op, log_tid="", row=None):
         raise albums.AlbumError(str(e))
     lb_title = ""
     if log_tid:
-        prior = (cache_store.find_task(log_tid) or {}).get("title") or ""
-        lb_title = cr.rename_logbook(log_tid, _alb_split_base(new_base)[1])
-        op.setdefault("ticktick", []).append({
-            "kind": "logbook", "id": log_tid, "pid": cr.pid_of(log_tid),
-            "action": "renamed", "prior": {"title": prior}})
+        tattoo = _alb_split_base(new_base)[1]
+        if live is not None:
+            lb_title = _alb_lb_title(live.get("title") or "", tattoo)
+            _alb_retitle_logbook(log_tid, lb_title, op, live=live)
+        else:
+            prior = (cache_store.find_task(log_tid) or {}).get("title") or ""
+            lb_title = cr.rename_logbook(log_tid, tattoo)
+            op.setdefault("ticktick", []).append({
+                "kind": "logbook", "id": log_tid, "pid": cr.pid_of(log_tid),
+                "action": "renamed", "prior": {"title": prior}})
     if row is None:
         row = albums.row_for_folder(lib, fid)
     row_done = False
     if row:
         fields = {"title": _eagle_title(new_base, fid)}
         prior = {"title": row.get("title") or ""}
+        if body is not None:
+            fields["content"], prior["content"] = body, row.get("content") or ""
         if lb_title:
-            body = row.get("content") or ""
-            swapped = cr._link_text_pat(log_tid).sub(
-                lambda m: f"[{lb_title}]{m.group(2)}", body)
-            if swapped != body:
-                fields["content"], prior["content"] = swapped, body
+            swapped = _alb_row_link_swap(row, log_tid, lb_title,
+                                         body=fields.get("content"))
+            if swapped is not None:
+                fields["content"] = swapped
+                prior.setdefault("content", row.get("content") or "")
         _content_retag(row, None, None, **fields)
         op.setdefault("ticktick", []).append({
             "kind": "row", "id": row.get("id"),
@@ -5252,7 +5377,9 @@ def _alb_rename_ripple(lib, fid, new_base, op, log_tid="", row=None):
 
 def album_rename(tid):
     """✏️ albrename:<tid>: one prompt (prefilled with the base), then the
-    ripple - folder · shots · row · logbook - one ledger op, one toast."""
+    ripple - folder · shots · row · logbook - one ledger op, one toast.
+    Refuses a name a sibling album already carries (🔗 Merge is the verb
+    then - Eagle cannot delete a twin folder)."""
     t, lib, fid, base = _alb_row(tid)
     if not t or not lib:
         _crm_say("Not a pipeline row · run tsy")
@@ -5273,6 +5400,18 @@ def album_rename(tid):
     new_base = _alb_resolve_base(base, typed, bool(log_tid))
     if new_base == base:
         _crm_say("Same name · nothing to do")
+        return
+    if not new_base:
+        _crm_say("Cancelled")
+        return
+    try:
+        alb = {r["fid"]: r for r in albums.library_albums(lib)}
+    except albums.AlbumError as e:
+        _crm_say(f"✏️ {e}")
+        return
+    twin = _alb_name_taken(alb, fid, new_base)
+    if twin:
+        _crm_say(f"✏️ {twin['name']} exists in {twin['path']} · 🔗 Merge instead")
         return
     op = albums.new_op("rename", lib, note=f"{base} → {new_base}")
     try:
@@ -5303,30 +5442,37 @@ def _alb_cust_disp(lb):
     return cr.customer_display({"title": hit[0]}) if hit else ""
 
 
-def _alb_retitle_logbook(log_tid, new_title, op):
-    """A's note title after B's customer took the tattoo (merge_logbooks
-    swaps the header link only): title under ITS list, caches, link
-    texts on open calendar tasks, the customer bullet."""
+def _alb_retitle_logbook(log_tid, new_title, op, live=None):
+    """A logbook's title: under ITS list, caches, link texts on open
+    calendar tasks, the customer bullet. live = the CARRIED state of a
+    note this verb already wrote (posted as `current`, no re-GET - a
+    lagging read would repost the pre-write content); None = read live.
+    Returns the state as written (the input when nothing changed)."""
     import crm_records as cr
     api = cr._api()
-    live = cr.get_note(log_tid)
+    if live is None:
+        live = cr.get_note(log_tid)
     prior = live.get("title") or ""
     if prior == new_title:
-        return
-    api.update_task(log_tid, live["projectId"], current=live, title=new_title,
-                    projectId=live["projectId"])
+        return live
+    pid = live.get("projectId") or cr.pid_of(live)
+    api.update_task(log_tid, pid, current=live, title=new_title, projectId=pid)
     cr._patch_cache(log_tid, title=new_title)
     cr._ripple_task_link_text(log_tid, new_title)
-    cr.sync_customer_bullet({**live, "title": new_title})
+    out = {**live, "title": new_title, "projectId": pid, "_projectId": pid}
+    cr.sync_customer_bullet(out)
     op.setdefault("ticktick", []).append({
-        "kind": "logbook", "id": log_tid, "pid": live["projectId"],
+        "kind": "logbook", "id": log_tid, "pid": pid,
         "action": "renamed", "prior": {"title": prior}})
+    return out
 
 
 def _alb_relink_task(ct, b_log, a_live, op):
     """A calendar task that linked B's logbook now links A's: a session
     task takes A's next S-number (Consult stays Consult - crmrelink's
-    rule), a Prepare follow-up keeps its title around the swapped link."""
+    rule), a Prepare follow-up keeps its title around the swapped link.
+    a_live = A's CARRIED state (content + title as written this run -
+    never a fresh GET, which can lag and hand out a used S-number)."""
     import crm_records as cr
     title = ct.get("title") or ""
     pid = ct.get("_projectId") or ct.get("projectId") or ""
@@ -5355,11 +5501,14 @@ def _alb_relink_task(ct, b_log, a_live, op):
         "prior": {"title": title}})
 
 
-def _alb_adopt_logbook(row, log_tid, fid, lib, op):
+def _alb_adopt_logbook(row, log_tid, fid, lib, op, title=None, write_row=True):
     """A John Doe row adopts a logbook: the note's 🦅 line → this album
-    (🎬 → this library when it said otherwise), written under ITS list;
-    the row body gains the 🎨 link (a '·' placeholder is replaced, any
-    other body kept below it)."""
+    (🎬 → this library when it said otherwise) and, when `title` is
+    given, the final title - ONE write under ITS list; the row body
+    gains the 🎨 link (a '·' placeholder is replaced, any other body
+    kept below it). write_row=False hands the body back unwritten so
+    the caller's title write carries it (one write per row).
+    Returns (the note as written, the row body)."""
     import crm_records as cr
     api = cr._api()
     live = cr.get_note(log_tid)
@@ -5369,20 +5518,30 @@ def _alb_adopt_logbook(row, log_tid, fid, lib, op):
     if cr.content_dest_of(new) != lib:
         new = cr.set_content_dest(new, lib)
     pid = live["projectId"]
-    api.update_task(log_tid, pid, current=live, content=new, projectId=pid)
+    fields, prior = {"content": new}, {"eagle": prior_fid}
+    if title and title != (live.get("title") or ""):
+        fields["title"], prior["title"] = title, live.get("title") or ""
+    api.update_task(log_tid, pid, current=live, projectId=pid, **fields)
     _patch_content_cache(log_tid, new)
+    out = {**live, **fields, "projectId": pid, "_projectId": pid}
+    if "title" in fields:
+        cr._patch_cache(log_tid, title=title)
+        cr._ripple_task_link_text(log_tid, title)
+        cr.sync_customer_bullet(out)
     op.setdefault("ticktick", []).append({
         "kind": "logbook", "id": log_tid, "pid": pid, "action": "adopted",
-        "prior": {"eagle": prior_fid}})
+        "prior": prior})
     old_body = row.get("content") or ""
-    body = f"🎨 {cr.task_link(pid, log_tid, live.get('title') or '')}"
+    body = f"🎨 {cr.task_link(pid, log_tid, out.get('title') or '')}"
     if old_body.strip() not in ("", "·"):
         body += "\n" + old_body
-    _content_retag(row, None, None, content=body)
-    op["ticktick"].append({
-        "kind": "row", "id": row.get("id"),
-        "pid": row.get("_projectId") or row.get("projectId") or "",
-        "action": "relinked", "prior": {"content": old_body}})
+    if write_row:
+        _content_retag(row, None, None, content=body)
+        op["ticktick"].append({
+            "kind": "row", "id": row.get("id"),
+            "pid": row.get("_projectId") or row.get("projectId") or "",
+            "action": "relinked", "prior": {"content": old_body}})
+    return out, body
 
 
 def _alb_child_fid(a_node, child):
@@ -5400,15 +5559,19 @@ def _alb_child_fid(a_node, child):
 
 def album_merge(tid, other_fid):
     """🔗 albmergeinto:<tid>:<other_fid>: album B (other_fid) folds into
-    the row's album A. Decisions first (name · which customer keeps the
-    tattoo · ONE confirm listing the plan), then the writes in order:
-    (1) TickTick logbooks - both → cr.merge_logbooks (B's open calendar
-    tasks relinked to A), only B → A adopts it; (2) rows - B's → Trash,
-    A takes the later 📸 stage tag; (3) Eagle - twins → Duplicates,
-    B's shots per child into A (children paired by name, created when
-    missing, Portfolio ↔ Portfolio) continuing A's numbering, B's husk →
-    bin, the rename ripple when a new name was chosen; (4) ledger +
-    toast."""
+    the row's album A. Plan first (LIVE items when the library is open,
+    disk otherwise), the finals rule on what would land under A's
+    stage, then the decisions (name · which customer keeps the tattoo ·
+    ONE confirm listing the plan), then the writes in order, each
+    TickTick task written ONCE on carried state: (1) logbooks - both →
+    cr.merge_logbooks (content + year tag + the final title in one
+    write; B's open calendar tasks relinked to A), only B → A adopts
+    it; (2) rows - B's → Trash; (3) Eagle - twins → Duplicates, B's
+    shots per child into A (children paired by name, created when
+    missing, Portfolio ↔ Portfolio) continuing A's numbering, B's husk
+    → bin, the rename ripple when the name changed (the row's title +
+    body ride one write); (4) ledger (A's and B's prior text under the
+    pieces' `backup`) + toast."""
     t, lib, a_fid, a_base = _alb_row(tid)
     if not t or not lib:
         _crm_say("Not a pipeline row · run tsy")
@@ -5449,12 +5612,39 @@ def album_merge(tid, other_fid):
     adopt = bool(b_log and not a_log)
     a_lb = _record_by_id(a_log) if a_log else None
     b_lb = _record_by_id(b_log) if b_log else None
+    # ---- plan (before the questions: a refusal must not cost answers) -
+    try:
+        a_items, _src = _alb_album_items(lib, a_fid)
+        b_items, src = _alb_album_items(lib, other_fid)
+        albums.hash_items(a_items)
+        albums.hash_items(b_items)
+    except albums.AlbumError as e:
+        _crm_say(f"🔗 {e}")
+        return
+    plan = albums.plan_merge(a_items, b_items, a_base, label=label)
+    by_id = {it.get("id"): it for it in b_items}
+    # the finals rule on what lands under A's stage label (a Portfolio
+    # child of B pairs with A's Portfolio child and keeps its finals)
+    check = [by_id[m["id"]] for m in plan["moves"]
+             if m["id"] in by_id and (a_stage == "Portfolio" or m["label"] != "Portfolio")]
+    try:
+        if check and not _alb_finals_check(check, a_stage):
+            _crm_say("Cancelled")
+            return
+    except albums.AlbumError as e:
+        _crm_say(f"🔗 {e}")
+        return
+    n_mv, n_dup = len(plan["moves"]), len(plan["dupes"])
+    new_children = sorted({m["child"] for m in plan["moves"] if m["create"]})
     # ---- decisions ------------------------------------------------------
     NEWN = "✏️ New name…"
-    pick = _choose("Keep which name?", [a_base, b_base, NEWN], default=a_base)
-    if pick is None:
-        _crm_say("Cancelled")
-        return
+    if a_base == b_base:
+        pick = a_base                      # one name: nothing to choose
+    else:
+        pick = _choose("Keep which name?", [a_base, b_base, NEWN], default=a_base)
+        if pick is None:
+            _crm_say("Cancelled")
+            return
     typed = ""
     if pick == NEWN:
         typed = _ask("New album name?", default=a_base)
@@ -5473,28 +5663,43 @@ def album_merge(tid, other_fid):
             _crm_say("Cancelled")
             return
         keep = "b" if ans == other else "a"
+    known = bool(a_log or b_log)
+    ref = b_base if (adopt or (both and keep == "b")) else a_base
     if typed:
-        ref = b_base if (adopt or (both and keep == "b")) else a_base
-        new_base = _alb_resolve_base(ref, typed, bool(a_log or b_log))
+        new_base = _alb_resolve_base(ref, typed, known)
+        if not new_base:
+            _crm_say("Cancelled")
+            return
+        twin = _alb_name_taken(alb, a_fid, new_base, skip=(other_fid,))
+        if twin:
+            _crm_say(f"🔗 {twin['name']} exists in {twin['path']} · pick that album instead")
+            return
     else:
-        new_base = pick
+        # a picked name keeps the survivor's customer part: the tattoo
+        # part of the pick (its own customer part stripped when that
+        # album is logbook-linked) under `ref`'s customer
+        picked_known = bool(a_log) if pick == a_base else bool(b_log)
+        tattoo = _alb_split_base(pick)[1] if picked_known else pick
+        new_base = _alb_resolve_base(ref, tattoo, known, safe=False)
     rename = new_base != a_base
-    # ---- plan -----------------------------------------------------------
-    try:
-        a_items = albums.hash_items(albums.items_of_album(lib, a_fid))
-        b_items = albums.hash_items(albums.items_of_album(lib, other_fid))
-    except albums.AlbumError as e:
-        _crm_say(f"🔗 {e}")
-        return
-    plan = albums.plan_merge(a_items, b_items, a_base, label=label)
-    n_mv, n_dup = len(plan["moves"]), len(plan["dupes"])
-    new_children = sorted({m["child"] for m in plan["moves"] if m["create"]})
+    # the survivor's FINAL logbook title (one write carries it)
+    log_title = None
+    if both or adopt:
+        emo, cust, tat = _alb_lb_parts(((a_lb if both else b_lb) or {}).get("title") or "")
+        if both and keep == "b" and b_disp:
+            cust = b_disp
+        if rename:
+            tat = _alb_split_base(new_base)[1]
+        log_title = f"{emo} {cust} • {cr._safe_name(tat)}" if cust \
+            else f"{emo} {cr._safe_name(tat)}"
     a_tag, b_tag = _alb_stage_tag(t), _alb_stage_tag(b_row)
     later = bool(b_row) and _ALB_STAGE_RANK.get(b_tag, 0) > _ALB_STAGE_RANK.get(a_tag, 0)
     lines = [f"🔗 Merge {b_base} into {a_base}?",
              f"• {n_mv} shots → {a_base}"
              + (f" · {n_dup} twins → Duplicates" if n_dup else "")
              + (f" · new: {', '.join(new_children)}" if new_children else "")]
+    if src == "disk":
+        lines.append("• planned from disk metadata (library not open - may lag a fresh move)")
     if b_row:
         lines.append("• its row → TickTick Trash"
                      + (f" · this row stays {a_tag or 'untagged'} - the album"
@@ -5517,33 +5722,49 @@ def album_merge(tid, other_fid):
                        + (f" → {new_base}" if rename else ""))
     api = cr._api()
     notes, refs, n_moved, log_final = [], 0, 0, a_log
+    lb_live, row_body = None, None
     try:
         if both:
             refs = len(re.findall(r"!\[[^\]]*\]\([^)]+\)",
                                   (b_lb or {}).get("content") or ""))
             b_log_pid = cr.pid_of(b_lb or b_log)      # before the purge
-            res = cr.merge_logbooks(a_log, b_log, keep_customer=keep)
+            res = cr.merge_logbooks(a_log, b_log, keep_customer=keep,
+                                    title=log_title)
+            lb_live = res["live"]
+            bp, ap = res.get("b_prior") or {}, res.get("prior") or {}
             op["ticktick"] += [
-                {"kind": "logbook", "id": b_log, "pid": b_log_pid,
-                 "action": "merged", "prior": {"into": a_log,
-                                               "title": (b_lb or {}).get("title") or ""}},
+                {"kind": "logbook", "id": b_log, "pid": bp.get("pid") or b_log_pid,
+                 "action": "merged",
+                 "prior": {"into": a_log, "title": bp.get("title") or
+                           (b_lb or {}).get("title") or ""},
+                 "backup": {"content": bp.get("content") or "",
+                            "title": bp.get("title") or "",
+                            "tags": list(bp.get("tags") or []),
+                            "pid": bp.get("pid") or b_log_pid}},
                 {"kind": "logbook", "id": a_log, "pid": res["pid"],
-                 "action": "merged", "prior": {"absorbed": b_log}}]
+                 "action": "merged",
+                 "prior": {"absorbed": b_log, "title": ap.get("title") or ""},
+                 "backup": {"content": ap.get("content") or "",
+                            "title": ap.get("title") or "",
+                            "tags": list(ap.get("tags") or [])}}]
             notes.append("logbook merged" + (" · reopened" if res.get("reopened") else ""))
-            if keep == "b" and b_disp:
-                a_live = cr.get_note(a_log)
-                tat = cr.logbook_base(a_live).partition(" - ")[2] or \
-                    _alb_split_base(a_base)[1]
-                emo = "🏛️" if cr.logbook_archived(a_live) else "🎨"
-                _alb_retitle_logbook(a_log, f"{emo} {b_disp} • {tat}", op)
             cal = cr.calendar_tasks_of(b_log, open_only=True)
+            for ct in cal:
+                _alb_relink_task(ct, b_log, lb_live, op)
             if cal:
-                a_live = cr.get_note(a_log)
-                for ct in cal:
-                    _alb_relink_task(ct, b_log, a_live, op)
                 notes.append(f"{len(cal)} calendar task(s) → this logbook")
+            if not rename:
+                swapped = _alb_row_link_swap(t, a_log, lb_live.get("title") or "")
+                if swapped is not None:
+                    _content_retag(t, None, None, content=swapped)
+                    op["ticktick"].append({
+                        "kind": "row", "id": t.get("id"),
+                        "pid": t.get("_projectId") or t.get("projectId") or "",
+                        "action": "relinked", "prior": {"content": t.get("content") or ""}})
         elif adopt:
-            _alb_adopt_logbook(t, b_log, a_fid, lib, op)
+            lb_live, row_body = _alb_adopt_logbook(t, b_log, a_fid, lib, op,
+                                                   title=log_title,
+                                                   write_row=not rename)
             log_final = b_log
             notes.append("logbook adopted")
         if b_row:
@@ -5564,7 +5785,6 @@ def album_merge(tid, other_fid):
         eg = _alb_eagle()
         try:
             eg.ensure_library(lib)
-            by_id = {it.get("id"): it for it in b_items}
             if plan["dupes"]:
                 dup_fid = albums.dup_folder(lib)
                 dupes = [by_id[d["id"]] for d in plan["dupes"] if d["id"] in by_id]
@@ -5596,8 +5816,11 @@ def album_merge(tid, other_fid):
         except eg.EagleError as e:
             raise albums.AlbumError(str(e))
         if rename:
-            _alb_rename_ripple(lib, a_fid, new_base, op, log_tid=log_final, row=t)
+            _alb_rename_ripple(lib, a_fid, new_base, op, log_tid=log_final, row=t,
+                               live=lb_live, body=row_body)
             notes.append(f"renamed → {new_base}")
+        if src == "disk":
+            notes.append("planned from disk metadata")
     except Exception as e:
         _alb_fail(op, e, "🔗 Merge stopped")
         return
