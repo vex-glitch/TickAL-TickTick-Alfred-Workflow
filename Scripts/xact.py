@@ -119,6 +119,21 @@ Editing pipeline (Photos → Eagle CRM → TV/FM - src/eagle.py):
                                     the row's folder → 02 Edit + 📸edit
     xact:eaglego:<lib>:<fid>      ↗️ switch library, open folder
 
+Albums (2026-09-11, ⌘ Actions '🖼 Album…' on a pipeline row; pickers =
+browse.py ctx:albpick / ctx:albcust via the crmbrowse trampoline):
+    xact:albmove:<lib>              📦 Eagle selection → stash → album picker
+                                    ('' lib = the open library; 🎛 Manage)
+    xact:albmoveto:<lib>:<fid>      📦 stashed shots → that album (rebase
+                                    names + tags; emptied source offered)
+    xact:albnew:<lib>:<stage>:<cust|new|none>  ➕ new album (+ logbook +
+                                    row) for the stashed shots
+    xact:albrename:<tid>            ✏️ folder · shots · row · logbook ripple
+    xact:albmerge:<tid>             🔗 → album picker (merge mode)
+    xact:albmergeinto:<tid>:<fid>   🔗 album <fid> → the row's album
+    xact:albcust:<tid>              👤 → customer picker (adopt mode)
+    xact:albadopt:<tid>:<cust|new>  👤 John Doe row gains a customer
+    xact:albundo                    ↩️ albums.undo_last() (Eagle side only)
+
 Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:fx_add:<pid>:<tid>         stage the task = MOVE it under the
                                     CURRENT focus task as a literal subtask
@@ -4507,6 +4522,107 @@ def content_retire(tid):
         except Exception:
             pass
     _crm_say(f"➖ {_task_base(t.get('title') or '')} retired from content")
+
+
+# ── Albums: shared plumbing ──────────────────────────────────────────────
+# ALBUMS (2026-09-11, spec: move · rename · merge · customer-later). The
+# row resolver + the dispatcher trampolines every album verb shares. The
+# three feature blocks BELOW hold STUBS; a feature agent replaces the stubs
+# INSIDE its own block only, nothing outside the four blocks moves.
+# src/albums.py (the substrate) is imported LAZILY, inside the functions -
+# link.py imports xact in-process.
+def _alb_row(tid):
+    """(task, lib, fid, base) of a pipeline row from the cache: lib = its
+    list's CONTENT_DESTS key, fid from the title (both link shapes)."""
+    import areas
+    t = cache_store.find_task(tid) if tid else None
+    if not t:
+        return None, "", "", ""
+    pid = t.get("_projectId") or t.get("projectId") or ""
+    lib = next((k for k, v in areas.CONTENT_DESTS.items() if v[0] == pid), "")
+    title = t.get("title") or ""
+    m = (re.search(r"eagle://folder/([^)\s]+)", title)
+         or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
+    return t, lib, (m.group(1) if m else ""), _task_base(title)
+
+
+def album_merge_pick(tid):
+    """🔗 albmerge:<tid> → the album picker in merge mode (trampoline
+    through the crmbrowse road, like every picker row)."""
+    t, lib, _fid, _base = _alb_row(tid)
+    if not t or not lib:
+        _crm_say("Not a pipeline row · run tsy")
+        return
+    crmbrowse(f"ctx:albpick:merge:{lib}:{tid}")
+
+
+def album_cust_pick(tid):
+    """👤 albcust:<tid> → the customer picker in adopt mode (trampoline);
+    the album's stage rides the ctx ('' when the substrate can't say)."""
+    t, lib, fid, _base = _alb_row(tid)
+    if not t or not lib:
+        _crm_say("Not a pipeline row · run tsy")
+        return
+    stage = ""
+    try:
+        import albums
+        stage = albums.album_stage(lib, fid) or ""
+    except Exception:
+        pass
+    crmbrowse(f"ctx:albcust:{lib}:{stage}:adopt:{tid}")
+
+
+# ── Albums: move ─────────────────────────────────────────────────────────
+def album_move(lib):
+    """📦 albmove:<lib>: albums.selection(lib or open_lib()) → stash →
+    reopen at ctx:albpick:move:<lib>: (crmbrowse). STUB."""
+    _crm_say("albmove · not built yet")
+
+
+def album_move_to(lib, fid):
+    """📦 albmoveto:<lib>:<fid>: unstash → finals rule → move_items →
+    ledger → emptied-source offer → toast. STUB."""
+    _crm_say("albmoveto · not built yet")
+
+
+def album_new(lib, stage, who):
+    """➕ albnew:<lib>:<stage>:<cust|new|none>: new album (+ logbook +
+    row) for the stashed shots, then the move. STUB."""
+    _crm_say("albnew · not built yet")
+
+
+# ── Albums: rename + merge ───────────────────────────────────────────────
+def album_rename(tid):
+    """✏️ albrename:<tid>: folder · shots · row · logbook ripple. STUB."""
+    _crm_say("albrename · not built yet")
+
+
+def album_merge(tid, other_fid):
+    """🔗 albmergeinto:<tid>:<other_fid>: album B (other_fid) → the row's
+    album A - logbooks, rows, Eagle, ledger. STUB."""
+    _crm_say("albmergeinto · not built yet")
+
+
+# ── Albums: customer later + undo ────────────────────────────────────────
+def album_adopt(tid, who):
+    """👤 albadopt:<tid>:<cust|new>: a John Doe row gains a customer -
+    logbook minted, album + row + shots renamed. STUB."""
+    _crm_say("albadopt · not built yet")
+
+
+def album_undo():
+    """↩️ albundo → albums.undo_last(): reverses the Eagle side of the
+    last ledger op; the toast lists the TickTick pieces to restore by
+    hand. Guarded: a missing substrate toasts instead of crashing."""
+    try:
+        import albums
+    except Exception as e:
+        _crm_say(f"↩️ albums module missing: {e}")
+        return
+    try:
+        _crm_say(albums.undo_last() or "↩️ Nothing to undo")
+    except Exception as e:
+        _crm_say(f"↩️ {e}")
 
 
 def eagle_open(rest):
@@ -8916,6 +9032,24 @@ def main():
             crmclose(rest)
         elif verb == "crmyear":
             crmyear(rest)
+        elif verb == "albmove":
+            album_move(rest)
+        elif verb == "albmoveto":
+            lib, fid = rest.split(":", 1); album_move_to(lib, fid)
+        elif verb == "albnew":
+            lib, stage, who = rest.split(":", 2); album_new(lib, stage, who)
+        elif verb == "albrename":
+            album_rename(rest)
+        elif verb == "albmerge":
+            album_merge_pick(rest)
+        elif verb == "albmergeinto":
+            tid, fid = rest.split(":", 1); album_merge(tid, fid)
+        elif verb == "albcust":
+            album_cust_pick(rest)
+        elif verb == "albadopt":
+            tid, who = rest.split(":", 1); album_adopt(tid, who)
+        elif verb == "albundo":
+            album_undo()
         elif verb == "crmrename":
             crmrename(rest)
         elif verb == "crmsummary":

@@ -24,6 +24,13 @@ Levels:
                                         (⏎ args are xact:crmnew_* dialog verbs)
     ctx:crmdone                         open session tasks - ⏎ complete + log
     ctx:crmlog                          records notes - ⏎ log a line
+    ctx:albpick:<mode>:<lib>:<tid>[:<ret>]   album picker, mode = move (the
+                                        stashed Eagle selection → an album,
+                                        ➕ New album rows → albcust) | merge
+                                        (album B → the row's album A)
+    ctx:albcust:<lib>:<stage>:<mode>[:<tid>] customer picker for an album,
+                                        mode = new (stashed shots' new album)
+                                        | adopt (a John Doe row gains one)
 
 Anything after the ctx token is the fuzzy filter query. `ctx:subtasks:<taskId>`
 (single id) is also accepted - the list is then
@@ -2232,6 +2239,9 @@ def render_cmanage(query):
         alfred.item(uid="cm-star", title="⭐ Portfolio Eagle selection",
                     subtitle="Edits → Tattoo Portfolio shelf",
                     arg="xact:portfolio", mods=_picker_mods()),
+        alfred.item(uid="cm-albmove", title="📦 Move Eagle selection…",
+                    subtitle="Shots → another album · new album",
+                    arg="xact:albmove:", mods=_picker_mods()),
         alfred.item(uid="cm-sweep", title="🦅 Eagle sweep",
                     subtitle="Missing skeletons + re-file archived folders",
                     arg="xact:eaglesweep", mods=_picker_mods()),
@@ -2647,6 +2657,218 @@ def render_plfolder(ids, query):
         rows = rows[:1] + (fuzz.filter_and_score(
             query, rows[1:], key_fn=lambda x: x["title"]) or rows[1:])
     return add_back(rows, back)
+
+
+# ── Albums: move · rename · merge · customer-later (2026-09-11) ──────────
+# Two picker screens for the album verbs (xact.py `alb*`, ⌘ Actions
+# '🖼 Album…' on a pipeline row, 🎛 Manage > Content). Both read
+# src/albums.py LAZILY (the substrate: the stash a picker screen inherits
+# from the verb's process, the disk-read album list); a missing module
+# renders one honest row instead of a crash. Disk reads only - looking
+# never switches the Eagle library.
+_ALB_STAGE_DIRS = (("Raw", "01 Raw"), ("Edit", "02 Edit"),
+                   ("Portfolio", "04 Portfolio"))
+
+
+def _alb_missing(back, err=""):
+    return add_back([alfred.item(
+        title="albums module missing",
+        subtitle=(str(err) or "src/albums.py absent") + "  |  ⌃🔙",
+        valid=False)], back)
+
+
+def _alb_row(tid):
+    """(base, fid, lib) of a pipeline row from the cache: base + fid from
+    the title (both link shapes), lib = its list's CONTENT_DESTS key."""
+    t = cache_store.find_task(tid) if tid else None
+    if not t:
+        return "", "", ""
+    title = (t.get("title") or "").strip()
+    mk = re.match(r"^\[(.*?)\]\(\S+?\)$", title)
+    base = (mk.group(1).strip() if mk
+            else re.sub(r"\s*eagle://\S+", "", title).strip())
+    m = (re.search(r"eagle://folder/([^)\s]+)", title)
+         or re.search(r"localhost:41595/folder\?id=([A-Za-z0-9]+)", title))
+    pid = t.get("_projectId") or t.get("projectId") or ""
+    lib = next((k for k, v in _areas.CONTENT_DESTS.items() if v[0] == pid), "")
+    return base, (m.group(1) if m else ""), lib
+
+
+def render_albpick(ids, query):
+    """📦/🔗 Album picker. ctx:albpick:<mode>:<lib>:<tid>[:<ret>]
+    mode=move: head = the stash (n shots · source album(s)); no stash =
+    one 'Select shots in Eagle first' row. Then ➕ New album in 01 Raw /
+    02 Edit / 04 Portfolio → ctx:albcust:<lib>:<stage>:new, then every
+    album of the library (albums.library_albums: 01 Raw, 02 Edit any
+    depth, 04 Portfolio; never 03 Post) → xact:albmoveto:<lib>:<fid>.
+    Portfolio targets say 'finals only'.
+    mode=merge: head = 'Merge into {A}', the row's own album and its
+    children left out → xact:albmergeinto:<tid>:<fid>.
+    Fuzzy on the album name; ⌃ = ret, default ctx:contentpl:<lib>."""
+    mode = ids[0] if ids else "move"
+    lib = ids[1] if len(ids) > 1 else ""
+    tid = ids[2] if len(ids) > 2 else ""
+    ret = ":".join(ids[3:]) if len(ids) > 3 else ""
+    back = ret or f"ctx:contentpl:{lib}"
+    try:
+        import albums
+    except Exception as e:
+        return _alb_missing(back, e)
+    head = []
+    fixed = []
+    sur_fid = ""
+    if mode == "merge":
+        base, sur_fid, _lib = _alb_row(tid)
+        head.append(alfred.item(
+            title=f"🔗 Merge into {base or 'this album'} · pick the album to absorb",
+            subtitle="Its shots · row · logbook fold into this one  |  ⌃🔙",
+            valid=False))
+        chip = "⏎🔗"
+    else:
+        try:
+            st = albums.unstash() or {}
+        except Exception:
+            st = {}
+        shots = st.get("items") or []
+        if not shots:
+            return add_back([alfred.item(
+                title="Select shots in Eagle first",
+                subtitle="Then 📦 Move Eagle selection  |  ⌃🔙",
+                valid=False)], back)
+        names = list((st.get("source_names") or {}).values())
+        n_src = len(st.get("sources") or {})
+        title = f"📦 {len(shots)} shots from {names[0] if names else 'Eagle'}"
+        if n_src > 1:
+            title += f" · {n_src} albums"
+        head.append(alfred.item(title=title,
+                                subtitle="Pick the album they go to  |  ⌃🔙",
+                                valid=False))
+        for stage, folder in _ALB_STAGE_DIRS:
+            fixed.append(alfred.item(
+                uid=f"albp-new-{stage}",
+                title=f"➕ New album in {folder}",
+                subtitle="Customer → name → dates"
+                         + (" · finals only" if stage == "Portfolio" else "")
+                         + "  |  ⏎⚡",
+                arg=f"xact:crmbrowse:ctx:albcust:{lib}:{stage}:new",
+                match=f"new album {folder}", mods=_picker_mods()))
+        chip = "⏎📦"
+    try:
+        albs = albums.library_albums(lib)
+    except Exception as e:
+        head.append(alfred.item(title="🦅 Library unreadable",
+                                subtitle=str(e), valid=False))
+        albs = []
+    by_fid = {a.get("fid"): a for a in albs}
+
+    def under_survivor(a):
+        seen, p = set(), a.get("parent")
+        while p and p not in seen:
+            if p == sur_fid:
+                return True
+            seen.add(p)
+            p = (by_fid.get(p) or {}).get("parent")
+        return False
+
+    rows = []
+    for a in albs:
+        fid = a.get("fid", "")
+        if mode == "merge" and (fid == sur_fid or under_survivor(a)):
+            continue
+        stage = a.get("stage", "")
+        sub = f"{a.get('path') or stage} · 🖼 {a.get('n', 0)}"
+        if mode == "move" and stage == "Portfolio":
+            sub += " · finals only"
+        arg = (f"xact:albmergeinto:{tid}:{fid}" if mode == "merge"
+               else f"xact:albmoveto:{lib}:{fid}")
+        rows.append(alfred.item(
+            uid=f"albp-{fid}", title=a.get("name", ""),
+            subtitle=f"{sub}  |  {chip}", arg=arg,
+            match=a.get("name", ""), mods=_picker_mods()))
+    if not rows:
+        rows = [alfred.item(title="No albums here",
+                            subtitle="01 Raw · 02 Edit · 04 Portfolio hold none",
+                            valid=False)]
+    body = fixed + rows
+    if query:
+        body = fuzz.filter_and_score(
+            query, body, key_fn=lambda x: x.get("match", x["title"])) or body
+    return add_back(head + body, back)
+
+
+def render_albcust(ids, query):
+    """👤 Customer picker for an album. ctx:albcust:<lib>:<stage>:<mode>
+    [:<tid>]. mode=new (the stashed shots' new album): ❓ Don't know ·
+    John Doe album → xact:albnew:<lib>:<stage>:none, ➕ New customer… →
+    …:new, then every customer + lead → …:<custTid>. mode=adopt (a John
+    Doe row gains a customer): ➕ New customer… → xact:albadopt:<tid>:new,
+    customers → xact:albadopt:<tid>:<custTid>. Subtitle = the person's
+    tattoo count. Fuzzy on the name; no hit keeps the ➕/❓ rows (they
+    are new). ⌃ = the album picker (new) / ctx:contentpl:<lib> (adopt)."""
+    lib = ids[0] if ids else ""
+    stage = ids[1] if len(ids) > 1 else ""
+    mode = ids[2] if len(ids) > 2 else "new"
+    tid = ids[3] if len(ids) > 3 else ""
+    back = (f"ctx:contentpl:{lib}" if mode == "adopt"
+            else f"ctx:albpick:move:{lib}:")
+    gate = _records_gate()
+    if gate:
+        return add_back(gate, back)
+    import crm_records as cr
+    folder = dict(_ALB_STAGE_DIRS).get(stage, stage or "album")
+
+    def arg_for(who):
+        return (f"xact:albadopt:{tid}:{who}" if mode == "adopt"
+                else f"xact:albnew:{lib}:{stage}:{who}")
+
+    if mode == "adopt":
+        base = _alb_row(tid)[0]
+        head = alfred.item(title=f"👤 {base or 'This album'} · whose tattoo?",
+                           subtitle="Logbook minted · album + row renamed  |  ⌃🔙",
+                           valid=False)
+    else:
+        head = alfred.item(title=f"📦 New album in {folder} · whose tattoo?",
+                           subtitle="Name + dates asked next  |  ⌃🔙",
+                           valid=False)
+    fixed = []
+    if mode != "adopt":
+        fixed.append(alfred.item(
+            uid="albc-none", title="❓ Don't know · John Doe album",
+            subtitle="Album named after the tattoo · no logbook  |  ⏎⚡",
+            arg=arg_for("none"), match="dont know john doe unknown",
+            mods=_picker_mods()))
+    fixed.append(alfred.item(
+        uid="albc-new", title="➕ New customer…",
+        subtitle="Name asked · customer note minted  |  ⏎⚡",
+        arg=arg_for("new"), match="new customer", mods=_picker_mods()))
+    # tattoo counts: one pass over the logbooks (open + archived)
+    counts, seen_lb = {}, set()
+    for tag in (_areas.LOGBOOK_TAG, _areas.ARCHIVE_TAG):
+        for lb in cr.records_notes(tag):
+            if lb["id"] in seen_lb:
+                continue
+            seen_lb.add(lb["id"])
+            hit = cr.parse_first_link(lb.get("content") or "")
+            if hit:
+                counts[hit[2]] = counts.get(hit[2], 0) + 1
+    rows, seen = [], set()
+    for c in (cr.records_notes(_areas.CUSTOMER_TAG)
+              + cr.records_notes(_areas.LEAD_TAG)):
+        if c["id"] in seen:
+            continue
+        seen.add(c["id"])
+        n = counts.get(c["id"], 0)
+        who = cr.customer_display(c)
+        rows.append(alfred.item(
+            uid=f"albc-{c['id']}",
+            title=f"{'🎣' if cr.is_lead(c) else '👤'} {who}",
+            subtitle=f"{n} tattoo{'' if n == 1 else 's'}  |  ⏎⚡",
+            arg=arg_for(c["id"]), match=who, mods=_picker_mods(),
+            variables=_record_vars(c)))
+    if query:
+        rows = fuzz.filter_and_score(
+            query, rows, key_fn=lambda x: x.get("match", x["title"]))
+    return add_back([head] + fixed + rows, back)
 
 
 def _img_counts():
@@ -3073,6 +3295,9 @@ _MANAGE = {
          "xact:promotesel"),
         ("mg-filed", "📥 File edited shots", "Intake → To post · task → Post",
          "xact:filedited"),
+        # album move: lib resolved from the OPEN library (xact album_move)
+        ("mg-albmove", "📦 Move Eagle selection…",
+         "Shots → another album · new album", "xact:albmove:"),
         ("mg-sweep", "🦅 Eagle sweep", "Missing skeletons + re-file archived folders",
          "xact:eaglesweep"),
     )),
@@ -4714,6 +4939,12 @@ def main():
 
         elif level == "plfolder":
             items = render_plfolder(ids, query)
+
+        elif level == "albpick":
+            items = render_albpick(ids, query)
+
+        elif level == "albcust":
+            items = render_albcust(ids, query)
 
         elif level == "cmanage":
             items = render_cmanage(query)

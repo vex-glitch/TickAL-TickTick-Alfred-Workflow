@@ -133,6 +133,9 @@ def section_name(task):
 # ☑️ TickTick Internals sub-list sentinel: the parent row autocompletes the
 # bar to this and the SF re-runs with it (alfredfiltersresults is off).
 INTERNALS_Q = "☑️ "
+# 🖼 Album… sub-list sentinel (pipeline rows only): same mechanics - the
+# parent row autocompletes the bar to this, the SF re-runs with it.
+ALBUM_Q = "🖼 "
 
 
 # Back is ⌃ everywhere - stamp the ⌃ back-mod on every emitted row
@@ -647,6 +650,10 @@ def main():
                  "xact:portfolio", "portfolio star final", True),
                 ("🖼 Browse photos", "Folders → grid",
                  _photos_arg, "browse photos grid folders", bool(_photos_arg)),
+                # ONE drill row for the album verbs (Vex 2026-09-11):
+                # ⏎ fills the bar with ALBUM_Q, the handler below renders
+                ("🖼 Album…", "Move · merge · rename · customer · undo",
+                 "album", "album move merge rename customer undo folder", True),
                 ("📸 Photo jobs", "Import · file a selection · attach",
                  f"xact:crmbrowse:ctx:lbphotos:{_content_log}", "photo jobs import attach",
                  bool(_content_log)),
@@ -670,6 +677,46 @@ def main():
                                  variables=dict(vars_, task_title=t), match=f"{k} {t}")
                      for (k, t, s, md) in _il]
             _rest = query[len(INTERNALS_Q.strip()):].strip()
+            if _rest:
+                items = fuzz.filter_and_score(_rest, items,
+                                              key_fn=lambda x: x.get("match", x["title"]))
+            _back = alfred.item(title="🔙 Back to actions", subtitle="All actions",
+                                arg="", valid=False, match="back", variables=vars_)
+            _back["autocomplete"] = ""
+            items.append(_back)
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # 🖼 Album… sub-list (pipeline rows): the album verbs behind ONE
+        # parent row, the ☑️ Internals shape (Vex 2026-09-11). lib = the
+        # row's list; the picker screens + xact.py alb* verbs do the work.
+        # 👤 Customer… only on John Doe rows (no 🎨 logbook link in the
+        # body); ↩️ Undo only while the albums ledger holds an op
+        # (src/albums.py is lazy + best-effort here: a missing module
+        # just drops the undo row).
+        if _is_content and query.startswith(ALBUM_Q.strip()):
+            try:
+                import albums as _alb
+                _can_undo = bool(_alb.Ledger().last())
+            except Exception:
+                _can_undo = False
+            _arows = [
+                ("📦 Move Eagle selection…", "Shots → another album · new album",
+                 f"xact:albmove:{_content_lib}", "move eagle selection shots", True),
+                ("🔗 Merge album into this…", "Other album's shots · row · logbook → here",
+                 f"xact:albmerge:{tid}", "merge absorb join", True),
+                ("✏️ Rename album", "Folder · shots · row · logbook",
+                 f"xact:albrename:{tid}", "rename name", True),
+                ("👤 Customer…", "John Doe → customer · logbook minted",
+                 f"xact:albcust:{tid}", "customer adopt john doe logbook",
+                 not _content_log),
+                ("↩️ Undo last album move", "Eagle side back · TickTick by hand",
+                 "xact:albundo", "undo last revert", _can_undo),
+            ]
+            items = [alfred.item(title=t, subtitle=s, arg=a, variables=vars_,
+                                 match=f"{kw} {t}")
+                     for (t, s, a, kw, show) in _arows if show]
+            _rest = query[len(ALBUM_Q.strip()):].strip()
             if _rest:
                 items = fuzz.filter_and_score(_rest, items,
                                               key_fn=lambda x: x.get("match", x["title"]))
@@ -844,6 +891,8 @@ def main():
                                      match=f"{kw} {t}", **extra))
             if a == "internals":      # drill row: ⏎ fills the bar, never fires
                 items[-1].update(arg="", valid=False, autocomplete=INTERNALS_Q)
+            if a == "album":          # same shape: the 🖼 Album… sub-list
+                items[-1].update(arg="", valid=False, autocomplete=ALBUM_Q)
 
         # 🗑️ Delete list - typed confirm, zero canvas: the first row
         # is invalid and autocompletes the bar to "delete list yes"; only then
