@@ -229,3 +229,31 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
                  ("evening", "🌙 Evening journal", "Journal dialogs",
                   f"[🖥 Evening journal]({url('journal', 'evening')})")]
     return rows
+
+
+def sticky_step(before, after):
+    """What a sticky step did, read from TickTick's AXSystemDialog windows
+    around it: (x, y, w, h, sticky, focused) tuples, sticky = 1 for a
+    sticky (AX title EMPTY) and 0 for a task pop-up (titled "Untitled";
+    button counts are no guide - a note sticky showed 5, a pop-up 6).
+    Returns (kind, frame):
+      ("new", frame)  exactly ONE new sticky appeared;
+      ("open", frame) no new one, but focus moved onto a sticky that was
+                      already there (TickTick focuses a task's open sticky);
+      (None, None)    nothing identifiable (nothing changed, two new, a
+                      pop-up) - so a wrong window is never moved."""
+    seen = {tuple(r[:4]) for r in before or ()}
+    new = [r for r in after or () if r[4] and tuple(r[:4]) not in seen]
+    if new:
+        return ("new", tuple(new[0][:4])) if len(new) == 1 else (None, None)
+    was = next((tuple(r[:4]) for r in before or () if r[5]), None)
+    now = next((r for r in after or () if r[5]), None)
+    if now and now[4] and tuple(now[:4]) != was:
+        return ("open", tuple(now[:4]))
+    return (None, None)
+
+
+def sticky_target(before, after):
+    """The (x, y, w, h) a KM routine macro should move after a sticky step
+    (link.py TICKAL_STICKY_FRAME), or None - sticky_step's frame."""
+    return sticky_step(before, after)[1]

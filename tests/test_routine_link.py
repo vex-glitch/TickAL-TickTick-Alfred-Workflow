@@ -186,6 +186,21 @@ check("money sticky row right after money",
 check("money sticky link",
       dict((r[0], r[3]) for r in ilm)["money_sticky"].endswith("?argument=moneysticky)"))
 
+# sticky_step / sticky_target: (x, y, w, h, sticky 1|pop-up 0, focused 1|0)
+ST, SS = rl.sticky_target, rl.sticky_step
+S1, S2 = (10, 10, 400, 900, 1, 0), (500, 10, 400, 900, 1, 0)
+POP = (1600, -800, 480, 580, 0, 0)          # a task pop-up (AX title "Untitled")
+F = lambda r: r[:5] + (1,)                   # the same window, focused
+check("sticky_step: one new sticky", SS([S1], [S1, (900, 10, 300, 300, 1, 1)]) == ("new", (900, 10, 300, 300)))
+check("sticky_step: a new pop-up is not a sticky", SS([S1], [S1, POP]) == (None, None))
+check("sticky_step: new sticky beside a new pop-up", SS([], [POP, S2]) == ("new", (500, 10, 400, 900)))
+check("sticky_step: two new stickies = ambiguous", SS([], [S1, S2]) == (None, None))
+check("sticky_step: already open, focus moved onto it", SS([F(S1), S2], [S1, F(S2)]) == ("open", (500, 10, 400, 900)))
+check("sticky_step: nothing changed", SS([F(S1), S2], [F(S1), S2]) == (None, None))
+check("sticky_step: focus moved to a pop-up", SS([F(S1), POP], [S1, F(POP)]) == (None, None))
+check("sticky_step: empty snapshots", SS([], []) == (None, None) and SS(None, None) == (None, None))
+check("sticky_target = sticky_step's frame", ST([], [S1]) == (10, 10, 400, 900) and ST([S1], [S1]) is None)
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":            # make test / python3 tests/...: exit code
     sys.exit(1 if FAILS else 0)

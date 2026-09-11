@@ -17,10 +17,14 @@ Link-road rules (research 2026-09-10 against xact sticky/focus_start):
     generator healed it) resolves to the repeating series.
   • TickTick is launched and awaited before the sticky's window count,
     and the row-click retry is skipped (Vex's hand is in the app).
-  • the FIRST sticky after a TickTick launch fails whichever task it is
-    (TickTick still loading). While TickTick is younger than COLD_S, a
-    "No new sticky" gets ONE retry (_cold_retry; KM routine macros start
-    TickTick cold - Shutdown • Start, 2026-09-11).
+  • every sticky step runs through _sticky_call (routine_link.sticky_step
+    over TickTick's window snapshots): the FIRST sticky after a TickTick
+    launch fails whichever task it is, so while TickTick is younger than
+    COLD_S a "No new sticky" gets ONE retry (not when focus moved onto an
+    already-open sticky); and TICKAL_STICKY_FRAME="x,y,w,h" in the
+    environment (KM shell steps only; a URL can't set env) moves the
+    step's sticky there, so routine macros land every sticky on Vex's
+    layout (2026-09-11, Shutdown • Start).
   • xact runs in-process on this node's own queue, never re-fired
     through the sequential ET XAct. Exception: journal dialog runs spawn
     DETACHED (xact._pn_bg, output → /tmp/tickal_periodic.log) so minutes
@@ -161,19 +165,123 @@ def _tt_age():
         return None
 
 
-def _cold_retry(call):
-    """Run a sticky-opening call; when TickTick is fresh from launch and no
-    sticky appeared, run it ONCE more after COLD_WAIT. The FIRST sticky
-    after a TickTick launch fails whichever task it is (TickTick still
-    loading: cold-start tests 2026-09-11, 4 of 4, the next one works). On
-    a warm TickTick "No new sticky" means one is already open: no retry."""
+def _sticky_call(call):
+    """Run a sticky-opening call (xact.sticky / pn_sticky / the money
+    sticky) with two KM-routine extras, both driven by TickTick's window
+    snapshots around the step (rl.sticky_step):
+      COLD RETRY - the FIRST sticky after a TickTick launch fails whichever
+        task it is (TickTick still loading; cold-start tests 2026-09-11,
+        old code 0/2, retry 2/2). While TickTick is younger than COLD_S a
+        "No new sticky" gets ONE retry after COLD_WAIT - unless focus moved
+        onto a sticky that was already there (TickTick reopens stickies
+        left open at quit; retrying those only cost ~10 s a step).
+      PLACEMENT - TICKAL_STICKY_FRAME="x,y,w,h" (only a KM shell step can
+        set env; a clicked link can't) moves the step's sticky there: the
+        one new sticky, or the already-open one TickTick focused. Nothing
+        identifiable = nothing moved.
+    A warm TickTick without the env var takes no snapshots at all."""
+    frame = _frame_env()
+    age0 = _tt_age()
+    watch = frame is not None or age0 is None or age0 < COLD_S
+    before = _dialogs() if watch else []
     out = call() or ""
-    if "No new sticky" in out:
+    kind, target = rl.sticky_step(before, _dialogs()) if watch else (None, None)
+    if "No new sticky" in out and kind != "open":
         age = _tt_age()
         if age is not None and age < COLD_S:
             time.sleep(COLD_WAIT)
             out = call() or ""
+            kind, target = rl.sticky_step(before, _dialogs())
+    if frame and target:
+        try:
+            subprocess.run(["osascript", "-e", _MOVE_OSA, *map(str, target + frame)],
+                           capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
     return out
+
+
+FRAME_ENV = "TICKAL_STICKY_FRAME"   # "x,y,w,h": where a KM routine macro wants the sticky
+
+_DIALOGS_OSA = '''
+tell application "System Events"
+	if not (exists process "TickTick") then return ""
+	tell process "TickTick"
+		set fp to {-99999, -99999}
+		set fs to {0, 0}
+		try
+			set fw to value of attribute "AXFocusedWindow"
+			set fp to position of fw
+			set fs to size of fw
+		end try
+		set out to ""
+		repeat with w in (every window whose subrole is "AXSystemDialog")
+			try
+				set p to position of w
+				set s to size of w
+				set t to ""
+				try
+					set t to (value of attribute "AXTitle" of w) as text
+				end try
+				set k to 0
+				if t is "" or t is "missing value" then set k to 1
+				set f to 0
+				if ((item 1 of p) as integer) = ((item 1 of fp) as integer) and ((item 2 of p) as integer) = ((item 2 of fp) as integer) and ((item 1 of s) as integer) = ((item 1 of fs) as integer) and ((item 2 of s) as integer) = ((item 2 of fs) as integer) then set f to 1
+				set out to out & ((item 1 of p) as integer) & "," & ((item 2 of p) as integer) & "," & ((item 1 of s) as integer) & "," & ((item 2 of s) as integer) & "," & k & "," & f & linefeed
+			end try
+		end repeat
+		return out
+	end tell
+end tell'''
+
+_MOVE_OSA = '''on run argv
+	set v to {}
+	repeat with a in argv
+		set end of v to (a as integer)
+	end repeat
+	tell application "System Events"
+		tell process "TickTick"
+			repeat with w in (every window whose subrole is "AXSystemDialog")
+				set p to position of w
+				set s to size of w
+				if ((item 1 of p) as integer) = (item 1 of v) and ((item 2 of p) as integer) = (item 2 of v) and ((item 1 of s) as integer) = (item 3 of v) and ((item 2 of s) as integer) = (item 4 of v) then
+					set position of w to {item 5 of v, item 6 of v}
+					set size of w to {item 7 of v, item 8 of v}
+					set position of w to {item 5 of v, item 6 of v}
+					return "placed"
+				end if
+			end repeat
+		end tell
+	end tell
+	return "not found"
+end run'''
+
+
+def _frame_env():
+    """TICKAL_STICKY_FRAME as (x, y, w, h), or None. Only a KM shell step
+    can set it: a clicked alfred:// link never carries env, so clicks keep
+    TickTick's own remembered sticky spot."""
+    try:
+        x, y, w, h = (int(float(p)) for p in os.environ.get(FRAME_ENV, "").split(","))
+        return (x, y, w, h) if w > 0 and h > 0 else None
+    except ValueError:
+        return None
+
+
+def _dialogs():
+    """TickTick's AXSystemDialog windows: [(x, y, w, h, buttons, focused)]."""
+    try:
+        r = subprocess.run(["osascript", "-e", _DIALOGS_OSA], capture_output=True,
+                           text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    rows = []
+    for ln in r.stdout.splitlines():
+        try:
+            rows.append(tuple(int(p) for p in ln.split(",")))
+        except ValueError:
+            pass
+    return [r for r in rows if len(r) == 6]
 
 
 # view:<slot> → the Alfred screen BrowseCtx opens (calendar rides OpenCalendar)
@@ -240,7 +348,7 @@ def run(verb, tid, pid_hint):
     if verb == "notesticky":             # same note as a sticky, no row-click retry
         if not _tt_ready(xact):
             return "🗒️ TickTick not up · no sticky", False
-        return _cold_retry(lambda: _quiet(xact.pn_sticky, tid, assist=False)), True
+        return _sticky_call(lambda: _quiet(xact.pn_sticky, tid, assist=False)), True
     if verb == "view":                   # no ticktick:// route for these
         if tid == "calendar":
             xact._run_trigger("OpenCalendar")                 # its List-menu flow
@@ -248,7 +356,9 @@ def run(verb, tid, pid_hint):
             xact._run_trigger("BrowseCtx", VIEW_CTX[tid])     # an Alfred screen
         return "", True
     if verb in ("money", "moneysticky"):
-        return _cold_retry(lambda: _money(xact, as_sticky=verb == "moneysticky")), True
+        if verb == "moneysticky":
+            return _sticky_call(lambda: _money(xact, as_sticky=True)), True
+        return _money(xact), True
     got = _resolve(xact, tid, pid_hint)
     if not got:
         return "🔗 Task not found · sync, then retry", False
@@ -261,7 +371,7 @@ def run(verb, tid, pid_hint):
     parts = []
     if verb in ("focus", "sticky"):
         if _tt_ready(xact):
-            parts.append(_cold_retry(lambda: _quiet(xact.sticky, pid, tid, assist=False)))
+            parts.append(_sticky_call(lambda: _quiet(xact.sticky, pid, tid, assist=False)))
         elif verb == "sticky":
             return "🗒️ TickTick not up · no sticky", False
         else:
