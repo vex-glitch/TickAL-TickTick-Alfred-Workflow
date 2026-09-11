@@ -53,6 +53,9 @@ STAGES = ("Raw", "Edit", "Portfolio")
 # Pace between two folder re-parents (HANDOFF_CONTENT trap: back-to-back
 # moves double-parent). Tests set it to 0.
 PACE = 0.4
+# capture_days plausibility window: a camera-clock reset (1970) or a
+# future stamp must not become Started/Finished + the 📦crm<year> tag.
+DAY_FLOOR = "2000-01-01"
 
 
 class AlbumError(Exception):
@@ -236,9 +239,12 @@ def rebased_items(items, new_base, label, existing_names, old_base=None):
     (`existing_names`, extended in-loop so a batch never collides with
     itself), shooting order kept, customer/tattoo tags swapped, every
     other tag kept. A shot already wearing the exact destination name
-    keeps it (a move into the same album renames nothing). old_base
-    names the source album so hand-named shots can shed its tags too.
-    Returns [{"id", "name", "tags"}]."""
+    keeps it (a move into the same album renames nothing). A shelf edit
+    ('• Edit • n', file_edited's export) KEEPS its Edit label wherever
+    it lands (renumbered under the new base) - a raw-named edit is
+    invisible to the 📤 Posted sweep and indistinguishable from the
+    raws. old_base names the source album so hand-named shots can shed
+    its tags too. Returns [{"id", "name", "tags"}]."""
     existing = list(existing_names or [])
     taken = set(existing)
     new_tags = base_tags(new_base)
@@ -248,11 +254,12 @@ def rebased_items(items, new_base, label, existing_names, old_base=None):
     for it in sorted(items, key=_shot_order):
         name = it.get("name") or ""
         b, stage, n = eagle.item_base(name)
-        if b == new_base and stage == label and name not in taken:
+        lab = "Edit" if stage == "Edit" else label
+        if b == new_base and stage == lab and name not in taken:
             nm = name
         else:
-            nm = eagle.item_name(new_base, label,
-                                 eagle.next_index(existing, new_base, label))
+            nm = eagle.item_name(new_base, lab,
+                                 eagle.next_index(existing, new_base, lab))
         existing.append(nm)
         taken.add(nm)
         drop = set(old_lc)
@@ -413,16 +420,24 @@ def selection(lib=None):
     if not sel:
         raise AlbumError("Nothing selected in Eagle")
     ids = [s.get("id") for s in sel if s.get("id")]
+    # item_get_selected is SHALLOW: folders / tags / filePath come from
+    # the full read. It FAILS CLOSED: a half-read selection would stash
+    # folders=[] / tags=[] and ↩️ Undo would later unfile the shots and
+    # wipe their tags (prior state = nothing).
     full = {}
     try:
         for f in eagle.get_items(ids, full=True) or []:
             full[f.get("id")] = f
-    except eagle.EagleError:
-        full = {}
+    except eagle.EagleError as e:
+        raise AlbumError(f"Selection unreadable · {e}")
+    missing = [i for i in ids if i not in full]
+    if missing:
+        raise AlbumError(f"Selection unreadable · {len(missing)} of {len(ids)}"
+                         " shots came back without details")
     try:
         names = _folder_names(eagle.folder_tree())
-    except eagle.EagleError:
-        names = {}
+    except eagle.EagleError as e:
+        raise AlbumError(f"Folder tree unreadable · {e}")
     items, sources = [], {}
     for s in sel:
         f = dict(s)
@@ -584,9 +599,10 @@ def _btime_epoch(path):
 def capture_days(lib, items):
     """Sorted unique ISO days the shots were taken (mdls creation date,
     Eagle btime as the fallback, bulk-export days vetoed - the
-    migration's rules). Paths come from the items ("path"/"filePath");
-    ids without one are looked up live (the open library). [] when no
-    date is known."""
+    migration's rules; days before DAY_FLOOR or after today (UTC) are
+    dropped, so one zeroed camera clock never decides the tattoo).
+    Paths come from the items ("path"/"filePath"); ids without one are
+    looked up live (the open library). [] when no date is known."""
     paths, missing = [], []
     for it in items or []:
         p = it.get("path") or it.get("filePath")
@@ -603,6 +619,7 @@ def capture_days(lib, items):
         return []
     epochs = _mdls(paths) or {}
     veto = _bulk_dates()
+    today = time.strftime("%Y-%m-%d", time.gmtime())
     days = set()
     for p in paths:
         e = epochs.get(p)
@@ -611,7 +628,7 @@ def capture_days(lib, items):
         if e is None:
             continue
         d = time.strftime("%Y-%m-%d", time.gmtime(e))
-        if d in veto:
+        if d in veto or d < DAY_FLOOR or d > today:
             continue
         days.add(d)
     return sorted(days)
@@ -631,35 +648,47 @@ def move_items(lib, items, dest_fid, dest_base, label, ledger_op,
                old_base=None):
     """LIVE: `items` (selection / disk dicts with id, name, folders, tags)
     into album `dest_fid` named `dest_base` under `label`. Membership is
-    REPLACED with [dest_fid] (the move idiom); a shot that also sits on
-    03 Post keeps that shelf. Names + customer/tattoo tags rebased,
-    everything else kept. Prior state lands in ledger_op["items"].
+    REPLACED with [dest_fid] (the move idiom) except: a shot that also
+    sits on 03 Post keeps that shelf, and a Raw/Edit move keeps any
+    placement under 04 Portfolio (the ⭐ dual placement; a move INTO a
+    Portfolio album replaces it - there the Portfolio folder IS the
+    source). Names + customer/tattoo tags rebased, everything else kept.
+    Prior state lands in ledger_op["items"] only once update_items
+    succeeded: nothing moved = nothing ledgered (no phantom ↩️ Undo).
     Returns {"moved": n, "renamed": n}."""
     if not items:
         return {"moved": 0, "renamed": 0}
-    _open_tree(lib)
+    tree = _open_tree(lib)
     try:
         existing = eagle.list_item_names(dest_fid)
         post = (eagle.pipeline_folders(create=False) or {}).get("Post") or ""
+        port = _stage_roots(tree).get("Portfolio") or {}
+        port_ids = set(_folder_names(port.get("children")))
+        keep = {post} if post else set()
+        if dest_fid not in port_ids:
+            keep |= port_ids
+        keep.discard(dest_fid)
         plan = rebased_items(items, dest_base, label, existing,
                              old_base=old_base)
         by_id = {it.get("id"): it for it in items}
-        payload, renamed = [], 0
+        payload, staged, renamed = [], [], 0
         for p in plan:
             it = by_id.get(p["id"]) or {}
             folders = [dest_fid]
-            if post and post in (it.get("folders") or []) and post != dest_fid:
-                folders.append(post)
+            for f in it.get("folders") or []:
+                if f in keep and f not in folders:
+                    folders.append(f)
             payload.append({"id": p["id"], "name": p["name"],
                             "folders": folders})
             if p["name"] != (it.get("name") or ""):
                 renamed += 1
-            ledger_op.setdefault("items", []).append({
+            staged.append({
                 "id": p["id"], "prior_name": it.get("name") or "",
                 "prior_folders": list(it.get("folders") or []),
                 "prior_tags": list(it.get("tags") or []),
                 "name": p["name"], "folders": folders})
         eagle.update_items(payload)
+        ledger_op.setdefault("items", []).extend(staged)
         ids = [p["id"] for p in plan]
         new_lc = {t.lower() for t in base_tags(dest_base)}
         stale = set()
@@ -684,8 +713,10 @@ def move_items(lib, items, dest_fid, dest_base, label, ledger_op,
 def new_album(lib, stage, base, ledger_op):
     """LIVE: create '{base}' under the OPEN library's stage folder
     (created flat at the root when missing). A same-named album already
-    under that stage (loose name match, any depth) is adopted instead of
-    twinned - Eagle cannot delete folders. Returns the fid."""
+    under that stage (loose name match, DIRECT children of the stage
+    root only - a level-2 child of another album such as 'Video' or a
+    copied skeleton's '01 Consultation' is never adopted) is adopted
+    instead of twinned - Eagle cannot delete folders. Returns the fid."""
     if stage not in STAGES:
         raise AlbumError(f"No such stage {stage!r}")
     tree = _open_tree(lib)
@@ -694,17 +725,9 @@ def new_album(lib, stage, base, ledger_op):
         root, _p = _find_node(tree, parent)
         want = _norm(base)
         hit = None
-
-        def walk(nodes):
-            for f in nodes or []:
-                if _norm(f.get("name")) == want:
-                    return f
-                h = walk(f.get("children"))
-                if h:
-                    return h
-            return None
         if root is not None:
-            hit = walk(root.get("children"))
+            hit = next((f for f in root.get("children") or []
+                        if _norm(f.get("name")) == want), None)
         if hit:
             ledger_op["note"] = (ledger_op.get("note") or "") + \
                 f" · adopted existing {hit.get('name')}"

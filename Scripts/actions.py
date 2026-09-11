@@ -691,15 +691,22 @@ def main():
         # parent row, the ☑️ Internals shape (Vex 2026-09-11). lib = the
         # row's list; the picker screens + xact.py alb* verbs do the work.
         # 👤 Customer… only on John Doe rows (no 🎨 logbook link in the
-        # body); ↩️ Undo only while the albums ledger holds an op
-        # (src/albums.py is lazy + best-effort here: a missing module
-        # just drops the undo row).
+        # body); ↩️ Undo only while the albums ledger holds an op, and
+        # the row NAMES that op (verb · note · when) - the ledger is a
+        # stack that persists across days, so ⏎ must say what it
+        # reverses (src/albums.py is lazy + best-effort here: a missing
+        # module just drops the undo row).
         if _is_content and query.startswith(ALBUM_Q.strip()):
             try:
                 import albums as _alb
-                _can_undo = bool(_alb.Ledger().last())
+                _last = _alb.Ledger().last() or {}
             except Exception:
-                _can_undo = False
+                _last = {}
+            _can_undo = bool(_last)
+            _uverb = str(_last.get("verb") or "op")
+            _usub = " · ".join(x for x in (
+                _uverb, str(_last.get("note") or "").strip(),
+                str(_last.get("when") or "")[:16].replace("T", " ")) if x)
             _arows = [
                 ("📦 Move Eagle selection…", "Shots → another album · new album",
                  f"xact:albmove:{_content_lib}", "move eagle selection shots", True),
@@ -710,7 +717,8 @@ def main():
                 ("👤 Customer…", "John Doe → customer · logbook minted",
                  f"xact:albcust:{tid}", "customer adopt john doe logbook",
                  not _content_log),
-                ("↩️ Undo last album move", "Eagle side back · TickTick by hand",
+                (f"↩️ Undo last album {_uverb}",
+                 f"{_usub} · Eagle side back · TickTick by hand",
                  "xact:albundo", "undo last revert", _can_undo),
             ]
             items = [alfred.item(title=t, subtitle=s, arg=a, variables=vars_,

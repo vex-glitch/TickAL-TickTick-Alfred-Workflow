@@ -15,8 +15,10 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "src"))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_ROOT, "src"))
+# the picker + ⌘ Actions tests import browse / actions (Scripts) lazily
+sys.path.insert(0, os.path.join(_ROOT, "Scripts"))
 os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
 os.environ.setdefault("crm_archive_list_id", "ARCHIVE")
 os.environ.setdefault("crm_records_tags",
@@ -306,6 +308,27 @@ class Naming(unittest.TestCase):
         out = albums.rebased_items(items[:1], "Phillip - Samurai", "Portfolio", [])
         self.assertEqual(out[0]["name"], "Phillip - Samurai • Portfolio • 1")
 
+    def test_rebased_items_keeps_an_edit_label(self):
+        # a shelf edit ('• Edit • n', file_edited's export) moved into
+        # an album keeps its Edit label (renumbered under the new base);
+        # the raws beside it take the destination label
+        items = [{"id": "e", "name": "Zeus • Edit • 1", "tags": ["Zeus", "reel"]},
+                 {"id": "r", "name": "Zeus • Raw • 2", "tags": ["Zeus"]}]
+        existing = ["Phillip - Samurai • Raw • 1", "Phillip - Samurai • Edit • 2"]
+        out = {o["id"]: o for o in albums.rebased_items(
+            items, "Phillip - Samurai", "Raw", existing)}
+        self.assertEqual(out["e"]["name"], "Phillip - Samurai • Edit • 3")
+        self.assertEqual(out["e"]["tags"], ["reel", "Phillip", "Samurai"])
+        self.assertEqual(out["r"]["name"], "Phillip - Samurai • Raw • 2")
+        # an edit already wearing the destination name keeps it
+        out = albums.rebased_items(
+            [{"id": "e", "name": "Phillip - Samurai • Edit • 2", "tags": []}],
+            "Phillip - Samurai", "Raw", ["Phillip - Samurai • Raw • 1"])
+        self.assertEqual(out[0]["name"], "Phillip - Samurai • Edit • 2")
+        # a Portfolio target does not relabel an edit either
+        out = albums.rebased_items(items[:1], "X", "Portfolio", [])
+        self.assertEqual(out[0]["name"], "X • Edit • 1")
+
     def test_norm(self):
         self.assertEqual(albums._norm("🗑 Deleted"), "deleted")
         self.assertEqual(albums._norm("04 Portfolio"), "04 portfolio")
@@ -466,6 +489,31 @@ class DiskReaders(Base):
         finally:
             albums._mdls, albums._bulk_dates = self._mdls, self._bulk
 
+    def test_capture_days_plausibility_window(self):
+        # a zeroed camera clock (1970) or a future stamp never decides
+        # Started/Finished + the 📦crm<year> tag; an all-bogus album
+        # reads as dateless (the 'When was it?' prompt)
+        import time as _t
+        items = albums.items_of_album("tv", "B1")     # I3 I4 I5
+        p = {i["id"]: i["path"] for i in items}
+        future = _t.time() + 3 * 86400
+        self._mdls, self._bulk = albums._mdls, albums._bulk_dates
+        albums._mdls = lambda paths: {p["I3"]: 3 * 86400,          # 1970-01-04
+                                      p["I4"]: 1_709_251_200,      # 2024-03-01
+                                      p["I5"]: future}
+        albums._bulk_dates = lambda: set()
+        try:
+            self.assertEqual(albums.capture_days("tv", items), ["2024-03-01"])
+            albums._mdls = lambda paths: {p["I3"]: 3 * 86400, p["I5"]: future}
+            bogus = [i for i in items if i["id"] in ("I3", "I5")]
+            self.assertEqual(albums.capture_days("tv", bogus), [])
+            # today itself is fine; the floor day is inclusive
+            albums._mdls = lambda paths: {p["I3"]: _t.time(),
+                                          p["I5"]: 946_684_800}     # 2000-01-01
+            self.assertEqual(len(albums.capture_days("tv", bogus)), 2)
+        finally:
+            albums._mdls, albums._bulk_dates = self._mdls, self._bulk
+
     def test_file_md5_and_hash_items(self):
         items = albums.items_of_album("tv", "A1") + albums.items_of_album("tv", "B1")
         albums.hash_items(items)
@@ -534,6 +582,14 @@ class PlanMerge(unittest.TestCase):
         self.assertEqual(albums.plan_merge([], [], "X"),
                          {"moves": [], "dupes": [], "renames": []})
 
+    def test_plan_inherits_the_edit_label(self):
+        a = [{"id": "a", "name": "X • Raw • 1", "tags": [], "child": ""}]
+        b = [{"id": "be", "name": "Y • Edit • 1", "tags": ["Y"], "child": ""},
+             {"id": "br", "name": "Y • Raw • 2", "tags": ["Y"], "child": ""}]
+        moves = {m["id"]: m for m in albums.plan_merge(a, b, "X")["moves"]}
+        self.assertEqual(moves["be"]["name"], "X • Edit • 1")
+        self.assertEqual(moves["br"]["name"], "X • Raw • 2")
+
 
 # ───────────────────────────────────── live movers over the fake eagle
 
@@ -562,6 +618,39 @@ class LiveEagle(Base):
         self.assertTrue(sel["items"][0]["path"].endswith(".jpg"))
         self.assertEqual(sel["items"][0]["tags"], ["Phillip", "Samurai", "tv"])
         self.assertEqual(albums.selection("tv")["lib"], "tv")
+
+    def test_selection_fails_closed_on_a_half_read(self):
+        # item_get_selected is shallow (no folders / tags / path); when
+        # the full read fails or comes back short the selection is
+        # REFUSED - a stash with folders=[] would make ↩️ Undo unfile the
+        # shots and wipe their tags
+        self.fake.selected = ["I1", "I2"]
+        self.fake.selected_items = lambda: [{"id": i, "name": self.fake.items[i]["name"]}
+                                            for i in self.fake.selected]
+
+        def boom(*a, **k):
+            raise real_eagle.EagleError("plugin timeout")
+        good = self.fake.get_items
+        self.fake.get_items = boom
+        with self.assertRaises(albums.AlbumError) as cm:
+            albums.selection()
+        self.assertIn("plugin timeout", str(cm.exception))
+        self.fake.get_items = lambda ids, full=True: good(ids[:1], full)   # short
+        with self.assertRaises(albums.AlbumError) as cm:
+            albums.selection()
+        self.assertIn("1 of 2", str(cm.exception))
+        self.fake.get_items = good
+        self.fake.folder_tree = boom
+        with self.assertRaises(albums.AlbumError) as cm:
+            albums.selection()
+        self.assertIn("Folder tree", str(cm.exception))
+        del self.fake.folder_tree
+        sel = albums.selection()
+        self.assertEqual(sel["items"][1]["folders"], ["A1", "post"])
+        self.assertEqual(sel["items"][0]["tags"], ["Phillip", "Samurai", "tv"])
+        # a shot legitimately in no folder (loose at the root) is fine
+        self.fake.items["I1"]["folders"] = []
+        self.assertEqual(albums.selection()["items"][0]["folders"], [])
 
     def test_move_items_rebases_and_ledgers(self):
         op = albums.new_op("move", "tv")
@@ -597,6 +686,64 @@ class LiveEagle(Base):
         self.assertEqual(self.fake.items["I1"]["name"],
                          "Phillip - Samurai • Portfolio • 2")   # continues P1's
 
+    def test_move_items_keeps_the_portfolio_placement(self):
+        # ⭐ dual placement: a raw shot also filed under 04 Portfolio
+        # keeps that placement on a Raw/Edit move ...
+        self.fake.items["I1"]["folders"] = ["A1", "P1"]
+        op = albums.new_op("move", "tv")
+        albums.move_items("tv", [dict(self.fake.items["I1"])], "B1", "Zeus", "Raw",
+                          op, old_base="Phillip - Samurai")
+        self.assertEqual(self.fake.items["I1"]["folders"], ["B1", "P1"])
+        self.assertEqual(op["items"][0]["prior_folders"], ["A1", "P1"])
+        self.assertEqual(op["items"][0]["folders"], ["B1", "P1"])
+        # ... and a shot on the shelf keeps both
+        self.fake.items["I2"]["folders"] = ["A1", "P1", "post"]
+        albums.move_items("tv", [dict(self.fake.items["I2"])], "E1",
+                          "Erol - Griffin", "Raw", op)
+        self.assertEqual(self.fake.items["I2"]["folders"], ["E1", "P1", "post"])
+        # a move INTO a Portfolio album replaces the prior Portfolio
+        # placement (it is the source there), the shelf still kept
+        p2 = self.fake.create_folder("Zeus", parent="port")
+        self.fake.items["I8"]["folders"] = ["P1", "post"]
+        albums.move_items("tv", [dict(self.fake.items["I8"])], p2, "Zeus",
+                          "Portfolio", op)
+        self.assertEqual(self.fake.items["I8"]["folders"], [p2, "post"])
+        albums.Ledger().append(op)
+        # a raw dual-placed shot moved into a Portfolio album: re-filed
+        # (a second op - one op ledgers a shot ONCE, xact's rule)
+        op2 = albums.new_op("move", "tv")
+        albums.move_items("tv", [dict(self.fake.items["I1"])], p2, "Zeus",
+                          "Portfolio", op2)
+        self.assertEqual(self.fake.items["I1"]["folders"], [p2])
+        albums.Ledger().append(op2)
+        # undo puts every placement back, op by op
+        albums.undo_last()
+        self.assertEqual(self.fake.items["I1"]["folders"], ["B1", "P1"])
+        albums.undo_last()
+        self.assertEqual(self.fake.items["I1"]["folders"], ["A1", "P1"])
+        self.assertEqual(self.fake.items["I2"]["folders"], ["A1", "P1", "post"])
+        self.assertEqual(self.fake.items["I8"]["folders"], ["P1", "post"])
+
+    def test_move_items_ledgers_only_after_eagle_moved(self):
+        # the plugin off BEFORE anything moved: nothing ledgered, so no
+        # phantom ↩️ Undo row masks the genuinely undoable op beneath
+        def boom(*a, **k):
+            raise real_eagle.EagleError("plugin off")
+        self.fake.update_items = boom
+        op = albums.new_op("move", "tv")
+        items = albums.items_of_album("tv", "B1")
+        with self.assertRaises(albums.AlbumError):
+            albums.move_items("tv", items, "A1", "Phillip - Samurai", "Raw", op)
+        self.assertEqual(op["items"], [])
+        # a failure AFTER update_items (the tag pass) is a real partial:
+        # the moved shots are ledgered so undo can reverse them
+        del self.fake.update_items
+        self.fake.add_item_tags = boom
+        with self.assertRaises(albums.AlbumError):
+            albums.move_items("tv", items, "A1", "Phillip - Samurai", "Raw", op)
+        self.assertEqual(sorted(e["id"] for e in op["items"]), ["I3", "I4", "I5"])
+        self.assertEqual(self.fake.items["I3"]["folders"], ["A1"])
+
     def test_new_album_creates_or_adopts(self):
         op = albums.new_op("new", "tv")
         fid = albums.new_album("tv", "Raw", "New Guy - Rose", op)
@@ -608,8 +755,14 @@ class LiveEagle(Base):
         self.assertEqual(albums.new_album("tv", "Raw", "zeus", op), "B1")
         self.assertIn("adopted existing Zeus", op["note"])
         self.assertFalse(op["folders"][-1]["created"])
-        # Edit albums may be nested: adoption searches the whole stage
-        self.assertEqual(albums.new_album("tv", "Edit", "VIDEO", op), "E1V")
+        # adoption looks at the stage root's DIRECT children only: a
+        # level-2 child of another album (02 Edit/Erol - Griffin/Video)
+        # is never adopted - a NEW album is created beside Erol - Griffin
+        fid = albums.new_album("tv", "Edit", "VIDEO", op)
+        self.assertNotEqual(fid, "E1V")
+        self.assertIn(("create_folder", "VIDEO", "edit"), self.fake.calls)
+        self.assertTrue(op["folders"][-1]["created"])
+        self.assertEqual(albums.new_album("tv", "Edit", "erol - griffin", op), "E1")
         # Portfolio child of A1 exists under 04 Portfolio; a Raw twin does not
         self.assertEqual(albums.new_album("tv", "Portfolio", "Phillip - Samurai", op), "P1")
         with self.assertRaises(albums.AlbumError):
@@ -923,6 +1076,147 @@ class MergeLive(Base):
         res = cr.merge_logbooks("A", "B")
         self.assertEqual(self.api.deleted, [("ARCHIVE", "B")])
         self.assertIn("### 2026-04-05 · S2", res["content"])
+
+
+# ───────────────────────────── the surfaces: album picker + ⌘ Actions row
+
+def _row(tid, title, content="·", pid=TV_PID, tags=("📸raw",)):
+    return {"id": tid, "projectId": pid, "_projectId": pid, "status": 0,
+            "title": title, "content": content, "tags": list(tags)}
+
+
+class Pickers(Base):
+    """browse.render_albpick over the fixture library (disk reads) and
+    the tmp stash / cache: the finals rule in the merge picker and the
+    move head row that counts album sources only."""
+
+    def test_merge_picker_hides_the_portfolio_twin(self):
+        import browse
+        cache.set("all_tasks", [_row("T1", "[Phillip - Samurai](eagle://folder/A1)")])
+        out = browse.render_albpick(["merge", "tv", "T1"], "")
+        titles = [r["title"] for r in out]
+        self.assertTrue(titles[0].startswith("🔗 Merge into Phillip - Samurai"))
+        self.assertEqual(titles.count("Phillip - Samurai"), 0)   # P1, the twin, gone
+        self.assertEqual(titles[1:], ["Zeus", "Erol - Griffin", "Video"])
+        self.assertTrue(all(r.get("arg", "").startswith("xact:albmergeinto:T1:")
+                            for r in out[1:]))
+
+    def test_merge_picker_portfolio_survivor_lists_finals_only(self):
+        import browse
+        rows = [
+            {"fid": "A1", "name": "Phillip - Samurai", "stage": "Raw", "parent": "raw",
+             "depth": 1, "path": "01 Raw/Phillip - Samurai", "n": 2},
+            {"fid": "B1", "name": "Zeus", "stage": "Raw", "parent": "raw",
+             "depth": 1, "path": "01 Raw/Zeus", "n": 3},
+            {"fid": "P1", "name": "Phillip - Samurai", "stage": "Portfolio",
+             "parent": "port", "depth": 1, "path": "04 Portfolio/Phillip - Samurai", "n": 1},
+            {"fid": "P2", "name": "Zeus", "stage": "Portfolio", "parent": "port",
+             "depth": 1, "path": "04 Portfolio/Zeus", "n": 4},
+        ]
+        cache.set("all_tasks", [_row("T1", "[Phillip - Samurai](eagle://folder/P1)"),
+                                _row("T2", "[Zeus](eagle://folder/B1)")])
+        saved = albums.library_albums
+        albums.library_albums = lambda lib: rows
+        try:
+            out = browse.render_albpick(["merge", "tv", "T1"], "")
+            body = out[1:]
+            self.assertEqual([r["title"] for r in body], ["Zeus"])
+            self.assertEqual(body[0]["arg"], "xact:albmergeinto:T1:P2")
+            self.assertIn("finals only", body[0]["subtitle"])
+            # a Raw survivor: only Raw/Edit albums, no chip
+            out = browse.render_albpick(["merge", "tv", "T2"], "")
+            body = out[1:]
+            self.assertEqual([r["arg"] for r in body], ["xact:albmergeinto:T2:A1"])
+            self.assertNotIn("finals only", body[0]["subtitle"])
+        finally:
+            albums.library_albums = saved
+
+    def test_move_head_counts_albums_not_the_shelf(self):
+        import browse
+        # Eagle listed the shelf first; 03 Post is no album
+        albums.stash({"lib": "tv",
+                      "items": [{"id": "I2", "name": "n", "folders": ["post", "A1"], "tags": []},
+                                {"id": "I1", "name": "n", "folders": ["A1"], "tags": []},
+                                {"id": "I3", "name": "n", "folders": ["B1"], "tags": []},
+                                {"id": "IX", "name": "n", "folders": ["post"], "tags": []},
+                                {"id": "IY", "name": "n", "folders": [], "tags": []}],
+                      "sources": {"post": ["I2", "IX"], "A1": ["I2", "I1"], "B1": ["I3"]},
+                      "source_names": {"post": "03 Post", "A1": "Phillip - Samurai",
+                                       "B1": "Zeus"}})
+        out = browse.render_albpick(["move", "tv", ""], "")
+        self.assertEqual(out[0]["title"],
+                         "📦 5 shots from Phillip - Samurai · 2 albums · 2 loose")
+        albums.stash({"lib": "tv",
+                      "items": [{"id": "IX", "name": "n", "folders": ["post"], "tags": []}],
+                      "sources": {"post": ["IX"]}, "source_names": {"post": "03 Post"}})
+        out = browse.render_albpick(["move", "tv", ""], "")
+        self.assertEqual(out[0]["title"], "📦 1 shots from Eagle · 1 loose")
+        # a source the disk list does not know yet (a fresh folder) is
+        # still named; the inbox and a stage root never are
+        albums.stash({"lib": "tv",
+                      "items": [{"id": "I1", "name": "n", "folders": ["NEW9"], "tags": []},
+                                {"id": "I2", "name": "n", "folders": ["inb", "raw"], "tags": []}],
+                      "sources": {"inb": ["I2"], "raw": ["I2"], "NEW9": ["I1"]},
+                      "source_names": {"inb": "Eagle Inbox/03 TV", "raw": "01 Raw",
+                                       "NEW9": "Fresh - Album"}})
+        out = browse.render_albpick(["move", "tv", ""], "")
+        self.assertEqual(out[0]["title"], "📦 2 shots from Fresh - Album · 1 loose")
+
+
+class ActionsAlbumRow(Base):
+    """The ⌘ Actions 🖼 sub-list (actions.py ALBUM_Q handler) rendered
+    in-process over the tmp cache + ledger: the ↩️ Undo row names the
+    op it reverses."""
+    ENV = {"task_list_id": TV_PID, "task_id": "T1", "item_type": "task",
+           "task_title": "[Zeus](eagle://folder/B1)"}
+
+    def _render(self):
+        import contextlib
+        import io
+        import actions
+        saved = {k: os.environ.get(k) for k in self.ENV}
+        argv = sys.argv
+        os.environ.update(self.ENV)
+        sys.argv = ["actions.py", "🖼"]
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                actions.main()
+        finally:
+            sys.argv = argv
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        return json.loads(buf.getvalue())["items"]
+
+    def test_undo_row_names_the_last_op(self):
+        cache.set("all_tasks", [_row("T1", "[Zeus](eagle://folder/B1)")])
+        rows = self._render()
+        self.assertFalse([r for r in rows if r["arg"] == "xact:albundo"])   # empty ledger
+        albums.Ledger().append(dict(albums.new_op("move", "tv",
+                                                  note="12 shots → Phillip - Samurai"),
+                                    when="2026-09-10T18:05:00"))
+        albums.Ledger().append(dict(albums.new_op("rename", "tv",
+                                                  note="Zeus → Tfb - Zeus"),
+                                    when="2026-09-11T09:12:00"))
+        undo = [r for r in self._render() if r["arg"] == "xact:albundo"]
+        self.assertEqual(len(undo), 1)
+        self.assertEqual(undo[0]["title"], "↩️ Undo last album rename")
+        self.assertEqual(undo[0]["subtitle"],
+                         "rename · Zeus → Tfb - Zeus · 2026-09-11 09:12"
+                         " · Eagle side back · TickTick by hand")
+        # after that op is popped the row names the one beneath it
+        albums.Ledger().pop_last()
+        undo = [r for r in self._render() if r["arg"] == "xact:albundo"]
+        self.assertEqual(undo[0]["title"], "↩️ Undo last album move")
+        self.assertIn("12 shots → Phillip - Samurai · 2026-09-10 18:05",
+                      undo[0]["subtitle"])
+        # undo trail records never surface
+        albums.Ledger().append({"verb": "undo", "lib": "tv", "note": "undid move"})
+        undo = [r for r in self._render() if r["arg"] == "xact:albundo"]
+        self.assertEqual(undo[0]["title"], "↩️ Undo last album move")
 
 
 if __name__ == "__main__":

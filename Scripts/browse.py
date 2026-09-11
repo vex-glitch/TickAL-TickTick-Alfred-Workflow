@@ -2696,14 +2696,19 @@ def _alb_row(tid):
 
 def render_albpick(ids, query):
     """📦/🔗 Album picker. ctx:albpick:<mode>:<lib>:<tid>[:<ret>]
-    mode=move: head = the stash (n shots · source album(s)); no stash =
-    one 'Select shots in Eagle first' row. Then ➕ New album in 01 Raw /
-    02 Edit / 04 Portfolio → ctx:albcust:<lib>:<stage>:new, then every
-    album of the library (albums.library_albums: 01 Raw, 02 Edit any
-    depth, 04 Portfolio; never 03 Post) → xact:albmoveto:<lib>:<fid>.
-    Portfolio targets say 'finals only'.
+    mode=move: head = the stash (n shots · the first SOURCE ALBUM ·
+    'k albums' when several · 'n loose' for shots whose folders are no
+    album - the 03 Post shelf, an inbox, the root - never counted as a
+    source); no stash = one 'Select shots in Eagle first' row. Then ➕
+    New album in 01 Raw / 02 Edit / 04 Portfolio → ctx:albcust:<lib>:
+    <stage>:new, then every album of the library (albums.library_albums:
+    01 Raw, 02 Edit any depth, 04 Portfolio; never 03 Post) →
+    xact:albmoveto:<lib>:<fid>. Portfolio targets say 'finals only'.
     mode=merge: head = 'Merge into {A}', the row's own album and its
-    children left out → xact:albmergeinto:<tid>:<fid>.
+    children left out, and the FINALS RULE in the picker: a Raw/Edit
+    survivor never lists a 04 Portfolio album (its finals would be
+    relabelled Raw), a Portfolio survivor lists only Portfolio albums
+    (chip 'finals only') → xact:albmergeinto:<tid>:<fid>.
     Fuzzy on the album name; ⌃ = ret, default ctx:contentpl:<lib>."""
     mode = ids[0] if ids else "move"
     lib = ids[1] if len(ids) > 1 else ""
@@ -2716,7 +2721,8 @@ def render_albpick(ids, query):
         return _alb_missing(back, e)
     head = []
     fixed = []
-    sur_fid = ""
+    sur_fid = sur_stage = ""
+    st, shots = {}, []
     if mode == "merge":
         base, sur_fid, _lib = _alb_row(tid)
         head.append(alfred.item(
@@ -2735,14 +2741,6 @@ def render_albpick(ids, query):
                 title="Select shots in Eagle first",
                 subtitle="Then 📦 Move Eagle selection  |  ⌃🔙",
                 valid=False)], back)
-        names = list((st.get("source_names") or {}).values())
-        n_src = len(st.get("sources") or {})
-        title = f"📦 {len(shots)} shots from {names[0] if names else 'Eagle'}"
-        if n_src > 1:
-            title += f" · {n_src} albums"
-        head.append(alfred.item(title=title,
-                                subtitle="Pick the album they go to  |  ⌃🔙",
-                                valid=False))
         for stage, folder in _ALB_STAGE_DIRS:
             fixed.append(alfred.item(
                 uid=f"albp-new-{stage}",
@@ -2753,13 +2751,52 @@ def render_albpick(ids, query):
                 arg=f"xact:crmbrowse:ctx:albcust:{lib}:{stage}:new",
                 match=f"new album {folder}", mods=_picker_mods()))
         chip = "⏎📦"
+    lib_err = None
     try:
         albs = albums.library_albums(lib)
     except Exception as e:
-        head.append(alfred.item(title="🦅 Library unreadable",
-                                subtitle=str(e), valid=False))
+        lib_err = alfred.item(title="🦅 Library unreadable",
+                              subtitle=str(e), valid=False)
         albs = []
     by_fid = {a.get("fid"): a for a in albs}
+    if mode == "merge":
+        sur_stage = (by_fid.get(sur_fid) or {}).get("stage") or ""
+        if not sur_stage and sur_fid:
+            try:
+                sur_stage = albums.album_stage(lib, sur_fid) or ""
+            except Exception:
+                sur_stage = ""
+    else:
+        # the head counts ALBUM sources only: a shot on the 03 Post shelf
+        # sits in its album AND on the shelf, and the shelf is no album.
+        # An album = a library_albums entry, or (the disk list lags a
+        # fresh folder / is unreadable) a source whose name is not a
+        # known non-album: shelf, stage root, inbox, bin.
+        src_names = st.get("source_names") or {}
+
+        def is_album_src(f):
+            if f in by_fid:
+                return True
+            nm = albums._norm(src_names.get(f) or "")
+            return bool(nm) and not (
+                re.fullmatch(r"(?:\d+\s*)?(raw|edit|post|portfolio)", nm)
+                or nm in ("deleted", "duplicates")
+                or nm.startswith("eagle inbox"))
+        srcs = [f for f in (st.get("sources") or {}) if is_album_src(f)]
+        names = [src_names.get(f) or (by_fid.get(f) or {}).get("name") or ""
+                 for f in srcs]
+        n_loose = sum(1 for it in shots
+                      if not any(is_album_src(f) for f in it.get("folders") or []))
+        title = f"📦 {len(shots)} shots from {names[0] if names else 'Eagle'}"
+        if len(srcs) > 1:
+            title += f" · {len(srcs)} albums"
+        if n_loose:
+            title += f" · {n_loose} loose"
+        head.append(alfred.item(title=title,
+                                subtitle="Pick the album they go to  |  ⌃🔙",
+                                valid=False))
+    if lib_err:
+        head.append(lib_err)
     # a copied CRM skeleton's empty stage children (01 Consultation …
     # 06 Healed under an 02 Edit album, FM: Shteffi - Ker) are not
     # albums: hidden when deeper than level 1 AND empty; every other
@@ -2782,14 +2819,20 @@ def render_albpick(ids, query):
     rows = []
     for a in albs:
         fid = a.get("fid", "")
-        if mode == "merge" and (fid == sur_fid or under_survivor(a)):
-            continue
+        stage = a.get("stage", "")
+        if mode == "merge":
+            if fid == sur_fid or under_survivor(a):
+                continue
+            # the finals rule, picker half: finals live in 04 Portfolio,
+            # so a Raw/Edit survivor never absorbs a Portfolio album and
+            # a Portfolio survivor absorbs nothing but finals
+            if sur_stage and (stage == "Portfolio") != (sur_stage == "Portfolio"):
+                continue
         if (a.get("depth", 1) > 1 and not a.get("n")
                 and (a.get("name") or "").casefold() in skel):
             continue
-        stage = a.get("stage", "")
         sub = f"{a.get('path') or stage} · 🖼 {a.get('n', 0)}"
-        if mode == "move" and stage == "Portfolio":
+        if stage == "Portfolio":
             sub += " · finals only"
         arg = (f"xact:albmergeinto:{tid}:{fid}" if mode == "merge"
                else f"xact:albmoveto:{lib}:{fid}")
