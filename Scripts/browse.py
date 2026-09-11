@@ -2766,6 +2766,17 @@ def render_albpick(ids, query):
                 sur_stage = albums.album_stage(lib, sur_fid) or ""
             except Exception:
                 sur_stage = ""
+        if sur_fid and not sur_stage and not lib_err:
+            # the row's folder is no album of THIS library (a live-era
+            # row still linking its CRM skeleton, or a folder the disk
+            # list cannot see): merging library albums into it would be
+            # a cross-library move, which Eagle cannot do - say so
+            return add_back([alfred.item(
+                uid="albpick-nolib",
+                title="🔗 This row's album is not in this library",
+                subtitle=f"{lib.upper()} holds no album for it · 🎬 Edit this"
+                         " first  |  ⌃🔙",
+                valid=False)], back)
     else:
         # the head counts ALBUM sources only: a shot on the 03 Post shelf
         # sits in its album AND on the shelf, and the shelf is no album.
