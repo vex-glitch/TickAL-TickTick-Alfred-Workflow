@@ -257,23 +257,41 @@ def _order_children(api, made, pid, parent_id):
 
 
 def _cache_children(made, pid, parent_id):
-    """Put new subtasks into all_tasks so search, the pickers and the focus
-    bar see them before the next sync (the parent is patched in separately)."""
+    """Put new subtasks into BOTH task caches so search, the pickers, the
+    focus bar AND the browse screens see them before the next sync.
+
+    all_tasks alone is not enough: the subtask drill renders from the per-list
+    project_data cache (browse.render_children), so patching only all_tasks
+    gave a parent row that counted "3 Subtasks" over a drill that said "No
+    subtasks" (Vex 2026-09-12). The parent's own patch has mirrored into
+    project_data all along; the children's never did.
+    """
     try:
         projects = cache_store.get("projects") or []
         pname = next((p.get("name", "") for p in projects if p.get("id") == pid),
                      "Inbox" if not pid else "")
-        ids = {k["id"] for k in made}
-        cached = [t for t in (cache_store.get("all_tasks") or [])
-                  if t.get("id") not in ids]
+        entries = []
         for k in made:
             entry = dict(k)
-            entry["parentId"] = parent_id
+            entry["parentId"] = parent_id      # the response says null, it lies
+            entry["projectId"] = entry.get("projectId") or pid
             entry["_projectId"] = pid or "inbox"
             entry["_projectName"] = pname
             entry["_columnName"] = ""
-            cached.append(entry)
-        cache_store.set("all_tasks", cached)
+            entries.append(entry)
+        ids = {e["id"] for e in entries}
+
+        cached = [t for t in (cache_store.get("all_tasks") or [])
+                  if t.get("id") not in ids]
+        cache_store.set("all_tasks", cached + entries)
+
+        key = _pd_key(pid)
+        pd = cache_store.get(key)
+        if pd is not None:
+            pd = dict(pd)
+            pd["tasks"] = ([t for t in pd.get("tasks", [])
+                            if t.get("id") not in ids] + entries)
+            cache_store.set(key, pd)
     except Exception:
         cache_store.invalidate("all_tasks")
 
@@ -815,6 +833,13 @@ def main():
                     new_entry = dict(result)
                     if new_entry.get("tags"):
                         new_entry["tags"] = _norm_tags(new_entry["tags"])
+                    # The create RESPONSE reports parentId null even when the
+                    # task really is attached (the same lie _order_children
+                    # works around). Copying it verbatim cached every subtask
+                    # added from ⌘ Actions as a TOP-LEVEL task, so its parent
+                    # showed the right count and the drill showed nothing.
+                    if payload.get("parentId"):
+                        new_entry["parentId"] = payload["parentId"]
                     new_entry["_projectId"]   = proj_id or "inbox"
                     new_entry["_projectName"] = (proj.get("name", "") if proj
                                                  else ("Inbox" if not proj_id else ""))

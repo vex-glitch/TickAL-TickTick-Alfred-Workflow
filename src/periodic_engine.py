@@ -725,7 +725,34 @@ def _day_money(doc):
     return pm.section_money_sum(msec.body) if msec is not None else None
 
 
-def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None):
+def _people_logged(day):
+    """[(name, text)] for every person card whose Log has an entry stamped
+    `day` - the 👥 side of the house showing up in the daily note (Vex
+    2026-09-12: "if there is people log that day, it should show in summary").
+    Newest first, silent when nothing was logged."""
+    try:
+        import people as _pe
+        if not areas.people_configured():
+            return []
+    except Exception:
+        return []
+    stamp = day.strftime("%Y-%m-%d")
+    out = []
+    for t in (cache_store.get("all_tasks") or []):
+        if (t.get("_projectId") or t.get("projectId")) != areas.PEOPLE_ID:
+            continue
+        title = t.get("title", "")
+        if not _pe.is_person(title) or _pe.is_archive(title):
+            continue
+        name = _pe.person_name(title)
+        for text, ts in _pe.log_entries(t.get("content") or ""):
+            if (ts or "").startswith(stamp):
+                out.append((ts, name, mdtext.flatten_links(text)))
+    out.sort(reverse=True)
+    return [(n, tx) for _ts, n, tx in out]
+
+
+def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
     """Day · Mood · Money · Focus · Completed, in Vex's order (2026-09-12),
     each carrying a compact ▲/▼ against the day before it (Vex, same day:
     "small indicator compared to the day before?").
@@ -765,6 +792,18 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None):
         pfm = (getattr(t2, "focus_minutes", lambda a, b: None)(pday, pday)
                if (t2 and pday) else None)
         lines.append(f"{tab}- Focus: {pm.fmt_hm(fm)}" + dc(fm, pfm or None, "duration"))
+    # the caller's own count lines (Won't do, Entries) sit here, above People
+    lines += list(extra or [])
+    plog = _people_logged(day)
+    if plog:
+        lines.append(f"{tab}- People: {len(plog)}")
+        lines += [f"{tab}\t- {nm}" + (f" · {tx[:48]}" if tx else "")
+                  for nm, tx in plog[:5]]
+        if len(plog) > 5:
+            lines.append(f"{tab}\t- _(+{len(plog) - 5} more)_")
+    # 🚨 Completed goes LAST and nothing may be appended after it (Vex
+    # 2026-09-12: "always keep completed tasks as last bullet point because it
+    # is longest"). Anything new belongs in `extra` or beside People above.
     tops = _completed_tops(day)
     if tops is not None:
         ptops = _completed_tops(pday) if pday else None
@@ -811,10 +850,11 @@ def _fill_daily(doc, p, index, is_today):
         yd2 = yd - timedelta(days=1)
         y2t = lookup(index, pm.period_for("daily", yd2))
         y2doc = ps.parse_sections(y2t.get("content") or "") if y2t else None
-        lines = _recap_lines(yd, t2, ydoc, pm.T2, pday=yd2, pdoc=y2doc)
         wd = _wontdo_between(yd, yd)
-        if wd is not None and len(wd):
-            lines.append(f"{pm.T2}- Won't do: {len(wd)}")
+        yextra = ([f"{pm.T2}- Won't do: {len(wd)}"]
+                  if wd is not None and len(wd) else [])
+        lines = _recap_lines(yd, t2, ydoc, pm.T2, pday=yd2, pdoc=y2doc,
+                             extra=yextra)
         ps.set_body(doc, pm.SEC_YESTERDAY, lines or [f"{pm.T1}_(no data)_"])
 
         # ✅ Tasks merge (sweep already ran in step 0)
@@ -836,13 +876,15 @@ def _fill_daily(doc, p, index, is_today):
         # 📊 Today summary - the SAME shape as ⏪ Yesterday (Vex 2026-09-12)
         nsec = ps.find(doc, pm.SEC_NOTES)
         entries = pm.harvest_entries(nsec.body) if nsec else []
-        sums = _recap_lines(day, t2, doc, pm.T2, pday=yd, pdoc=ydoc)
+        textra = []
         if entries:
             counts = {}
             for _hm, g, _b in entries:
                 counts[g] = counts.get(g, 0) + 1
             detail = " · ".join(f"{n} {g}" for g, n in counts.items())
-            sums.append(f"{pm.T2}- Entries: {len(entries)} ({detail})")
+            textra.append(f"{pm.T2}- Entries: {len(entries)} ({detail})")
+        sums = _recap_lines(day, t2, doc, pm.T2, pday=yd, pdoc=ydoc,
+                            extra=textra)
         ps.set_body(doc, pm.SEC_DAY_SUM, sums or [f"{pm.T1}_(no data)_"])
 
         # 🌅/🌙 journal Q lines seed at refresh (never-empty sections,
