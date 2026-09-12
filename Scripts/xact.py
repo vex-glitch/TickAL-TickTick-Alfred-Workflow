@@ -332,7 +332,7 @@ def buffer_complete():
             api.complete_task(pid, tid)
             done += 1
             completed_tids.add(tid)
-            _pl = person_autolog(tid)   # before the cache drop below
+            _pl = person_autolog(tid) + routine_checkin(tid)   # before the cache drop below
             if _pl and _pl not in plogged:
                 plogged.append(_pl)
             cached = cache_store.get("all_tasks")
@@ -10309,8 +10309,8 @@ def focus_done():
         focus_stop()
         try:
             _api().complete_task(pid, tid)
-            plog = person_autolog(tid)
-            _complete_cache_patch(pid, tid)
+            plog = person_autolog(tid) + routine_checkin(tid)   # the bar's ● is
+            _complete_cache_patch(pid, tid)                     # a completion road too
             print(f"✅ {title[:40]} completed{plog}")
         except Exception as e:
             print(f"✅ complete failed: {type(e).__name__}")
@@ -10321,8 +10321,8 @@ def focus_done():
         pomo_abandon()
         try:
             _api().complete_task(pid, tid)
-            plog = person_autolog(tid)
-            _complete_cache_patch(pid, tid)
+            plog = person_autolog(tid) + routine_checkin(tid)   # the bar's ● is
+            _complete_cache_patch(pid, tid)                     # a completion road too
             print(f"✅ {title[:40]} completed{plog}")
         except Exception as e:
             print(f"✅ complete failed: {type(e).__name__}")

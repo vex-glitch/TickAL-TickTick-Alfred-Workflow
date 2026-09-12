@@ -4619,18 +4619,28 @@ def render_rtrack(ids, query):
     want = [r for r in rt.ROUTINES if r.get("habit")]
     habits = {h["id"]: h for h in (cache_store.get("habits") or [])}
     checks = cache_store.get("habit_checkins") or {}
-    if any(r["habit"] not in habits for r in want):
-        # a habit minted since the last hourly sync: ONE live read, never a
-        # screen that says "not synced yet" about a habit we just made
+    if not query and any(r["habit"] not in habits for r in want):
+        # A habit minted since the last hourly sync: ONE live read, so the
+        # screen never says "not synced yet" about a habit we just made.
+        # Guarded by `not query`: this filter re-runs per KEYSTROKE, and an
+        # id that no longer resolves (deleted habit, registry typo) would
+        # otherwise re-read on every character, forever. What it reads is
+        # written back to the cache, so the next render needs no network.
         try:
             import api_v2
-            live = api_v2.TickTickV2().get_habits()
+            v2 = api_v2.TickTickV2()          # ONE client, not two
+            live = v2.get_habits()
             if live:
                 habits = {h["id"]: h for h in live}
-                fresh = api_v2.TickTickV2().habit_checkins(
-                    [r["habit"] for r in want], hm.stamp(today) - 31)
+                cache_store.set("habits", live)
+                # stamp() packs YYYYMMDD: subtract DAYS from the date, never
+                # from the packed int (20260912 - 31 = 20260881, a stamp no
+                # August day can be below - it silently dropped the month)
+                fresh = v2.habit_checkins([r["habit"] for r in want],
+                                          hm.stamp(today - timedelta(days=32)))
                 if fresh:
                     checks = dict(checks, **fresh)
+                    cache_store.set("habit_checkins", checks)
         except Exception:
             pass
 
@@ -4656,12 +4666,19 @@ def render_rtrack(ids, query):
             uid=f"rk-{r['key']}",
             title=f"{chip} {name}",
             subtitle=f"{' · '.join(bits)}  |  ⏎✅  ⌥📅  ⌃🔙",
+            match=f"{name} {r['key']}",
             arg=f"xact:habit_tick:{r['habit']}",
             valid=True,
+            # a habit row is not a task: clear the task vars the Routines row
+            # exported on its way here, or ⌘ Actions would act on the routine
+            # you pressed ⌘⇧ on, whatever row the cursor is now standing on
+            variables={"task_id": "", "task_list_id": "", "task_title": "",
+                       "item_type": ""},
             mods={
                 "alt": {"arg": "", "subtitle": "📅 Days, un-tick, diary",
-                        "variables": {"browse_ctx": f"ctx:habit:{r['habit']}"}},
-                "cmd": {"arg": "", "subtitle": "⌘ Actions"},
+                        "variables": {"browse_ctx": f"ctx:habit:{r['habit']}",
+                                      "task_id": "", "task_list_id": "",
+                                      "task_title": "", "item_type": ""}},
             }))
     if query:
         rows = [x for x in rows if fuzz.score(query, x["title"]) > 0]

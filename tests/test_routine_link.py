@@ -212,6 +212,34 @@ check("sticky_step: focus moved to a pop-up", SS([F(S1), POP], [S1, F(POP)]) == 
 check("sticky_step: empty snapshots", SS([], []) == (None, None) and SS(None, None) == (None, None))
 check("sticky_target = sticky_step's frame", ST([], [S1]) == (10, 10, 400, 900) and ST([S1], [S1]) is None)
 
+# ── the routine registry (src/routines.py) ─────────────────────────────────
+import routines as rt  # noqa: E402
+
+check("five routines", len(rt.ROUTINES) == 5, len(rt.ROUTINES))
+check("keys unique", len({r["key"] for r in rt.ROUTINES}) == 5)
+check("task ids unique", len({r["tid"] for r in rt.ROUTINES}) == 5)
+check("every routine is complete",
+      all(r.get("tid") and r.get("pid") and r.get("macro") and r.get("habit")
+          for r in rt.ROUTINES),
+      [r["key"] for r in rt.ROUTINES if not r.get("habit")])
+check("task ids parse as link ids",
+      all(rl.parse(f"done:{r['tid']}")[1] == r["tid"] for r in rt.ROUTINES))
+check("habit ids are 24-hex",
+      all(len(r["habit"]) == 24 and all(c in "0123456789abcdef" for c in r["habit"])
+          for r in rt.ROUTINES))
+check("macro uids all valid", all(rt.valid_macro(r["macro"]) for r in rt.ROUTINES))
+check("macro uids unique", len({r["macro"] for r in rt.ROUTINES}) == 5)
+check("habits unique per routine", len({r["habit"] for r in rt.ROUTINES}) == 5)
+check("by_tid finds each", all(rt.by_tid(r["tid"])["key"] == r["key"] for r in rt.ROUTINES))
+check("by_tid misses a stranger (the done: gate refuses any other task)",
+      rt.by_tid("0123456789abcdef01234567") is None)
+check("by_key round trip", all(rt.by_key(r["key"])["tid"] == r["tid"] for r in rt.ROUTINES))
+check("macro_url shape",
+      rt.macro_url(rt.ROUTINES[0]["macro"]).startswith("kmtrigger://macro="))
+check("every routine has a mintable Finish link",
+      all(rl.url("done", r["tid"], r["pid"]).startswith("alfred://runtrigger/")
+          for r in rt.ROUTINES))
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":            # make test / python3 tests/...: exit code
     sys.exit(1 if FAILS else 0)

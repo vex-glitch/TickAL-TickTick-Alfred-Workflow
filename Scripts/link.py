@@ -101,6 +101,34 @@ def _quiet(fn, *a, **kw):
     return " · ".join(ln.strip() for ln in buf.getvalue().splitlines() if ln.strip())
 
 
+def _rolled_past_today(xact, pid, tid):
+    """A refusal line when this routine is already finished for now, else "".
+    A repeating task keeps its id and rolls its due date forward on
+    completion, so "already done" reads as "due after today". Fails OPEN (a
+    live read that errors returns "", the click goes through): a missed
+    refusal costs one extra completion, a false refusal costs the routine."""
+    try:
+        t = xact._api().get_task(pid, tid)
+    except Exception:
+        return ""
+    if not t:
+        return ""
+    if t.get("status"):                      # already completed, not repeating
+        return "✅ Already done"
+    raw = t.get("startDate") or t.get("dueDate")
+    if not (raw and t.get("repeatFlag")):
+        return ""
+    try:
+        from datetime import datetime, timezone
+        import filtering
+        day = filtering.utc_str_to_local_date(raw)
+        if day and day > datetime.now(timezone.utc).astimezone().date():
+            return f"✅ Already done · next {day.strftime('%a %d %b')}"
+    except Exception:
+        return ""
+    return ""
+
+
 def _complete(pid, tid, title):
     """Tick a task off through the SAME road the ⇧ chord uses (src/dispatch.py
     "complete:"), so the caches, the session guards and the routine habit
@@ -444,6 +472,21 @@ def run(verb, tid, pid_hint):
     tid, pid, title = got                # tid: a completed instance → its series
     os.environ["task_title"] = title     # sticky()/focus_start() read it
     if verb == "done":                   # the "Finish <routine>" step
+        # ET Link is URL-fired and Alfred never prompts, so this verb is
+        # gated TWICE. (1) It completes a REGISTERED ROUTINE only: every
+        # other verb in this grammar navigates, opens or starts a timer,
+        # and a link that ticks off any task by id is a different animal -
+        # a shared list or a web page could carry one. (2) A routine
+        # already finished today is refused, because a repeating task rolls
+        # forward under the SAME id: a second click would complete
+        # TOMORROW's occurrence (the 5 s debounce does not cover a click a
+        # minute later, or a re-walk of the routine's steps).
+        import routines as rt
+        if not rt.by_tid(tid):
+            return "🔗 Not a routine", False
+        rolled = _rolled_past_today(xact, pid, tid)
+        if rolled:
+            return rolled, False
         return _complete(pid, tid, title), True
     if verb in ("focus", "timer"):
         clash = _timer_clash(xact, tid)
