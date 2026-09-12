@@ -14,6 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 import periodic_sections as ps
+import focus_blocks as fb
 import periodic_model as pm
 
 PASS = FAIL = 0
@@ -388,6 +389,35 @@ check("goal line: whitespace squeezed",
       pm.goal_line("  Ship   it  ") == "- [ ] Ship it")
 check("a link-titled task does not nest in a goal",
       pm.goal_line("x", "P", "c" * 24, "[Money](kmtrigger://m)").count("](") == 1)
+
+# ── 20. Vex's 2026-09-12 round: habits due today, clocks, ordering ─────────
+check("20.habit-weekly-byday",
+      pm.habit_due("RRULE:FREQ=WEEKLY;BYDAY=SU", 20260913, date(2026, 9, 13))
+      and not pm.habit_due("RRULE:FREQ=WEEKLY;BYDAY=SU", 20260913,
+                           date(2026, 9, 12)))
+check("20.habit-daily-every-day",
+      pm.habit_due("RRULE:FREQ=DAILY;INTERVAL=1", 20260913, date(2026, 9, 12)))
+check("20.habit-daily-interval",
+      pm.habit_due("RRULE:FREQ=DAILY;INTERVAL=7", 20260906, date(2026, 9, 13))
+      and not pm.habit_due("RRULE:FREQ=DAILY;INTERVAL=7", 20260906,
+                           date(2026, 9, 12)))
+check("20.habit-unknown-rule-shows",           # never hide on a parse failure
+      pm.habit_due("", None, date(2026, 9, 12))
+      and pm.habit_due("RRULE:FREQ=MONTHLY", None, date(2026, 9, 12)))
+check("20.stamp", pm.unpack_stamp(20260913) == date(2026, 9, 13)
+      and pm.unpack_stamp(None) is None and pm.unpack_stamp("x") is None)
+check("20.clock-allday", pm.clock("2026-09-13T05:30:00.000+0000", True) == "")
+check("20.timed-title", pm.timed_title("T", "09:00") == "T · 09:00"
+      and pm.timed_title("T", "") == "T")
+_a = fb.make_line("P", "a" * 24, pm.timed_title("Late", "19:00")).raw
+_b = fb.make_line("P", "b" * 24, pm.timed_title("Early", "07:30")).raw
+_c = fb.make_line("P", "c" * 24, "Untimed").raw
+check("20.sort-by-clock", pm.sort_checkboxes([_a, _b, _c]) == [_b, _a, _c])
+check("20.sort-keeps-other-lines",
+      pm.sort_checkboxes(["head", _a, _b]) == ["head", _b, _a])
+check("20.sort-noop-under-two", pm.sort_checkboxes([_a]) == [_a])
+check("20.timed-line-keeps-its-tid",
+      pm.checkbox_tids([_a]) == {"a" * 24: False}, _a)
 
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:

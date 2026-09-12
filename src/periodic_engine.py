@@ -378,8 +378,13 @@ def _scheduled_today(day):
             continue
         when = t.get("startDate") or t.get("dueDate") or ""
         if when and utc_str_to_local_date(when) == iso:
-            out.append((pid, t.get("id"), t.get("title") or "Task"))
-    return out
+            # the clock rides INSIDE the label; a time after the link would
+            # cost the line the task id the parser reads off its end
+            hm = pm.clock(when, t.get("isAllDay"))
+            out.append((pid, t.get("id"),
+                        pm.timed_title(t.get("title") or "Task", hm), hm))
+    out.sort(key=lambda r: r[3] or "99:99")      # by the hour, untimed last
+    return [(pid, tid, title) for pid, tid, title, _hm in out]
 
 
 _COMPLETED = None      # [(local_date_str, task)] - one v2 call per process
@@ -715,9 +720,15 @@ def _fill_daily(doc, p, index, is_today):
         lines = []
         comp = _completed_between(yd, yd)
         if comp is not None:
-            lines.append(f"{pm.T2}- Completed: {len(comp)}")
+            # subtasks are their parent's detail, not separate achievements:
+            # one shutdown ticked 30 of them and buried the day (Vex
+            # 2026-09-12). Parents only, top ten, the rest as a number.
+            tops = [t for t in comp if not t.get("parentId")]
+            lines.append(f"{pm.T2}- Completed: {len(tops)}")
             lines += [f"{pm.T3}- {mdtext.flatten_links(t.get('title') or '')[:64]}"
-                      for t in comp]
+                      for t in tops[:10]]
+            if len(tops) > 10:
+                lines.append(f"{pm.T3}- _(+{len(tops) - 10} more)_")
         fm = getattr(t2, "focus_minutes", lambda a, b: None)(yd, yd) if t2 else None
         if fm:
             lines.append(f"{pm.T2}- Focus: {pm.fmt_hm(fm)}")
@@ -743,7 +754,7 @@ def _fill_daily(doc, p, index, is_today):
             body = [ln for ln in sec.body if not pm.PENDING_RE.match(ln.strip())]
             merged, _added = pm.merge_checkboxes(body, _scheduled_today(day),
                                                  indent=pm.T2)
-            ps.set_body(doc, pm.SEC_TODAY, merged)
+            ps.set_body(doc, pm.SEC_TODAY, pm.sort_checkboxes(merged))
 
         # ⏩ Tomorrow - same checkbox links, tomorrow's schedule
         tmw = ps.find(doc, pm.SEC_TOMORROW)
@@ -751,7 +762,7 @@ def _fill_daily(doc, p, index, is_today):
             body = [ln for ln in tmw.body if not pm.PENDING_RE.match(ln.strip())]
             merged, _added = pm.merge_checkboxes(
                 body, _scheduled_today(day + timedelta(days=1)), indent=pm.T2)
-            ps.set_body(doc, pm.SEC_TOMORROW, merged)
+            ps.set_body(doc, pm.SEC_TOMORROW, pm.sort_checkboxes(merged))
 
         # 📊 Today summary - own sections, zero extra calls
         tsec = ps.find(doc, pm.SEC_TODAY)
@@ -771,8 +782,8 @@ def _fill_daily(doc, p, index, is_today):
         if entries:
             detail = " · ".join(f"{n} {g}" for g, n in counts.items())
             sums.append(f"- 📓 Entries: {len(entries)} ({detail})")
-        if msec:
-            sums.append(f"- Money: {pm.fmt_amount(pm.section_money_sum(msec.body))}")
+        # no Money line here: the 💰 block under Summaries carries the day's
+        # total AND its entries, and Vex asked for it in one place only
         ps.set_body(doc, pm.SEC_DAY_SUM,
                     pm.ind(sums) if sums else [f"{pm.T1}_(no data)_"])
 

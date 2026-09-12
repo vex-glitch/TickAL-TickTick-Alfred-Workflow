@@ -15,18 +15,23 @@
 ##### ☀️ Today
 - Habits
 	- _(pending)_
+
 - Countdowns
 	- _(pending)_
-- Money
-	- **Total = 0**
 ---
 ##### 🔎 Summaries
 - Today
 	- _(pending)_
+
 - Yesterday
 	- _(pending)_
+
 - Tomorrow
+
+- Money
+	- **Total = 0**
 ---
 ##### 📓 Journals
 - 🌅 Morning Journal
+
 - 🌙 Evening journal

@@ -292,14 +292,21 @@ def _checkins(after):
 
 
 def habit_lines_daily():
-    """'- ✅ Meditate' / '- ⬜ Meditate' for today. None on any failure."""
+    """'- ✅ Meditate' / '- ⬜ Meditate' for the habits DUE today. None on any
+    failure. Vex 2026-09-12: the note listed every habit, so a Sunday review
+    and a 30-day one sat there unticked all week pretending to be today's
+    work - pm.habit_due reads each habit's own rule."""
+    import periodic_model as pm
     habits = _habits()
     if not habits:
         return None
-    today = _stamp(date.today())
+    day = date.today()
+    today = _stamp(day)
     checks = _checkins(today - 1)
     if checks is None:
         return None
+    habits = [h for h in habits
+              if pm.habit_due(h.get("repeatRule"), h.get("targetStartDate"), day)]
     lines = []
     for h in habits[:8]:
         done = any(c.get("checkinStamp") == today and c.get("status", 2) == 2

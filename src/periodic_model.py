@@ -642,6 +642,95 @@ def mark_swept(body_lines, tids):
     return list(body_lines)
 
 
+# ── Scheduled-task lines ────────────────────────────────────────────────────
+TIME_TAIL_RE = re.compile(r" · (?P<hm>[012]?\d:[0-5]\d)\]\(")
+
+
+def clock(iso, all_day=False):
+    """'09:00' for a timed task, '' for an all-day one. LOCAL, like every
+    other time these notes show - the API stores UTC."""
+    if all_day or not iso:
+        return ""
+    try:
+        from datetime import datetime, timezone
+        c = str(iso)[:19]
+        dt = datetime(int(c[0:4]), int(c[5:7]), int(c[8:10]),
+                      int(c[11:13]), int(c[14:16]), int(c[17:19]),
+                      tzinfo=timezone.utc)
+        return dt.astimezone().strftime("%H:%M")
+    except Exception:
+        return ""
+
+
+def timed_title(title, hm):
+    """'Task · 09:00' - the time goes INSIDE the link label, never after it:
+    the checkbox parser reads the task id off the END of the line, so a
+    trailing time would cost the line its identity (Vex 2026-09-12)."""
+    return f"{title} · {hm}" if hm else title
+
+
+def sort_checkboxes(body_lines):
+    """Checkbox lines ordered by the time in their label, untimed last, every
+    other line left exactly where it is. Stable, so same-time tasks keep the
+    order they arrived in."""
+    idxs = [i for i, ln in enumerate(body_lines) if fb.CHECKBOX_RE.match(ln)]
+    if len(idxs) < 2:
+        return list(body_lines)
+
+    def key(i):
+        m = TIME_TAIL_RE.search(body_lines[i])
+        return (m.group("hm") if m else "99:99", idxs.index(i))
+
+    out = list(body_lines)
+    for slot, src in zip(idxs, sorted(idxs, key=key)):
+        out[slot] = body_lines[src]
+    return out
+
+
+# ── Habits ──────────────────────────────────────────────────────────────────
+_HABIT_DAYS = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
+
+
+def unpack_stamp(n):
+    """20260913 → date, or None."""
+    try:
+        n = int(n)
+        return date(n // 10000, (n // 100) % 100, n % 100)
+    except (TypeError, ValueError):
+        return None
+
+
+def habit_due(rule, anchor, day):
+    """Is a habit due on `day`? (Vex 2026-09-12: the daily note listed ALL
+    habits, including the ones that only come round on a Sunday or every 30
+    days.)  `anchor` is targetStartDate, packed YYYYMMDD.
+
+    WEEKLY honours BYDAY. DAILY with an INTERVAL counts whole periods from
+    the anchor. Anything else - and anything unparseable - answers True: a
+    habit wrongly SHOWN is a smaller sin than one wrongly hidden.
+    """
+    bits = {}
+    for part in (rule or "").replace("RRULE:", "").split(";"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            bits[k.strip().upper()] = v.strip().upper()
+    freq, every = bits.get("FREQ"), int(bits.get("INTERVAL") or 1)
+    start = unpack_stamp(anchor)
+    if freq == "WEEKLY":
+        days = [_HABIT_DAYS[d] for d in (bits.get("BYDAY") or "").split(",")
+                if d in _HABIT_DAYS]
+        if days:
+            return day.weekday() in days
+        return True
+    if freq == "DAILY":
+        if every <= 1:
+            return True
+        if start is None:
+            return True
+        return (day - start).days % every == 0
+    return True
+
+
 # ── Journal ──────────────────────────────────────────────────────────────────
 # Both shapes parse: the old bold form (**Q1 · …** / A: …) that older notes
 # carry, and Vex's 2026-09-12 bullet form (- Q1 · … / - *A: …*). Writers emit
