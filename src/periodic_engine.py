@@ -712,40 +712,64 @@ def _mood_of_doc(doc):
     return None
 
 
-def _recap_lines(day, t2, nday, tab):
-    """Day · Mood · Money · Focus · Completed, in Vex's order (2026-09-12).
+def _day_money(doc):
+    """A daily note's money for the day → float | None. The evening journal
+    answer, then a legacy 💰 section."""
+    if doc is None:
+        return None
+    ans = _answer_in(doc, pm.SEC_EVENING, "money did you earn")
+    amt = pm.parse_money_answer(ans) if ans else None
+    if amt is not None:
+        return amt
+    msec = ps.find(doc, pm.SEC_MONEY)
+    return pm.section_money_sum(msec.body) if msec is not None else None
+
+
+def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None):
+    """Day · Mood · Money · Focus · Completed, in Vex's order (2026-09-12),
+    each carrying a compact ▲/▼ against the day before it (Vex, same day:
+    "small indicator compared to the day before?").
 
     The first three are EVENING/MORNING JOURNAL answers - the rating and the
     money are asked there, so the summary reflects them rather than keeping a
     second copy ("it is an answer in the evening journal, that is all that
-    should be there"). Each line appears only when its data really exists.
-    `nday` is the day's parsed note, or None.
+    should be there"). Each line appears only when its data really exists, and
+    its arrow only when the day before has the same number to compare with -
+    so a blank yesterday costs you the arrow, never the line.
+
+    `nday` is the day's parsed note; `pday`/`pdoc` are the comparison day and
+    its note.
     """
+    def dc(cur, prev, kind="count"):
+        c = pm.delta_chip(cur, prev, kind)
+        return f"  {c}" if c else ""
+
     lines = []
     if nday is not None:
         stars = pm.answer_stars(_answer_in(nday, pm.SEC_EVENING, "rate the day"))
         if stars:
-            lines.append(f"{tab}- Day: {stars}")
+            pst = (pm.answer_stars(_answer_in(pdoc, pm.SEC_EVENING, "rate the day"))
+                   if pdoc is not None else "")
+            lines.append(f"{tab}- Day: {stars}" + dc(len(stars), len(pst) or None))
         mood = _mood_of_doc(nday)
         if mood:
-            lines.append(f"{tab}- Mood: {pm.mood_text(mood[0], mood[1])}")
-        money = _answer_in(nday, pm.SEC_EVENING, "money did you earn")
-        if not money:                       # older notes kept a 💰 section
-            msec = ps.find(nday, pm.SEC_MONEY)
-            if msec is not None:
-                total = pm.section_money_sum(msec.body)
-                money = pm.fmt_amount(total) if total else ""
-        else:
-            amt = pm.parse_money_answer(money)
-            money = pm.fmt_amount(amt) if amt is not None else money
+            pmood = _mood_of_doc(pdoc) if pdoc is not None else None
+            lines.append(f"{tab}- Mood: {pm.mood_text(mood[0], mood[1])}"
+                         + dc(mood[0], pmood[0] if pmood else None))
+        money = _day_money(nday)
         if money:
-            lines.append(f"{tab}- Money: {money}")
+            lines.append(f"{tab}- Money: {pm.fmt_amount(money)}"
+                         + dc(money, _day_money(pdoc) or None, "money"))
     fm = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
     if fm:
-        lines.append(f"{tab}- Focus: {pm.fmt_hm(fm)}")
+        pfm = (getattr(t2, "focus_minutes", lambda a, b: None)(pday, pday)
+               if (t2 and pday) else None)
+        lines.append(f"{tab}- Focus: {pm.fmt_hm(fm)}" + dc(fm, pfm or None, "duration"))
     tops = _completed_tops(day)
     if tops is not None:
-        lines.append(f"{tab}- Completed: {len(tops)}")
+        ptops = _completed_tops(pday) if pday else None
+        lines.append(f"{tab}- Completed: {len(tops)}"
+                     + dc(len(tops), len(ptops) if ptops is not None else None))
         lines += [f"{tab}\t- {n[:64]}" for n in tops[:10]]
         if len(tops) > 10:
             lines.append(f"{tab}\t- _(+{len(tops) - 10} more)_")
@@ -784,7 +808,10 @@ def _fill_daily(doc, p, index, is_today):
         yd = day - timedelta(days=1)
         yt = lookup(index, pm.period_for("daily", yd))
         ydoc = ps.parse_sections(yt.get("content") or "") if yt else None
-        lines = _recap_lines(yd, t2, ydoc, pm.T2)
+        yd2 = yd - timedelta(days=1)
+        y2t = lookup(index, pm.period_for("daily", yd2))
+        y2doc = ps.parse_sections(y2t.get("content") or "") if y2t else None
+        lines = _recap_lines(yd, t2, ydoc, pm.T2, pday=yd2, pdoc=y2doc)
         wd = _wontdo_between(yd, yd)
         if wd is not None and len(wd):
             lines.append(f"{pm.T2}- Won't do: {len(wd)}")
@@ -809,7 +836,7 @@ def _fill_daily(doc, p, index, is_today):
         # 📊 Today summary - the SAME shape as ⏪ Yesterday (Vex 2026-09-12)
         nsec = ps.find(doc, pm.SEC_NOTES)
         entries = pm.harvest_entries(nsec.body) if nsec else []
-        sums = _recap_lines(day, t2, doc, pm.T2)
+        sums = _recap_lines(day, t2, doc, pm.T2, pday=yd, pdoc=ydoc)
         if entries:
             counts = {}
             for _hm, g, _b in entries:
@@ -1355,8 +1382,9 @@ def append_entry(kind, text, when=None):
     ok, _doc = _pn_rmw(pid, tid, mutate)
     if not ok:
         return "💫 No 📓 Notes section in today's note"
-    toasts = {"win": "🏆 Win logged", "nag": "👎 Nag logged",
-              "thought": "💭 Noted", "link": "🔗 Link saved"}
+    toasts = {"win": "🟢 Win logged", "nag": "🔴 Nag logged",
+              "thought": "💭 Noted", "reminder": "❗️ Reminder noted",
+              "link": "🔗 Link saved"}
     return toasts.get(kind, "💫 Logged")
 
 

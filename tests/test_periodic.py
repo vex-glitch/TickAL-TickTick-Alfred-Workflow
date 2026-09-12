@@ -217,7 +217,12 @@ check("15.ramp", ramp[0] == "▁" and ramp[-1] == "█")
 nb = ["- 09:12 🏆 closed the deal", "- 10:00 💭 hmm", "- 11:00 😊 3 · meh",
       "- 21:00 😊 4 · tired but good", "not an entry"]
 h = pm.harvest_entries(nb)
-check("16.harvest", len(h) == 4 and h[0][1] == "🏆")
+# a 🏆 written before the 2026-09-12 recolour reads back as the 🟢 it is now
+check("16.harvest", len(h) == 4 and h[0][1] == "🟢")
+check("16.harvest-new-glyphs",
+      [g for _hm, g, _b in pm.harvest_entries(
+          ["- 09:00 🟢 win", "- 09:01 🔴 nag", "- 09:02 ❗️ remind"])]
+      == ["🟢", "🔴", "❗️"])
 check("16.mood-last", pm.day_mood(nb) == (4, "tired but good"))
 check("16.delta", pm.fmt_delta(43, 37) == "+6" and pm.fmt_delta(37, 43) == "-6"
       and pm.fmt_delta(680, 745, "duration") == "-1h 05m"
@@ -226,8 +231,14 @@ check("16.delta", pm.fmt_delta(43, 37) == "+6" and pm.fmt_delta(37, 43) == "-6"
 check("16.statline", pm.stat_line("Completed", "43", "+6") == "- Completed: 43 (Δ +6)"
       and pm.STAT_RE.match("- Completed: 43 (Δ +6)"))
 check("16.entryline", pm.make_entry("win", "shipped", "14:32")
-      == "- 14:32 🏆 shipped"
-      and pm.ENTRY_RE.match("- 14:32 🏆 shipped"))
+      == "- 14:32 🟢 shipped"
+      and pm.ENTRY_RE.match("- 14:32 🟢 shipped"))
+check("16.entryline-reminder", pm.make_entry("reminder", "bank", "14:32")
+      == "- 14:32 ❗️ bank"
+      and pm.ENTRY_RE.match("- 14:32 ❗️ bank"))
+check("16.entryline-legacy-still-parses",
+      bool(pm.ENTRY_RE.match("- 14:32 🏆 shipped"))
+      and bool(pm.ENTRY_RE.match("- 14:32 👎 nagged")))
 
 # ── 17. breadcrumb self-heal ─────────────────────────────────────────────────
 doc = ps.parse_sections("◀ old · ▲ up · new ▶\n\n### 🧭 Nav\nx\n")
@@ -276,14 +287,16 @@ check("19.set-line-replace", "Mood: 😞" in nb and "Mood: 🙂 · ok" not in nb
 nb2 = pm.set_line_in_body(['> "q" · A'], pm.RATING_LINE_RE, pm.rating_line(5))
 check("19.set-line-append", nb2 == ['> "q" · A', "Day: ★★★★★"])
 ents = pm.entries_grouped([
-    (date(2026, 7, 9), "14:32", "🏆", "Shipped"),
-    (date(2026, 7, 10), "09:11", "🏆", "Won"),
+    (date(2026, 7, 9), "14:32", "🟢", "Shipped"),
+    (date(2026, 7, 10), "09:11", "🟢", "Won"),
+    (date(2026, 7, 9), "18:00", "❗️", "Bank"),
     (date(2026, 7, 9), "20:00", "💭", "Hmm"),
     (date(2026, 7, 9), "21:00", "😊", "4 · ok"),    # moods excluded
 ])
 check("19.entries-grouped",
-      ents == ["\t\t**🏆 Wins**", "\t\t\t- Won · Fri 09:11",
+      ents == ["\t\t**🟢 Wins**", "\t\t\t- Won · Fri 09:11",
                "\t\t\t- Shipped · Thu 14:32",
+               "\t\t**❗️ Reminders**", "\t\t\t- Bank · Thu 18:00",
                "\t\t**💭 Thoughts**", "\t\t\t- Hmm · Thu 20:00"], ents)
 check("19.chip-behind", pm.chip(114, 121) == "🔴 7 tasks behind last week (−6%)")
 check("19.chip-ahead", pm.chip(121, 114) == "🟢 7 tasks ahead of last week (+6%)")
@@ -464,10 +477,10 @@ def _tpl_doc():
 _d = _tpl_doc()
 _ok = ps.append_body(_d, pm.SEC_NOTES, [pm.T2 + pm.make_entry("win", "shipped", "10:30")])
 _out = ps.serialize_sections(_d)
-check("23.entry-lands-in-bullet-notes", _ok and "🏆 shipped" in _out,
+check("23.entry-lands-in-bullet-notes", _ok and "🟢 shipped" in _out,
       repr(_out[:400]))
 check("23.entry-kept-one-tab-under-its-bullet",
-      "\n\t- 10:30 🏆 shipped" in _out, repr(_out[:400]))
+      "\n\t- 10:30 🟢 shipped" in _out, repr(_out[:400]))
 
 _d = _tpl_doc()
 for _k, _t, _hm in (("win", "one", "10:30"), ("nag", "two", "10:40"),
@@ -491,6 +504,19 @@ check("23.section-append-still-works",
 check("23.missing-name-still-false",
       ps.append_body(_d, "nope", ["- y"]) is False)
 
+
+# ── 24. day-over-day indicator (Vex 2026-09-12: "small indicator compared to
+# the day before?"). Arrows, because 🟢/🔴 now mean Win and Nag.
+check("24.delta-up", pm.delta_chip(5, 3) == "▲ 2")
+check("24.delta-down", pm.delta_chip(3, 5) == "▼ 2")
+check("24.delta-level", pm.delta_chip(4, 4) == "▬")
+check("24.delta-money", pm.delta_chip(200, 120, "money") == "▲ 80")
+check("24.delta-duration", pm.delta_chip(364, 300, "duration") == "▲ 1h 04m")
+check("24.delta-no-baseline",
+      pm.delta_chip(3, None) is None and pm.delta_chip(None, 3) is None)
+check("24.delta-avoids-the-entry-glyphs",
+      all(g not in (pm.delta_chip(5, 3) + pm.delta_chip(3, 5))
+          for g in ("🟢", "🔴")))
 
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:

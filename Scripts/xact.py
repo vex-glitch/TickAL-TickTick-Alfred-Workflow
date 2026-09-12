@@ -192,9 +192,10 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     name (geocoded once; a pinned place is
                                     never overwritten by IP guessing)
     xact:pn_entry:<b64|plain>       📓 entry into today's daily ({"kind","text"}
-                                    or plain "w Shipped it"; kinds w/n/t/k/l/m)
-    xact:pn_income:<b64|plain>      💰 "- amt · label" + re-total (plain
-                                    "485 label"; empty → dialog)
+                                    or plain "w Shipped it"; kinds w/n/t/r/k/l/m)
+    xact:pn_income:<b64|plain>      💰 sums into the evening journal's money
+                                    answer (plain "485 label"; legacy notes
+                                    with a 💰 section keep using it)
     xact:pn_journal:<slot>          morning|evening|weekly - dialog per
                                     unanswered prompt, partial-save,
                                     phone-wins merge (weekly ends in the
@@ -6535,7 +6536,7 @@ def _pn():
 
 
 _PN_SPECS = ("daily", "yesterday", "weekly", "monthly", "quarterly", "yearly")
-_PN_KINDS = {"w": "win", "n": "nag", "t": "thought",
+_PN_KINDS = {"w": "win", "n": "nag", "t": "thought", "r": "reminder",
              "k": "task", "l": "link", "m": "mood"}
 
 

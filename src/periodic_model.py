@@ -480,9 +480,15 @@ def sum_in_period(day_sums, p):
 
 
 # ── Capture entries (📓 Notes, APPEND) ───────────────────────────────────────
-ENTRY_GLYPHS = {"win": "🏆", "nag": "👎", "thought": "💭",
-                "link": "🔗", "mood": "😊"}
-ENTRY_RE = re.compile(r"^\s*- (?P<hm>\d{2}:\d{2}) (?P<glyph>🏆|👎|💭|🔗|😊) (?P<body>.*)$")
+# Vex 2026-09-12 recoloured the two verdict entries (🏆/👎 -> 🟢/🔴) and added
+# ❗️ Reminder. The old glyphs stay READABLE forever - every note already
+# written carries them - and canonicalize into the new ones on the way out, so
+# a week that straddles the change still groups as one list.
+ENTRY_GLYPHS = {"win": "🟢", "nag": "🔴", "thought": "💭",
+                "reminder": "❗️", "link": "🔗", "mood": "😊"}
+ENTRY_LEGACY = {"🏆": "🟢", "👎": "🔴"}
+ENTRY_RE = re.compile(
+    r"^\s*- (?P<hm>\d{2}:\d{2}) (?P<glyph>🟢|🔴|❗️|💭|🔗|😊|🏆|👎) (?P<body>.*)$")
 MOOD_RE = re.compile(r"^(?P<score>[1-5])(?:\s*·\s*(?P<note>.*))?$")
 
 
@@ -491,12 +497,13 @@ def make_entry(kind, text, hm):
 
 
 def harvest_entries(body_lines):
-    """[(hm, glyph, body)] from a 📓 Notes body."""
+    """[(hm, glyph, body)] from a 📓 Notes body, legacy glyphs canonicalized."""
     out = []
     for ln in body_lines:
         m = ENTRY_RE.match(ln)
         if m:
-            out.append((m.group("hm"), m.group("glyph"), m.group("body")))
+            g = m.group("glyph")
+            out.append((m.group("hm"), ENTRY_LEGACY.get(g, g), m.group("body")))
     return out
 
 
@@ -609,9 +616,9 @@ PENDING_RE = re.compile(r"^_\(.*\)_$")
 
 
 # ── 📨 Entries (weekly harvest) ──────────────────────────────────────────────
-GROUP_ORDER = ["🏆", "👎", "💭", "🔗"]     # 😊 gets its own weekly section
-GROUP_LABELS = {"🏆": "Wins", "👎": "Nags", "💭": "Thoughts",
-                "🔗": "Links", "😊": "Moods"}
+GROUP_ORDER = ["🟢", "🔴", "❗️", "💭", "🔗"]   # 😊 gets its own weekly section
+GROUP_LABELS = {"🟢": "Wins", "🔴": "Nags", "❗️": "Reminders",
+                "💭": "Thoughts", "🔗": "Links", "😊": "Moods"}
 
 
 def entries_grouped(items, glyphs=None, gi=T2, ei=T3):
@@ -654,6 +661,28 @@ def chip(cur, prev, kind="count", unit="tasks"):
     if diff < 0:
         return f"🔴 {mag} behind last week{pct}"
     return "⚪ level with last week"
+
+
+def delta_chip(cur, prev, kind="count"):
+    """Compact day-over-day indicator for the daily summaries: '▲ 2' / '▼ 1'
+    / '▬'. None when there is nothing to compare against.
+
+    Arrows rather than the weekly chip's 🟢/🔴: those two are the Win and Nag
+    entry glyphs now (Vex 2026-09-12), and one note must not spend the same
+    colour on two meanings.
+    """
+    if cur is None or prev is None:
+        return None
+    diff = cur - prev
+    if not diff:
+        return "▬"
+    if kind == "duration":
+        mag = fmt_hm(int(abs(diff)))
+    elif kind == "money":
+        mag = fmt_amount(abs(diff))
+    else:
+        mag = f"{abs(diff):g}"
+    return f"{'▲' if diff > 0 else '▼'} {mag}"
 
 
 # ── Checkbox merge (✅ Today, MANAGED) ───────────────────────────────────────

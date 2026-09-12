@@ -111,19 +111,17 @@ def idle_rows(frag):
     # Vex's order (2026-09-12). The three families are ONE row each - goals,
     # journals and the schedule-it verbs each open their own little screen
     # instead of spending five lines on the idle one.
+    # Everything you WRITE into a note lives behind ➕ Entry (Vex 2026-09-12:
+    # ➕ Add was the entry list's ☑️ Task by another road, 💰 Income and
+    # 😊 Mood are journal answers now, and ⭐️ Highlight belongs with the rest
+    # of the writing verbs). What stays out here is navigation and the refresh.
     extras = [
-        ("pn-entry",     "➕ Entry",         "Log a win, nag, thought, link",
+        ("pn-entry",     "➕ Entry",         "Write into today's note",
          None, "pn + "),
-        ("pn-income",    "💰 Income",        "Log money you made",
-         None, "pn $ "),
         ("pn-goals",     "🏆 Goals",         "The day goal and the week goal",
          None, "pn goals "),
         ("pn-journals",  "📓 Journals",      "Morning, evening, weekly",
          None, "pn journals "),
-        ("pn-add",       "➕ Add",           "Put a task on today or tomorrow",
-         None, "pn add "),
-        ("pn-highlight", "⭐️ Highlight",     "One thing that stands out",
-         "xact:pn_highlight", None),
         ("pn-refresh",   "♻️ Refresh Today", "Complete ticked, rebuild numbers",
          "xact:pn_refresh", None),
     ]
@@ -145,64 +143,54 @@ def idle_rows(frag):
     return items
 
 
+# 😊 Mood and 💰 Income are gone from here: both are evening/morning journal
+# ANSWERS, and a second door to the same answer is a second place to look
+# (Vex 2026-09-12). ⭐️ Highlight moved IN, because it writes too.
 _KIND_LEGEND = [
-    ("w", "🏆 Win"), ("n", "👎 Nag"), ("t", "💭 Thought"),
-    ("k", "☑️ Task"), ("l", "🔗 Link"), ("m", "😊 Mood"),
+    ("w", "🟢 Win"), ("n", "🔴 Nag"), ("t", "💭 Thought"),
+    ("r", "❗️ Reminder"), ("l", "🔗 Link"), ("k", "☑️ Task"),
+    ("h", "⭐️ Highlight"),
 ]
-_KINDS = {"w": "win", "n": "nag", "t": "thought", "k": "task",
-          "l": "link", "m": "mood"}
-_GLYPH = {"win": "🏆", "nag": "👎", "thought": "💭", "task": "☑️",
-          "link": "🔗", "mood": "😊"}
+_KINDS = {"w": "win", "n": "nag", "t": "thought", "r": "reminder",
+          "l": "link"}
+_GLYPH = {"win": "🟢", "nag": "🔴", "thought": "💭", "reminder": "❗️",
+          "link": "🔗"}
 _LEGEND_SUBS = {"w": "Something went well", "n": "Something nagged you",
-                "t": "Plain text is a thought too", "k": "Makes a real task",
+                "t": "Plain text is a thought too",
+                "r": "Something not to forget",
                 "l": "Clipboard is the link, you name it",
-                "m": "How you feel, 5 faces"}
-_MOOD_FACES = [(5, "😁", "Great"), (4, "🙂", "Good"), (3, "😐", "OK"),
-               (2, "😞", "Meh"), (1, "😢", "Rough")]
-
-
-def _mood_rows():
-    rows = []
-    for score, face, label in _MOOD_FACES:
-        rows.append(alfred.item(
-            uid=f"pn-mood-{score}",
-            title=f"{face} {label}",
-            subtitle="⏎ then an optional note",
-            arg=f"xact:pn_mood:{score}", valid=True, mods=_mods()))
-    return rows
+                "k": "Put a task on today or tomorrow",
+                "h": "The one thing this week is remembered for"}
 
 
 def entry_rows(rest):
     if not rest:
         rows = []
         for letter, label in _KIND_LEGEND:
-            it = alfred.item(title=label, subtitle=_LEGEND_SUBS[letter],
+            it = alfred.item(uid=f"pn-kind-{letter}",
+                             title=label, subtitle=_LEGEND_SUBS[letter],
                              arg="", valid=False, mods=_mods())
             it["autocomplete"] = f"pn + {letter} "
             rows.append(it)
         return rows
+    head, _, tail = rest.strip().partition(" ")
+    letter = head.lower()
+    if letter == "k":                     # ☑️ Task owns the whole add screen
+        return task_rows(tail.strip())
+    if letter == "h":
+        return highlight_rows(tail.strip())
     kind, text = "thought", rest.strip()
-    head, _, tail = text.partition(" ")
-    if head.lower() == "m" and not tail:
-        # mood is a picker: faces first, note dialog after
-        return _mood_rows()
-    if head.lower() in _KINDS and not tail and head.lower() != "l":
+    if letter in _KINDS and not tail and letter != "l":
         # bare kind letter (fresh from the legend) → prompt, never a valid
         # "💭 Thought - w" row an accidental ⏎ would log
-        return [alfred.item(title=f"Type the {_KINDS[head.lower()]} text…",
+        return [alfred.item(title=f"Type the {_KINDS[letter]} text…",
                             valid=False, mods=_mods())]
-    if head.lower() in _KINDS and (tail or head.lower() == "l"):
-        kind, text = _KINDS[head.lower()], tail.strip()
-    if kind == "mood":
-        m = re.match(r"^([1-5])(?!\d)\s*·?\s*(.*)$", text)
-        if not m:
-            return _mood_rows()           # junk after m → back to the faces
-        note = m.group(2).strip()         # normalize to the verb's grammar
-        text = m.group(1) + (f" · {note}" if note else "")
+    if letter in _KINDS and (tail or letter == "l"):
+        kind, text = _KINDS[letter], tail.strip()
     if not text and kind != "link":
         return [alfred.item(title=f"Type the {kind} text…",
                             valid=False, mods=_mods())]
-    shown = text or ("the copied link" if kind == "link" else "clipboard contents")
+    shown = text or "the copied link"
     sub = ("⏎ Log it as [%s](clipboard)" % (text[:28] or "the link name")
            if kind == "link" else "⏎ Log to today's note")
     return [alfred.item(
@@ -212,24 +200,30 @@ def entry_rows(rest):
         valid=True, mods=_mods())]
 
 
-def income_rows(rest):
-    if not rest:
-        return [alfred.item(title="💰 Log income",
-                            subtitle="Amount first, then what for",
+def highlight_rows(frag):
+    frag = (frag or "").strip()
+    if not frag:
+        return [alfred.item(title="Type the highlight…",
+                            subtitle="What this week is remembered for",
                             valid=False, mods=_mods())]
-    head, _, tail = rest.strip().partition(" ")
-    amt = pm.parse_amount(head)
-    if amt is None:
-        return [alfred.item(title="💰 Amount first",
-                            subtitle="Then what it was for",
-                            valid=False, mods=_mods())]
-    label = tail.strip()
-    shown = pm.fmt_amount(amt) + (f" · {label}" if label else "")
     return [alfred.item(
-        title=f"💰 {shown}",
-        subtitle="⏎ Log to today's 💰 Money",
-        arg=f"xact:pn_income:{_b64({'amount': amt, 'label': label})}",
+        uid="pn-hl",
+        title=f"⭐️ {frag[:60]}",
+        subtitle="⏎ Save to this week's note",
+        arg=f"xact:pn_highlight:{_b64({'text': frag})}",
         valid=True, mods=_mods())]
+
+
+def income_rows(rest):
+    """💰 stopped being a list row (Vex 2026-09-12: "I will only answer the
+    question in the journal"). The caller ET still fires `pn $ `, so this
+    screen points at the one place the number lives now instead of dead-ending.
+    """
+    return [alfred.item(
+        uid="pn-money-journal",
+        title="💰 Money is an evening journal answer",
+        subtitle="⏎ Open the evening journal",
+        arg="xact:pn_journal:evening", valid=True, mods=_mods())]
 
 
 def _task_pool(include_notes=False):
@@ -294,6 +288,70 @@ def day_goal_rows(frag):
 
 
 _TIME_RE = re.compile(r"^(\d{1,2})(?::(\d{2}))?$")
+
+
+def task_rows(rest):
+    """☑️ Task - the ONE add screen. ➕ Add in the main list and the entry
+    list's ☑️ Task were two roads to the same intent (Vex 2026-09-12), so this
+    screen does both jobs: pick a task you already have, or name one you do
+    not. Screen 2 ("!pid:tid [time]") picks the day, and the time if you type
+    one."""
+    rest = rest or ""
+    if rest.startswith("!"):
+        spec, _, frag = rest[1:].partition(" ")
+        pid, _, tid = spec.partition(":")
+        if not pid or not tid:            # hand-typed '!' junk - no valid row
+            return [alfred.item(title="Type to pick a task…",
+                                valid=False, mods=_mods())]
+        title = next((t.get("title") for t in (cache_store.get("all_tasks") or [])
+                      if t.get("id") == tid), "Task") or "Task"
+        frag = frag.strip()
+        m = _TIME_RE.match(frag)
+        hhmm = (f"{int(m.group(1)):02d}:{m.group(2) or '00'}"
+                if frag and m and int(m.group(1)) <= 23
+                and int(m.group(2) or 0) <= 59 else None)
+        rows = []
+        for when, emoji, label in (("today", "☀️", "today"),
+                                   ("tomorrow", "🌙", "tomorrow")):
+            rows.append(alfred.item(
+                uid=f"pn-task-{when}",
+                title=f"{emoji} {title[:44]} → {label}"
+                      + (f" {hhmm}" if hhmm else ""),
+                subtitle="⏎ With this time" if hhmm else "⏎ Day only, no time",
+                arg=f"xact:pn_sched:{when}|{pid}|{tid}"
+                    + (f"|{hhmm}" if hhmm else ""),
+                valid=True, mods=_mods()))
+        if not hhmm:
+            rows.append(alfred.item(uid="pn-task-time", title="⏰ At a time",
+                                    subtitle="Keep typing · like 14:30",
+                                    valid=False, mods=_mods()))
+        return rows
+
+    def row(t):
+        pid = t.get("projectId") or t.get("_projectId", "")
+        it = alfred.item(
+            uid=f"pn-task-{t['id']}",
+            title="☑️ " + pick_title(t),
+            subtitle=pick_where(t) + "  |  ⏎ Pick a day",
+            arg="", valid=False, mods=_mods())
+        it["autocomplete"] = f"pn + k !{pid}:{t['id']} "
+        return it
+    frag = rest.strip()
+    pool = _task_pool(include_notes=True)
+    if frag:
+        pool = fuzz.filter_and_score(frag, pool, key_fn=lambda t: t.get("title") or "")
+    items = [row(t) for t in pool[:40]]
+    if frag:
+        items.append(alfred.item(
+            uid="pn-task-new",
+            title=f'➕ New task: "{frag[:50]}"',
+            subtitle="Makes a real task, on today",
+            arg=f"xact:pn_entry:{_b64({'kind': 'task', 'text': frag})}",
+            valid=True, mods=_mods()))
+    elif not items:
+        items = [alfred.item(title="Type to pick or name a task…",
+                             valid=False, mods=_mods())]
+    return items
 
 
 def sched_rows(rest, when):
@@ -369,12 +427,6 @@ _FAMILIES = {
          "xact:pn_journal:evening", None),
         ("pn-jw", "📔 Weekly journal",  "Review the week, set next week",
          "xact:pn_journal:weekly", None),
-    ]),
-    "add": ("➕ Add", [
-        ("pn-today", "☀️ Add to today",    "Pick any task, schedule it today",
-         None, "pn today "),
-        ("pn-tmrw",  "🌙 Add to tomorrow", "Pick any task, schedule it tomorrow",
-         None, "pn tmrw "),
     ]),
 }
 
@@ -491,7 +543,7 @@ def rows(query):
         rest = _after(q, prefix)
         if rest is not None:
             return sched_rows(rest, when)
-    for key in ("goals", "journals", "add"):
+    for key in ("goals", "journals"):
         rest = _after(q, key)
         if rest is None:
             continue
