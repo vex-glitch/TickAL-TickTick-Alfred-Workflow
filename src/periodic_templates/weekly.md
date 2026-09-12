@@ -1,40 +1,40 @@
 {{breadcrumbs}}
 ---
-### 🏆 Goals
+##### 🏆 Goals
 
-### ✨ Highlight
+##### ✨ Highlight
 ---
-# 📌 This Week
-### 🔥 Top list
+#### 📌 This Week
+##### 🔥 Top list
 
-### 🚀 Top tasks
+##### 🚀 Top tasks
 
-### ➕ Created
+##### ➕ Created
 
-### ✅ Completed
+##### ✅ Completed
 
-### 📈 Stats
+##### 📈 Stats
 	_(pending)_
 
-### 🎯 Focus
+##### 🎯 Focus
 
-### 📨 Entries
+##### 📨 Entries
 	_(pending)_
 
-### 😊 Moods
+##### 😊 Moods
 	_(pending)_
 
-### 🔄 Habit consistency
+##### 🔄 Habit consistency
 	_(pending)_
 
-### 💰 Income
-### 👽 People
-	_(pending)_
----
-### ⏪ Last week
+##### 💰 Income
+##### 👽 People
 	_(pending)_
 ---
-### 📔 Weekly journal
+##### ⏪ Last week
+	_(pending)_
 ---
-### ♻️ Weekly Review
+##### 📔 Weekly journal
+---
+##### ♻️ Weekly Review
 	_(set "Weekly review list id" in Settings to mirror your review here)_

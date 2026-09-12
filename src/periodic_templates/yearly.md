@@ -1,29 +1,29 @@
 {{breadcrumbs}}
 ---
-### 📊 Dashboard
+##### 📊 Dashboard
 _(pending)_
 
-### 🏆 Top 10 wins
+##### 🏆 Top 10 wins
 
-### 🎯 Goals scorecard
+##### 🎯 Goals scorecard
 _(pending)_
 
-### 📝 Year in one paragraph
+##### 📝 Year in one paragraph
 
-### ⭐ Best of
+##### ⭐ Best of
 - Best book:
 - Best trip:
 - Best purchase:
 - Best meal:
 - Best day:
 
-### 🧭 Theme of the year
+##### 🧭 Theme of the year
 
-### 🚫 Anti-goals
+##### 🚫 Anti-goals
 _(what you will NOT do)_
 
-### 🧪 December test
+##### 🧪 December test
 Would December-you be proud of this plan?
 
-### 💰 Money
+##### 💰 Money
 **Total = 0**

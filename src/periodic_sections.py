@@ -29,7 +29,15 @@ Pure module: no I/O, no workflow imports.
 """
 import re
 
-SECTION_HEADER_RE = re.compile(r'^###\s+(?P<name>.+?)\s*$')
+SECTION_HEADER_RE = re.compile(r'^(?P<hashes>#{3,6})\s+(?P<name>.+?)\s*$')
+
+# A `- name` bullet inside a section body is addressable exactly like a
+# section: its BODY is the indented run beneath it. Vex's 2026-09-12 layout
+# turned most sub-sections into bullets (TickTick folds headers, so the few
+# that stay headers are the folding points) and 66 fillers address their
+# targets BY NAME - so the name resolves to either shape and every filler
+# keeps working untouched.
+BULLET_RE = re.compile(r'^(?P<indent>\t*)- (?P<name>.+?)\s*$')
 
 
 # Decor lines: `---` dividers and `#`/`##`
@@ -115,30 +123,156 @@ def serialize_sections(doc):
     return "\n".join(out)
 
 
+def _tabs(line):
+    return len(line) - len(line.lstrip("\t"))
+
+
+def _rebase(lines, tabs):
+    """Re-indent `lines` so their shallowest line sits at `tabs`, keeping
+    every relative depth (a journal's Q/A nesting must survive)."""
+    real = [l for l in lines if l.strip()]
+    if not real:
+        return list(lines)
+    base = min(_tabs(l) for l in real)
+    out = []
+    for l in lines:
+        if not l.strip():
+            out.append("")
+            continue
+        out.append("\t" * (tabs + _tabs(l) - base) + l.lstrip("\t"))
+    return out
+
+
+class Block:
+    """A `- name` bullet addressed like a section. Its span is recomputed on
+    every access, so a write that changes the body's length cannot leave a
+    stale index behind."""
+    __slots__ = ("sec", "header", "name", "indent")
+
+    def __init__(self, sec, header, name, indent):
+        self.sec, self.header, self.name, self.indent = sec, header, name, indent
+
+    def _span(self):
+        body = self.sec.body
+        try:
+            i = body.index(self.header)
+        except ValueError:
+            return None, None
+        j = i + 1
+        while j < len(body):
+            ln = body[j]
+            if ln.strip() and _tabs(ln) <= self.indent:
+                break
+            j += 1
+        while j > i + 1 and not body[j - 1].strip():   # trailing blanks are
+            j -= 1                                     # the GAP, not the body
+        return i + 1, j
+
+    @property
+    def body(self):
+        a, b = self._span()
+        return [] if a is None else self.sec.body[a:b]
+
+    @body.setter
+    def body(self, lines):
+        a, b = self._span()
+        if a is not None:
+            self.sec.body[a:b] = _rebase(lines, self.indent + 1)
+
+
+def _blocks(sec):
+    """Every top-level bullet of a section body, shallowest indent wins."""
+    real = [l for l in sec.body if l.strip() and BULLET_RE.match(l)]
+    if not real:
+        return []
+    top = min(_tabs(l) for l in real)
+    out = []
+    for l in sec.body:
+        m = BULLET_RE.match(l)
+        if m and _tabs(l) == top:
+            out.append(Block(sec, l, m.group("name"), top))
+    return out
+
+
+# Vex's layout renamed anchors as he de-emojied ("💰 Money" -> "- Money",
+# "☀️ Daily" -> "- 📌 Daily", "🌅 Morning journal" -> "- 🌅 Morning Journal"),
+# so a name also matches with its symbols and case stripped.
+_NORM_RE = re.compile(r"[^\w\s']+", re.UNICODE)
+
+
+def _norm(name):
+    return " ".join(_NORM_RE.sub(" ", name or "").split()).casefold()
+
+
+def _only(cands):
+    """The single candidate, or None - an AMBIGUOUS normalized name must never
+    be guessed. "📊 Today" and "☀️ Today" both normalize to "today", and
+    writing the day summary into the group that holds Habits, Countdowns and
+    Money would eat three blocks."""
+    return cands[0] if len(cands) == 1 else None
+
+
 def find(doc, name):
-    """First section whose name matches EXACTLY, else None."""
+    """The section or bullet BLOCK this name addresses.
+
+    Four passes, most literal first: exact header, exact bullet, then the
+    normalized forms - bullets BEFORE headers, because a renamed sub-block
+    is the intended target far more often than a group header that happens
+    to normalize the same way. A normalized pass that finds two candidates
+    returns None rather than pick one.
+    """
     for sec in doc.sections:
         if sec.name == name:
             return sec
-    return None
+    for sec in doc.sections:
+        for blk in _blocks(sec):
+            if blk.name == name:
+                return blk
+    want = _norm(name)
+    if not want:
+        return None
+    blocks = [b for sec in doc.sections for b in _blocks(sec) if _norm(b.name) == want]
+    hit = _only(blocks)
+    if hit is not None:
+        return hit
+    return _only([sec for sec in doc.sections if _norm(sec.name) == want])
 
 
 def find_prefix(doc, prefix):
-    """First section whose name STARTS WITH prefix, else None - the anchor
-    form for data-in-header sections ('### ✅ Completed: 121 · 🟢 …')."""
+    """First section whose name STARTS WITH prefix, else the first bullet
+    block that does - the anchor form for data-in-header sections
+    ('### ✅ Completed: 121 · 🟢 …', or '- Completed: 121')."""
     for sec in doc.sections:
         if sec.name.startswith(prefix):
             return sec
+    for sec in doc.sections:
+        for blk in _blocks(sec):
+            if blk.name.startswith(prefix):
+                return blk
     return None
 
 
 def set_header(sec, name):
     """Rewrite a section's header text (data-in-header sections). Returns
-    True when it changed."""
+    True when it changed. A Block's header is its bullet line, and its own
+    hash level / indent is preserved - a filler must never flatten the
+    layout it writes into."""
     if sec.name == name:
         return False
+    if isinstance(sec, Block):
+        body = sec.sec.body
+        try:
+            i = body.index(sec.header)
+        except ValueError:
+            return False
+        new_line = "\t" * sec.indent + f"- {name}"
+        body[i] = new_line
+        sec.header, sec.name = new_line, name
+        return True
+    hashes = (SECTION_HEADER_RE.match(sec.header or "").group("hashes")
+              if SECTION_HEADER_RE.match(sec.header or "") else "###")
     sec.name = name
-    sec.header = f"### {name}"
+    sec.header = f"{hashes} {name}"
     return True
 
 
@@ -154,7 +288,11 @@ def _canon(lines):
 
 def _gap(doc, sec):
     """The canonical trailing gap after sec's body: nothing when the next
-    section opens with decor (--- hugs the content), one blank otherwise."""
+    section opens with decor (--- hugs the content), one blank otherwise.
+    A Block owns no gap - the blank between bullets belongs to the section
+    body around it, so writing one would grow the note on every refresh."""
+    if isinstance(sec, Block):
+        return []
     i = doc.sections.index(sec)
     nxt = doc.sections[i + 1] if i + 1 < len(doc.sections) else None
     return [] if (nxt is not None and nxt.pre) else [""]

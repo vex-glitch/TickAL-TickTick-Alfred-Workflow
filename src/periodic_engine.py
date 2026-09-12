@@ -280,7 +280,12 @@ def _compose_lead(doc, p, index, refetch):
             w_line = w
     out = [_crumb(p, index)] + ["---"]
     if p.kind == "daily":
-        tail = [x for x in [w_line] + q_lines + [mood, day] if x]
+        # Mood and the day rating are NOT in the lead any more - Vex moved
+        # them into the journals, where the questions that produce them live
+        # ("I have removed mood from top of the note, left it in journal
+        # part", 2026-09-12). They are still parsed OUT of an old lead above,
+        # so a legacy note's values survive into their new home.
+        tail = [x for x in [w_line] + q_lines if x]
         if tail:
             out += tail + ["---"]
     if doc.lead != out:
@@ -446,6 +451,13 @@ def _day_mood_of(task):
     """A daily task → (score, note) | None. Lead Mood: line first,
     legacy 💬 section then 📓 Notes 😊 entry for older notes."""
     doc = ps.parse_sections(task.get("content") or "")
+    msec = ps.find(doc, pm.SEC_MORNING)          # its own question owns it now
+    if msec is not None:
+        for _n, q, a, _i in pm.journal_pairs(msec.body):
+            if a and "mood" in (q or "").casefold():
+                hit = pm.quote_mood([a])
+                if hit:
+                    return hit
     mood = pm.quote_mood(doc.lead)
     if mood:
         return mood
@@ -684,7 +696,7 @@ def _fill_daily(doc, p, index, is_today):
             # weekly goals CLEARED → mirror resets to the pointer, never
             # keeps stale copies
             ps.set_body(doc, pm.SEC_WEEK_GOALS,
-                        [f"{pm.T1}_(mirrors this week's weekly note - "
+                        [f"{pm.T1}- _(mirrors this week's weekly note - "
                          "edit goals there)_"])
 
     if is_today:
@@ -703,21 +715,21 @@ def _fill_daily(doc, p, index, is_today):
         lines = []
         comp = _completed_between(yd, yd)
         if comp is not None:
-            lines.append(f"{pm.T2}- ✅ Completed: {len(comp)}")
+            lines.append(f"{pm.T2}- Completed: {len(comp)}")
             lines += [f"{pm.T3}- {mdtext.flatten_links(t.get('title') or '')[:64]}"
                       for t in comp]
         fm = getattr(t2, "focus_minutes", lambda a, b: None)(yd, yd) if t2 else None
         if fm:
-            lines.append(f"{pm.T2}- 🍅 Focus: {pm.fmt_hm(fm)}")
+            lines.append(f"{pm.T2}- Focus: {pm.fmt_hm(fm)}")
         wd = _wontdo_between(yd, yd)
         if wd is not None and len(wd):
-            lines.append(f"{pm.T2}- 🗑 Wontdo: {len(wd)}")
+            lines.append(f"{pm.T2}- Won't do: {len(wd)}")
         yt = lookup(index, pm.period_for("daily", yd))
         if yt:
             ydoc = ps.parse_sections(yt.get("content") or "")
             msec = ps.find(ydoc, pm.SEC_MONEY)
             if msec:
-                lines.append(f"{pm.T2}- 💰 Money: "
+                lines.append(f"{pm.T2}- Money: "
                              f"{pm.fmt_amount(pm.section_money_sum(msec.body))}")
             mood = _day_mood_of(yt)
             if mood:
@@ -752,15 +764,15 @@ def _fill_daily(doc, p, index, is_today):
         msec = ps.find(doc, pm.SEC_MONEY)
         sums = []
         if boxes:
-            sums.append(f"- ⏳ Today: {sum(boxes.values())} of {len(boxes)} done")
+            sums.append(f"- Tasks: {sum(boxes.values())} of {len(boxes)} done")
         fm_t = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
         if fm_t:
-            sums.append(f"- 🍅 Focus so far: {pm.fmt_hm(fm_t)}")
+            sums.append(f"- Focus: {pm.fmt_hm(fm_t)}")
         if entries:
             detail = " · ".join(f"{n} {g}" for g, n in counts.items())
             sums.append(f"- 📓 Entries: {len(entries)} ({detail})")
         if msec:
-            sums.append(f"- 💰 Today: {pm.fmt_amount(pm.section_money_sum(msec.body))}")
+            sums.append(f"- Money: {pm.fmt_amount(pm.section_money_sum(msec.body))}")
         ps.set_body(doc, pm.SEC_DAY_SUM,
                     pm.ind(sums) if sums else [f"{pm.T1}_(no data)_"])
 
@@ -1320,17 +1332,50 @@ def _lead_rmw_line(line_re, new_line, day=None):
     return None
 
 
+def _journal_answer(slot, needle, text, day=None):
+    """Write `text` as the answer to the journal question containing `needle`.
+    True when it landed. The mood and the day rating are journal answers now,
+    not lead lines, so their quick-entry verbs write where the question is."""
+    p = pm.period_for("daily", day or _today())
+    task, _ = ensure_note(p)
+    pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
+    sec_name = _JOURNAL_SECTIONS.get(slot)
+
+    def mutate(doc, live):
+        sec = ps.find(doc, sec_name)
+        if sec is None:
+            return False
+        body = list(sec.body)
+        for n, q, _a, idx in pm.journal_pairs(body):
+            if needle.casefold() not in (q or "").casefold():
+                continue
+            m = pm.JOURNAL_A_RE.match(body[idx])
+            ws, dash = m.group("ws"), m.group("dash") or ""
+            ital = m.group("ital")
+            body[idx] = f"{ws}{dash}{ital}A: {text}{ital}"
+            ps.set_sec_body(doc, sec, body)
+            return True
+        return False
+    ok, _doc = _pn_rmw(pid, tid, mutate)
+    return ok
+
+
 def set_day_mood(score, note="", day=None):
-    """Lead Mood: line (replace-or-insert - last mood wins)."""
-    err = _lead_rmw_line(pm.MOOD_LINE_RE, pm.mood_line(score, note), day=day)
-    return err or (f"{pm.MOOD_FACES[int(score)]} Mood logged"
-                   + (f" · {note}" if note else ""))
+    """The morning journal's mood answer, else the lead Mood: line (older
+    notes and any layout without that question)."""
+    shown = pm.mood_line(score, note)[6:]            # "🙂 · note"
+    if not _journal_answer("morning", "mood", shown, day=day):
+        _lead_rmw_line(pm.MOOD_LINE_RE, pm.mood_line(score, note), day=day)
+    return (f"{pm.MOOD_FACES[int(score)]} Mood logged"
+            + (f" · {note}" if note else ""))
 
 
 def set_day_rating(score, day=None):
-    """Lead Day: ★ line."""
-    err = _lead_rmw_line(pm.RATING_LINE_RE, pm.rating_line(score), day=day)
-    return err or f"{'★' * max(1, min(5, int(score)))} Day rated"
+    """The evening journal's rating answer, else the lead Day: ★ line."""
+    stars = "★" * max(1, min(5, int(score)))
+    if not _journal_answer("evening", "rate the day", stars, day=day):
+        _lead_rmw_line(pm.RATING_LINE_RE, pm.rating_line(score), day=day)
+    return f"{stars} Day rated"
 
 
 def set_highlight(text, day=None):

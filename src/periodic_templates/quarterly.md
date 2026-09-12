@@ -1,20 +1,20 @@
 {{breadcrumbs}}
 ---
-### 🎯 OKR review
+##### 🎯 OKR review
 _(score last quarter's OKRs - keep / kill / change)_
 
-### 🚀 Next-Q OKRs
+##### 🚀 Next-Q OKRs
 
-### ⚖️ Decision log
+##### ⚖️ Decision log
 The one decision:
 
-### 🔋 Energy audit
+##### 🔋 Energy audit
 _(pending)_
 
-### 📈 Stats
+##### 📈 Stats
 _(pending)_
 
-### 💰 Money
+##### 💰 Money
 **Total = 0**
 
-### 💡 Observations
+##### 💡 Observations

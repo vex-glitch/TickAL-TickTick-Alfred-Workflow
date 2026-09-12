@@ -182,10 +182,10 @@ check("14.fixed-morning-bridge",
       [k for k, _q in fixed_mb] == ["mood", "free", "free", "free"]
       and "Ship the bridge" in fixed_mb[1][1])
 fixed_e = pm.journal_fixed("evening", {"goal": "Ship the thing"})
-check("14.fixed-evening",
-      [k for k, _q in fixed_e] == ["free", "goal", "money", "rating",
-                                   "bridge"]
-      and "Ship the thing" in fixed_e[1][1])
+check("14.fixed-evening",                     # bridge FIRST (Vex 2026-09-12)
+      [k for k, _q in fixed_e] == ["bridge", "free", "goal", "money",
+                                   "rating"]
+      and "Ship the thing" in fixed_e[2][1], [k for k, _q in fixed_e])
 fixed_w = pm.journal_fixed("weekly", {"goals": "A; B"})
 check("14.fixed-weekly", [k for k, _q in fixed_w] == ["highlight", "wgoals"]
       and "A; B" in fixed_w[1][1])
@@ -196,7 +196,12 @@ seeded[3] = "\t\tA: phone answer"                   # Q2 answered on phone
 merged, filled = pm.merge_journal_answers(
     seeded, {1: "mine", 2: "should NOT overwrite", 3: ""})
 check("14.phone-wins", filled == 1 and "\t\tA: phone answer" in merged
-      and "\t\tA: mine" in merged)                  # indent survives
+      and "\t\t- *A: mine*" in merged, merged)     # indent + shape survive
+# a legacy note's plain A-line keeps its plain shape - never half-converted
+_old_shape, _f = pm.merge_journal_answers(
+    ["\t**Q1 · Old style**", "\t\tA: "], {1: "kept plain"})
+check("14.legacy-shape", _f == 1 and _old_shape[1] == "\t\tA: kept plain",
+      _old_shape)
 check("14.empty-skip", all("should NOT" not in ln for ln in merged))
 
 # ── 15. sparklines ───────────────────────────────────────────────────────────
@@ -241,9 +246,13 @@ check("17.render", crumb == "◀ 2026-07-10 · Fri · [▲ 2026-W28](URL) · 202
 for kind, anchors in pm.WRITER_ANCHORS.items():
     tpl_path = os.path.join(ROOT, "src", "periodic_templates", f"{kind}.md")
     tpl = open(tpl_path, encoding="utf-8").read()
+    _tdoc = ps.parse_sections(tpl)
     for a in anchors:
-        check(f"18.anchor[{kind}:{a}]", f"### {a}\n" in tpl or tpl.endswith(f"### {a}"),
-              f"missing in {kind}.md")
+        # RESOLVES, rather than "appears as ### a": Vex's 2026-09-12 layout
+        # made most anchors bullets, and a few renamed themselves as he
+        # dropped emoji - ps.find is the thing every filler actually uses
+        check(f"18.anchor[{kind}:{a}]", ps.find(_tdoc, a) is not None,
+              f"unreachable in {kind}.md")
     check(f"18.tpl-roundtrip[{kind}]",
           ps.serialize_sections(ps.parse_sections(tpl)) == tpl)
 

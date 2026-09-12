@@ -1,22 +1,22 @@
 {{breadcrumbs}}
 ---
-### 🎯 Month goal
+##### 🎯 Month goal
 - [ ]
 
-### 📈 Stats
+##### 📈 Stats
 _(pending)_
 
-### 📊 Sparklines
+##### 📊 Sparklines
 _(pending)_
 
-### 🏆 Top wins
+##### 🏆 Top wins
 _(pending)_
 
-### 👽 People
+##### 👽 People
 _(pending)_
 
-### 💡 Observations
+##### 💡 Observations
 
-### 💰 Money
+##### 💰 Money
 _week lines may straddle months - Total counts this month's days only_
 **Total = 0**

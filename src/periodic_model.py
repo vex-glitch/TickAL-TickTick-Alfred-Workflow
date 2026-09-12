@@ -643,8 +643,12 @@ def mark_swept(body_lines, tids):
 
 
 # ── Journal ──────────────────────────────────────────────────────────────────
-JOURNAL_Q_RE = re.compile(r"^\s*\*\*Q(?P<n>\d+) · (?P<q>.+)\*\*\s*$")
-JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)A: ?(?P<a>.*)$")
+# Both shapes parse: the old bold form (**Q1 · …** / A: …) that older notes
+# carry, and Vex's 2026-09-12 bullet form (- Q1 · … / - *A: …*). Writers emit
+# the new one; merge_journal_answers rebuilds each A-line in the shape it
+# found, so a note is never half-converted.
+JOURNAL_Q_RE = re.compile(r"^\s*(?:- )?\*{0,2}Q(?P<n>\d+)\s*· (?P<q>.+?)\*{0,2}\s*$")
+JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)\*?\s*$")
 
 
 # Fixed journal prompts - code-owned because they ROUTE: each key
@@ -683,13 +687,18 @@ def journal_fixed(slot, ctx=None):
                   if goal else
                   "Did you achieve your daily goal? "
                   "Describe success/failure factors.")
+        # The bridge asks FIRST (Vex 2026-09-12 moved it there): it is the one
+        # answer that leaves the note - it writes tomorrow's head and the
+        # Bridges board - so it should not be the question you reach tired.
+        # Safe to reorder: this one list drives both the seeding and the
+        # answer routing (periodic_engine reads its keys in this order).
         return [
+            ("bridge", "🌉 Daily bridge - what should tomorrow-you know? "
+                       "(saves to the Bridges board + tomorrow's note)"),
             ("free", "What is on your mind?"),
             ("goal", goal_q),
             ("money", "How much money did you earn today? (logs to 💰 Money)"),
             ("rating", "Rate the day, 1-5 stars"),
-            ("bridge", "🌉 Daily bridge - what should tomorrow-you know? "
-                       "(saves to the Bridges board + tomorrow's note)"),
         ]
     # weekly - the three-things picker is NOT a seeded question: it runs as
     # the Alfred goal-picker handoff after the dialogs (phones edit next
@@ -722,13 +731,13 @@ def select_prompts(pool, d, which, k=None):
 def seed_journal_lines(prompts):
     lines = []
     for i, q in enumerate(prompts, 1):
-        lines.append(f"{T1}**Q{i} · {q}**")     # nested journal layout
-        lines.append(f"{T2}A: ")
+        lines.append(journal_q_line(i, q))
+        lines.append(f"{T2}- *A: *")
     return lines
 
 
 def journal_q_line(n, q, ws=T1):
-    return f"{ws}**Q{n} · {q}**"
+    return f"{ws}- Q{n} · {q}"
 
 
 def journal_pairs(body_lines):
@@ -755,8 +764,9 @@ def merge_journal_answers(body_lines, answers):
     filled = 0
     for n, _q, a, idx in journal_pairs(body):
         if n in answers and not a and answers[n].strip():
-            ws = JOURNAL_A_RE.match(body[idx]).group("ws")
-            body[idx] = f"{ws}A: {answers[n].strip()}"
+            m = JOURNAL_A_RE.match(body[idx])
+            ws, dash, ital = m.group("ws"), m.group("dash") or "", m.group("ital")
+            body[idx] = f"{ws}{dash}{ital}A: {answers[n].strip()}{ital}"
             filled += 1
     return body, filled
 
