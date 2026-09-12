@@ -33,7 +33,7 @@
 			</dict>
 			<dict>
 				<key>destinationuid</key>
-				<string>EDE420E3-AFCE-4509-B279-8333920CA098</string>
+				<string>RT000005-0000-4000-9000-2026091200AA</string>
 				<key>modifiers</key>
 				<integer>1179648</integer>
 				<key>modifiersubtext</key>
@@ -4502,6 +4502,33 @@
 				<string></string>
 				<key>sourceoutputuid</key>
 				<string>RT00000C-0000-4000-9000-2026091200AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>RT000005-0000-4000-9000-2026091200AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>0CD3CE18-7E6F-4F6A-B384-29DB797F3BF0</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>RT00000D-0000-4000-9000-2026091200AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>EDE420E3-AFCE-4509-B279-8333920CA098</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>RT00000E-0000-4000-9000-2026091200AA</string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -14092,6 +14119,52 @@ fi</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>conditions</key>
+				<array>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^ctx:</string>
+						<key>outputlabel</key>
+						<string>browse</string>
+						<key>uid</key>
+						<string>RT00000D-0000-4000-9000-2026091200AA</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^(?!ctx:)</string>
+						<key>outputlabel</key>
+						<string>new task</string>
+						<key>uid</key>
+						<string>RT00000E-0000-4000-9000-2026091200AA</string>
+					</dict>
+				</array>
+				<key>elselabel</key>
+				<string>N/A</string>
+				<key>hideelse</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.conditional</string>
+			<key>uid</key>
+			<string>RT000005-0000-4000-9000-2026091200AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -18022,6 +18095,15 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<real>2450.0</real>
 			<key>ypos</key>
 			<real>860.0</real>
+		</dict>
+		<key>RT000005-0000-4000-9000-2026091200AA</key>
+		<dict>
+			<key>note</key>
+			<string>⌘⇧ router: ctx→Browse, else→New Task</string>
+			<key>xpos</key>
+			<real>2450.0</real>
+			<key>ypos</key>
+			<real>520.0</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
