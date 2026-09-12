@@ -1134,11 +1134,61 @@ PN_AGENT_PLIST = os.path.expanduser(
 PN_AGENT_LOG = "/tmp/tickal_periodic.log"
 
 
+# launchd grants its agents no TCC rights, and /bin/bash carries none of its
+# own, so an agent shelling through py.sh cannot READ a workflow that sits
+# behind a TCC wall: "Operation not permitted", exit 126, every morning,
+# silently. iCloud Drive is the wall that bites, because a whole Alfred prefs
+# folder can be synced there - Vex's is, and his mint agent had been dead
+# since 2026-07-13 while the hourly sync agent beside it kept running, the
+# only difference being that its plist named python3 directly. So: resolve
+# py.sh's ladder at INSTALL time and run the interpreter itself.
+_TCC_WALLS = ("/Library/Mobile Documents/",)
+
+
+def _tcc_walled(path):
+    return any(w in (path or "") for w in _TCC_WALLS)
+
+
+def _agent_python():
+    """py.sh's interpreter ladder, resolved once for a plist."""
+    import shutil
+    for cand in ("/opt/homebrew/bin/python3", "/usr/local/bin/python3"):
+        if os.path.exists(cand):
+            return cand
+    return shutil.which("python3") or "/usr/bin/python3"
+
+
+def _agent_wf_of(args):
+    """The workflow dir an installed agent points at, for either shape:
+    [python3, <wf>/…/x.py, verb] (current) or the older
+    [bash, <wf>/Scripts/py.sh, <wf>/…/x.py, verb]."""
+    scripts = [a for a in args if a.endswith(".py")]
+    return os.path.dirname(os.path.dirname(scripts[0])) if scripts else ""
+
+
+def _agent_stale_reason(cur, wf, loaded):
+    """'' = healthy; else why the installed agent needs a repair."""
+    args = [str(a) for a in cur.get("ProgramArguments", [])]
+    got = _agent_wf_of(args)
+    if not args or not got:
+        return "it predates this workflow version"
+    script = next(a for a in args if a.endswith(".py"))
+    if not os.path.exists(script):
+        return "it points at a deleted workflow copy"
+    if got != wf:
+        return "it points at a previous workflow copy"
+    if os.path.basename(args[0]).startswith("bash") and _tcc_walled(script):
+        return ("it runs through bash, which macOS will not let read this "
+                "workflow copy")
+    if not loaded:
+        return "launchd does not have it loaded"
+    return ""
+
+
 def _pn_agent_dict(wf):
     return {
         "Label": PN_AGENT_LABEL,
-        "ProgramArguments": ["/bin/bash",
-                             os.path.join(wf, "Scripts", "py.sh"),
+        "ProgramArguments": [_agent_python(),
                              os.path.join(wf, "Scripts", "xact.py"),
                              "xact:pn_mint"],
         "WorkingDirectory": wf,
@@ -1195,17 +1245,7 @@ def _pn_agent_state(wf):
             cur = plistlib.load(f)
     except Exception:
         return "its file is unreadable"
-    args = [str(a) for a in cur.get("ProgramArguments", [])] or [""]
-    if os.path.basename(args[0]) != "bash" or len(args) < 3:
-        return "it predates this workflow version"
-    py_sh = args[1]
-    if not os.path.exists(py_sh):
-        return "it points at a deleted workflow copy"
-    if os.path.dirname(os.path.dirname(py_sh)) != wf:
-        return "it points at a previous workflow copy"
-    if not _pn_agent_loaded():
-        return "launchd does not have it loaded"
-    return ""
+    return _agent_stale_reason(cur, wf, _pn_agent_loaded())
 
 
 def pn_agent_toggle():
@@ -1304,8 +1344,7 @@ def _dialog(prompt, buttons, default):
 def _sync_agent_dict(wf):
     return {
         "Label": SYNC_AGENT_LABEL,
-        "ProgramArguments": ["/bin/bash",
-                             os.path.join(wf, "Scripts", "py.sh"),
+        "ProgramArguments": [_agent_python(),
                              os.path.join(wf, "src", "sync.py"), "sync"],
         "WorkingDirectory": wf,
         "StartInterval": 3600,
@@ -1362,17 +1401,7 @@ def _sync_agent_state(wf):
             cur = plistlib.load(f)
     except Exception:
         return "its file is unreadable"
-    args = [str(a) for a in cur.get("ProgramArguments", [])] or [""]
-    if os.path.basename(args[0]) != "bash" or len(args) < 3:
-        return "it predates this workflow version"
-    py_sh = args[1]
-    if not os.path.exists(py_sh):
-        return "it points at a deleted workflow copy"
-    if os.path.dirname(os.path.dirname(py_sh)) != wf:
-        return "it points at a previous workflow copy"
-    if not _sync_agent_loaded():
-        return "launchd does not have it loaded"
-    return ""
+    return _agent_stale_reason(cur, wf, _sync_agent_loaded())
 
 
 def cachesync_toggle():

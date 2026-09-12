@@ -167,6 +167,18 @@ check("empty today block not emitted",
       fb.serialize(doc) == "plain description")
 
 print()
+# ── a title that IS a link must not be wrapped into a link (2026-09-12) ────
+check("a link title contributes only its label",
+      fb.link_text("[Weekly Review • Start](alfred://runtrigger/x?a=b)")
+      == "Weekly Review • Start")
+check("a plain title is untouched", fb.link_text("Work") == "Work")
+check("empty and None survive", fb.link_text("") == "" and fb.link_text(None) == "")
+_ln = fb.make_line("PID", "a" * 24, "[Money](kmtrigger://macro=X)")
+check("the checkbox line carries exactly one link",
+      _ln.raw.count("](") == 1, _ln.raw)
+check("and it still round-trips to its tid",
+      fb.parse("### 2026-09-12\n" + _ln.raw).blocks[0].lines[0].tid == "a" * 24)
+
 if FAILS:
     print(f"❌ {len(FAILS)} failures: {FAILS}")
     sys.exit(1)

@@ -147,10 +147,26 @@ def serialize(doc):
     return "\n".join(out)
 
 
+MD_LINK_RE = re.compile(r'\[([^\[\]]*)\]\([^()]*\)')
+
+
+def link_text(title):
+    """The text a checkbox line should carry for `title`.
+
+    A title that is ITSELF a markdown link - every routine step is one -
+    would be wrapped again into "[[name](url)](task link)": a link inside a
+    link, which renders as neither. Seen live in the weekly note's ♻️ mirror
+    (2026-09-12), where three of six rows came out that way. Same rule as
+    display.link_label, spelled out here so this module keeps its no-import
+    purity.
+    """
+    return MD_LINK_RE.sub(r'\1', title or '')
+
+
 def make_line(pid, tid, title):
     """New unchecked checkbox line, format cloned from the app's own storage
     (trailing space after the link matches wild data)."""
-    clean = " ".join((title or "(untitled)").replace("\r", " ").split("\n"))
+    clean = " ".join(link_text(title or "(untitled)").replace("\r", " ").split("\n"))
     return Line(
         f"- [ ] [{clean}](https://ticktick.com/webapp/#p/{pid}/tasks/{tid}) ",
         "checkbox", False, tid, pid)
