@@ -19,6 +19,10 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     done:<tid>[:<pid>]    tick the task off, through the same road the ⇧ chord
                           uses - a routine's habit gets today's check-in with
                           it (the "Finish <routine>" step of each routine)
+    routine:<key>         open a routine's whole workspace (its step list:
+                          quit/open apps, place windows, run link verbs).
+                          Keys come from src/routines.py, so a link can
+                          only name a routine that exists
     pause | resume        the running timer
     journal:<morning|evening|weekly>  the periodic journal dialogs. Even
                           with zero input it lazy-mints the note and seeds
@@ -63,7 +67,19 @@ PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
           ("monthly", "this month's"), ("quarterly", "this quarter's"),
           ("yearly", "this year's"))
 PN_SPECS = tuple(s for s, _ in PN_NOW)
+def _routine_keys():
+    """The routine keys, read from the registry so the grammar and the
+    runner can never disagree. Falls back to an empty tuple: a broken
+    import must refuse routine links, never open the grammar."""
+    try:
+        import routines as _rt
+        return tuple(r["key"] for r in _rt.ROUTINES)
+    except Exception:
+        return ()
+
+
 SLOT_VERBS = {"journal": ("morning", "evening", "weekly"),
+              "routine": _routine_keys(),
               "view": ("calendar", "countdowns", "crmcal"),
               "note": PN_SPECS,
               "notesticky": PN_SPECS}

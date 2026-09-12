@@ -4574,10 +4574,11 @@ def render_routines(query):
         steps = f"{n} steps" if n != 1 else "1 step"
         if not t:
             steps = "not synced yet"
-        url = rt.macro_url(r["macro"])
-        ctrl = ({"arg": f"xact:km_run:{r['macro']}:{title}",
-                 "subtitle": "▶️ Start", "valid": True} if url else
-                {"arg": "", "subtitle": "▶️ Macro id looks wrong", "valid": False})
+        # NATIVE since 2026-09-12: the step list in routines.json, no
+        # Keyboard Maestro. The macro uid stays in the registry as the
+        # fallback road while Vex smokes this.
+        ctrl = {"arg": f"xact:routine_run:{r['key']}",
+                "subtitle": "▶️ Start", "valid": True}
         rows.append(alfred.item(
             uid=f"rt-{r['key']}",
             title=title,

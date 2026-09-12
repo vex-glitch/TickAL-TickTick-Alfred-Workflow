@@ -1,0 +1,100 @@
+{
+  "_readme": "TickAL routine step lists (see src/routine_runner.py for the step types). Ported from Vex's Keyboard Maestro macros 2026-09-12, frames unchanged. {tid}/{pid} expand to the routine's own task.",
+  "startup": {
+    "name": "🌅 Startup",
+    "steps": [
+      {"do": "activate", "app": "com.TickTick.task.mac", "wait": true},
+      {"do": "hide_others"},
+      {"do": "place", "app": "com.TickTick.task.mac", "frame": [970, 10, 1900, 1060]},
+      {"do": "activate", "app": "com.apple.Safari.WebApp.33619214-A054-4466-9B40-FF08655838E4", "wait": true},
+      {"do": "place", "app": "com.apple.Safari.WebApp.33619214-A054-4466-9B40-FF08655838E4", "frame": [1606, -848, 1004, 838]},
+      {"do": "activate", "app": "com.TickTick.task.mac", "wait": true},
+      {"do": "link", "arg": "focus:{tid}:{pid}", "sticky": [2887, 355, 490, 705], "bar": [2888, 10]},
+      {"do": "link", "arg": "notesticky:daily", "sticky": [3850, -845, 1060, 1900]},
+      {"do": "link", "arg": "view:calendar"},
+      {"do": "activate", "app": "com.TickTick.task.mac"},
+      {"do": "key", "key": "escape", "mods": ["shift"]}
+    ]
+  },
+  "shutdown": {
+    "name": "🌆 Shutdown",
+    "steps": [
+      {"do": "quit", "app": "com.TickTick.task.mac", "secs": 15},
+      {"do": "activate", "app": "com.TickTick.task.mac", "wait": true},
+      {"do": "hide_others"},
+      {"do": "url", "url": "ticktick:///webapp/#p/{pid}/tasks/{tid}"},
+      {"do": "link", "arg": "timer:{tid}:{pid}", "bar": [3055, 10]},
+      {"do": "place", "app": "com.TickTick.task.mac", "frame": [1089, -856, 2037, 848]},
+      {"do": "activate", "app": "com.apple.Photos", "wait": true},
+      {"do": "place", "app": "com.apple.Photos", "frame": [10, 10, 869, 1060]},
+      {"do": "activate", "app": "com.apple.Safari.WebApp.33619214-A054-4466-9B40-FF08655838E4", "wait": true},
+      {"do": "place", "app": "com.apple.Safari.WebApp.33619214-A054-4466-9B40-FF08655838E4", "frame": [1288, 10, 1264, 1060]},
+      {"do": "activate", "app": "com.TickTick.task.mac", "wait": true},
+      {"do": "link", "arg": "sticky:{tid}:{pid}", "sticky": [2556, 10, 496, 1060]},
+      {"do": "link", "arg": "moneysticky", "sticky": [879, 10, 406, 1061]},
+      {"do": "link", "arg": "notesticky:daily", "sticky": [3850, -845, 1060, 1900]},
+      {"do": "link", "arg": "view:calendar"},
+      {"do": "link", "arg": "view:crmcal"}
+    ]
+  },
+  "weekly": {
+    "name": "♻️ Weekly Review",
+    "steps": [
+      {"do": "quit", "app": "com.TickTick.task.mac", "secs": 15},
+      {"do": "activate", "app": "com.TickTick.task.mac", "wait": true},
+      {"do": "hide_others"},
+      {"do": "link", "arg": "focus:{tid}:{pid}", "sticky": [1094, -848, 418, 838], "bar": [2694, -848]},
+      {"do": "link", "arg": "notesticky:weekly", "sticky": [3847, -848, 1063, 1903]},
+      {"do": "pause", "secs": 3},
+      {"do": "activate", "app": "com.readdle.SparkDesktop-setapp"},
+      {"do": "activate", "app": "cc.anybox.Anybox"},
+      {"do": "activate", "app": "tw.ogdesign.eagle"},
+      {"do": "pause", "secs": 5},
+      {"do": "place", "app": "com.TickTick.task.mac", "frame": [1285, 10, 1267, 1060]},
+      {"do": "place", "app": "cc.anybox.Anybox", "frame": [2560, 11, 958, 1060]},
+      {"do": "place", "app": "tw.ogdesign.eagle", "frame": [7, 9, 1273, 1064]},
+      {"do": "place", "app": "com.readdle.SparkDesktop-setapp", "frame": [1526, -849, 1161, 838]},
+      {"do": "url", "url": "ticktick:///webapp/#p/inbox/tasks"}
+    ]
+  },
+  "monthly": {
+    "name": "🗓️ Monthly Review",
+    "steps": [
+      {"do": "quit", "app": "com.TickTick.task.mac", "secs": 15},
+      {"do": "activate", "app": "com.TickTick.task.mac", "wait": true},
+      {"do": "hide_others"},
+      {"do": "link", "arg": "focus:{tid}:{pid}", "sticky": [1094, -848, 418, 838], "bar": [2694, -848]},
+      {"do": "link", "arg": "notesticky:monthly", "sticky": [3847, -848, 1063, 1903]},
+      {"do": "pause", "secs": 3},
+      {"do": "activate", "app": "com.readdle.SparkDesktop-setapp"},
+      {"do": "activate", "app": "cc.anybox.Anybox"},
+      {"do": "activate", "app": "tw.ogdesign.eagle"},
+      {"do": "pause", "secs": 5},
+      {"do": "place", "app": "com.TickTick.task.mac", "frame": [1285, 10, 1267, 1060]},
+      {"do": "place", "app": "cc.anybox.Anybox", "frame": [2560, 11, 958, 1060]},
+      {"do": "place", "app": "tw.ogdesign.eagle", "frame": [7, 9, 1273, 1064]},
+      {"do": "place", "app": "com.readdle.SparkDesktop-setapp", "frame": [1526, -849, 1161, 838]},
+      {"do": "url", "url": "ticktick:///webapp/#p/inbox/tasks"}
+    ]
+  },
+  "quarterly": {
+    "name": "🌓 Quarterly Review",
+    "steps": [
+      {"do": "quit", "app": "com.TickTick.task.mac", "secs": 15},
+      {"do": "activate", "app": "com.TickTick.task.mac", "wait": true},
+      {"do": "hide_others"},
+      {"do": "link", "arg": "focus:{tid}:{pid}", "sticky": [1094, -848, 418, 838], "bar": [2694, -848]},
+      {"do": "link", "arg": "notesticky:quarterly", "sticky": [3847, -848, 1063, 1903]},
+      {"do": "pause", "secs": 3},
+      {"do": "activate", "app": "com.readdle.SparkDesktop-setapp"},
+      {"do": "activate", "app": "cc.anybox.Anybox"},
+      {"do": "activate", "app": "tw.ogdesign.eagle"},
+      {"do": "pause", "secs": 5},
+      {"do": "place", "app": "com.TickTick.task.mac", "frame": [1285, 10, 1267, 1060]},
+      {"do": "place", "app": "cc.anybox.Anybox", "frame": [2560, 11, 958, 1060]},
+      {"do": "place", "app": "tw.ogdesign.eagle", "frame": [7, 9, 1273, 1064]},
+      {"do": "place", "app": "com.readdle.SparkDesktop-setapp", "frame": [1526, -849, 1161, 838]},
+      {"do": "url", "url": "ticktick:///webapp/#p/inbox/tasks"}
+    ]
+  }
+}

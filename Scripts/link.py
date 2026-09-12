@@ -443,6 +443,8 @@ def run(verb, tid, pid_hint):
         return _quiet(xact.focus_pause), True
     if verb == "resume":
         return _quiet(xact.focus_resume), True
+    if verb == "routine":                # tid carries the routine key
+        return _quiet(xact.routine_run, tid), True
     if verb == "journal":                # tid carries the (allowlisted) slot
         # DETACHED: the dialog run can last minutes and must never hold
         # this sequential node (a focus/pause click would queue behind it)

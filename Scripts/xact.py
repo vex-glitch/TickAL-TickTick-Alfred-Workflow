@@ -206,6 +206,10 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     (sweeps ticked ✅ Today boxes first)
     xact:pn_mint                    the 04:30 agent run: mint-ahead + catch-up
                                     + refresh + roll-ups (launchd fires this)
+    xact:routine_run:<key>          open a routine's whole workspace from
+                                    its step list (routines.json, else the
+                                    built-in default); spawns routine_exec
+    xact:routine_exec:<key>         the detached child that runs the steps
     xact:km_run:<UID>[:<label>]     fire a Keyboard Maestro macro by UID,
                                     DETACHED (a routine macro runs 10-20 s and
                                     this node is sequential); 🌓 Routines ⌃
@@ -6497,6 +6501,179 @@ _PN_KINDS = {"w": "win", "n": "nag", "t": "thought",
              "k": "task", "l": "link", "m": "mood"}
 
 
+ROUTINE_CFG = os.path.join(os.path.expanduser("~"), ".ticktick_alfred",
+                           "routines.json")
+ROUTINE_LOG = "/tmp/tickal_routine.log"
+
+_OSA_PLACE = """on run argv
+	set bid to item 1 of argv
+	set x to (item 2 of argv) as integer
+	set y to (item 3 of argv) as integer
+	set w to (item 4 of argv) as integer
+	set h to (item 5 of argv) as integer
+	tell application "System Events"
+		try
+			set p to first process whose bundle identifier is bid
+			set win to front window of p
+			set position of win to {x, y}
+			set size of win to {w, h}
+			return "placed"
+		on error
+			return "no window to place"
+		end try
+	end tell
+end run"""
+
+_OSA_HIDE = """tell application "System Events"
+	set fp to name of first process whose frontmost is true
+	set visible of (every process whose visible is true and background only is false and name is not fp) to false
+end tell"""
+
+
+def _routine_steps(r):
+    """(steps, source) for a routine: the user's routines.json when it holds a
+    list for this key, else routine_runner.default_steps. A list that fails
+    validation is REFUSED whole, never half-run - most routines quit TickTick
+    in their first step, and stopping midway there is worse than not starting.
+    """
+    import json as _json
+    import routine_runner as rr
+    spec = {"weekly": "weekly", "monthly": "monthly",
+            "quarterly": "quarterly"}.get(r["key"], "daily")
+    steps, src = rr.default_steps(spec), "built-in default"
+    try:
+        with open(ROUTINE_CFG) as f:
+            entry = (_json.load(f) or {}).get(r["key"]) or {}
+        if entry.get("steps"):
+            steps, src = entry["steps"], "routines.json"
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError) as e:
+        return None, f"routines.json unreadable ({type(e).__name__})"
+    bad = rr.validate(steps)
+    if bad:
+        return None, f"{src}: " + "; ".join(bad[:3])
+    return [rr.expand(s, r["tid"], r["pid"]) for s in steps], src
+
+
+def _routine_step(step, wf, log):
+    """Run ONE step, best effort: a window that cannot be placed must not
+    cost the rest of the workspace. Everything lands in the log."""
+    import routine_runner as rr
+    kind = step.get("do")
+
+    def say(msg):
+        log.write(f"   {rr.describe(step)} -> {msg}\n")
+
+    try:
+        if kind == "quit":
+            secs = int(step.get("secs", 15))
+            r = subprocess.run(
+                ["osascript", "-e", "on run argv",
+                 "-e", f"with timeout of {secs} seconds",
+                 "-e", "tell application id (item 1 of argv) to quit",
+                 "-e", "end timeout", "-e", "end run", step["app"]],
+                capture_output=True, text=True, timeout=secs + 5)
+            say("quit" if r.returncode == 0 else (r.stderr or "?").strip()[:60])
+        elif kind == "activate":
+            subprocess.run(["open", "-b", step["app"]],      # LaunchServices,
+                           capture_output=True, timeout=15)  # never an AE
+            if step.get("wait"):
+                for _ in range(30):
+                    r = subprocess.run(
+                        ["osascript", "-e",
+                         f'application id "{step["app"]}" is running'],
+                        capture_output=True, text=True, timeout=10)
+                    if (r.stdout or "").strip() == "true":
+                        break
+                    time.sleep(0.4)
+            say("open")
+        elif kind == "hide_others":
+            subprocess.run(["osascript", "-e", _OSA_HIDE],
+                           capture_output=True, timeout=20)
+            say("hidden")
+        elif kind == "place":
+            args = [str(int(v)) for v in step["frame"]]
+            r = subprocess.run(["osascript", "-", step["app"], *args],
+                               input=_OSA_PLACE, capture_output=True,
+                               text=True, timeout=20)
+            say((r.stdout or r.stderr or "?").strip()[:60])
+        elif kind == "link":
+            env = dict(os.environ)
+            if step.get("sticky"):
+                env["TICKAL_STICKY_FRAME"] = ",".join(str(int(v)) for v in step["sticky"])
+            if step.get("bar"):
+                env["TICKAL_BAR_AT"] = ",".join(str(int(v)) for v in step["bar"])
+            r = subprocess.run(
+                ["/bin/bash", os.path.join(wf, "Scripts", "py.sh"),
+                 os.path.join(wf, "Scripts", "link.py"), step["arg"]],
+                capture_output=True, text=True, env=env, timeout=90)
+            say((r.stdout or r.stderr or "").strip()[:80] or "ok")
+        elif kind == "url":
+            subprocess.run(["open", step["url"]], capture_output=True, timeout=15)
+            say("opened")
+        elif kind == "pause":
+            time.sleep(float(step.get("secs", 1)))
+            say("ok")
+        elif kind == "key":
+            mods = step.get("mods") or []
+            using = (" using {" + ", ".join(f"{m} down" for m in mods) + "}") if mods else ""
+            subprocess.run(
+                ["osascript", "-e", 'tell application "System Events" to key code '
+                 f'{rr.KEYS[step["key"]]}{using}'],
+                capture_output=True, timeout=15)
+            say("pressed")
+    except (OSError, subprocess.TimeoutExpired, KeyError, ValueError) as e:
+        say(f"FAILED {type(e).__name__}")
+
+
+def routine_exec(key):
+    """Run a routine's steps in order, in THIS process (routine_run spawns it
+    detached). Nothing here talks to Alfred: the log is the record."""
+    import routines as rt
+    r = rt.by_key(key)
+    if not r:
+        return
+    steps, src = _routine_steps(r)
+    wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(ROUTINE_LOG, "a") as log:
+        log.write(f"\n{_op_iso()} start {r['label']} ({src})\n")
+        if steps is None:
+            log.write(f"   REFUSED: {src}\n")
+            return
+        for step in steps:
+            _routine_step(step, wf, log)
+            log.flush()
+        log.write(f"{_op_iso()} done {r['label']}\n")
+
+
+def routine_run(key):
+    """🌓 Routines ⌃ and the routine:<key> link: open the whole workspace.
+    DETACHED - a routine relaunches TickTick and runs 20-60 s while this node
+    is sequential; the toast goes out at once, the log carries the rest.
+    This is what replaced the Keyboard Maestro macros (Vex 2026-09-12)."""
+    import routines as rt
+    r = rt.by_key(key)
+    if not r:
+        print("▶️ Unknown routine")
+        return
+    steps, src = _routine_steps(r)
+    if steps is None:
+        print(f"▶️ {r['label']} · step list refused · see {ROUTINE_LOG}")
+        return
+    wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        with open(ROUTINE_LOG, "a") as logf:
+            subprocess.Popen(
+                ["/bin/bash", os.path.join(wf, "Scripts", "py.sh"),
+                 os.path.join(wf, "Scripts", "xact.py"), f"xact:routine_exec:{key}"],
+                stdout=logf, stderr=logf, start_new_session=True)
+    except OSError as e:
+        print(f"▶️ Start failed · {type(e).__name__}")
+        return
+    print(f"▶️ {r['label']} started · {len(steps)} steps")
+
+
 def km_run(rest):
     """Fire a Keyboard Maestro macro by UID: the 🌓 Routines ⌃ chord. rest =
     "<UID>[:<label>]". DETACHED on purpose - a routine macro quits and
@@ -10665,6 +10842,10 @@ def main():
             pn_income(rest)
         elif verb == "km_run":
             km_run(rest)
+        elif verb == "routine_run":
+            routine_run(rest)
+        elif verb == "routine_exec":
+            routine_exec(rest)
         elif verb == "pn_journal":
             pn_journal(rest)
         elif verb == "pn_goal":
