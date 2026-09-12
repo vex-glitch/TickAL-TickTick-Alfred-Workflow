@@ -115,6 +115,7 @@ def parse_ctx(raw):
                "people": "ctx:people",
                "countdowns": "ctx:countdowns",
                "habits": "ctx:habits",
+               "routines": "ctx:routines",
                "tph": "ctx:tph",
                "content": "ctx:contentpl",
                "inbox": "ctx:inbox", "completed": "ctx:completed",
@@ -4546,6 +4547,59 @@ def render_countdowns(level, ids, query):
 
 
 # ── Level: habits / habit ────────────────────────────────────────────────────
+def render_routines(query):
+    """🌓 Routines: one row per routine, from src/routines.py (config, never
+    name matching). The title is the LIVE task title, so the emoji Vex keeps
+    on the task in TickTick is the emoji on the row.
+
+    Chords (Vex 2026-09-12): ⏎ opens the task in TickTick · ⌃ STARTS it (its
+    "… • Start" KM macro, through the ⌃ router → XAct) · ⇧ ticks it done (a
+    repeating routine rolls to its next date) · ⌥ browses its steps · ⌘ is
+    Actions, as everywhere. NO add_back here: ⌃ is the start chord on this
+    screen, and this screen hangs off the main menu."""
+    import routines as rt
+    tasks = cache_store.get("all_tasks") or []
+    by_id = {t.get("id"): t for t in tasks}
+    kids = {}
+    for t in tasks:
+        if t.get("parentId") and t.get("status", 0) == 0:
+            kids[t["parentId"]] = kids.get(t["parentId"], 0) + 1
+
+    rows = []
+    for r in rt.ROUTINES:
+        t = by_id.get(r["tid"]) or {}
+        title = t.get("title") or r["label"]
+        pid = t.get("projectId") or r["pid"]
+        n = kids.get(r["tid"], 0)
+        steps = f"{n} steps" if n != 1 else "1 step"
+        if not t:
+            steps = "not synced yet"
+        url = rt.macro_url(r["macro"])
+        ctrl = ({"arg": f"xact:km_run:{r['macro']}:{title}",
+                 "subtitle": "▶️ Start", "valid": True} if url else
+                {"arg": "", "subtitle": "▶️ Macro id looks wrong", "valid": False})
+        rows.append(alfred.item(
+            uid=f"rt-{r['key']}",
+            title=title,
+            subtitle=f"{steps}  |  ⏎↗️  ⌃▶️  ⇧✅  ⌥📋  ⌘⚡",
+            arg=f"open:ticktick:///webapp/#p/{pid}/tasks/{r['tid']}",
+            valid=True,
+            variables={"task_id": r["tid"], "task_list_id": pid,
+                       "task_title": title, "item_type": "task"},
+            mods={
+                "cmd":   {"arg": "", "subtitle": "⌘ Actions"},
+                "shift": {"arg": f"complete:{pid}:{r['tid']}:{title}",
+                          "subtitle": "✅ Done"},
+                "alt":   {"arg": "", "subtitle": "📋 Steps",
+                          "valid": bool(n),
+                          "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{r['tid']}"}},
+                "ctrl":  ctrl,
+            }))
+    if query:
+        rows = [r for r in rows if fuzz.score(query, r["title"]) > 0]
+    return rows or [alfred.item(title="No routine matches", valid=False)]
+
+
 def render_habits(level, ids, query):
     """ctx:habits - the 🔄 hub, sections as headers, due-first: ⏎ TICKS
     today (value habits step; note dialog rides recordEnable habits).
@@ -4993,6 +5047,9 @@ def main():
 
         elif level in ("habits", "habit"):
             items = render_habits(level, ids, query)
+
+        elif level == "routines":
+            items = render_routines(query)
 
         elif level == "tph":
             items = render_tph(ids[0] if ids else "", query)

@@ -206,6 +206,9 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     (sweeps ticked ✅ Today boxes first)
     xact:pn_mint                    the 04:30 agent run: mint-ahead + catch-up
                                     + refresh + roll-ups (launchd fires this)
+    xact:km_run:<UID>[:<label>]     fire a Keyboard Maestro macro by UID,
+                                    DETACHED (a routine macro runs 10-20 s and
+                                    this node is sequential); 🌓 Routines ⌃
 
 stdout → the End notification. task_title rides the env.
 """
@@ -6494,6 +6497,27 @@ _PN_KINDS = {"w": "win", "n": "nag", "t": "thought",
              "k": "task", "l": "link", "m": "mood"}
 
 
+def km_run(rest):
+    """Fire a Keyboard Maestro macro by UID: the 🌓 Routines ⌃ chord. rest =
+    "<UID>[:<label>]". DETACHED on purpose - a routine macro quits and
+    relaunches TickTick and runs 10-20 s, while this node is sequential, so
+    waiting would block the next Alfred action. By UID, never by name: two
+    macros can share a name and a rename breaks a name link."""
+    import routines as rt
+    uid, _, label = rest.partition(":")
+    url = rt.macro_url(uid.strip())
+    if not url:
+        print("▶️ Macro id looks wrong")
+        return
+    try:
+        subprocess.Popen(["open", url], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e:
+        print(f"▶️ Start failed · {e}")
+        return
+    print(f"▶️ {label.strip() or 'Routine'} started")
+
+
 def _pn_bg(arg):
     """Detached background xact run - the instant-open path (opens were slow
     when the full refresh + Tier-2 fetches ran BEFORE the app opened). The
@@ -10615,6 +10639,8 @@ def main():
             pn_entry(rest)
         elif verb == "pn_income":
             pn_income(rest)
+        elif verb == "km_run":
+            km_run(rest)
         elif verb == "pn_journal":
             pn_journal(rest)
         elif verb == "pn_goal":

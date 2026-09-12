@@ -150,6 +150,12 @@ def build_items():
             subtitle="Tick, streaks, diary",
             arg="habits",
         ),
+        alfred.item(
+            uid="routines",
+            title="🌓 Routines",
+            subtitle="Start a routine",
+            arg="routines",
+        ),
         # The "🎬 Content pipeline" row DIED here 2026-07-28 (Vex: "kill the
         # main menu"). It sat directly above the CRM row, and once CRM and
         # Content merged into one home that row was the same world twice -
