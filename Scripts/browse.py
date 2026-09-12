@@ -4581,7 +4581,7 @@ def render_routines(query):
         rows.append(alfred.item(
             uid=f"rt-{r['key']}",
             title=title,
-            subtitle=f"{steps}  |  ⏎↗️  ⌃▶️  ⇧✅  ⌥📋  ⌘⚡",
+            subtitle=f"{steps}  |  ⏎↗️  ⌃▶️  ⇧✅  ⌥📋  ⌘⇧📊  ⌘⚡",
             arg=f"open:ticktick:///webapp/#p/{pid}/tasks/{r['tid']}",
             valid=True,
             variables={"task_id": r["tid"], "task_list_id": pid,
@@ -4594,10 +4594,79 @@ def render_routines(query):
                           "valid": bool(n),
                           "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{r['tid']}"}},
                 "ctrl":  ctrl,
+                # ⌘⇧ → the tracker, this routine on top (the ⌘⇧ router sends
+                # a "ctx:" arg into Browse instead of the Add window)
+                "cmd+shift": {"arg": f"ctx:rtrack:{r['key']}",
+                              "subtitle": "📊 Tracker"},
             }))
     if query:
         rows = [r for r in rows if fuzz.score(query, r["title"]) > 0]
     return rows or [alfred.item(title="No routine matches", valid=False)]
+
+
+def render_rtrack(ids, query):
+    """📊 Routines tracker (⌘⇧ on any routine row): every routine's habit in
+    ONE screen, not just the row you pressed - the point of a tracker is the
+    comparison, and the row you came from rides on top so it is preselected.
+    Same chords as the Habits hub, so the muscle memory carries: ⏎ ticks
+    today, ⌥ opens that habit's screen (past days, un-tick, skip, diary),
+    ⌃ goes back to Routines."""
+    import routines as rt
+    import habits_model as hm
+    from datetime import date as _date
+    today = _date.today()
+    ts = hm.stamp(today)
+    want = [r for r in rt.ROUTINES if r.get("habit")]
+    habits = {h["id"]: h for h in (cache_store.get("habits") or [])}
+    checks = cache_store.get("habit_checkins") or {}
+    if any(r["habit"] not in habits for r in want):
+        # a habit minted since the last hourly sync: ONE live read, never a
+        # screen that says "not synced yet" about a habit we just made
+        try:
+            import api_v2
+            live = api_v2.TickTickV2().get_habits()
+            if live:
+                habits = {h["id"]: h for h in live}
+                fresh = api_v2.TickTickV2().habit_checkins(
+                    [r["habit"] for r in want], hm.stamp(today) - 31)
+                if fresh:
+                    checks = dict(checks, **fresh)
+        except Exception:
+            pass
+
+    first = ids[0] if ids else ""
+    want.sort(key=lambda r: (r["key"] != first, ))
+    tasks = {t.get("id"): t for t in cache_store.get("all_tasks") or []}
+    rows = []
+    for r in want:
+        h = habits.get(r["habit"])
+        name = (tasks.get(r["tid"]) or {}).get("title") or r["label"]
+        if h is None:
+            rows.append(alfred.item(
+                uid=f"rk-{r['key']}", title=f"⬜ {name}",
+                subtitle="habit not readable · run a sync", valid=False))
+            continue
+        ck = checks.get(r["habit"])
+        chip = hm.state_chip(h, hm.checkin_for(ck, ts))
+        bits = [hm.dots(h, ck, today)]
+        if h.get("currentStreak"):
+            bits.append(f"🔥{h['currentStreak']}")
+        bits.append(f"{h.get('totalCheckIns') or 0} total")
+        rows.append(alfred.item(
+            uid=f"rk-{r['key']}",
+            title=f"{chip} {name}",
+            subtitle=f"{' · '.join(bits)}  |  ⏎✅  ⌥📅  ⌃🔙",
+            arg=f"xact:habit_tick:{r['habit']}",
+            valid=True,
+            mods={
+                "alt": {"arg": "", "subtitle": "📅 Days, un-tick, diary",
+                        "variables": {"browse_ctx": f"ctx:habit:{r['habit']}"}},
+                "cmd": {"arg": "", "subtitle": "⌘ Actions"},
+            }))
+    if query:
+        rows = [x for x in rows if fuzz.score(query, x["title"]) > 0]
+    return add_back(rows or [alfred.item(title="No routine matches", valid=False)],
+                    "ctx:routines")
 
 
 def render_habits(level, ids, query):
@@ -5050,6 +5119,9 @@ def main():
 
         elif level == "routines":
             items = render_routines(query)
+
+        elif level == "rtrack":
+            items = render_rtrack(ids, query)
 
         elif level == "tph":
             items = render_tph(ids[0] if ids else "", query)
