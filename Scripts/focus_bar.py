@@ -254,6 +254,20 @@ def _saved_zooms():
         return {}
 
 
+FOLD_MAX = 200          # folded tids kept in the bar file (a routine has ~10)
+
+
+def _saved_folded():
+    """The tids folded shut, from the bar file - a fold outlives the bar
+    (spawned fresh per session) and a switch to another task and back."""
+    try:
+        with open(BAR_STATE) as f:
+            raw = json.load(f).get("folded") or []
+        return [str(t) for t in raw if t][:FOLD_MAX]
+    except (OSError, ValueError, TypeError, AttributeError):
+        return []
+
+
 def _fourcc(s):
     return int.from_bytes(s.encode("mac_roman"), "big")
 
@@ -400,6 +414,7 @@ GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.18, 0.75, 0.47, 0.95)
 # Expanded list: px each nesting level below the direct child shifts its
 # checkbox + title - just enough to read as nested (Vex 2026-09-10)
 INDENT = 14
+TLINK_W = 22       # row 1's link icon box (row icons scale with the zoom)
 TASK_FONT = 15     # row titles (17 → 15, Vex 2026-09-10: the task/sub gap read too big)
 SUB_FONT = 14      # sub-subtask titles (13 → 14, Vex 2026-09-10: ~7% under tasks)
 CIRCLE_PT = 13     # task checkbox glyph (was 15)
@@ -462,6 +477,7 @@ class BarController(NSObject):
         self._flash_until = 0.0         # the zoom % owns the clock until then
         self._hot = None                # hover hotkeys (⌘+ / ⌘− / ⌘0)
         self.user_w, self.user_h = _saved_size()   # edge drag / Moom size
+        self.folded = _saved_folded()   # tids whose subtree is folded shut
         self.row_pool = []              # lazily-built expanded item rows
         self.visible_items = []         # the filtered+scrolled window
         self.scroll_off = 0             # first visible row index
@@ -594,6 +610,19 @@ class BarController(NSObject):
         self.t_title.cell().setLineBreakMode_(NSLineBreakByTruncatingTail)
         self.t_title.setToolTip_("Open in TickTick")
         fx.addSubview_(self.t_title)
+        # row 1's own link, when the focused title carries one. It hugs the
+        # title instead of joining the right-hand run: that run is controls,
+        # and the ⌄ stays the rightmost thing on the bar (Vex 2026-09-12)
+        self.b_tlink = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 22, 22))
+        self.b_tlink.setBordered_(False)
+        self.b_tlink.setTitle_("")
+        self.b_tlink.setImage_(sym_image("link", 13))
+        self.b_tlink.setContentTintColor_(NSColor.secondaryLabelColor())
+        self.b_tlink.setTarget_(self)
+        self.b_tlink.setAction_("onTitleLink:")
+        self.b_tlink.setToolTip_("Run the link in this title")
+        self.b_tlink.setHidden_(True)
+        fx.addSubview_(self.b_tlink)
         self.l_clock = label(CLOCK_PT, mono=True,   # prominent, not huge
                              color=NSColor.colorWithWhite_alpha_(0.68, 1.0))
         self.l_clock.setFont_(NSFont.monospacedDigitSystemFontOfSize_weight_(
@@ -1132,6 +1161,7 @@ class BarController(NSObject):
                 st["size"] = [self.user_w, self.user_h]
             if self._zooms:
                 st["zoom"] = self._zooms                 # per monitor
+            st["folded"] = list(self.folded)[:FOLD_MAX]  # folded subtrees
             tmp = BAR_STATE + ".tmp"
             with open(tmp, "w") as f:
                 json.dump(st, f)
@@ -1332,8 +1362,11 @@ class BarController(NSObject):
         return None
 
     def _row_views(self, i):
-        """Lazily-built (circle, title, grip) 3-tuple for expanded item row
-        i - the grip is the drag-drop reorder handle."""
+        """Lazily-built (circle, title, grip, fold, link) 5-tuple for expanded
+        item row i - the grip is the drag-drop reorder handle, the fold
+        chevron hugs the text of a row that has subtasks, and the link icon
+        sits in the far-right column (mirroring the grip) when the title
+        carries one (Vex 2026-09-12)."""
         while len(self.row_pool) <= i:
             idx = len(self.row_pool)
             b = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 26, 26))
@@ -1364,10 +1397,41 @@ class BarController(NSObject):
             grip.setToolTip_("Drag to reorder")
             grip._bar = self
             self.fx.addSubview_(grip)
-            self.row_pool.append((b, t, grip))
+            f = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 16, 20))
+            f.setBordered_(False)
+            f.setTitle_("")
+            f.setImage_(sym_image("chevron.down", 10))
+            f.setContentTintColor_(NSColor.tertiaryLabelColor())
+            f.setTarget_(self)
+            f.setAction_("onFoldRow:")
+            f.setTag_(idx)
+            f.setToolTip_("Fold subtasks")
+            self.fx.addSubview_(f)
+            k = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 20, 20))
+            k.setBordered_(False)
+            k.setTitle_("")
+            k.setImage_(sym_image("link", 12))
+            k.setContentTintColor_(NSColor.secondaryLabelColor())
+            k.setTarget_(self)
+            k.setAction_("onLinkRow:")
+            k.setTag_(idx)
+            k.setToolTip_("Run the link in this title")
+            self.fx.addSubview_(k)
+            self.row_pool.append((b, t, grip, f, k))
         return self.row_pool[i]
 
     MAX_ROWS = 10
+
+    def _text_w(self, button, cap):
+        """The width of a button's text AS DRAWN, capped at its box. The
+        attributed title measures the glyphs alone; intrinsicContentSize adds
+        the cell's padding, which at row-1's 20 pt bold left a visible gap
+        before the hugging icon (Vex 2026-09-12)."""
+        try:
+            w = float(button.attributedTitle().size().width)
+        except Exception:
+            w = float(button.intrinsicContentSize().width) - 8
+        return max(0.0, min(w, cap))
 
     def _relayout(self):
         if self._drag is not None:    # a grip drag owns the rows: a poll or
@@ -1379,7 +1443,11 @@ class BarController(NSObject):
         att = m["attributed"]
         all_items = (self.block or {}).get("items", []) if att else []
         # ticked rows leave the BAR - the description keeps them
-        items = fsub.open_rows(all_items)   # minus a ticked parent's children
+        full_rows = fsub.open_rows(all_items)   # minus a ticked parent's children
+        # which rows own a subtree is read off the UNFOLDED list: a folded
+        # row has no deeper row left, and its chevron would vanish with them
+        kid_tids = fsub.kid_tids(full_rows)
+        items = self._open_items()          # ...minus every folded subtree
         nxt = self._first_unchecked() if att else None
         expanded = self.expanded and bool(items)
         live = self._resizing()      # edge drag or Moom stream: frame rules
@@ -1399,6 +1467,7 @@ class BarController(NSObject):
         # and the title takes the extra room
         title_w = 0.0
         natural = 0.0
+        tlink = fsub.title_link(m["title"]) if att else None
         if att:
             full = _disp(m["title"]) or "Task"   # links render as [name]🔗
             self.t_title.setTitle_(full[:60])
@@ -1406,7 +1475,8 @@ class BarController(NSObject):
             natural = max(60.0, self.t_title.intrinsicContentSize().width + 10)
         btn_w = ICON_BOX * (3 + (2 if att else 0) + (1 if items else 0))
         clock_w = self._clock_w()   # the digits' real width, not a fixed 96 px box
-        fixed = 16 + ((30 + 8 + 12) if att else 0) + clock_w + CLOCK_GAP + btn_w + 14
+        fixed = (16 + ((30 + 8 + 12) if att else 0) + clock_w + CLOCK_GAP + btn_w + 14
+                 + (TLINK_W + 6 if tlink else 0))   # row 1's link keeps its room
         min_w = max(420.0, fixed + (60.0 if att else 0.0))
         fr = self.panel.frame()
         if live:
@@ -1465,10 +1535,16 @@ class BarController(NSObject):
         x = 16
         for v, show in ((self.b_done, att), (self.t_title, att)):
             v.setHidden_(not show)
+        self.b_tlink.setHidden_(not (att and tlink))
         if att:
             self.b_done.setFrame_(NSMakeRect(x, y1 - 1, 30, 30))
             x += 38
             self.t_title.setFrame_(NSMakeRect(x, y1, title_w, 28))
+            if tlink:       # hugging the title text as drawn, not the box
+                tw = self._text_w(self.t_title, title_w)
+                self.b_tlink.setFrame_(NSMakeRect(x + tw + 2, y1 + 3, TLINK_W, 22))
+                self.b_tlink.setToolTip_(f"Run this link\n{tlink}")
+                x += TLINK_W + 6
             x += title_w + 12
         # right side, right→left - a tight run of ICON_BOX icons, edge to
         # edge, the clock just left of it (Vex 2026-09-10: both gaps halved)
@@ -1545,10 +1621,11 @@ class BarController(NSObject):
             self._gap_y = [y_top]                   # drop-line y per gap (grip)
             for i in range(n_rows):
                 it = window[i]
-                b, t, g = self._row_views(i)
+                b, t, g, f, k = self._row_views(i)
+                for v in (b, t, g, f, k):
+                    v._tid = it.get("tid") or ""   # click-time re-resolution
                 for v in (b, t, g):
                     v.setHidden_(False)
-                    v._tid = it.get("tid") or ""   # click-time re-resolution
                 # nested subtasks: checkbox AND title shift one INDENT per
                 # level below the direct child; their box goes SQUARE and
                 # small (matching the 13 pt text) and their row sits tighter
@@ -1572,7 +1649,28 @@ class BarController(NSObject):
                 t.setContentTintColor_(ROW_TEXT)
                 th = (19 if nested else 22) * z
                 tx = x0 + dx + bw + 8
-                t.setFrame_(NSMakeRect(tx, mid - th / 2.0, w - tx - 12, th))
+                # right-hand icons take their room BEFORE the title: the
+                # link sits in a fixed far-right column (the grip's mirror),
+                # the fold chevron hugs the end of the text
+                url = fsub.title_link(it["title"])
+                folds = it.get("tid") in kid_tids
+                kw, fw = 20 * z, 16 * z
+                avail = max(24.0, w - tx - 12 - (kw + 6 if url else 0)
+                            - (fw + 4 if folds else 0))
+                t.setFrame_(NSMakeRect(tx, mid - th / 2.0, avail, th))
+                k.setHidden_(not url)
+                if url:
+                    k.setImage_(sym_image("link", 12 * z))
+                    k.setFrame_(NSMakeRect(w - 12 - kw, mid - 10 * z, kw, 20 * z))
+                    k.setToolTip_(f"Run this link\n{url}")
+                f.setHidden_(not folds)
+                if folds:
+                    shut = it.get("tid") in self.folded
+                    f.setImage_(sym_image("chevron.right" if shut else "chevron.down", 10 * z))
+                    f.setToolTip_("Unfold subtasks" if shut else "Fold subtasks")
+                    # text width as DRAWN (a truncated title fills avail)
+                    tw = self._text_w(t, avail)
+                    f.setFrame_(NSMakeRect(tx + tw + 4, mid - 10 * z, fw, 20 * z))
                 # grip: a fixed column in the free space LEFT of the
                 # checkboxes (x 7.. - the boxes start at 30, unmoved at
                 # 100%; Vex 2026-09-10: the right-hand grips ate title room)
@@ -1694,6 +1792,37 @@ class BarController(NSObject):
         i = sender.tag()
         return items[i] if i < len(items) else None
 
+    def _open_url(self, url):
+        """Run a link a task title carries (kmtrigger://, alfred://,
+        ticktick://, https:// ...). `open` is the same door a click inside
+        TickTick uses; the bar never interprets the target itself."""
+        if not url:
+            return
+        try:
+            subprocess.run(["open", url], check=False)
+        except OSError as e:
+            _log(f"open_url: {e}")
+
+    def onLinkRow_(self, sender):
+        it = self._row_item(sender)
+        self._open_url(fsub.title_link((it or {}).get("title", "")))
+
+    def onTitleLink_(self, sender):
+        self._open_url(fsub.title_link(self.state.get("title") or ""))
+
+    def onFoldRow_(self, sender):
+        """Fold / unfold this row's subtasks. The tids live in the bar file,
+        so a fold survives the bar exiting between sessions."""
+        tid = getattr(sender, "_tid", "") or ""
+        if not tid:
+            return
+        if tid in self.folded:
+            self.folded = [t for t in self.folded if t != tid]
+        else:
+            self.folded = ([tid] + [t for t in self.folded if t != tid])[:FOLD_MAX]
+        self._persist_origin()
+        self._relayout()
+
     def onTickRow_(self, sender):
         it = self._row_item(sender)
         if it and not it["checked"]:
@@ -1708,8 +1837,11 @@ class BarController(NSObject):
 
     # ── drag-drop reorder (the grip) ─────────────────────────────────────
     def _open_items(self):
-        """The rows the bar shows (and drags): fsub.open_rows."""
-        return fsub.open_rows((self.block or {}).get("items") or [])
+        """The rows the bar shows (and drags): fsub.open_rows, minus the
+        subtrees folded shut. ONE choke point, so relayout, the scroll cap
+        and a grip drag always index the same list."""
+        rows = fsub.open_rows((self.block or {}).get("items") or [])
+        return fsub.fold_rows(rows, set(self.folded)) if self.folded else rows
 
     @objc.python_method
     def grip_down(self, grip, event):

@@ -20,6 +20,8 @@ API facts the design leans on (live-verified 2026-07-21 on scratch tasks):
     childIds is creation order - never trust it for display.
 """
 
+import re
+
 SORT_STEP = 65536
 RESPREAD = "respread"          # move_order sentinel: midpoint collapsed
 MAX_DEPTH = 4                  # descendants() default reach (TickTick nests ~4)
@@ -229,6 +231,62 @@ def open_rows(items):
             skip_d = d
             continue
         out.append(it)
+    return out
+
+
+# ── row links + folding (the bar's right-hand icons, 2026-09-12) ────────────
+# A routine's steps carry their automation in the TITLE as markdown
+# ("[Startup • Start](kmtrigger://macro=...)"), so the bar needs the target,
+# not the rendered text (display.md_links_display turns it into "[name]🔗").
+_MD_LINK = re.compile(r"\[[^\]]*\]\(\s*([^)\s]+)\s*\)")
+_BARE_URL = re.compile(r"[a-z][a-z0-9+.\-]*://[^\s)\]]+", re.I)
+_SCHEME = re.compile(r"[a-z][a-z0-9+.\-]*:", re.I)
+_BLOCKED = ("javascript:", "data:", "vbscript:")
+
+
+def title_link(title):
+    """The URL a task title carries: its FIRST markdown link's target, else a
+    bare scheme://... in the text, else None. A target without a scheme is
+    not openable, so it comes back None; javascript:/data:/vbscript: never
+    come back at all (a title can arrive from a shared list)."""
+    s = title or ""
+    m = _MD_LINK.search(s)
+    url = m.group(1) if m else None
+    if not url:
+        b = _BARE_URL.search(s)
+        url = b.group(0).rstrip(".,;") if b else None
+    if not url or not _SCHEME.match(url):
+        return None
+    return None if url.lower().startswith(_BLOCKED) else url
+
+
+def kid_tids(rows):
+    """The tids in a DFS row list that HAVE a subtree (the next row is
+    deeper). Read it off the unfolded list: a folded row's children are gone
+    from the folded one, and its chevron would vanish with them."""
+    out = set()
+    for i, it in enumerate(rows or []):
+        nxt = rows[i + 1] if i + 1 < len(rows) else None
+        if nxt and nxt.get("depth", 1) > it.get("depth", 1) and it.get("tid"):
+            out.add(it["tid"])
+    return out
+
+
+def fold_rows(rows, folded):
+    """rows minus every row inside a FOLDED row's subtree - open_rows' depth
+    contiguity, one level up: the folded row itself stays (it carries the
+    chevron), its descendants go. folded: a tid container."""
+    folded = folded or ()
+    out, skip_d = [], None
+    for it in rows or []:
+        d = it.get("depth", 1)
+        if skip_d is not None:
+            if d > skip_d:
+                continue
+            skip_d = None
+        out.append(it)
+        if it.get("tid") in folded:
+            skip_d = d
     return out
 
 

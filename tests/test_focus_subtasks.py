@@ -184,6 +184,52 @@ srv = ["NEW", "A", "C", "D"]
 k = fs.anchor_slot(srv, *fs.drop_anchor(rest, 2))
 check("stale server list still lands after the anchor", srv[k - 1] == "C", k)
 
+# ── row links + folding (bar right-hand icons, 2026-09-12) ─────────────────
+check("markdown link target",
+      fs.title_link("[Startup • Start](kmtrigger://macro=Startup%20%E2%80%A2%20Start)")
+      == "kmtrigger://macro=Startup%20%E2%80%A2%20Start")
+check("alfred link target",
+      fs.title_link("[Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aweekly)")
+      == "alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aweekly")
+check("first link wins",
+      fs.title_link("[a](ticktick://habit) then [b](https://x.test/)") == "ticktick://habit")
+check("no link", fs.title_link("Check todays schedule") is None)
+check("empty title", fs.title_link("") is None and fs.title_link(None) is None)
+check("bare url", fs.title_link("pay https://ynab.test/budget today")
+      == "https://ynab.test/budget")
+check("bare url loses trailing punctuation",
+      fs.title_link("open https://x.test/a.") == "https://x.test/a")
+check("relative target is not openable", fs.title_link("[x](/Users/vex/thing)") is None)
+check("javascript refused", fs.title_link("[x](javascript:alert(1))") is None)
+check("data refused", fs.title_link("[x](DATA:text/html,hi)") is None)
+check("url with parens in the text survives",
+      fs.title_link("[Money (YNAB)](kmtrigger://macro=YNAB)") == "kmtrigger://macro=YNAB")
+
+R = [{"tid": "a", "depth": 1}, {"tid": "b", "depth": 2},
+     {"tid": "c", "depth": 3}, {"tid": "d", "depth": 1}]
+check("kid_tids = rows with a subtree", fs.kid_tids(R) == {"a", "b"})
+check("kid_tids on a flat list", fs.kid_tids([{"tid": "a", "depth": 1}]) == set())
+check("kid_tids ignores an idless row", fs.kid_tids([{"depth": 1}, {"depth": 2}]) == set())
+check("fold hides the whole subtree",
+      [r["tid"] for r in fs.fold_rows(R, {"a"})] == ["a", "d"])
+check("fold a middle row keeps its parent open",
+      [r["tid"] for r in fs.fold_rows(R, {"b"})] == ["a", "b", "d"])
+check("no folds = every row", [r["tid"] for r in fs.fold_rows(R, set())]
+      == ["a", "b", "c", "d"])
+check("folding a leaf changes nothing",
+      [r["tid"] for r in fs.fold_rows(R, {"d"})] == ["a", "b", "c", "d"])
+check("a folded tid that is gone is ignored",
+      [r["tid"] for r in fs.fold_rows(R, {"zz"})] == ["a", "b", "c", "d"])
+check("fold survives an empty list", fs.fold_rows([], {"a"}) == [])
+check("a folded row still owns its chevron (kids read off the unfolded list)",
+      "a" in fs.kid_tids(R) and "a" in {r["tid"] for r in fs.fold_rows(R, {"a"})})
+deep = [{"tid": "p", "depth": 1}, {"tid": "q", "depth": 2}, {"tid": "r", "depth": 3},
+        {"tid": "s", "depth": 2}, {"tid": "t", "depth": 1}]
+check("fold stops at the subtree edge, siblings stay",
+      [x["tid"] for x in fs.fold_rows(deep, {"q"})] == ["p", "q", "s", "t"])
+check("two folds at once",
+      [x["tid"] for x in fs.fold_rows(deep, {"q", "p"})] == ["p", "t"])
+
 print()
 if FAILS:
     print(f"{len(FAILS)} FAILURES: {FAILS}")
