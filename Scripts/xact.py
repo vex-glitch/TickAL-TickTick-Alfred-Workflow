@@ -6605,6 +6605,71 @@ def _routine_steps(r):
     return [rr.expand(s, r["tid"], r["pid"]) for s in steps], src
 
 
+def _routine_reset(tid, pid, days=120):
+    """Reopen every completed step under a routine task, so the occurrence
+    about to start has its whole checklist back.
+
+    TickTick does this itself - but only in the APP, client-side. Completing a
+    repeating parent through the API rolls its date forward and leaves the
+    children completed, so they are missing from the next occurrence
+    (probe-verified 2026-09-12, both roads; Vex: "if I tick off YNAB today
+    while doing shutdown, it is gone from tomorrows shutdown as well"). Our
+    own completion roads (the [Finish …] link, the ⇧ done chord) are API
+    roads, so the routine repairs its tree on the way in.
+
+    Reopening is the app's own write: v2 batch/task with status 0, which
+    leaves the stale completedTime stamp exactly as the app leaves it.
+    Best effort - a routine must still open when TickTick is unreachable."""
+    import routine_runner as rr
+    import api_v2
+    if not tid or not pid:
+        return "no task"
+    api, v2 = _api(), api_v2.TickTickV2()
+    try:
+        bag = list((api.get_project_data(pid) or {}).get("tasks") or [])
+    except Exception as e:
+        return f"open tasks unreadable ({type(e).__name__})"
+    done = v2.project_completed(pid, days=days)
+    if done is None:
+        return "completed feed unreadable"
+    bag += done
+    todo, asked = [], set()
+    for _ in range(5):              # a routine tree is four levels at most
+        todo, unknown = rr.completed_descendants(tid, bag)
+        fresh = [u for u in unknown if u not in asked]
+        if not fresh:
+            break
+        asked.update(fresh)         # a step completed before the feed window,
+        for miss in fresh[:rr.MAX_RESET]:            # or a dead id in childIds
+            try:
+                t = api.get_task(pid, miss)
+            except Exception:
+                continue
+            if t and t.get("id"):
+                bag.append(t)
+    if not todo:
+        return "nothing to reopen"
+    by_id = {t.get("id"): t for t in bag if t.get("id")}
+    bodies = []
+    for one in todo:
+        t = by_id.get(one)
+        if t:
+            b = dict(t)
+            b["status"] = 0
+            b["completedTime"] = None
+            bodies.append(b)
+    n = 0
+    for i in range(0, len(bodies), 50):
+        chunk = bodies[i:i + 50]
+        if v2.update_tasks(chunk):
+            n += len(chunk)
+    try:
+        cache_store.invalidate("all_tasks")
+    except Exception:
+        pass
+    return f"reopened {n} of {len(bodies)}"
+
+
 def _routine_step(step, wf, log):
     """Run ONE step, best effort: a window that cannot be placed must not
     cost the rest of the workspace. Everything lands in the log."""
@@ -6665,6 +6730,9 @@ def _routine_step(step, wf, log):
         elif kind == "pause":
             time.sleep(float(step.get("secs", 1)))
             say("ok")
+        elif kind == "reset":
+            say(_routine_reset(step.get("tid"), step.get("pid"),
+                               int(step.get("days", 120))))
         elif kind == "key":
             mods = step.get("mods") or []
             using = (" using {" + ", ".join(f"{m} down" for m in mods) + "}") if mods else ""

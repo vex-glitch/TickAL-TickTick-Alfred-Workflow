@@ -16,6 +16,7 @@ A step is a dict {"do": <type>, …}:
     {"do": "url",      "url": "<url>"}
     {"do": "pause",    "secs": 3}
     {"do": "key",      "key": "escape"[, "mods": ["shift", …]]}
+    {"do": "reset",    "tid": "{tid}", "pid": "{pid}"[, "days": 120]}
 
 `arg` may carry {tid} and {pid}: they expand to the routine's own task, so a
 step list stays portable when a task is recreated or the file is shared.
@@ -25,12 +26,14 @@ numbers the KM macros carried, so a ported list lands pixel for pixel.
 """
 
 STEP_TYPES = ("quit", "activate", "hide_others", "place", "link", "url",
-              "pause", "key")
+              "pause", "key", "reset")
 KEYS = {"escape": 53, "return": 36, "tab": 48, "space": 49, "delete": 51,
         "f4": 118, "f6": 97}
 MODS = ("command", "shift", "option", "control")
 MAX_PAUSE = 60          # a step list is a workspace opener, not a scheduler
 MAX_STEPS = 60
+MAX_RESET = 200         # a routine tree is ~30 steps; 200 is a runaway guard
+MAX_DAYS = 400          # how far back a reset may look for a completed step
 
 
 def expand(step, tid="", pid=""):
@@ -40,6 +43,9 @@ def expand(step, tid="", pid=""):
         out["arg"] = out["arg"].replace("{tid}", tid).replace("{pid}", pid)
     if isinstance(out.get("url"), str):
         out["url"] = out["url"].replace("{tid}", tid).replace("{pid}", pid)
+    for slot in ("tid", "pid"):
+        if isinstance(out.get(slot), str):
+            out[slot] = out[slot].replace("{tid}", tid).replace("{pid}", pid)
     return out
 
 
@@ -84,6 +90,13 @@ def validate(steps):
             secs = s.get("secs", 1)
             if not isinstance(secs, (int, float)) or not 0 <= secs <= MAX_PAUSE:
                 out.append(f"step {i}: secs must be 0..{MAX_PAUSE}")
+        if kind == "reset":
+            for slot in ("tid", "pid"):
+                if not isinstance(s.get(slot), str) or not s[slot]:
+                    out.append(f"step {i}: reset needs {slot}")
+            days = s.get("days", 120)
+            if not isinstance(days, int) or not 1 <= days <= MAX_DAYS:
+                out.append(f"step {i}: days must be 1..{MAX_DAYS}")
         if kind == "key":
             if s.get("key") not in KEYS:
                 out.append(f"step {i}: key must be one of {', '.join(sorted(KEYS))}")
@@ -117,15 +130,67 @@ def describe(step):
         return f"wait {step.get('secs', 1):g}s"
     if k == "key":
         return "press " + "+".join((step.get("mods") or []) + [step["key"]])
+    if k == "reset":
+        return "reset steps"
     return str(k)
 
 
+def completed_descendants(root_tid, tasks, cap=MAX_RESET):
+    """(to_reopen, unknown) for the tree under `root_tid`.
+
+    `tasks` is any bag of task dicts - the project's OPEN tasks plus whatever
+    completed ones a caller could fetch. Children are read from childIds AND
+    from parentId, because either side can be a beat stale.
+
+    to_reopen: ids in the bag that are completed (status 2).
+    unknown:   child ids no task in the bag explains. They are either
+               completed outside the caller's window or deleted; a caller
+               that fetches them and walks again reaches the level below.
+
+    Occurrence records are skipped WHOLE. When the app completes a repeating
+    parent it archives a copy of the tree under a fresh id carrying
+    repeatTaskId, and reopening one of those copies would hang a ghost
+    routine beside the live one (probe-verified 2026-09-12). The root itself
+    is never returned: a routine's own completion is what rolls its date.
+    """
+    by_id, kids = {}, {}
+    for t in tasks or []:
+        tid = t.get("id")
+        if not tid:
+            continue
+        by_id[tid] = t
+        parent = t.get("parentId")
+        if parent:
+            kids.setdefault(parent, []).append(tid)
+    out, unknown, seen, queue = [], [], {root_tid}, [root_tid]
+    while queue and len(out) < cap:
+        cur = queue.pop(0)
+        here = by_id.get(cur) or {}
+        for kid in list(here.get("childIds") or []) + kids.get(cur, []):
+            if kid in seen:
+                continue
+            seen.add(kid)
+            k = by_id.get(kid)
+            if k is None:
+                unknown.append(kid)
+                continue                      # nothing to walk into yet
+            if k.get("repeatTaskId"):
+                continue                      # an archived occurrence, not a step
+            if k.get("status") == 2:
+                out.append(kid)
+            queue.append(kid)
+            if len(out) >= cap:
+                break
+    return out, unknown
+
+
 def default_steps(spec="daily"):
-    """What a routine does with no config of its own: focus the task with its
-    sticky, open the period note, show the calendar. No app juggling, no
-    frames - a published user gets something that works, and layout is what
-    the config file adds."""
+    """What a routine does with no config of its own: put the steps ticked in
+    the last occurrence back, focus the task with its sticky, open the period
+    note, show the calendar. No app juggling, no frames - a published user
+    gets something that works, and layout is what the config file adds."""
     return [
+        {"do": "reset", "tid": "{tid}", "pid": "{pid}"},
         {"do": "activate", "app": "com.TickTick.task.mac", "wait": True},
         {"do": "link", "arg": "focus:{tid}:{pid}"},
         {"do": "link", "arg": f"notesticky:{spec}"},

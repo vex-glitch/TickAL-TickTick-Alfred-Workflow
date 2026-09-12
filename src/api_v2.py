@@ -188,6 +188,55 @@ class TickTickV2:
         r.raise_for_status()
         return r.json() if r.text.strip() else []
 
+    def project_completed(self, project_id, days=120, limit=500):
+        """Completed tasks of ONE project - GET /api/v2/project/<id>/completed/
+        (probe-verified 2026-09-12). get_completed spends its whole row budget
+        on the newest completions ACCOUNT-wide, so a quiet list's older ones
+        fall off it; this route spends the budget on one list. The cap still
+        bites on a busy list (the routines list runs ~40 completions a day, so
+        500 rows reach back ~12 days) - a caller that must not miss an older
+        one falls back to fetching the id.
+        Returns the list, or None on any failure: an empty list means the
+        project truly has no completions in the window, and a reset must
+        never read a transport blip as "nothing to do"."""
+        if not self.token or not project_id:
+            return None
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        try:
+            r = requests.get(
+                f"https://api.ticktick.com/api/v2/project/{project_id}/completed/",
+                params={"from": (now - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00"),
+                        "to": now.strftime("%Y-%m-%d 23:59:59"), "limit": limit},
+                cookies={"t": self.token}, headers=_base_headers(), timeout=20)
+            if not r.ok:
+                return None
+            d = r.json() if r.text.strip() else []
+            return d if isinstance(d, list) else None
+        except Exception:
+            return None
+
+    def update_tasks(self, tasks):
+        """POST /api/v2/batch/task `update` with FULL task objects - the road
+        the app itself writes on, and the only one that carries MANY tasks in
+        a single request (v1 is one object per POST, plus a GET to build it).
+        `tasks` = full task dicts (v1 GET shape is fine) already carrying the
+        change. True when the server acks every one."""
+        if not self.token or not tasks:
+            return False
+        bodies = [{k: v for k, v in t.items() if not k.startswith("_")}
+                  for t in tasks]
+        try:
+            r = requests.post(
+                "https://api.ticktick.com/api/v2/batch/task",
+                headers={**_base_headers(), "cookie": f"t={self.token}",
+                         "content-type": "application/json"},
+                json={"add": [], "update": bodies, "delete": []},
+                timeout=25)
+            return bool(r.ok) and not (r.json().get("id2error") or {})
+        except Exception:
+            return False
+
     def get_abandoned(self, days=60, limit=200):
         """Won't-do ("Abandoned") tasks across ALL projects - same route
         family as get_completed but /closed with a status param

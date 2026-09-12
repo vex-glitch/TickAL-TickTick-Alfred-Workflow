@@ -81,8 +81,11 @@ check("describe shows sticky + bar",
 # the shipped registry must be runnable with no config file at all
 for r in rt.ROUTINES:
     steps = [rr.expand(s, r["tid"], r["pid"]) for s in rr.default_steps()]
+    args = [x.get("arg") for x in steps]
     check(f"{r['key']}: default list runs with its own ids",
-          rr.validate(steps) == [] and steps[1]["arg"] == f"focus:{r['tid']}:{r['pid']}")
+          rr.validate(steps) == [] and f"focus:{r['tid']}:{r['pid']}" in args)
+    check(f"{r['key']}: default list resets its own tree first",
+          steps[0] == {"do": "reset", "tid": r["tid"], "pid": r["pid"]}, steps[0])
 
 # ── which occurrence? (the ⌃ Start safety net) ─────────────────────────────
 import datetime as _dt  # noqa: E402
@@ -136,6 +139,59 @@ check("a +0000 stamp reads as a local day",
 check("junk stamps are None",
       rt.local_date("not a date") is None and rt.local_date("") is None
       and rt.local_date(None) is None)
+
+# ── the reset step (Vex 2026-09-12: ticked steps vanish from the next
+# occurrence, because only the APP resets subtasks - the API road does not) ──
+RESET = {"do": "reset", "tid": "{tid}", "pid": "{pid}"}
+check("reset is a step type", "reset" in rr.STEP_TYPES)
+check("a reset step validates", rr.validate([RESET]) == [])
+check("reset needs tid and pid",
+      len(rr.validate([{"do": "reset"}])) == 2)
+check("reset days is bounded",
+      rr.validate([dict(RESET, days=9999)]) and rr.validate([dict(RESET, days=0)]))
+check("reset days accepts a quarter", rr.validate([dict(RESET, days=120)]) == [])
+check("reset slots expand to the routine's own task",
+      rr.expand(RESET, "TID", "PID") == {"do": "reset", "tid": "TID", "pid": "PID"})
+check("reset describes itself", rr.describe(RESET) == "reset steps")
+
+# tree: root > a (done) > a1 (done), b (open) > b1 (done); plus an archived
+# occurrence copy of the whole thing, which must never be touched.
+TREE = [
+    {"id": "root", "childIds": ["a", "b"]},
+    {"id": "a", "parentId": "root", "status": 2, "childIds": ["a1"]},
+    {"id": "a1", "parentId": "a", "status": 2},
+    {"id": "b", "parentId": "root", "status": 0, "childIds": ["b1"]},
+    {"id": "b1", "parentId": "b", "status": 2},
+    {"id": "ghost", "repeatTaskId": "root", "status": 2, "childIds": ["g1"]},
+    {"id": "g1", "parentId": "ghost", "status": 2},
+]
+todo, unknown = rr.completed_descendants("root", TREE)
+check("every completed step is found, at any depth",
+      sorted(todo) == ["a", "a1", "b1"], todo)
+check("the root itself is never reopened", "root" not in todo)
+check("open steps are left alone", "b" not in todo)
+check("an archived occurrence is skipped whole",
+      "ghost" not in todo and "g1" not in todo, todo)
+check("nothing unknown in a complete bag", unknown == [], unknown)
+
+todo2, unknown2 = rr.completed_descendants("root", [TREE[0], TREE[3]])
+check("a child the bag cannot explain is reported, not guessed",
+      unknown2 == ["a", "b1"] and todo2 == [], (todo2, unknown2))
+check("a parentId-only link is walked too",
+      rr.completed_descendants("root", [{"id": "root"},
+                                        {"id": "x", "parentId": "root", "status": 2}])[0] == ["x"])
+check("a cycle cannot hang the walk",
+      rr.completed_descendants("root", [{"id": "root", "childIds": ["a"]},
+                                        {"id": "a", "parentId": "root", "status": 2,
+                                         "childIds": ["root", "a"]}])[0] == ["a"])
+check("the cap holds",
+      len(rr.completed_descendants("root",
+          [{"id": "root", "childIds": [str(i) for i in range(50)]}]
+          + [{"id": str(i), "parentId": "root", "status": 2} for i in range(50)],
+          cap=7)[0]) == 7)
+check("an empty bag is survivable",
+      rr.completed_descendants("root", []) == ([], [])
+      and rr.completed_descendants("root", None) == ([], []))
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":
