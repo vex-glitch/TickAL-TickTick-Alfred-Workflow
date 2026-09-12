@@ -9801,28 +9801,34 @@ def _habit_parse_day(raw):
     return d.year * 10000 + d.month * 100 + d.day
 
 
-def _habit_tick_core(hid, day_stamp, retro=False):
+def _habit_tick_core(hid, day_stamp, retro=False, quiet=False):
     """Shared tick: live day-checkin read (fail closed) → tick_payload →
     batch write → cache patches + streak bump → note dialog when the habit
-    keeps a diary and the day just completed (today only)."""
+    keeps a diary and the day just completed (today only).
+
+    quiet: say nothing and never open the diary dialog - the routine ⇧-done
+    ripple rides this (a completion must not pop a dialog). Returns
+    (ok, message) either way; the interactive callers ignore it."""
     import habits_model as hm
     import api_v2
+
+    def say(msg):
+        if not quiet:
+            _crm_say(msg)
+        return msg
+
     h = _habit_by_id(hid)
     if h is None:
-        _crm_say("🔄 Habit not found (offline?)")
-        return
+        return False, say("🔄 Habit not found (offline?)")
     v2 = api_v2.TickTickV2()
     if not v2.token:
-        _crm_say("🔄 Needs the v2 login (Settings → Attachment Login)")
-        return
+        return False, say("🔄 Needs the v2 login (Settings → Attachment Login)")
     existing, ok = _habit_day_checkin(v2, hid, day_stamp)
     if not ok:
-        _crm_say("🔄 Can't read checkins (offline?) · nothing ticked")
-        return
+        return False, say("🔄 Can't read checkins (offline?) · nothing ticked")
     payload = hm.tick_payload(h, day_stamp, existing, _op_iso())
     if payload is None:
-        _crm_say(f"✅ {h.get('name', '')} · already done")
-        return
+        return True, say(f"✅ {h.get('name', '')} · already done")
     entry, done, value = payload
     if existing:
         ok2 = v2.habit_checkins_batch(update=[entry])
@@ -9830,8 +9836,7 @@ def _habit_tick_core(hid, day_stamp, retro=False):
         entry["id"] = api_v2.new_object_id()
         ok2 = v2.habit_checkins_batch(add=[entry])
     if not ok2:
-        _crm_say("🔄 Tick failed (offline?)")
-        return
+        return False, say("🔄 Tick failed (offline?)")
     _ck_patch(hid, entry)
     name = h.get("name", "")
     was_done = existing and existing.get("status") == hm.DONE
@@ -9842,7 +9847,7 @@ def _habit_tick_core(hid, day_stamp, retro=False):
         _hb_patch(entity=h2)
         h = h2
     noted = ""
-    if done and not was_done and not retro and h.get("recordEnable"):
+    if done and not was_done and not retro and h.get("recordEnable") and not quiet:
         txt = _ask(f"Note for {name}? (optional)", title="🔄 Habit diary")
         if txt and txt.strip():
             rec = hm.record_payload(api_v2.new_object_id(), hid, day_stamp,
@@ -9851,13 +9856,32 @@ def _habit_tick_core(hid, day_stamp, retro=False):
                 noted = " · 📝"
     if hm.is_real(h) and not done:
         goal = h.get("goal") or 1
-        _crm_say(f"🔄 {name} · {value:g}/{goal:g} {h.get('unit') or ''}"
-                 .rstrip())
-    else:
-        streak = h.get("currentStreak") or 0
-        chip = f" · 🔥{streak}" if streak > 1 else ""
-        when = "" if not retro else " · ⏪"
-        _crm_say(f"✅ {name}{chip}{when}{noted}")
+        return True, say(f"🔄 {name} · {value:g}/{goal:g} {h.get('unit') or ''}"
+                         .rstrip())
+    streak = h.get("currentStreak") or 0
+    chip = f" · 🔥{streak}" if streak > 1 else ""
+    when = "" if not retro else " · ⏪"
+    return True, say(f"✅ {name}{chip}{when}{noted}")
+
+
+def routine_checkin(tid):
+    """The ⇧-done ripple (Vex 2026-09-12): completing a routine task also
+    checks in that routine's habit for today. Returns a TOAST SUFFIX and
+    never raises - the habit is the bookkeeping, the completion is the
+    point, so a dead v2 token or an offline read must not cost it."""
+    try:
+        import routines as rt
+        r = rt.by_tid(tid)
+        if not r or not r.get("habit"):
+            return ""
+        import habits_model as hm
+        from datetime import date as _d
+        ok, msg = _habit_tick_core(r["habit"], hm.stamp(_d.today()), quiet=True)
+        if not ok:
+            return " · 🔄 habit not ticked"
+        return " · 🔄 already done" if "already done" in msg else " · 🔄 ticked"
+    except Exception:
+        return ""
 
 
 def habit_tick(hid):

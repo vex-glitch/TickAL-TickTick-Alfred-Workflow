@@ -101,6 +101,26 @@ def _quiet(fn, *a, **kw):
     return " · ".join(ln.strip() for ln in buf.getvalue().splitlines() if ln.strip())
 
 
+def _complete(pid, tid, title):
+    """Tick a task off through the SAME road the ⇧ chord uses (src/dispatch.py
+    "complete:"), so the caches, the session guards and the routine habit
+    ripple stay ONE implementation. Its toast is captured, not printed: this
+    node's stdout is the End banner."""
+    import dispatch
+    buf = io.StringIO()
+    argv = sys.argv
+    sys.argv = ["dispatch", f"complete:{pid}:{tid}:{title or 'Task'}"]
+    try:
+        with contextlib.redirect_stdout(buf):
+            dispatch.main()
+    except Exception as e:
+        return f"✅ Complete failed · {type(e).__name__}"
+    finally:
+        sys.argv = argv
+    return " · ".join(ln.strip() for ln in buf.getvalue().splitlines()
+                      if ln.strip()) or "✅ Done"
+
+
 def _resolve(xact, tid, pid_hint):
     """(tid, pid, title): the cache first (its real projectId beats the
     link's hint and the 'inbox' alias), else a LIVE read with the hint.
@@ -423,6 +443,8 @@ def run(verb, tid, pid_hint):
         return "🔗 Task not found · sync, then retry", False
     tid, pid, title = got                # tid: a completed instance → its series
     os.environ["task_title"] = title     # sticky()/focus_start() read it
+    if verb == "done":                   # the "Finish <routine>" step
+        return _complete(pid, tid, title), True
     if verb in ("focus", "timer"):
         clash = _timer_clash(xact, tid)
         if clash:

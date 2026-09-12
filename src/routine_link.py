@@ -16,6 +16,9 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     focus:<tid>[:<pid>]   sticky (best effort) + timer
     sticky:<tid>[:<pid>]  sticky only
     timer:<tid>[:<pid>]   timer only
+    done:<tid>[:<pid>]    tick the task off, through the same road the ⇧ chord
+                          uses - a routine's habit gets today's check-in with
+                          it (the "Finish <routine>" step of each routine)
     pause | resume        the running timer
     journal:<morning|evening|weekly>  the periodic journal dialogs. Even
                           with zero input it lazy-mints the note and seeds
@@ -54,7 +57,7 @@ BUNDLE  = "com.vex.tickal"
 TRIGGER = "Link"
 MAX_LEN = 200
 
-TASK_VERBS = ("focus", "sticky", "timer")
+TASK_VERBS = ("focus", "sticky", "timer", "done")
 BARE_VERBS = ("ping", "pause", "resume", "money", "moneysticky")
 PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
           ("monthly", "this month's"), ("quarterly", "this quarter's"),

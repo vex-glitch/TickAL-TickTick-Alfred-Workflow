@@ -24,19 +24,24 @@ ROUTINES_LIST = "6a268ea18f081f1de80eaeb5"      # 🌅 Routines
 ROUTINES = (
     {"key": "startup", "label": "🌅 Startup",
      "tid": "6a9faa51635ed1022425af34", "pid": ROUTINES_LIST,
-     "macro": "3BE75925-603A-4962-98B1-55686A7DDE6C"},
+     "macro": "3BE75925-603A-4962-98B1-55686A7DDE6C",
+     "habit": "6aa5379e8f081102b4f0d1ec"},          # 🌅 Startup (daily)
     {"key": "shutdown", "label": "🌆 Shutdown",
      "tid": "6a268ea28f081f1de80eb10b", "pid": ROUTINES_LIST,
-     "macro": "D896DA99-5DD0-4247-9C4E-17DA9E657009"},
+     "macro": "D896DA99-5DD0-4247-9C4E-17DA9E657009",
+     "habit": "6aa537a58f087a63208091fe"},          # 🌆 Shutdown (daily)
     {"key": "weekly", "label": "♻️ Weekly Review",
      "tid": "6aa4eaad7c035e06a3686a2f", "pid": ROUTINES_LIST,
-     "macro": "676A175C-92D8-4F5E-9A66-B81E0E4AE6AC"},
+     "macro": "676A175C-92D8-4F5E-9A66-B81E0E4AE6AC",
+     "habit": "6a271b2ce2995158ed6ab3a6"},          # Weekly Review (Sun)
     {"key": "monthly", "label": "🗓️ Monthly Review",
      "tid": "6aa517f607a3ba2e0339b7bd", "pid": ROUTINES_LIST,
-     "macro": "524BE77F-4BEE-4B8D-AC16-34F128D616DD"},
+     "macro": "524BE77F-4BEE-4B8D-AC16-34F128D616DD",
+     "habit": "6a271bbda9b89158ed6ab457"},          # Monthly Review (30d)
     {"key": "quarterly", "label": "🌓 Quarterly Review",
      "tid": "6aa520b28f084b1907ea08e2", "pid": ROUTINES_LIST,
-     "macro": "28115256-AF19-42FC-A6DA-5CAF2F18D6C6"},
+     "macro": "28115256-AF19-42FC-A6DA-5CAF2F18D6C6",
+     "habit": "6a271c1c30a9d158ed6ab8ad"},          # Quarterly Retreat (90d)
 )
 
 _HEX = "0123456789abcdefABCDEF"

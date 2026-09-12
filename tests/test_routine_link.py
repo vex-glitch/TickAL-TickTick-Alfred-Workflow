@@ -46,6 +46,13 @@ check("still-encoded arg decoded once",
       rl.parse(f"focus%3A{TID}%3A{PID}") == ("focus", TID, PID))
 check("surrounding whitespace stripped", rl.parse(f"  ping \n") == ("ping", "", ""))
 
+check("done with pid", rl.parse(f"done:{TID}:{PID}") == ("done", TID, PID))
+check("done without pid", rl.parse(f"done:{TID}") == ("done", TID, ""))
+check("done url round trip",
+      rl.url("done", TID, PID).endswith(f"?argument=done%3A{TID}%3A{PID}"))
+check("done needs a task", refused("done") is not None)
+check("done refuses a slot word", refused("done:weekly") is not None)
+
 check("journal morning", rl.parse("journal:morning") == ("journal", "morning", ""))
 check("journal evening", rl.parse("journal:evening") == ("journal", "evening", ""))
 check("journal weekly", rl.parse("journal:weekly") == ("journal", "weekly", ""))

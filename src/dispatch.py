@@ -367,6 +367,10 @@ def main():
                 import xact as _xact
                 log_suffix = _xact.person_autolog(
                     tid, snap if isinstance(snap, dict) else None)
+                # Routine ⇧-done ripple: the routine's habit gets today's
+                # check-in too (Vex 2026-09-12). Suffix-only, like the
+                # autolog above - it never blocks or fails the completion.
+                log_suffix += _xact.routine_checkin(tid)
             except Exception:
                 pass
             print(f"{title} completed{guard_note}{log_suffix}")
