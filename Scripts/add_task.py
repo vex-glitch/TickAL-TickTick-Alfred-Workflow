@@ -609,30 +609,28 @@ def task_picker(fill, fragment):
     candidates = [t for t in all_tasks if t.get("status", 0) == 0]
     task_map   = {t["id"]: t for t in all_tasks}
 
+    from display import pick_title, pick_where
+    # Filter the TASKS, not the rows: the row title now carries the priority
+    # dot, date and tags, and fuzzy-matching a typed name against that noise
+    # scores worse than against the real title.
+    if fragment:
+        candidates = fuzz.filter_and_score(fragment, candidates,
+                                           key_fn=lambda t: t.get("title", ""))
     items = []
     for t in candidates:
-        title     = t.get("title", "Untitled")
-        list_name = t.get("_projectName", "")
-        parent_id = t.get("parentId", "")
-
-        if parent_id:
-            parent       = task_map.get(parent_id)
-            parent_title = parent.get("title", "") if parent else ""
-            subtitle     = f"↳ {parent_title}>{list_name}" if parent_title else list_name
-        else:
-            subtitle = list_name or ""
-
+        title = t.get("title", "Untitled")
+        # The PLAIN title fills the bar (the ~p token is matched against real
+        # titles); the row only DISPLAYS the house shape, so two same-named
+        # tasks in two lists are telling apart (Vex 2026-09-12).
         filled = f"{fill}{title} "
         items.append(alfred.item(
-            title=title,
-            subtitle=subtitle,
+            title=pick_title(t),
+            subtitle=pick_where(t, task_map),
             arg="",
             valid=False,
             autocomplete=filled,
         ))
 
-    if fragment:
-        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     if not items:
         msg = f'No tasks matching "{fragment}"' if fragment else "No tasks cached · run Sync first"
         items = [alfred.item(title=msg, valid=False)]
@@ -656,30 +654,26 @@ def link_picker(prefix, fragment, scope_list_id=None):
         candidates = [t for t in all_tasks if t.get("status", 0) == 0]
         candidates += list(cache_store.get("all_notes") or [])
 
+    from display import pick_title, pick_where
+    # Filter the TASKS, not the rows (the row title carries chips now)
+    if fragment:
+        candidates = fuzz.filter_and_score(fragment, candidates,
+                                           key_fn=lambda t: t.get("title", ""))
     items, seen = [], set()
     for t in candidates:
         tid = t.get("id")
         if tid in seen:
             continue
         seen.add(tid)
-        title     = t.get("title", "Untitled")
-        list_name = t.get("_projectName", "")
-        parent_id = t.get("parentId", "")
-        if parent_id:
-            parent   = task_map.get(parent_id)
-            ptitle   = parent.get("title", "") if parent else ""
-            crumb    = f"↳ {ptitle}>{list_name}" if ptitle else list_name
-        else:
-            crumb = list_name or ""
+        title = t.get("title", "Untitled")
         items.append(alfred.item(
-            title=title,
-            subtitle=f"🔗 {crumb}" if crumb else "🔗 Link task",
+            title=pick_title(t),
+            subtitle="🔗 " + pick_where(t, task_map),
             arg="", valid=False,
+            # the [[ ]] form takes the REAL title - it is resolved by name
             autocomplete=f"{prefix}[[{title}]] ",
         ))
 
-    if fragment:
-        items = fuzz.filter_and_score(fragment, items, key_fn=lambda x: x["title"])
     if not items:
         what = "CRM bookings" if crm else "tasks"
         msg = (f'No {what} matching "{fragment}"' if fragment
@@ -1428,6 +1422,12 @@ def task_preview(query):
      list_name, parent_name, section_name, note, repeat, reminders,
      attach_image, post_stage, post_focus) = parse_task(query)
 
+    # "Buy groceries | Milk | Bread" - the pipes carve subtasks out of the
+    # TITLE only, so every attribute token has already been taken off the line
+    # above and applies to the whole add (Vex 2026-09-12).
+    import subtask_line as sl
+    title, kid_titles = sl.split_line(title)
+
     # A link grabbed by the URL hotkey rides along as a session variable so the
     # add window opens "as usual" (empty title to type) with the URL already in
     # the description. A typed =note stays on top; the link is appended below it.
@@ -1597,6 +1597,9 @@ def task_preview(query):
         parts.append("🎯 stage after")
     if post_focus:
         parts.append("➕ to focus after")
+    if kid_titles:
+        parts.append(("+ " if effective_parent_id else "↳ ")
+                     + " · ".join(kid_titles)[:70])
     if "[[" in title:
         parts.append("🔗 linked")
     # A CRM booking's post-create slot belongs to the Prepare window
@@ -1659,6 +1662,8 @@ def task_preview(query):
                     break
     if effective_parent_id:
         payload["parentId"] = effective_parent_id
+    if kid_titles:
+        payload["_children"] = kid_titles
 
     payload["_notif_text"] = _build_notif(
         title, list_display or "", env_list_id, env_section_id, effective_parent_id,
@@ -1697,13 +1702,32 @@ def task_preview(query):
                       "cmd+shift": {"valid": True, "arg": f"create:{enc_stage}",
                                     "subtitle": "📍 Stage for focus"}}
 
+    _kid_chip = sl.chip(kid_titles, sibling=bool(effective_parent_id))
     items = [alfred.item(
-        title=f"Create: {title}",
+        title=f"Create: {title}" + (f"  {_kid_chip}" if _kid_chip else ""),
         subtitle=subtitle,
         arg=f"create:{encoded}",
         valid=True,
         mods=chord_mods,
     )]
+
+    # ➕ Another subtask - the focus picker's "from A | B | " shape: the row
+    # hands the line back with one more separator, and the ✅ row above stays
+    # the way out (Vex 2026-09-12: "it automatically does another | to input
+    # next subtask and first row is confirming I am done adding subtasks").
+    # Offered once a pipe is in play, and from the first keystroke when the add
+    # is already aimed into a parent (the ⌘ Actions "➕ Add task" road).
+    if kid_titles or sl.in_subtask_mode(query) or effective_parent_id:
+        _under = (parent_display or os.environ.get("task_title", "").strip()
+                  if effective_parent_id else title)
+        items.append(alfred.item(
+            uid="add-another-sub",
+            title="➕ Another subtask",
+            subtitle=(f"Next one under “{_under[:30]}”" if _under
+                      else "Type the next one")
+                     + "  |  ⏎ keeps the line open",
+            arg="", valid=False,
+            autocomplete=sl.next_query(query)))
 
     # Offer the next scheduling step as a selectable row (mirrors reschedule.py
     # Screen 2): once a date is set, surface "Add time"; once a time is set,

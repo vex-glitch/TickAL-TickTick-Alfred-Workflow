@@ -225,6 +225,59 @@ def _patch_task_cache(tid, **fields):
         cache_store.invalidate("all_tasks")
 
 
+def _order_children(api, made, pid, parent_id):
+    """Put freshly created subtasks in the order they were TYPED.
+
+    A task created through v1 takes a DESCENDING sortOrder, so creating Milk
+    then Bread shows Bread first (the trap that came out as a MIRRORED tree
+    when the quarterly review was cloned). The server's own values are reused
+    - collected, sorted ascending, dealt back out in typed order - so the
+    block keeps the magnitude TickTick chose and only its internal order
+    changes, which also keeps it clear of any subtasks already there.
+
+    The create RESPONSE reports parentId null even though the task really is
+    attached (live-probed 2026-09-12), so the parent is restated on every
+    body: posting the response back as-is would detach the lot.
+    """
+    orders = sorted((k.get("sortOrder") or 0) for k in made)
+    if len(orders) < 2:
+        return
+    bodies = []
+    for i, k in enumerate(made):
+        b = {kk: vv for kk, vv in k.items() if not kk.startswith("_")}
+        b["sortOrder"] = orders[i]
+        b["parentId"] = parent_id
+        b["projectId"] = b.get("projectId") or pid
+        bodies.append(b)
+    try:
+        import api_v2
+        api_v2.TickTickV2().update_tasks(bodies)
+    except Exception:
+        pass          # order is cosmetic; the subtasks themselves are made
+
+
+def _cache_children(made, pid, parent_id):
+    """Put new subtasks into all_tasks so search, the pickers and the focus
+    bar see them before the next sync (the parent is patched in separately)."""
+    try:
+        projects = cache_store.get("projects") or []
+        pname = next((p.get("name", "") for p in projects if p.get("id") == pid),
+                     "Inbox" if not pid else "")
+        ids = {k["id"] for k in made}
+        cached = [t for t in (cache_store.get("all_tasks") or [])
+                  if t.get("id") not in ids]
+        for k in made:
+            entry = dict(k)
+            entry["parentId"] = parent_id
+            entry["_projectId"] = pid or "inbox"
+            entry["_projectName"] = pname
+            entry["_columnName"] = ""
+            cached.append(entry)
+        cache_store.set("all_tasks", cached)
+    except Exception:
+        cache_store.invalidate("all_tasks")
+
+
 def _cached_task(tid):
     """Cached task/note for tid (avoids a live GET), or None. See cache.find_task."""
     return cache_store.find_task(tid)
@@ -792,6 +845,32 @@ def main():
                 except Exception:
                     cache_store.invalidate("all_tasks")  # fallback
 
+            # "Buy groceries | Milk | Bread" - the subtasks the pipes carved
+            # out. They hang off the SAME parent when the add was aimed into
+            # one (every segment is a sibling there), else off the task just
+            # created. Best effort: a child that fails must not cost the task.
+            kid_note = ""
+            kid_titles = payload.get("_children") or []
+            if kid_titles and result and result.get("id"):
+                kid_pid = result.get("projectId") or proj_id
+                kid_parent = payload.get("parentId") or result["id"]
+                made = []
+                for kt in kid_titles:
+                    try:
+                        k = api.create_task(title=kt, project_id=kid_pid,
+                                            parent_id=kid_parent)
+                    except Exception:
+                        continue
+                    if k and k.get("id"):
+                        made.append(k)
+                if made:
+                    _order_children(api, made, kid_pid, kid_parent)
+                    _cache_children(made, kid_pid, kid_parent)
+                n_made = len(made)
+                kid_note = (f"\n↳ {n_made} subtask" + ("" if n_made == 1 else "s")
+                            + (f" · {len(kid_titles) - n_made} failed"
+                               if n_made < len(kid_titles) else ""))
+
             # / add-flow "🖼️ Add image": upload the clipboard image as a real
             # attachment to the task we just created (needs its id + projectId).
             attach_note = ""
@@ -836,7 +915,7 @@ def main():
                     f"Prepare for {_ref} *")   # ' *' = open on the date picker
 
             notif = payload.get("_notif_text") or f"Task added to {payload.get('listName') or 'Inbox'}"
-            print(notif + attach_note)
+            print(notif + kid_note + attach_note)
 
             # Post-create chaining (the / menu's +stage / +focus rows; the
             # preview row's ⌘/⇧⌘ chords add _post_fstart): stage
