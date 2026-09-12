@@ -206,6 +206,9 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     (sweeps ticked ✅ Today boxes first)
     xact:pn_mint                    the 04:30 agent run: mint-ahead + catch-up
                                     + refresh + roll-ups (launchd fires this)
+    xact:routine_start:<key>        ⌃ Start: run it when today IS its day,
+                                    else open the confirm screen (which
+                                    occurrence would this be?)
     xact:routine_run:<key>          open a routine's whole workspace from
                                     its step list (routines.json, else the
                                     built-in default); spawns routine_exec
@@ -6679,6 +6682,41 @@ def routine_exec(key):
         log.write(f"{_op_iso()} done {r['label']}\n")
 
 
+def routine_task(r):
+    """The routine's task, LIVE when the API answers (the cache can be a
+    completion behind, and "which occurrence" is exactly what goes stale),
+    else the cached copy, else {}."""
+    try:
+        t = _api().get_task(r["pid"], r["tid"])
+        if t and t.get("id") == r["tid"]:
+            return t
+    except Exception:
+        pass
+    return cache_store.find_task(r["tid"]) or {}
+
+
+def routine_start(key):
+    """The ⌃ Start / routine: link road, with the safety net (Vex
+    2026-09-12: "how does it know what is next undone routine in line?").
+
+    A repeating routine keeps ONE id and rolls its date forward when it is
+    completed, so the task's own date says which occurrence a start would
+    open. Due today (or late, or undated) runs at once. Due LATER means
+    today's is already done, or today is not this routine's day, so the run
+    is held and the confirm screen opens instead - naming the occurrence it
+    would start and the one just finished."""
+    import routines as rt
+    r = rt.by_key(key)
+    if not r:
+        print("▶️ Unknown routine")
+        return
+    st = rt.due_state(routine_task(r))
+    if st["state"] == "ahead":
+        _run_trigger("BrowseCtx", f"ctx:rconfirm:{key}")   # clean bar, no arg
+        return
+    routine_run(key)
+
+
 def routine_run(key):
     """🌓 Routines ⌃ and the routine:<key> link: open the whole workspace.
     DETACHED - a routine relaunches TickTick and runs 20-60 s while this node
@@ -10876,6 +10914,8 @@ def main():
             km_run(rest)
         elif verb == "routine_run":
             routine_run(rest)
+        elif verb == "routine_start":
+            routine_start(rest)
         elif verb == "routine_exec":
             routine_exec(rest)
         elif verb == "pn_journal":

@@ -444,7 +444,10 @@ def run(verb, tid, pid_hint):
     if verb == "resume":
         return _quiet(xact.focus_resume), True
     if verb == "routine":                # tid carries the routine key
-        return _quiet(xact.routine_run, tid), True
+        # through the SAME guard as the ⌃ chord: a click on "Startup • Start"
+        # when today's is already done opens the confirm screen (which
+        # occurrence?) instead of quietly running tomorrow's
+        return _quiet(xact.routine_start, tid), True
     if verb == "journal":                # tid carries the (allowlisted) slot
         # DETACHED: the dialog run can last minutes and must never hold
         # this sequential node (a focus/pause click would queue behind it)

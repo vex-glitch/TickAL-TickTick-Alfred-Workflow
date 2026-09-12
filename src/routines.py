@@ -72,3 +72,103 @@ def valid_macro(uid):
 def macro_url(uid):
     """kmtrigger:// URL for a macro UID, or None when the UID is malformed."""
     return f"kmtrigger://macro={uid}" if valid_macro(uid) else None
+
+
+# ── which occurrence? (the ⌃ Start safety net, Vex 2026-09-12) ──────────────
+# A repeating routine keeps ONE id and rolls its date forward on completion,
+# so the task's own due date says which occurrence is live: due today = the
+# one you mean; due later = today's is done (or today is not its day) and a
+# blind start would open the NEXT one without saying so.
+import datetime as _dt
+import re as _re
+
+_RRULE = _re.compile(r"(?:RRULE:)?(.*)", _re.I)
+_WEEKDAYS = {"MO": "Monday", "TU": "Tuesday", "WE": "Wednesday",
+             "TH": "Thursday", "FR": "Friday", "SA": "Saturday", "SU": "Sunday"}
+_ORDINAL = {1: "1st", 2: "2nd", 3: "3rd", 21: "21st", 22: "22nd", 23: "23rd", 31: "31st"}
+
+
+def _rule_parts(repeat_flag):
+    out = {}
+    for bit in (_RRULE.match(repeat_flag or "").group(1) or "").split(";"):
+        if "=" in bit:
+            k, v = bit.split("=", 1)
+            out[k.strip().upper()] = v.strip().upper()
+    return out
+
+
+def local_date(iso):
+    """The LOCAL calendar day of a TickTick timestamp ('…+0000'), or None.
+    Local, never UTC: a routine due 05:00 UTC is a Berlin morning, and the
+    question is always "is this today for Vex"."""
+    if not iso:
+        return None
+    try:
+        txt = iso.replace("Z", "+00:00")
+        if _re.search(r"[+-]\d{4}$", txt):          # +0000 → +00:00
+            txt = txt[:-2] + ":" + txt[-2:]
+        return _dt.datetime.fromisoformat(txt).astimezone().date()
+    except (ValueError, TypeError):
+        return None
+
+
+def rule_text(repeat_flag):
+    """The schedule in words: 'daily', 'Sundays', 'the 30th', 'every 3
+    months on the 30th'. '' when the task does not repeat."""
+    p = _rule_parts(repeat_flag)
+    freq, every = p.get("FREQ"), int(p.get("INTERVAL") or 1)
+    if not freq:
+        return ""
+    if freq == "DAILY":
+        return "daily" if every == 1 else f"every {every} days"
+    if freq == "WEEKLY":
+        days = [_WEEKDAYS.get(d, d) for d in (p.get("BYDAY") or "").split(",") if d]
+        when = " and ".join(days) + "s" if days else "weekly"
+        return when if every == 1 else f"{when}, every {every} weeks"
+    if freq in ("MONTHLY", "YEARLY"):
+        day = p.get("BYMONTHDAY")
+        on = f"the {_ORDINAL.get(int(day), str(int(day)) + 'th')}" if day and day.isdigit() else freq.lower()
+        unit = "month" if freq == "MONTHLY" else "year"
+        return f"{on} of every {unit}" if every == 1 else f"{on}, every {every} {unit}s"
+    return freq.lower()
+
+
+def prev_occurrence(day, repeat_flag):
+    """The occurrence BEFORE `day` for this rule, or None. Used to name the
+    one that was just completed: the series rolled past it, so it needs no
+    completion record to be known."""
+    if not day:
+        return None
+    p = _rule_parts(repeat_flag)
+    freq, every = p.get("FREQ"), int(p.get("INTERVAL") or 1)
+    if freq == "DAILY":
+        return day - _dt.timedelta(days=every)
+    if freq == "WEEKLY":
+        return day - _dt.timedelta(weeks=every)
+    if freq in ("MONTHLY", "YEARLY"):
+        months = every * (12 if freq == "YEARLY" else 1)
+        y, m = day.year, day.month - months
+        while m <= 0:
+            m += 12
+            y -= 1
+        last = [31, 29 if y % 4 == 0 and (y % 100 or y % 400 == 0) else 28,
+                31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]
+        return _dt.date(y, m, min(day.day, last))
+    return None
+
+
+def due_state(task, today=None):
+    """Which occurrence a start would open:
+        {"state": "today"|"ahead"|"overdue"|"undated", "date": date|None,
+         "prev": date|None, "rule": str, "days": int}
+    "ahead" is the one that needs a question: today's is done, or today is
+    not this routine's day, so starting would run the NEXT occurrence."""
+    today = today or _dt.date.today()
+    task = task or {}
+    day = local_date(task.get("startDate") or task.get("dueDate"))
+    rule = rule_text(task.get("repeatFlag"))
+    if day is None:
+        return {"state": "undated", "date": None, "prev": None, "rule": rule, "days": 0}
+    state = "today" if day == today else ("ahead" if day > today else "overdue")
+    return {"state": state, "date": day, "days": (day - today).days, "rule": rule,
+            "prev": prev_occurrence(day, task.get("repeatFlag"))}

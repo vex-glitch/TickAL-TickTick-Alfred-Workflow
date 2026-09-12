@@ -4574,15 +4574,21 @@ def render_routines(query):
         steps = f"{n} steps" if n != 1 else "1 step"
         if not t:
             steps = "not synced yet"
+        # which occurrence is live, so the row says it before ⌃ does
+        st = rt.due_state(t)
+        chip = {"today": "due today", "overdue": "overdue",
+                "ahead": f"next {st['date']:%a %d %b}" if st["date"] else ""}.get(st["state"], "")
+        if st["state"] == "overdue" and st["date"]:
+            chip = f"overdue since {st['date']:%a %d %b}"
         # NATIVE since 2026-09-12: the step list in routines.json, no
         # Keyboard Maestro. The macro uid stays in the registry as the
         # fallback road while Vex smokes this.
-        ctrl = {"arg": f"xact:routine_run:{r['key']}",
+        ctrl = {"arg": f"xact:routine_start:{r['key']}",
                 "subtitle": "▶️ Start", "valid": True}
         rows.append(alfred.item(
             uid=f"rt-{r['key']}",
             title=title,
-            subtitle=f"{steps}  |  ⏎↗️  ⌃▶️  ⇧✅  ⌥📋  ⌘⇧📊  ⌘⚡",
+            subtitle=f"{steps}{' · ' + chip if chip else ''}  |  ⏎↗️  ⌃▶️  ⇧✅  ⌥📋  ⌘⇧📊  ⌘⚡",
             arg=f"open:ticktick:///webapp/#p/{pid}/tasks/{r['tid']}",
             valid=True,
             variables={"task_id": r["tid"], "task_list_id": pid,
@@ -4603,6 +4609,68 @@ def render_routines(query):
     if query:
         rows = [r for r in rows if fuzz.score(query, r["title"]) > 0]
     return rows or [alfred.item(title="No routine matches", valid=False)]
+
+
+def render_rconfirm(ids, query):
+    """The ⌃ Start safety net (Vex 2026-09-12): this routine is NOT due
+    today - today's run is done, or today is not its day - so the start was
+    held and this screen says which occurrence it would open.
+
+    Head line names today and the schedule; row 1 starts the next occurrence
+    anyway, with its day spelled out; row 2 names the previous one (derived
+    from the rule - the series has already rolled past it, so it needs no
+    completion record) with the real completion time when the cache has it."""
+    import routines as rt
+    from datetime import date as _date
+    key = ids[0] if ids else ""
+    r = rt.by_key(key)
+    if not r:
+        return add_back([alfred.item(title="Unknown routine", valid=False)],
+                        "ctx:routines")
+    t = cache_store.find_task(r["tid"]) or {}
+    name = t.get("title") or r["label"]
+    st = rt.due_state(t)
+    today = _date.today()
+    nxt, prev = st["date"], st["prev"]
+
+    def when(d):
+        if not d:
+            return "date unknown"
+        delta = (d - today).days
+        chip = {0: "today", 1: "tomorrow", -1: "yesterday"}.get(delta)
+        return f"{d:%A %Y-%m-%d}" + (f" · {chip}" if chip else "")
+
+    # the completion time of the previous occurrence, when the sync window
+    # still holds that instance (it keeps ~200 rows, a few days)
+    done_at = ""
+    for c in cache_store.get("completed_tasks") or []:
+        if c.get("repeatTaskId") == r["tid"] and c.get("completedTime"):
+            day = rt.local_date(c["completedTime"])
+            if day and (not prev or day >= prev):
+                done_at = f" · ticked {day:%a %Y-%m-%d}"
+                break
+
+    rows = [alfred.item(
+        uid="rc-head",
+        title=f"Today is {today:%A} · {name} runs {st['rule'] or 'on no schedule'}",
+        subtitle="Not due today · nothing has started",
+        valid=False)]
+    rows.append(alfred.item(
+        uid="rc-go",
+        title=f"▶️ Start the next one · {when(nxt)}",
+        subtitle=f"Runs {name} now  |  ⏎▶️  ⌃🔙",
+        arg=f"xact:routine_run:{key}",
+        valid=True))
+    rows.append(alfred.item(
+        uid="rc-prev",
+        title=(f"✅ Last one · {when(prev)}{done_at}" if prev
+               else "✅ No earlier occurrence"),
+        subtitle=f"Open {name} in TickTick  |  ⏎↗️  ⌃🔙",
+        arg=f"open:ticktick:///webapp/#p/{t.get('projectId') or r['pid']}/tasks/{r['tid']}",
+        valid=True,
+        variables={"task_id": r["tid"], "task_list_id": t.get("projectId") or r["pid"],
+                   "task_title": name, "item_type": "task"}))
+    return add_back(rows, "ctx:routines")
 
 
 def render_rtrack(ids, query):
@@ -5140,6 +5208,9 @@ def main():
 
         elif level == "rtrack":
             items = render_rtrack(ids, query)
+
+        elif level == "rconfirm":
+            items = render_rconfirm(ids, query)
 
         elif level == "tph":
             items = render_tph(ids[0] if ids else "", query)

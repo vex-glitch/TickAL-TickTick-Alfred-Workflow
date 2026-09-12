@@ -84,6 +84,59 @@ for r in rt.ROUTINES:
     check(f"{r['key']}: default list runs with its own ids",
           rr.validate(steps) == [] and steps[1]["arg"] == f"focus:{r['tid']}:{r['pid']}")
 
+# ── which occurrence? (the ⌃ Start safety net) ─────────────────────────────
+import datetime as _dt  # noqa: E402
+
+TODAY = _dt.date(2026, 9, 12)          # a Saturday
+DAILY = "RRULE:FREQ=DAILY;INTERVAL=1"
+SUNDAY = "RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=SU"
+M30 = "RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=30"
+Q30 = "RRULE:FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=30"
+
+
+def T(day, rule=DAILY, hhmm="05:00"):
+    return {"startDate": f"{day}T{hhmm}:00.000+0000", "repeatFlag": rule}
+
+
+check("due today", rt.due_state(T("2026-09-12"), TODAY)["state"] == "today")
+check("due tomorrow = ahead (today's is done)",
+      rt.due_state(T("2026-09-13"), TODAY)["state"] == "ahead")
+check("due yesterday = overdue",
+      rt.due_state(T("2026-09-11"), TODAY)["state"] == "overdue")
+check("no date = undated", rt.due_state({}, TODAY)["state"] == "undated")
+check("no task at all is safe", rt.due_state(None, TODAY)["state"] == "undated")
+check("days counts forward", rt.due_state(T("2026-09-30", M30), TODAY)["days"] == 18)
+check("a weekly ahead names last Sunday",
+      rt.due_state(T("2026-09-13", SUNDAY), TODAY)["prev"] == _dt.date(2026, 9, 6))
+check("a daily ahead names yesterday",
+      rt.due_state(T("2026-09-13"), TODAY)["prev"] == _dt.date(2026, 9, 12))
+check("a monthly ahead names last month",
+      rt.due_state(T("2026-09-30", M30), TODAY)["prev"] == _dt.date(2026, 8, 30))
+check("a quarterly ahead goes back three months",
+      rt.due_state(T("2026-09-30", Q30), TODAY)["prev"] == _dt.date(2026, 6, 30))
+check("month arithmetic crosses the year",
+      rt.prev_occurrence(_dt.date(2026, 1, 30), M30) == _dt.date(2025, 12, 30))
+check("a 31st clamps into February",
+      rt.prev_occurrence(_dt.date(2026, 3, 31), M30) == _dt.date(2026, 2, 28))
+check("a leap February clamps to 29",
+      rt.prev_occurrence(_dt.date(2024, 3, 31), M30) == _dt.date(2024, 2, 29))
+check("no rule = no previous", rt.prev_occurrence(_dt.date(2026, 9, 12), "") is None)
+
+check("rule words: daily", rt.rule_text(DAILY) == "daily")
+check("rule words: Sundays", rt.rule_text(SUNDAY) == "Sundays")
+check("rule words: the 30th", rt.rule_text(M30) == "the 30th of every month")
+check("rule words: quarterly", rt.rule_text(Q30) == "the 30th, every 3 months")
+check("rule words: two weekdays",
+      rt.rule_text("RRULE:FREQ=WEEKLY;BYDAY=MO,TH") == "Monday and Thursdays")
+check("rule words: every 3 days", rt.rule_text("RRULE:FREQ=DAILY;INTERVAL=3") == "every 3 days")
+check("rule words: none", rt.rule_text("") == "" and rt.rule_text(None) == "")
+
+check("a +0000 stamp reads as a local day",
+      rt.local_date("2026-09-13T05:00:00.000+0000") is not None)
+check("junk stamps are None",
+      rt.local_date("not a date") is None and rt.local_date("") is None
+      and rt.local_date(None) is None)
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":
     sys.exit(1 if FAILS else 0)
