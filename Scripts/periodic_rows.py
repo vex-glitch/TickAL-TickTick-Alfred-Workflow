@@ -48,19 +48,33 @@ def _mods(sticky_spec=None):
         m["ctrl+shift"] = {"valid": True,
                            "arg": f"xact:pn_sticky:{sticky_spec}",
                            "subtitle": "📌 Open as sticky"}
+        # ⌥ = every note of this tier, newest first (Vex 2026-09-12: "I should
+        # be able to enter a list of those notes ... so I can actually open any
+        # note, not just this week's"). The search SF's ⌥ edge enters the
+        # Browse loop, so the ctx rides as a VARIABLE with an EMPTY arg -
+        # iron rule 8, nothing lands in the bar.
+        m["alt"] = {"valid": True, "arg": "", "subtitle": "📚 All of them",
+                    "variables": {"browse_ctx": f"ctx:pnlist:{sticky_spec}"}}
     else:
         m["ctrl+shift"] = dict(_DEAD)
     return m
 
 
+# The tiers, in Vex's order and emoji (2026-09-12). Yesterday lost its own
+# row: ⌥ on Daily opens every daily note, newest first, so it is one row down
+# there instead of a permanent line on the idle screen.
 _OPEN_ROWS = [
-    ("daily",     "💫", "Today"),
-    ("yesterday", "◀️", "Yesterday"),
-    ("weekly",    "📆", "Week"),
-    ("monthly",   "🗓", "Month"),
-    ("quarterly", "🧭", "Quarter"),
-    ("yearly",    "📅", "Year"),
+    ("daily",     "☀️", "Daily"),
+    ("weekly",    "♻️", "Weekly"),
+    ("monthly",   "🗓️", "Monthly"),
+    ("quarterly", "🌓", "Quarterly"),
+    ("yearly",    "🎉", "Yearly"),
 ]
+
+# extra words a tier row should answer to when the scope is filtered
+_OPEN_KW = {"daily": "today note day",
+            "weekly": "week", "monthly": "month",
+            "quarterly": "quarter", "yearly": "year"}
 
 
 def _period_of(spec, today):
@@ -88,33 +102,28 @@ def idle_rows(frag):
         it = alfred.item(
             uid=f"pn-open-{spec}",
             title=f"{emoji} {label} · {pm.title(p)}",
-            subtitle="⏎↗️ Open  ⌃⇧📌 Sticky",
+            subtitle="⏎↗️ Open  ⌥📚 All  ⌃⇧📌 Sticky",
             arg=f"xact:pn_open:{spec}", valid=True,
             mods=_mods(spec))
-        it["_kw"] = spec if spec != "daily" else "daily note"   # 'pn daily' hits
+        it["_kw"] = f"{spec} {_OPEN_KW.get(spec, '')}"
         items.append(it)
+    # Vex's order (2026-09-12). The three families are ONE row each - goals,
+    # journals and the schedule-it verbs each open their own little screen
+    # instead of spending five lines on the idle one.
     extras = [
-        ("pn-entry",     "➕ Entry",            "Log a win, nag, thought, link",
+        ("pn-entry",     "➕ Entry",         "Log a win, nag, thought, link",
          None, "pn + "),
-        ("pn-income",    "💰 Income",           "Log money you made",
+        ("pn-income",    "💰 Income",        "Log money you made",
          None, "pn $ "),
-        ("pn-daygoal",   "☀️ Day goal",         "Pick the one thing for today",
-         None, "pn day "),
-        ("pn-today",     "☀️ Add to today",     "Pick any task, schedule it today",
-         None, "pn today "),
-        ("pn-tmrw",      "🌙 Add to tomorrow",  "Pick any task, schedule it tomorrow",
-         None, "pn tmrw "),
-        ("pn-jm",        "🌅 Morning journal",  "Answer short questions",
-         "xact:pn_journal:morning", None),
-        ("pn-je",        "🌙 Evening journal",  "Answer short questions",
-         "xact:pn_journal:evening", None),
-        ("pn-jw",        "📔 Weekly journal",   "Review the week, set next week",
-         "xact:pn_journal:weekly", None),
-        ("pn-goal",      "🎯 Weekly goal",      "Pick a task",
-         None, "pn goal "),
-        ("pn-highlight", "🗓️ Week highlight",   "One thing that stands out",
+        ("pn-goals",     "🏆 Goals",         "The day goal and the week goal",
+         None, "pn goals "),
+        ("pn-journals",  "📓 Journals",      "Morning, evening, weekly",
+         None, "pn journals "),
+        ("pn-add",       "➕ Add",           "Put a task on today or tomorrow",
+         None, "pn add "),
+        ("pn-highlight", "⭐️ Highlight",     "One thing that stands out",
          "xact:pn_highlight", None),
-        ("pn-refresh",   "🔄 Refresh today",    "Complete ticked, rebuild numbers",
+        ("pn-refresh",   "♻️ Refresh Today", "Complete ticked, rebuild numbers",
          "xact:pn_refresh", None),
     ]
     for uid, title, sub, arg, autoc in extras:
@@ -333,6 +342,54 @@ def sched_rows(rest, when):
                         row_fn=row, empty_hint="Type to pick a task…")
 
 
+# ── the three family screens (Vex 2026-09-12) ───────────────────────────────
+# Each is a plain row list plus a way back; the members kept their own verbs,
+# so nothing downstream changed - only where the row is reached from.
+_FAMILIES = {
+    "goals": ("🏆 Goals", [
+        ("pn-daygoal", "☀️ Day goal",    "The one thing for today",
+         None, "pn day "),
+        ("pn-goal",    "🎯 Weekly goal", "Pick a task for the week",
+         None, "pn goal "),
+    ]),
+    "journals": ("📓 Journals", [
+        ("pn-jm", "🌅 Morning journal", "Answer short questions",
+         "xact:pn_journal:morning", None),
+        ("pn-je", "🌙 Evening journal", "Answer short questions",
+         "xact:pn_journal:evening", None),
+        ("pn-jw", "📔 Weekly journal",  "Review the week, set next week",
+         "xact:pn_journal:weekly", None),
+    ]),
+    "add": ("➕ Add", [
+        ("pn-today", "☀️ Add to today",    "Pick any task, schedule it today",
+         None, "pn today "),
+        ("pn-tmrw",  "🌙 Add to tomorrow", "Pick any task, schedule it tomorrow",
+         None, "pn tmrw "),
+    ]),
+}
+
+
+def family_rows(key, frag):
+    label, members = _FAMILIES[key]
+    items = []
+    for uid, title, sub, arg, autoc in members:
+        it = alfred.item(uid=uid, title=title, subtitle=sub,
+                         arg=arg or "", valid=bool(arg), mods=_mods())
+        if autoc:
+            it["autocomplete"] = autoc
+        items.append(it)
+    if frag:
+        items = fuzz.filter_and_score(frag, items, key_fn=lambda x: x["title"])
+    if not items:
+        return [alfred.item(uid=f"pn-{key}-nohit",
+                            title=f'Nothing in {label} matching "{frag}"',
+                            valid=False, mods=_mods())]
+    items.append(alfred.item(uid=f"pn-{key}-back", title="🔙 Back",
+                             subtitle="Every periodic row", arg="", valid=False,
+                             autocomplete="pn ", mods=_mods()))
+    return items
+
+
 def _after(q, prefix):
     """rest after a WORD prefix ('day', 'day frag', 'today!pid:tid …') |
     None. The boundary check keeps 'daily' out of the 'day' submode."""
@@ -362,6 +419,10 @@ def rows(query):
         rest = _after(q, prefix)
         if rest is not None:
             return sched_rows(rest, when)
+    for key in ("goals", "journals", "add"):
+        rest = _after(q, key)
+        if rest is not None:
+            return family_rows(key, rest)
     rest = _after(q, "day")
     if rest is not None:
         return day_goal_rows(rest)

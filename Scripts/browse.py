@@ -3969,6 +3969,68 @@ def render_buffer(query):
                              valid=False)]
     return add_back(items, "ctx:folders")
 
+# ── Level: pnlist (💫 every note of ONE tier, newest first) ─────────────────
+def render_pnlist(ids, query):
+    """ctx:pnlist:<daily|weekly|monthly|quarterly|yearly> - the archive behind
+    a periodic row's ⌥ (Vex 2026-09-12: "I should be able to enter a list of
+    those notes, current at top, the oldest at the bottom ... so I can
+    actually open any note, not just this week's").
+
+    Tier membership comes from the note's TIER TAG, the same truth the engine
+    indexes on, never from parsing a title. Sorting is the title descending,
+    which is chronological for every tier because each one leads with a
+    zero-padded number (2026-09-12 · Sat · 2026-W37 · 2026-09 September ·
+    2026-Q3 · 2026). The CACHE is the pool: this renders on every keystroke.
+    """
+    import periodic_model as pm
+    import areas
+    spec = (ids[0] if ids else "").lower()
+    if spec not in pm.TIER_TAGS:
+        return add_back([alfred.item(title="💫 Unknown period", valid=False)],
+                        "ctx:folders")
+    if not areas.periodic_configured():
+        return add_back([areas.setup_row("Periodic notes", "48-periodic.md")],
+                        "ctx:folders")
+    want = pm.TIER_TAGS[spec].lower()
+    pid = areas.PERIODIC_LIST_ID
+    seen, pool = set(), []
+    for n in (cache_store.get("all_notes") or []) + (cache_store.get("all_tasks") or []):
+        nid = n.get("id")
+        if not nid or nid in seen:
+            continue
+        if (n.get("_projectId") or n.get("projectId")) != pid:
+            continue
+        if want not in {str(x).lower() for x in (n.get("tags") or [])}:
+            continue
+        seen.add(nid)
+        pool.append(n)
+    pool.sort(key=lambda n: (n.get("title") or ""), reverse=True)
+
+    now = pm.title(pm.period_for(spec, datetime.now().date()))
+    items = []
+    for n in pool:
+        title = n.get("title") or "Untitled"
+        here = title.startswith(now) or now.startswith(title)
+        items.append(alfred.item(
+            uid=f"pnl-{n['id']}",
+            title=("⭐️ " if here else "") + title,
+            subtitle=("Current  |  ⏎↗️  ⌃🔙" if here else "⏎↗️  ⌃🔙"),
+            arg=f"open:ticktick:///webapp/#p/{pid}/tasks/{n['id']}",
+            valid=True,
+            variables={"task_id": n["id"], "task_list_id": pid,
+                       "task_title": title, "item_type": "note"},
+            mods=_picker_mods()))
+    if query:
+        items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
+    if not items:
+        items = [alfred.item(
+            uid="pnl-none",
+            title=(f'No {spec} note matching "{query}"' if query
+                   else f"No {spec} notes yet"),
+            subtitle="They are minted as you use them", valid=False)]
+    return add_back(items, "ctx:folders")
+
+
 # ── Level: bridges (🌉 - the five-row hub + the project picker) ──────────────
 def render_bridges(ids, query):
     """ctx:bridges - the ruled five rows: Add Daily / Add Project /
@@ -5190,6 +5252,9 @@ def main():
 
         elif level == "buffer":
             items = render_buffer(query)
+
+        elif level == "pnlist":
+            items = render_pnlist(ids, query)
 
         elif level == "bridges":
             items = render_bridges(ids, query)
