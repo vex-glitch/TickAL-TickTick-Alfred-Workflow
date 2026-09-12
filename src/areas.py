@@ -18,6 +18,8 @@ by a normalised key, so assigning it reuses that tag - no duplicates.
 import os
 import re
 
+import mdtext
+
 import cache as cache_store
 import config as cfg
 
@@ -304,17 +306,19 @@ def build_action(mode, pid, tid, title):
     if mode in ("project", "list"):
         name = (proj or {}).get("name") or title
         link = _list_link(pid)
-        cta_title = (f"💼 P • [{clean_project_name(name)}]({link}) 🔗"
-                     if mode == "project" else f"[{name}]({link}) 🔗")
+        cta_title = ("💼 P • " + mdtext.md_link(clean_project_name(name), link) + " 🔗"
+                     if mode == "project"
+                     else mdtext.md_link(name, link) + " 🔗")
         # No ~l token: an untagged item leaves nothing to terminate the ~l
         # capture, so the parser would sit in the list picker forever. The 📌CTA
         # destination rides as row variables (list_id/list_name) instead -
         # exactly how the CRM Add hub pins its list.
         q = f"{tagpart}{cta_title} *"
     else:  # task / subtask / note - link the task; parent list goes in the body
-        q = f"{tagpart}[{title}]({_task_link(pid, tid)}) 🔗 *"
+        # a routine step's title IS a link; wrapping it raw nested (2026-09-12)
+        q = f"{tagpart}{mdtext.md_link(title, _task_link(pid, tid))} 🔗 *"
         list_name = (proj or {}).get("name", "")
-        note = f"[{list_name}]({_list_link(pid)})" if list_name else ""
+        note = mdtext.md_link(list_name, _list_link(pid)) if list_name else ""
     return {"query": q, "note": note, "mode": mode, "tag": tag,
             "label": "📌 Create CTA",
             "preview": "Create and schedule Call to Action task"}

@@ -2742,7 +2742,8 @@ def _mint_raw_task(lb, dest, fid, tag="📸raw"):
 def _eagle_title(base, fid):
     """Content-task title: markdown link - TickTick linkifies ONLY
     [text](eagle://…), never the bare scheme (Vex smoke 2026-07-26)."""
-    return f"[{base}](eagle://folder/{fid})" if fid else base
+    import mdtext
+    return mdtext.md_link(base, f"eagle://folder/{fid}") if fid else base
 
 
 def _task_base(title):

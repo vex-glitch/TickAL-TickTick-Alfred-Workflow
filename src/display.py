@@ -7,6 +7,8 @@ formatting of titles, subtitles, dates, priority, and breadcrumbs.
 """
 import re
 from datetime import datetime, timezone
+
+import mdtext
 from script_base import run_path
 
 # Pre-compiled patterns for search key cleaning
@@ -291,7 +293,9 @@ def link_label(title):
     strips bare URLs and tag suffixes, which a plain title must keep.
     """
     title = title or ""
-    return search_key(title) if "](" in title else title
+    # search_key also drops bare URLs and tag suffixes, which a PLAIN title
+    # must keep - so only a title that really carries a link goes through it
+    return mdtext.flatten_links(title) if "](" in title else title
 
 
 def pick_title(task, mark=""):

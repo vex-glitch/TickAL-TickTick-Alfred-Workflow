@@ -32,6 +32,7 @@ test:
 	@python3 tests/test_routine_link.py
 	@python3 tests/test_routine_runner.py
 	@python3 tests/test_subtask_line.py
+	@python3 tests/test_mdtext.py
 	@python3 tests/test_api_update.py
 	@python3 tests/test_albums.py
 	@python3 tests/test_alb_move.py

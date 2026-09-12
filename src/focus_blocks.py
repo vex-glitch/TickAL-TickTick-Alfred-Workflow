@@ -29,6 +29,8 @@ focus_picker.py and focus_bar.py alike.
 """
 import re
 
+import mdtext
+
 DATE_HEADER_RE = re.compile(r'^###\s+(\d{4}-\d{2}-\d{2})\s*$')
 SEPARATOR_RE = re.compile(r'^---\s*$')
 CHECKBOX_RE = re.compile(r'^\s*[-*]\s\[(?P<mark>[ xX])\]\s?(?P<body>.*)$')
@@ -147,20 +149,11 @@ def serialize(doc):
     return "\n".join(out)
 
 
-MD_LINK_RE = re.compile(r'\[([^\[\]]*)\]\([^()]*\)')
-
-
 def link_text(title):
-    """The text a checkbox line should carry for `title`.
-
-    A title that is ITSELF a markdown link - every routine step is one -
-    would be wrapped again into "[[name](url)](task link)": a link inside a
-    link, which renders as neither. Seen live in the weekly note's ♻️ mirror
-    (2026-09-12), where three of six rows came out that way. Same rule as
-    display.link_label, spelled out here so this module keeps its no-import
-    purity.
-    """
-    return MD_LINK_RE.sub(r'\1', title or '')
+    """The text a checkbox line should carry: mdtext's rule (a title that is
+    itself a link cannot be wrapped in another one). Seen live in the weekly
+    note's ♻️ mirror, three of six rows (2026-09-12)."""
+    return mdtext.flatten_links(title)
 
 
 def make_line(pid, tid, title):

@@ -30,6 +30,8 @@ project_data_{records}) so a fresh note is immediately pickable.
 """
 import os
 import re
+
+import mdtext
 import datetime
 
 import config as cfg
@@ -81,7 +83,9 @@ def _today():
 
 
 def task_link(pid, tid, title):
-    return f"[{title}](https://ticktick.com/webapp/#p/{pid}/tasks/{tid})"
+    # LINK_RE reads these back with [^\]]* for the label, so a title that is
+    # itself a link would both render wrong and refuse to parse (2026-09-12)
+    return mdtext.md_link(title, f"https://ticktick.com/webapp/#p/{pid}/tasks/{tid}")
 
 
 def parse_first_link(text):
