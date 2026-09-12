@@ -232,41 +232,11 @@ def _load_template(kind):
     return "{{breadcrumbs}}\n\n### 💰 Money\n**Total = 0**\n"   # last-resort skeleton
 
 
-# Smart-view rows: (label, url) - EXACTLY the VIEWS deep links shipped +
-# verified against the app in everything_search; routes not in that table
-# are dead. If the app doesn't hyperlink ticktick:// inside note bodies,
-# drop row 1 - row 2 (https task-anchors) still works.
-def _nav_lines(p=None, index=None):
-    """Two rows, three links each (Vex 2026-09-10 - the old second row held
-    ONE lonely link, 💫 Periodic, now dropped: ▲ on the crumb climbs the
-    ladder): ⏪ Yesterday · 📅 Today · 🌄 Tomorrow, then 7️⃣ Next 7 ·
-    ✔️ Completed · 🔄 Habits (+ 👥 CRM / ♻️ Review when set up). Yesterday =
-    the daily note before THIS note on a daily, before today elsewhere -
-    plain text until that note exists (a later refresh links it)."""
-    yday = None
-    if index is not None:
-        try:
-            from datetime import date, timedelta
-            yp = (pm.prev_period(p) if p is not None and p.kind == "daily"
-                  else pm.period_for("daily", date.today() - timedelta(days=1)))
-            yday = _note_url(lookup(index, yp))
-        except Exception:
-            yday = None
-    row1 = [("⏪ Yesterday", yday),
-            ("📅 Today", "ticktick://v1/show?smartlist=today"),
-            ("🌄 Tomorrow", "ticktick://v1/show?smartlist=tomorrow")]
-    row2 = [("7️⃣ Next 7", "ticktick://v1/show?smartlist=next_7_days"),
-            ("✔️ Completed", "ticktick://v1/show?smartlist=completed"),
-            ("🔄 Habits", "ticktick://habit")]
-    if areas.crm_configured():
-        row2.append((f"👥 {areas.crm_list_name()}",
-                     f"https://ticktick.com/webapp/#p/{areas.CRM_ID}/tasks"))
-    rv = _review_target()
-    if rv:
-        row2.append(("♻️ Review", rv[0]))
-    return [pm.render_breadcrumb(row1), pm.render_breadcrumb(row2)]
-
-
+# Vex 2026-09-12: the note head is the BREADCRUMB only - "I do not need all
+# those links. Leave only previous, up, next." The two smart-view rows that
+# used to sit under it (⏪ Yesterday · 📅 Today · 🌄 Tomorrow, then 7️⃣ Next 7 ·
+# ✔️ Completed · 🔄 Habits, plus 👥 CRM / ♻️ Review) are gone; those deep links
+# still live, verified, in everything_search's VIEWS table.
 def _review_target():
     """weekly_review_id → (https_url, kind, obj) | None. kind: 'list' when the
     id names a project, 'task' when it names a cached task (its subtasks are
@@ -308,7 +278,7 @@ def _compose_lead(doc, p, index, refetch):
             q_lines = [q]
         if w:
             w_line = w
-    out = [_crumb(p, index)] + _nav_lines(p, index) + ["---"]
+    out = [_crumb(p, index)] + ["---"]
     if p.kind == "daily":
         tail = [x for x in [w_line] + q_lines + [mood, day] if x]
         if tail:
@@ -363,7 +333,6 @@ def create_note(p, index):
     tpl = _load_template(p.kind)
     content = pm.render_template(tpl, {
         "breadcrumbs": _crumb(p, index),
-        "navlinks": "\n".join(_nav_lines(p, index)),
     })
     # Child tag ONLY - TickTick's group-by-tag prefers the PARENT when both
     # are attached, which would collapse the kanban into one 💫Periodic

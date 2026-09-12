@@ -1,5 +1,4 @@
 {{breadcrumbs}}
-{{navlinks}}
 ---
 ### 📊 Dashboard
 _(pending)_

@@ -1,5 +1,4 @@
 {{breadcrumbs}}
-{{navlinks}}
 ---
 # 🏆 Goals
 ### 🗓️ Weekly
