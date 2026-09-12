@@ -75,9 +75,49 @@ def _wmo_emoji(code):
     return "🌡"
 
 
+def geocode(name):
+    """City name → (lat, lon, label) via Open-Meteo's geocoding (no key), or
+    None. Used to PIN a location by name instead of guessing it."""
+    if not (name or "").strip():
+        return None
+    try:
+        r = requests.get("https://geocoding-api.open-meteo.com/v1/search",
+                         params={"name": name.strip(), "count": 1,
+                                 "language": "en", "format": "json"},
+                         timeout=_TIMEOUT)
+        hits = (r.json() or {}).get("results") or []
+        if not hits:
+            return None
+        h = hits[0]
+        bits = [h.get("name"), h.get("admin1"), h.get("country")]
+        label = ", ".join(b for b in bits if b)
+        return h["latitude"], h["longitude"], label
+    except Exception:
+        return None
+
+
+def pin_place(name):
+    """Geocode `name` and pin it in config.json as the weather location.
+    Returns the label on success, None on a miss."""
+    hit = geocode(name)
+    if not hit:
+        return None
+    lat, lon, label = hit
+    data = cfg.load()
+    data["periodic_lat"], data["periodic_lon"] = lat, lon
+    data["periodic_place"] = label
+    data["periodic_geo_pinned"] = True
+    cfg.save(data)
+    return label
+
+
 def get_latlon():
-    """Cached in config.json (periodic_lat/lon - manual override honored);
-    bootstrapped ONCE via IP geolocation. None → retry next run."""
+    """Cached in config.json (periodic_lat/lon). A PINNED location (set by
+    name, periodic_geo_pinned) is final - nothing may overwrite it. Otherwise
+    bootstrapped ONCE via IP geolocation, which is only as good as the exit
+    node: behind a VPN it reports the VPN's city, which is exactly how this
+    ended up frozen on the wrong one (Vex 2026-09-12). None → retry next run.
+    """
     data = cfg.load()
     if data.get("periodic_lat") is not None and data.get("periodic_lon") is not None:
         return data["periodic_lat"], data["periodic_lon"]

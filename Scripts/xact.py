@@ -186,6 +186,9 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
     xact:pn_open:<spec>             daily|yesterday|weekly|monthly|quarterly|
                                     yearly → lazy-mint + refresh + deep link
     xact:pn_sticky:<spec>           same, then open the note as a sticky
+    xact:pn_setloc[:<city>]         pin the daily note's weather location by
+                                    name (geocoded once; a pinned place is
+                                    never overwritten by IP guessing)
     xact:pn_entry:<b64|plain>       📓 entry into today's daily ({"kind","text"}
                                     or plain "w Shipped it"; kinds w/n/t/k/l/m)
     xact:pn_income:<b64|plain>      💰 "- amt · label" + re-total (plain
@@ -6913,6 +6916,27 @@ def pn_open(spec):
     print(f"💫 {pm.title(p)} {'minted' if minted else 'open'}")
 
 
+def pn_setloc(rest=""):
+    """💫 Where the daily note's weather comes from. Takes a city name, asks
+    for one when called bare, geocodes it (Open-Meteo, no key) and PINS it.
+
+    It used to bootstrap itself ONCE from IP geolocation and freeze, which is
+    only as good as the exit node: behind a VPN it stores the VPN's city and
+    never corrects itself (Vex's was stuck on Berlin while the IP read New
+    York). A name you chose beats a guess that cannot be re-checked."""
+    import periodic_fetch as pf
+    name = (rest or "").strip() or _ask("Weather for which city?")
+    if not (name or "").strip():
+        return
+    label = pf.pin_place(name)
+    if not label:
+        print(f"🌦 No place called {name.strip()[:30]}")
+        return
+    cache_store.invalidate("pn_weather")      # the old city's line must go
+    line = pf.get_weather() or ""
+    print(f"🌦 Weather: {label}" + (f" · {line}" if line else ""))
+
+
 def pn_sticky(spec, assist=True):
     """assist=False (the link road) skips sticky()'s row-click retry."""
     if not _pn_gate():
@@ -11049,6 +11073,8 @@ def main():
             pn_sched(rest)
         elif verb == "pn_refresh":
             pn_refresh(rest)
+        elif verb == "pn_setloc":
+            pn_setloc(rest)
         elif verb == "pn_mint":
             pn_mint()
         else:
