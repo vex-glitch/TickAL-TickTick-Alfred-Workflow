@@ -130,10 +130,13 @@ def goal_line(text="", pid=None, tid=None, title=None):
 # `### <anchor>…` header line in the shipped template (prefix anchors seed
 # bare, the engine appends `: data` on refresh).
 WRITER_ANCHORS = {
+    # no SEC_MONEY: the day's money is the EVENING JOURNAL's answer, and the
+    # summary reflects it (Vex 2026-09-12 - "it is an answer in the evening
+    # journal, that is all that should be there"). Older notes that still
+    # carry a 💰 section are still read, they just are not seeded any more.
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
                   SEC_YESTERDAY, SEC_YBRIDGE, SEC_TODAY, SEC_TOMORROW,
-                  SEC_MORNING, SEC_NOTES, SEC_EVENING, SEC_DAY_SUM,
-                  SEC_MONEY],
+                  SEC_MORNING, SEC_NOTES, SEC_EVENING, SEC_DAY_SUM],
     "weekly":    [SEC_GOALS, SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK, SEC_WEEKLY_JNL,
@@ -494,17 +497,34 @@ def rating_line(score):
 
 
 def answer_mood(text):
-    """(score, note) from a journal MOOD answer, which is the bare face the
-    picker echoes - "😐", or "🙂 · slept badly". None when it is not one."""
+    """(score, note) from a journal MOOD answer: the bare face the picker
+    echoes, with anything written after it on the SAME line as the note -
+    "😐", "🙂 slept badly", or the older "🙂 · slept badly". None otherwise."""
     t = (text or "").strip()
     if not t:
         return None
-    face, _, note = t.partition("·")
-    face = face.strip()
+    face = t[:1]
     if face in FACE_SCORE:
-        return FACE_SCORE[face], note.strip()
+        return FACE_SCORE[face], t[1:].lstrip(" ·\t")
     m = MOOD_LINE_RE.match(t)                      # tolerate a full Mood: line
     return (FACE_SCORE[m.group("face")], m.group("note") or "") if m else None
+
+
+def mood_text(score, note=""):
+    """'🙂 slept badly' - a plain space, no separator (Vex 2026-09-12)."""
+    return MOOD_FACES[int(score)] + (f" {note}" if note else "")
+
+
+def answer_stars(text):
+    """'★★★' or '3' from a journal RATING answer → the star string, or ''."""
+    t = (text or "").strip()
+    if t and set(t) == {"★"}:
+        return t[:5]
+    try:
+        n = int(float(t.split()[0]))
+    except (ValueError, IndexError):
+        return ""
+    return "★" * max(1, min(5, n)) if 1 <= n <= 5 else ""
 
 
 def quote_mood(body_lines):

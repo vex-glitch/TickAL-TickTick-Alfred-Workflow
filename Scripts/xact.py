@@ -7100,12 +7100,15 @@ def pn_journal(slot):
                 import periodic_model as pm
                 note = (m.group(2) or "").strip()
                 routed.append(pe.set_day_mood(int(m.group(1)), note, day=day0))
-                a = pm.mood_line(int(m.group(1)), note)[6:]   # echo "🙂 · note"
+                a = pm.mood_text(int(m.group(1)), note)       # echo "🙂 note"
         elif key == "money":
+            # the ANSWER is the record now; append_income only still runs for
+            # a note that carries a 💰 section (pre-2026-09-12 layouts)
             import periodic_model as pm
+            import periodic_sections as _ps
             head, _, tail = a.partition(" ")
             amt = pm.parse_amount(head)
-            if amt is not None:
+            if amt is not None and pe._daily_has_money(day0):
                 routed.append(pe.append_income(amt, tail.strip(), day=day0))
         elif key == "rating":
             m = _re.match(r"^([1-5])(?!\d)", a)

@@ -398,8 +398,8 @@ def _next_occurrence(cd, today):
 
 
 def countdown_lines():
-    """'- Name · 23d' soonest-first (cap 6); '· today' at zero. None on
-    reader failure."""
+    """'- Name · 23d' soonest-first (cap 4, Vex 2026-09-12 - they were never
+    random, just six deep); '· today' at zero. None on reader failure."""
     j = _v2_get("countdown/list")
     if not isinstance(j, dict):
         return None
@@ -420,7 +420,7 @@ def countdown_lines():
                      f"- {cd.get('name', '?')} · {label}"))
     if not rows:
         return None
-    return [line for _k, line in sorted(rows)[:6]]
+    return [line for _k, line in sorted(rows)[:4]]
 
 
 def bday_lines(days=14):

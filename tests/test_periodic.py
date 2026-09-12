@@ -434,6 +434,22 @@ _m, _f = pm.merge_journal_answers(_s, {1: "😐"})
 check("21.italic-round-trip",
       _m[1] == "\t\t- A: 😐" and pm.journal_pairs(_m)[0][2] == "😐", _m)
 
+# ── 22. round 4: mood spacing, stars, money from the journal ──────────────
+check("22.mood-space", pm.mood_text(4, "slept badly") == "🙂 slept badly"
+      and pm.mood_text(3) == "😐")
+check("22.mood-space-round-trip",
+      pm.answer_mood(pm.mood_text(4, "slept badly")) == (4, "slept badly"))
+check("22.mood-old-separator-still-reads",
+      pm.answer_mood("🙂 · slept badly") == (4, "slept badly"))
+check("22.stars-from-digit", pm.answer_stars("4") == "★★★★")
+check("22.stars-from-stars", pm.answer_stars("★★★") == "★★★")
+check("22.stars-refuse", pm.answer_stars("0") == "" and pm.answer_stars("x") == ""
+      and pm.answer_stars("") == "" and pm.answer_stars(None) == "")
+check("22.stars-cap", pm.answer_stars("9") == "")
+check("22.money-no-longer-seeded-daily",
+      pm.SEC_MONEY not in pm.WRITER_ANCHORS["daily"]
+      and pm.SEC_MONEY in pm.WRITER_ANCHORS["monthly"])
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)

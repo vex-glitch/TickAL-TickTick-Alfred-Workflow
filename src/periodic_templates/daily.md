@@ -23,8 +23,7 @@
 ---
 ##### 🔎 Summaries
 - Today
-	- Money
-		- **Total = 0**
+	- _(pending)_
 
 - Yesterday
 	- _(pending)_

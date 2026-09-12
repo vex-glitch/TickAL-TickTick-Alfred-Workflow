@@ -435,7 +435,12 @@ def _day_sums(index):
         if not d:
             continue
         doc = ps.parse_sections(t.get("content") or "")
-        sec = ps.find(doc, pm.SEC_MONEY)
+        ans = _answer_in(doc, pm.SEC_EVENING, "money did you earn")
+        amt = pm.parse_amount(ans) if ans else None
+        if amt is not None:
+            sums[d] = amt
+            continue
+        sec = ps.find(doc, pm.SEC_MONEY)      # notes from before the move
         if sec:
             sums[d] = pm.section_money_sum(sec.body)
     return sums
@@ -696,7 +701,7 @@ def _completed_tops(day):
     if comp is None:
         return None
     out, seen = [], set()
-    for t in comp:
+    for t in sorted(comp, key=lambda x: x.get("completedTime") or ""):
         if t.get("parentId"):
             continue
         name = mdtext.flatten_links(t.get("title") or "").strip()
@@ -706,6 +711,17 @@ def _completed_tops(day):
         seen.add(key)
         out.append(name)
     return out
+
+
+def _answer_in(doc, sec_name, needle):
+    """The answer to the journal question containing `needle`, or ''."""
+    sec = ps.find(doc, sec_name)
+    if sec is None:
+        return ""
+    for _n, q, a, _i in pm.journal_pairs(sec.body):
+        if a and needle.casefold() in (q or "").casefold():
+            return a.strip()
+    return ""
 
 
 def _mood_of_doc(doc):
@@ -721,14 +737,34 @@ def _mood_of_doc(doc):
     return None
 
 
-def _recap_lines(day, t2, mood, money_lines, tab):
-    """Mood · Money · Focus · Completed, in Vex's order (2026-09-12), each
-    line only when its data is really there (the honest-absence rule)."""
+def _recap_lines(day, t2, nday, tab):
+    """Day · Mood · Money · Focus · Completed, in Vex's order (2026-09-12).
+
+    The first three are EVENING/MORNING JOURNAL answers - the rating and the
+    money are asked there, so the summary reflects them rather than keeping a
+    second copy ("it is an answer in the evening journal, that is all that
+    should be there"). Each line appears only when its data really exists.
+    `nday` is the day's parsed note, or None.
+    """
     lines = []
-    if mood:
-        lines.append(f"{tab}- Mood: {pm.MOOD_FACES[mood[0]]}"
-                     + (f" · {mood[1]}" if mood[1] else ""))
-    lines += money_lines
+    if nday is not None:
+        stars = pm.answer_stars(_answer_in(nday, pm.SEC_EVENING, "rate the day"))
+        if stars:
+            lines.append(f"{tab}- Day: {stars}")
+        mood = _mood_of_doc(nday)
+        if mood:
+            lines.append(f"{tab}- Mood: {pm.mood_text(mood[0], mood[1])}")
+        money = _answer_in(nday, pm.SEC_EVENING, "money did you earn")
+        if not money:                       # older notes kept a 💰 section
+            msec = ps.find(nday, pm.SEC_MONEY)
+            if msec is not None:
+                total = pm.section_money_sum(msec.body)
+                money = pm.fmt_amount(total) if total else ""
+        else:
+            amt = pm.parse_amount(money)
+            money = pm.fmt_amount(amt) if amt is not None else money
+        if money:
+            lines.append(f"{tab}- Money: {money}")
     fm = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
     if fm:
         lines.append(f"{tab}- Focus: {pm.fmt_hm(fm)}")
@@ -769,18 +805,11 @@ def _fill_daily(doc, p, index, is_today):
             if hb:
                 ps.set_body(doc, pm.SEC_HABITS, pm.ind(hb))
 
-        # ⏪ Yesterday recap - Mood · Money · Focus · Completed (Vex's order)
+        # ⏪ Yesterday recap - Day · Mood · Money · Focus · Completed
         yd = day - timedelta(days=1)
         yt = lookup(index, pm.period_for("daily", yd))
-        ymoney = []
-        if yt:
-            ydoc = ps.parse_sections(yt.get("content") or "")
-            msec = ps.find(ydoc, pm.SEC_MONEY)
-            if msec:
-                ymoney = [f"{pm.T2}- Money: "
-                          f"{pm.fmt_amount(pm.section_money_sum(msec.body))}"]
-        lines = _recap_lines(yd, t2, _day_mood_of(yt) if yt else None,
-                             ymoney, pm.T2)
+        ydoc = ps.parse_sections(yt.get("content") or "") if yt else None
+        lines = _recap_lines(yd, t2, ydoc, pm.T2)
         wd = _wontdo_between(yd, yd)
         if wd is not None and len(wd):
             lines.append(f"{pm.T2}- Won't do: {len(wd)}")
@@ -802,20 +831,10 @@ def _fill_daily(doc, p, index, is_today):
                 body, _scheduled_today(day + timedelta(days=1)), indent=pm.T2)
             ps.set_body(doc, pm.SEC_TOMORROW, pm.sort_checkboxes(merged))
 
-        # 📊 Today summary - the SAME shape as ⏪ Yesterday (Vex 2026-09-12):
-        # Mood · Money · Focus · Completed. The 💰 Money BLOCK lives inside
-        # it, so its entries carry over verbatim while the lines around it
-        # are rebuilt - it is the note's only money home (append_income and
-        # the monthly roll-up both read it).
-        msec = ps.find(doc, pm.SEC_MONEY)
-        money_lines = ([f"{pm.T2}- Money"]
-                       + [f"{pm.T3}{ln.strip()}" for ln in (msec.body if msec else [])
-                          if ln.strip()]) if msec is not None else []
-        if msec is not None and len(money_lines) == 1:
-            money_lines.append(f"{pm.T3}- **Total = 0**")
+        # 📊 Today summary - the SAME shape as ⏪ Yesterday (Vex 2026-09-12)
         nsec = ps.find(doc, pm.SEC_NOTES)
         entries = pm.harvest_entries(nsec.body) if nsec else []
-        sums = _recap_lines(day, t2, _mood_of_doc(doc), money_lines, pm.T2)
+        sums = _recap_lines(day, t2, doc, pm.T2)
         if entries:
             counts = {}
             for _hm, g, _b in entries:
@@ -1582,6 +1601,15 @@ def _mirror_week_goals(wdoc):
         return True
     _pn_rmw(dtask.get("projectId") or areas.PERIODIC_LIST_ID,
             dtask.get("id"), mirror)
+
+
+def _daily_has_money(day=None):
+    """True when that day's note still carries a 💰 section (older layouts)."""
+    t = lookup(build_index(), pm.period_for("daily", day or _today()))
+    if not t:
+        return False
+    return ps.find(ps.parse_sections(t.get("content") or ""),
+                   pm.SEC_MONEY) is not None
 
 
 def append_income(amount, label, day=None):
