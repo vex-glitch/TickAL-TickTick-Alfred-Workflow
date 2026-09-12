@@ -29,7 +29,12 @@ import periodic_journal as pj
 import periodic_model as pm
 import periodic_sections as ps
 from api import TickTickAPI
-from display import md_links_display
+import mdtext
+# NOTE: display.md_links_display is DISPLAY-ONLY ("[name]🔗", never applied to
+# data - its own docstring says so) and four writers here were putting it into
+# note CONTENT: the ⏪ Yesterday recap and three roll-up summaries. Plain text
+# is what a note wants, so they flatten to the LABEL instead (2026-09-12,
+# after Vex asked why a line in his daily note showed raw markdown).
 from filtering import utc_str_to_local_date
 from script_base import run_path
 
@@ -730,7 +735,7 @@ def _fill_daily(doc, p, index, is_today):
         comp = _completed_between(yd, yd)
         if comp is not None:
             lines.append(f"{pm.T2}- ✅ Completed: {len(comp)}")
-            lines += [f"{pm.T3}- {md_links_display(t.get('title') or '')[:64]}"
+            lines += [f"{pm.T3}- {mdtext.flatten_links(t.get('title') or '')[:64]}"
                       for t in comp]
         fm = getattr(t2, "focus_minutes", lambda a, b: None)(yd, yd) if t2 else None
         if fm:
@@ -949,7 +954,7 @@ def _fill_weekly(doc, p, index):
                     f"{top} · {done_bp.get(top, 0)} done · "
                     f"{created_bp.get(top, 0)} added")
     if comp_cur:
-        top3 = ", ".join(md_links_display(t.get("title") or "")[:32]
+        top3 = ", ".join(mdtext.flatten_links(t.get("title") or "")[:32]
                          for t in comp_cur[:3])
         _set_headed(doc, pm.SEC_TOP_TASKS, top3)
 
@@ -992,7 +997,7 @@ def _fill_weekly(doc, p, index):
             if rec and rec[0]:
                 ln = f"- {pm.DAY_ABBR[d.weekday()]} · {pm.fmt_hm(rec[0])}"
                 if rec[1]:
-                    ln += f" · {md_links_display(rec[1])[:40]}"
+                    ln += f" · {mdtext.flatten_links(rec[1])[:40]}"
                 day_lines.append(ln)
         _set_headed(doc, pm.SEC_FOCUS_WEEK, head + (f" · {ch}" if ch else ""),
                     pm.ind(day_lines)
@@ -1053,7 +1058,7 @@ def _fill_weekly(doc, p, index):
             lw.append(f"- 🔥 Top list: {top} · {prev_bp.get(top, 0)} done · "
                       f"{prev_created_bp.get(top, 0)} added")
         lw.append(f"- Completed: {len(comp_prev)}")
-        top3 = ", ".join(md_links_display(t.get("title") or "")[:32]
+        top3 = ", ".join(mdtext.flatten_links(t.get("title") or "")[:32]
                          for t in comp_prev[:3])
         if top3:
             lw.append(f"{pm.T1}- top: {top3}")

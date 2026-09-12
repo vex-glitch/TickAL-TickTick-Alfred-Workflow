@@ -31,7 +31,11 @@ check("a link inside a sentence flattens in place",
 check("two links both flatten",
       md.flatten_links("[a](u) and [b](v)") == "a and b")
 
-check("stray brackets are dropped", md.link_text("a ] b [ c") == "a  b  c")
+check("a literal bracket becomes a paren, never vanishes",
+      md.link_text("Rebecca • Sleeve [250]") == "Rebecca • Sleeve (250)",
+      md.link_text("Rebecca • Sleeve [250]"))
+check("so the label can no longer end early",
+      "[" not in md.link_text("a ] b [ c") and "]" not in md.link_text("a ] b [ c"))
 check("a trailing backslash is dropped", md.link_text("path\\\\") == "path")
 check("the limit trims cleanly",
       md.link_text("one two three four", limit=8) == "one two")

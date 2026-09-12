@@ -22,7 +22,7 @@ This module is where the rule lives now.
 import re
 
 MD_LINK_RE = re.compile(r"\[([^\[\]]*)\]\([^()]*\)")
-_BREAKERS_RE = re.compile(r"[\[\]\\]")
+_BRACKETS = {ord("["): "(", ord("]"): ")"}
 
 
 def flatten_links(text):
@@ -32,10 +32,13 @@ def flatten_links(text):
 
 def link_text(text, limit=None):
     """Text safe to use as a markdown link LABEL: links flattened, then any
-    stray bracket or backslash dropped - a bracket would end the label early
-    and a trailing backslash would escape the closing one. `limit` caps the
-    result (trimmed again, so a cut never leaves a dangling space)."""
-    t = _BREAKERS_RE.sub("", flatten_links(text)).strip()
+    surviving bracket turned into a PAREN and backslashes dropped - a bracket
+    would end the label early, a trailing backslash would escape the closing
+    one. Parens rather than deletion because a literal bracket is usually
+    content, not syntax ("Rebecca • Sleeve [250]" is a price); grab_url.md_link
+    has converted them this way all along. `limit` caps the result (trimmed
+    again, so a cut never leaves a dangling space)."""
+    t = flatten_links(text).translate(_BRACKETS).replace("\\", "").strip()
     return t[:limit].strip() if limit else t
 
 

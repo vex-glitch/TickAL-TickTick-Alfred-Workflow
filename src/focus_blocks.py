@@ -153,7 +153,7 @@ def link_text(title):
     """The text a checkbox line should carry: mdtext's rule (a title that is
     itself a link cannot be wrapped in another one). Seen live in the weekly
     note's ♻️ mirror, three of six rows (2026-09-12)."""
-    return mdtext.flatten_links(title)
+    return mdtext.link_text(title)
 
 
 def make_line(pid, tid, title):
