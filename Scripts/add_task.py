@@ -404,9 +404,16 @@ def resolve_wikilinks(text, prefer_pid=None):
         return text
     pool = (cache_store.get("all_tasks") or []) + (cache_store.get("all_notes") or [])
 
+    from display import link_label
+
     def _sub(m):
         name = m.group(1).strip()
         hits = [t for t in pool if (t.get("title") or "").strip().lower() == name.lower()]
+        if not hits:
+            # A task whose title IS a markdown link is offered by its LABEL
+            # (wrapping the raw title puts brackets inside the [[ ]])
+            hits = [t for t in pool
+                    if link_label(t.get("title") or "").strip().lower() == name.lower()]
         if not hits:
             return m.group(0)
         hits.sort(key=lambda t: (
@@ -417,7 +424,8 @@ def resolve_wikilinks(text, prefer_pid=None):
         t   = hits[0]
         pid = t.get("_projectId") or t.get("projectId") or ""
         tid = t.get("id", "")
-        return f"[{t.get('title') or name}](https://ticktick.com/webapp/#p/{pid}/tasks/{tid})"
+        return (f"[{link_label(t.get('title')) or name}]"
+                f"(https://ticktick.com/webapp/#p/{pid}/tasks/{tid})")
 
     return re.sub(r'\[\[(.+?)\]\]', _sub, text)
 
@@ -654,7 +662,7 @@ def link_picker(prefix, fragment, scope_list_id=None):
         candidates = [t for t in all_tasks if t.get("status", 0) == 0]
         candidates += list(cache_store.get("all_notes") or [])
 
-    from display import pick_title, pick_where
+    from display import pick_title, pick_where, link_label
     # Filter the TASKS, not the rows (the row title carries chips now)
     if fragment:
         candidates = fuzz.filter_and_score(fragment, candidates,
@@ -670,8 +678,10 @@ def link_picker(prefix, fragment, scope_list_id=None):
             title=pick_title(t),
             subtitle="🔗 " + pick_where(t, task_map),
             arg="", valid=False,
-            # the [[ ]] form takes the REAL title - it is resolved by name
-            autocomplete=f"{prefix}[[{title}]] ",
+            # the [[ ]] form is resolved by name, and a link-titled task is
+            # offered by its LABEL - brackets inside [[ ]] nest into a link
+            # that renders as neither (live-probed 2026-09-12)
+            autocomplete=f"{prefix}[[{link_label(title)}]] ",
         ))
 
     if not items:

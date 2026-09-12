@@ -154,6 +154,19 @@ try:
 finally:
     display.run_path, cache.get = real_run_path, real_get
 
+# ── link_label: a title that IS a markdown link (every routine step) ────────
+check("a link title contributes only its label",
+      display.link_label("[Shutdown • Start](alfred://runtrigger/x)") == "Shutdown • Start")
+check("a plain title is used whole",
+      display.link_label("🌆 Shutdown") == "🌆 Shutdown")
+check("a plain title keeps a bare URL (search_key would strip it)",
+      display.link_label("Read https://example.com later")
+      == "Read https://example.com later")
+check("empty and None survive",
+      display.link_label("") == "" and display.link_label(None) == "")
+check("a label never carries brackets that would nest in [[ ]]",
+      "](" not in display.link_label("[A](u)"))
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":            # make test / python3 tests/...: exit code
     sys.exit(1 if FAILS else 0)

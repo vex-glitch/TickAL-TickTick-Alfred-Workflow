@@ -282,6 +282,18 @@ def build_title(task, buffered=False):
     return f"{core} {tag_str}" if tag_str else core
 
 
+def link_label(title):
+    """The text a [Title](url) link should carry.
+
+    A title that is ITSELF a markdown link (every routine step is one) would
+    nest into '[[name](url)](link)' and render as neither, so such a title
+    contributes only its LABEL. Anything else is used whole - search_key also
+    strips bare URLs and tag suffixes, which a plain title must keep.
+    """
+    title = title or ""
+    return search_key(title) if "](" in title else title
+
+
 def pick_title(task, mark=""):
     """A PICKER row's title, in the shape search and browse already use:
     markdown links rendered, priority dot, date, tags.
