@@ -6554,13 +6554,28 @@ end run"""
 _OSA_HIDE = """on run argv
 	set keepBid to item 1 of argv
 	tell application "System Events"
-		repeat with p in (every process whose visible is true and background only is false)
+		-- TWO passes on purpose: hiding an app mutates the process list, and
+		-- a `repeat with p in (every process …)` over the live collection
+		-- skips whatever shifts under it (Vex 2026-09-12: Keyboard Maestro
+		-- and Anybox survived every run). Collect ids first, hide second.
+		set bids to {}
+		repeat with p in (every process whose background only is false)
 			try
-				if bundle identifier of p is not keepBid then set visible of p to false
+				set b to bundle identifier of p
+				if b is not missing value and b is not keepBid and (visible of p) is true then
+					set end of bids to b
+				end if
 			end try
 		end repeat
+		set hid to 0
+		repeat with b in bids
+			try
+				set visible of (first process whose bundle identifier is b) to false
+				set hid to hid + 1
+			end try
+		end repeat
+		return "hid " & hid & " of " & (count of bids)
 	end tell
-	return "hidden"
 end run"""
 
 
