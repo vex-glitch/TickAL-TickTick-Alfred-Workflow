@@ -190,8 +190,10 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     or plain "w Shipped it"; kinds w/n/t/k/l/m)
     xact:pn_income:<b64|plain>      💰 "- amt · label" + re-total (plain
                                     "485 label"; empty → dialog)
-    xact:pn_journal:<slot>          morning|evening - dialog per unanswered
-                                    prompt, partial-save, phone-wins merge
+    xact:pn_journal:<slot>          morning|evening|weekly - dialog per
+                                    unanswered prompt, partial-save,
+                                    phone-wins merge (weekly ends in the
+                                    three-things picker into next week)
     xact:pn_goal:<pid>:<tid>        task → weekly 🎯 Goals + daily mirror
                                     (three-things seq active → NEXT week)
     xact:pn_goal_text:<b64>         plain-text goal, same write

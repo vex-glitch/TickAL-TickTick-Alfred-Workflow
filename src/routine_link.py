@@ -17,10 +17,13 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     sticky:<tid>[:<pid>]  sticky only
     timer:<tid>[:<pid>]   timer only
     pause | resume        the running timer
-    journal:<morning|evening>  the periodic journal dialogs. Even with zero
-                          input it lazy-mints today's daily and seeds its
-                          journal Qs (like any pn open); answers are only
-                          what Vex types, the link carries no text
+    journal:<morning|evening|weekly>  the periodic journal dialogs. Even
+                          with zero input it lazy-mints the note and seeds
+                          its journal Qs (like any pn open); answers are
+                          only what Vex types, the link carries no text.
+                          weekly rides the weekly note and ends in the
+                          three-things picker into next week's 🏆 Goals,
+                          so in a KM macro it goes LAST (Alfred opens)
     view:<calendar|countdowns|crmcal>  destinations the app has NO link
                           for: calendar = ET OpenCalendar's List-menu flow,
                           countdowns = the Alfred ⏳ hub, crmcal = the
@@ -57,7 +60,7 @@ PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
           ("monthly", "this month's"), ("quarterly", "this quarter's"),
           ("yearly", "this year's"))
 PN_SPECS = tuple(s for s, _ in PN_NOW)
-SLOT_VERBS = {"journal": ("morning", "evening"),
+SLOT_VERBS = {"journal": ("morning", "evening", "weekly"),
               "view": ("calendar", "countdowns", "crmcal"),
               "note": PN_SPECS,
               "notesticky": PN_SPECS}
@@ -227,7 +230,9 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
         rows += [("morning", "🌅 Morning journal", "Journal dialogs",
                   f"[🖥 Morning journal]({url('journal', 'morning')})"),
                  ("evening", "🌙 Evening journal", "Journal dialogs",
-                  f"[🖥 Evening journal]({url('journal', 'evening')})")]
+                  f"[🖥 Evening journal]({url('journal', 'evening')})"),
+                 ("weekly_journal", "📔 Weekly journal", "Journal + next goals",
+                  f"[🖥 Weekly journal]({url('journal', 'weekly')})")]
     return rows
 
 

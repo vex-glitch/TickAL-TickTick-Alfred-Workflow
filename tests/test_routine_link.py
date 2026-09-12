@@ -48,11 +48,14 @@ check("surrounding whitespace stripped", rl.parse(f"  ping \n") == ("ping", "", 
 
 check("journal morning", rl.parse("journal:morning") == ("journal", "morning", ""))
 check("journal evening", rl.parse("journal:evening") == ("journal", "evening", ""))
+check("journal weekly", rl.parse("journal:weekly") == ("journal", "weekly", ""))
 check("journal url round trip",
       rl.url("journal", "evening").endswith("?argument=journal%3Aevening"))
+check("journal weekly url round trip",
+      rl.url("journal", "weekly").endswith("?argument=journal%3Aweekly"))
 
 # ── parse: everything else is refused ───────────────────────────────────────
-check("journal weekly refused", refused("journal:weekly") is not None)
+check("journal monthly refused", refused("journal:monthly") is not None)
 check("journal without slot", refused("journal") is not None)
 check("journal extra field", refused("journal:morning:x") is not None)
 check("empty", refused("") == "empty link")
@@ -124,11 +127,12 @@ check("full list order", keys == ["focus", "sticky", "timer", "calendar", "habit
                                   "daily", "daily_sticky", "weekly", "weekly_sticky",
                                   "monthly", "monthly_sticky", "quarterly",
                                   "quarterly_sticky", "yearly", "yearly_sticky",
-                                  "morning", "evening"], keys)
+                                  "morning", "evening", "weekly_journal"], keys)
 check("no item → destinations + journals only",
       [r[0] for r in rl.internal_links()] == keys[3:])
 check("periodic off drops daily + journals",
-      not {"daily", "morning", "evening"} & {r[0] for r in rl.internal_links(periodic=False)})
+      not {"daily", "morning", "evening", "weekly_journal"}
+      & {r[0] for r in rl.internal_links(periodic=False)})
 check("note daily", rl.parse("note:daily") == ("note", "daily", ""))
 check("note weekly", rl.parse("note:weekly") == ("note", "weekly", ""))
 check("note yesterday refused", refused("note:yesterday") is not None)
