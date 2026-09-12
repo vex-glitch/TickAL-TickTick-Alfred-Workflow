@@ -186,6 +186,8 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
     xact:pn_open:<spec>             daily|yesterday|weekly|monthly|quarterly|
                                     yearly → lazy-mint + refresh + deep link
     xact:pn_sticky:<spec>           same, then open the note as a sticky
+    xact:pn_setgoal:<b64>           set a goal on any tier: {kind, text, pid,
+                                    tid, title} - text, a task, or both
     xact:pn_setloc[:<city>]         pin the daily note's weather location by
                                     name (geocoded once; a pinned place is
                                     never overwritten by IP guessing)
@@ -7165,6 +7167,28 @@ def pn_goal(pid, tid):
         print(toast)
 
 
+def pn_setgoal(rest):
+    """🎯 Set a goal on any tier. Payload {kind, text, pid, tid, title} -
+    text alone, a task alone, or both (Vex 2026-09-12)."""
+    if not _pn_gate():
+        return
+    spec = _pn_decode(rest) or {}
+    kind = (spec.get("kind") or "").strip()
+    tid = (spec.get("tid") or "").strip() or None
+    pid = (spec.get("pid") or "").strip() or None
+    title = spec.get("title") or (_task_title(tid, default="Task", pid=pid)
+                                  if tid else None)
+    # mid three-things (the weekly journal handoff), a weekly goal belongs to
+    # NEXT week - the same rule pn_goal follows, so both doors agree
+    ahead = bool(kind == "weekly" and _goalseq_load())
+    toast = _pn().set_period_goal(kind, spec.get("text") or "", pid, tid,
+                                  title, ahead=ahead)
+    if ahead:
+        _goal_seq_step(toast)
+    else:
+        print(toast)
+
+
 def pn_goal_text(rest):
     if not _pn_gate():
         return
@@ -11075,6 +11099,8 @@ def main():
             pn_refresh(rest)
         elif verb == "pn_setloc":
             pn_setloc(rest)
+        elif verb == "pn_setgoal":
+            pn_setgoal(rest)
         elif verb == "pn_mint":
             pn_mint()
         else:

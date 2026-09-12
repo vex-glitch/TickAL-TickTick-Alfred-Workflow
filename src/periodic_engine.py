@@ -1413,6 +1413,84 @@ def set_day_goal(pid_or_text, tid=None, title=None):
         else "💫 No ☀️ Day Goal section in today's note"
 
 
+def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False):
+    """Set a goal on ANY tier (Vex 2026-09-12: "There should be goal setting
+    for every periodic note"), in any of his three shapes - text, a task, or
+    text anchored to a task (pm.goal_line).
+
+    Daily REPLACES its body (the One Thing) and schedules the picked task for
+    today, the way the old day-goal flow did; every other tier APPENDS, so a
+    month or a quarter can carry several. Weekly additionally re-mirrors into
+    today's daily, since the daily shows the week's goals.
+
+    The target sections are pm.GOAL_SECTION - all five ship in their
+    templates and none is written by a filler, so a goal cannot be clobbered.
+    """
+    if kind not in pm.GOAL_SECTION:
+        return f"💫 {kind} has no goal section"
+    line = pm.goal_line(text, pid, tid, title)
+    if not line:
+        return "🎯 Nothing to set"
+    if kind == "daily" and tid:
+        today_iso = _today().strftime("%Y-%m-%dT00:00:00+0000")
+        try:
+            from dispatch import _cached_task, _patch_task_cache
+            _api().update_task(tid, pid, current=_cached_task(tid),
+                               startDate=today_iso, dueDate=today_iso)
+            _patch_task_cache(tid, startDate=today_iso, dueDate=today_iso)
+        except Exception as e:
+            _log(f"period_goal schedule: {e}")
+
+    p = pm.period_for(kind, _today())
+    if ahead:                       # the weekly journal's three-things pass
+        p = pm.next_period(p)
+    task, _ = ensure_note(p)
+    npid = task.get("projectId") or areas.PERIODIC_LIST_ID
+    sec_name = pm.GOAL_SECTION[kind]
+    indent = pm.T1
+
+    def mutate(doc, live):
+        if ps.find(doc, sec_name) is None:
+            return False
+        if kind == "daily":
+            ps.set_body(doc, sec_name, [indent + line])
+            tail = fb.LINK_TAIL_RE.search(line)
+            tsec = ps.find(doc, pm.SEC_TODAY)
+            if tsec is not None and tail:
+                merged, _a = pm.merge_checkboxes(
+                    tsec.body, [(tail.group("pid"), tail.group("tid"),
+                                 title or "Task")], indent=pm.T2)
+                ps.set_body(doc, pm.SEC_TODAY, merged)
+            return True
+        return ps.append_body(doc, sec_name, [indent + line])
+
+    ok, doc_out = _pn_rmw(npid, task.get("id"), mutate)
+    if not ok:
+        return f"💫 No {sec_name} section in the {kind} note"
+    task["content"] = ps.serialize_sections(doc_out)
+    if kind == "weekly" and not ahead:      # only THIS week mirrors into today
+        _mirror_week_goals(doc_out)
+    shown = text or title or ""
+    when = " (next)" if ahead else ""
+    return f"🎯 {pm.GOAL_SECTION[kind]}{when} · {shown[:40]}"
+
+
+def _mirror_week_goals(wdoc):
+    """Today's daily shows the week's goals - re-pull them after a write."""
+    dtask = lookup(build_index(), pm.period_for("daily", _today()))
+    if not dtask:
+        return
+    gsec = ps.find(wdoc, pm.SEC_GOALS)
+    goals = [ln for ln in (gsec.body if gsec else []) if ln.strip()]
+
+    def mirror(doc, live):
+        if goals:
+            ps.set_body(doc, pm.SEC_WEEK_GOALS, goals)
+        return True
+    _pn_rmw(dtask.get("projectId") or areas.PERIODIC_LIST_ID,
+            dtask.get("id"), mirror)
+
+
 def append_income(amount, label, day=None):
     # a taught-separator answer like "500 · client" splits into head+tail
     # leaving "· client" - shave leading separators, never double them

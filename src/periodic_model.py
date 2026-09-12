@@ -92,6 +92,40 @@ SEC_THEME      = "🧭 Theme of the year"
 SEC_ANTI       = "🚫 Anti-goals"
 SEC_DECEMBER   = "🧪 December test"
 
+# Where a goal lands, per tier (Vex 2026-09-12: "There should be goal setting
+# for every periodic note"). Only daily and weekly had a setter before; the
+# other three sections already ship in their templates and NO filler writes
+# them, so appending is safe and nothing can overwrite a goal.
+GOAL_SECTION = {
+    "daily":     SEC_DAY_GOAL,      # the One Thing - REPLACES the body
+    "weekly":    SEC_GOALS,
+    "monthly":   SEC_MONTH_GOAL,
+    "quarterly": SEC_OKR_REVIEW,
+    "yearly":    SEC_SCORECARD,
+}
+
+
+def goal_line(text="", pid=None, tid=None, title=None):
+    """The three shapes a goal can take (Vex's own list):
+        text only  -> "- [ ] Ship the thing"
+        task only  -> "- [ ] [Task](url)"
+        both       -> "- [ ] Ship the thing · [Task](url)"
+    The link stays LAST so the line still ends in a task URL, which is what
+    the checkbox parser reads the tid from - tick the goal in the note and
+    the real task completes, in all three shapes that have one.
+    """
+    import focus_blocks as fb
+    text = " ".join((text or "").split())
+    if tid:
+        linked = fb.make_line(pid, tid, title or "Task").raw.rstrip()
+        if not text:
+            return linked
+        return linked.replace("- [ ] ", f"- [ ] {text} · ", 1)
+    if not text:
+        return ""
+    return f"- [ ] {text}"
+
+
 # Anchors every writer targets, per tier - each must appear as a
 # `### <anchor>…` header line in the shipped template (prefix anchors seed
 # bare, the engine appends `: data` on refresh).

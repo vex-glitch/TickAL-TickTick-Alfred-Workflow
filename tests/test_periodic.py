@@ -361,6 +361,25 @@ check("the lookup key ignores the range",
 check("a renamed note is still its own period",
       pm.stable_key(pm.long_title(_wk)) == pm.title_key(_wk))
 
+# ── goals on every tier, in Vex's three shapes (2026-09-12) ────────────────
+check("every tier has a goal section",
+      set(pm.GOAL_SECTION) == {"daily", "weekly", "monthly", "quarterly", "yearly"})
+check("goal line: text alone",
+      pm.goal_line("Ship the thing") == "- [ ] Ship the thing")
+check("goal line: task alone ends in its link",
+      pm.goal_line("", "P", "a" * 24, "Onboard").startswith("- [ ] [Onboard](")
+      and pm.goal_line("", "P", "a" * 24, "Onboard").count("](") == 1)
+_both = pm.goal_line("Ship it", "P", "b" * 24, "Onboard")
+check("goal line: text AND task, text first", _both.startswith("- [ ] Ship it · ["), _both)
+check("goal line: the link stays last, so the tid still parses",
+      pm.checkbox_tids([_both]) == {"b" * 24: False}, _both)
+check("goal line: nothing in, nothing out",
+      pm.goal_line("") == "" and pm.goal_line(None) == "")
+check("goal line: whitespace squeezed",
+      pm.goal_line("  Ship   it  ") == "- [ ] Ship it")
+check("a link-titled task does not nest in a goal",
+      pm.goal_line("x", "P", "c" * 24, "[Money](kmtrigger://m)").count("](") == 1)
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)

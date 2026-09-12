@@ -26,6 +26,7 @@ import areas
 import cache as cache_store
 import fuzzy as fuzz
 import periodic_model as pm
+from display import pick_title, pick_where
 from script_base import run_path
 
 
@@ -254,8 +255,8 @@ def goal_rows(frag):
         pid = t.get("projectId") or t.get("_projectId", "")
         return alfred.item(
             uid=f"pn-goal-{t['id']}",
-            title=f"📋 {(t.get('title') or 'Untitled')[:60]}",
-            subtitle=sub,
+            title="📋 " + pick_title(t),
+            subtitle=pick_where(t) + "  |  " + sub,
             arg=f"xact:pn_goal:{pid}:{t['id']}",
             valid=True, mods=_mods())
     items = _picker_rows(frag, _task_pool(), row,
@@ -274,8 +275,8 @@ def day_goal_rows(frag):
         pid = t.get("projectId") or t.get("_projectId", "")
         return alfred.item(
             uid=f"pn-dg-{t['id']}",
-            title=f"☀️ {(t.get('title') or 'Untitled')[:60]}",
-            subtitle="⏎ The one thing · pinned + scheduled today",
+            title="☀️ " + pick_title(t),
+            subtitle=pick_where(t) + "  |  ⏎ The one thing · scheduled today",
             arg=f"xact:pn_day_goal:{pid}:{t['id']}",
             valid=True, mods=_mods())
     items = _picker_rows(frag, _task_pool(include_notes=True), row,
@@ -333,8 +334,8 @@ def sched_rows(rest, when):
         pid = t.get("projectId") or t.get("_projectId", "")
         it = alfred.item(
             uid=f"pn-sched-{t['id']}",
-            title=f"{emoji} {(t.get('title') or 'Untitled')[:60]}",
-            subtitle=f"⏎ Schedule {label}",
+            title=f"{emoji} " + pick_title(t),
+            subtitle=pick_where(t) + f"  |  ⏎ Schedule {label}",
             arg="", valid=False, mods=_mods())
         it["autocomplete"] = f"pn {key}!{pid}:{t['id']} "
         return it
@@ -347,10 +348,16 @@ def sched_rows(rest, when):
 # so nothing downstream changed - only where the row is reached from.
 _FAMILIES = {
     "goals": ("🏆 Goals", [
-        ("pn-daygoal", "☀️ Day goal",    "The one thing for today",
-         None, "pn day "),
-        ("pn-goal",    "🎯 Weekly goal", "Pick a task for the week",
-         None, "pn goal "),
+        ("pn-goal-daily",     "☀️ Daily",     "The one thing for today",
+         None, "pn goals daily "),
+        ("pn-goal-weekly",    "♻️ Weekly",    "Goals for this week",
+         None, "pn goals weekly "),
+        ("pn-goal-monthly",   "🗓️ Monthly",   "Goals for this month",
+         None, "pn goals monthly "),
+        ("pn-goal-quarterly", "🌓 Quarterly", "Goals for this quarter",
+         None, "pn goals quarterly "),
+        ("pn-goal-yearly",    "🎉 Yearly",    "Goals for this year",
+         None, "pn goals yearly "),
     ]),
     "journals": ("📓 Journals", [
         ("pn-jm", "🌅 Morning journal", "Answer short questions",
@@ -390,6 +397,68 @@ def family_rows(key, frag):
     return items
 
 
+_GOAL_TIERS = {"daily": "☀️ Daily", "weekly": "♻️ Weekly",
+               "monthly": "🗓️ Monthly", "quarterly": "🌓 Quarterly",
+               "yearly": "🎉 Yearly"}
+
+
+def tier_goal_rows(kind, rest):
+    """One screen, Vex's three shapes (2026-09-12):
+        "<text>"              -> ➕ the text alone
+        "<frag>"              -> pick a task alone
+        "<text> | <frag>"     -> the text anchored to the picked task
+    The pipe is the add bar's own separator, so the grammar is one you
+    already type; the 🔗 row hands the line back with it appended.
+    """
+    label = _GOAL_TIERS[kind]
+    head, _, tail = (rest or "").partition("|")
+    text, frag = head.strip(), tail.strip()
+    combining = "|" in (rest or "")
+
+    def arg(txt, t=None):
+        payload = {"kind": kind, "text": txt}
+        if t is not None:
+            payload.update({"pid": t.get("projectId") or t.get("_projectId", ""),
+                            "tid": t["id"], "title": t.get("title") or ""})
+        return "xact:pn_setgoal:" + _b64(payload)
+
+    items = []
+    if combining and text:
+        items.append(alfred.item(
+            uid="pn-goal-textonly", title=f'🎯 {label} · "{text[:44]}"',
+            subtitle="⏎ Just the text, no task", arg=arg(text),
+            valid=True, mods=_mods()))
+    elif text:
+        items.append(alfred.item(
+            uid="pn-goal-textonly", title=f'🎯 {label} · "{text[:44]}"',
+            subtitle="⏎ Set it  ·  ⇥ then a task", arg=arg(text),
+            valid=True, autocomplete=f"pn goals {kind} {text} | ",
+            mods=_mods()))
+
+    pool = _task_pool(include_notes=(kind == "daily"))
+    pick = frag if combining else text
+    if pick:
+        pool = fuzz.filter_and_score(pool and pick, pool,
+                                     key_fn=lambda t: t.get("title") or "")
+    for t in pool[:30]:
+        items.append(alfred.item(
+            uid=f"pn-goal-{kind}-{t['id']}",
+            title=("📋 " if not (combining and text) else "🔗 ") + pick_title(t),
+            subtitle=pick_where(t) + (f'  |  ⏎ "{text[:24]}" on this task'
+                                      if (combining and text)
+                                      else f"  |  ⏎ The {label} goal"),
+            arg=arg(text if combining else "", t), valid=True, mods=_mods()))
+    if not items:
+        items = [alfred.item(uid="pn-goal-empty",
+                             title=f"Type the {label} goal…",
+                             subtitle="Text, a task, or both with  |",
+                             valid=False, mods=_mods())]
+    items.append(alfred.item(uid=f"pn-goal-{kind}-back", title="🔙 Back",
+                             subtitle="Every tier", arg="", valid=False,
+                             autocomplete="pn goals ", mods=_mods()))
+    return items
+
+
 def _after(q, prefix):
     """rest after a WORD prefix ('day', 'day frag', 'today!pid:tid …') |
     None. The boundary check keeps 'daily' out of the 'day' submode."""
@@ -421,8 +490,14 @@ def rows(query):
             return sched_rows(rest, when)
     for key in ("goals", "journals", "add"):
         rest = _after(q, key)
-        if rest is not None:
-            return family_rows(key, rest)
+        if rest is None:
+            continue
+        if key == "goals":
+            for tier in _GOAL_TIERS:
+                sub = _after(rest, tier)
+                if sub is not None:
+                    return tier_goal_rows(tier, sub)
+        return family_rows(key, rest)
     rest = _after(q, "day")
     if rest is not None:
         return day_goal_rows(rest)
