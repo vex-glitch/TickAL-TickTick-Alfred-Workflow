@@ -195,7 +195,7 @@ def build_index(force=False):
                 if d:
                     idx[(kind, d.isoformat())] = t
             else:
-                idx[(kind, title)] = t
+                idx[(kind, pm.stable_key(title))] = t
             break
     _INDEX = idx
     return idx
@@ -338,7 +338,7 @@ def create_note(p, index):
     # are attached, which would collapse the kanban into one 💫Periodic
     # column. The parent exists as the tree node, never on tasks.
     task = _api().create_task(
-        title=pm.title(p), project_id=areas.PERIODIC_LIST_ID,
+        title=pm.long_title(p), project_id=areas.PERIODIC_LIST_ID,
         content=content, kind="NOTE",
         tags=[pm.tag(p)])
     index[(p.kind, pm.title_key(p))] = task

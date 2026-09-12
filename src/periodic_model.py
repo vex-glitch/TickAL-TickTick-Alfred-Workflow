@@ -216,14 +216,47 @@ def title(p):
     return f"{s.year}"
 
 
+def _ord(n):
+    """1st · 2nd · 3rd · 4th … 11th-13th are th, 21st/22nd/23rd are not."""
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    return f"{n}{ {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th') }".replace(" ", "")
+
+
+def date_range(p):
+    """'7th-13th Sep', or '28th Sep-4th Oct' when the span crosses a month."""
+    a, b = p.start, p.end
+    am, bm = MONTH_ABBR[a.month], MONTH_ABBR[b.month]
+    if a.month == b.month:
+        return f"{_ord(a.day)}-{_ord(b.day)} {bm}"
+    return f"{_ord(a.day)} {am}-{_ord(b.day)} {bm}"
+
+
+def long_title(p):
+    """The note's own NAME. Weekly carries its date range, because "2026-W37"
+    alone says nothing about which days it covers (Vex 2026-09-12). The
+    STABLE id stays in front and title_key still matches on it, so renaming a
+    note can never orphan it from the index."""
+    if p.kind == "weekly":
+        return f"{title(p)} • {date_range(p)}"
+    return title(p)
+
+
 def tag(p):
     return TIER_TAGS[p.kind]
 
 
 def title_key(p):
     """Index-lookup key: daily matches by ISO-date title PREFIX (tolerates
-    day-abbr drift), other tiers by exact title."""
+    day-abbr drift), other tiers by the STABLE id - the part before " • ", so
+    a weekly note keeps its identity whether or not its name carries the date
+    range (see long_title)."""
     return p.start.isoformat() if p.kind == "daily" else title(p)
+
+
+def stable_key(note_title):
+    """The index key for a non-daily note TITLE: everything before " • "."""
+    return (note_title or "").split(" • ")[0].strip()
 
 
 def parse_daily_title(s):

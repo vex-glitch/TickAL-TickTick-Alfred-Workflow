@@ -337,6 +337,30 @@ check("20.tasks-swept-tolerant",
 check("20.lead-mood", pm.quote_mood(["crumb", "Mood: 😁 · great"]) == (5, "great"))
 
 # ── report ───────────────────────────────────────────────────────────────────
+# ── weekly notes carry their date range (Vex 2026-09-12) ───────────────────
+_wk = pm.period_for("weekly", date(2026, 9, 12))
+check("weekly name carries the range",
+      pm.long_title(_wk) == "2026-W37 • 7th-13th Sep", pm.long_title(_wk))
+check("a range crossing a month names both",
+      pm.date_range(pm.period_for("weekly", date(2026, 9, 30)))
+      == "28th Sep-4th Oct")
+check("ordinals: 1st 2nd 3rd 4th",
+      [pm._ord(n) for n in (1, 2, 3, 4)] == ["1st", "2nd", "3rd", "4th"])
+check("ordinals: the teens are all th",
+      [pm._ord(n) for n in (11, 12, 13)] == ["11th", "12th", "13th"])
+check("ordinals: 21st 22nd 23rd 31st",
+      [pm._ord(n) for n in (21, 22, 23, 31)] == ["21st", "22nd", "23rd", "31st"])
+check("the other tiers are unchanged",
+      all(pm.long_title(pm.period_for(k, date(2026, 9, 12)))
+          == pm.title(pm.period_for(k, date(2026, 9, 12)))
+          for k in ("daily", "monthly", "quarterly", "yearly")))
+check("the lookup key ignores the range",
+      pm.title_key(_wk) == "2026-W37"
+      and pm.stable_key("2026-W37 • 7th-13th Sep") == "2026-W37"
+      and pm.stable_key("2026-W37") == "2026-W37")
+check("a renamed note is still its own period",
+      pm.stable_key(pm.long_title(_wk)) == pm.title_key(_wk))
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)
