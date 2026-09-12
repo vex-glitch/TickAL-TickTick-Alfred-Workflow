@@ -282,6 +282,30 @@ def build_title(task, buffered=False):
     return f"{core} {tag_str}" if tag_str else core
 
 
+def pick_title(task, mark=""):
+    """A PICKER row's title, in the shape search and browse already use:
+    markdown links rendered, priority dot, date, tags.
+
+    Pickers used to print the bare title, so two tasks with the same name in
+    two lists were the same row twice with nothing to choose between them
+    (Vex 2026-09-12). Pair it with pick_where for the list itself.
+    """
+    return build_title(task) + (mark or "")
+
+
+def pick_where(task, task_map=None):
+    """Where a picked task lives, for the left half of a picker subtitle:
+    '📂 List', or '↳ Parent · 📂 List' when the task is itself a subtask.
+    `task_map` is any id → task dict; without it the parent is skipped."""
+    lname = (task or {}).get("_projectName") or "Inbox"
+    home = f"📂 {lname}"
+    parent = (task_map or {}).get((task or {}).get("parentId") or "")
+    if not parent:
+        return home
+    ptitle = md_links_display(parent.get("title", ""))[:24]
+    return f"↳ {ptitle} · {home}" if ptitle else home
+
+
 def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb="",
                    actions=False, buffer_mod=False, note=""):
     """

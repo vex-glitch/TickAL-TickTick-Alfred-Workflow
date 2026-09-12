@@ -76,7 +76,7 @@ try:
     import cache as cache_store
     import xact                       # Scripts sibling: focus state + defaults
     import focus_subtasks as fsub     # pure: descendants (nested subtasks)
-    from display import search_key, md_links_display
+    from display import search_key, md_links_display, pick_title, pick_where
     from fuzzy import filter_and_score
 except Exception as e:
     emit_error(f"Import failed: {e}")
@@ -332,9 +332,9 @@ def _add_search(frag, focus_tid):
         mark = " 🎯" if tid in staged else ""
         items.append(alfred.item(
             uid=f"fp-add-{tid}",
-            title=md_links_display(t.get("title", ""))[:60] + mark,
-            subtitle=("Already in focus  ⌃🔙" if mark
-                      else "Add to current focus  ⌥🗒  ⌃🔙"),
+            title=pick_title(t, mark),
+            subtitle=pick_where(t) + ("  |  Already in focus  ⌃🔙" if mark
+                                      else "  |  Add to current focus  ⌥🗒  ⌃🔙"),
             arg=f"xact:fx_add:{pid}:{tid}", valid=True, variables=tvars,
             mods={"alt": {"valid": True, "arg": f"xact:fx_add_sticky:{pid}:{tid}",
                           "subtitle": "Add + open the sticky",
@@ -399,8 +399,8 @@ def _remove_search(frag, fpid, ftid):
         pid = t.get("projectId") or t.get("_projectId", "") or fpid
         items.append(alfred.item(
             uid=f"fp-rm-{t['id']}",
-            title=_indent(t) + md_links_display(t.get("title", ""))[:60],
-            subtitle="Un-stage · send it home  ⌃🔙",
+            title=_indent(t) + pick_title(t),
+            subtitle=pick_where(t) + "  |  Un-stage · send it home  ⌃🔙",
             arg=f"xact:fx_unstage:{pid}:{t['id']}", valid=True, mods=BACK))
     if not items:
         items = [alfred.item(
@@ -419,8 +419,8 @@ def _link_search(frag):
         pid, tid, tvars = _task_vars(t)
         items.append(alfred.item(
             uid=f"fp-lk-{tid}",
-            title=md_links_display(t.get("title", ""))[:60],
-            subtitle="Link the running session  ⌃🔙",
+            title=pick_title(t),
+            subtitle=pick_where(t) + "  |  Link the running session  ⌃🔙",
             arg=f"xact:fx_link:{pid}:{tid}", valid=True, variables=tvars,
             mods=BACK))
     if not items:
@@ -806,8 +806,8 @@ def render_stage(raw):
             tpid = t.get("projectId") or t.get("_projectId", "")
             items.append(alfred.item(
                 uid=f"fp-st-src-{t['id']}",
-                title=md_links_display(t.get("title", ""))[:60],
-                subtitle="Stage this task  ⌃🔙",
+                title=pick_title(t),
+                subtitle=pick_where(t) + "  |  Stage this task  ⌃🔙",
                 arg=f"xact:stage_open:{tpid}:{t['id']}",
                 valid=True, mods=BACK))
         if not items:
@@ -895,9 +895,9 @@ def render_stage(raw):
             mark = " 🎯" if t["id"] in staged else ""
             items.append(alfred.item(
                 uid=f"fp-st-pick-{t['id']}",
-                title=nt[:60] + mark,
-                subtitle=("Already in focus  ⌃🔙" if mark
-                          else "Queue, confirm on the ✅ row  ⌃🔙"),
+                title=pick_title(t, mark),
+                subtitle=pick_where(t) + ("  |  Already in focus  ⌃🔙" if mark
+                                          else "  |  Queue, confirm on the ✅ row  ⌃🔙"),
                 arg="", valid=False,
                 autocomplete=f"{prefix}from {' | '.join(committed + [nt])} | ",
                 mods=BACK))
@@ -1038,7 +1038,7 @@ def render_backlog(raw):
         pid, tid, tvars = _task_vars(t)
         items.append(alfred.item(
             uid=f"fp-log-{tid}",
-            title=md_links_display(t.get("title", "")),
+            title=pick_title(t),
             subtitle=f"📂 {t.get('_projectName') or 'Inbox'}  |  "
                      f"⏎🕰️ {rng}  ⌃🔙",
             arg=f"xact:focus_backlog:{s_ep}:{e_ep}:{pid}:{tid}",

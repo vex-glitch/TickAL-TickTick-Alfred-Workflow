@@ -34,6 +34,7 @@ try:
     import cache as cache_store
     import alfred
     import fuzzy as fuzz
+    from display import pick_title, pick_where
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -151,34 +152,29 @@ def task_picker(query, current_tid, task_title, back):
     all_tasks = cache_store.get("all_tasks") or []
     task_map  = {t["id"]: t for t in all_tasks}
 
+    pool = [t for t in all_tasks
+            if t.get("status", 0) == 0 and t["id"] != current_tid]
+    # Filter the TASKS, not the rows: the row title now carries the priority
+    # dot, date and tags, which a typed name should not have to match.
+    if query:
+        pool = fuzz.filter_and_score(query, pool,
+                                     key_fn=lambda t: t.get("title", ""))
     items = []
-    for t in all_tasks:
-        if t.get("status", 0) != 0:
-            continue
-        if t["id"] == current_tid:
-            continue  # can't make a task its own parent
-        tid   = t["id"]
-        pid   = t.get("projectId") or t.get("_projectId", "")
-        name  = t.get("title", "Untitled")
-        lname = t.get("_projectName", "")
+    for t in pool:
+        tid = t["id"]
+        pid = t.get("projectId") or t.get("_projectId", "")
 
-        # Build breadcrumb showing parent chain
-        parent_id = t.get("parentId", "")
-        if parent_id and parent_id in task_map:
-            parent_title = task_map[parent_id].get("title", "")
-            subtitle = f"↳ {parent_title}  {lname}  |  Make \"{task_title}\" a subtask  ⌃ 🔙"
-        else:
-            subtitle = f"{lname}  |  Make \"{task_title}\" a subtask  ⌃ 🔙"
+        # Where it lives, in the house shape - two same-named tasks in two
+        # lists were the same row twice before (Vex 2026-09-12)
+        subtitle = (pick_where(t, task_map)
+                    + f"  |  Make \"{task_title}\" a subtask  ⌃ 🔙")
 
         items.append(alfred.item(
-            title=name,
+            title=pick_title(t),
             subtitle=subtitle,
             arg=f"task:{pid}:{tid}",
             mods=back,
         ))
-
-    if query:
-        items = fuzz.filter_and_score(query, items, key_fn=lambda x: x["title"])
 
     if not items:
         msg = f'No tasks matching "{query}"' if query else "No tasks cached · run Sync first"

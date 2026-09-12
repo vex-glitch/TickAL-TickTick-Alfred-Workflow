@@ -4214,8 +4214,8 @@ def render_people(level, ids, query):
         for t in pool[:200]:
             tpid = t.get("_projectId") or t.get("projectId") or ""
             rows.append(alfred.item(
-                uid=f"plt-{t['id']}", title=t.get("title", ""),
-                subtitle=(t.get("_projectName", "")
+                uid=f"plt-{t['id']}", title=build_title(t),
+                subtitle=(f"📂 {t.get('_projectName') or 'Inbox'}"
                           + "  |  ⏎👽 pick the person  ⌃🔙"),
                 arg=f"xact:crmbrowse:ctx:people:attach:{tpid}:{t['id']}",
                 valid=True,
