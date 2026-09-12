@@ -10,7 +10,7 @@ A step is a dict {"do": <type>, …}:
 
     {"do": "quit",     "app": <bundle id>[, "secs": 15]}
     {"do": "activate", "app": <bundle id>[, "wait": true]}
-    {"do": "hide_others"}
+    {"do": "hide_others"[, "keep": <bundle id>]}   default keep: TickTick
     {"do": "place",    "app": <bundle id>, "frame": [x, y, w, h]}
     {"do": "link",     "arg": "<link verb>"[, "sticky": [x,y,w,h]][, "bar": [x,y]]}
     {"do": "url",      "url": "<url>"}
@@ -76,6 +76,8 @@ def validate(steps):
                 out.append(f"step {i}: sticky must be [x, y, w, h]")
             if "bar" in s and not _frame_ok(s["bar"], 2):
                 out.append(f"step {i}: bar must be [x, y]")
+        if kind == "hide_others" and "keep" in s and not isinstance(s["keep"], str):
+            out.append(f"step {i}: keep must be a bundle id")
         if kind == "url" and not isinstance(s.get("url"), str):
             out.append(f"step {i}: url needs url")
         if kind in ("pause", "quit"):
@@ -98,7 +100,7 @@ def describe(step):
     if k == "activate":
         return f"open {step['app']}" + (" (wait)" if step.get("wait") else "")
     if k == "hide_others":
-        return "hide others"
+        return "hide others, keep " + (step.get("keep") or "TickTick")
     if k == "place":
         x, y, w, h = step["frame"]
         return f"place {step['app']} at {x:g},{y:g} {w:g}x{h:g}"

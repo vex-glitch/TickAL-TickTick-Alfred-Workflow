@@ -6514,20 +6514,51 @@ _OSA_PLACE = """on run argv
 	tell application "System Events"
 		try
 			set p to first process whose bundle identifier is bid
-			set win to front window of p
+		on error
+			return "app not running"
+		end try
+		-- wait for a REAL window: an app just launched has none yet, and
+		-- TickTick's front window right after a deep link is the task
+		-- POP-UP (an AXSystemDialog), never the main window
+		set win to missing value
+		repeat 24 times
+			try
+				set std to (windows of p whose subrole is "AXStandardWindow")
+				if (count of std) > 0 then
+					set win to item 1 of std
+					exit repeat
+				end if
+			end try
+			delay 0.25
+		end repeat
+		if win is missing value then
+			try
+				set win to front window of p
+			on error
+				return "no window to place"
+			end try
+		end if
+		try
 			set position of win to {x, y}
 			set size of win to {w, h}
 			return "placed"
-		on error
-			return "no window to place"
+		on error errMsg
+			return "place failed: " & errMsg
 		end try
 	end tell
 end run"""
 
-_OSA_HIDE = """tell application "System Events"
-	set fp to name of first process whose frontmost is true
-	set visible of (every process whose visible is true and background only is false and name is not fp) to false
-end tell"""
+_OSA_HIDE = """on run argv
+	set keepBid to item 1 of argv
+	tell application "System Events"
+		repeat with p in (every process whose visible is true and background only is false)
+			try
+				if bundle identifier of p is not keepBid then set visible of p to false
+			end try
+		end repeat
+	end tell
+	return "hidden"
+end run"""
 
 
 def _routine_steps(r):
@@ -6589,9 +6620,10 @@ def _routine_step(step, wf, log):
                     time.sleep(0.4)
             say("open")
         elif kind == "hide_others":
-            subprocess.run(["osascript", "-e", _OSA_HIDE],
-                           capture_output=True, timeout=20)
-            say("hidden")
+            keep = step.get("keep") or "com.TickTick.task.mac"
+            r = subprocess.run(["osascript", "-", keep], input=_OSA_HIDE,
+                               capture_output=True, text=True, timeout=30)
+            say((r.stdout or r.stderr or "?").strip()[:60])
         elif kind == "place":
             args = [str(int(v)) for v in step["frame"]]
             r = subprocess.run(["osascript", "-", step["app"], *args],
