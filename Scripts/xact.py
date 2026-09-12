@@ -288,7 +288,14 @@ def _run_trigger(name, arg=None):
 def _app_sync():
     """Click TickTick's File ▸ Sync (background-safe SE menu click - the
     refresh-after-add pattern). Makes an OPEN sticky redraw our content
-    writes within seconds instead of the app's own ~1 min sync cadence."""
+    writes within seconds instead of the app's own ~1 min sync cadence.
+
+    THROTTLED (see src/app_sync.py): firing this unthrottled from several
+    call sites per user action wedged the app's sync in-flight guard on
+    2026-09-12 and it silently stopped pulling for 35 minutes."""
+    import app_sync
+    if not app_sync.claim():
+        return
     subprocess.run(
         ["osascript", "-e",
          'tell application "System Events" to tell process "TickTick" '

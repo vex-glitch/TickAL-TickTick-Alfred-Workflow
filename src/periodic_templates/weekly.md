@@ -11,8 +11,6 @@
 
 ##### ➕ Created
 
-##### ✅ Completed
-
 ##### 📈 Stats
 	_(pending)_
 
@@ -30,6 +28,8 @@
 ##### 💰 Income
 ##### 👽 People
 	_(pending)_
+
+##### ✅ Completed
 ---
 ##### ⏪ Last week
 	_(pending)_

@@ -101,8 +101,15 @@ def _flock():
 
 def _app_sync_nudge():
     """Open windows redraw our content writes in seconds (xact clone - this
-    module can't import Scripts/)."""
+    module can't import Scripts/).
+
+    THROTTLED through the same claim as xact's clone (src/app_sync.py): the
+    two of them together fired three File ▸ Sync clicks inside 300 ms and
+    wedged the app's sync on 2026-09-12."""
     try:
+        import app_sync
+        if not app_sync.claim():
+            return
         if os.environ.get("alfred_version"):
             subprocess.run(
                 ["osascript", "-e",

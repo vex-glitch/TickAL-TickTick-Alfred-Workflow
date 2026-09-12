@@ -87,11 +87,15 @@ sync-pull:
 	@cp "$(LIVE)/info.plist" info.plist
 	@git status --short info.plist
 
-# Push ONE .py file (or a baked Scripts/assets/*.png) repo→live:
+# Push ONE .py file (a baked Scripts/assets/*.png, or a periodic-note
+# template) repo→live:
 #   make sync-push FILE=Scripts/foo.py
+# Templates are shipped code, not docs: create_note renders the LIVE copy at
+# mint time, so a template fixed only in the repo never reaches a new note
+# (found 2026-09-12 - the live weekly.md was months behind).
 sync-push:
 	@test -n "$(FILE)" || (echo "usage: make sync-push FILE=Scripts/foo.py" && exit 1)
-	@case "$(FILE)" in *.py|Scripts/assets/*.png) ;; *) echo "REFUSED: only .py files and Scripts/assets/*.png sync repo→live"; exit 1;; esac
+	@case "$(FILE)" in *.py|Scripts/assets/*.png|src/periodic_templates/*.md) ;; *) echo "REFUSED: only .py files, Scripts/assets/*.png and src/periodic_templates/*.md sync repo→live"; exit 1;; esac
 	@mkdir -p "$(LIVE)/$(dir $(FILE))"
 	@cp "$(FILE)" "$(LIVE)/$(FILE)"
 	@echo "synced $(FILE) → live"
