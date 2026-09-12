@@ -415,6 +415,7 @@ GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.18, 0.75, 0.47, 0.95)
 # checkbox + title - just enough to read as nested (Vex 2026-09-10)
 INDENT = 14
 TLINK_W = 22       # row 1's link icon box (row icons scale with the zoom)
+TLINK_GAP = 6      # ...and the room between the title and that icon
 TASK_FONT = 15     # row titles (17 → 15, Vex 2026-09-10: the task/sub gap read too big)
 SUB_FONT = 14      # sub-subtask titles (13 → 14, Vex 2026-09-10: ~7% under tasks)
 CIRCLE_PT = 13     # task checkbox glyph (was 15)
@@ -1475,8 +1476,13 @@ class BarController(NSObject):
             natural = max(60.0, self.t_title.intrinsicContentSize().width + 10)
         btn_w = ICON_BOX * (3 + (2 if att else 0) + (1 if items else 0))
         clock_w = self._clock_w()   # the digits' real width, not a fixed 96 px box
+        # row 1's link icon joins the RIGHT-hand run: it ends CLOCK_GAP before
+        # the digits, exactly as the digits end CLOCK_GAP before ⏸ (Vex
+        # 2026-09-12: hugging the title left a hole and ate the title). It
+        # costs the title only what it is, not the 12 px title gap it replaces.
+        link_room = (TLINK_W + CLOCK_GAP + TLINK_GAP - 12) if tlink else 0
         fixed = (16 + ((30 + 8 + 12) if att else 0) + clock_w + CLOCK_GAP + btn_w + 14
-                 + (TLINK_W + 6 if tlink else 0))   # row 1's link keeps its room
+                 + link_room)
         min_w = max(420.0, fixed + (60.0 if att else 0.0))
         fr = self.panel.frame()
         if live:
@@ -1540,11 +1546,11 @@ class BarController(NSObject):
             self.b_done.setFrame_(NSMakeRect(x, y1 - 1, 30, 30))
             x += 38
             self.t_title.setFrame_(NSMakeRect(x, y1, title_w, 28))
-            if tlink:       # hugging the title text as drawn, not the box
-                tw = self._text_w(self.t_title, title_w)
-                self.b_tlink.setFrame_(NSMakeRect(x + tw + 2, y1 + 3, TLINK_W, 22))
+            if tlink:       # CLOCK_GAP before the digits, like the digits
+                cx = w - 14 - btn_w - CLOCK_GAP - clock_w   # the clock's left edge
+                self.b_tlink.setFrame_(NSMakeRect(cx - CLOCK_GAP - TLINK_W,
+                                                  y1 + 3, TLINK_W, 22))
                 self.b_tlink.setToolTip_(f"Run this link\n{tlink}")
-                x += TLINK_W + 6
             x += title_w + 12
         # right side, right→left - a tight run of ICON_BOX icons, edge to
         # edge, the clock just left of it (Vex 2026-09-10: both gaps halved)
