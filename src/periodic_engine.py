@@ -460,7 +460,7 @@ def _day_mood_of(task):
     if msec is not None:
         for _n, q, a, _i in pm.journal_pairs(msec.body):
             if a and "mood" in (q or "").casefold():
-                hit = pm.quote_mood([a])
+                hit = pm.answer_mood(a)
                 if hit:
                     return hit
     mood = pm.quote_mood(doc.lead)
@@ -686,6 +686,61 @@ def refresh_period(p, index=None, force=False):
     return f"refreshed{f' · swept {swept[0]}' if swept[0] else ''}"
 
 
+def _completed_tops(day):
+    """Yesterday's/today's completions worth naming: top-level tasks only
+    (a subtask is its parent's detail), deduped by title. A repeating task
+    leaves one completion record per occurrence and testing can leave more -
+    "I cannot complete the same recurring task twice that day" (Vex
+    2026-09-12). None when the completed feed is unreadable."""
+    comp = _completed_between(day, day)
+    if comp is None:
+        return None
+    out, seen = [], set()
+    for t in comp:
+        if t.get("parentId"):
+            continue
+        name = mdtext.flatten_links(t.get("title") or "").strip()
+        key = name.casefold()
+        if not name or key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
+def _mood_of_doc(doc):
+    """(score, note) from a parsed daily note's morning journal, or None."""
+    msec = ps.find(doc, pm.SEC_MORNING)
+    if msec is None:
+        return None
+    for _n, q, a, _i in pm.journal_pairs(msec.body):
+        if a and "mood" in (q or "").casefold():
+            hit = pm.answer_mood(a)
+            if hit:
+                return hit
+    return None
+
+
+def _recap_lines(day, t2, mood, money_lines, tab):
+    """Mood · Money · Focus · Completed, in Vex's order (2026-09-12), each
+    line only when its data is really there (the honest-absence rule)."""
+    lines = []
+    if mood:
+        lines.append(f"{tab}- Mood: {pm.MOOD_FACES[mood[0]]}"
+                     + (f" · {mood[1]}" if mood[1] else ""))
+    lines += money_lines
+    fm = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
+    if fm:
+        lines.append(f"{tab}- Focus: {pm.fmt_hm(fm)}")
+    tops = _completed_tops(day)
+    if tops is not None:
+        lines.append(f"{tab}- Completed: {len(tops)}")
+        lines += [f"{tab}\t- {n[:64]}" for n in tops[:10]]
+        if len(tops) > 10:
+            lines.append(f"{tab}\t- _(+{len(tops) - 10} more)_")
+    return lines
+
+
 def _fill_daily(doc, p, index, is_today):
     day = p.start
     # 🎯 Week goals mirror - verbatim copy; absent/empty weekly keeps the
@@ -714,38 +769,21 @@ def _fill_daily(doc, p, index, is_today):
             if hb:
                 ps.set_body(doc, pm.SEC_HABITS, pm.ind(hb))
 
-        # ⏪ Yesterday recap - honest-absence rule per line; FULL completed
-        # list, nested one level deeper
+        # ⏪ Yesterday recap - Mood · Money · Focus · Completed (Vex's order)
         yd = day - timedelta(days=1)
-        lines = []
-        comp = _completed_between(yd, yd)
-        if comp is not None:
-            # subtasks are their parent's detail, not separate achievements:
-            # one shutdown ticked 30 of them and buried the day (Vex
-            # 2026-09-12). Parents only, top ten, the rest as a number.
-            tops = [t for t in comp if not t.get("parentId")]
-            lines.append(f"{pm.T2}- Completed: {len(tops)}")
-            lines += [f"{pm.T3}- {mdtext.flatten_links(t.get('title') or '')[:64]}"
-                      for t in tops[:10]]
-            if len(tops) > 10:
-                lines.append(f"{pm.T3}- _(+{len(tops) - 10} more)_")
-        fm = getattr(t2, "focus_minutes", lambda a, b: None)(yd, yd) if t2 else None
-        if fm:
-            lines.append(f"{pm.T2}- Focus: {pm.fmt_hm(fm)}")
-        wd = _wontdo_between(yd, yd)
-        if wd is not None and len(wd):
-            lines.append(f"{pm.T2}- Won't do: {len(wd)}")
         yt = lookup(index, pm.period_for("daily", yd))
+        ymoney = []
         if yt:
             ydoc = ps.parse_sections(yt.get("content") or "")
             msec = ps.find(ydoc, pm.SEC_MONEY)
             if msec:
-                lines.append(f"{pm.T2}- Money: "
-                             f"{pm.fmt_amount(pm.section_money_sum(msec.body))}")
-            mood = _day_mood_of(yt)
-            if mood:
-                lines.append(f"{pm.T2}- Mood: {pm.MOOD_FACES[mood[0]]}"
-                             + (f" · {mood[1]}" if mood[1] else ""))
+                ymoney = [f"{pm.T2}- Money: "
+                          f"{pm.fmt_amount(pm.section_money_sum(msec.body))}"]
+        lines = _recap_lines(yd, t2, _day_mood_of(yt) if yt else None,
+                             ymoney, pm.T2)
+        wd = _wontdo_between(yd, yd)
+        if wd is not None and len(wd):
+            lines.append(f"{pm.T2}- Won't do: {len(wd)}")
         ps.set_body(doc, pm.SEC_YESTERDAY, lines or [f"{pm.T1}_(no data)_"])
 
         # ✅ Tasks merge (sweep already ran in step 0)
@@ -764,28 +802,27 @@ def _fill_daily(doc, p, index, is_today):
                 body, _scheduled_today(day + timedelta(days=1)), indent=pm.T2)
             ps.set_body(doc, pm.SEC_TOMORROW, pm.sort_checkboxes(merged))
 
-        # 📊 Today summary - own sections, zero extra calls
-        tsec = ps.find(doc, pm.SEC_TODAY)
-        boxes = pm.checkbox_tids(tsec.body) if tsec else {}
+        # 📊 Today summary - the SAME shape as ⏪ Yesterday (Vex 2026-09-12):
+        # Mood · Money · Focus · Completed. The 💰 Money BLOCK lives inside
+        # it, so its entries carry over verbatim while the lines around it
+        # are rebuilt - it is the note's only money home (append_income and
+        # the monthly roll-up both read it).
+        msec = ps.find(doc, pm.SEC_MONEY)
+        money_lines = ([f"{pm.T2}- Money"]
+                       + [f"{pm.T3}{ln.strip()}" for ln in (msec.body if msec else [])
+                          if ln.strip()]) if msec is not None else []
+        if msec is not None and len(money_lines) == 1:
+            money_lines.append(f"{pm.T3}- **Total = 0**")
         nsec = ps.find(doc, pm.SEC_NOTES)
         entries = pm.harvest_entries(nsec.body) if nsec else []
-        counts = {}
-        for _hm, g, _b in entries:
-            counts[g] = counts.get(g, 0) + 1
-        msec = ps.find(doc, pm.SEC_MONEY)
-        sums = []
-        if boxes:
-            sums.append(f"- Tasks: {sum(boxes.values())} of {len(boxes)} done")
-        fm_t = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
-        if fm_t:
-            sums.append(f"- Focus: {pm.fmt_hm(fm_t)}")
+        sums = _recap_lines(day, t2, _mood_of_doc(doc), money_lines, pm.T2)
         if entries:
+            counts = {}
+            for _hm, g, _b in entries:
+                counts[g] = counts.get(g, 0) + 1
             detail = " · ".join(f"{n} {g}" for g, n in counts.items())
-            sums.append(f"- 📓 Entries: {len(entries)} ({detail})")
-        # no Money line here: the 💰 block under Summaries carries the day's
-        # total AND its entries, and Vex asked for it in one place only
-        ps.set_body(doc, pm.SEC_DAY_SUM,
-                    pm.ind(sums) if sums else [f"{pm.T1}_(no data)_"])
+            sums.append(f"{pm.T2}- Entries: {len(entries)} ({detail})")
+        ps.set_body(doc, pm.SEC_DAY_SUM, sums or [f"{pm.T1}_(no data)_"])
 
         # 🌅/🌙 journal Q lines seed at refresh (never-empty sections,
         # phone-answerable); unanswered fixed prompts refresh their text so

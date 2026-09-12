@@ -5,11 +5,13 @@
 #### 🏆 Goals
 - 🗓️ Weekly
 	- _(mirrors this week's weekly note - edit goals there)_
+
 - 📌 Daily
 	- _(pick one - ☀️ in search, or the morning journal asks)_
 ---
 #### ⚔️ Workbench
 - ✅ Tasks
+
 - 📓 Notes
 ---
 ##### ☀️ Today
@@ -21,15 +23,13 @@
 ---
 ##### 🔎 Summaries
 - Today
-	- _(pending)_
+	- Money
+		- **Total = 0**
 
 - Yesterday
 	- _(pending)_
 
 - Tomorrow
-
-- Money
-	- **Total = 0**
 ---
 ##### 📓 Journals
 - 🌅 Morning Journal

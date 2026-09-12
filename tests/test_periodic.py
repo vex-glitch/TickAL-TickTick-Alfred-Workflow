@@ -197,7 +197,7 @@ seeded[3] = "\t\tA: phone answer"                   # Q2 answered on phone
 merged, filled = pm.merge_journal_answers(
     seeded, {1: "mine", 2: "should NOT overwrite", 3: ""})
 check("14.phone-wins", filled == 1 and "\t\tA: phone answer" in merged
-      and "\t\t- *A: mine*" in merged, merged)     # indent + shape survive
+      and "\t\t- A: mine" in merged, merged)       # indent + shape survive
 # a legacy note's plain A-line keeps its plain shape - never half-converted
 _old_shape, _f = pm.merge_journal_answers(
     ["\t**Q1 · Old style**", "\t\tA: "], {1: "kept plain"})
@@ -418,6 +418,21 @@ check("20.sort-keeps-other-lines",
 check("20.sort-noop-under-two", pm.sort_checkboxes([_a]) == [_a])
 check("20.timed-line-keeps-its-tid",
       pm.checkbox_tids([_a]) == {"a" * 24: False}, _a)
+
+# ── 21. round 3: mood answers, dedupe, italics (Vex 2026-09-12) ────────────
+check("21.answer-mood-bare", pm.answer_mood("😐") == (3, ""))
+check("21.answer-mood-note", pm.answer_mood("🙂 · slept badly") == (4, "slept badly"))
+check("21.answer-mood-full-line", pm.answer_mood("Mood: 😁") == (5, ""))
+check("21.answer-mood-junk",
+      pm.answer_mood("nonsense") is None and pm.answer_mood("") is None
+      and pm.answer_mood(None) is None)
+check("21.question-italic-answer-plain",
+      pm.seed_journal_lines(["Q?"]) == ["\t- *Q1 · Q?*", "\t\t- A: "],
+      pm.seed_journal_lines(["Q?"]))
+_s = pm.seed_journal_lines(["Mood?"])
+_m, _f = pm.merge_journal_answers(_s, {1: "😐"})
+check("21.italic-round-trip",
+      _m[1] == "\t\t- A: 😐" and pm.journal_pairs(_m)[0][2] == "😐", _m)
 
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:

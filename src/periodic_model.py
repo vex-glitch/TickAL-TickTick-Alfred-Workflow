@@ -493,6 +493,20 @@ def rating_line(score):
     return f"Day: {'★' * max(1, min(5, int(score)))}"
 
 
+def answer_mood(text):
+    """(score, note) from a journal MOOD answer, which is the bare face the
+    picker echoes - "😐", or "🙂 · slept badly". None when it is not one."""
+    t = (text or "").strip()
+    if not t:
+        return None
+    face, _, note = t.partition("·")
+    face = face.strip()
+    if face in FACE_SCORE:
+        return FACE_SCORE[face], note.strip()
+    m = MOOD_LINE_RE.match(t)                      # tolerate a full Mood: line
+    return (FACE_SCORE[m.group("face")], m.group("note") or "") if m else None
+
+
 def quote_mood(body_lines):
     """💬 body → (score, note) | None."""
     for ln in body_lines:
@@ -821,12 +835,14 @@ def seed_journal_lines(prompts):
     lines = []
     for i, q in enumerate(prompts, 1):
         lines.append(journal_q_line(i, q))
-        lines.append(f"{T2}- *A: *")
+        lines.append(f"{T2}- A: ")
     return lines
 
 
 def journal_q_line(n, q, ws=T1):
-    return f"{ws}- Q{n} · {q}"
+    # the QUESTION is italic, the answer plain (Vex 2026-09-12 - he had them
+    # the wrong way round in his mock-up and corrected it)
+    return f"{ws}- *Q{n} · {q}*"
 
 
 def journal_pairs(body_lines):

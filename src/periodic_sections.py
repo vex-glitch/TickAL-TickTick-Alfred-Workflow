@@ -181,17 +181,19 @@ class Block:
 
 
 def _blocks(sec):
-    """Every top-level bullet of a section body, shallowest indent wins."""
-    real = [l for l in sec.body if l.strip() and BULLET_RE.match(l)]
-    if not real:
-        return []
-    top = min(_tabs(l) for l in real)
+    """Every bullet of a section body, at ANY depth, outermost first.
+
+    Depth matters because a block can hold another: the 💰 Money block lives
+    INSIDE the day summary (Vex 2026-09-12 - "Money needs to be a part of
+    today summary, not a standalone section"), so its entries are two levels
+    below the header. Ambiguity is handled by find()'s guard, not by only
+    looking at the top level."""
     out = []
     for l in sec.body:
         m = BULLET_RE.match(l)
-        if m and _tabs(l) == top:
-            out.append(Block(sec, l, m.group("name"), top))
-    return out
+        if m:
+            out.append(Block(sec, l, m.group("name"), _tabs(l)))
+    return sorted(out, key=lambda b: b.indent)
 
 
 # Vex's layout renamed anchors as he de-emojied ("💰 Money" -> "- Money",
