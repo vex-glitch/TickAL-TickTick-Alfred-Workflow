@@ -450,6 +450,48 @@ check("22.money-no-longer-seeded-daily",
       pm.SEC_MONEY not in pm.WRITER_ANCHORS["daily"]
       and pm.SEC_MONEY in pm.WRITER_ANCHORS["monthly"])
 
+# ── 23. append_body into a BULLET block (Vex 2026-09-12: "I tried adding a
+# win, it did nothing") - a Block's .body is a COPY, so the old in-place
+# extend filled a throwaway list and still reported success.
+_DAILY_TPL = open(os.path.join(ROOT, "src", "periodic_templates",
+                               "daily.md")).read()
+
+
+def _tpl_doc():
+    return ps.parse_sections(_DAILY_TPL)
+
+
+_d = _tpl_doc()
+_ok = ps.append_body(_d, pm.SEC_NOTES, [pm.T2 + pm.make_entry("win", "shipped", "10:30")])
+_out = ps.serialize_sections(_d)
+check("23.entry-lands-in-bullet-notes", _ok and "🏆 shipped" in _out,
+      repr(_out[:400]))
+check("23.entry-kept-one-tab-under-its-bullet",
+      "\n\t- 10:30 🏆 shipped" in _out, repr(_out[:400]))
+
+_d = _tpl_doc()
+for _k, _t, _hm in (("win", "one", "10:30"), ("nag", "two", "10:40"),
+                    ("thought", "three", "11:05")):
+    ps.append_body(_d, pm.SEC_NOTES, [pm.T2 + pm.make_entry(_k, _t, _hm)])
+_notes = ps.find(_d, pm.SEC_NOTES).body
+check("23.entries-are-siblings-not-nested",
+      len(_notes) == 3 and {ps._tabs(l) for l in _notes} == {1},
+      repr(_notes))
+
+# appending must not disturb the neighbours or the divider below
+check("23.append-left-workbench-intact",
+      "- ✅ Tasks" in _out and "---\n##### ☀️ Today" in _out, repr(_out[:400]))
+
+# a section (not a bullet) still appends the old way
+_d = ps.parse_sections("### A\n- x\n\n### B\n")
+check("23.section-append-still-works",
+      ps.append_body(_d, "A", ["- y"])
+      and ps.find(_d, "A").body[:2] == ["- x", "- y"],
+      repr(ps.find(_d, "A").body))
+check("23.missing-name-still-false",
+      ps.append_body(_d, "nope", ["- y"]) is False)
+
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)

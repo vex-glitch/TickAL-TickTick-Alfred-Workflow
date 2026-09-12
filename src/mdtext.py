@@ -45,3 +45,55 @@ def link_text(text, limit=None):
 def md_link(text, url, limit=None):
     """A markdown link whose label can neither nest nor break the syntax."""
     return f"[{link_text(text, limit)}]({url})"
+
+
+# ── the 🔗 entry grammar (Vex 2026-09-12) ────────────────────────────────────
+# "it should take a clipboard and whatever I write should be the description
+# part between [] of a markdown link". So: the URL comes from the clipboard,
+# the words you type name it. A URL typed in the bar still wins over the
+# clipboard - typing one is a louder signal than whatever got copied last.
+URL_RE = re.compile(r"(?<![\w@])[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s<>\"')\]]+")
+_MD_ONLY_RE = re.compile(r"^\s*\[([^\[\]]*)\]\(([^()\s]+)\)\s*$")
+
+
+def find_url(text):
+    """The first URL in `text`, else None. Any scheme - ticktick://,
+    obsidian:// and kmtrigger:// are links Vex pastes as often as https."""
+    m = URL_RE.search(text or "")
+    return m.group(0).rstrip(".,;:!?") if m else None
+
+
+def url_name(url):
+    """A readable stand-in label when you typed none: the host without www,
+    or the scheme's own word for schemes that have no host."""
+    if not url:
+        return ""
+    rest = url.split("://", 1)[1] if "://" in url else url
+    host = rest.split("/", 1)[0].split("?", 1)[0]
+    host = host.split("@")[-1]
+    if host.startswith("www."):
+        host = host[4:]
+    return host or (url.split("://", 1)[0] if "://" in url else url)
+
+
+def link_entry(typed, clip):
+    """(typed words, clipboard) → the text of a 🔗 entry, or None when there
+    is nothing to log.
+
+    A clipboard that already holds a markdown link keeps its URL and takes
+    your words as the new label. With no URL anywhere this is just text -
+    a link entry with nothing to link is still a note worth keeping.
+    """
+    typed, clip = (typed or "").strip(), (clip or "").strip()
+    md = _MD_ONLY_RE.match(clip)
+    if md:
+        return md_link(typed or md.group(1) or url_name(md.group(2)),
+                       md.group(2))
+    url = find_url(typed)
+    if url:
+        label = " ".join(typed.replace(url, " ", 1).split())
+    else:
+        url, label = find_url(clip), typed
+    if not url:
+        return typed or clip or None
+    return md_link(link_text(label) or url_name(url), url)

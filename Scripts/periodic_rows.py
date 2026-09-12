@@ -155,7 +155,8 @@ _GLYPH = {"win": "🏆", "nag": "👎", "thought": "💭", "task": "☑️",
           "link": "🔗", "mood": "😊"}
 _LEGEND_SUBS = {"w": "Something went well", "n": "Something nagged you",
                 "t": "Plain text is a thought too", "k": "Makes a real task",
-                "l": "Empty = clipboard", "m": "How you feel, 5 faces"}
+                "l": "Clipboard is the link, you name it",
+                "m": "How you feel, 5 faces"}
 _MOOD_FACES = [(5, "😁", "Great"), (4, "🙂", "Good"), (3, "😐", "OK"),
                (2, "😞", "Meh"), (1, "😢", "Rough")]
 
@@ -201,10 +202,12 @@ def entry_rows(rest):
     if not text and kind != "link":
         return [alfred.item(title=f"Type the {kind} text…",
                             valid=False, mods=_mods())]
-    shown = text or "clipboard contents"
+    shown = text or ("the copied link" if kind == "link" else "clipboard contents")
+    sub = ("⏎ Log it as [%s](clipboard)" % (text[:28] or "the link name")
+           if kind == "link" else "⏎ Log to today's note")
     return [alfred.item(
         title=f"{_GLYPH[kind]} {kind.capitalize()} · {shown[:60]}",
-        subtitle="⏎ Log to today's note",
+        subtitle=sub,
         arg=f"xact:pn_entry:{_b64({'kind': kind, 'text': text})}",
         valid=True, mods=_mods())]
 

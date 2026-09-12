@@ -322,13 +322,29 @@ def set_sec_body(doc, sec, lines):
 def append_body(doc, name, lines):
     """Append lines at the section's end, before the trailing gap (APPEND
     semantics - existing lines are never rewritten). False when the section
-    is absent or lines is empty."""
+    is absent or lines is empty.
+
+    The write goes back through `sec.body = ...`, never by mutating the list
+    in place: a Block's `body` is a PROPERTY that hands out a copy of its
+    slice, so `sec.body.extend(...)` filled a throwaway list and returned
+    True while the note never changed. That is what silently ate every
+    "➕ Entry" once 📓 Notes became a bullet (Vex 2026-09-12: "I tried adding
+    a win, it did nothing")."""
     sec = find(doc, name)
     if sec is None or not lines:
         return False
-    body = sec.body
+    body = list(sec.body)
     while body and not body[-1].strip():
         body.pop()
+    real = [l for l in body if l.strip()]
+    if real:
+        # Land beside what is already there, not under it. Callers pass their
+        # own indent guess (pm.T2 and friends) and a Block re-bases the WHOLE
+        # body as one run, so an appended line one tab deeper than the last
+        # one became its CHILD - the second entry of the day nested inside
+        # the first.
+        lines = _rebase(lines, min(_tabs(l) for l in real))
     body.extend(lines)
     body.extend(_gap(doc, sec))
+    sec.body = body
     return True

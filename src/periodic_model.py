@@ -379,6 +379,38 @@ def fmt_amount(x):
     return str(int(x)) if float(x) == int(x) else f"{x:.2f}"
 
 
+# A journal money ANSWER is hand-typed prose, so only the FIRST number counts.
+# parse_amount scrapes every digit in the string, which reads "500 for the
+# sleeve, 2 sessions" as 5002 - fine for the canonical "- 485 · label" entry
+# lines it was built for, wrong for a sentence.
+MONEY_ANSWER_RE = re.compile(r"(?<![\w.,])(\d[\d.,]*)")
+
+
+def parse_money_answer(text):
+    """Evening-journal money answer → amount | None (first number wins)."""
+    m = MONEY_ANSWER_RE.search(text or "")
+    return parse_amount(m.group(1)) if m else None
+
+
+def money_answer_line(total, labels):
+    """The canonical shape the 💰 verb writes back into that answer:
+    the running total, then what it was for."""
+    tail = ", ".join([l for l in labels if l])
+    return fmt_amount(total) + (f" · {tail}" if tail else "")
+
+
+def split_money_answer(text):
+    """An answer written by money_answer_line → (amount|None, [labels])."""
+    amt = parse_money_answer(text)
+    tail = ""
+    for sep in (" · ", " - "):
+        if sep in (text or ""):
+            tail = (text or "").split(sep, 1)[1]
+            break
+    labels = [x.strip() for x in tail.split(",") if x.strip()]
+    return amt, labels
+
+
 def parse_money_entry(line):
     """Daily-money entry → (amount, label) | None. Canonical '- 485 · label';
     lenient: '- 485' and '- 485 - label' also parse; any indentation
@@ -820,7 +852,7 @@ def journal_fixed(slot, ctx=None):
                        "(saves to the Bridges board + tomorrow's note)"),
             ("free", "What is on your mind?"),
             ("goal", goal_q),
-            ("money", "How much money did you earn today? (logs to 💰 Money)"),
+            ("money", "How much money did you earn today?"),
             ("rating", "Rate the day, 1-5 stars"),
         ]
     # weekly - the three-things picker is NOT a seeded question: it runs as

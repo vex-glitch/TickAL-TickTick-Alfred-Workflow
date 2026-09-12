@@ -268,8 +268,6 @@ def _compose_lead(doc, p, index, refetch):
     q_lines = [l for l in old if l.strip().startswith(">")]
     w_line = next((l for l in old if "°C" in l
                    and not l.strip().startswith(">")), None)
-    mood = next((l for l in old if pm.MOOD_LINE_RE.match(l.strip())), None)
-    day = next((l for l in old if pm.RATING_LINE_RE.match(l.strip())), None)
     if refetch and p.kind == "daily":
         t2 = _tier2()
         q = getattr(t2, "get_quote", lambda: None)() if t2 else None
@@ -283,8 +281,8 @@ def _compose_lead(doc, p, index, refetch):
         # Mood and the day rating are NOT in the lead any more - Vex moved
         # them into the journals, where the questions that produce them live
         # ("I have removed mood from top of the note, left it in journal
-        # part", 2026-09-12). They are still parsed OUT of an old lead above,
-        # so a legacy note's values survive into their new home.
+        # part", 2026-09-12). An old note's Mood:/Day: lines are dropped here,
+        # and the readers fall back to them while they still exist.
         tail = [x for x in [w_line] + q_lines if x]
         if tail:
             out += tail + ["---"]
@@ -292,29 +290,6 @@ def _compose_lead(doc, p, index, refetch):
         doc.lead = out
         return True
     return False
-
-
-def _set_lead_line(doc, line_re, new_line):
-    """Replace the first lead line matching line_re, else insert before the
-    lead's LAST --- divider (mood/rating writers)."""
-    lead = list(doc.lead)
-    for i, ln in enumerate(lead):
-        if line_re.match(ln.strip()):
-            if lead[i] == new_line:
-                return False
-            lead[i] = new_line
-            doc.lead = lead
-            return True
-    last_div = None
-    for i, ln in enumerate(lead):
-        if ln.strip().startswith("---"):
-            last_div = i
-    if last_div is not None:
-        lead.insert(last_div, new_line)
-    else:
-        lead.append(new_line)
-    doc.lead = lead
-    return True
 
 
 # ── mint ─────────────────────────────────────────────────────────────────────
@@ -436,7 +411,7 @@ def _day_sums(index):
             continue
         doc = ps.parse_sections(t.get("content") or "")
         ans = _answer_in(doc, pm.SEC_EVENING, "money did you earn")
-        amt = pm.parse_amount(ans) if ans else None
+        amt = pm.parse_money_answer(ans) if ans else None
         if amt is not None:
             sums[d] = amt
             continue
@@ -761,7 +736,7 @@ def _recap_lines(day, t2, nday, tab):
                 total = pm.section_money_sum(msec.body)
                 money = pm.fmt_amount(total) if total else ""
         else:
-            amt = pm.parse_amount(money)
+            amt = pm.parse_money_answer(money)
             money = pm.fmt_amount(amt) if amt is not None else money
         if money:
             lines.append(f"{tab}- Money: {money}")
@@ -1385,20 +1360,6 @@ def append_entry(kind, text, when=None):
     return toasts.get(kind, "💫 Logged")
 
 
-def _lead_rmw_line(line_re, new_line, day=None):
-    """Replace-or-insert one managed line in a daily note's LEAD (the
-    Mood:/Day: lines live beside the quote). day pins journal flows that
-    cross midnight."""
-    p = pm.period_for("daily", day or _today())
-    task, _ = ensure_note(p)
-    pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
-
-    def mutate(doc, live):
-        return _set_lead_line(doc, line_re, new_line)
-    _pn_rmw(pid, tid, mutate)
-    return None
-
-
 def _journal_answer(slot, needle, text, day=None):
     """Write `text` as the answer to the journal question containing `needle`.
     True when it landed. The mood and the day rating are journal answers now,
@@ -1413,13 +1374,16 @@ def _journal_answer(slot, needle, text, day=None):
         if sec is None:
             return False
         body = list(sec.body)
-        for n, q, _a, idx in pm.journal_pairs(body):
+        for n, q, a, idx in pm.journal_pairs(body):
             if needle.casefold() not in (q or "").casefold():
                 continue
             m = pm.JOURNAL_A_RE.match(body[idx])
             ws, dash = m.group("ws"), m.group("dash") or ""
             ital = m.group("ital")
-            body[idx] = f"{ws}{dash}{ital}A: {text}{ital}"
+            # callable = read-modify-write (the 💰 verb sums into whatever is
+            # already answered there)
+            val = text(a or "") if callable(text) else text
+            body[idx] = f"{ws}{dash}{ital}A: {val}{ital}"
             ps.set_sec_body(doc, sec, body)
             return True
         return False
@@ -1428,20 +1392,25 @@ def _journal_answer(slot, needle, text, day=None):
 
 
 def set_day_mood(score, note="", day=None):
-    """The morning journal's mood answer, else the lead Mood: line (older
-    notes and any layout without that question)."""
-    shown = pm.mood_line(score, note)[6:]            # "🙂 · note"
+    """The morning journal's mood answer - the quick way to answer that one
+    question without opening the whole dialog run.
+
+    There is no lead-line fallback any more: _compose_lead rebuilds the lead
+    from scratch on every refresh and no longer emits Mood:/Day:, so a
+    fallback write there would be deleted within the hour. Better to say the
+    question is missing than to pretend it landed."""
+    shown = pm.mood_text(int(score), note)
     if not _journal_answer("morning", "mood", shown, day=day):
-        _lead_rmw_line(pm.MOOD_LINE_RE, pm.mood_line(score, note), day=day)
+        return "💫 No mood question in today's morning journal (♻️ Refresh Today)"
     return (f"{pm.MOOD_FACES[int(score)]} Mood logged"
             + (f" · {note}" if note else ""))
 
 
 def set_day_rating(score, day=None):
-    """The evening journal's rating answer, else the lead Day: ★ line."""
+    """The evening journal's rating answer (see set_day_mood on the fallback)."""
     stars = "★" * max(1, min(5, int(score)))
     if not _journal_answer("evening", "rate the day", stars, day=day):
-        _lead_rmw_line(pm.RATING_LINE_RE, pm.rating_line(score), day=day)
+        return "💫 No rating question in today's evening journal (♻️ Refresh Today)"
     return f"{stars} Day rated"
 
 
@@ -1621,6 +1590,10 @@ def append_income(amount, label, day=None):
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
     entry = pm.money_entry_line(amount, label)
 
+    # Money has ONE home since Vex moved it into the evening journal ("it is
+    # an answer in the evening journal, that is all that should be there",
+    # 2026-09-12), so the verb sums into that answer. A note old enough to
+    # still carry a 💰 section keeps using it - that is where its history is.
     def mutate(doc, live):
         sec = ps.find(doc, pm.SEC_MONEY)
         if sec is None:
@@ -1632,7 +1605,14 @@ def append_income(amount, label, day=None):
         return True
     ok, _doc = _pn_rmw(pid, tid, mutate)
     if not ok:
-        return "💫 No 💰 Money section in today's note"
+        def bump(prev):
+            had, labels = pm.split_money_answer(prev)
+            if label:
+                labels.append(label)
+            return pm.money_answer_line((had or 0) + amount, labels)
+        ok = _journal_answer("evening", "money did you earn", bump, day=day)
+    if not ok:
+        return "💫 No money question in today's evening journal"
     return f"💰 {pm.fmt_amount(amount)}" + (f" · {label}" if label else "")
 
 

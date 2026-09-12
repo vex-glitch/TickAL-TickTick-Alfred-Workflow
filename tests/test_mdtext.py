@@ -55,6 +55,33 @@ m = READER.fullmatch(md.md_link(STEP, "https://t/x"))
 check("a reader keyed on [^]]* still parses it", bool(m), md.md_link(STEP, "https://t/x"))
 check("and gets the label back", m and m.group(1) == "Money")
 
+# ── 🔗 entry grammar: clipboard is the URL, typed words are the label
+check("clipboard url + typed label",
+      md.link_entry("Anthropic docs", "https://docs.anthropic.com/en/api")
+      == "[Anthropic docs](https://docs.anthropic.com/en/api)")
+check("no label falls back to the host",
+      md.link_entry("", "https://www.example.com/a/b")
+      == "[example.com](https://www.example.com/a/b)")
+check("a typed url beats the clipboard",
+      md.link_entry("Read this https://example.com/a/b now", "https://other.com")
+      == "[Read this now](https://example.com/a/b)")
+check("brackets in a label become parens",
+      md.link_entry("Sleeve [250] ref", "https://pin.it/abc")
+      == "[Sleeve (250) ref](https://pin.it/abc)")
+check("a copied markdown link keeps its target, takes a new name",
+      md.link_entry("My note", "[Old](https://x.com/1)")
+      == "[My note](https://x.com/1)")
+check("a copied markdown link alone survives whole",
+      md.link_entry("", "[Old](https://x.com/1)") == "[Old](https://x.com/1)")
+check("any scheme counts, not just http",
+      md.link_entry("KM macro", "kmtrigger://macro=ABC")
+      == "[KM macro](kmtrigger://macro=ABC)")
+check("no url anywhere is still a note",
+      md.link_entry("just a thought", "not a url") == "just a thought")
+check("nothing at all is nothing", md.link_entry("", "") is None)
+check("the built entry survives the reader",
+      md.MD_LINK_RE.fullmatch(md.link_entry("a b", "https://x.com/1")) is not None)
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if FAILS:
     raise AssertionError(f"{len(FAILS)} checks failed: {FAILS}")

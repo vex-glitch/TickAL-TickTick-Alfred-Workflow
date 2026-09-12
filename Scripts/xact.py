@@ -6986,12 +6986,18 @@ def pn_entry(rest):
     if kind not in _PN_KINDS.values():
         kind = "thought"                      # unknown b64 kind → honest default
     text = (spec.get("text") or "").strip()
-    if kind == "link" and not text:
+    if kind == "link":
+        # The clipboard carries the URL, the words you type name it
+        # (Vex 2026-09-12). mdtext owns the grammar - a typed URL still wins,
+        # and a clipboard that is already a markdown link keeps its target.
+        import mdtext
         r = subprocess.run(["pbpaste"], capture_output=True)
-        text = r.stdout.decode("utf-8", "replace").strip()
-        if not text:
-            print("🔗 Clipboard is empty")
+        clip = r.stdout.decode("utf-8", "replace").strip()
+        built = mdtext.link_entry(text, clip)
+        if not built:
+            print("🔗 Nothing to link - copy a URL first")
             return
+        text = built
     if kind == "mood":
         import re as _re
         m = _re.match(r"^([1-5])(?!\d)\s*·?\s*(.*)$", text)
