@@ -3,7 +3,6 @@
 #### 🌉 Yesterday's bridge
 ---
 #### 🏆 Goals
-
 - 🗓️ Weekly
 	- _(mirrors this week's weekly note - edit goals there)_
 
@@ -15,7 +14,7 @@
 
 - 📓 Notes
 ---
-#### ☀️ today
+#### ☀️ Today
 - 🔄 Habits
 	- _(pending)_
 
@@ -23,7 +22,6 @@
 	- _(pending)_
 ---
 #### 🔎 Summaries
-
 - Today
 	- _(pending)_
 
