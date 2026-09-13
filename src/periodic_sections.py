@@ -19,6 +19,9 @@ Contracts:
     the disclosed limitation and the universal per-section kill switch.
   * set_body/append_body never reflow other sections: mutations are local to
     one section's line list.
+  * TickTick's fold comment (`#### 🏆 Goals <!-- {"folded":true} -->`) is
+    never part of a name and always survives set_header: folding a section
+    in the app must not hide it from its filler or get undone by a refresh.
 
 Sibling of focus_blocks.py, deliberately separate: the focus grammar keys on
 date headers only and its parser must stay untouched. Checkbox/link
@@ -39,6 +42,23 @@ SECTION_HEADER_RE = re.compile(r'^(?P<hashes>#{3,6})\s+(?P<name>.+?)\s*$')
 # keeps working untouched.
 BULLET_RE = re.compile(r'^(?P<indent>\t*)- (?P<name>.+?)\s*$')
 
+# TickTick keeps a folded header's state ON the header line itself:
+# `#### 🏆 Goals <!-- {"folded":true} -->`. The comment is the app's, never
+# part of the name: find() must see "🏆 Goals", and set_header must put the
+# comment back, or a folded section goes invisible to its filler and every
+# data-in-header rewrite unfolds it (both seen 2026-09-13).
+FOLD_RE = re.compile(r'\s*<!--\s*\{.*\}\s*-->\s*$')
+
+
+def split_fold(text):
+    """(name, fold): the name without TickTick's trailing state comment, and
+    that comment exactly as written (leading space included), '' when none.
+    A line that is nothing but a comment keeps it as its name."""
+    m = FOLD_RE.search(text or "")
+    if not m or not text[:m.start()].strip():
+        return text, ""
+    return text[:m.start()], text[m.start():].rstrip()
+
 
 # Decor lines: `---` dividers and `#`/`##`
 # GROUP headers between sections. They belong to the section that FOLLOWS
@@ -48,13 +68,14 @@ DECOR_RE = re.compile(r'^(?:---+|#{1,2}\s.*)\s*$')
 
 
 class Section:
-    __slots__ = ("header", "name", "body", "pre")
+    __slots__ = ("header", "name", "body", "pre", "fold")
 
-    def __init__(self, header, name, body=None, pre=None):
+    def __init__(self, header, name, body=None, pre=None, fold=""):
         self.header = header      # exact original header line (no \n)
-        self.name = name          # stripped text after "### "
+        self.name = name          # stripped text after "### ", fold comment cut
         self.body = body or []    # raw lines until the next header
         self.pre = pre or []      # decor lines owned by THIS section
+        self.fold = fold          # TickTick's ' <!-- {"folded":true} -->' or ''
 
 
 class SecDoc:
@@ -76,7 +97,8 @@ def parse_sections(content):
     for raw in lines:
         m = SECTION_HEADER_RE.match(raw)
         if m:
-            current = Section(raw, m.group("name"))
+            name, fold = split_fold(m.group("name"))
+            current = Section(raw, name, fold=fold)
             doc.sections.append(current)
         elif current is not None:
             current.body.append(raw)
@@ -147,10 +169,11 @@ class Block:
     """A `- name` bullet addressed like a section. Its span is recomputed on
     every access, so a write that changes the body's length cannot leave a
     stale index behind."""
-    __slots__ = ("sec", "header", "name", "indent")
+    __slots__ = ("sec", "header", "name", "indent", "fold")
 
-    def __init__(self, sec, header, name, indent):
+    def __init__(self, sec, header, name, indent, fold=""):
         self.sec, self.header, self.name, self.indent = sec, header, name, indent
+        self.fold = fold
 
     def _span(self):
         body = self.sec.body
@@ -192,7 +215,8 @@ def _blocks(sec):
     for l in sec.body:
         m = BULLET_RE.match(l)
         if m:
-            out.append(Block(sec, l, m.group("name"), _tabs(l)))
+            name, fold = split_fold(m.group("name"))
+            out.append(Block(sec, l, name, _tabs(l), fold))
     return sorted(out, key=lambda b: b.indent)
 
 
@@ -258,7 +282,9 @@ def set_header(sec, name):
     """Rewrite a section's header text (data-in-header sections). Returns
     True when it changed. A Block's header is its bullet line, and its own
     hash level / indent is preserved - a filler must never flatten the
-    layout it writes into."""
+    layout it writes into. TickTick's fold comment rides along, so a
+    folded section stays folded however often its data changes."""
+    name, _ = split_fold(name)          # a caller never writes the app's state
     if sec.name == name:
         return False
     if isinstance(sec, Block):
@@ -267,14 +293,14 @@ def set_header(sec, name):
             i = body.index(sec.header)
         except ValueError:
             return False
-        new_line = "\t" * sec.indent + f"- {name}"
+        new_line = "\t" * sec.indent + f"- {name}{sec.fold}"
         body[i] = new_line
         sec.header, sec.name = new_line, name
         return True
     hashes = (SECTION_HEADER_RE.match(sec.header or "").group("hashes")
               if SECTION_HEADER_RE.match(sec.header or "") else "###")
     sec.name = name
-    sec.header = f"{hashes} {name}"
+    sec.header = f"{hashes} {name}{sec.fold}"
     return True
 
 
