@@ -780,6 +780,14 @@ def main():
                 cache_store.invalidate("projects")
             print(f"{name} created")
 
+        elif arg.startswith("addunder:"):
+            # add bar ST mode: the picked parent rides as VARIABLES on this
+            # flow. Print only the marker - the router on this node's output
+            # sends exactly "addunder" to a Call-ET Add (passinput FALSE,
+            # passvariables TRUE) so the bar re-opens EMPTY in subtask mode,
+            # and everything else on to the End toast as before.
+            sys.stdout.write("addunder")
+
         elif arg.startswith("cta:"):
             # cta:<base64 {mode, pid, tid, title}> - the one dynamic "Add CTA /
             # Prepare" Actions row. Every mode opens the Add window prefilled (via

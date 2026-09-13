@@ -894,6 +894,62 @@ def mode_menu(fragment):
     return items or [alfred.item(title=f'No options matching "{fragment}"', valid=False)]
 
 
+# Variables the add bar reads as context. ST rows set every one of them: the
+# six ⌘ Actions passes, plus the prefill/label ones blanked, so a parent
+# picked from a Browse screen never inherits that screen's list or note.
+_ST_BLANK = ("list_name", "section_name", "prefill_note", "prefill_error",
+             "prefill_tag")
+
+
+def subtask_parent_items(fragment):
+    """ST mode - pick a parent, then type its subtasks (Vex 2026-09-13:
+    "I should be able to add a subtask directly from add with st prefix ...
+    my brain sometimes thinks add first").
+
+    The parent rides as VARIABLES, never as text in the bar. ~p carries a
+    parent by TITLE, and that is not safe to lean on here: probed 2026-09-13,
+    "~p Weekly note" resolved to a DIFFERENT task whose long title merely
+    contains those words (99 open titles are duplicated, the fallback is a
+    substring match, 14 titles contain a trigger character). So ⏎ hands
+    dispatch an `addunder:` arg plus the same variables ⌘ Actions > Add a
+    subtask sets; the canvas router re-opens this bar with them and an EMPTY
+    query (iron rule 8). From there it IS the ⌘ Actions subtask flow - the
+    pipes, ➕ Another subtask and the breadcrumb toast all come for free.
+    """
+    from display import pick_title, pick_where
+    all_tasks = cache_store.get("all_tasks") or []
+    task_map = {t["id"]: t for t in all_tasks}
+    # notes cannot hold subtasks in TickTick, so they are not offered
+    pool = [t for t in all_tasks
+            if t.get("status", 0) == 0 and t.get("kind") != "NOTE"]
+    if fragment:
+        pool = fuzz.filter_and_score(fragment, pool,
+                                     key_fn=lambda t: t.get("title", ""))
+    else:
+        pool.sort(key=lambda t: t.get("modifiedTime") or "", reverse=True)
+    dead = {"valid": False, "subtitle": ""}
+    items = []
+    for t in pool[:50]:
+        pid = t.get("projectId") or t.get("_projectId") or ""
+        variables = {"task_id": t["id"], "task_list_id": pid,
+                     "task_title": t.get("title", ""), "item_type": "task",
+                     "list_id": pid, "section_id": t.get("columnId") or ""}
+        variables.update({k: "" for k in _ST_BLANK})
+        items.append(alfred.item(
+            uid=f"st-{t['id']}",
+            title="🧬 " + pick_title(t),
+            subtitle=pick_where(t, task_map) + "  |  ⏎ Add subtasks",
+            arg=f"addunder:{pid}:{t['id']}", valid=True,
+            variables=variables,
+            # ⌘ and ⌘⇧ also wire to dispatch: dead here, one meaning per row
+            mods={"cmd": dict(dead), "cmd+shift": dict(dead)}))
+    if not items:
+        msg = (f'No tasks matching "{fragment}"' if fragment
+               else "Type to pick the parent task…")
+        items = [alfred.item(title=msg, valid=False)]
+    return items
+
+
 def people_create_items(fragment):
     """H mode: person CTAs by autocomplete (the ~p parent token does the
     rest - list inherits from the card, *date @time schedule natively) +
@@ -2245,6 +2301,12 @@ def main():
         # ── T prefix → create tag ─────────────────────────────────────────────
         if query.lower().startswith("t "):
             items = tag_create_items(query[2:].strip())
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # ── ST prefix → pick a parent, then type its subtasks ────────────────
+        if query.lower().startswith("st "):
+            items = subtask_parent_items(query[3:].strip())
             print(alfred.output(items, skipknowledge=True))
             return
 
