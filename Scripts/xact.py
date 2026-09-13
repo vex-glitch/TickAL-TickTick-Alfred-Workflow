@@ -6901,10 +6901,13 @@ def _pn_bg(arg):
     wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
         with open("/tmp/tickal_periodic.log", "a") as logf:
+            # stdout goes to the log here, never to a notification - a verb
+            # the user is waiting on reads TICKAL_DETACHED and posts its own
             subprocess.Popen(
                 ["/bin/bash", os.path.join(wf, "Scripts", "py.sh"),
                  os.path.join(wf, "Scripts", "xact.py"), arg],
-                stdout=logf, stderr=logf, start_new_session=True)
+                stdout=logf, stderr=logf, start_new_session=True,
+                env=dict(os.environ, TICKAL_DETACHED="1"))
     except Exception:
         pass
 
@@ -7148,6 +7151,13 @@ def pn_journal(slot):
     if cancelled:
         bits.append("(cancelled)")
     print(" ".join(bits))
+    if os.environ.get("TICKAL_DETACHED"):
+        # a routine step's journal runs detached (_pn_bg) and its stdout only
+        # reaches the log - so it said nothing when it finished (Vex
+        # 2026-09-13: "Journal completed should give a notification"). The
+        # hotkey and pn-list roads print to Alfred's End toast and must not
+        # get a second one, hence the flag.
+        _crm_say(" ".join(bits))
     if cancelled:
         return
     # ── picker handoffs (dialogs can't host pickers)
@@ -10298,6 +10308,21 @@ def _habit_tick_core(hid, day_stamp, retro=False, quiet=False):
     return True, say(f"✅ {name}{chip}{when}{noted}")
 
 
+def _confetti():
+    """Detached screen-wide confetti (Scripts/confetti.py; Vex 2026-09-13: "our
+    complete function on routines produces confetti on screen"). Needs the
+    PyObjC python the focus bar uses; without one it simply does not happen.
+    Never raises and never waits - a celebration must not slow a completion."""
+    try:
+        py = _bar_python()
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "confetti.py")
+        if py and os.path.exists(script):
+            subprocess.Popen([py, script], start_new_session=True, close_fds=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
 def routine_checkin(tid):
     """The ⇧-done ripple (Vex 2026-09-12): completing a routine task also
     checks in that routine's habit for today. Returns a TOAST SUFFIX and
@@ -10306,6 +10331,8 @@ def routine_checkin(tid):
     try:
         import routines as rt
         r = rt.by_tid(tid)
+        if r:
+            _confetti()        # every routine completion road lands here
         if not r or not r.get("habit"):
             return ""
         import habits_model as hm
