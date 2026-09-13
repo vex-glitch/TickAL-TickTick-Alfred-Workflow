@@ -902,6 +902,34 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
     return lines
 
 
+def _sync_ticks(doc, p, day):
+    """Tick the ✅ Tasks / ⏩ Tomorrow lines whose task was completed in
+    TickTick (Vex 2026-09-13: ticking a line completed the task, but
+    completing the task never ticked the line, "even when I refresh").
+
+    Every line ticked here goes into the sweep's ledger at once: it is done,
+    and the ledger is what keeps the sweep from ever completing it again -
+    so reopening that task in TickTick later is never undone by the note.
+    Nothing is unticked. No completed feed (no v2 token, offline) = no
+    change, never a guess."""
+    comp = _completed_between(day - timedelta(days=1), day + timedelta(days=1))
+    if comp is None:
+        return
+    ticked = []
+    for sec_name, line_day in ((pm.SEC_TODAY, day),
+                               (pm.SEC_TOMORROW, day + timedelta(days=1))):
+        sec = ps.find(doc, sec_name)
+        if sec is None:
+            continue
+        done = pm.done_tids_for(comp, line_day, utc_str_to_local_date)
+        body, hit = pm.tick_lines(list(sec.body), done)
+        if hit:
+            ps.set_sec_body(doc, sec, body)
+            ticked += hit
+    if ticked:
+        _swept_add(pm.title_key(p), ticked)
+
+
 def _bridge_text(day):
     """The daily bridge saved FOR `day` (the "D • Bridge 🌉 YYYY/MM/DD" note
     in the Bridges list), or "" - from the cache, which the bridge save
@@ -993,6 +1021,9 @@ def _fill_daily(doc, p, index, is_today):
             merged, _added = pm.merge_checkboxes(
                 body, _scheduled_today(day + timedelta(days=1)), indent=pm.T2)
             ps.set_body(doc, pm.SEC_TOMORROW, pm.sort_checkboxes(merged))
+
+        # ☑️ ticks follow TickTick: a task completed anywhere shows ticked here
+        _sync_ticks(doc, p, day)
 
         # 📊 Today summary - the SAME shape as ⏪ Yesterday (Vex 2026-09-12)
         nsec = ps.find(doc, pm.SEC_NOTES)

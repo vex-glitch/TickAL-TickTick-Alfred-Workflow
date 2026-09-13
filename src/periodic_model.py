@@ -780,6 +780,45 @@ def sweep_verdict(live, line_day, to_local_date):
     return "complete"
 
 
+def done_tids_for(records, line_day, to_local_date):
+    """The task ids a note line should show TICKED for line_day, from the
+    completed feed (Vex 2026-09-13: "if I tick off a task in TickTick that
+    shows in tasks in daily note, that checkbox is not ticked in daily note.
+    Even when I refresh").
+
+    A plain task keeps its id when completed, so its own record counts. A
+    REPEATING task's line links the SERIES id, and its completion lives on a
+    copy with a new id and repeatTaskId = the series - that copy counts only
+    for the occurrence's own day, or finishing today's Startup would tick a
+    Startup line meant for tomorrow."""
+    d = line_day.isoformat()
+    out = set()
+    for t in records or []:
+        series = t.get("repeatTaskId")
+        if series:
+            occ = to_local_date(t.get("startDate") or t.get("dueDate") or "")
+            if occ == d:
+                out.add(series)
+        elif t.get("id"):
+            out.add(t["id"])
+    return out
+
+
+def tick_lines(body_lines, tids):
+    """body with every UNticked linked checkbox whose task id is in tids
+    ticked -> (new_body, [ticked tids]). Only [ ] -> [x]: a line never gets
+    unticked here, so a tick Vex made in the note is never taken back."""
+    out, ticked = [], []
+    for ln in body_lines:
+        cb = fb.CHECKBOX_RE.match(ln)
+        tail = fb.LINK_TAIL_RE.search(ln) if cb else None
+        if cb and tail and cb.group("mark") not in "xX" and tail.group("tid") in tids:
+            ln = ln.replace("[ ]", "[x]", 1)
+            ticked.append(tail.group("tid"))
+        out.append(ln)
+    return out, ticked
+
+
 def merge_checkboxes(body_lines, items, indent=""):
     """items = [(pid, tid, title)] → (new_body, added). Dedupe by tid against
     ALL existing linked lines, checked or unchecked (a phone-ticked task must

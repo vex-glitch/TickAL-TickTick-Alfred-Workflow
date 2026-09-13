@@ -549,6 +549,39 @@ check("25.an-undated-repeating-task-still-completes",
 check("25.a-plain-task-dated-later-is-not-blocked (not a repeat)",
       pm.sweep_verdict({"status": 0, "dueDate": "2026-09-20T08:00"}, _D, _loc) == "complete")
 
+# ── 26. ticks follow TickTick (Vex 2026-09-13: completing a task in TickTick
+# never ticked its line in the daily note, "even when I refresh")
+_loc = lambda s: s[:10]
+_D, _T = date(2026, 9, 13), date(2026, 9, 14)
+_recs = [
+    {"id": "PLAIN", "completedTime": "2026-09-13T09:00"},                        # plain task
+    {"id": "COPY1", "repeatTaskId": "SERIES", "startDate": "2026-09-13T04:30"},  # today's occurrence
+    {"id": "COPY2", "repeatTaskId": "LATER", "startDate": "2026-09-14T04:30"},   # tomorrow's occurrence
+]
+check("26.a-plain-completed-task-counts", "PLAIN" in pm.done_tids_for(_recs, _D, _loc))
+check("26.a-repeating-task-counts-through-its-copy",
+      "SERIES" in pm.done_tids_for(_recs, _D, _loc)
+      and "COPY1" not in pm.done_tids_for(_recs, _D, _loc))
+check("26.a-copy-counts-only-for-its-own-day",
+      "LATER" not in pm.done_tids_for(_recs, _D, _loc)
+      and "LATER" in pm.done_tids_for(_recs, _T, _loc)
+      and "SERIES" not in pm.done_tids_for(_recs, _T, _loc))
+_u = "https://ticktick.com/webapp/#p/aaaaaaaaaaaaaaaaaaaaaaaa/tasks/"
+_ids = {"PLAIN": "a" * 24, "SERIES": "b" * 24, "OPEN": "c" * 24}
+_body = [f"\t- [ ] [Plain · 09:00]({_u}{_ids['PLAIN']}) ",
+         f"\t- [ ] [Startup · 06:30]({_u}{_ids['SERIES']}) ",
+         f"\t- [ ] [Still open]({_u}{_ids['OPEN']}) ",
+         f"\t- [x] [Ticked by hand]({_u}{'d' * 24}) "]
+_nb, _hit = pm.tick_lines(_body, {_ids["PLAIN"], _ids["SERIES"]})
+check("26.completed-lines-get-ticked", _nb[0].startswith("\t- [x] [Plain")
+      and _nb[1].startswith("\t- [x] [Startup"), _nb)
+check("26.open-lines-stay-open", _nb[2].startswith("\t- [ ] [Still open"), _nb)
+check("26.a-hand-tick-is-never-taken-back", _nb[3] == _body[3], _nb)
+check("26.reports-what-it-ticked", sorted(_hit) == sorted([_ids["PLAIN"], _ids["SERIES"]]), _hit)
+check("26.a-bracket-in-the-title-is-not-mistaken-for-the-box",
+      pm.tick_lines([f"\t- [ ] [Buy [2] cables]({_u}{_ids['PLAIN']}) "], {_ids["PLAIN"]})[0][0]
+      == f"\t- [x] [Buy [2] cables]({_u}{_ids['PLAIN']}) ")
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)
