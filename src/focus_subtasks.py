@@ -323,6 +323,73 @@ def move_block(items, i, g):
     return rest[:at] + block + rest[at:]
 
 
+# ── drag-to-reparent (focus bar grip, Vex 2026-09-13) ───────────────────────
+# "make a task a subtask of another task in focus bar by dragging ... to the
+# right and holding over a task we want to be a parent task". The reorder
+# drag above stays sibling-only; dragging RIGHT switches the same gesture to
+# nesting. Rows are addressed by TID here, not index: the bar hit-tests the
+# FOLDED visible list but must reason about the UNFOLDED one (a folded row
+# still carries its hidden subtree along).
+ROOT = ""        # the focus task itself as a drop target: the bar's header row
+
+
+def reparent_targets(items, tid, max_depth=MAX_DEPTH):
+    """The tids that may ADOPT the row `tid` together with its subtree, plus
+    ROOT for the focus task. items: the bar's UNFOLDED open rows (DFS,
+    depth-stamped).
+
+    Refused: the row itself and its own subtree (a cycle), its CURRENT parent
+    (a no-op the bar should not flare for), and any parent under which the
+    moved subtree would sink past max_depth - descendants() stops reading
+    there, so the row would silently vanish from the bar after the move.
+    """
+    i = next((k for k, x in enumerate(items or []) if x.get("tid") == tid), None)
+    if i is None:
+        return set()
+    par = _parents(items)
+    j = _subtree_end(items, i)
+    d0 = items[i].get("depth", 1)
+    height = max(items[k].get("depth", 1) for k in range(i, j)) - d0
+    out = set()
+    if par[i] is not None and 1 + height <= max_depth:
+        out.add(ROOT)
+    for k, t in enumerate(items):
+        if i <= k < j or not t.get("tid") or t.get("tid") == par[i]:
+            continue
+        if t.get("depth", 1) + 1 + height > max_depth:
+            continue
+        out.add(t["tid"])
+    return out
+
+
+def reparent_block(items, tid, target):
+    """items with row `tid` and its subtree moved to be the LAST child of
+    `target` (ROOT = of the focus task, i.e. the end of the list), depths
+    re-based - the bar's optimistic local move, the move_block of nesting.
+    An unknown tid/target, or a target inside the moved block, changes
+    nothing."""
+    items = list(items or [])
+    i = next((k for k, x in enumerate(items) if x.get("tid") == tid), None)
+    if i is None:
+        return items
+    j = _subtree_end(items, i)
+    if target != ROOT and any(x.get("tid") == target for x in items[i:j]):
+        return items
+    block = [dict(x) for x in items[i:j]]
+    rest = items[:i] + items[j:]
+    if target == ROOT:
+        new_d, at = 1, len(rest)
+    else:
+        k = next((n for n, x in enumerate(rest) if x.get("tid") == target), None)
+        if k is None:
+            return items
+        new_d, at = rest[k].get("depth", 1) + 1, _subtree_end(rest, k)
+    shift = new_d - block[0].get("depth", 1)
+    for x in block:
+        x["depth"] = x.get("depth", 1) + shift
+    return rest[:at] + block + rest[at:]
+
+
 def record_note(date, entries):
     """The focus record's note - the children snapshot at stop time,
     today_note's successor. entries: [(title, checked)] in display order.

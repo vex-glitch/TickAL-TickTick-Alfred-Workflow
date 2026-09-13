@@ -230,6 +230,61 @@ check("fold stops at the subtree edge, siblings stay",
 check("two folds at once",
       [x["tid"] for x in fs.fold_rows(deep, {"q", "p"})] == ["p", "t"])
 
+
+# ── drag-to-reparent (Vex 2026-09-13: "dragging it to the right and holding
+# over a task we want to be a parent task") ──────────────────────────────────
+#   a            depth 1
+#     a1         depth 2
+#       a11      depth 3
+#   b            depth 1
+#   c            depth 1
+#     c1         depth 2
+T = [{"tid": "a", "depth": 1}, {"tid": "a1", "depth": 2}, {"tid": "a11", "depth": 3},
+     {"tid": "b", "depth": 1}, {"tid": "c", "depth": 1}, {"tid": "c1", "depth": 2}]
+ids = lambda rows: [(x["tid"], x["depth"]) for x in rows]
+
+check("a leaf can go under any other row",
+      fs.reparent_targets(T, "b") == {"a", "a1", "a11", "c", "c1"},
+      fs.reparent_targets(T, "b"))
+check("never into itself or its own subtree (a cycle)",
+      not ({"a", "a1", "a11"} & fs.reparent_targets(T, "a")))
+check("its current parent is not a target (no-op, no flare)",
+      "a" not in fs.reparent_targets(T, "a1"))
+check("a direct child cannot be dropped on ROOT (already there)",
+      fs.ROOT not in fs.reparent_targets(T, "b"))
+check("a nested row CAN go back to ROOT - the undo road",
+      fs.ROOT in fs.reparent_targets(T, "c1") and fs.ROOT in fs.reparent_targets(T, "a1"))
+check("depth cap: a 3-deep subtree cannot sink below a depth-2 row",
+      "c1" not in fs.reparent_targets(T, "a", max_depth=4)
+      and "b" in fs.reparent_targets(T, "a", max_depth=4),
+      fs.reparent_targets(T, "a", max_depth=4))
+check("depth cap: a leaf cannot go under a row already at the floor",
+      "a11" not in fs.reparent_targets(T, "b", max_depth=3))
+check("unknown tid has no targets", fs.reparent_targets(T, "zz") == set())
+
+check("move a subtree under a sibling: lands LAST, depths re-based",
+      ids(fs.reparent_block(T, "a", "c"))
+      == [("b", 1), ("c", 1), ("c1", 2), ("a", 2), ("a1", 3), ("a11", 4)],
+      ids(fs.reparent_block(T, "a", "c")))
+check("move a leaf under a leaf",
+      ids(fs.reparent_block(T, "b", "a11"))
+      == [("a", 1), ("a1", 2), ("a11", 3), ("b", 4), ("c", 1), ("c1", 2)])
+check("ROOT pulls a nested row out to the end, at depth 1",
+      ids(fs.reparent_block(T, "a1", fs.ROOT))
+      == [("a", 1), ("b", 1), ("c", 1), ("c1", 2), ("a1", 1), ("a11", 2)])
+check("round trip: c1 to ROOT then back under c restores the tree",
+      ids(fs.reparent_block(fs.reparent_block(T, "c1", fs.ROOT), "c1", "c")) == ids(T))
+check("a target inside the moved block changes nothing",
+      ids(fs.reparent_block(T, "a", "a11")) == ids(T))
+check("unknown tid or target changes nothing",
+      ids(fs.reparent_block(T, "zz", "a")) == ids(T)
+      and ids(fs.reparent_block(T, "b", "zz")) == ids(T))
+check("the input list is never mutated",
+      ids(T) == [("a", 1), ("a1", 2), ("a11", 3), ("b", 1), ("c", 1), ("c1", 2)])
+check("a folded target still receives the child at its subtree end",
+      ids(fs.reparent_block(T, "b", "a"))
+      == [("a", 1), ("a1", 2), ("a11", 3), ("b", 2), ("c", 1), ("c1", 2)])
+
 print()
 if FAILS:
     print(f"{len(FAILS)} FAILURES: {FAILS}")

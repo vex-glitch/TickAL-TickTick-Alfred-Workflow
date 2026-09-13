@@ -155,6 +155,9 @@ Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:fx_oneliner                dialog → "- text" bullet appended to the
                                     focus task's content (the note)
     xact:fx_sweep                   RETIRED stub (ticks complete for real)
+    xact:fx_parent:<tid>:<tid|root> bar drag-to-reparent: <tid> + its subtree
+                                    become the LAST child of the target (root
+                                    = the focus task); one v2 taskParent op
     xact:fx_copy[:<pid>:<tid>]      open subtasks → clipboard as a
                                     paste-ready "- Title" bullet list
     xact:convert:<pid>:<tid>        flip the item kind TEXT↔NOTE (⌘ Actions
@@ -10702,6 +10705,75 @@ def fx_move(tid, direction):
     print("reordered")
 
 
+def fx_parent(tid, target):
+    """Bar drag-to-reparent: make `tid` (with its whole subtree) the LAST
+    child of `target` - a row tid, or "root" for the focus task itself (the
+    header row, which is also how a nested row gets back out). Prints
+    "reparented" on success; the bar greps stdout for it.
+
+    ONE v2 batch/taskParent op carrying BOTH parentId and oldParentId.
+    Live-probed 2026-09-13 on scratch tasks: it moves a task together with
+    its own children atomically and fixes both parents' childIds, so there is
+    no window where the row floats detached (the two-step detach-then-adopt
+    road also works, but a failure between its steps orphans the row).
+
+    The follow-up sortOrder write is a v1 FULL-OBJECT post, and v1 SETS
+    parentId from whatever object it posts - so it restates the new parent.
+    Posting the pre-move task with only sortOrder changed would quietly move
+    the row straight back.
+    """
+    cur = _current_focus_task()
+    if not cur:
+        print("🎯 No task-linked session running")
+        return
+    fpid, ftid = cur[0], cur[1]
+    target = ftid if target in ("", "root") else target
+    open_children, _cids = _children_state(fpid, ftid)
+    byid = {t.get("id"): t for t in open_children}
+    me = byid.get(tid)
+    if me is None:
+        print("🎯 Move skipped · that task left the list")
+        return
+    if target != ftid and target not in byid:
+        print("🎯 Move skipped · the new parent left the list")
+        return
+    old = me.get("parentId")
+    if old == target:
+        print("reparented")                       # already there
+        return
+
+    def lookup(x):
+        return byid.get(x) or ({"parentId": None} if x == ftid else None)
+    if target == tid or fsub.would_cycle(target, tid, lookup):
+        print("🎯 A task can't go inside its own subtasks")
+        return
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        print("🎯 Nesting needs the Attachment Login token (Settings)")
+        return
+    pid = me.get("projectId") or fpid
+    if not v2.task_parent([{"taskId": tid, "projectId": pid,
+                            "parentId": target, "oldParentId": old}]):
+        print("🎯 TickTick refused the move · try again in a minute")
+        return
+    from dispatch import _patch_task_cache
+    sibs = [t.get("sortOrder") or 0 for t in open_children
+            if t.get("parentId") == target and t.get("id") != tid]
+    fields = {"parentId": target}
+    if sibs:
+        fields["sortOrder"] = max(sibs) + fsub.SORT_STEP
+        try:
+            _api().update_task(tid, pid, current=me, **fields)
+        except Exception as e:
+            # nested for real, just not last among its new siblings - a
+            # cosmetic miss, never a reason to report the move as failed
+            sys.stderr.write(f"fx_parent sortOrder {tid[:8]}: {e}\n")
+            fields.pop("sortOrder", None)
+    _patch_task_cache(tid, **fields)
+    print("reparented")
+
+
 def section_focus(pid, sid):
     """A section's open tasks → today's block (bulk add)."""
     data = cache_store.get(f"project_data_{pid}") or {}
@@ -11066,6 +11138,8 @@ def main():
             tag_delete(rest)
         elif verb == "fx_move":
             tid, direction = rest.split(":", 1); fx_move(tid, direction)
+        elif verb == "fx_parent":
+            tid, target = rest.split(":", 1); fx_parent(tid, target)
         elif verb == "section_focus":
             pid, sid = rest.split(":", 1); section_focus(pid, sid)
         elif verb == "stage_open":

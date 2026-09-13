@@ -176,6 +176,7 @@ try:
         NSImageView, NSCursor, NSEvent,
     )
     from AppKit import NSView            # noqa: E402
+    from Foundation import NSRunLoop, NSRunLoopCommonModes   # noqa: E402
     from Quartz import (                 # noqa: E402
         CAEmitterLayer, CAEmitterCell, CACurrentMediaTime, kCAEmitterLayerPoint,
         CALayer, CATransaction, CAGradientLayer, CAKeyframeAnimation,
@@ -344,8 +345,11 @@ class _HoverHotkeys:
 
 
 class GripView(NSImageView):
-    """A row's drag handle (≡, far right - replaced the ⤒↑↓⤓ arrows, Vex
-    2026-09-10): press, drag, drop. The controller does the work; the grip
+    """A row's drag handle (≡ - replaced the ⤒↑↓⤓ arrows, Vex 2026-09-10;
+    it sits in the free column LEFT of the checkboxes, not far right, since
+    the right-hand grips ate title room). Press, drag, drop: straight up or
+    down reorders among siblings, dragged RIGHT and rested on a row it nests
+    under that row (Vex 2026-09-13). The controller does the work; the grip
     never drags the WINDOW (the panel is movable by its background)."""
 
     def acceptsFirstMouse_(self, event):
@@ -414,6 +418,11 @@ GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.18, 0.75, 0.47, 0.95)
 # Expanded list: px each nesting level below the direct child shifts its
 # checkbox + title - just enough to read as nested (Vex 2026-09-10)
 INDENT = 14
+# drag-to-reparent (Vex 2026-09-13): past this far RIGHT of where the grip
+# was pressed, the drag stops reordering and starts nesting; resting over a
+# row for NEST_DWELL arms it as the new parent
+NEST_DX = 26
+NEST_DWELL = 0.35
 TLINK_W = 22       # row 1's link icon box (row icons scale with the zoom)
 TLINK_GAP = 6      # ...and the room between the title and that icon
 TASK_FONT = 15     # row titles (17 → 15, Vex 2026-09-10: the task/sub gap read too big)
@@ -685,6 +694,23 @@ class BarController(NSObject):
         self._drop_grad = grad
         self.drop_line.setHidden_(True)
         self.overlay.addSubview_(self.drop_line)
+
+        # nest target: a capsule around the row that will ADOPT the dragged
+        # one - faint while you rest on it, full + a flare once armed
+        self.nest_glow = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 10, 10))
+        self.nest_glow.setWantsLayer_(True)
+        ng = self.nest_glow.layer()
+        ng.setCornerRadius_(9.0)
+        ng.setBorderWidth_(1.5)
+        ng.setBorderColor_(GREEN.colorWithAlphaComponent_(0.95).CGColor())
+        ng.setBackgroundColor_(GREEN.colorWithAlphaComponent_(0.10).CGColor())
+        ng.setShadowColor_(GREEN.CGColor())
+        ng.setShadowRadius_(9.0)
+        ng.setShadowOffset_((0, 0))
+        ng.setShadowOpacity_(0.7)
+        ng.setMasksToBounds_(False)
+        self.nest_glow.setHidden_(True)
+        self.overlay.addSubview_(self.nest_glow)
 
         self._restore_origin()
 
@@ -1395,7 +1421,7 @@ class BarController(NSObject):
             grip.setImage_(sym_image("line.3.horizontal", 11))
             grip.setContentTintColor_(NSColor.tertiaryLabelColor())
             grip.setTag_(idx)
-            grip.setToolTip_("Drag to reorder")
+            grip.setToolTip_("Drag to reorder · drag right onto a task to nest it")
             grip._bar = self
             self.fx.addSubview_(grip)
             f = PillButton.alloc().initWithFrame_(NSMakeRect(0, 0, 16, 20))
@@ -1685,8 +1711,9 @@ class BarController(NSObject):
                 y_top -= rh
                 self._gap_y.append(y_top)
                 # no siblings = nowhere to go: the grip dims
-                g.setAlphaValue_(1.0 if len(fsub.sibling_gaps(
-                    items, self.scroll_off + i)) > 2 else 0.35)
+                g.setAlphaValue_(1.0 if (len(fsub.sibling_gaps(
+                    items, self.scroll_off + i)) > 2
+                    or fsub.reparent_targets(items, it.get("tid"))) else 0.35)
 
         # overflow strip: "scroll ↑2 · ↓4" under the last row
         self.l_more.setHidden_(not overflow)
@@ -1870,7 +1897,14 @@ class BarController(NSObject):
                       "gaps": fsub.sibling_gaps(items, i),
                       "depth": max(1, items[i].get("depth", 1)),
                       "order": tuple(x.get("tid") for x in items),
-                      "pick": None}
+                      "pick": None,
+                      # nesting: the UNFOLDED rows decide who may adopt it
+                      # (a folded row still drags its hidden subtree along)
+                      "x0": event.locationInWindow().x,
+                      "targets": fsub.reparent_targets(
+                          fsub.open_rows((self.block or {}).get("items") or []), tid),
+                      "nest": False, "cand": None, "armed": None,
+                      "cand_rect": None, "dwell": None}
         for v in row:
             v.setAlphaValue_(0.55)
         NSCursor.closedHandCursor().push()
@@ -1885,9 +1919,20 @@ class BarController(NSObject):
         y = event.locationInWindow().y
         H = self.panel.frame().size.height
         dy = y - d["y0"]
+        nest = (event.locationInWindow().x - d["x0"] >= NEST_DX * self.zoom
+                and bool(d["targets"]))
+        nx = INDENT * self.zoom if nest else 0.0     # the row leans in: "nest"
         for v, fr in zip(d["row"], d["frames"]):
             ny = max(-6.0, min(H - ROW1_H - fr.size.height + 6.0, fr.origin.y + dy))
-            v.setFrameOrigin_((fr.origin.x, ny))
+            v.setFrameOrigin_((fr.origin.x + nx, ny))
+        if nest:
+            d["nest"] = True
+            d["pick"] = None                 # a nest drop is never also a reorder
+            self.drop_line.setHidden_(True)
+            self._nest_hover(d, y, H)
+            return
+        if d["nest"]:
+            self._nest_clear(d)
         best = None
         for g, tgt in d["gaps"]:
             gv = g - d["so"]
@@ -1912,6 +1957,123 @@ class BarController(NSObject):
             CATransaction.commit()
         if changed:
             self._pulse_drop_line()
+
+    @objc.python_method
+    def _nest_hover(self, d, y, H):
+        """Which row the pointer rests on while nesting. The header row is
+        the focus task itself (fsub.ROOT - how a nested row gets back out);
+        a list row is a candidate only if fsub.reparent_targets allows it.
+        A NEW candidate restarts the dwell; staying on it arms it."""
+        cand, rect = None, None
+        if y >= H - ROW1_H:
+            if fsub.ROOT in d["targets"]:
+                cand = fsub.ROOT
+                rect = NSMakeRect(8.0, H - ROW1_H + 4.0, self.W - 16.0, ROW1_H - 8.0)
+        else:
+            gy, vis = d["gap_y"], self._open_items()
+            for v in range(len(gy) - 1):
+                if gy[v + 1] < y <= gy[v]:
+                    k = v + d["so"]
+                    tid = vis[k].get("tid") if k < len(vis) else None
+                    if tid and tid in d["targets"]:
+                        cand = tid
+                        x = max(4.0, self._x0 - 10.0)
+                        rect = NSMakeRect(x, gy[v + 1] + 1.0, self.W - x - 8.0,
+                                          gy[v] - gy[v + 1] - 2.0)
+                    break
+        if cand == d["cand"]:
+            return
+        self._nest_clear(d, keep_mode=True)
+        d["cand"], d["cand_rect"] = cand, rect
+        if cand is None:
+            return
+        self._nest_show(rect, armed=False)
+        t = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(
+            NEST_DWELL, self, "armNest:", cand or "root", False)
+        # COMMON modes: a timer in the default mode alone can stall while the
+        # mouse button is held, which is exactly when this one has to fire
+        NSRunLoop.currentRunLoop().addTimer_forMode_(t, NSRunLoopCommonModes)
+        d["dwell"] = t
+
+    def armNest_(self, timer):
+        """The dwell ran out on the same candidate: arm it (full glow + a
+        flare - 'let go now and it nests here')."""
+        d = self._drag
+        if d is None or not d["nest"]:
+            return
+        cand = str(timer.userInfo() or "")
+        cand = fsub.ROOT if cand == "root" else cand
+        if cand != d["cand"] or d["cand_rect"] is None:
+            return
+        d["armed"], d["dwell"] = cand, None
+        self._nest_show(d["cand_rect"], armed=True)
+
+    @objc.python_method
+    def _nest_show(self, rect, armed):
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)
+        try:
+            self.nest_glow.setFrame_(rect)
+            self.nest_glow.setAlphaValue_(1.0 if armed else 0.35)
+            self.nest_glow.setHidden_(False)
+        finally:
+            CATransaction.commit()
+        if armed:
+            try:
+                a = CAKeyframeAnimation.animationWithKeyPath_("shadowRadius")
+                a.setValues_([9.0, 20.0, 9.0])
+                a.setKeyTimes_([0.0, 0.25, 1.0])
+                a.setDuration_(0.45)
+                self.nest_glow.layer().addAnimation_forKey_(a, "nestFlare")
+            except Exception as e:
+                _log(f"nest flare: {e}")
+
+    @objc.python_method
+    def _nest_clear(self, d, keep_mode=False):
+        """Drop the candidate: stop its dwell timer, hide the glow. keep_mode
+        stays in nesting (the pointer moved to another row); otherwise the
+        drag has gone back LEFT and reordering resumes."""
+        t = d.get("dwell")
+        if t is not None:
+            t.invalidate()
+        d["dwell"], d["cand"], d["armed"], d["cand_rect"] = None, None, None, None
+        self.nest_glow.setHidden_(True)
+        if not keep_mode:
+            d["nest"] = False
+
+    @objc.python_method
+    def _nest_to(self, tid, target):
+        """OPTIMISTIC local nest first (fsub.reparent_block - the row and its
+        subtree land under the new parent the instant you let go), then the
+        authoritative xact fx_parent write in the background, serialized on
+        _rmw_lock with every other live write, exactly like _reorder_to. A
+        folded target unfolds so you see where it went."""
+        items = (self.block or {}).get("items") or []
+        open_ = fsub.open_rows(items)
+        others = [x for x in items if not any(x is o for o in open_)]
+        self.block["items"] = fsub.reparent_block(open_, tid, target) + others
+        if target and target in self.folded:
+            self.folded = [t for t in self.folded if t != target]
+            self._persist_origin()
+        self.mutation_seq += 1          # drop in-flight stale polls
+        self._relayout_pending = False
+        self._relayout()
+        runner = self._xact_direct(f"fx_parent:{tid}:{target or 'root'}")
+
+        def work():
+            with self._rmw_lock:
+                out = runner()
+            if "reparented" not in (out or ""):
+                _log(f"nest {tid[:8]} -> {(target or 'root')[:8]}: {(out or 'no output')[:120]!r}")
+                last = (out or "").strip().splitlines()[-1:] or [""]
+                self._xact_et("notify:" + (
+                    last[0] if last[0].startswith("🎯")
+                    else "🎯 Nest didn't stick · TickTick rate limit, try "
+                         "again in a minute"))
+            self.mutation_seq += 1
+            self.content_dirty.set()
+
+        threading.Thread(target=work, daemon=True).start()
 
     @objc.python_method
     def _pulse_drop_line(self):
@@ -1949,6 +2111,17 @@ class BarController(NSObject):
         for v in d["row"]:
             v.setAlphaValue_(1.0)
         items = self._open_items()
+        if d["nest"]:
+            armed = d["armed"]
+            self._nest_clear(d)
+            # only an ARMED target nests, and never on a list that changed
+            # mid-drag (a poll landed): same rule as the reorder below
+            if armed is not None and tuple(x.get("tid") for x in items) == d["order"]:
+                self._nest_to(d["tid"], armed)
+                return
+            self._relayout_pending = False
+            self._relayout()
+            return
         pick = d["pick"]
         if pick and tuple(x.get("tid") for x in items) == d["order"]:
             g, tgt = pick
