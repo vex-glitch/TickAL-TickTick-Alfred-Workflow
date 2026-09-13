@@ -874,6 +874,7 @@ def mode_menu(fragment):
     autocompletes its prefix; the letter shortcut is shown too."""
     rows = [
         ("",   "✅", "Task",    "Type name"),
+        ("st ", "🧬", "Subtask", "Under a task"),
         ("L ", "📋", "List",    "New list"),
         ("N ", "📝", "Note",    "New note"),
         ("P ", "💼", "Project", "list + meta task"),

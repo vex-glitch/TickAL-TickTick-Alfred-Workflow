@@ -688,7 +688,11 @@ def otd_lines(memories):
         return ["- _(nothing from past years yet)_"]
     out = []
     for d, url, stars, mood, wins, hl in memories:
-        label = f"{d.year} · {DAY_ABBR[d.weekday()]}"
+        # the label IS that day's daily note title ("2025-09-13 · Sat"), the
+        # same name the breadcrumb links by - so the line reads as the note
+        # it opens (Vex 2026-09-13: "make sure to include a link to that
+        # days daily note")
+        label = title(period_for("daily", d))
         out.append(f"- [{label}]({url})" if url else f"- {label}")
         if stars:
             out.append(f"\t- Day: {stars}")

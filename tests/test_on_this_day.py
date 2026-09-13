@@ -83,12 +83,12 @@ check("today-is-never-its-own-memory",
 
 lines = pm.otd_lines(mem)
 check("renders",
-      lines[:6] == ["- [2025 · Sat](https://ticktick.com/webapp/#p/PLIST/tasks/t25)",
+      lines[:6] == ["- [2025-09-13 · Sat](https://ticktick.com/webapp/#p/PLIST/tasks/t25)",
                     "\t- Day: ★★★★", "\t- Mood: 🙂 slept badly",
                     "\t- 🟢 Shipped the album", "\t- 🟢 an old-glyph win",
                     "\t- ⭐️ The week the shop opened"], lines)
 check("quiet-year-is-just-its-link",
-      lines[6] == "- [2024 · Fri](https://ticktick.com/webapp/#p/PLIST/tasks/t24)"
+      lines[6] == "- [2024-09-13 · Fri](https://ticktick.com/webapp/#p/PLIST/tasks/t24)"
       and len(lines) == 7, lines)
 check("wins-capped-at-three",
       len([l for l in pm.otd_lines([(TODAY, None, "", "", list("abcde"), "")])
@@ -116,7 +116,7 @@ before = ps.serialize_sections(doc)
 ps.set_body(doc, pm.SEC_OTD, pm.otd_lines(mem))
 after = ps.serialize_sections(doc)
 check("fills-the-section",
-      after.split("##### 🕰️ On this day\n", 1)[1].startswith("- [2025 · Sat]"),
+      after.split("##### 🕰️ On this day\n", 1)[1].startswith("- [2025-09-13 · Sat]"),
       after[-300:])
 check("leaves-everything-above-untouched",
       after.split("##### 🕰️ On this day")[0] == before.split("##### 🕰️ On this day")[0])
