@@ -6811,6 +6811,46 @@ def routine_exec(key):
         log.write(f"{_op_iso()} done {r['label']}\n")
 
 
+def routine_reset_after(key):
+    """Put a just-finished routine's steps back, DETACHED from the finish.
+
+    Vex 2026-09-13, looking at his Routines board after Shutdown: "There is no
+    startup at all ... there is no calendar or start startup." The reset only
+    ran as the FIRST step of the next start, so from Finish until then every
+    routine showed its ticked steps missing and their own subtasks floating
+    loose in the column. Now the finish itself repairs the tree; the reset at
+    start stays as the safety net and finds nothing to do.
+
+    Safe to run right after the complete: completed_descendants never returns
+    the root and skips occurrence copies (repeatTaskId), so the fresh
+    completed copy is left alone. The log is the record."""
+    import routines as rt
+    r = rt.by_key(key)
+    if not r:
+        return
+    pid = (routine_task(r) or {}).get("projectId") or r["pid"]
+    verdict = _routine_reset(r["tid"], pid)
+    try:
+        with open(ROUTINE_LOG, "a") as log:
+            log.write(f"{_op_iso()} finished {r['label']} -> steps back: {verdict}\n")
+    except OSError:
+        pass
+
+
+def _routine_reset_bg(key):
+    """Spawn routine_reset_after; never blocks or raises (the completion toast
+    must not wait on two feed reads)."""
+    wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        with open(ROUTINE_LOG, "a") as logf:
+            subprocess.Popen(
+                ["/bin/bash", os.path.join(wf, "Scripts", "py.sh"),
+                 os.path.join(wf, "Scripts", "xact.py"), f"xact:routine_reset_after:{key}"],
+                stdout=logf, stderr=logf, start_new_session=True)
+    except OSError:
+        pass
+
+
 def routine_task(r):
     """The routine's task, LIVE when the API answers (the cache can be a
     completion behind, and "which occurrence" is exactly what goes stale),
@@ -10333,6 +10373,7 @@ def routine_checkin(tid):
         r = rt.by_tid(tid)
         if r:
             _confetti()        # every routine completion road lands here
+            _routine_reset_bg(r["key"])   # its steps back now, not at next start
         if not r or not r.get("habit"):
             return ""
         import habits_model as hm
@@ -11203,6 +11244,8 @@ def main():
             routine_start(rest)
         elif verb == "routine_exec":
             routine_exec(rest)
+        elif verb == "routine_reset_after":
+            routine_reset_after(rest)
         elif verb == "pn_journal":
             pn_journal(rest)
         elif verb == "pn_goal":
