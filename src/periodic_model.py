@@ -752,6 +752,34 @@ def checked_linked(body_lines):
     return out
 
 
+def sweep_verdict(live, line_day, to_local_date):
+    """Should the sweep complete a ticked line's task? -> "complete" | "done".
+
+    A ticked line in a note points at a task ID, and a REPEATING task keeps
+    that id when an occurrence is completed: the series just rolls its date
+    forward. So a line ticked for an occurrence that was ALREADY completed
+    elsewhere (the routine's end, the focus bar, the app) points at an open
+    task that is now TOMORROW's occurrence, and completing it again eats
+    tomorrow. On 2026-09-13 the refresh at 09:34 did exactly that to Rise and
+    shine, Startup and Self Care, an hour after they were finished for real.
+
+    "done" = leave it alone and record it: the task is no longer open, or it
+    repeats and its current occurrence is already past the day the line was
+    ticked for. line_day is that day (the note's day for ✅ Tasks, the next
+    day for ⏩ Tomorrow). to_local_date maps a TickTick UTC stamp to
+    'YYYY-MM-DD' local. A task we could not read never reaches here - the
+    caller skips it rather than completing blind.
+    """
+    if (live or {}).get("status", 0) != 0:
+        return "done"
+    if live.get("repeatFlag"):
+        when = live.get("startDate") or live.get("dueDate") or ""
+        occ = to_local_date(when) if when else ""
+        if occ and occ > line_day.isoformat():
+            return "done"
+    return "complete"
+
+
 def merge_checkboxes(body_lines, items, indent=""):
     """items = [(pid, tid, title)] → (new_body, added). Dedupe by tid against
     ALL existing linked lines, checked or unchecked (a phone-ticked task must

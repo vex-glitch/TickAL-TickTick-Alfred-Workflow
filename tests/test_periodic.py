@@ -518,6 +518,37 @@ check("24.delta-avoids-the-entry-glyphs",
       all(g not in (pm.delta_chip(5, 3) + pm.delta_chip(3, 5))
           for g in ("🟢", "🔴")))
 
+# ── 25. the sweep never completes an occurrence twice (2026-09-13: the 09:34
+# refresh re-completed Rise and shine, Startup and Self Care an hour after
+# they were done, eating TOMORROW's occurrences - a repeating task keeps its
+# id and rolls forward, so a ticked line points at the next occurrence)
+_loc = lambda s: s[:10]
+_D, _T = date(2026, 9, 13), date(2026, 9, 14)
+_rep = "RRULE:FREQ=DAILY;INTERVAL=1"
+check("25.plain-open-task-completes",
+      pm.sweep_verdict({"status": 0, "dueDate": "2026-09-13T08:00"}, _D, _loc) == "complete")
+check("25.already-completed-is-left-alone",
+      pm.sweep_verdict({"status": 2}, _D, _loc) == "done")
+check("25.repeating-still-on-its-day-completes (ticked in the note first)",
+      pm.sweep_verdict({"status": 0, "repeatFlag": _rep,
+                        "startDate": "2026-09-13T04:30"}, _D, _loc) == "complete")
+check("25.THE-BUG: repeating already rolled to tomorrow is NOT completed again",
+      pm.sweep_verdict({"status": 0, "repeatFlag": _rep,
+                        "startDate": "2026-09-14T04:30"}, _D, _loc) == "done")
+check("25.a-Tomorrow-line-completes-tomorrows-occurrence",
+      pm.sweep_verdict({"status": 0, "repeatFlag": _rep,
+                        "startDate": "2026-09-14T04:30"}, _T, _loc) == "complete")
+check("25.a-Tomorrow-line-rolled-past-tomorrow-is-left-alone",
+      pm.sweep_verdict({"status": 0, "repeatFlag": _rep,
+                        "startDate": "2026-09-15T04:30"}, _T, _loc) == "done")
+check("25.dueDate-counts-when-there-is-no-startDate",
+      pm.sweep_verdict({"status": 0, "repeatFlag": _rep,
+                        "dueDate": "2026-09-14T04:30"}, _D, _loc) == "done")
+check("25.an-undated-repeating-task-still-completes",
+      pm.sweep_verdict({"status": 0, "repeatFlag": _rep}, _D, _loc) == "complete")
+check("25.a-plain-task-dated-later-is-not-blocked (not a repeat)",
+      pm.sweep_verdict({"status": 0, "dueDate": "2026-09-20T08:00"}, _D, _loc) == "complete")
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)

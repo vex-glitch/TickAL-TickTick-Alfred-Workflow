@@ -559,6 +559,26 @@ def _swept_add(key, tids):
         pass
 
 
+def _sweep_due(pairs, line_day):
+    """(due_pairs, already_done_tids): one LIVE read per ticked task, judged
+    by pm.sweep_verdict. A task that cannot be read is neither completed nor
+    recorded - it is simply tried again on the next refresh."""
+    api = _api()
+    due, already = [], []
+    for pid, tid in pairs:
+        try:
+            live = api.get_task(pid, tid)
+        except Exception as e:
+            _log(f"sweep read {tid[:8]}: {e}")
+            continue
+        if pm.sweep_verdict(live, line_day[tid], utc_str_to_local_date) == "done":
+            already.append(tid)
+            _log(f"sweep skip {tid[:8]}: already done for {line_day[tid]}")
+        else:
+            due.append((pid, tid))
+    return due, already
+
+
 def _complete_many(pairs):
     """Pooled completer over ALL [(pid, tid)] - the _sweep_from_doc pattern
     (max 4 workers, no truncation). Returns (done_tids, failed_tids)."""
@@ -625,15 +645,28 @@ def refresh_period(p, index=None, force=False):
         if p.start <= today <= p.end + timedelta(days=1):
             key = pm.title_key(p)
             ledger = set(_swept_load().get(key, []))
-            pairs = []
+            pairs, line_day = [], {}
             for sec_name in _SWEEP_SECTIONS.get(p.kind, ()):
                 sec = ps.find(doc, sec_name)
                 if sec:
-                    pairs += [(pp, tt) for pp, tt in pm.checked_linked(sec.body)
-                              if tt not in ledger]
+                    # the day a ticked line stands for: ⏩ Tomorrow's lines
+                    # are the NEXT day's occurrence, everything else the note's
+                    d = (p.start + timedelta(days=1)
+                         if sec_name == pm.SEC_TOMORROW else
+                         (p.start if p.kind == "daily" else p.end))
+                    for pp, tt in pm.checked_linked(sec.body):
+                        if tt not in ledger:
+                            pairs.append((pp, tt))
+                            line_day.setdefault(tt, d)
             pairs = list(dict.fromkeys(pairs))
-            if pairs:
-                done, failed = _complete_many(pairs)
+            # never complete blind: an occurrence already finished elsewhere
+            # (a repeating task's id is still open, pointing at TOMORROW) is
+            # recorded, not completed again - see pm.sweep_verdict
+            due, already = _sweep_due(pairs, line_day)
+            if already:
+                _swept_add(key, already)
+            if due:
+                done, failed = _complete_many(due)
                 if done:
                     _swept_add(key, done)
                 notes_swept.append((len(done), len(failed)))
