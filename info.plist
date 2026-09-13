@@ -1502,7 +1502,7 @@
 		<array>
 			<dict>
 				<key>destinationuid</key>
-				<string>D07180DE-EC6F-46FE-AFD9-F0AE32DE67E6</string>
+				<string>ST000001-0000-4000-9000-2026091300AA</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -1541,7 +1541,7 @@
 		<array>
 			<dict>
 				<key>destinationuid</key>
-				<string>BD5367D5-4884-49B1-8833-5E7A776D8F54</string>
+				<string>ST000005-0000-4000-9000-2026091300AA</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -4560,6 +4560,64 @@
 				<false/>
 			</dict>
 		</array>
+		<key>ST000001-0000-4000-9000-2026091300AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>ST000004-0000-4000-9000-2026091300AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>ST000002-0000-4000-9000-2026091300AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>D07180DE-EC6F-46FE-AFD9-F0AE32DE67E6</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>ST000003-0000-4000-9000-2026091300AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>ST000004-0000-4000-9000-2026091300AA</key>
+		<array/>
+		<key>ST000005-0000-4000-9000-2026091300AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>ST000008-0000-4000-9000-2026091300AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>ST000006-0000-4000-9000-2026091300AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>BD5367D5-4884-49B1-8833-5E7A776D8F54</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>ST000007-0000-4000-9000-2026091300AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>ST000008-0000-4000-9000-2026091300AA</key>
+		<array/>
 		<key>WT000002-0000-4000-8000-000000000002</key>
 		<array>
 			<dict>
@@ -14280,6 +14338,136 @@ fi</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>conditions</key>
+				<array>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<true/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^addunder$</string>
+						<key>outputlabel</key>
+						<string>st subtask</string>
+						<key>uid</key>
+						<string>ST000002-0000-4000-9000-2026091300AA</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<true/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^(?!addunder$)</string>
+						<key>outputlabel</key>
+						<string>toast</string>
+						<key>uid</key>
+						<string>ST000003-0000-4000-9000-2026091300AA</string>
+					</dict>
+				</array>
+				<key>elselabel</key>
+				<string>N/A</string>
+				<key>hideelse</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.conditional</string>
+			<key>uid</key>
+			<string>ST000001-0000-4000-9000-2026091300AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Add</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>ST000004-0000-4000-9000-2026091300AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>conditions</key>
+				<array>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<true/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^addunder$</string>
+						<key>outputlabel</key>
+						<string>st subtask</string>
+						<key>uid</key>
+						<string>ST000006-0000-4000-9000-2026091300AA</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<true/>
+						<key>matchmode</key>
+						<integer>4</integer>
+						<key>matchstring</key>
+						<string>^(?!addunder$)</string>
+						<key>outputlabel</key>
+						<string>toast</string>
+						<key>uid</key>
+						<string>ST000007-0000-4000-9000-2026091300AA</string>
+					</dict>
+				</array>
+				<key>elselabel</key>
+				<string>N/A</string>
+				<key>hideelse</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.conditional</string>
+			<key>uid</key>
+			<string>ST000005-0000-4000-9000-2026091300AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>externaltriggerid</key>
+				<string>Add</string>
+				<key>passinputasargument</key>
+				<false/>
+				<key>passvariables</key>
+				<true/>
+				<key>workflowbundleid</key>
+				<string>self</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.callexternaltrigger</string>
+			<key>uid</key>
+			<string>ST000008-0000-4000-9000-2026091300AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -17503,7 +17691,7 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>colorindex</key>
 			<integer>9</integer>
 			<key>xpos</key>
-			<real>3790.0</real>
+			<real>3965.0</real>
 			<key>ypos</key>
 			<real>260.0</real>
 		</dict>
@@ -18239,6 +18427,50 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<real>2650.0</real>
 			<key>ypos</key>
 			<real>430.0</real>
+		</dict>
+		<key>ST000001-0000-4000-9000-2026091300AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>note</key>
+			<string>st ⏎ → Add subtask, else → toast</string>
+			<key>xpos</key>
+			<real>3790.0</real>
+			<key>ypos</key>
+			<real>260.0</real>
+		</dict>
+		<key>ST000004-0000-4000-9000-2026091300AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>12</integer>
+			<key>note</key>
+			<string>→ Add (subtask of picked)</string>
+			<key>xpos</key>
+			<real>3965.0</real>
+			<key>ypos</key>
+			<real>365.0</real>
+		</dict>
+		<key>ST000005-0000-4000-9000-2026091300AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>note</key>
+			<string>st ⏎ → Add subtask, else → toast</string>
+			<key>xpos</key>
+			<real>1910.0</real>
+			<key>ypos</key>
+			<real>1480.0</real>
+		</dict>
+		<key>ST000008-0000-4000-9000-2026091300AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>12</integer>
+			<key>note</key>
+			<string>→ Add (subtask of picked)</string>
+			<key>xpos</key>
+			<real>2035.0</real>
+			<key>ypos</key>
+			<real>1480.0</real>
 		</dict>
 		<key>WT000002-0000-4000-8000-000000000002</key>
 		<dict>
