@@ -719,6 +719,46 @@ def _mood_of_doc(doc):
     return None
 
 
+def _otd_memories(day, index):
+    """[(date, url, stars, mood, wins, highlight)] for this date in every
+    earlier year that has a daily note, newest first. Daily notes only exist
+    once opened, so the first real memory is a year after the earliest note
+    (2026-07-11 -> 2027-07-11); until then this returns []."""
+    years = [d.year for (k, key) in index if k == "daily"
+             for d in [pm.parse_daily_title(key)] if d]
+    out = []
+    if not years:
+        return out
+    for back in range(1, day.year - min(years) + 1):
+        d = pm.same_day_back(day, back)
+        t = lookup(index, pm.period_for("daily", d)) if d else None
+        if not t:
+            continue
+        doc = ps.parse_sections(t.get("content") or "")
+        stars = pm.answer_stars(_answer_in(doc, pm.SEC_EVENING, "rate the day"))
+        mood = _mood_of_doc(doc)
+        nsec = ps.find(doc, pm.SEC_NOTES)
+        wins = [mdtext.flatten_links(b).strip()
+                for _hm, g, b in (pm.harvest_entries(nsec.body) if nsec else [])
+                if g == "🟢"]
+        hl = ""
+        wk = lookup(index, pm.period_for("weekly", d))
+        if wk:
+            hsec = ps.find(ps.parse_sections(wk.get("content") or ""),
+                           pm.SEC_HIGHLIGHT)
+            if hsec is not None:
+                # a divider can sit in the last section's body (decor only
+                # migrates when a NEXT section exists) - never let it through
+                parts = [ln.strip().lstrip("-").strip() for ln in hsec.body
+                         if ln.strip() and not ps.DECOR_RE.match(ln.strip())
+                         and not pm.PENDING_RE.match(ln.strip())]
+                hl = " ".join(x for x in parts if x)
+        out.append((d, _note_url(t), stars,
+                    pm.mood_text(mood[0], mood[1]) if mood else "",
+                    wins, mdtext.flatten_links(hl)))
+    return out
+
+
 def _day_money(doc):
     """A daily note's money for the day → float | None. The evening journal
     answer, then a legacy 💰 section."""
@@ -898,6 +938,12 @@ def _fill_daily(doc, p, index, is_today):
         # phone-answerable); unanswered fixed prompts refresh their text so
         # the evening 'did you achieve {goal}' bakes in a goal set at noon
         _seed_daily_journals(doc, day)
+
+    # 🕰️ On this day - any daily note, not just today's: opening an old note
+    # shows ITS memories. Looked up only when the section is there (deleting
+    # it is the kill switch, like every other section).
+    if ps.find(doc, pm.SEC_OTD) is not None:
+        ps.set_body(doc, pm.SEC_OTD, pm.otd_lines(_otd_memories(day, index)))
 
     # 💰 re-total ALWAYS (historical dailies included)
     msec = ps.find(doc, pm.SEC_MONEY)

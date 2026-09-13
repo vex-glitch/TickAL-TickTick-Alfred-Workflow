@@ -50,6 +50,7 @@ SEC_MORNING    = "🌅 Morning journal"
 SEC_NOTES      = "📓 Notes"
 SEC_EVENING    = "🌙 Evening journal"
 SEC_DAY_SUM    = "📊 Today"               # under the # 🔎 Summaries group
+SEC_OTD        = "🕰️ On this day"         # past years' same date, last in the note
 SEC_MONEY      = "💰 Money"
 # weekly
 SEC_GOALS      = "🏆 Goals"
@@ -136,7 +137,7 @@ WRITER_ANCHORS = {
     # carry a 💰 section are still read, they just are not seeded any more.
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
                   SEC_YESTERDAY, SEC_YBRIDGE, SEC_TODAY, SEC_TOMORROW,
-                  SEC_MORNING, SEC_NOTES, SEC_EVENING, SEC_DAY_SUM],
+                  SEC_MORNING, SEC_NOTES, SEC_EVENING, SEC_DAY_SUM, SEC_OTD],
     "weekly":    [SEC_GOALS, SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK, SEC_WEEKLY_JNL,
@@ -661,6 +662,42 @@ def chip(cur, prev, kind="count", unit="tasks"):
     if diff < 0:
         return f"🔴 {mag} behind last week{pct}"
     return "⚪ level with last week"
+
+
+def same_day_back(day, years):
+    """`day` moved back `years` years, or None when that date does not exist
+    that year (29 Feb in a common year has no "on this day")."""
+    try:
+        return day.replace(year=day.year - years)
+    except ValueError:
+        return None
+
+
+def otd_lines(memories):
+    """🕰️ On this day body. memories = [(date, url|None, stars, mood, wins,
+    highlight)], newest year first.
+
+    Each year's line LINKS to that day's note, so the section is a door into
+    the whole day rather than a copy of it. A past note with none of the four
+    readers filled still gets its line - opening it is the point. With no
+    past-year note at all the section holds one quiet line instead of an
+    empty header: a header that appeared and vanished could not honour the
+    delete-it-to-kill-it rule every other section follows.
+    """
+    if not memories:
+        return ["- _(nothing from past years yet)_"]
+    out = []
+    for d, url, stars, mood, wins, hl in memories:
+        label = f"{d.year} · {DAY_ABBR[d.weekday()]}"
+        out.append(f"- [{label}]({url})" if url else f"- {label}")
+        if stars:
+            out.append(f"\t- Day: {stars}")
+        if mood:
+            out.append(f"\t- Mood: {mood}")
+        out += [f"\t- 🟢 {w}" for w in (wins or [])[:3]]
+        if hl:
+            out.append(f"\t- ⭐️ {hl}")
+    return out
 
 
 def delta_chip(cur, prev, kind="count"):
