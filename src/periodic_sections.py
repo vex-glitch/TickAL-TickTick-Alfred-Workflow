@@ -197,7 +197,7 @@ def _blocks(sec):
 
 
 # Vex's layout renamed anchors as he de-emojied ("💰 Money" -> "- Money",
-# "☀️ Daily" -> "- 📌 Daily", "🌅 Morning journal" -> "- 🌅 Morning Journal"),
+# "☀️ Daily" -> "- ☀️ Daily", "🌅 Morning journal" -> "- 🌅 Morning journal"),
 # so a name also matches with its symbols and case stripped.
 _NORM_RE = re.compile(r"[^\w\s']+", re.UNICODE)
 

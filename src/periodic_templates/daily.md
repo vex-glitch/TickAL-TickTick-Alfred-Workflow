@@ -3,10 +3,11 @@
 #### 🌉 Yesterday's bridge
 ---
 #### 🏆 Goals
+
 - 🗓️ Weekly
 	- _(mirrors this week's weekly note - edit goals there)_
 
-- 📌 Daily
+- ☀️ Daily
 	- _(pick one - ☀️ in search, or the morning journal asks)_
 ---
 #### ⚔️ Workbench
@@ -14,14 +15,15 @@
 
 - 📓 Notes
 ---
-##### ☀️ Today
-- Habits
+#### ☀️ today
+- 🔄 Habits
 	- _(pending)_
 
-- Countdowns
+- ⏳ Countdowns
 	- _(pending)_
 ---
-##### 🔎 Summaries
+#### 🔎 Summaries
+
 - Today
 	- _(pending)_
 
@@ -30,9 +32,9 @@
 
 - Tomorrow
 ---
-##### 📓 Journals
-- 🌅 Morning Journal
+#### 📓 Journals
+- 🌅 Morning journal
 
 - 🌙 Evening journal
 ---
-##### 🕰️ On this day
+#### 🕰️ On this day

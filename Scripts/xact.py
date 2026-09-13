@@ -9059,9 +9059,17 @@ def _bridge_month_tag(day):
 
 
 def _bridge_feed_tomorrow(text, day):
-    """Same text lands where tomorrow-morning eyes go: the NEXT day's daily
-    note, ### 🌉 Yesterday's bridge. Old notes lack the header - the section
-    is inserted right after ⏪ Yesterday. Defensive: periodic is optional."""
+    """Keep tomorrow's note current IF IT ALREADY EXISTS - never create it.
+
+    This used to mint tomorrow's note on the spot so the bridge had somewhere
+    to go. A note's layout is frozen at mint, so 2026-09-13's note was born at
+    17:35 the day before from the template of that moment, two hours before
+    the layout changed, and kept the old layout for good (Vex: "it has
+    nothing to do with what we agreed on yesterday"). It also dropped the
+    bridge in as a ### header under ⏪ Yesterday, which is why the bridge sat
+    at the bottom. The daily filler now READS the saved bridge when the note
+    is made and on every refresh, so nothing has to be pushed in early.
+    Defensive: periodic is optional."""
     import areas
     if not (text or "").strip() or not areas.periodic_configured():
         return ""
@@ -9070,17 +9078,15 @@ def _bridge_feed_tomorrow(text, day):
         import periodic_sections as ps
         pe = _pn()
         nxt = pm.period_for("daily", day + timedelta(days=1))
-        task, _ = pe.ensure_note(nxt)
+        task = pe.lookup(pe.build_index(), nxt)
+        if not task:
+            return ""                    # the note reads it when it is made
         pid = task.get("projectId") or areas.PERIODIC_LIST_ID
-        lines = [(pm.T1 + ln) if ln.strip() else "" for ln in text.splitlines()]
+        lines = pe.bridge_quote(text)
 
         def mutate(doc, live):
             if ps.find(doc, pm.SEC_YBRIDGE) is None:
-                sec = ps.Section(f"### {pm.SEC_YBRIDGE}", pm.SEC_YBRIDGE)
-                ysec = ps.find(doc, pm.SEC_YESTERDAY)
-                at = (doc.sections.index(ysec) + 1) if ysec \
-                    else len(doc.sections)
-                doc.sections.insert(at, sec)
+                return False             # an old layout: the relayout tool's job
             return ps.set_body(doc, pm.SEC_YBRIDGE, lines)
         pe._pn_rmw(pid, task.get("id"), mutate)
         return "⏩ fed tomorrow's note"

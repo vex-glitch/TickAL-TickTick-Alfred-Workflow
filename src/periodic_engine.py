@@ -769,7 +769,11 @@ def _day_money(doc):
     if amt is not None:
         return amt
     msec = ps.find(doc, pm.SEC_MONEY)
-    return pm.section_money_sum(msec.body) if msec is not None else None
+    if msec is None or not any(pm.parse_money_entry(l) for l in msec.body):
+        # an EMPTY legacy section is "not answered", not "earned 0" - read as
+        # 0 it drew "Money: 0 ▼ 120" for a day the question was left blank
+        return None
+    return pm.section_money_sum(msec.body)
 
 
 def _people_logged(day):
@@ -830,10 +834,13 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
             pmood = _mood_of_doc(pdoc) if pdoc is not None else None
             lines.append(f"{tab}- Mood: {pm.mood_text(mood[0], mood[1])}"
                          + dc(mood[0], pmood[0] if pmood else None))
+        # ALWAYS a line, 0 until the evening journal answers (Vex 2026-09-13:
+        # "Money was not in the summary"). The arrow still needs both days.
         money = _day_money(nday)
-        if money:
-            lines.append(f"{tab}- Money: {pm.fmt_amount(money)}"
-                         + dc(money, _day_money(pdoc) or None, "money"))
+        pmoney = _day_money(pdoc) if pdoc is not None else None
+        lines.append(f"{tab}- Money: {pm.fmt_amount(money or 0)}"
+                     + (dc(money, pmoney, "money")
+                        if money is not None and pmoney is not None else ""))
     fm = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
     if fm:
         pfm = (getattr(t2, "focus_minutes", lambda a, b: None)(pday, pday)
@@ -862,8 +869,42 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
     return lines
 
 
+def _bridge_text(day):
+    """The daily bridge saved FOR `day` (the "D • Bridge 🌉 YYYY/MM/DD" note
+    in the Bridges list), or "" - from the cache, which the bridge save
+    patches the moment it writes."""
+    try:
+        import bridges as br
+        if not areas.bridges_configured():
+            return ""
+        want = br.daily_title(day)
+        for key in ("all_notes", "all_tasks"):
+            for t in (cache_store.get(key) or []):
+                if (t.get("title") == want and
+                        (t.get("_projectId") or t.get("projectId")) == areas.BRIDGES_ID):
+                    return (t.get("content") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def bridge_quote(text):
+    """Bridge text as the note shows it: every line a > quote (Vex's layout,
+    2026-09-12/13). Blank lines stay blank so paragraphs survive."""
+    return [f"> {ln.strip()}" if ln.strip() else ""
+            for ln in (text or "").strip().splitlines()]
+
+
 def _fill_daily(doc, p, index, is_today):
     day = p.start
+    # 🌉 Yesterday's bridge - READ from the bridge saved yesterday, at the
+    # top of the note. It used to be PUSHED in at save time, which created
+    # tomorrow's note a day early from whatever template existed then; that
+    # note then kept that old layout for good (2026-09-13's note was minted
+    # at 17:35 the day before, two hours before the layout changed).
+    btxt = _bridge_text(day - timedelta(days=1))
+    if btxt:
+        ps.set_body(doc, pm.SEC_YBRIDGE, bridge_quote(btxt))
     # 🎯 Week goals mirror - verbatim copy; absent/empty weekly keeps the
     # template pointer line (bootstrap window)
     wk = lookup(index, pm.period_for("weekly", day))
@@ -1770,8 +1811,9 @@ def journal_seed(slot):
             bsec = ps.find(doc, pm.SEC_YBRIDGE)
             if bsec:
                 ctx["ybridge"] = " ".join(
-                    ln.strip() for ln in bsec.body
-                    if ln.strip() and "_(pending)_" not in ln)
+                    ln.strip().lstrip(">").strip() for ln in bsec.body
+                    if ln.strip() and "_(pending)_" not in ln
+                    and not ps.DECOR_RE.match(ln.strip()))
         elif slot == "evening":
             gsec = ps.find(doc, pm.SEC_DAY_GOAL)
             ctx["goal"] = pm.day_goal_title(gsec.body) if gsec else ""

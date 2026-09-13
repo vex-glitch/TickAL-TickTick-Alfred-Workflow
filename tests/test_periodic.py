@@ -493,7 +493,7 @@ check("23.entries-are-siblings-not-nested",
 
 # appending must not disturb the neighbours or the divider below
 check("23.append-left-workbench-intact",
-      "- ✅ Tasks" in _out and "---\n##### ☀️ Today" in _out, repr(_out[:400]))
+      "- ✅ Tasks" in _out and "---\n#### ☀️ today" in _out, repr(_out[:400]))
 
 # a section (not a bullet) still appends the old way
 _d = ps.parse_sections("### A\n- x\n\n### B\n")

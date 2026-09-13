@@ -90,6 +90,20 @@ one = pe._recap_lines(DAY, None, None, pm.T2, extra=[pm.T2 + "- Entries: 1"])
 check("extra-still-precedes-completed",
       _labels(one) == ["Entries", "Completed"], _labels(one))
 
+# Money is ALWAYS a line (Vex 2026-09-13: "Money was not in the summary"):
+# 0 until the evening journal answers, and still in its slot after Mood
+pe._completed_tops = lambda d: ["x"]
+pe._people_logged = lambda d: []
+pe._answer_in = lambda doc, sec, needle: ""
+pe._mood_of_doc = lambda doc: (4, "bad thoughts")
+import periodic_sections as ps  # noqa: E402
+unans = pe._recap_lines(DAY, None, ps.parse_sections(""), pm.T2)
+check("money-shows-0-when-unanswered", pm.T2 + "- Money: 0" in unans, repr(unans))
+check("money-sits-after-mood-before-completed",
+      _labels(unans) == ["Mood", "Money", "Completed"], _labels(unans))
+check("no-arrow-without-both-days", all("▲" not in l and "▼" not in l
+                                        for l in unans if "Money" in l), repr(unans))
+
 print(f"recap order: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)
