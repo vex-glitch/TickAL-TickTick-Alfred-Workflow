@@ -800,6 +800,11 @@ def main():
              is_task_like and _people_ok and not _is_person_card and _generic),
             ("⤵️ Browse tasks",    "Drill into tasks",     "browse",        "browse tasks drill", itype == "section"),
             (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like and (_generic or _sess_done)),
+            # 📑 carry a task forward (Vex 2026-09-13): the SAME schedule
+            # picker, told by sched_for/dup_tid to copy instead of move
+            ("📑 Duplicate…",      "Same task, another day", "schedule",
+             "duplicate copy clone again tomorrow carry forward",
+             is_task_like and not is_note and bool(tid) and bool(task) and _generic),
             ("☀️ Add to today",    "Land it on today",     f"xact:pn_sched:today|{pid}|{tid}",
              "today add schedule now day", is_task_like and bool(tid) and bool(task) and _generic),
             ("🌙 Add to tomorrow", "Land it on tomorrow",  f"xact:pn_sched:tomorrow|{pid}|{tid}",
@@ -888,6 +893,14 @@ def main():
                 continue
             extra = {"mods": open_link_mods} if (t == "🌐 Open link" and open_link_mods) else {}
             row_vars = cta_vars if a.startswith("cta:") else vars_
+            if a == "schedule":
+                # both rows ride the same picker; say which job it is, and set
+                # it EVERY time - a ⌃ back from the duplicate picker must not
+                # leave a plain Schedule copying
+                row_vars = dict(row_vars)
+                dup_row = t == "📑 Duplicate…"
+                row_vars.update({"sched_for": "duplicate" if dup_row else "",
+                                 "dup_tid": tid if dup_row else ""})
             if a == "browse":   # unified Browse box reads ctx from env
                 row_vars = dict(row_vars)
                 row_vars["browse_ctx"] = browse_ctxs[t]

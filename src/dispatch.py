@@ -296,6 +296,37 @@ def _cache_children(made, pid, parent_id):
         cache_store.invalidate("all_tasks")
 
 
+def _cache_new_tasks(tasks):
+    """Freshly created tasks into all_tasks AND the per-list project_data, so
+    search, pickers and browse screens see them before the hourly sync (the
+    create path's own mirror, for several tasks with their own parents)."""
+    try:
+        projects = cache_store.get("projects") or []
+        names = {p.get("id"): p.get("name", "") for p in projects}
+        entries = []
+        for t in tasks:
+            if not t or not t.get("id"):
+                continue
+            e = dict(t)
+            pid = e.get("projectId") or ""
+            e["_projectId"] = pid or "inbox"
+            e["_projectName"] = names.get(pid, "Inbox" if pid.startswith("inbox") else "")
+            e["_columnName"] = ""
+            entries.append(e)
+        ids = {e["id"] for e in entries}
+        cache_store.set("all_tasks", [t for t in (cache_store.get("all_tasks") or [])
+                                      if t.get("id") not in ids] + entries)
+        for e in entries:
+            key = _pd_key(e.get("projectId") or "")
+            pd = cache_store.get(key)
+            if pd is not None:
+                pd = dict(pd)
+                pd["tasks"] = [t for t in pd.get("tasks", []) if t.get("id") != e["id"]] + [e]
+                cache_store.set(key, pd)
+    except Exception:
+        cache_store.invalidate("all_tasks")
+
+
 def _cached_task(tid):
     """Cached task/note for tid (avoids a live GET), or None. See cache.find_task."""
     return cache_store.find_task(tid)
@@ -512,6 +543,28 @@ def main():
             h, m = divmod(mins, 60)
             dur = (f"{h}h {m}m" if h and m else f"{h}h" if h else f"{m}m")
             print(f"{verb} · {task_title}\n🟢 {start_disp} → {end_disp}  ({dur})")
+
+        elif arg.startswith(("dup_date:", "dup_span:")):
+            # dup_date:pid:tid:iso[;R:..] / dup_span:pid:tid:start|end[;R:..]
+            # 📑 Duplicate… from the schedule picker (Vex 2026-09-13): the task
+            # and its OPEN subtasks, names untouched, on the picked day.
+            is_span = arg.startswith("dup_span:")
+            raw, rem_tokens = _split_reminders(arg[9:])
+            pid, tid, when = raw.split(":", 2)
+            start_iso, end_iso = (when.split("|", 1) if is_span else (when, None))
+            import duplicate
+            import api_v2
+            api = TickTickAPI(cfg.get_token())
+            extra = [x for x in (rem.trigger(t) for t in rem_tokens) if x]
+            new_root, kids, problems = duplicate.run(
+                api, api_v2.TickTickV2(), pid, tid, start_iso, end_iso, extra)
+            _cache_new_tasks([new_root] + kids)
+            task_title = new_root.get("title") or os.environ.get("task_title", "Task")
+            when_disp = utc_to_long_display(new_root.get("startDate") or new_root.get("dueDate") or start_iso)
+            n = len(kids)
+            kid_note = f" · {n} subtask{'' if n == 1 else 's'}" if n else ""
+            warn = f"\n⚠️ {problems[0]}" if problems else ""
+            print(f"📑 Duplicated · {task_title}\n🟢 {when_disp}{kid_note}{warn}")
 
         elif arg.startswith("attr_cleardate:"):
             # attr_cleardate:projectId:taskId

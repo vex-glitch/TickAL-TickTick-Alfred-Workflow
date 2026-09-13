@@ -254,6 +254,15 @@ def main():
         pass
 
     action_verb = "Reschedule" if has_date else "Schedule"
+    # 📑 Duplicate… rides this picker (Vex 2026-09-13). Bound to the task it
+    # was opened for, so a stale variable can never turn a plain Schedule of
+    # some other task into a copy.
+    dup = (os.environ.get("sched_for") == "duplicate"
+           and bool(tid) and os.environ.get("dup_tid") == tid)
+    if dup:
+        action_verb = "Duplicate"
+    P_DATE = "dup_date:" if dup else "attr_date:"
+    P_SPAN = "dup_span:" if dup else "attr_span:"
 
     try:
         back = back_mod(list_id, tid)
@@ -352,7 +361,7 @@ def main():
                         uid="dispatch",
                         title=f"{display}  @{time_str} → {end_str}",
                         subtitle=f"⏳ {dur}{rem_tag}  ⏎ {action_verb} \"{task_title}\"  |  ⌃ 🔙",
-                        arg=f"attr_span:{list_id}:{tid}:{iso}|{end_iso}{rem_suffix}",
+                        arg=f"{P_SPAN}{list_id}:{tid}:{iso}|{end_iso}{rem_suffix}",
                         valid=True,
                         mods=back,
                     ))
@@ -362,7 +371,7 @@ def main():
                         uid="dispatch",
                         title=f"{display}{time_tag}",
                         subtitle=f"{rem_tag_lead}⏎ {action_verb} \"{task_title}\"  |  ⌃ 🔙",
-                        arg=f"attr_date:{list_id}:{tid}:{iso}{rem_suffix}",
+                        arg=f"{P_DATE}{list_id}:{tid}:{iso}{rem_suffix}",
                         valid=True,
                         mods=back,
                     ))
@@ -414,12 +423,12 @@ def main():
         if not date_part:
             items.append(alfred.item(
                 uid="hint",
-                title="Pick a date…",
+                title="Duplicate for which day?" if dup else "Pick a date…",
                 subtitle="or type: tomorrow · 21/07 · next monday · end of june",
                 valid=False,
                 mods=back,
             ))
-            if has_date:
+            if has_date and not dup:
                 items.append(alfred.item(
                     uid="clear-date",
                     title="Clear date",
