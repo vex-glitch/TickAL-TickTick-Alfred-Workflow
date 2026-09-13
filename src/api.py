@@ -168,6 +168,14 @@ class TickTickAPI:
             f"{BASE_URL}/project/{project_id}/task/{task_id}/complete"
         )
         _check(r)
+        # A repeating task's completed copy is dropped by the Mac app unless
+        # it is delivered twice (repeat_settle docstring). Detached, so no
+        # completion waits on it; a non-repeat costs the child one read.
+        try:
+            import repeat_settle
+            repeat_settle.spawn(project_id, task_id)
+        except Exception:
+            pass
         return True
 
     def update_task(self, task_id, project_id, current=None, **fields):

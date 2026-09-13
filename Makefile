@@ -38,6 +38,8 @@ test:
 	@python3 tests/test_alb_move.py
 	@python3 tests/test_alb_merge.py
 	@python3 tests/test_alb_adopt.py
+	@python3 tests/test_repeat_settle.py
+	@python3 tests/test_fold_comments.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:
