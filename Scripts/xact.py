@@ -199,10 +199,13 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
     xact:pn_income:<b64|plain>      💰 sums into the evening journal's money
                                     answer (plain "485 label"; legacy notes
                                     with a 💰 section keep using it)
-    xact:pn_journal:<slot>          morning|evening|weekly - dialog per
+    xact:pn_journal:<slot>[@<date>] morning|evening|weekly - dialog per
                                     unanswered prompt, partial-save,
                                     phone-wins merge (weekly ends in the
-                                    three-things picker into next week)
+                                    three-things picker into next week; the
+                                    daily goal questions pause for the goal
+                                    picker, @date = the note it resumes in)
+    xact:pn_goal_skip:<b64>         ⏭ No goal on a paused journal's picker
     xact:pn_goal:<pid>:<tid>        task → weekly 🎯 Goals + daily mirror
                                     (three-things seq active → NEXT week)
     xact:pn_goal_text:<b64>         plain-text goal, same write
@@ -7171,34 +7174,84 @@ def _goalseq_save(remaining):
 def pn_journal(slot):
     """Dialog run over UNANSWERED prompts. Fixed prompts ROUTE -
     mood → 💬 Mood line, money → 💰 entry, rating → 💬 Day ★, highlight →
-    ✨ section - and the run hands off to a picker at the end (morning: the
-    ☀️ Day-goal picker when no goal is set; weekly: the three-things picker
-    into NEXT week's 🎯 Goals)."""
+    ✨ section - and the goal questions hand off to the ☀️ goal picker
+    (Vex 2026-09-15): the evening's 🎯 tomorrow question and the morning's
+    ☀️ check stop the dialogs, open the picker aimed at that day, and the pick
+    answers the question and reopens this journal (goal_handoff). The weekly
+    journal still ends in the three-things picker into NEXT week's 🎯 Goals.
+
+    slot may carry the note's day, "evening@2026-09-15": a journal reopened
+    after the picker keeps writing the note it started in, midnight or not."""
     if not _pn_gate():
         return
+    slot, _, pin = (slot or "").partition("@")
     if slot not in _JOURNAL_UI:
         print(f"💫 Unknown journal slot {slot!r}")
         return
+    pin_day = None
+    if pin:
+        try:
+            from datetime import date as _date
+            pin_day = _date.fromisoformat(pin)
+        except ValueError:
+            pin_day = None
     pe = _pn()
     import re as _re
-    keys, pairs, jper = pe.journal_seed(slot)
+    import goal_handoff as gh
+    keys, pairs, jper = pe.journal_seed(slot, day=pin_day)
     if pairs is None:
         print("💫 No journal section in the note (header renamed?)")
         return
     day0 = jper.start          # pin the note - dialog runs can cross midnight
     emoji, label = _JOURNAL_UI[slot]
     open_pairs = [(n, q) for n, q, a, _i in pairs if not a]
+    # questions skipped (empty OK) before the goal picker paused this run stay
+    # skipped when the pick reopens it
+    import periodic_model as pm
+    carried = gh.take_skips(slot, day0)
+    held = 0                   # carried skips: still unanswered, just not asked
+    if pin_day and carried:
+        kept = [(n, q) for n, q in open_pairs
+                if not any(pm.same_question(q, c) for c in carried)]
+        held = len(open_pairs) - len(kept)
+        open_pairs = kept
+    else:
+        carried = []
+        # a fresh run (hotkey, link, list) supersedes any goal screen an
+        # earlier run left open - a pick there must not overwrite this run
+        gh.clear()
     total = len(pairs)
     answers, cancelled, routed = {}, False, []
+    skipped = []
     bridge_said = ""
+    handoff = None             # "set" | "changed": stop here for the picker
     for n, q in open_pairs:
-        key = keys[n - 1] if n <= len(keys) else "free"
+        key = keys.get(n, "free")
+        if key == "tgoal":
+            handoff = "set"
+            break
+        if key == "gcheck":
+            goal = pe.day_goal_on(day0)
+            if not goal:
+                handoff = "set"
+                break
+            # a real Cancel button: display dialog maps Esc only onto one
+            b = _dialog(q, ["Cancel", "Change…", "Keep"], "Keep")
+            if b == "Keep":
+                answers[n] = gh.answer_text(slot, "kept", goal)
+                continue
+            if b == "Change…":
+                handoff = "changed"
+                break
+            cancelled = True           # Cancel / Esc on the goal check
+            break
         a = _ask(q, title=f"{label} journal · {n}/{total}")
         if a is None:                     # Cancel: stop, keep what we have
             cancelled = True
             break
         a = a.strip()
         if not a:                         # empty-OK = skip this prompt
+            skipped.append(q)
             continue
         # (?!\d) - "10" must not prefix-match as mood/rating 1
         if key == "mood":
@@ -7230,8 +7283,22 @@ def pn_journal(slot):
             bridge_said = bridge_from_answer(a, day0)
             routed.append(bridge_said)
         answers[n] = a
-    filled = pe.journal_merge(slot, answers, period=jper) if answers else 0
-    done_now = (total - len(open_pairs)) + filled
+    asked = {n: q for n, q in open_pairs}
+    filled = pe.journal_merge(slot, answers, period=jper, questions=asked) if answers else 0
+    done_now = (total - len(open_pairs) - held) + filled
+    if handoff:
+        # ── the goal question: dialogs can't host the picker, so stop here,
+        # remember where, and let the pick reopen this journal
+        gh.save(slot, day0, mode=handoff)
+        gh.remember_skips(slot, day0, carried + skipped)
+        when = "tomorrow's" if slot == "evening" else "today's"
+        line = " ".join(b for b in (f"{emoji} {label} {done_now}/{total}", bridge_said,
+                                    f"· 🎯 pick {when} goal") if b)
+        print(line)
+        if os.environ.get("TICKAL_DETACHED") and bridge_said:
+            _crm_say(line)             # a link-started run's bridge result is shown
+        _run_trigger("Search", "pn goals journal ")
+        return
     bits = [f"{emoji} {label} saved {done_now}/{total}"]
     if bridge_said:
         bits.append(bridge_said)
@@ -7247,10 +7314,8 @@ def pn_journal(slot):
         _crm_say(" ".join(bits))
     if cancelled:
         return
-    # ── picker handoffs (dialogs can't host pickers)
-    if slot == "morning" and not pe.day_goal_now():
-        _run_trigger("Search", "pn day ")
-    elif slot == "weekly":
+    # ── the weekly three-things handoff (dialogs can't host pickers)
+    if slot == "weekly":
         _goalseq_save(3)
         _run_trigger("Search", "pn goal ")
 
@@ -7295,6 +7360,9 @@ def pn_setgoal(rest):
     pid = (spec.get("pid") or "").strip() or None
     title = spec.get("title") or (_task_title(tid, default="Task", pid=pid)
                                   if tid else None)
+    if spec.get("jnl"):
+        _goal_from_journal(spec, kind, pid, tid, title)
+        return
     # mid three-things (the weekly journal handoff), a weekly goal belongs to
     # NEXT week - the same rule pn_goal follows, so both doors agree
     ahead = bool(kind == "weekly" and _goalseq_load())
@@ -7304,6 +7372,88 @@ def pn_setgoal(rest):
         _goal_seq_step(toast)
     else:
         print(toast)
+
+
+def _jnl_spec(raw):
+    """A handoff carried in a picker row -> (slot, mode, note_day, for_day) |
+    None. The row carries it (not only the state file) so a pick still lands
+    right if another journal's handoff overwrote the file meanwhile."""
+    from datetime import date as _date
+    try:
+        slot = raw.get("slot")
+        if slot not in ("morning", "evening"):
+            return None
+        return (slot, "changed" if raw.get("mode") == "changed" else "set",
+                _date.fromisoformat(raw["note_day"]), _date.fromisoformat(raw["for_day"]))
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _resume_journal(slot, note_day):
+    """Reopen the paused journal, detached (the picker's End toast goes out
+    now; the dialogs follow). TICKAL_DETACHED makes its final line notify."""
+    _pn_bg(f"xact:pn_journal:{slot}@{note_day.isoformat()}")
+
+
+def _goal_from_journal(spec, kind, pid, tid, title):
+    """A pick on the goal screen a paused journal opened: set the ☀️ goal on
+    the day it is for (the evening's creates tomorrow's note), answer the
+    journal's goal question with it, reopen the journal."""
+    import goal_handoff as gh
+    j = _jnl_spec(spec.get("jnl"))
+    if not j:
+        print("🎯 That goal screen expired · run the journal again")
+        return
+    slot, mode, note_day, for_day = j
+    pe = _pn()
+    toast = pe.set_period_goal("daily", spec.get("text") or "", pid, tid, title,
+                               day=for_day)
+    if toast.startswith("💫"):
+        # the goal did not land (no ☀️ Daily in that note): leave the question
+        # open and the screen live, so the journal asks again
+        print(toast + " · pick again, or run the journal")
+        return
+    shown = pm_goal_display(spec.get("text") or "", title)
+    key = "tgoal" if slot == "evening" else "gcheck"
+    outcome = "changed" if mode == "changed" else "set"
+    if not pe.journal_answer_key(slot, key, gh.answer_text(slot, outcome, shown), note_day):
+        toast += " · journal question not found"
+    gh.clear()
+    print(toast)
+    _resume_journal(slot, note_day)
+
+
+def pm_goal_display(text, title):
+    """What a goal reads as in the journal answer: "text · task" when both."""
+    text, title = (text or "").strip(), (title or "").strip()
+    if text and title:
+        return f"{text} · {title}"
+    return text or title
+
+
+def pn_goal_skip(rest):
+    """⏭ No goal, on the goal screen a paused journal opened: answer the
+    question so the journal moves past it, then reopen the journal."""
+    if not _pn_gate():
+        return
+    import goal_handoff as gh
+    j = _jnl_spec(_pn_decode(rest) or {})
+    if not j:
+        print("🎯 That goal screen expired · run the journal again")
+        return
+    slot, mode, note_day, _for_day = j
+    key = "tgoal" if slot == "evening" else "gcheck"
+    pe = _pn()
+    if mode == "changed":
+        # Change… and then nothing: the goal stays, so the answer says kept
+        goal = pe.day_goal_on(note_day)
+        pe.journal_answer_key(slot, key, gh.answer_text(slot, "kept", goal), note_day)
+        print("↩️ Goal kept")
+    else:
+        pe.journal_answer_key(slot, key, gh.answer_text(slot, "skip"), note_day)
+        print("⏭ No goal set")
+    gh.clear()
+    _resume_journal(slot, note_day)
 
 
 def pn_goal_text(rest):
@@ -11295,6 +11445,8 @@ def main():
             routine_reset_after(rest)
         elif verb == "pn_journal":
             pn_journal(rest)
+        elif verb == "pn_goal_skip":
+            pn_goal_skip(rest)
         elif verb == "pn_goal":
             pid, tid = rest.split(":", 1); pn_goal(pid, tid)
         elif verb == "pn_goal_text":

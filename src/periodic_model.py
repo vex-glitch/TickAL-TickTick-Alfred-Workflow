@@ -950,27 +950,35 @@ JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)
 JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5}
 
 
+def _clip(s, n=140):
+    s = (s or "").strip()
+    return s[:n].rstrip() + "…" if len(s) > n else s
+
+
 def journal_fixed(slot, ctx=None):
-    """[(route_key, question)] - the fixed head of each journal, in order."""
+    """[(route_key, question)] - the fixed head of each journal, in order.
+
+    Every key except "free" is RECOGNISED BY ITS WORDING (JOURNAL_KEY_RULES),
+    never by its position: a note keeps the question set it was seeded with,
+    so the day a question is added, older notes still route their own
+    answers right (Vex 2026-09-15 added the goal prompts to both journals)."""
     ctx = ctx or {}
     if slot == "morning":
         out = [
             ("mood", "Mood 1-5 (1 😢 · 3 😐 · 5 😁), optional note after ·"),
         ]
-        # 🌉 yesterday's bridge echoes as a reflection prompt. Key MUST stay
-        # "free": inserted prompts shift later indexes, and index-keyed
-        # routing tolerates that only while every shifting slot is "free".
-        yb = (ctx.get("ybridge") or "").strip()
+        # 🌉 yesterday's bridge echoes as a reflection prompt
+        yb = _clip(ctx.get("ybridge"))
         if yb:
-            if len(yb) > 140:
-                yb = yb[:140].rstrip() + "…"
-            out.append(("free", f"🌉 Yesterday's bridge: {yb} - "
-                                "what carries into today?"))
-        out += [
-            ("free", "What is on your mind?"),
-            ("free", "What is the one thing you need to do today? What would, "
-                     "if achieved, make this day count?"),
-        ]
+            out.append(("ybridge", f"🌉 Yesterday's bridge: {yb} - "
+                                   "what carries into today?"))
+        # ☀️ the goal check (Vex 2026-09-15): last night's goal, kept or
+        # changed through the goal picker. It replaces "What is the one thing
+        # you need to do today?" and the picker that used to follow the dialogs.
+        goal = _clip(ctx.get("goal"), 100)
+        out.append(("gcheck", f"☀️ Does your goal for today still align with: {goal}?"
+                              if goal else "☀️ What is today's goal?"))
+        out.append(("free", "What is on your mind?"))
         return out
     if slot == "evening":
         goal = (ctx.get("goal") or "").strip()
@@ -982,11 +990,13 @@ def journal_fixed(slot, ctx=None):
         # The bridge asks FIRST (Vex 2026-09-12 moved it there): it is the one
         # answer that leaves the note - it writes tomorrow's head and the
         # Bridges board - so it should not be the question you reach tired.
-        # Safe to reorder: this one list drives both the seeding and the
-        # answer routing (periodic_engine reads its keys in this order).
+        # Tomorrow's goal right after it (Vex 2026-09-15): picked through the
+        # goal picker, it creates tomorrow's note and fills its ☀️ Daily.
         return [
             ("bridge", "🌉 Daily bridge - what should tomorrow-you know? "
                        "(saves to the Bridges board + tomorrow's note)"),
+            ("tgoal", "🎯 What is the goal for tomorrow? The one thing that, "
+                      "if done, makes the day a success?"),
             ("free", "What is on your mind?"),
             ("goal", goal_q),
             ("money", "How much money did you earn today?"),
@@ -1006,6 +1016,113 @@ def journal_fixed(slot, ctx=None):
                       "Think of one thing that stands out."),
         ("wgoals", goals_q),
     ]
+
+
+# Which fixed question a seeded Q line IS, by its wording. Every question
+# journal_fixed has ever seeded must match its rule (older wordings too), and
+# no rule may match another key's question or a pool prompt.
+JOURNAL_KEY_RULES = (
+    ("mood", re.compile(r"^Mood 1-5\b")),
+    ("ybridge", re.compile(r"^🌉 Yesterday's bridge\b")),
+    ("gcheck", re.compile(r"^☀️ (?:Does your goal for today still align|What is today's goal\?)")),
+    ("bridge", re.compile(r"^🌉 Daily bridge\b")),
+    ("tgoal", re.compile(r"^🎯 What is the goal for tomorrow\?")),
+    ("goal", re.compile(r"^Did you achieve your daily goal\b")),
+    ("money", re.compile(r"^How much money did you earn today\?")),
+    ("rating", re.compile(r"^Rate the day\b")),
+    ("highlight", re.compile(r"^What was the highlight of the week\?")),
+    ("wgoals", re.compile(r"^Did you achieve your weekly goals\b")),
+)
+
+
+_MD_ESCAPE_RE = re.compile(r"\\([!-/:-@\[-`{-~])")        # \ + any ASCII punctuation
+
+
+def unescape_md(text):
+    """Drop the backslash escapes the TickTick app adds to markdown it saves
+    ("Mood 1-5 \\(1 ...\\)", "\\_\\(pending\\)\\_")."""
+    text = text or ""
+    for _ in range(4):                  # the app can escape an escape again
+        out = _MD_ESCAPE_RE.sub(r"\1", text)
+        if out == text:
+            break
+        text = out
+    return text
+
+
+def journal_key(question):
+    """The route key of one question's text, "free" when it is not a fixed
+    question (a pool prompt, "What is on your mind?", a retired wording)."""
+    q = unescape_md((question or "").strip())
+    for key, rx in JOURNAL_KEY_RULES:
+        if rx.search(q):
+            return key
+    return "free"
+
+
+def journal_keys(pairs):
+    """{n: route_key} for journal_pairs output."""
+    return {n: journal_key(q) for n, q, _a, _i in pairs}
+
+
+def insert_fixed_questions(body_lines, fixed):
+    """Give a journal seeded BEFORE a fixed question existed that question,
+    unanswered, right after the fixed question it follows in `fixed` (after
+    the last Q/A pair before it, else at the top). Every Q is renumbered in
+    order and each answer stays under its own question. Only keys a rule can
+    recognise are inserted ("free" never is). Returns (new_body, inserted)."""
+    body = list(body_lines)
+    have = {journal_key(q) for _n, q, _a, _i in journal_pairs(body)}
+    inserted = []
+    for pos, (key, text) in enumerate(fixed):
+        if key == "free" or key in have or journal_key(text) != key:
+            continue
+        pairs = journal_pairs(body)
+        if not pairs:
+            return body_lines, []          # an unseeded journal seeds whole
+        # the nearest EARLIER fixed key this journal already has
+        after = None
+        for prev_key, _t in reversed(fixed[:pos]):
+            hit = [p for p in pairs if journal_key(p[1]) == prev_key]
+            if hit:
+                after = hit[-1]
+                break
+        at = (after[3] + 1) if after else (pairs[0][3] - 1)
+        if after:
+            # past the answer's own continuation lines (a phone answer can run
+            # onto more bullets under it) - never split an answer
+            q_indent = len(body[after[3] - 1]) - len(body[after[3] - 1].lstrip())
+            j = at
+            while j < len(body) and not JOURNAL_Q_RE.match(body[j]):
+                ln = body[j]
+                if ln.strip() and len(ln) - len(ln.lstrip()) <= q_indent:
+                    break
+                j += 1
+            while j > at and not body[j - 1].strip():      # trailing blanks stay after
+                j -= 1
+            at = j
+        q_ws = body[pairs[0][3] - 1][:len(body[pairs[0][3] - 1]) - len(body[pairs[0][3] - 1].lstrip())] or T1
+        a_ws = body[pairs[0][3]][:len(body[pairs[0][3]]) - len(body[pairs[0][3]].lstrip())] or T2
+        body[at:at] = [journal_q_line(0, text, q_ws), f"{a_ws}- A: "]
+        have.add(key)
+        inserted.append(key)
+    if not inserted:
+        return body_lines, []
+    return renumber_journal(body), inserted
+
+
+def renumber_journal(body_lines):
+    """Q lines numbered 1..n in document order; everything else verbatim."""
+    out, n = [], 0
+    for ln in body_lines:
+        m = JOURNAL_Q_RE.match(ln)
+        if m:
+            n += 1
+            ws = ln[:len(ln) - len(ln.lstrip())]
+            out.append(journal_q_line(n, m.group("q"), ws))
+        else:
+            out.append(ln)
+    return out
 
 
 def select_prompts(pool, d, which, k=None):
@@ -1051,17 +1168,51 @@ def journal_pairs(body_lines):
     return out
 
 
-def merge_journal_answers(body_lines, answers):
+def same_question(a, b):
+    """Two question texts are the same question: equal once TickTick's escapes
+    are dropped, or the same FIXED key (a dynamic question's text follows the
+    goal, so its words can move while it is still the same question)."""
+    ua, ub = unescape_md(a or "").strip(), unescape_md(b or "").strip()
+    if ua == ub:
+        return True
+    ka = journal_key(ua)
+    return ka != "free" and ka == journal_key(ub)
+
+
+def merge_journal_answers(body_lines, answers, questions=None):
     """answers = {n: text}. Fill ONLY still-empty A-lines (phone wins). The
-    A-line's own indentation survives. Returns (new_body, filled_count)."""
+    A-line's own indentation survives. Returns (new_body, filled_count).
+
+    questions = {n: the question text answer n was given for}: the answer
+    lands under question n only if it still IS that question, else under the
+    one question that is (a copy of the note saved mid-run by the app or the
+    phone can carry other numbering), else nowhere - a skipped answer beats
+    one filed under the wrong question."""
     body = list(body_lines)
-    filled = 0
-    for n, _q, a, idx in journal_pairs(body):
-        if n in answers and not a and answers[n].strip():
-            m = JOURNAL_A_RE.match(body[idx])
-            ws, dash, ital = m.group("ws"), m.group("dash") or "", m.group("ital")
-            body[idx] = f"{ws}{dash}{ital}A: {answers[n].strip()}{ital}"
-            filled += 1
+    pairs = journal_pairs(body)
+    by_n = {n: (q, a, idx) for n, q, a, idx in pairs}
+    filled, used = 0, set()
+    for n, text in answers.items():
+        if not (text or "").strip():
+            continue
+        target = None
+        if questions and n in questions:
+            asked = questions[n]
+            if n in by_n and same_question(by_n[n][0], asked):
+                target = by_n[n]
+            else:
+                hits = [(q, a, idx) for _n, q, a, idx in pairs if same_question(q, asked)]
+                target = hits[0] if len(hits) == 1 else None
+        else:
+            target = by_n.get(n)
+        if target is None or target[1] or target[2] in used:
+            continue
+        idx = target[2]
+        m = JOURNAL_A_RE.match(body[idx])
+        ws, dash, ital = m.group("ws"), m.group("dash") or "", m.group("ital")
+        body[idx] = f"{ws}{dash}{ital}A: {text.strip()}{ital}"
+        used.add(idx)
+        filled += 1
     return body, filled
 
 
@@ -1154,8 +1305,11 @@ def goal_titles(body_lines):
     md-link stripped)."""
     out = []
     for ln in body_lines:
-        s = ln.strip()
-        if not s or PENDING_RE.match(s):
+        # the TickTick app backslash-escapes markdown when the note is edited
+        # there ("\_\(pick one...\)\_"), and an escaped placeholder was read
+        # as the goal: "Did you achieve your daily goal, _(pick one...)?"
+        s = unescape_md(ln.strip())
+        if not s or PENDING_RE.match(s) or PENDING_RE.match(s[2:] if s.startswith("- ") else s):
             continue
         s = re.sub(r"^- \[[ xX]\] ", "", s)
         s = s[2:] if s.startswith("- ") else s

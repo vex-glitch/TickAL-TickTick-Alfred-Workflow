@@ -191,9 +191,11 @@ class TickTickAPI:
         payload = {k: v for k, v in current.items() if not k.startswith("_")}
         for key, value in fields.items():
             payload[key] = value  # None serialises as JSON null - clears the field
-        # Auto-set isAllDay based on date fields
+        # Auto-set isAllDay based on date fields - unless the caller says. The
+        # guess reads any 00:00:00 UTC as all-day, so a 02:00 CEST task moved
+        # with day_move came back all-day (review 2026-09-15).
         date_val = fields.get("startDate") or fields.get("dueDate")
-        if "startDate" in fields or "dueDate" in fields:
+        if ("startDate" in fields or "dueDate" in fields) and "isAllDay" not in fields:
             if date_val is None:
                 payload["isAllDay"] = False
             else:

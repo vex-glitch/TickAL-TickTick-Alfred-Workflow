@@ -1059,17 +1059,24 @@ def _fill_daily(doc, p, index, is_today):
 def _refresh_fixed_q(sec, fixed):
     """Rewrite UNANSWERED fixed-prompt Q lines to their current text (dynamic
     prompts bake in live goal text). Answered ones are frozen history; the
-    Q line's own indentation survives."""
+    Q line's own indentation survives.
+
+    Matched BY KEY, never by position: rewriting "Q2" to whatever the current
+    list's second question is would turn an older note's "What is on your
+    mind?" into the goal question the day one was inserted."""
+    by_key = {k: q for k, q in fixed if k != "free"}
     body = list(sec.body)
     changed = False
-    for n, _q, a, a_idx in pm.journal_pairs(body):
-        if n <= len(fixed) and not a:
-            raw = body[a_idx - 1]
-            ws = raw[:len(raw) - len(raw.lstrip())] or pm.T1
-            want = pm.journal_q_line(n, fixed[n - 1][1], ws)
-            if raw != want:
-                body[a_idx - 1] = want
-                changed = True
+    for n, q, a, a_idx in pm.journal_pairs(body):
+        key = pm.journal_key(q)
+        if a or key not in by_key:
+            continue
+        raw = body[a_idx - 1]
+        ws = raw[:len(raw) - len(raw.lstrip())] or pm.T1
+        want = pm.journal_q_line(n, by_key[key], ws)
+        if raw != want:
+            body[a_idx - 1] = want
+            changed = True
     if changed:
         sec.body = body
 
@@ -1097,7 +1104,12 @@ def _canon_journal_indent(sec):
         sec.body = out
 
 
-def _seed_slot(doc, sec_name, slot, d, ctx):
+def _seed_slot(doc, sec_name, slot, d, ctx, insert=False):
+    """Seed a journal section that has no questions; otherwise refresh the
+    unanswered fixed questions' text. insert=True (the journal being RUN,
+    never a background refresh) also gives an older journal any fixed
+    question it predates - tonight's note got the 🎯 tomorrow question the
+    day it was added (Vex 2026-09-15) without rewriting a past note."""
     sec = ps.find(doc, sec_name)
     if sec is None:
         return
@@ -1108,15 +1120,20 @@ def _seed_slot(doc, sec_name, slot, d, ctx):
         sec.body = [ln for ln in sec.body if not pm.PENDING_RE.match(ln.strip())]
         ps.append_body(doc, sec_name, pm.seed_journal_lines(prompts))
     else:
+        if insert:
+            body, added = pm.insert_fixed_questions(sec.body, fixed)
+            if added:
+                sec.body = body
         _refresh_fixed_q(sec, fixed)
     _canon_journal_indent(sec)
 
 
 def _seed_daily_journals(doc, day):
-    gsec = ps.find(doc, pm.SEC_DAY_GOAL)
-    goal = pm.day_goal_title(gsec.body) if gsec else ""
-    _seed_slot(doc, pm.SEC_MORNING, "morning", day, {})
-    _seed_slot(doc, pm.SEC_EVENING, "evening", day, {"goal": goal})
+    # the SAME ctx the journal run builds, bridge echo included: a morning
+    # seeded here without it had the echo inserted (and every question
+    # renumbered) on each morning's first run (review 2026-09-15)
+    _seed_slot(doc, pm.SEC_MORNING, "morning", day, journal_ctx("morning", doc))
+    _seed_slot(doc, pm.SEC_EVENING, "evening", day, journal_ctx("evening", doc))
 
 
 def _by_proj(tasks, projects):
@@ -1676,13 +1693,10 @@ def set_day_goal(pid_or_text, tid=None, title=None):
     today_iso = _today().strftime("%Y-%m-%dT00:00:00+0000")
     if tid:
         line = fb.make_line(pid_or_text, tid, title or "Task").raw
-        try:
-            from dispatch import _cached_task, _patch_task_cache
-            _api().update_task(tid, pid_or_text, current=_cached_task(tid),
-                               startDate=today_iso, dueDate=today_iso)
-            _patch_task_cache(tid, startDate=today_iso, dueDate=today_iso)
-        except Exception as e:
-            _log(f"day_goal schedule: {e}")
+        # onto today at its own time - T00:00:00+0000 wiped a task's clock
+        # and read as all-day (Vex 2026-09-15)
+        info = _goal_task_to_day(pid_or_text, tid, _today(), title)
+        merge_ok, title_label, note = info["merge"], info["label"], info["suffix"]
     else:
         real = _api().create_task(title=pid_or_text, due_date=today_iso)
         try:
@@ -1694,6 +1708,7 @@ def set_day_goal(pid_or_text, tid=None, title=None):
         line = fb.make_line(real.get("projectId"), real.get("id"),
                             pid_or_text).raw
         title = pid_or_text
+        merge_ok, title_label, note = True, pid_or_text, ""
 
     p = pm.period_for("daily", _today())
     task, _ = ensure_note(p)
@@ -1711,26 +1726,80 @@ def set_day_goal(pid_or_text, tid=None, title=None):
         # the ✅ Tasks merge on the next refresh would re-add it; put it there
         # now so the day list and the goal agree immediately
         tsec = ps.find(doc, pm.SEC_TODAY)
-        if tsec is not None and link_tid:
+        if tsec is not None and link_tid and merge_ok:
             merged, _a = pm.merge_checkboxes(
-                tsec.body, [(link_pid, link_tid, title or "Task")],
+                tsec.body, [(link_pid, link_tid, title_label or title or "Task")],
                 indent=pm.T2)
             ps.set_body(doc, pm.SEC_TODAY, merged)
         return True
     ok, _doc = _pn_rmw(pid, ntid, mutate)
-    return f"☀️ Day goal: {(title or pid_or_text)[:40]}" if ok \
+    return f"☀️ Day goal: {(title or pid_or_text)[:40]}{note}" if ok \
         else "💫 No ☀️ Day Goal section in today's note"
 
 
-def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False):
+def _goal_task_to_day(pid, tid, day, title=None):
+    """Move a daily goal's task onto `day`, keeping its time of day (Vex
+    2026-09-15: "Move to tomorrow, keep time"). Untimed = all day; a repeating
+    or already finished task is left where it is.
+
+    Returns {suffix, merge, label}: the toast suffix ('' = moved), whether the
+    task belongs in that day's ✅ Tasks (a repeat whose occurrence is another
+    day must not be there - ticking its line would let the sweep call it done
+    without completing it), and the Tasks label carrying the clock the ✅
+    merge would have given it."""
+    import day_move
+    out = {"suffix": "", "merge": True, "label": title or "Task"}
+    try:
+        live = _api().get_task(pid, tid)
+    except Exception as e:
+        _log(f"goal task read: {e}")
+        # unknown task: it could be a repeat due another day, so it stays out
+        # of Tasks (the 04:30 ✅ merge adds it if it really is that day's)
+        out.update(suffix=" · date not changed", merge=False)
+        return out
+    title = title or live.get("title") or "Task"
+    fields, how = day_move.move_fields(live, day)
+    if fields is None:
+        if how == "done":
+            out.update(suffix=" · already done", merge=False)
+        else:
+            on_day = day_move.occurs_on(live, day)
+            out.update(suffix=" · repeats, date kept" + ("" if on_day else ", not in Tasks"),
+                       merge=on_day)
+        when = live
+    else:
+        try:
+            posted = _api().update_task(tid, live.get("projectId") or pid, current=live,
+                                        **fields) or {}
+            when = {k: posted.get(k, fields.get(k)) for k in ("startDate", "dueDate", "isAllDay")}
+            try:
+                from dispatch import _patch_task_cache
+                _patch_task_cache(tid, **when)          # isAllDay too, as posted
+            except Exception:
+                pass
+        except Exception as e:
+            _log(f"goal task move: {e}")
+            out.update(suffix=" · date not changed", merge=day_move.occurs_on(live, day))
+            when = live
+    stamp = when.get("startDate") or when.get("dueDate")
+    hm = pm.clock(stamp, when.get("isAllDay")) if stamp else None
+    out["label"] = pm.timed_title(title, hm)
+    return out
+
+
+def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
+                    day=None):
     """Set a goal on ANY tier (Vex 2026-09-12: "There should be goal setting
     for every periodic note"), in any of his three shapes - text, a task, or
     text anchored to a task (pm.goal_line).
 
-    Daily REPLACES its body (the One Thing) and schedules the picked task for
-    today, the way the old day-goal flow did; every other tier APPENDS, so a
+    Daily REPLACES its body (the One Thing) and moves the picked task onto
+    that day at its own time (day_move); every other tier APPENDS, so a
     month or a quarter can carry several. Weekly additionally re-mirrors into
     today's daily, since the daily shows the week's goals.
+
+    `day` aims a DAILY goal at another day's note - the evening journal picks
+    tomorrow's (Vex 2026-09-15) and creates that note if it is not there yet.
 
     The target sections are pm.GOAL_SECTION - all five ship in their
     templates and none is written by a filler, so a goal cannot be clobbered.
@@ -1740,17 +1809,13 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False):
     line = pm.goal_line(text, pid, tid, title)
     if not line:
         return "🎯 Nothing to set"
+    target_day = day or _today()
+    moved, merge, label = "", True, title or "Task"
     if kind == "daily" and tid:
-        today_iso = _today().strftime("%Y-%m-%dT00:00:00+0000")
-        try:
-            from dispatch import _cached_task, _patch_task_cache
-            _api().update_task(tid, pid, current=_cached_task(tid),
-                               startDate=today_iso, dueDate=today_iso)
-            _patch_task_cache(tid, startDate=today_iso, dueDate=today_iso)
-        except Exception as e:
-            _log(f"period_goal schedule: {e}")
+        info = _goal_task_to_day(pid, tid, target_day, title)
+        moved, merge, label = info["suffix"], info["merge"], info["label"]
 
-    p = pm.period_for(kind, _today())
+    p = pm.period_for(kind, target_day if kind == "daily" else _today())
     if ahead:                       # the weekly journal's three-things pass
         p = pm.next_period(p)
     task, _ = ensure_note(p)
@@ -1765,10 +1830,10 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False):
             ps.set_body(doc, sec_name, [indent + line])
             tail = fb.LINK_TAIL_RE.search(line)
             tsec = ps.find(doc, pm.SEC_TODAY)
-            if tsec is not None and tail:
+            if tsec is not None and tail and merge:
                 merged, _a = pm.merge_checkboxes(
-                    tsec.body, [(tail.group("pid"), tail.group("tid"),
-                                 title or "Task")], indent=pm.T2)
+                    tsec.body, [(tail.group("pid"), tail.group("tid"), label)],
+                    indent=pm.T2)
                 ps.set_body(doc, pm.SEC_TODAY, merged)
             return True
         return ps.append_body(doc, sec_name, [indent + line])
@@ -1781,7 +1846,25 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False):
         _mirror_week_goals(doc_out)
     shown = text or title or ""
     when = " (next)" if ahead else ""
-    return f"🎯 {pm.GOAL_SECTION[kind]}{when} · {shown[:40]}"
+    if kind == "daily" and target_day != _today():
+        when = f" {target_day.strftime('%a %d %b')}"
+    return f"🎯 {pm.GOAL_SECTION[kind]}{when} · {shown[:40]}{moved}"
+
+
+def day_goal_on(day):
+    """☀️ Daily goal display text of `day`'s note, read LIVE (the index copy
+    can be a phone edit behind) | '' (no note, no goal)."""
+    task = lookup(build_index(), pm.period_for("daily", day))
+    if not task:
+        return ""
+    try:
+        task = _api().get_task(task.get("projectId") or areas.PERIODIC_LIST_ID,
+                               task.get("id")) or task
+    except Exception:
+        pass
+    doc = ps.parse_sections(task.get("content") or "")
+    sec = ps.find(doc, pm.SEC_DAY_GOAL)
+    return pm.day_goal_title(sec.body) if sec else ""
 
 
 def _mirror_week_goals(wdoc):
@@ -1848,55 +1931,92 @@ _JOURNAL_SECTIONS = {"morning": pm.SEC_MORNING, "evening": pm.SEC_EVENING,
                      "weekly": pm.SEC_WEEKLY_JNL}
 
 
-def _journal_target(slot):
+def _journal_target(slot, day=None):
     if slot == "weekly":
-        return pm.period_for("weekly", _today())
-    return pm.period_for("daily", _today())
+        return pm.period_for("weekly", day or _today())
+    return pm.period_for("daily", day or _today())
 
 
-def journal_seed(slot):
+def journal_seed(slot, day=None):
     """RMW#1: seed Q/A pairs iff the section has none; unanswered fixed Qs
-    get their dynamic text refreshed. Returns (route_keys, pairs, period) -
-    keys[n-1] routes answer n (mood/money/rating/highlight land outside the
-    journal); pairs carry existing answers so the dialogs skip what's done;
-    period PINS the note for the whole dialog run (a run that crosses
-    midnight must keep writing the day it started on)."""
+    get their dynamic text refreshed, and a journal seeded before a fixed
+    question existed gets that question (insert=True). Returns
+    (route_keys, pairs, period) - route_keys {n: key}, read off each
+    question's WORDING (pm.journal_key), routes answer n; pairs carry existing
+    answers so the dialogs skip what's done; period PINS the note for the
+    whole dialog run (a run that crosses midnight must keep writing the day it
+    started on - `day` carries that pin into a journal resumed after the goal
+    picker)."""
     sec_name = _JOURNAL_SECTIONS[slot]
-    p = _journal_target(slot)
+    p = _journal_target(slot, day)
     task, _ = ensure_note(p)
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
-    keys_out = []
 
     def mutate(doc, live):
-        ctx = {}
-        if slot == "morning":
-            # 🌉 yesterday's bridge already lives IN this note (the bridge
-            # write fans out to the next day) - echo it as a prompt.
-            bsec = ps.find(doc, pm.SEC_YBRIDGE)
-            if bsec:
-                ctx["ybridge"] = " ".join(
-                    ln.strip().lstrip(">").strip() for ln in bsec.body
-                    if ln.strip() and "_(pending)_" not in ln
-                    and not ps.DECOR_RE.match(ln.strip()))
-        elif slot == "evening":
-            gsec = ps.find(doc, pm.SEC_DAY_GOAL)
-            ctx["goal"] = pm.day_goal_title(gsec.body) if gsec else ""
-        elif slot == "weekly":
-            gsec = ps.find(doc, pm.SEC_GOALS)
-            ctx["goals"] = "; ".join(pm.goal_titles(gsec.body)[:5]) if gsec else ""
-        keys_out[:] = [k for k, _q in pm.journal_fixed(slot, ctx)]
+        ctx = journal_ctx(slot, doc)
         sec = ps.find(doc, sec_name)
         if sec is None:
             return None
-        _seed_slot(doc, sec_name, slot, p.start, ctx)
+        _seed_slot(doc, sec_name, slot, p.start, ctx, insert=True)
         return pm.journal_pairs(ps.find(doc, sec_name).body)
     pairs, _doc = _pn_rmw(pid, tid, mutate)
-    return keys_out, pairs, p
+    keys = pm.journal_keys(pairs) if pairs else {}
+    return keys, pairs, p
 
 
-def journal_merge(slot, answers, period=None):
+def journal_ctx(slot, doc):
+    """The live text a journal's fixed questions bake in, read off the note."""
+    ctx = {}
+    if slot == "morning":
+        # 🌉 yesterday's bridge already lives IN this note - echo it as a prompt
+        bsec = ps.find(doc, pm.SEC_YBRIDGE)
+        if bsec:
+            ctx["ybridge"] = " ".join(
+                ln.strip().lstrip(">").strip() for ln in bsec.body
+                if ln.strip() and "_(pending)_" not in ln
+                and not ps.DECOR_RE.match(ln.strip()))
+    if slot in ("morning", "evening"):
+        gsec = ps.find(doc, pm.SEC_DAY_GOAL)
+        ctx["goal"] = pm.day_goal_title(gsec.body) if gsec else ""
+    elif slot == "weekly":
+        gsec = ps.find(doc, pm.SEC_GOALS)
+        ctx["goals"] = "; ".join(pm.goal_titles(gsec.body)[:5]) if gsec else ""
+    return ctx
+
+
+def journal_answer_key(slot, key, text, day):
+    """Write `text` as the answer to the journal question whose route key is
+    `key` in `day`'s note, even over an earlier answer (the goal picker's
+    pick is the answer). True when it landed."""
+    p = _journal_target(slot, day)
+    task, _ = ensure_note(p)
+    pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
+    sec_name = _JOURNAL_SECTIONS.get(slot)
+
+    def mutate(doc, live):
+        sec = ps.find(doc, sec_name)
+        if sec is None:
+            return False
+        body = list(sec.body)
+        for n, q, a, idx in pm.journal_pairs(body):
+            if pm.journal_key(q) != key:
+                continue
+            m = pm.JOURNAL_A_RE.match(body[idx])
+            ws, dash, ital = m.group("ws"), m.group("dash") or "", m.group("ital")
+            body[idx] = f"{ws}{dash}{ital}A: {text}{ital}"
+            sec.body = body
+            return True
+        return False
+    ok, _doc = _pn_rmw(pid, tid, mutate)
+    return bool(ok)
+
+
+def journal_merge(slot, answers, period=None, questions=None):
     """RMW#2: fill collected answers into STILL-EMPTY A-lines (phone wins).
-    `period` = the seed-time period (midnight-safe)."""
+    `period` = the seed-time period (midnight-safe). `questions` {n: text} =
+    what each answer was ASKED for: an answer only lands under that question,
+    so a stale copy of the note saved mid-run (the app, the phone) cannot
+    shift answers onto their neighbours."""
     sec_name = _JOURNAL_SECTIONS[slot]
     p = period or _journal_target(slot)
     task, _ = ensure_note(p)
@@ -1906,7 +2026,7 @@ def journal_merge(slot, answers, period=None):
         sec = ps.find(doc, sec_name)
         if sec is None:
             return 0
-        merged, filled = pm.merge_journal_answers(sec.body, answers)
+        merged, filled = pm.merge_journal_answers(sec.body, answers, questions)
         if filled:
             sec.body = merged
         return filled

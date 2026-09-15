@@ -177,16 +177,16 @@ p3 = pm.select_prompts(pool, d, "evening")
 check("14.deterministic", p1 == p2 and len(p1) == 3)
 check("14.slot-differs", p1 != p3 and len(p3) == 5)
 fixed_m = pm.journal_fixed("morning")
-check("14.fixed-morning", [k for k, _q in fixed_m] == ["mood", "free", "free"])
+check("14.fixed-morning", [k for k, _q in fixed_m] == ["mood", "gcheck", "free"])
 fixed_mb = pm.journal_fixed("morning", {"ybridge": "Ship the bridge"})
 check("14.fixed-morning-bridge",
-      [k for k, _q in fixed_mb] == ["mood", "free", "free", "free"]
+      [k for k, _q in fixed_mb] == ["mood", "ybridge", "gcheck", "free"]
       and "Ship the bridge" in fixed_mb[1][1])
 fixed_e = pm.journal_fixed("evening", {"goal": "Ship the thing"})
 check("14.fixed-evening",                     # bridge FIRST (Vex 2026-09-12)
-      [k for k, _q in fixed_e] == ["bridge", "free", "goal", "money",
+      [k for k, _q in fixed_e] == ["bridge", "tgoal", "free", "goal", "money",
                                    "rating"]
-      and "Ship the thing" in fixed_e[2][1], [k for k, _q in fixed_e])
+      and "Ship the thing" in fixed_e[3][1], [k for k, _q in fixed_e])
 fixed_w = pm.journal_fixed("weekly", {"goals": "A; B"})
 check("14.fixed-weekly", [k for k, _q in fixed_w] == ["highlight", "wgoals"]
       and "A; B" in fixed_w[1][1])

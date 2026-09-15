@@ -41,6 +41,7 @@ test:
 	@$(PYTHON) tests/test_alb_adopt.py
 	@$(PYTHON) tests/test_repeat_settle.py
 	@$(PYTHON) tests/test_fold_comments.py
+	@$(PYTHON) tests/test_journal_goal.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:

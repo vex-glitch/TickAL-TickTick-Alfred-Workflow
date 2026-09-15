@@ -457,15 +457,27 @@ _GOAL_TIERS = {"daily": "☀️ Daily", "weekly": "♻️ Weekly",
                "yearly": "🎉 Yearly"}
 
 
-def tier_goal_rows(kind, rest):
+def tier_goal_rows(kind, rest, jnl=None):
     """One screen, Vex's three shapes (2026-09-12):
         "<text>"              -> ➕ the text alone
         "<frag>"              -> pick a task alone
         "<text> | <frag>"     -> the text anchored to the picked task
     The pipe is the add bar's own separator, so the grammar is one you
     already type; the 🔗 row hands the line back with it appended.
+
+    jnl = a goal_handoff state: the screen a paused journal opened (Vex
+    2026-09-15 - tomorrow's goal from the evening journal, today's from the
+    morning check). Same rows, aimed at that day, each pick carrying the
+    handoff so it answers the question and reopens the journal; 🔙 Back
+    becomes ⏭ No goal.
     """
     label = _GOAL_TIERS[kind]
+    prefix = f"pn goals {kind}"
+    if jnl:
+        day = jnl["for_day"]
+        label = ("☀️ Tomorrow" if jnl["slot"] == "evening" else "☀️ Today") \
+            + f" ({day.strftime('%a %d %b')})"
+        prefix = "pn goals journal"
     head, _, tail = (rest or "").partition("|")
     text, frag = head.strip(), tail.strip()
     combining = "|" in (rest or "")
@@ -475,6 +487,10 @@ def tier_goal_rows(kind, rest):
         if t is not None:
             payload.update({"pid": t.get("projectId") or t.get("_projectId", ""),
                             "tid": t["id"], "title": t.get("title") or ""})
+        if jnl:
+            payload["jnl"] = {"slot": jnl["slot"], "mode": jnl["mode"],
+                              "note_day": jnl["note_day"].isoformat(),
+                              "for_day": jnl["for_day"].isoformat()}
         return "xact:pn_setgoal:" + _b64(payload)
 
     items = []
@@ -487,7 +503,7 @@ def tier_goal_rows(kind, rest):
         items.append(alfred.item(
             uid="pn-goal-textonly", title=f'🎯 {label} · "{text[:44]}"',
             subtitle="⏎ Set it  ·  ⇥ then a task", arg=arg(text),
-            valid=True, autocomplete=f"pn goals {kind} {text} | ",
+            valid=True, autocomplete=f"{prefix} {text} | ",
             mods=_mods()))
 
     pool = _task_pool(include_notes=(kind == "daily"))
@@ -508,6 +524,20 @@ def tier_goal_rows(kind, rest):
                              title=f"Type the {label} goal…",
                              subtitle="Text, a task, or both with  |",
                              valid=False, mods=_mods())]
+    if jnl:
+        skip = {"slot": jnl["slot"], "mode": jnl["mode"],
+                "note_day": jnl["note_day"].isoformat(),
+                "for_day": jnl["for_day"].isoformat()}
+        if jnl["mode"] == "changed":
+            # Change… then nothing: the goal stays, and the answer says so
+            skip_title = "↩️ Keep the current goal"
+        else:
+            skip_title = "⏭ No goal tonight" if jnl["slot"] == "evening" else "⏭ No goal today"
+        items.append(alfred.item(
+            uid="pn-goal-jnl-skip", title=skip_title,
+            subtitle="Back to the journal", arg="xact:pn_goal_skip:" + _b64(skip),
+            valid=True, mods=_mods()))
+        return items
     items.append(alfred.item(uid=f"pn-goal-{kind}-back", title="🔙 Back",
                              subtitle="Every tier", arg="", valid=False,
                              autocomplete="pn goals ", mods=_mods()))
@@ -548,6 +578,18 @@ def rows(query):
         if rest is None:
             continue
         if key == "goals":
+            sub = _after(rest, "journal")
+            if sub is not None:                 # a paused journal's picker
+                import goal_handoff
+                state = goal_handoff.load()
+                if not state:
+                    # never the ordinary picker: that would set TODAY's goal
+                    # from tomorrow's question
+                    return [alfred.item(uid="pn-goal-jnl-expired",
+                                        title="🎯 This goal screen expired",
+                                        subtitle="Run the journal again",
+                                        valid=False, mods=_mods())]
+                return tier_goal_rows("daily", sub, jnl=state)
             for tier in _GOAL_TIERS:
                 sub = _after(rest, tier)
                 if sub is not None:
