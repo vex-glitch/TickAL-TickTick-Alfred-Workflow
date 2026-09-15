@@ -9,10 +9,13 @@
          RunAtLoad + the pn_last_mint stamp catch up at login (fresh stamp =
          exit with zero network). Lazy-mint keeps the feature alive even with
          no agent at all. -->
+    <!-- python DIRECTLY, not bash + py.sh: macOS will not let a bash-launched
+         agent read a workflow folder synced in iCloud Drive (the mint agent
+         was dead from 2026-07-13 that way). And a VERSIONED python:
+         bin/python3 can vanish in a brew upgrade (2026-09-15). -->
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID/Scripts/py.sh</string>
+        <string>/opt/homebrew/bin/python3.13</string>
         <string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID/Scripts/xact.py</string>
         <string>xact:pn_mint</string>
     </array>

@@ -5,7 +5,8 @@
     <key>Label</key><string>com.vex.tickal.cachesync</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/python3</string>
+        <!-- a VERSIONED python: bin/python3 can vanish in a brew upgrade (2026-09-15) -->
+        <string>/opt/homebrew/bin/python3.13</string>
         <string>/PATH/TO/Alfred.alfredpreferences/workflows/user.workflow.YOUR-WORKFLOW-ID/src/sync.py</string>
         <string>sync</string>
     </array>

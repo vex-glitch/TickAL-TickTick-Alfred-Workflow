@@ -15,7 +15,7 @@ Two ways in:
       - here Alfred is frontmost, so we probe running browsers instead.
 
 Run Script config: language /bin/bash, no input needed:
-    /opt/homebrew/bin/python3 "Scripts/grab_url.py"
+    bash "Scripts/py.sh" "Scripts/grab_url.py"
 Call External Trigger: id "TT", passinputasargument ON, passvariables ON.
 
 Cross-browser: Safari family + every Chromium browser (Chrome, Brave, Edge,

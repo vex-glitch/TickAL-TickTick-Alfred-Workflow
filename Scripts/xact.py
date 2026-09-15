@@ -882,20 +882,23 @@ def _bar_python():
     # and every xact invocation is a fresh process - don't re-pay it. Staleness
     # (pyobjc uninstalled later) just means a bar that exits 3 into the log;
     # delete ~/.ticktick_alfred/bar_python to force a re-probe.
+    # The cache holds the path AND its real binary: bin/python3 or the python@3
+    # opt link can later point at another Python with no PyObjC (review
+    # 2026-09-15), so a moved link re-probes instead of trusting the path.
     try:
         with open(_BAR_PY_CACHE) as f:
-            cached = f.read().strip()
-        if cached and os.path.exists(cached):
+            lines = f.read().split("\n")
+        cached = lines[0].strip()
+        real = lines[1].strip() if len(lines) > 1 else ""
+        if cached and real and os.path.exists(cached) and os.path.realpath(cached) == real:
             _BAR_PY = cached
             return cached
     except OSError:
         pass
-    import shutil
     # Probe EVERYTHING focus_bar imports - pyobjc-core alone (a common partial
     # install) would pass an `import objc` probe and then die in the bar.
     probe = "import objc, AppKit, Quartz, PyObjCTools.AppHelper"
-    for c in ("/opt/homebrew/bin/python3", "/usr/local/bin/python3",
-              shutil.which("python3")):
+    for c in _python_ladder():
         if c and os.path.exists(c):
             try:
                 if subprocess.run([c, "-c", probe], capture_output=True,
@@ -904,7 +907,7 @@ def _bar_python():
                     try:
                         os.makedirs(os.path.dirname(_BAR_PY_CACHE), exist_ok=True)
                         with open(_BAR_PY_CACHE, "w") as f:
-                            f.write(c)
+                            f.write(c + "\n" + os.path.realpath(c))
                     except OSError:
                         pass
                     return c
@@ -1165,13 +1168,55 @@ def _tcc_walled(path):
     return any(w in (path or "") for w in _TCC_WALLS)
 
 
-def _agent_python():
-    """py.sh's interpreter ladder, resolved once for a plist."""
+def _python_ladder():
+    """Scripts/py.sh's interpreter ladder as existing paths, one per real
+    binary, in order (keep the two in step): Apple Silicon Homebrew's
+    bin/python3 and python@3 opt link (libexec/bin/python3), the same pair
+    under /usr/local, the newest versioned python3.1x, then PATH only when it
+    is 3.10+ (never Apple's /usr/bin stub without Command Line Tools).
+    2026-09-15: a brew upgrade made python@3.13 a non-default install and
+    dropped /opt/homebrew/bin/python3; every path baked from the old two-rung
+    ladder died (the focus bar found no PyObjC python, both LaunchAgents
+    exited 78)."""
+    import glob
     import shutil
-    for cand in ("/opt/homebrew/bin/python3", "/usr/local/bin/python3"):
-        if os.path.exists(cand):
-            return cand
-    return shutil.which("python3") or "/usr/bin/python3"
+    out = ["/opt/homebrew/bin/python3",
+           "/opt/homebrew/opt/python@3/libexec/bin/python3",
+           "/usr/local/bin/python3",
+           "/usr/local/opt/python@3/libexec/bin/python3"]
+    for d in ("/opt/homebrew/bin", "/usr/local/bin"):
+        out += sorted(glob.glob(os.path.join(d, "python3.1[0-9]")), reverse=True)
+    path_py = shutil.which("python3")
+    try:
+        if path_py and (path_py != "/usr/bin/python3" or subprocess.run(
+                ["xcode-select", "-p"], capture_output=True, timeout=10).returncode == 0):
+            if subprocess.run([path_py, "-c", "import sys; sys.exit(sys.version_info < (3, 10))"],
+                              capture_output=True, timeout=10).returncode == 0:
+                out.append(path_py)
+    except Exception:
+        pass
+    seen, ladder = set(), []
+    for p in out:
+        if os.path.exists(p) and os.path.realpath(p) not in seen:
+            seen.add(os.path.realpath(p))
+            ladder.append(p)
+    return ladder
+
+
+def _agent_python():
+    """The interpreter an agent plist names, resolved once at install time:
+    the newest VERSIONED Homebrew python3.1x first. python3.X stays linked
+    across patch upgrades and when another Python becomes Homebrew's default,
+    while bin/python3 and the python@3 opt link move or vanish (2026-09-15:
+    bin/python3 went; the opt link re-points once python@3.14 is installed).
+    Agents need no PyObjC. Then py.sh's ladder."""
+    import glob
+    for d in ("/opt/homebrew/bin", "/usr/local/bin"):
+        versioned = sorted(glob.glob(os.path.join(d, "python3.1[0-9]")), reverse=True)
+        if versioned:
+            return versioned[0]
+    ladder = _python_ladder()
+    return ladder[0] if ladder else "/usr/bin/python3"
 
 
 def _agent_wf_of(args):
@@ -1188,6 +1233,8 @@ def _agent_stale_reason(cur, wf, loaded):
     got = _agent_wf_of(args)
     if not args or not got:
         return "it predates this workflow version"
+    if not os.access(args[0], os.X_OK):
+        return "its Python is gone (a Homebrew upgrade moved it)"
     script = next(a for a in args if a.endswith(".py"))
     if not os.path.exists(script):
         return "it points at a deleted workflow copy"

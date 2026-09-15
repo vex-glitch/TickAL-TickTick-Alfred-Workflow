@@ -1,8 +1,9 @@
 WORKFLOW_NAME := TickAL
 BUNDLE       := $(WORKFLOW_NAME).alfredworkflow
-# System python (3.9) can't import the vendored urllib3 (needs 3.10+) - use the
-# same homebrew python the cache-sync LaunchAgent runs on.
-PYTHON       := /opt/homebrew/bin/python3
+# System python (3.9) can't import the vendored urllib3 (needs 3.10+) - use
+# Homebrew's, by the same ladder as Scripts/py.sh (a brew upgrade can drop
+# bin/python3 while the python@3 alias stays, 2026-09-15).
+PYTHON       := $(firstword $(wildcard /opt/homebrew/bin/python3 /opt/homebrew/opt/python@3/libexec/bin/python3 /usr/local/bin/python3 /usr/local/opt/python@3/libexec/bin/python3) $(lastword $(sort $(wildcard /opt/homebrew/bin/python3.1[0-9]))) $(lastword $(sort $(wildcard /usr/local/bin/python3.1[0-9]))) python3)
 
 .PHONY: all bundle install test test-api test-lists test-tasks test-add test-sync clean
 
@@ -25,21 +26,21 @@ install: bundle
 
 # ── Unit tests (pure stdlib, no credentials or network needed) ────────────
 test:
-	@python3 tests/test_periodic.py
-	@python3 tests/test_focus_blocks.py
-	@python3 tests/test_people.py
-	@python3 tests/test_eagle.py
-	@python3 tests/test_routine_link.py
-	@python3 tests/test_routine_runner.py
-	@python3 tests/test_subtask_line.py
-	@python3 tests/test_mdtext.py
-	@python3 tests/test_api_update.py
-	@python3 tests/test_albums.py
-	@python3 tests/test_alb_move.py
-	@python3 tests/test_alb_merge.py
-	@python3 tests/test_alb_adopt.py
-	@python3 tests/test_repeat_settle.py
-	@python3 tests/test_fold_comments.py
+	@$(PYTHON) tests/test_periodic.py
+	@$(PYTHON) tests/test_focus_blocks.py
+	@$(PYTHON) tests/test_people.py
+	@$(PYTHON) tests/test_eagle.py
+	@$(PYTHON) tests/test_routine_link.py
+	@$(PYTHON) tests/test_routine_runner.py
+	@$(PYTHON) tests/test_subtask_line.py
+	@$(PYTHON) tests/test_mdtext.py
+	@$(PYTHON) tests/test_api_update.py
+	@$(PYTHON) tests/test_albums.py
+	@$(PYTHON) tests/test_alb_move.py
+	@$(PYTHON) tests/test_alb_merge.py
+	@$(PYTHON) tests/test_alb_adopt.py
+	@$(PYTHON) tests/test_repeat_settle.py
+	@$(PYTHON) tests/test_fold_comments.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:
@@ -55,17 +56,17 @@ print(f'Projects: {len(ps)}'); \
 test-lists:
 	@echo "--- main.py (list browser, no query) ---"
 	@cd "$(CURDIR)" && \
-		$(PYTHON) src/main.py "" | python3 -m json.tool
+		$(PYTHON) src/main.py "" | $(PYTHON) -m json.tool
 
 test-tasks:
 	@echo "--- main.py (task search: /) ---"
 	@cd "$(CURDIR)" && \
-		$(PYTHON) src/main.py "/" | python3 -m json.tool
+		$(PYTHON) src/main.py "/" | $(PYTHON) -m json.tool
 
 test-add:
 	@echo "--- main.py (add task preview) ---"
 	@cd "$(CURDIR)" && \
-		$(PYTHON) src/main.py "+Buy milk *tomorrow !2 #shopping" | python3 -m json.tool
+		$(PYTHON) src/main.py "+Buy milk *tomorrow !2 #shopping" | $(PYTHON) -m json.tool
 
 test-sync:
 	@echo "--- sync.py (do_sync) ---"
@@ -97,7 +98,7 @@ sync-pull:
 # (found 2026-09-12 - the live weekly.md was months behind).
 sync-push:
 	@test -n "$(FILE)" || (echo "usage: make sync-push FILE=Scripts/foo.py" && exit 1)
-	@case "$(FILE)" in *.py|Scripts/assets/*.png|src/periodic_templates/*.md) ;; *) echo "REFUSED: only .py files, Scripts/assets/*.png and src/periodic_templates/*.md sync repo→live"; exit 1;; esac
+	@case "$(FILE)" in *.py|Scripts/*.sh|Scripts/assets/*.png|src/periodic_templates/*.md) ;; *) echo "REFUSED: only .py files, Scripts/*.sh, Scripts/assets/*.png and src/periodic_templates/*.md sync repo→live"; exit 1;; esac
 	@mkdir -p "$(LIVE)/$(dir $(FILE))"
 	@cp "$(FILE)" "$(LIVE)/$(FILE)"
 	@echo "synced $(FILE) → live"
