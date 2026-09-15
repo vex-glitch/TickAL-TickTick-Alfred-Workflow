@@ -492,6 +492,37 @@ xact.pn_goal_skip(base64.b64encode(json.dumps(
 check("Change… then keep answers 'Kept', not 'No goal'",
       fake.answers == [("morning", "gcheck", "✅ Kept: Ship it", date(2026, 9, 16))], fake.answers)
 
+# ── 9. the review of the 04:30 run ────────────────────────────────────────────
+tasks = ["\t- [ ] [Write the brief · 18:00](https://ticktick.com/webapp/#p/P/tasks/aaaaaaaaaaaaaaaaaaaaaaaa)"]
+merged, n = pm.merge_checkboxes(tasks, [("P", "bbbbbbbbbbbbbbbbbbbbbbbb", "Dentist · 08:00")], indent=pm.T2)
+check("04:30's tasks land beside the evening goal line, not a tab deeper",
+      n == 1 and all(ln.startswith("\t- [ ]") and not ln.startswith("\t\t") for ln in merged), merged)
+check("an empty list still takes the caller's indent",
+      pm.merge_checkboxes([], [("P", "cccccccccccccccccccccccc", "X")], indent=pm.T2)[0][0].startswith("\t\t- [ ]"))
+check("00:30 is still the day that is ending", xact._before_day_rollover(datetime(2026, 9, 16, 0, 30)))
+check("04:30 is the new day", not xact._before_day_rollover(datetime(2026, 9, 16, 4, 30)))
+check("22:30 is the same day", not xact._before_day_rollover(datetime(2026, 9, 15, 22, 30)))
+seen = {}
+
+
+class _PinPE(FakePE):
+    def journal_seed(self, slot, day=None):
+        seen["day"] = day
+        return FakePE.journal_seed(self, slot, day)
+
+
+_ro = xact._before_day_rollover
+xact._before_day_rollover = lambda now=None: True
+xact._pn = lambda: _PinPE(pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])))
+xact._ask = lambda q, title="": None
+xact.pn_journal("evening")
+check("an evening journal started after midnight writes the day that is ending",
+      seen.get("day") == date.today() - __import__("datetime").timedelta(days=1), seen)
+seen.clear()
+xact.pn_journal("morning")
+check("the morning journal is never shifted", seen.get("day") is None, seen)
+xact._before_day_rollover = _ro
+
 print(f"journal goal: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)

@@ -7171,6 +7171,13 @@ def _goalseq_save(remaining):
         pass
 
 
+def _before_day_rollover(now=None):
+    """True between midnight and 04:30, when the periodic day has not turned
+    over yet (the 04:30 agent mints the new day's notes)."""
+    now = now or datetime.now()
+    return (now.hour, now.minute) < (4, 30)
+
+
 def pn_journal(slot):
     """Dialog run over UNANSWERED prompts. Fixed prompts ROUTE -
     mood → 💬 Mood line, money → 💰 entry, rating → 💬 Day ★, highlight →
@@ -7195,6 +7202,11 @@ def pn_journal(slot):
             pin_day = _date.fromisoformat(pin)
         except ValueError:
             pin_day = None
+    elif slot == "evening" and _before_day_rollover():
+        # an evening journal at 00:30 still belongs to the day that is ending
+        # (the 04:30 agent's day): its tomorrow is the day that has just begun
+        from datetime import date as _date, timedelta as _td
+        pin_day = _date.today() - _td(days=1)
     pe = _pn()
     import re as _re
     import goal_handoff as gh
@@ -7210,7 +7222,7 @@ def pn_journal(slot):
     import periodic_model as pm
     carried = gh.take_skips(slot, day0)
     held = 0                   # carried skips: still unanswered, just not asked
-    if pin_day and carried:
+    if pin and pin_day and carried:            # only a RESUMED run (the @date pin)
         kept = [(n, q) for n, q in open_pairs
                 if not any(pm.same_question(q, c) for c in carried)]
         held = len(open_pairs) - len(kept)

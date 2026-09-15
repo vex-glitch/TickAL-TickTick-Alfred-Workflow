@@ -826,6 +826,12 @@ def merge_checkboxes(body_lines, items, indent=""):
     new links append after the last checkbox (or at top), prefixed with
     `indent` (tab nesting)."""
     known = set(checkbox_tids(body_lines))
+    # land BESIDE the checkboxes already there: a list whose first line came
+    # in one tab deep (the evening goal pick) got every 04:30 task a tab
+    # deeper than it, and the list read ragged (review 2026-09-15)
+    depths = [len(ln) - len(ln.lstrip("\t")) for ln in body_lines if fb.CHECKBOX_RE.match(ln)]
+    if depths:
+        indent = "\t" * min(depths)
     fresh = [indent + fb.make_line(pid, tid, ttl).raw
              for pid, tid, ttl in items if tid not in known]
     if not fresh:
