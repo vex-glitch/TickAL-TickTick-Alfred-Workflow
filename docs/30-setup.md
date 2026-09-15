@@ -11,7 +11,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 | Requirement | Detail |
 |---|---|
 | Alfred 5 + Powerpack | Workflows need the Powerpack license |
-| Python 3 | Homebrew (Apple Silicon or Intel) or the Xcode Command Line Tools. `Scripts/py.sh` resolves whichever is installed - no hardcoded interpreter. No python3 at all → an error with an install hint instead of results |
+| Python 3.10+ | From Homebrew (Apple Silicon or Intel). `Scripts/py.sh` finds it on its own - no hardcoded interpreter, and a Homebrew update that renames `python3` does not break it. macOS's built-in Python (3.9) is too old; with nothing newer, every keyword shows **TickAL needs Python 3.10+** instead of results |
 | TickTick account | Plus a free TickTick developer app (two minutes, next section) |
 | PyObjC (optional) | Floating focus bar + clipboard-image attach - one Settings row installs it, see [Focus bar](#focus-bar) |
 

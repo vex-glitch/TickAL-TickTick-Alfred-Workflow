@@ -62,13 +62,15 @@ Every other focus feature - timer, pomodoro, staging blocks, sweep - works witho
 |---------|-------|-----|
 | `tcr` renders one row: "CRM needs setup" | `crm_list_id` is empty | ⌘⏎ on your CRM list's row → **🆔 Copy id**, paste it into Configure Workflow - see [CRM](47-crm.md) (screenshot of the pointer row there) |
 
-## "python3 not found"
+## "TickAL needs Python 3.10+"
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Every keyword errors with `TickAL: python3 not found - install Python 3` | No usable Python 3 on the machine | Install one: `brew install python` or `xcode-select --install` |
+| Every keyword shows **TickAL needs Python 3.10+**, or errors with `Import failed: unsupported operand type(s) for \|` | No Python 3.10 or newer was found, so only macOS's built-in 3.9 was left, and it is too old | Install Homebrew's: `brew install python3`. If Homebrew's Python is already installed, update the workflow: older copies missed Homebrew's versioned `python3.13` after an update removed `python3` |
+| Focus bar or clipboard-image attach stopped after moving to a new Python version | PyObjC is installed per Python version | `tup` → **Install PyObjC** |
+| Hourly Sync or the 04:30 agent stopped after a Homebrew update | The agent names the Python path it was installed with, and the update removed it | `tup` → **Hourly Sync** or **Periodic Agent** - it detects the missing Python and offers **Repair** |
 
-The workflow resolves Python via `Scripts/py.sh`: Apple-Silicon Homebrew → Intel Homebrew → `PATH`. Any of those works; no configuration needed. PyObjC (focus bar + clipboard-image attach) must land in whichever one wins - `tup` → **Install PyObjC** does exactly that.
+The workflow resolves Python via `Scripts/py.sh`: Homebrew's `python3` (Apple Silicon, then Intel), then Homebrew's newest versioned `python3.1x`, then `PATH` if that one is 3.10 or newer. No configuration needed. PyObjC (focus bar + clipboard-image attach) must land in whichever one wins - `tup` → **Install PyObjC** does exactly that.
 
 ## Hourly sync stale or orphaned
 
