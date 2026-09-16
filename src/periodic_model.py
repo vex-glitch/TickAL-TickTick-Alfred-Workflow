@@ -1198,7 +1198,9 @@ def merge_journal_answers(body_lines, answers, questions=None):
     pairs = journal_pairs(body)
     by_n = {n: (q, a, idx) for n, q, a, idx in pairs}
     filled, used = 0, set()
-    for n, text in answers.items():
+    writes = []                  # (idx, lines) applied LAST, bottom-up, so a
+    for n, text in answers.items():          # multi-line answer cannot shift
+                                             # the indices still to be written
         if not (text or "").strip():
             continue
         target = None
@@ -1216,9 +1218,19 @@ def merge_journal_answers(body_lines, answers, questions=None):
         idx = target[2]
         m = JOURNAL_A_RE.match(body[idx])
         ws, dash, ital = m.group("ws"), m.group("dash") or "", m.group("ital")
-        body[idx] = f"{ws}{dash}{ital}A: {text.strip()}{ital}"
+        # Paragraphs become sibling bullets: the shape a phone answer already
+        # takes, and the one insert_fixed_questions already walks past. A
+        # blank line between them would end the list in TickTick's renderer,
+        # so the bullet IS the paragraph break.
+        parts = [p.strip() for p in str(text).split("\n")]
+        parts = [p for p in parts if p]
+        lines = [f"{ws}{dash}{ital}A: {parts[0]}{ital}"]
+        lines += [f"{ws}{dash}{ital}{p}{ital}" for p in parts[1:]]
+        writes.append((idx, lines))
         used.add(idx)
         filled += 1
+    for idx, lines in sorted(writes, key=lambda w: w[0], reverse=True):
+        body[idx:idx + 1] = lines
     return body, filled
 
 

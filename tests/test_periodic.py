@@ -205,6 +205,23 @@ check("14.legacy-shape", _f == 1 and _old_shape[1] == "\t\tA: kept plain",
       _old_shape)
 check("14.empty-skip", all("should NOT" not in ln for ln in merged))
 
+# a long free-roam answer keeps its paragraphs: each becomes a sibling bullet
+# (a blank line between them would end the list in TickTick's renderer), and
+# the lines it adds must not shift the answers written after it
+_ml = pm.seed_journal_lines(["Q one?", "Q two?", "Q three?"])
+_out, _f = pm.merge_journal_answers(
+    _ml, {1: "para one\n\npara two\n  para three  ", 2: "short", 3: "last"})
+check("14.multiline-filled", _f == 3, _f)
+check("14.multiline-bullets",
+      _out[1:5] == ["\t\t- A: para one", "\t\t- para two",
+                    "\t\t- para three", "\t- *Q2 · Q two?*"], _out)
+check("14.multiline-no-shift",
+      pm.journal_pairs(_out)[1][2] == "short"
+      and pm.journal_pairs(_out)[2][2] == "last", pm.journal_pairs(_out))
+check("14.multiline-reads-back", pm.journal_pairs(_out)[0][2] == "para one")
+_one, _f1 = pm.merge_journal_answers(pm.seed_journal_lines(["Q?"]), {1: "  plain  "})
+check("14.single-line-unchanged", _f1 == 1 and _one[1] == "\t\t- A: plain", _one)
+
 # ── 15. sparklines ───────────────────────────────────────────────────────────
 check("15.zero", pm.spark([0, 0, 0]) == "▁▁▁")
 check("15.equal", pm.spark([5, 5, 5]) == "▁▁▁")

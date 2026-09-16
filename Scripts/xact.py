@@ -1064,9 +1064,23 @@ def _osa_dialog(body):
     street removes the whole class.
 
     The bare retry stays for the case where the hosted call errors -
-    but NEVER on a user cancel (-128), or pressing Esc would re-open
-    the dialog in a loop."""
-    prog = 'tell application "System Events"\nactivate\n' + body + '\nend tell'
+    but NEVER on a user cancel (-128), and never on a TIMEOUT (-1712).
+
+    THE TIMEOUT (Vex 2026-09-16: "after some time, the same question pops
+    up again ... I press OK on both entries but not one is logged"). An
+    Apple Event carries a deadline, 120 s by default, and a dialog that
+    sits unanswered past it fails the SEND with -1712 while the box stays
+    on screen. So a long answer - the evening journal's "What is on your
+    mind?", which he writes for minutes - timed out, and the bare retry
+    below then opened a SECOND box over the first. The first one's OK had
+    nowhere to return to, and an empty OK on the second reads as "skip
+    this prompt", so the answer he typed twice was written neither time.
+    Measured here: a 3 s `with timeout` on a hosted dialog errors -1712 at
+    3.31 s with the panel still up. A day is the deadline now - a prompt
+    is answered when it is answered."""
+    prog = ('with timeout of 86400 seconds\n'
+            'tell application "System Events"\nactivate\n' + body
+            + '\nend tell\nend timeout')
     try:
         mover = subprocess.Popen(["osascript", "-e", _DIALOG_MOVER],
                                  stdout=subprocess.DEVNULL,
@@ -1083,17 +1097,33 @@ def _osa_dialog(body):
                 mover.wait(timeout=2)
             except Exception:
                 pass
-    if r.returncode == 0 or "-128" in (r.stderr or ""):
-        return r
-    return subprocess.run(["osascript", "-e", body],
-                          capture_output=True, text=True)
+    err = r.stderr or ""
+    if r.returncode == 0 or "-128" in err or "-1712" in err:
+        return r                       # answered, cancelled, or timed out
+    return subprocess.run(
+        ["osascript", "-e",
+         "with timeout of 86400 seconds\n" + body + "\nend timeout"],
+        capture_output=True, text=True)
 
 
-def _ask(prompt, title="TickAL", hidden=False, default=""):
+def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False):
     """Module-level dialog helper. Returns None on Cancel, "" on
     empty-OK - the journal flow assigns those OPPOSITE meanings (cancel =
     stop + save partial; empty = skip this prompt), so the two must be
-    distinguishable. v2login keeps its own nested copy untouched."""
+    distinguishable. v2login keeps its own nested copy untouched.
+
+    `multiline` opens the real text box (src/ask_box.py) for a prompt that
+    invites prose, because `display dialog`'s field is one line: it does not
+    wrap, you cannot see what you wrote, and Return submits. It falls back
+    here wherever PyObjC is missing, and is never used with `hidden` (a
+    password wants the one-line secure field)."""
+    if multiline and not hidden:
+        try:
+            import ask_box
+            if ask_box.available():
+                return ask_box.ask(prompt, title, default)
+        except Exception:
+            pass                      # no AppKit, or it would not draw
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace('"', '\\"')
     osa = ('text returned of (display dialog "{}" default answer "{}" '
@@ -7287,7 +7317,10 @@ def pn_journal(slot):
                 break
             cancelled = True           # Cancel / Esc on the goal check
             break
-        a = _ask(q, title=f"{label} journal · {n}/{total}")
+        # mood / money / rating are parsed out of ONE short line; the rest
+        # are prose, and prose gets the big box (Vex 2026-09-16).
+        a = _ask(q, title=f"{label} journal · {n}/{total}",
+                 multiline=key not in ("mood", "money", "rating"))
         if a is None:                     # Cancel: stop, keep what we have
             cancelled = True
             break
