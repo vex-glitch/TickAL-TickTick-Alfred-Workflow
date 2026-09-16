@@ -30,6 +30,66 @@ _OPAQUE = _re.compile(r'\[\[[^\[\]]*\]\]'
 _TOKEN = _re.compile(r'(?<!\S)[~#!*@/>=&%]')
 
 
+# Only what the bar ACTUALLY consumes, so ordinary punctuation survives:
+# "Fish & Chips" keeps its &, "Sale 50% off" its %, "2020 > 2021" its >.
+# Two rules beyond parse_task's own tokens, both from find_active_trigger:
+# a trigger in the LAST word opens a sub-picker on a one-word fragment, and
+# a word-initial @ opens the time picker whatever follows it (it strips its
+# fragment before testing). The standalone markers are here too: a page
+# title carrying "^" or "+focus" would silently arm them and lose the word.
+_UNSAFE = _re.compile(
+    r'(?<!\S)(?:'
+    r'[~*/=@]'                                            # picker or span
+    r'|#(?=\S)'                                           # #tag
+    r'|!(?=[123](?:\s|$))'                                # !priority
+    r'|>(?=\d)'                                           # >duration
+    r'|&(?=(?:daily|weekdays|weekly|monthly|yearly)(?:\s|$))'
+    r'|%(?=\S)'                                           # %reminder
+    r'|\^(?=\s|$)'                                        # ^ attach image
+    r'|\+(?=(?:stage|focus|web)(?:\s|$))'                 # +stage +focus +web
+    r'|[~#!*/>@&%=](?=\S*\s*$)'                           # one in the last word
+    r')', _re.IGNORECASE)
+
+
+def splice_title(text, name):
+    """`text` with `name` joined onto its TITLE, before the first attribute
+    token - the rule next_query already follows for the pipe.
+
+    Appending at the END would feed the words to whatever token sits last:
+    "u *sat " plus "Monday Night Football" reads as a date span, not a name,
+    and both the title and the date come out wrong.
+    """
+    if not name:
+        return text
+    masked, show = _masked(text or "")
+    m = _TOKEN.search(masked)
+    cut = m.start() if m else len(masked)
+    head = show(masked[:cut]).rstrip()
+    tail = show(masked[cut:]).strip()
+    out = f"{head} {name}".strip()
+    return f"{out} {tail}" if tail else out
+
+
+def bar_safe(text):
+    """Arbitrary text made safe to put INTO the add bar.
+
+    The bar owns a dozen characters, so text that came from somewhere else -
+    a web page title, fed in by the `u ` prefix's browser row - cannot be
+    typed in raw: "Easy chicken curry | BBC Good Food" would have carved
+    "BBC Good Food" off as a subtask, and "Recipe #5" would have minted a
+    tag. The pipe becomes the separator this workflow uses everywhere else;
+    a word-initial trigger is dropped, because this grammar has no escape
+    and the words matter more than the punctuation.
+    """
+    t = (text or "").replace(SEP, "·").replace("[[", "((").replace("]]", "))")
+    for _ in range(12):         # dropping one can expose the next: "~/path"
+        out = _UNSAFE.sub("", t)
+        if out == t:
+            break
+        t = out
+    return " ".join(t.split())
+
+
 def _masked(text):
     """(text with every opaque run hidden, a function that puts them back)."""
     holes = []

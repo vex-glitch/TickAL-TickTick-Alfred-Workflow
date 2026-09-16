@@ -35,6 +35,7 @@ test:
 	@$(PYTHON) tests/test_subtask_line.py
 	@$(PYTHON) tests/test_mdtext.py
 	@$(PYTHON) tests/test_clipboard.py
+	@$(PYTHON) tests/test_browser_tab.py
 	@$(PYTHON) tests/test_api_update.py
 	@$(PYTHON) tests/test_albums.py
 	@$(PYTHON) tests/test_alb_move.py

@@ -24,76 +24,23 @@ friendly message in the add window rather than failing silently - no clipboard
 or keystroke side effects.
 """
 import json
-import subprocess
+import os
+import sys
 
-# Chromium-family apps all share the `active tab of front window` dialect.
-CHROMIUM = {
-    "Google Chrome", "Google Chrome Canary", "Google Chrome Beta",
-    "Google Chrome Dev", "Chromium",
-    "Brave Browser", "Brave Browser Beta", "Brave Browser Nightly",
-    "Microsoft Edge", "Microsoft Edge Beta", "Microsoft Edge Dev",
-    "Microsoft Edge Canary",
-    "Vivaldi", "Opera", "Opera GX", "Opera Beta",
-    "Arc", "Dia", "Sidekick", "Yandex", "Min",
-}
-# Safari family uses `current tab of front window`, title property is `name`.
-SAFARI = {"Safari", "Safari Technology Preview", "WebKit"}
-
-# Probe order when the frontmost app isn't a browser (e.g. invoked from Alfred's
-# menu). Most-likely-primary browsers first.
-PRIORITY = [
-    "Safari", "Google Chrome", "Arc", "Brave Browser", "Microsoft Edge",
-    "Vivaldi", "Opera", "Chromium", "Safari Technology Preview",
-]
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 
-def _osa(script):
-    """Run a one-liner AppleScript; return stripped stdout, or None on failure."""
-    try:
-        out = subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True, text=True, timeout=5,
-        )
-        if out.returncode == 0:
-            return out.stdout.strip()
-    except Exception:
-        pass
-    return None
+def emit(variables):
+    """Print the envelope a Run Script uses to pass variables onward to TT."""
+    print(json.dumps({"alfredworkflow": {"arg": "", "variables": variables}}))
 
 
-def frontmost_app():
-    return _osa('tell application "System Events" to get name of first '
-                'application process whose frontmost is true') or ""
-
-
-def running_apps():
-    out = _osa('tell application "System Events" to get name of every '
-               'application process whose background only is false')
-    return {a.strip() for a in (out or "").split(",")}
-
-
-def family(app):
-    if app in CHROMIUM:
-        return "chromium"
-    if app in SAFARI:
-        return "safari"
-    return None
-
-
-def grab_from(app):
-    """Read (url, title) from a known browser, or (None, None)."""
-    fam = family(app)
-    if fam == "chromium":
-        tab_spec, title_prop = "active tab of front window", "title"
-    elif fam == "safari":
-        tab_spec, title_prop = "current tab of front window", "name"
-    else:
-        return None, None
-    url   = _osa(f'tell application "{app}" to get URL of {tab_spec}')
-    title = _osa(f'tell application "{app}" to get {title_prop} of {tab_spec}')
-    if url and url.startswith(("http://", "https://", "file://")):
-        return url, (title or "")
-    return None, None
+try:
+    import browser_tab as bt
+except Exception as _e:                     # src/ unreachable: say so, don't die
+    emit({"prefill_error": f"Could not load the browser reader: {_e}"})
+    raise SystemExit(0)
 
 
 def md_link(url, title):
@@ -107,32 +54,17 @@ def md_link(url, title):
     return f"[{title}]({url})"
 
 
-def emit(variables):
-    """Print the envelope a Run Script uses to pass variables onward to TT."""
-    print(json.dumps({"alfredworkflow": {"arg": "", "variables": variables}}))
-
-
 def main():
-    front = frontmost_app()
-
-    # Frontmost first (hotkey path: the browser is still in front). If that's
-    # not a usable browser (menu path: Alfred is frontmost), probe the running
-    # browsers in priority order.
-    url = title = None
-    if family(front):
-        url, title = grab_from(front)
-    if not url:
-        running = running_apps()
-        for app in PRIORITY:
-            if app == front or app not in running:
-                continue
-            url, title = grab_from(app)
-            if url:
-                break
+    # Frontmost first (hotkey path: the browser is still in front), then the
+    # running browsers in priority order (menu path: Alfred is frontmost).
+    # browser_tab owns both, and the add bar's `u ` prefix reads the same tab
+    # through its cached() door.
+    front = bt.frontmost_app()
+    _app, url, title = bt.front_tab(front=front)
 
     if url:
         emit({"prefill_note": md_link(url, title)})
-    elif family(front) is None and front:
+    elif bt.family(front) is None and front:
         emit({"prefill_error": "No browser tab to read · open a page in Safari "
                                "or a Chromium browser (Chrome, Brave, Edge, Arc…)"})
     else:

@@ -219,6 +219,12 @@ def parse_task(query):
     new_q, n_fx = re.subn(r'(?<!\S)\+focus(?=\s|$) ?', '', q)
     post_stage, post_focus = n_stage > 0, n_fx > 0
     q = new_q
+    # +web - the `u ` link prefix takes its URL from the front browser tab
+    # instead of the clipboard. A marker, not a picker, because it has to
+    # survive every keystroke and every sub-picker round trip.
+    new_q, n_web = re.subn(r'(?<!\S)\+web(?=\s|$) ?', '', q)
+    use_web = n_web > 0
+    q = new_q
 
     # ~p parent_task (multi-word, ends at next trigger or end of string).
     # Resolve-and-trim like ~l: title typed AFTER the picked parent used to be
@@ -377,7 +383,7 @@ def parse_task(query):
         note = re.sub(r'(?:(?<=\s)|^)/n(?=\s|$)', '\n', note)
     return (title, date_str, time_str, end_str, priority, tags,
             list_name, parent_name, section_name, note, repeat,
-            reminders, attach_image, post_stage, post_focus)
+            reminders, attach_image, post_stage, post_focus, use_web)
 
 def resolve_list_id(list_name, lists):
     """Find project ID by name (case-insensitive prefix/contains match)."""
@@ -1487,6 +1493,7 @@ def _split_tag_parents(tags):
 
 # ── 🔗 u mode - the clipboard is the link, you name it ───────────────────────
 _CLIP = None
+_TAB = None
 
 
 def _clip_link():
@@ -1501,37 +1508,132 @@ def _clip_link():
     return _CLIP
 
 
-def _link_title(typed, prefill=""):
-    """`u ` mode → (markdown title, label, url, prefill_used), or four empties
-    when nothing anywhere holds a link.
+def _link_title(typed, prefill="", web=False):
+    """`u ` mode → (markdown title, label, url, src), src naming the rung the
+    URL came from: "typed", "pre", "clip" or "tab". ("", "", "", "") when
+    nothing anywhere holds a link.
 
     The words you type name the link; the URL comes from the loudest source
-    that has one - typed in the bar, then the URL hotkey's prefill (you fired
-    that for THIS add), then the clipboard. mdtext owns the grammar, so a
-    clipboard that is ALREADY a markdown link keeps its target and takes your
-    words as the new label. A [[Task]] in the label resolves and flattens to
-    that task's name: a link cannot nest inside a link (mdtext's whole point),
-    so the name is the most of it that can survive.
+    that has one - typed in the bar, then the browser tab when you asked for
+    it with +web, then the URL hotkey's prefill (you fired that for THIS
+    add), then the clipboard, and last the browser tab anyway, because a page
+    you are looking at beats having nothing to link. mdtext owns the grammar,
+    so a clipboard that is ALREADY a markdown link keeps its target and takes
+    your words as the new label. A [[Task]] in the label resolves and
+    flattens to that task's name: a link cannot nest inside a link (mdtext's
+    whole point), so the name is the most of it that can survive.
     """
     import mdtext
     label, url = mdtext.link_parts(typed, "")          # a typed URL wins
-    used_pre = False
-    if not url and prefill:
-        label, url = mdtext.link_parts(typed, prefill)
-        used_pre = bool(url)
+    src = "typed" if url else ""
     if not url:
-        label, url = mdtext.link_parts(typed, _clip_link())
+        # Getters, not values: with +web set and a tab open, the clipboard is
+        # never read at all.
+        rungs = [("pre", lambda: prefill),
+                 ("clip", _clip_link),
+                 ("tab", lambda: _browser_tab().get("url") or "")]
+        if web:
+            rungs.insert(0, rungs.pop())               # you asked for the tab
+        for name, get in rungs:
+            raw = get() or ""
+            if not raw:
+                continue
+            label, url = mdtext.link_parts(typed, raw)
+            if url:
+                src = name
+                break
     if not url:
-        return "", "", "", False
+        return "", "", "", ""
     label = mdtext.link_text(resolve_wikilinks(label)) or mdtext.url_name(url)
-    return mdtext.md_link(label, url), label, url, used_pre
+    return mdtext.md_link(label, url), label, url, src
+
+
+def _browser_tab():
+    """The front browser tab, read once per process and cached for 2 seconds
+    on disk. Free when nothing is open (~30 ms for the process list), and
+    paid once per bar session when a browser is: while the add bar is up YOU
+    are typing in Alfred, so the front tab cannot change under the cache."""
+    global _TAB
+    if _TAB is None:
+        try:
+            import browser_tab
+            _TAB = browser_tab.cached()
+        except Exception:
+            _TAB = {"app": "", "url": "", "title": ""}
+    return _TAB
+
+
+_WEB_RE = re.compile(r'(?<!\S)\+web(?=\s|$)\s*')
+
+
+def _web_query(query, on):
+    """The same query with the +web marker put on or taken off. It sits right
+    after the prefix so the name stays at the end, where the cursor lands."""
+    bare = _WEB_RE.sub('', query[2:]).lstrip()
+    return f"{query[:2]}+web {bare}" if on else f"{query[:2]}{bare}"
 
 
 def _no_link_rows():
     """`u ` with nothing to link refuses, in pn_entry's shipped words, rather
-    than quietly creating an ordinary item that only LOOKS like it worked."""
+    than quietly creating an ordinary item that only LOOKS like it worked.
+    Nothing to offer beside it: the browser tab is itself one of the rungs
+    that just came back empty."""
     return [alfred.item(title="🔗 Nothing to link",
-                        subtitle="Copy a URL first", valid=False)]
+                        subtitle="Copy a URL first, or open a page",
+                        valid=False)]
+
+
+def _tab_rows(query, src, use_web, typed, alt_url=""):
+    """The offer: one row to take the link off the front browser tab instead,
+    and the way back out of it. Nothing at all when no browser has a page.
+
+    With no name typed yet the row hands you the PAGE TITLE, which is what
+    grab_url has always used for its label - the page already named itself,
+    and typing that again is work.
+
+    `alt_url` is what would win if +web were off, so the way back is only
+    offered when there is something to go back TO.
+    """
+    if not query.lower().startswith("u ") or src == "typed":
+        return []                      # a URL you typed beats every offer
+    tab = _browser_tab()
+    url = tab.get("url") or ""
+    ttl = tab.get("title") or ""
+    app = tab.get("app") or ""
+    import mdtext
+    import subtask_line as sl
+
+    def _where(u):
+        return f"{app} · {mdtext.url_name(u)}" if app else mdtext.url_name(u)
+
+    if not url:
+        if not (use_web and alt_url):
+            return []
+        # +web is pinned but nothing is open, and there IS a fallback
+        return [alfred.item(
+            uid="u-tab-off", title="🌐 No browser tab to read",
+            subtitle=f"Back to {mdtext.url_name(alt_url)}", arg="",
+            valid=False, autocomplete=_web_query(query, False))]
+    rows = []
+    name = sl.bar_safe(ttl)
+    # Offer the tab whenever it is not already the link - and when it IS, so
+    # long as nothing is typed, because the row still hands over the name.
+    if src != "tab" or not typed:
+        rows.append(alfred.item(
+            uid="u-tab", title=f"🌐 {ttl or _where(url)}",
+            subtitle=_where(url) + ("  |  ⏎ takes the page name"
+                                    if not typed and name else ""),
+            arg="", valid=False,
+            autocomplete=(sl.splice_title(_web_query(query, True), name)
+                          if not typed else _web_query(query, True))))
+    # The way back, only once the marker is pinned and there is somewhere
+    # to go back TO.
+    if src == "tab" and use_web and alt_url and alt_url != url:
+        rows.append(alfred.item(
+            uid="u-tab-off", title="📋 Use the copied link instead",
+            subtitle=mdtext.url_name(alt_url), arg="", valid=False,
+            autocomplete=_web_query(query, False)))
+    return rows
 
 
 # ── Task preview ──────────────────────────────────────────────────────────────
@@ -1546,7 +1648,8 @@ def task_preview(query, link=False):
     """
     (title, date_str, time_str, end_str, priority, tags,
      list_name, parent_name, section_name, note, repeat, reminders,
-     attach_image, post_stage, post_focus) = parse_task(query[2:] if link else query)
+     attach_image, post_stage, post_focus, use_web) = parse_task(
+        query[2:] if link else query)
 
     # "Buy groceries | Milk | Bread" - the pipes carve subtasks out of the
     # TITLE only, so every attribute token has already been taken off the line
@@ -1562,18 +1665,27 @@ def task_preview(query, link=False):
     # `u ` mode. The link is built from the ALREADY PARSED title, never before
     # it: a real URL carries = & # ~ and sometimes |, and the add tokenizer
     # would shred one into a date, a tag, a note and phantom subtasks.
-    disp_title, link_url = title, ""
+    disp_title, link_url, link_src, alt_url = title, "", "", ""
     if link:
-        md_title, label, link_url, used_pre = _link_title(title, pre)
+        import mdtext as _md
+        md_title, label, link_url, link_src = _link_title(
+            title, pre, web=use_web)
         if not link_url:
             return _no_link_rows()
-        if used_pre:
-            pre = ""                    # it is the NAME now, not the note
+        # The prefill is the NAME now, not the note - and that holds whenever
+        # it carries the SAME link, however it won (fire the URL hotkey, then
+        # pick the tab: same page, and it would have landed in both places).
+        if link_src == "pre" or (pre and _md.find_url(pre) == link_url):
+            pre = ""
+        if use_web:          # what the way-back row would fall to
+            alt_url = _link_title(title, pre, web=False)[2]
         if not title:
             return [alfred.item(
                 title="Type the link name…",
-                subtitle=f"🔗 {label}  |  {symbol_legend()}",
-                valid=False)]
+                subtitle=("%s %s  |  %s"
+                          % ("🌐" if link_src == "tab" else "🔗", label,
+                             symbol_legend())),
+                valid=False)] + _tab_rows(query, link_src, use_web, "", alt_url)
         title, disp_title = md_title, label
 
     eff_note = (f"{note}\n\n{pre}" if note and pre else (note or pre or None))
@@ -1696,7 +1808,8 @@ def task_preview(query, link=False):
     parts = []
     if link_url:
         import mdtext
-        parts.append(f"🔗 {mdtext.url_name(link_url)}")
+        parts.append(("🌐 " if link_src == "tab" else "🔗 ")
+                     + mdtext.url_name(link_url))
     _lchip = f"~{list_display}" if list_display else "~Inbox"
     if list_name and not list_id:
         _lchip += "?"
@@ -1882,6 +1995,7 @@ def task_preview(query, link=False):
             # ⌘ and ⌘⇧ are the focus chords on the row above; one meaning
             # per row, so they are honestly dead here.
             mods={"cmd": dict(_dead), "cmd+shift": dict(_dead)}))
+        items += _tab_rows(query, link_src, use_web, title, alt_url)
 
     # ➕ Another subtask - the focus picker's "from A | B | " shape: the row
     # hands the line back with one more separator, and the ✅ row above stays
@@ -2383,7 +2497,7 @@ def main():
             elif err:
                 sub = f"⚠️ {err}"
             else:
-                sub = _add_target_label() or "/ for list, note, project or tag"
+                sub = _add_target_label() or "/ for link, list, note or project"
             items = [alfred.item(
                 title="Type a task name…",
                 subtitle=sub,
