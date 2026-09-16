@@ -98,10 +98,16 @@ Leading prefixes switch what gets created:
 
 | Prefix | Creates |
 |--------|---------|
+| `st ` | Subtask (pick the parent, then type them) |
+| `u name` | Link - the copied URL becomes the name; task, note, onto a description, or as a subtask |
 | `L ` | List |
 | `N ` | Note |
 | `P ` | Project (list + scheduled 📌CTA task - [Projects](49-projects.md)) |
 | `T ` | Tag (top-level, or nested under a parent) |
+| `B ` | Bridge (daily or project) |
+| `H ` | Person (CTA, or new) |
+| `C ` | Countdown (name + date) |
+| `R ` | Habit |
 
 ## Search scopes
 

@@ -2,7 +2,7 @@
 
 _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-cheatsheet.md)_
 
-> Create tasks, lists, notes, and projects from one input line with a token grammar and live sub-pickers.
+> Create tasks, lists, notes, links, and projects from one input line with a token grammar and live sub-pickers.
 
 **Keyword:** `tad` (grammar: `tad Title *date @time !1-3 #tag ~l List =note`) · **Hotkey:** (set in canvas)
 
@@ -44,7 +44,7 @@ Notes on specific tokens:
 
 ## The `/` menu
 
-On an empty field, `/` picks what to create - Task, List, Note, Project, or Tag. Once a title exists (or the window is pinned to a container), `/` lists every applicable add-on (date, time, duration, repeat, reminder, priority, tag, location, note, image); ⏎ autocompletes its symbol into the query. Context-dependent rows appear only when valid - `@` after a date, `>` after a time, `&`/`%` after a date.
+On an empty field, `/` picks what to create - Task, Subtask, URL, List, Note, Project, Tag, Bridge, Person, Countdown or Habit. Once a title exists (or the window is pinned to a container), `/` lists every applicable add-on (date, time, duration, repeat, reminder, priority, tag, location, note, image); ⏎ autocompletes its symbol into the query. Context-dependent rows appear only when valid - `@` after a date, `>` after a time, `&`/`%` after a date.
 
 <details><summary>Screenshot</summary>
 
@@ -52,16 +52,41 @@ On an empty field, `/` picks what to create - Task, List, Note, Project, or Tag.
 
 </details>
 
-## Creation modes: L / N / P / T
+## Creation modes
+
+A prefix on an empty field picks what you are making. The `/` menu lists them all.
 
 | Prefix | Creates | Details |
 |--------|---------|---------|
+| `st ` | Subtask | Pick the parent, then type its subtasks - the parent rides as a variable, never as text in the bar |
+| `u name` | Link | The link you copied becomes the item's NAME. Four destinations - [below](#links-u) |
 | `L name` | List | One ⏎, done |
 | `N title` | Note | Notes take `*` `@` `>` `&` `%` `#` `~` `=` too; `~l` includes note lists |
 | `P name` | Project | Pick an area tag → creates a `💼P • name` list plus its scheduled 📌CTA task - full flow on [Projects](49-projects.md) |
 | `T name` | Tag | Two rows: **➕** creates it top-level, **🪆 under parent…** opens the parent list (typing filters it). Needs the [v2 token](30-setup.md) |
+| `B ` | Bridge | Daily or project handoff note - see [CRM](47-crm.md) |
+| `H ` | Person | A person's CTA, or a new person |
+| `C name` | Countdown | Name plus a date |
+| `R name` | Habit | A new habit |
 
-Prefixes are case-insensitive (`l `, `n `, `p `, `t ` work). Area tags for `P` are your tags starting with a keycap number (1️⃣…) - they arrive with the tag sync, no setup; the whole convention is on [Projects](49-projects.md).
+Prefixes are case-insensitive (`l `, `n `, `p `, `t `, `u ` work). Area tags for `P` are your tags starting with a keycap number (1️⃣…) - they arrive with the tag sync, no setup; the whole convention is on [Projects](49-projects.md).
+
+## Links: `u `
+
+`u ` names a link you already have. Copy a URL, type `u Chicken curry`, and the item's **name** becomes `[Chicken curry](https://…)`. Every other token still applies, so `u Chicken curry *saturday ~l Reading #recipes` schedules and files it in one line.
+
+Four rows, four destinations:
+
+| Row | Lands |
+|-----|-------|
+| ✅ **Create** | A new task |
+| 📝 **Create note** | The same thing as a note (pipes are the one thing it cannot do - a note holds no subtasks) |
+| 📄 **Add to a description…** | A picker over tasks *and* notes; the link goes on its own line at the bottom of the one you pick |
+| 🧬 **Add as a subtask…** | Drops into the `~p` parent picker; ⏎ on the ✅ row above then files it under that task |
+
+Where the URL comes from, loudest source first: one typed in the bar, the browser tab when you took the 🌐 row, the Save link / URL hotkey's prefill (it becomes the name instead of the description), then the clipboard, and finally the browser tab anyway when nothing else has one. The subtitle chip says which won - **🔗** for a copied link, **🌐** for the tab. A clipboard that already holds a markdown link keeps its target and takes your words as the new label. With nothing to link anywhere the screen refuses rather than quietly creating a plain item.
+
+**🌐 From the browser.** Safari and every Chromium browser (Chrome, Brave, Edge, Arc, Vivaldi, Opera…) answer. With no name typed yet the row also hands over the page title, so `u ` ⏎ ⏎ files the page under its own headline. Firefox-based browsers, Zen included, expose no tab URL to AppleScript at all, so no row appears for them - copy the address instead. Nothing is ever asked of a browser that is not already running, because that would launch it.
 
 ## Adding into a list, section, or task
 
