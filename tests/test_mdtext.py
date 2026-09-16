@@ -82,6 +82,62 @@ check("nothing at all is nothing", md.link_entry("", "") is None)
 check("the built entry survives the reader",
       md.MD_LINK_RE.fullmatch(md.link_entry("a b", "https://x.com/1")) is not None)
 
+# ── parens in the target: Wikipedia-class URLs are ordinary links ───────────
+WIKI = "https://en.wikipedia.org/wiki/Foo_(bar)"
+check("a url keeps its own balanced parens", md.find_url(WIKI) == WIKI,
+      md.find_url(WIKI))
+check("a url inside a sentence gives the paren back",
+      md.find_url("(see https://x.com/a) now") == "https://x.com/a",
+      md.find_url("(see https://x.com/a) now"))
+check("sentence punctuation still comes off",
+      md.find_url("go to https://x.com/a.") == "https://x.com/a")
+check("and both at once",
+      md.find_url("(see https://x.com/a).") == "https://x.com/a",
+      md.find_url("(see https://x.com/a)."))
+_wl = md.md_link("Foo bar", WIKI)
+check("so a paren link is built whole", _wl == f"[Foo bar]({WIKI})", _wl)
+check("and flattens back to its label", md.flatten_links(_wl) == "Foo bar",
+      md.flatten_links(_wl))
+check("the reader matches it whole", md.MD_LINK_RE.fullmatch(_wl) is not None)
+check("a paren url still round-trips through the entry grammar",
+      md.link_entry("Foo bar", WIKI) == _wl)
+
+# ── url_name: a deep link is named by its app, not by its command ───────────
+check("a web host names itself",
+      md.url_name("https://news.ycombinator.com/item?id=42") == "news.ycombinator.com")
+check("www comes off", md.url_name("http://www.bbc.co.uk/news") == "bbc.co.uk")
+check("an app scheme names the app, not the command",
+      md.url_name("crouton://viewRecipe?id=8435") == "crouton",
+      md.url_name("crouton://viewRecipe?id=8435"))
+check("same for the ones Vex pastes daily",
+      md.url_name("obsidian://open?vault=V") == "obsidian"
+      and md.url_name("kmtrigger://macro=2DC5") == "kmtrigger"
+      and md.url_name("ticktick://v1/show?x=1") == "ticktick")
+check("a hostless file url names the scheme",
+      md.url_name("file:///Users/v/a.md") == "file")
+check("a dotless WEB host is still a host",
+      md.url_name("http://localhost:3000/x") == "localhost:3000")
+
+# ── link_parts: the same ladder, with the url handed back separately ────────
+check("label and url come back apart",
+      md.link_parts("Read this", "https://example.com/a")
+      == ("Read this", "https://example.com/a"))
+check("no url anywhere is flagged by a None url",
+      md.link_parts("just words", "not a url") == ("just words", None))
+check("a typed url wins and leaves the rest as the label",
+      md.link_parts("Read https://typed.example/x now", "https://clip.example/y")
+      == ("Read now", "https://typed.example/x"))
+check("a copied markdown link hands back its own target",
+      md.link_parts("My name", "[Old](https://x.com/1)")
+      == ("My name", "https://x.com/1"))
+check("with no words typed the copied label rides along",
+      md.link_parts("", "[Old](https://x.com/1)") == ("Old", "https://x.com/1"))
+check("the label is RAW here - md_link is what sanitises it",
+      md.link_parts("Sleeve [250]", "https://x.com/1")[0] == "Sleeve [250]")
+check("link_entry is still link_parts plus md_link",
+      md.link_entry("Sleeve [250]", "https://x.com/1")
+      == "[Sleeve (250)](https://x.com/1)")
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if FAILS:
     raise AssertionError(f"{len(FAILS)} checks failed: {FAILS}")

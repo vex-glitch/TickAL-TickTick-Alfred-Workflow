@@ -84,6 +84,23 @@ check("chip counts", sl.chip(["a"]) == "+ 1 subtask"
       and sl.chip(["a", "b"]) == "+ 2 subtasks" and sl.chip([]) == ""
       and sl.chip(None) == "")
 
+# ── a bare url is opaque too: a pipe inside one is TEXT ─────────────────────
+check("a pipe inside a typed url is not a separator",
+      sl.split_line("https://fonts.googleapis.com/css?family=A|B Fonts | kid")
+      == ("https://fonts.googleapis.com/css?family=A|B Fonts", ["kid"]),
+      sl.split_line("https://fonts.googleapis.com/css?family=A|B Fonts | kid"))
+check("a url with balanced parens survives whole",
+      sl.split_line("https://en.wikipedia.org/wiki/Foo_(bar) | kid")
+      == ("https://en.wikipedia.org/wiki/Foo_(bar)", ["kid"]))
+check("any scheme, not just http",
+      sl.split_line("crouton://viewRecipe?id=A|B | kid")
+      == ("crouton://viewRecipe?id=A|B", ["kid"]))
+check("and the ordinary pipes still carve",
+      sl.split_line("Buy groceries | Milk | Bread")
+      == ("Buy groceries", ["Milk", "Bread"]))
+check("a url with no pipe is untouched",
+      sl.split_line("Read https://x.com/a now") == ("Read https://x.com/a now", []))
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if FAILS:
     raise AssertionError(f"{len(FAILS)} checks failed: {FAILS}")

@@ -875,6 +875,7 @@ def mode_menu(fragment):
     rows = [
         ("",   "✅", "Task",    "Type name"),
         ("st ", "🧬", "Subtask", "Under a task"),
+        ("U ", "🔗", "URL",     "You name it"),
         ("L ", "📋", "List",    "New list"),
         ("N ", "📝", "Note",    "New note"),
         ("P ", "💼", "Project", "list + meta task"),
@@ -1403,7 +1404,8 @@ def reminder_picker(prefix, fragment):
 
 
 # ── Notification builder ─────────────────────────────────────────────────────
-def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, section_display=None):
+def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id,
+                 section_display=None, kind_word="Task"):
     """
     Returns the notification string for a task creation, potentially two lines:
       Line 1 - action label  ("Subtask added" / "Task added to {Section}" / etc.)
@@ -1437,19 +1439,19 @@ def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id, 
             pid = t.get("parentId")
 
     depth = len(parent_titles)   # 0 = new top-level task, 1 = subtask, 2 = sub-subtask, …
+    # What a CHILD of this kind is called: note_preview has said "Sub-note"
+    # since it shipped, and a note filed under a parent must say the same.
+    kid_word = "subtask" if kind_word == "Task" else "sub-" + kind_word.lower()
 
     # ── Line 1: action label ──────────────────────────────────────────────────
     if depth == 0:
         if section_name:
-            line1 = f"Task {title} added to {section_name}"
+            line1 = f"{kind_word} {title} added to {section_name}"
         else:
-            line1 = f"Task {title} added to {list_display or 'Inbox'}"
-    elif depth == 1:
-        line1 = f"Subtask {title} added"
-    elif depth == 2:
-        line1 = f"Sub-subtask {title} added"
+            line1 = f"{kind_word} {title} added to {list_display or 'Inbox'}"
     else:
-        line1 = ("Sub-" * (depth - 1)) + f"subtask {title} added"
+        line1 = ("Sub-" * (depth - 1)) + f"{kid_word} {title} added"
+        line1 = line1[0].upper() + line1[1:]
 
     # ── Line 2: breadcrumb including the new task ─────────────────────────────
     crumb = []
@@ -1483,11 +1485,68 @@ def _split_tag_parents(tags):
     return names, parents
 
 
+# ── 🔗 u mode - the clipboard is the link, you name it ───────────────────────
+_CLIP = None
+
+
+def _clip_link():
+    """The clipboard as a link source, read ONCE per process. A script filter
+    run IS one keystroke, so once per process is once per keystroke."""
+    global _CLIP
+    if _CLIP is None:
+        try:
+            _CLIP = clip_util.link_source()
+        except Exception:
+            _CLIP = ""
+    return _CLIP
+
+
+def _link_title(typed, prefill=""):
+    """`u ` mode → (markdown title, label, url, prefill_used), or four empties
+    when nothing anywhere holds a link.
+
+    The words you type name the link; the URL comes from the loudest source
+    that has one - typed in the bar, then the URL hotkey's prefill (you fired
+    that for THIS add), then the clipboard. mdtext owns the grammar, so a
+    clipboard that is ALREADY a markdown link keeps its target and takes your
+    words as the new label. A [[Task]] in the label resolves and flattens to
+    that task's name: a link cannot nest inside a link (mdtext's whole point),
+    so the name is the most of it that can survive.
+    """
+    import mdtext
+    label, url = mdtext.link_parts(typed, "")          # a typed URL wins
+    used_pre = False
+    if not url and prefill:
+        label, url = mdtext.link_parts(typed, prefill)
+        used_pre = bool(url)
+    if not url:
+        label, url = mdtext.link_parts(typed, _clip_link())
+    if not url:
+        return "", "", "", False
+    label = mdtext.link_text(resolve_wikilinks(label)) or mdtext.url_name(url)
+    return mdtext.md_link(label, url), label, url, used_pre
+
+
+def _no_link_rows():
+    """`u ` with nothing to link refuses, in pn_entry's shipped words, rather
+    than quietly creating an ordinary item that only LOOKS like it worked."""
+    return [alfred.item(title="🔗 Nothing to link",
+                        subtitle="Copy a URL first", valid=False)]
+
+
 # ── Task preview ──────────────────────────────────────────────────────────────
-def task_preview(query):
+def task_preview(query, link=False):
+    """`link=True` is the `u ` mode: the item's NAME becomes a markdown link to
+    a URL you already copied, and a second row files the same thing as a note.
+
+    The FULL query arrives here, "u " included, and only the parser sees it
+    stripped - that is what keeps every follow-up autocomplete (⏰ / ⏳ / 🔔 and
+    ➕ Another subtask) inside the mode instead of dropping the next keystroke
+    back into a plain add.
+    """
     (title, date_str, time_str, end_str, priority, tags,
      list_name, parent_name, section_name, note, repeat, reminders,
-     attach_image, post_stage, post_focus) = parse_task(query)
+     attach_image, post_stage, post_focus) = parse_task(query[2:] if link else query)
 
     # "Buy groceries | Milk | Bread" - the pipes carve subtasks out of the
     # TITLE only, so every attribute token has already been taken off the line
@@ -1499,6 +1558,24 @@ def task_preview(query):
     # add window opens "as usual" (empty title to type) with the URL already in
     # the description. A typed =note stays on top; the link is appended below it.
     pre = os.environ.get("prefill_note", "").strip()
+
+    # `u ` mode. The link is built from the ALREADY PARSED title, never before
+    # it: a real URL carries = & # ~ and sometimes |, and the add tokenizer
+    # would shred one into a date, a tag, a note and phantom subtasks.
+    disp_title, link_url = title, ""
+    if link:
+        md_title, label, link_url, used_pre = _link_title(title, pre)
+        if not link_url:
+            return _no_link_rows()
+        if used_pre:
+            pre = ""                    # it is the NAME now, not the note
+        if not title:
+            return [alfred.item(
+                title="Type the link name…",
+                subtitle=f"🔗 {label}  |  {symbol_legend()}",
+                valid=False)]
+        title, disp_title = md_title, label
+
     eff_note = (f"{note}\n\n{pre}" if note and pre else (note or pre or None))
 
     # A tag pre-applied by the CRM tag-drill (⌘ add-with-tag) rides in like the
@@ -1617,6 +1694,9 @@ def task_preview(query):
     # unresolved token already marks itself) - without it a typo'd ~l read
     # exactly like a real list while the task silently landed in Inbox.
     parts = []
+    if link_url:
+        import mdtext
+        parts.append(f"🔗 {mdtext.url_name(link_url)}")
     _lchip = f"~{list_display}" if list_display else "~Inbox"
     if list_name and not list_id:
         _lchip += "?"
@@ -1733,7 +1813,7 @@ def task_preview(query):
         payload["_children"] = kid_titles
 
     payload["_notif_text"] = _build_notif(
-        title, list_display or "", env_list_id, env_section_id, effective_parent_id,
+        disp_title, list_display or "", env_list_id, env_section_id, effective_parent_id,
         section_display=section_display,
     )
 
@@ -1771,12 +1851,37 @@ def task_preview(query):
 
     _kid_chip = sl.chip(kid_titles, sibling=bool(effective_parent_id))
     items = [alfred.item(
-        title=f"Create: {title}" + (f"  {_kid_chip}" if _kid_chip else ""),
+        title=f"Create: {disp_title}" + (f"  {_kid_chip}" if _kid_chip else ""),
         subtitle=subtitle,
         arg=f"create:{encoded}",
         valid=True,
         mods=chord_mods,
     )]
+
+    # Row two files the SAME link as a note. One payload, one key different -
+    # the shape list_create_items already uses for its folder rows. Pipes are
+    # the one thing it cannot do: the children would be created as plain tasks
+    # and a NOTE can parent none of them.
+    if link:
+        p_note = dict(payload)
+        p_note["kind"] = "NOTE"
+        p_note["_notif_text"] = _build_notif(
+            disp_title, list_display or "", env_list_id, env_section_id,
+            effective_parent_id, section_display=section_display,
+            kind_word="Note")
+        _dead = {"valid": False, "subtitle": "Focus chords are on the row above"}
+        items.append(alfred.item(
+            uid="u-note",
+            title=f"Create note: {disp_title}",
+            subtitle=("One note, no subtasks" if kid_titles
+                      else ("  ".join(parts) + "  |  " if parts else "")
+                           + "📝 Note, nothing to tick"),
+            arg=("" if kid_titles else "create:" + base64.b64encode(
+                json.dumps(p_note).encode()).decode()),
+            valid=not kid_titles,
+            # ⌘ and ⌘⇧ are the focus chords on the row above; one meaning
+            # per row, so they are honestly dead here.
+            mods={"cmd": dict(_dead), "cmd+shift": dict(_dead)}))
 
     # ➕ Another subtask - the focus picker's "from A | B | " shape: the row
     # hands the line back with one more separator, and the ✅ row above stays
@@ -1786,7 +1891,7 @@ def task_preview(query):
     # is already aimed into a parent (the ⌘ Actions "➕ Add task" road).
     if kid_titles or sl.in_subtask_mode(query) or effective_parent_id:
         _under = (parent_display or os.environ.get("task_title", "").strip()
-                  if effective_parent_id else title)
+                  if effective_parent_id else disp_title)
         items.append(alfred.item(
             uid="add-another-sub",
             title="➕ Another subtask",
@@ -2368,6 +2473,44 @@ def main():
                     items = note_preview(query[2:])
             else:
                 items = note_preview(query[2:])
+            print(alfred.output(items, skipknowledge=True))
+            return
+
+        # ── U prefix → name a link you already copied ─────────────────────────
+        # The TASK trigger table (the note road has no !), and like every
+        # prefixed mode find_active_trigger runs on the FULL query, so each
+        # picker carries the "u " back in its own autocomplete for free.
+        if query.lower().startswith("u "):
+            trigger = find_active_trigger(query)
+            items = None
+            if trigger:
+                ch, prefix, fragment = trigger
+                if ch == '~':
+                    items = location_router(prefix, fragment)
+                elif ch == '#':
+                    items = tag_picker(prefix, fragment)
+                elif ch == '!':
+                    items = priority_picker(prefix, fragment)
+                elif ch == '*':
+                    items = date_picker(prefix, fragment)
+                elif ch == '@':
+                    items = time_picker(prefix, fragment)
+                elif ch == '>':
+                    items = duration_picker(prefix, fragment)
+                elif ch == '&':
+                    items = repeat_picker(prefix, fragment)
+                elif ch == '%':
+                    items = reminder_picker(prefix, fragment)
+                elif ch == '[[':
+                    _sl = parse_task(prefix)[6]
+                    scope = (resolve_list_id(_sl, get_lists())[0] if _sl
+                             else os.environ.get("list_id")
+                             or os.environ.get("task_list_id") or None)
+                    items = link_picker(prefix, fragment, scope)
+                elif ch == '/':
+                    items = master_menu(prefix, fragment)
+            if items is None:
+                items = task_preview(query, link=True)
             print(alfred.output(items, skipknowledge=True))
             return
 

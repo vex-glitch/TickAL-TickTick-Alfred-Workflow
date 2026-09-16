@@ -17,10 +17,14 @@ import re as _re
 
 SEP = "|"
 
-# A pipe inside a [[wikilink]] or a [markdown](link) is TEXT. Both carry
-# real-world titles (a picked task, a pasted link) and must survive the split:
-# add_task's own [[ ]] syntax round-trips through here.
-_OPAQUE = _re.compile(r'\[\[[^\[\]]*\]\]|\[[^\[\]]*\]\([^()]*\)')
+# A pipe inside a [[wikilink]], a [markdown](link) or a BARE url is TEXT.
+# All three carry real-world strings (a picked task, a pasted link, a query
+# string like ?family=A|B) and must survive the split: add_task's own [[ ]]
+# syntax round-trips through here, and the `u ` link prefix builds its
+# markdown link from the title only AFTER this has run.
+_OPAQUE = _re.compile(r'\[\[[^\[\]]*\]\]'
+                      r'|\[[^\[\]]*\]\((?:[^()\n]|\([^()\n]*\))*\)'
+                      r'|[a-zA-Z][a-zA-Z0-9+.\-]*://\S+')
 
 # The add bar's attribute triggers, at a word boundary (add_task.parse_task).
 _TOKEN = _re.compile(r'(?<!\S)[~#!*@/>=&%]')

@@ -7095,9 +7095,7 @@ def pn_entry(rest):
         # (Vex 2026-09-12). mdtext owns the grammar - a typed URL still wins,
         # and a clipboard that is already a markdown link keeps its target.
         import mdtext
-        r = subprocess.run(["pbpaste"], capture_output=True)
-        clip = r.stdout.decode("utf-8", "replace").strip()
-        built = mdtext.link_entry(text, clip)
+        built = mdtext.link_entry(text, _pblink())
         if not built:
             print("🔗 Nothing to link - copy a URL first")
             return
@@ -9253,11 +9251,27 @@ def _focus_prefill(query, pid, tid):
 # 🌉 prompt here (bridge_from_answer).
 
 def _pbpaste():
+    """The clipboard as plain text. clipboard.text() owns the mechanism."""
     try:
-        r = subprocess.run(["pbpaste"], capture_output=True)
-        return r.stdout.decode("utf-8", "replace").strip()
+        import clipboard as clip_util
+        return clip_util.text().strip()
     except Exception:
-        return ""
+        try:
+            r = subprocess.run(["pbpaste"], capture_output=True)
+            return r.stdout.decode("utf-8", "replace").strip()
+        except Exception:
+            return ""
+
+
+def _pblink():
+    """The clipboard as a LINK source - the flavors pbpaste cannot see
+    included, so a link copied out of Crouton works here and in the add
+    bar's `u ` prefix alike."""
+    try:
+        import clipboard as clip_util
+        return clip_util.link_source().strip()
+    except Exception:
+        return _pbpaste()
 
 
 def _list_name_of(pid):

@@ -12,7 +12,9 @@ import mdtext
 from script_base import run_path
 
 # Pre-compiled patterns for search key cleaning
-_MD_LINK_RE     = re.compile(r'\[([^\]]*)\]\([^)]*\)')  # [text](url) → text
+# One level of balanced parens in the target - mdtext.MD_LINK_RE has the
+# same rule, and without it a Wikipedia-class link renders as '[name]🔗)'.
+_MD_LINK_RE     = re.compile(r'\[([^\]]*)\]\((?:[^()\n]|\([^()\n]*\))*\)')  # [text](url) → text
 _URL_RE         = re.compile(r'https?://\S+')
 _TAG_SUFFIX_RE  = re.compile(r'\s+#\s+\S.*$')           # ' # tag1 tag2…' suffix            # bare URLs
 

@@ -21,7 +21,10 @@ This module is where the rule lives now.
 """
 import re
 
-MD_LINK_RE = re.compile(r"\[([^\[\]]*)\]\([^()]*\)")
+# The target may carry ONE level of balanced parens: Wikipedia-class URLs
+# (…/Foo_(bar)) are ordinary links, and a target that stopped at the first
+# ")" left every flattener in the repo printing raw markdown (2026-09-16).
+MD_LINK_RE = re.compile(r"\[([^\[\]]*)\]\((?:[^()\n]|\([^()\n]*\))*\)")
 _BRACKETS = {ord("["): "(", ord("]"): ")"}
 
 
@@ -52,48 +55,79 @@ def md_link(text, url, limit=None):
 # part between [] of a markdown link". So: the URL comes from the clipboard,
 # the words you type name it. A URL typed in the bar still wins over the
 # clipboard - typing one is a louder signal than whatever got copied last.
-URL_RE = re.compile(r"(?<![\w@])[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s<>\"')\]]+")
-_MD_ONLY_RE = re.compile(r"^\s*\[([^\[\]]*)\]\(([^()\s]+)\)\s*$")
+URL_RE = re.compile(r"(?<![\w@])[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s<>\"'\]]+")
+_MD_ONLY_RE = re.compile(r"^\s*\[([^\[\]]*)\]\(((?:[^()\s]|\([^()\s]*\))+)\)\s*$")
+
+
+def trim_url(url):
+    """Sentence punctuation off the end, and closing parens only while they
+    are UNBALANCED: "(see https://x/a)" ends at the a, while
+    "https://en.wikipedia.org/wiki/Foo_(bar)" keeps its own."""
+    url = url.rstrip(".,;:!?")
+    while url.endswith(")") and url.count(")") > url.count("("):
+        url = url[:-1].rstrip(".,;:!?")
+    return url
 
 
 def find_url(text):
     """The first URL in `text`, else None. Any scheme - ticktick://,
-    obsidian:// and kmtrigger:// are links Vex pastes as often as https."""
+    obsidian://, crouton:// and kmtrigger:// are links Vex pastes as often
+    as https."""
     m = URL_RE.search(text or "")
-    return m.group(0).rstrip(".,;:!?") if m else None
+    return trim_url(m.group(0)) if m else None
 
 
 def url_name(url):
     """A readable stand-in label when you typed none: the host without www,
-    or the scheme's own word for schemes that have no host."""
+    or the scheme's own word for schemes that have no host.
+
+    An app deep link puts a COMMAND where a web link puts a host -
+    crouton://viewRecipe?id=…, obsidian://open?vault=…, kmtrigger://macro=… -
+    and "viewRecipe" names nothing. A dotless authority on a non-web scheme
+    is that case, so the scheme answers instead (2026-09-16)."""
     if not url:
         return ""
+    scheme = url.split("://", 1)[0].lower() if "://" in url else ""
     rest = url.split("://", 1)[1] if "://" in url else url
     host = rest.split("/", 1)[0].split("?", 1)[0]
     host = host.split("@")[-1]
     if host.startswith("www."):
         host = host[4:]
-    return host or (url.split("://", 1)[0] if "://" in url else url)
+    if scheme and scheme not in ("http", "https") and "." not in host:
+        return scheme
+    return host or scheme or url
+
+
+def link_parts(typed, clip):
+    """(typed words, clipboard) → (label, url), url None when neither side
+    holds one. The label is RAW here - md_link sanitises it - so a caller
+    with no url still gets the words back untouched.
+
+    Source ladder: a clipboard that is already a markdown link keeps its
+    target and takes your words as the new label; then a URL typed in the
+    bar (louder than whatever got copied last); then the clipboard.
+    """
+    typed, clip = (typed or "").strip(), (clip or "").strip()
+    md = _MD_ONLY_RE.match(clip)
+    if md:
+        return (typed or md.group(1) or url_name(md.group(2))), md.group(2)
+    url = find_url(typed)
+    if url:
+        return " ".join(typed.replace(url, " ", 1).split()), url
+    url = find_url(clip)
+    if not url:
+        return (typed or clip), None
+    return typed, url
 
 
 def link_entry(typed, clip):
     """(typed words, clipboard) → the text of a 🔗 entry, or None when there
     is nothing to log.
 
-    A clipboard that already holds a markdown link keeps its URL and takes
-    your words as the new label. With no URL anywhere this is just text -
-    a link entry with nothing to link is still a note worth keeping.
+    With no URL anywhere this is just text - a link entry with nothing to
+    link is still a note worth keeping.
     """
-    typed, clip = (typed or "").strip(), (clip or "").strip()
-    md = _MD_ONLY_RE.match(clip)
-    if md:
-        return md_link(typed or md.group(1) or url_name(md.group(2)),
-                       md.group(2))
-    url = find_url(typed)
-    if url:
-        label = " ".join(typed.replace(url, " ", 1).split())
-    else:
-        url, label = find_url(clip), typed
+    label, url = link_parts(typed, clip)
     if not url:
-        return typed or clip or None
+        return label or None
     return md_link(link_text(label) or url_name(url), url)

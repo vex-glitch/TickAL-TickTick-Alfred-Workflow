@@ -1293,7 +1293,7 @@ def done_week_lines(per_day):
 
 
 # ── ☀️ Day Goal ──────────────────────────────────────────────────────────────
-_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((?:[^()\n]|\([^()\n]*\))+\)")
 
 
 def strip_md_links(s):

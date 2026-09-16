@@ -9,10 +9,12 @@ import re
 
 # Markdown links - angle form (target may contain spaces/parens) and plain form.
 MD_ANGLE = re.compile(r'\[([^\]]*)\]\(\s*<\s*([^>]+?)\s*>\s*\)')
-MD_PLAIN = re.compile(r'\[([^\]]*)\]\(\s*([^)\s]+?)\s*\)')
+MD_PLAIN = re.compile(r'\[([^\]]*)\]\(\s*((?:[^()\s]|\([^()\s]*\))+?)\s*\)')
 # Bare URIs of any scheme. Lookbehind drops "](" / "(<" lead-ins and mid-word
-# matches; the dedup below is the real guard against double-capture.
-BARE_URI = re.compile(r'(?<![\w(<])[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s)>\]]+')
+# matches; the dedup below is the real guard against double-capture. A
+# trailing ")" belongs to the URL only while its parens balance, so
+# "…/Foo_(bar)" opens whole while "(see https://x/a)" stops at the a.
+BARE_URI = re.compile(r'(?<![\w(<])[a-zA-Z][a-zA-Z0-9+.\-]*://[^\s>\]]+')
 _SCHEME  = re.compile(r'^[a-zA-Z][a-zA-Z0-9+.\-]*:')
 
 
@@ -33,7 +35,8 @@ def extract_links(text):
             if labelled:
                 label, target = m.group(1).strip(), m.group(2).strip()
             else:
-                target = m.group(0).rstrip('.,;')
+                import mdtext
+                target = mdtext.trim_url(m.group(0))
                 label = target
             if _openable(target) and target not in found:
                 found[target] = (m.start(), label or target)

@@ -1,4 +1,4 @@
-"""Read an image off the macOS clipboard (no extra deps).
+"""Read the macOS clipboard (no extra deps): an image, or plain text.
 
 Shared by Scripts/attach_image.py (⌘ Actions → 🖼️ Add image on an existing task),
 src/dispatch.py (the / add-flow "🖼️ Add image", which attaches to the task it
@@ -27,6 +27,70 @@ def _pasteboard():
         return NSPasteboard.generalPasteboard()
     except Exception:
         return None
+
+
+# Flavors a copied LINK can arrive in. NOT the legacy "Apple URL pasteboard
+# type": that one is a plist ARRAY of [url, title], so reading it as a string
+# hands back 289 bytes of XML whose only URL is Apple's DTD - a copied file
+# would have linked the task to apple.com (caught in review, 2026-09-16).
+_URL_FLAVORS = ("public.url", "public.file-url")
+
+
+def text():
+    """The clipboard as plain TEXT, or "" when it holds none. Never raises.
+
+    `pbpaste`, not AppKit: the add bar reads the clipboard on every keystroke
+    and a script filter is a FRESH process each time, so the AppKit import is
+    always cold. Measured 2026-09-16 on python3.13, five cold runs each:
+    ~10 ms to fork pbpaste, ~95 ms to import AppKit and read.
+    """
+    try:
+        import subprocess
+        r = subprocess.run(["pbpaste"], capture_output=True, timeout=5)
+        return r.stdout.decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def url():
+    """The clipboard's URL flavor, or "". The half pbpaste cannot see.
+
+    Validated, never trusted: a pasteboard flavor is whatever the copying app
+    wrote there, so anything that is not a plain URL is dropped rather than
+    passed on to be linked.
+    """
+    pb = _pasteboard()
+    if pb is None:
+        return ""
+    import mdtext
+    for flavor in _URL_FLAVORS:
+        try:
+            raw = (pb.stringForType_(flavor) or "")
+        except Exception:
+            continue
+        raw = str(raw).strip()
+        if raw and mdtext.find_url(raw) == raw:
+            return raw
+    return ""
+
+
+def link_source():
+    """What a 🔗 road should read the clipboard as.
+
+    Text first - a copied URL, and a copied markdown link, are both text, and
+    that rung costs a tenth of the other one. But a link copied out of a
+    native app arrives with its href in the URL flavor ALONE (verified
+    2026-09-16 on a real Crouton copy: pbpaste and every `pbpaste -Prefer`
+    came back empty while public.url held crouton://viewRecipe?id=…), and a
+    link copied off a web page arrives with the page TITLE in the text flavor
+    and the href beside it. So when the text carries no URL, the URL flavor
+    answers.
+    """
+    import mdtext
+    t = text()
+    if mdtext.find_url(t):
+        return t
+    return url() or t
 
 
 def image_file():
