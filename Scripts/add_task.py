@@ -1573,6 +1573,53 @@ def _web_query(query, on):
     return f"{query[:2]}+web {bare}" if on else f"{query[:2]}{bare}"
 
 
+# `+to ` puts the link on an item that already exists. Everything after it
+# is the filter, so it always sits at the END of the query - the shape ~l and
+# ~p already use.
+_TO_RE = re.compile(r'(?<!\S)\+to(?:\s+(.*))?$', re.S)
+
+
+def _append_rows(query, frag):
+    """`+to ` → pick the item the link goes ON. Tasks AND notes, because a
+    note is exactly the kind of thing a link belongs in (so, unlike the `st `
+    parent picker, notes are NOT filtered out here)."""
+    from display import pick_title, pick_where
+    import subtask_line as sl
+    base = _TO_RE.sub('', query[2:]).strip()
+    parsed = parse_task(base)
+    typed, use_web = sl.split_line(parsed[0])[0], parsed[15]
+    md_title, _label, url, _src = _link_title(
+        typed, os.environ.get("prefill_note", "").strip(), web=use_web)
+    if not url:
+        return _no_link_rows()
+    all_tasks = cache_store.get("all_tasks") or []
+    task_map = {t["id"]: t for t in all_tasks}
+    pool = [t for t in all_tasks if t.get("status", 0) == 0]
+    if frag:
+        pool = fuzz.filter_and_score(frag, pool,
+                                     key_fn=lambda t: t.get("title", ""))
+    else:
+        pool.sort(key=lambda t: t.get("modifiedTime") or "", reverse=True)
+    dead = {"valid": False, "subtitle": ""}
+    items = []
+    for t in pool[:50]:
+        pid = t.get("projectId") or t.get("_projectId") or ""
+        spec = {"pid": pid, "tid": t["id"], "text": md_title}
+        items.append(alfred.item(
+            uid=f"uto-{t['id']}",
+            title="📄 " + pick_title(t),
+            subtitle=pick_where(t, task_map) + "  |  ⏎ onto its description",
+            arg="xact:u_append:" + base64.b64encode(
+                json.dumps(spec).encode()).decode(),
+            valid=True,
+            mods={"cmd": dict(dead), "cmd+shift": dict(dead)}))
+    if not items:
+        items = [alfred.item(
+            title=(f'No item matching "{frag}"' if frag
+                   else "Type to pick the item…"), valid=False)]
+    return items
+
+
 def _no_link_rows():
     """`u ` with nothing to link refuses, in pn_entry's shipped words, rather
     than quietly creating an ordinary item that only LOOKS like it worked.
@@ -1964,7 +2011,7 @@ def task_preview(query, link=False):
 
     _kid_chip = sl.chip(kid_titles, sibling=bool(effective_parent_id))
     items = [alfred.item(
-        title=f"Create: {disp_title}" + (f"  {_kid_chip}" if _kid_chip else ""),
+        title=f"✅ Create: {disp_title}" + (f"  {_kid_chip}" if _kid_chip else ""),
         subtitle=subtitle,
         arg=f"create:{encoded}",
         valid=True,
@@ -1985,7 +2032,7 @@ def task_preview(query, link=False):
         _dead = {"valid": False, "subtitle": "Focus chords are on the row above"}
         items.append(alfred.item(
             uid="u-note",
-            title=f"Create note: {disp_title}",
+            title=f"📝 Create note: {disp_title}",
             subtitle=("One note, no subtasks" if kid_titles
                       else ("  ".join(parts) + "  |  " if parts else "")
                            + "📝 Note, nothing to tick"),
@@ -1995,6 +2042,20 @@ def task_preview(query, link=False):
             # ⌘ and ⌘⇧ are the focus chords on the row above; one meaning
             # per row, so they are honestly dead here.
             mods={"cmd": dict(_dead), "cmd+shift": dict(_dead)}))
+        # The other two destinations: onto something that already exists.
+        # The subtask road is the SAME ~p parent the bar has always had, so
+        # ⏎ still lands on the ✅ row above with a ↳parent chip - no second
+        # flavour of "put it under that one".
+        _q = query.rstrip()
+        items.append(alfred.item(
+            uid="u-append", title="📄 Add to a description…",
+            subtitle="Bottom of a task or note", arg="", valid=False,
+            autocomplete=f"{_q} +to "))
+        if not effective_parent_id:
+            items.append(alfred.item(
+                uid="u-sub", title="🧬 Add as a subtask…",
+                subtitle="Under a task you pick", arg="", valid=False,
+                autocomplete=f"{_q} ~p "))
         items += _tab_rows(query, link_src, use_web, title, alt_url)
 
     # ➕ Another subtask - the focus picker's "from A | B | " shape: the row
@@ -2228,7 +2289,7 @@ def note_preview(query):
     enc_stage = base64.b64encode(json.dumps(p_stage).encode()).decode()
 
     items = [alfred.item(
-        title=f"Create note: {title}",
+        title=f"📝 Create note: {title}",
         subtitle=subtitle,
         arg=f"create:{encoded}",
         valid=True,
@@ -2595,6 +2656,11 @@ def main():
         # prefixed mode find_active_trigger runs on the FULL query, so each
         # picker carries the "u " back in its own autocomplete for free.
         if query.lower().startswith("u "):
+            _to = _TO_RE.search(query)
+            if _to:
+                print(alfred.output(_append_rows(query, (_to.group(1) or "").strip()),
+                                    skipknowledge=True))
+                return
             trigger = find_active_trigger(query)
             items = None
             if trigger:

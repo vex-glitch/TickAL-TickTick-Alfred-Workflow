@@ -46,7 +46,7 @@ _UNSAFE = _re.compile(
     r'|&(?=(?:daily|weekdays|weekly|monthly|yearly)(?:\s|$))'
     r'|%(?=\S)'                                           # %reminder
     r'|\^(?=\s|$)'                                        # ^ attach image
-    r'|\+(?=(?:stage|focus|web)(?:\s|$))'                 # +stage +focus +web
+    r'|\+(?=(?:stage|focus|web|to)(?:\s|$))'              # the +markers
     r'|[~#!*/>@&%=](?=\S*\s*$)'                           # one in the last word
     r')', _re.IGNORECASE)
 

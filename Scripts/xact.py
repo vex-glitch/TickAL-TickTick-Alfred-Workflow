@@ -40,6 +40,8 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
     xact:habit_archive:<id>         status 1
     xact:habit_delete:<id>          confirm → delete (checkins cascade)
     xact:task_copy:<pid>:<tid>      📋 task name → clipboard
+    xact:u_append:<b64>             🔗 add bar `u `: link → bottom of an
+                                    item's description (task or note)
     xact:task_copy_full:<pid>:<tid> name + '>' blockquoted description
     xact:buffer_copy[:full]         every buffered task as a block,
                                     one per line (no blank separators)
@@ -594,6 +596,36 @@ def _patch_content_cache(tid, content):
                              for n in notes])
     except Exception:
         cache_store.invalidate("all_notes")
+
+
+def u_append(rest):
+    """The add bar's `u ` prefix, third row: put the markdown link on the
+    BOTTOM of an item that already exists, instead of making a new one.
+    Tasks and notes alike - a note is exactly the kind of thing a link
+    belongs in. LIVE read, never the cache: appending to a stale description
+    would drop whatever was typed into it since the last sync."""
+    spec = _pn_decode(rest) or {}
+    pid, tid = spec.get("pid") or "", spec.get("tid") or ""
+    text = (spec.get("text") or "").strip()
+    if not tid or not text:
+        _crm_say("🔗 Nothing to append")
+        return
+    try:
+        live = _api().get_task(pid, tid)
+    except Exception as e:
+        _crm_say(f"🔗 Could not read that item · {e}")
+        return
+    old = live.get("content") or ""
+    body = (old.rstrip() + "\n" + text) if old.strip() else text
+    try:
+        _api().update_task(tid, pid, current=live, content=body)
+    except Exception as e:
+        _crm_say(f"🔗 Could not save · {e}")
+        return
+    _patch_content_cache(tid, body)
+    import mdtext
+    _crm_say("🔗 Added to " + (mdtext.link_text(live.get("title") or "", 40)
+                               or "the item"))
 
 
 def _fx_rmw(pid, tid, mutate):
@@ -11471,6 +11503,8 @@ def main():
             routine_reset_after(rest)
         elif verb == "pn_journal":
             pn_journal(rest)
+        elif verb == "u_append":
+            u_append(rest)
         elif verb == "pn_goal_skip":
             pn_goal_skip(rest)
         elif verb == "pn_goal":
