@@ -1230,15 +1230,29 @@ def _fill_weekly(doc, p, index):
     today = _today()
     if not (p.start <= today <= p.end + timedelta(days=1)):
         return
+    def _in(anchor):
+        return pm.scope_of("weekly", anchor)
+
+    # ALL or NOTHING on the layout. A note minted under an older skeleton has
+    # none of the 📊 Stats / 💿 Data bullets, but ⏪ Last week and the journal
+    # still resolve - so a refresh would drop this week's new-shaped block
+    # beside frozen old-style headers and leave the note looking half
+    # rewritten. It sits still instead until tools/pnrepair/relayout_weekly.py
+    # rebuilds it, or Monday mints a fresh one on the current template.
+    # Tested by ANCHOR rather than by group name: Vex renames headers, and a
+    # group he renamed must cost him that group, not the whole note.
+    scoped = [a for a in pm.WRITER_ANCHORS["weekly"] if _in(a)]
+    if not any(ps.find_prefix(doc, a, _in(a)) is not None for a in scoped):
+        _log(f"weekly {pm.title(p)} predates the 2026-09-17 layout - left "
+             f"alone (tools/pnrepair/relayout_weekly.py rebuilds it)")
+        return
+
     t2 = _tier2()
     prev = pm.prev_period(p)
     day_sums = _day_sums(index)
     projects = {pr.get("id"): pr.get("name")
                 for pr in (cache_store.get("projects") or [])}
     live_end = min(p.end, today)
-
-    def _in(anchor):
-        return pm.scope_of("weekly", anchor)
 
     comp_cur = _completed_between(p.start, live_end)
     comp_prev = _completed_between(prev.start, prev.end)

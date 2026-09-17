@@ -109,7 +109,9 @@ Minted Sunday for the week ahead - and opening it midweek mints it on the spot, 
 - **📔 Weekly journal**.
 - **♻️ Weekly Review** - a live mirror of your review list, sections preserved, both directions: tick in the note and the real task completes; the source re-mirrors on every refresh.
 
-Rearranged it yourself? Sections are found BY NAME wherever you put them, so moving and renesting is free. When the shipped layout changes, the week currently open is rebuilt on the new one (your goals, journal answers and review ticks ride across, and anything the new layout has no home for is kept verbatim at the bottom); weeks already closed keep the shape they were written in.
+Rearranged it yourself? Sections are found BY NAME wherever you put them, so moving and renesting is free.
+
+A note's shape is fixed when it is minted - refresh fills bodies, it never reshapes. So when the shipped layout changes, the week already open keeps the old one and is left strictly alone (never half-rewritten) until the next Monday mints a fresh note. To move it over now instead, `tools/pnrepair/relayout_weekly.py` rebuilds it in place: your goals, journal answers and review ticks ride across, anything the new layout has no home for is kept verbatim at the bottom, it prints the result and changes nothing without `--apply`, and it refuses outright if a single line you wrote would be lost. Weeks already closed keep the shape they were written in - their numbers exist nowhere else.
 
 **Monthly** adds sparklines and top wins; **quarterly** and **yearly** ship as templates + money roll-ups for now - their review sections land in a later release (the first real quarterly mint is Sep 30).
 

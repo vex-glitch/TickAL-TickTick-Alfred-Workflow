@@ -332,6 +332,27 @@ check("18b.scope-does-not-reach-into-a-bullet",
       ps.find_prefix(ps.parse_sections(
           "##### 📊 Stats\n- Habit consistency\n\t- Focus time · 3/7 · 42%\n"),
           "Focus", "📊 Stats") is None)
+# the predicate _fill_weekly uses to decide a note is on the CURRENT skeleton:
+# an older one must answer no on every scoped anchor, or a refresh writes this
+# week's new-shaped ⏪ Last week beside last month's frozen headers
+
+
+def _on_new_skeleton(doc):
+    scoped = [a for a in pm.WRITER_ANCHORS["weekly"] if pm.scope_of("weekly", a)]
+    return any(ps.find_prefix(doc, a, pm.scope_of("weekly", a)) is not None
+               for a in scoped)
+
+
+check("18b.new-skeleton-detected", _on_new_skeleton(_filled))
+check("18b.old-skeleton-detected",
+      not _on_new_skeleton(ps.parse_sections(
+          "##### 🏆 Goals\n\n##### ✨ Highlight\n---\n#### 📌 This Week\n"
+          "##### 🔥 Top list: 🌅 Routines · 186 done\n\n"
+          "##### ➕ Created: 914 · 🟢 815 tasks ahead of last week\n"
+          "\t\t- 🗂 🌅 Routines · 335\n\n##### 📈 Stats\n\t\t- Mon ▇▇▇ 44\n\n"
+          "##### 😊 Moods\n\t\t- Average: 3.7\n---\n##### ⏪ Last week\n"
+          "\t- Completed: 103\n")),
+      "an old-layout weekly must look old")
 check("18b.absent-container-is-silent",
       ps.find(_filled, pm.SEC_COMPLETED, "🚫 nope") is None
       and ps.set_body(_filled, pm.SEC_COMPLETED, ["x"], "🚫 nope") is False,
