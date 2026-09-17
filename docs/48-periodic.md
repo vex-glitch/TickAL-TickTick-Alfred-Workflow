@@ -112,7 +112,7 @@ All three journals seed their questions into the note at mint, so you can answer
 - **Weekly** (2 fixed + 5 drawn): the week's highlight (the answer IS the record, and 🕰️ On this day reads it back years later), *did you achieve your weekly goals?* - then a picker asks for **three things that would make next week a success**, written into next week's 🎯 Goals.
 - **Monthly** (2 fixed + 5 drawn): the month's highlight and *did you achieve your monthly goals?*, named. No picker after it - a month is not a three-things horizon, and next month's goal is set from the 🎯 row like every other tier's.
 
-Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly,monthly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
+Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly,monthly,quarterly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
 
 ## Money - the roll-up pyramid
 
@@ -159,7 +159,19 @@ That has three consequences worth knowing:
 - The **rankings** (Top lists, Top tasks, and the 🗂 breakdowns) come from the weeks lying **wholly inside** the month, plus the one still running. A sealed week straddling two months keeps its ranking in week shape and nothing can cut that by day, so it is left out rather than let the neighbouring month's traffic in. Like the weekly, the rankings skip your routines list; the headline counts do not.
 - Weeks written before 2026-09-17 still give up their numbers; their rankings only partly survive, because the old layout kept those in the header.
 
-**Quarterly** and **yearly** ship as templates + money roll-ups for now - their review sections land in a later release (the first real quarterly mint is Sep 30).
+## The quarterly note
+
+The monthly's shape counted by **month**, and the old skeleton is gone - 🎯 OKR review, 🚀 Next-Q OKRs, ⚖️ Decision log, 🔋 Energy audit and 💡 Observations never had a filler and were never filled by hand (Vex 2026-09-17: "kill it all, adhere to our existing logic").
+
+- **The quarter's months** under the breadcrumb, linked: `M1 · July · M2 · August · M3 · September`.
+- **🏆 Goals** - 🎉 Yearly goal mirrors the year's note, 🌓 Quarterly goal is yours.
+- Then ✨ Highlight, 📊 Stats (with **Monthly Completed** bars and focus by month), 💿 Data (moods by month, income by month, the quarter's 🎂 dates), **⏪ Last quarter**, **📔 Quarterly journal** and **♻️ Quarterly Review**.
+
+A month never straddles a quarter, so none of the clipping the monthly needs applies: the quarter just sums its months' headlines. A month whose note cannot be read says `no note` rather than 0, exactly as a week does one tier down.
+
+**Yearly** still ships as a template + money roll-up - it gains its quarter links in the head, and the rest lands in a later release.
+
+The **📔 journal** runs at four tiers now: morning, evening, weekly, monthly and quarterly. Each has its own pool and its own draw.
 
 ## The 04:30 agent
 

@@ -7258,7 +7258,8 @@ def pn_income(rest):
 
 
 _JOURNAL_UI = {"morning": ("🌅", "Morning"), "evening": ("🌙", "Evening"),
-               "weekly": ("📔", "Weekly"), "monthly": ("📔", "Monthly")}
+               "weekly": ("📔", "Weekly"), "monthly": ("📔", "Monthly"),
+               "quarterly": ("📔", "Quarterly")}
 _GOALSEQ = run_path("tickal_pn_goalseq.json")
 
 
@@ -7404,11 +7405,13 @@ def pn_journal(slot):
             if m:
                 routed.append(pe.set_day_rating(int(m.group(1)), day=day0))
                 a = "★" * int(m.group(1))
-        elif key == "mhighlight":
-            # the month's ✨, same rule as the week's: the ANSWER is the
-            # record, and the section is only written where one exists
-            if pe.has_highlight("monthly", day0):
-                routed.append(pe.set_highlight(a, day=day0, kind="monthly"))
+        elif key in ("mhighlight", "qhighlight"):
+            # the month's and the quarter's ✨, same rule as the week's: the
+            # ANSWER is the record, and the section is only written where one
+            # exists
+            tier = "monthly" if key == "mhighlight" else "quarterly"
+            if pe.has_highlight(tier, day0):
+                routed.append(pe.set_highlight(a, day=day0, kind=tier))
         elif key == "highlight":
             # the ANSWER is the record now (Vex's 2026-09-17 layout has no
             # ✨ section); set_highlight only still runs for a note that

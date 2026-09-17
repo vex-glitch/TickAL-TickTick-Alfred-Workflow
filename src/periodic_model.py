@@ -106,6 +106,16 @@ SEC_MDATES     = "⏳ Dates"                # birthdays + countdowns this month
 SEC_LAST_MONTH = "⏪ Last month"
 SEC_MREVIEW    = "♻️ Monthly Review"
 SEC_MONTHLY_JNL = "📔 Monthly journal"
+# quarterly - the monthly's shape one tier up, counted by MONTH. Vex killed
+# the old skeleton wholesale on 2026-09-17 ("kill it all, adhere to our
+# existing logic"): 🎯 OKR review, 🚀 Next-Q OKRs, ⚖️ Decision log and
+# 🔋 Energy audit never had a filler and he never filled one by hand.
+SEC_QTR_YEAR   = "🎉 Yearly goal"          # mirror of the year's goals
+SEC_QTR_QTR    = "🌓 Quarterly goal"       # THIS quarter's own
+SEC_QBARS      = "Monthly Completed"      # per-month bars
+SEC_LAST_QTR   = "⏪ Last quarter"
+SEC_QTR_JNL    = "📔 Quarterly journal"
+SEC_QREVIEW    = "♻️ Quarterly Review"
 SEC_MONTH_GOAL = "🎯 Month goal"          # what monthly notes called it before
 SEC_SPARKS     = "📊 Sparklines"
 SEC_TOP_WINS   = "🏆 Top wins"
@@ -132,7 +142,7 @@ GOAL_SECTION = {
     "daily":     SEC_DAY_GOAL,      # the One Thing - REPLACES the body
     "weekly":    SEC_WK_WEEK,       # the bullet, not the whole section
     "monthly":   SEC_MTH_MONTH,
-    "quarterly": SEC_OKR_REVIEW,
+    "quarterly": SEC_QTR_QTR,
     "yearly":    SEC_SCORECARD,
 }
 
@@ -140,7 +150,8 @@ GOAL_SECTION = {
 # Names a tier's goal section used to have. A mirror or a setter tries the
 # current name first and these after it, so a note minted under an older
 # template still answers (and is never silently written twice).
-GOAL_SECTION_ALT = {"monthly": [SEC_MONTH_GOAL]}
+GOAL_SECTION_ALT = {"monthly": [SEC_MONTH_GOAL],
+                    "quarterly": [SEC_OKR_REVIEW]}
 
 
 def goal_section_names(kind):
@@ -199,7 +210,12 @@ WRITER_ANCHORS = {
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
                   SEC_MDATES, SEC_PEOPLE, SEC_LAST_MONTH, SEC_MONTHLY_JNL,
                   SEC_MREVIEW],
-    "quarterly": [SEC_MONEY],            # v3.0: template + money only
+    "quarterly": [SEC_QTR_YEAR, SEC_QTR_QTR, SEC_HIGHLIGHT,
+                  SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
+                  SEC_QBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
+                  SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
+                  SEC_MDATES, SEC_PEOPLE, SEC_LAST_QTR, SEC_QTR_JNL,
+                  SEC_QREVIEW],
     "yearly":    [SEC_MONEY],
 }
 
@@ -225,6 +241,19 @@ SECTION_SCOPE = {
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_MBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
+        SEC_HABIT_WEEK: SEC_WK_STATS,
+        SEC_HL_WEEK: SEC_WK_DATA,
+        SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
+        SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
+        SEC_MDATES: SEC_WK_DATA,
+    },
+    # the same two group headers again - a quarter is a month with a longer
+    # ruler, and every writer keeps its name
+    "quarterly": {
+        SEC_QTR_YEAR: SEC_GOALS, SEC_QTR_QTR: SEC_GOALS,
+        SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
+        SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
+        SEC_QBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
         SEC_HABIT_WEEK: SEC_WK_STATS,
         SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
@@ -503,6 +532,60 @@ def count_list_lines(pairs, n=3, gi=T1):
     traffic = {nm: d + a for nm, (d, a) in (pairs or {}).items()}
     return [f"{gi}- {nm} · {pairs[nm][0]} done · {pairs[nm][1]} added"
             for nm, _c in top_n(traffic, n)]
+
+
+CHILD_KIND = {"weekly": "daily", "monthly": "weekly",
+              "quarterly": "monthly", "yearly": "quarterly"}
+
+
+def child_spans(p):
+    """[(n, child period, start, end)] - the periods one tier down that a note
+    covers, numbered from 1 within it and CLIPPED to it.
+
+    Only weeks straddle: a month always sits inside one quarter and a quarter
+    inside one year, so for those tiers the clip is the child itself. Numbered
+    by the PARENT (Vex's "Week1 1st-7th Sep"), because that is how he reads a
+    note; the child's own id is one click away in its title."""
+    kind = CHILD_KIND.get(p.kind)
+    if not kind:
+        return []
+    out, d, n = [], p.start, 0
+    while d <= p.end:
+        cp = period_for(kind, d)
+        n += 1
+        out.append((n, cp, max(cp.start, p.start), min(cp.end, p.end)))
+        d = cp.end + timedelta(days=1)
+    return out
+
+
+def span_label(kind, n, a, b):
+    """The label a parent gives one of its children, with its dates on it
+    (Vex 2026-09-17: "Everywhere you write W1 add date range").
+
+        weekly    → "Mon, 14th Sep"        (a day names itself)
+        monthly   → "W1 · 1st-6th Sep"
+        quarterly → "M1 · July"
+        yearly    → "Q1 · Jan-Mar"
+    """
+    if kind == "weekly":
+        return day_link_label(a)
+    if kind == "monthly":
+        return week_span_label(n, a, b)
+    if kind == "quarterly":
+        return f"M{n} · {MONTH_NAME[a.month]}"
+    return f"Q{n} · {MONTH_ABBR[a.month]}-{MONTH_ABBR[b.month]}"
+
+
+def child_link_lines(p, url_for):
+    """One bullet per child period, linked where its note exists. A child with
+    no note yet is plain text and heals into a link on a later refresh - the
+    breadcrumb rule (see render_breadcrumb)."""
+    out = []
+    for n, cp, a, b in child_spans(p):
+        label = span_label(p.kind, n, a, b)
+        u = url_for(cp)
+        out.append(f"- [{label}]({u})" if u else f"- {label}")
+    return out
 
 
 def month_week_spans(p):
@@ -1530,7 +1613,7 @@ JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)
 # 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
 # live day-goal / weekly-goals text baked into the prompt.
 JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5,
-                    "monthly": 5}          # 2 fixed + 5, the weekly's shape
+                    "monthly": 5, "quarterly": 5}   # 2 fixed + 5 everywhere
 
 
 def _clip(s, n=140):
@@ -1592,19 +1675,23 @@ def journal_fixed(slot, ctx=None):
             ("money", "How much money did you earn today?"),
             ("rating", "Rate the day, 1-5 stars"),
         ]
-    if slot == "monthly":
+    if slot in ("monthly", "quarterly"):
+        word = "month" if slot == "monthly" else "quarter"
         # the weekly's two, one tier up. No picker handoff: next month's goal
         # is set from the 🎯 row like every other tier's, and a month is not
         # a three-things horizon.
+        adj = "monthly" if slot == "monthly" else "quarterly"
         goals = (ctx.get("goals") or "").strip()
         return [
-            ("mhighlight", "What was the highlight of the month? "
-                           "Think of one thing that stands out."),
-            ("mgoals", (f"Did you achieve your monthly goals, {goals}? "
-                        "Describe success/fail factors on each."
-                        if goals else
-                        "Did you achieve your monthly goals? "
-                        "Describe success/fail factors on each.")),
+            (f"{word[0]}highlight",
+             f"What was the highlight of the {word}? "
+             "Think of one thing that stands out."),
+            (f"{word[0]}goals",
+             (f"Did you achieve your {adj} goals, {goals}? "
+              "Describe success/fail factors on each."
+              if goals else
+              f"Did you achieve your {adj} goals? "
+              "Describe success/fail factors on each.")),
         ]
     # weekly - the three-things picker is NOT a seeded question: it runs as
     # the Alfred goal-picker handoff after the dialogs (phones edit next
@@ -1644,6 +1731,8 @@ JOURNAL_KEY_RULES = (
     # wrong tier's note
     ("mhighlight", re.compile(r"^What was the highlight of the month\?")),
     ("mgoals", re.compile(r"^Did you achieve your monthly goals\b")),
+    ("qhighlight", re.compile(r"^What was the highlight of the quarter\?")),
+    ("qgoals", re.compile(r"^Did you achieve your quarterly goals\b")),
 )
 
 

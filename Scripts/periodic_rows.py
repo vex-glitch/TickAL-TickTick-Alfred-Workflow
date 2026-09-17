@@ -724,6 +724,8 @@ _FAMILIES = {
          "xact:pn_journal:weekly", None),
         ("pn-jmo", "📔 Monthly journal", "Review the month",
          "xact:pn_journal:monthly", None),
+        ("pn-jq", "📔 Quarterly journal", "Review the quarter",
+         "xact:pn_journal:quarterly", None),
     ]),
 }
 

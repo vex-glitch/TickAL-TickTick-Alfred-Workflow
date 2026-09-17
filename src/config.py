@@ -108,6 +108,14 @@ def get_monthly_review_id():
     return load().get("monthly_review_id", "")
 
 
+def get_quarterly_review_id():
+    """♻️ Quarterly-review source. Same story as monthly_review_id: no
+    Configure-panel field yet, so config.json is where it lives."""
+    if "quarterly_review_id" in os.environ:
+        return os.environ["quarterly_review_id"]
+    return load().get("quarterly_review_id", "")
+
+
 def get_folders():
     """{groupId: folderName} - v2 auto-names (the folder_groups cache, filled
     at sync when an Attachment-Login token exists) overlaid by manual names

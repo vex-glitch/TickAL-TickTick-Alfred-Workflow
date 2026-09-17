@@ -1,0 +1,21 @@
+## random
+- Which month of this quarter would you live again, and what made it that one?
+- What did you believe at the start of this quarter that you no longer believe?
+- Which commitment from three months ago turned out to be a mistake?
+- What got better slowly enough that you nearly missed it?
+- Where did you spend the most hours, and was that the plan?
+- What would this quarter look like to someone reading only your calendar?
+- Which relationship got stronger this quarter, and what did that cost?
+- What did you finish that you had been carrying for more than a year?
+- Which fear from the start of this quarter turned out to be nothing?
+- What is the one number that best describes these three months?
+- What did you keep paying for and never use?
+- Which skill is measurably better than it was in month one?
+- What did you do this quarter purely because someone expected it?
+- Where did you get lucky, and what would have happened without it?
+- What did you protect this quarter that was worth protecting?
+- Which month broke the pattern, and why?
+- What is still on the list from the last quarterly review?
+- If you could give the next quarter one rule, what would it be?
+- What did you stop explaining to people, and why?
+- Which version of yourself showed up most this quarter?
