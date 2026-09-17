@@ -201,7 +201,8 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
     xact:pn_income:<b64|plain>      💰 sums into the evening journal's money
                                     answer (plain "485 label"; legacy notes
                                     with a 💰 section keep using it)
-    xact:pn_journal:<slot>[@<date>] morning|evening|weekly - dialog per
+    xact:pn_journal:<slot>[@<date>] morning|evening|weekly|monthly|
+                                   quarterly - dialog per
                                     unanswered prompt, partial-save,
                                     phone-wins merge (weekly ends in the
                                     three-things picker into next week; the

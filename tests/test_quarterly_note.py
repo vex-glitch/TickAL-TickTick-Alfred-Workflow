@@ -188,5 +188,60 @@ pay = json.loads(base64.b64decode(addrow["arg"].split(":", 2)[2]))
 check("the payload names its tier", pay["kind"] == "monthly", pay)
 check("and is not aimed ahead by default", not pay.get("ahead"), pay)
 
+# ── what the 2026-09-17 review found ───────────────────────────────────────
+check("the quarterly review sweeps its ticks",
+      pm.SEC_QREVIEW in pe._SWEEP_SECTIONS["quarterly"])
+# a partial roll-up says how partial it is, and draws no chip
+qdoc2 = ps.parse_sections(pm.render_template(
+    pe._load_template("quarterly"), {"breadcrumbs": "C", "monthlinks": "- x"}))
+one = {("monthly", pm.title_key(SEP)): {"id": "M", "projectId": "P",
+                                        "content": ps.serialize_sections(mdoc)}}
+pe._fill_quarterly(qdoc2, Q3, one)
+head = ps.find_prefix(qdoc2, pm.SEC_COMPLETED, pm.SEC_WK_STATS).name
+check("a partial quarter says so", head.endswith("1 of 3 months"), head)
+check("…and draws no vs-last-quarter chip", "▲" not in head and "▼" not in head, head)
+bars = ps.find(qdoc2, pm.SEC_QBARS, pm.SEC_WK_STATS).body
+check("a month with no note says no note",
+      any("M1 · July · no note" in l for l in bars), bars)
+# a month whose note EXISTS but has no numbers is a different fact
+noneidx = dict(one)
+noneidx[("monthly", pm.title_key(pm.period_for("monthly", date(2026, 7, 1))))] = {
+    "id": "J", "projectId": "P",
+    "content": pm.render_template(pe._load_template("monthly"),
+                                  {"breadcrumbs": "C", "weeklinks": "- x"})}
+qdoc3 = ps.parse_sections(pm.render_template(
+    pe._load_template("quarterly"), {"breadcrumbs": "C", "monthlinks": "- x"}))
+pe._fill_quarterly(qdoc3, Q3, noneidx)
+bars3 = ps.find(qdoc3, pm.SEC_QBARS, pm.SEC_WK_STATS).body
+check("a note with no numbers is not a missing note",
+      any("M1 · July · no numbers" in l for l in bars3), bars3)
+# money never invents a zero for a span with no daily notes
+inc = ps.find_prefix(qdoc3, pm.SEC_INCOME, pm.SEC_WK_DATA)
+check("income says 'no notes' where there are none",
+      any("no notes" in l for l in inc.body), inc.body)
+# the layout guard
+oldq = ps.parse_sections("C\n---\n##### 🎯 OKR review\n_(score)_\n"
+                         "##### 📈 Stats\n_(pending)_\n")
+pe._fill_quarterly(oldq, Q3, one)
+check("a pre-2026-09-17 quarterly is left alone",
+      "_(pending)_" in ps.serialize_sections(oldq)
+      and "Monthly Completed" not in ps.serialize_sections(oldq))
+# the goal kill switch stops the WRITER too
+killed = ps.parse_sections(ps.serialize_sections(_goal_doc("weekly")).replace(
+    "- ♻️ Weekly\n", ""))
+check("deleting ♻️ Weekly leaves nowhere to append",
+      pe._week_goal_home(killed) is None)
+check("…and an old-shape note still appends to the section",
+      pe._week_goal_home(ps.parse_sections("C\n---\n#### 🏆 Goals\n\t- [ ] x\n"))
+      == pm.SEC_GOALS)
+# an app escape never travels down the mirror chain
+check("mirrored lines are unescaped",
+      pm.unescape_md_lines(["\t- [ ] \\[Goal\\]\\(u\\)"])
+      == ["\t- [ ] [Goal](u)"])
+# the highlight answer routes to ITS tier's question
+check("the highlight fallback knows each tier's key",
+      pm.journal_key("What was the highlight of the quarter? x") == "qhighlight"
+      and pm.journal_key("What was the highlight of the month? x") == "mhighlight")
+
 print(f"quarterly note: {P} passed, {F} failed")
 sys.exit(1 if F else 0)

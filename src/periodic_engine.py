@@ -302,7 +302,10 @@ def _week_goals_of(wdoc):
                  for a in (pm.SEC_WK_QTR, pm.SEC_WK_MONTH))
     sec = (ps.find(wdoc, pm.SEC_WK_WEEK, pm.SEC_GOALS) if tiered
            else ps.find(wdoc, pm.SEC_GOALS))
-    return [ln for ln in (sec.body if sec else []) if ln.strip()], sec
+    # goal_titles, not "non-blank": the section fallback hands back the bullet
+    # HEADERS too, and an untouched template leaves a bare "- [ ]" - both
+    # would travel into the daily note as if they were goals
+    return [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])], sec
 
 
 def _goal_sec_of(doc, kind):
@@ -377,18 +380,27 @@ def _goal_append(doc, sec_name, line):
     sec = ps.find(doc, sec_name)
     if sec is None:
         return False
-    keep = [l for l in sec.body if not pm.EMPTY_BOX_RE.match(l.strip())]
+    keep = [l for l in sec.body
+            if not pm.EMPTY_BOX_RE.match(l.strip())
+            and not pm.PENDING_RE.match(pm.unescape_md(l.strip()))]
     if keep != list(sec.body):
         sec.body = keep
     return ps.append_body(doc, sec_name, [line])
 
 
 def _week_goal_home(doc):
-    """Where a NEW weekly goal is appended: the ♻️ Weekly bullet, or the whole
-    🏆 Goals section in a note minted before the tiered layout."""
-    return (pm.SEC_WK_WEEK
-            if ps.find(doc, pm.SEC_WK_WEEK, pm.SEC_GOALS) is not None
-            else pm.SEC_GOALS)
+    """Where a NEW weekly goal is appended, or None when there is nowhere.
+
+    It reads the note's SHAPE exactly as _week_goals_of does. On a tiered
+    note with ♻️ Weekly deleted - the documented kill switch - the answer is
+    NOTHING: appending into 🏆 Goals instead would drop the goal beside the
+    two mirrors, where the reader will never look at it and the editor can
+    never remove it (review 2026-09-17)."""
+    if ps.find(doc, pm.SEC_WK_WEEK, pm.SEC_GOALS) is not None:
+        return pm.SEC_WK_WEEK
+    tiered = any(ps.find(doc, a, pm.SEC_GOALS) is not None
+                 for a in (pm.SEC_WK_QTR, pm.SEC_WK_MONTH))
+    return None if tiered else pm.SEC_GOALS
 
 
 def _mirror_goal(doc, anchor, kind, index, day, hint):
@@ -406,9 +418,8 @@ def _mirror_goal(doc, anchor, kind, index, day, hint):
     sec = next((x for x in (ps.find(pdoc, nm)
                             for nm in pm.goal_section_names(kind))
                 if x is not None), None)
-    lines = [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])]
-    if not lines:                  # a bare "- [ ]" or an _(hint)_ is not a goal
-        lines = []
+    lines = pm.unescape_md_lines(
+        [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])])
     ps.set_body(doc, anchor, lines or [pm.T1 + hint], within=pm.SEC_GOALS)
 
 
@@ -807,7 +818,8 @@ def _complete_many(pairs):
 # mirror sweep exactly like ✅ Today - tick anywhere, real task completes).
 _SWEEP_SECTIONS = {"daily": (pm.SEC_TODAY, pm.SEC_TOMORROW),
                    "weekly": (pm.SEC_REVIEW,),
-                   "monthly": (pm.SEC_MREVIEW,)}
+                   "monthly": (pm.SEC_MREVIEW,),
+                   "quarterly": (pm.SEC_QREVIEW,)}
 
 
 def refresh_period(p, index=None, force=False):
@@ -1200,11 +1212,14 @@ def _fill_daily(doc, p, index, is_today):
     if wk:
         wdoc = ps.parse_sections(wk.get("content") or "")
         goals, gsec = _week_goals_of(wdoc)
+        goals = pm.unescape_md_lines(goals)
         if goals:
             ps.set_body(doc, pm.SEC_WEEK_GOALS, goals)
-        elif gsec is not None:
-            # weekly goals CLEARED → mirror resets to the pointer, never
-            # keeps stale copies
+        else:
+            # CLEARED, or the ♻️ Weekly bullet deleted (the kill switch) →
+            # the mirror resets to its pointer. The old `elif gsec is not
+            # None` kept the last copy alive forever in the deleted case,
+            # which is the one where a stale goal is most misleading
             ps.set_body(doc, pm.SEC_WEEK_GOALS,
                         [f"{pm.T1}- _(mirrors this week's weekly note - "
                          "edit goals there)_"])
@@ -1782,6 +1797,37 @@ def _ignored_names(projects):
             if pid in _stats_ignored_pids()}
 
 
+def _has_dailies(day_sums, a, b):
+    """Is there ANY daily note inside [a, b]? A span with none has no money
+    story at all, and a "• 0" there reads as a month he earned nothing in
+    (the rule _fill_rollup_money has always used for a whole period)."""
+    return any(a <= d <= b for d in day_sums)
+
+
+def _span_money_lines(day_sums, spans, kind, today):
+    """Money by child span: the amount where there are notes to read, an
+    honest word where there are not, and nothing at all for a span that has
+    not happened yet."""
+    out = []
+    for n, _cp, a, b in spans:
+        if a > today:
+            break
+        label = pm.span_label(kind, n, a, b)
+        if not _has_dailies(day_sums, a, b):
+            out.append(f"- {label} • no notes")
+            continue
+        out.append(f"- {label} • {pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))}")
+    return out
+
+
+def _partial(known, spans, word):
+    """' · 2 of 3 months' when a roll-up could not read every child, '' when
+    it could. A total summed out of half its parts must say so; the review
+    called an unmarked one 'a partial quarter reported as a whole'."""
+    return (f" · {len(known)} of {len(spans)} {word}s"
+            if len(known) < len(spans) else "")
+
+
 def _month_stats_of(index, mp, drop_names=()):
     """What a month contributed, read off its own monthly note - the pyramid's
     next storey. Simpler than a week's: a month never straddles a quarter, so
@@ -1810,6 +1856,8 @@ def _month_stats_of(index, mp, drop_names=()):
     if done is None:
         return None
     created, created_body = headed(pm.SEC_CREATED, "➕ Created")
+    # created stays None when that note has no Created number to read: a 0
+    # would make the quarter's header a confident undercount
 
     def keep(mp_):
         return {k: v for k, v in mp_.items() if k not in drop_names}
@@ -1818,7 +1866,7 @@ def _month_stats_of(index, mp, drop_names=()):
         sec = ps.find_prefix(doc, anchor, pm.scope_of("monthly", anchor))
         return sec.body if sec is not None else []
 
-    return {"done": done, "created": created or 0,
+    return {"done": done, "created": created,
             "by_proj": keep(pm.parse_proj_lines(done_body)),
             "created_by_proj": pm.parse_proj_lines(created_body),
             "top_lists": keep(pm.parse_top_list_lines(body(pm.SEC_TOP_LIST))),
@@ -1956,12 +2004,15 @@ def _fill_monthly(doc, p, index):
     # that holds open tasks plus nine days of completed ones, so a month's own
     # early days are already short and LAST month is a fiction - the chip read
     # "🟢 ▲ 1204 (+1974%)" against an August that was really just its survivors.
-    created_cur = sum(st["created"] for st in rank_cur) if rank_cur else None
+    cre_known = [st["created"] for st in rank_cur if st.get("created") is not None]
+    created_cur = sum(cre_known) if cre_known else None
+    part = _partial(rank_cur, spans, "week")
     if created_cur is not None:
-        cprev = sum(st["created"] for st in rank_prev) if rank_prev else None
-        ch = pm.chip(created_cur, cprev)
+        cprev = (sum(st["created"] for st in rank_prev
+                     if st.get("created") is not None) or None) if rank_prev else None
+        ch = pm.chip(created_cur, cprev) if not part else None
         _set_headed(doc, pm.SEC_CREATED,
-                    str(created_cur) + (f" · {ch}" if ch else ""),
+                    str(created_cur) + (f" · {ch}" if ch else "") + part,
                     pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
                         pm.merge_counts(*[st["created_by_proj"]
                                           for st in rank_cur]))]),
@@ -1970,9 +2021,13 @@ def _fill_monthly(doc, p, index):
     # ── Completed + the per-week bars, both off the weeks' own numbers
     done_cur = _month_done(data, p)
     if done_cur is not None:
-        ch = pm.chip(done_cur, _month_done(prev_data, prev))
+        known = [st for st in data.values() if st]
+        part = _partial(known, spans, "week")
+        ch = (pm.chip(done_cur, _month_done(prev_data, prev))
+              if not part and not _partial([st for st in prev_data.values() if st],
+                                           pm.child_spans(prev), "week") else None)
         _set_headed(doc, pm.SEC_COMPLETED,
-                    str(done_cur) + (f" · {ch}" if ch else ""),
+                    str(done_cur) + (f" · {ch}" if ch else "") + part,
                     pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
                         pm.merge_counts(*[st["by_proj"]
                                           for st in rank_cur]))]),
@@ -1982,9 +2037,11 @@ def _fill_monthly(doc, p, index):
             if a > today:
                 break                      # a week that has not started yet
             st = data.get(wp.start)        # is not a week with a missing note
+            why = "no note" if lookup(index, wp) is None else "no numbers"
             rows.append((pm.week_span_label(n, a, b),
                          None if not st else
-                         sum(v for d, v in st["per_day"].items() if a <= d <= b)))
+                         sum(v for d, v in st["per_day"].items() if a <= d <= b),
+                         why))
         ps.set_body(doc, pm.SEC_MBARS, pm.ind(pm.done_span_lines(rows)[:-1]),
                     _in(pm.SEC_MBARS))
 
@@ -2069,9 +2126,7 @@ def _fill_monthly(doc, p, index):
           if any(prev.start <= d <= prev.end for d in day_sums) else None)
     _set_headed(doc, pm.SEC_INCOME,
                 pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                pm.ind([f"- {pm.week_span_label(n, a, b)} • "
-                        f"{pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))}"
-                        for n, _wp, a, b in spans])
+                pm.ind(_span_money_lines(day_sums, spans, "monthly", today))
                 + [pm.money_total_line(inc_cur, 3)],
                 _in(pm.SEC_INCOME))
 
@@ -2168,18 +2223,30 @@ def _fill_quarterly(doc, p, index):
 
     # ── Created / Completed + the per-month bars, all off the monthly notes
     if known:
-        cre = sum(st["created"] for st in known)
-        ch = pm.chip(cre, sum(st["created"] for st in known_prev)
-                     if known_prev else None)
-        _set_headed(doc, pm.SEC_CREATED, str(cre) + (f" · {ch}" if ch else ""),
-                    pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
-                        pm.merge_counts(*[st["created_by_proj"]
-                                          for st in known]))]),
-                    _in(pm.SEC_CREATED))
+        # A roll-up summed out of SOME of its children says so, and a chip is
+        # only drawn when both sides are whole: comparing half a quarter with
+        # a whole one is a number nobody can act on.
+        part, part_prev = _partial(known, spans, "month"), \
+            _partial(known_prev, pm.child_spans(prev), "month")
+        whole = not part and not part_prev
+        cre_known = [st["created"] for st in known if st["created"] is not None]
+        if cre_known:
+            cre = sum(cre_known)
+            ch = pm.chip(cre, sum(st["created"] for st in known_prev
+                                  if st["created"] is not None) or None) \
+                if whole and known_prev else None
+            _set_headed(doc, pm.SEC_CREATED,
+                        str(cre) + (f" · {ch}" if ch else "")
+                        + _partial(cre_known, spans, "month"),
+                        pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
+                            pm.merge_counts(*[st["created_by_proj"]
+                                              for st in known]))]),
+                        _in(pm.SEC_CREATED))
         done = sum(st["done"] for st in known)
-        ch = pm.chip(done, sum(st["done"] for st in known_prev)
-                     if known_prev else None)
-        _set_headed(doc, pm.SEC_COMPLETED, str(done) + (f" · {ch}" if ch else ""),
+        ch = (pm.chip(done, sum(st["done"] for st in known_prev))
+              if whole and known_prev else None)
+        _set_headed(doc, pm.SEC_COMPLETED,
+                    str(done) + (f" · {ch}" if ch else "") + part,
                     pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
                         pm.merge_counts(*[st["by_proj"] for st in known]))]),
                     _in(pm.SEC_COMPLETED))
@@ -2188,8 +2255,11 @@ def _fill_quarterly(doc, p, index):
             if a > today:
                 break
             st = data.get(cp.start)
+            # "no note" and "no numbers" are different facts, and the head
+            # two lines above LINKS the note it would be denying
+            why = "no note" if lookup(index, cp) is None else "no numbers"
             rows.append((pm.span_label("quarterly", n, a, b),
-                         None if not st else st["done"]))
+                         None if not st else st["done"], why))
         ps.set_body(doc, pm.SEC_QBARS, pm.ind(pm.done_span_lines(rows)[:-1]),
                     _in(pm.SEC_QBARS))
 
@@ -2199,7 +2269,10 @@ def _fill_quarterly(doc, p, index):
     if tot is not None:
         prev_min = getattr(t2, "focus_minutes", lambda a, b: None)(prev.start,
                                                                    prev.end)
-        ch = pm.chip(tot[0], prev_min, "duration")
+        # a quarter is longer than the timeline remembers, and "0 last
+        # quarter" is what an unreachable window looks like from here - the
+        # same zero this filler refuses to print as a by-month line
+        ch = pm.chip(tot[0], prev_min, "duration") if prev_min else None
         lines = []
         for n, _cp, a, b in spans:
             if a > today:
@@ -2275,9 +2348,7 @@ def _fill_quarterly(doc, p, index):
           if any(prev.start <= d <= prev.end for d in day_sums) else None)
     _set_headed(doc, pm.SEC_INCOME,
                 pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                pm.ind([f"- {pm.span_label('quarterly', n, a, b)} • "
-                        f"{pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))}"
-                        for n, _cp, a, b in spans])
+                pm.ind(_span_money_lines(day_sums, spans, "quarterly", today))
                 + [pm.money_total_line(inc_cur, 3)],
                 _in(pm.SEC_INCOME))
 
@@ -2628,7 +2699,9 @@ def set_highlight(text, day=None, kind="weekly"):
     ok, _doc = _pn_rmw(pid, tid, mutate)
     if ok:
         return "✨ Highlight saved"
-    if journal_answer_key(kind, "highlight", text, p.start):
+    hkey = {"monthly": "mhighlight", "quarterly": "qhighlight"}.get(kind,
+                                                                    "highlight")
+    if journal_answer_key(kind, hkey, text, p.start):
         return f"✨ Highlight saved to the {kind} journal"
     return f"💫 Nowhere to save the highlight · the {kind} note has no ✨ " \
            "section and no highlight question"
@@ -2786,6 +2859,8 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
         nonlocal sec_name
         if kind == "weekly":             # bullet on a tiered note, section on
             sec_name = _week_goal_home(doc)      # one minted before it
+            if sec_name is None:                 # ♻️ Weekly deleted
+                return False
         else:                            # …and a note minted under an older
             for nm in pm.goal_section_names(kind):   # name still answers
                 if ps.find(doc, nm) is not None:
@@ -2839,11 +2914,18 @@ def _mirror_week_goals(wdoc):
     dtask = lookup(build_index(), pm.period_for("daily", _today()))
     if not dtask:
         return
-    goals, _gsec = _week_goals_of(wdoc)
+    goals, gsec = _week_goals_of(wdoc)
 
     def mirror(doc, live):
         if goals:
-            ps.set_body(doc, pm.SEC_WEEK_GOALS, goals)
+            ps.set_body(doc, pm.SEC_WEEK_GOALS, pm.unescape_md_lines(goals))
+        else:
+            # cleared, or the ♻️ Weekly bullet deleted: the mirror resets to
+            # its pointer. Leaving the last copy behind kept a removed goal
+            # on the daily note for the rest of the week (review 2026-09-17)
+            ps.set_body(doc, pm.SEC_WEEK_GOALS,
+                        [f"{pm.T1}- _(mirrors this week's weekly note - "
+                         "edit goals there)_"])
         return True
     _pn_rmw(dtask.get("projectId") or areas.PERIODIC_LIST_ID,
             dtask.get("id"), mirror)
@@ -3169,7 +3251,8 @@ def set_goal(pid_or_text, tid=None, title=None, week="current"):
         line = f"{pm.T1}- [ ] {pid_or_text}"
 
     def mutate(doc, live):
-        return _goal_append(doc, _week_goal_home(doc), line)
+        home = _week_goal_home(doc)
+        return _goal_append(doc, home, line) if home else False
     ok, wdoc_out = _pn_rmw(wpid, wtask.get("id"), mutate)
     if not ok:
         return "💫 No 🎯 Goals section in the weekly note"

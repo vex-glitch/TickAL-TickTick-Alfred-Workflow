@@ -620,15 +620,20 @@ def week_span_label(n, a, b):
 def done_span_lines(rows):
     """'- W1 · 1st-6th Sep ▇▇▇ 12' per row, then the month total.
 
-    rows = [(label, count | None)]. None is NOT zero: it means that week has
-    no note to read the number off, and a 0 there would read as a week he got
-    nothing done in. The bar scales to the biggest week that IS known."""
-    nums = [c for _l, c in rows if c is not None]
+    rows = [(label, count | None[, why])]. None is NOT zero: it means there is
+    no number to read, and a 0 there would read as a span he got nothing done
+    in. `why` names which kind of nothing. The bar scales to the biggest
+    known span."""
+    nums = [r[1] for r in rows if r[1] is not None]
     mx = max(nums, default=0)
     out = []
-    for label, c in rows:
+    for row in rows:
+        label, c = row[0], row[1]
         if c is None:
-            out.append(f"- {label} · no note")
+            # a row may say WHY: a note that does not exist and one that
+            # exists with no numbers in it are different facts, and the head
+            # two lines above links the second one
+            out.append(f"- {label} · {row[2] if len(row) > 2 else 'no note'}")
             continue
         bar = "▇" * max(1, round(c / mx * 7)) if mx and c else ""
         out.append(f"- {label} " + (f"{bar} {c}" if bar else f"{c}"))
@@ -1713,7 +1718,11 @@ def journal_fixed(slot, ctx=None):
 # journal_fixed has ever seeded must match its rule (older wordings too), and
 # no rule may match another key's question or a pool prompt.
 JOURNAL_KEY_RULES = (
-    ("mood", re.compile(r"^Mood 1-5\b")),
+    # 1-5 with ANY dash: the app (and Vex) rewrite the hyphen as an en or em
+    # dash when a question gets edited in TickTick, and two live morning
+    # journals carry that shape - a mood answer that does not route is a mood
+    # that never reaches the note's summary
+    ("mood", re.compile(r"^Mood 1[-\u2010-\u2015]5\b")),
     ("ybridge", re.compile(r"^🌉 Yesterday's bridge\b")),
     ("gcheck", re.compile(r"^☀️ (?:Does your goal for today still align|What is today's goal\?)")),
     ("bridge", re.compile(r"^🌉 Daily bridge\b")),
@@ -1737,6 +1746,15 @@ JOURNAL_KEY_RULES = (
 
 
 _MD_ESCAPE_RE = re.compile(r"\\([!-/:-@\[-`{-~])")        # \ + any ASCII punctuation
+
+
+def unescape_md_lines(lines):
+    """unescape_md over a block. Every MIRROR passes its lines through this:
+    the app backslash-escapes a line Vex edits in TickTick, and a raw copy
+    carried that "\\[Goal\\]\\(url\\)" down the quarter → month → week →
+    day chain, where it renders as literal brackets and never heals
+    (review 2026-09-17, live in his notes)."""
+    return [unescape_md(l) for l in (lines or [])]
 
 
 def unescape_md(text):

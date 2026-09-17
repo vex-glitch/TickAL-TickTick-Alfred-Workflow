@@ -105,7 +105,7 @@ The head of the note (the breadcrumb, then the weather and the quote) is compose
 
 ## Journals
 
-All three journals seed their questions into the note at mint, so you can answer from any device by typing after `A:`. Running them from Alfred asks each **unanswered** question in a dialog - ⏎ saves and advances, empty ⏎ skips, Cancel stops and keeps what you answered. Phone answers are never overwritten.
+All five journals seed their questions into the note at mint, so you can answer from any device by typing after `A:`. Running them from Alfred asks each **unanswered** question in a dialog - ⏎ saves and advances, empty ⏎ skips, Cancel stops and keeps what you answered. Phone answers are never overwritten.
 
 - **Morning** (3 fixed + 3 drawn from an editable pool, below): mood (1-5), what's on your mind, the one thing - then, if no day goal is set, the ☀️ picker opens by itself.
 - **Evening** (6 fixed + 5 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, on your mind, *did you achieve your daily goal - {your goal}?*, money earned, rate the day (the stars stay in the journal answer).
@@ -145,7 +145,7 @@ Minted Sunday for the week ahead - and opening it midweek mints it on the spot, 
 
 Rearranged it yourself? Sections are found BY NAME wherever you put them, so moving and renesting is free.
 
-A note's shape is fixed when it is minted - refresh fills bodies, it never reshapes. So when the shipped layout changes, the week already open keeps the old one and is left strictly alone (never half-rewritten) until the next Monday mints a fresh note. To move it over now instead, `tools/pnrepair/relayout_weekly.py` (and `relayout_monthly.py`, and `relayout_daily.py`) rebuilds it in place: your goals, journal answers and review ticks ride across, anything the new layout has no home for is kept verbatim at the bottom, it prints the result and changes nothing without `--apply`, and it refuses outright if a single line you wrote would be lost. Weeks already closed keep the shape they were written in - their numbers exist nowhere else. The one thing they do get is `tools/pnrepair/weekday_links.py`, which stamps the day links into any weekly note's head (dry run by default, `--apply` to write): it touches the breadcrumb and those seven lines and nothing else, so a closed week's numbers are safe.
+A note's shape is fixed when it is minted - refresh fills bodies, it never reshapes. So when the shipped layout changes, the week already open keeps the old one and is left strictly alone (never half-rewritten) until the next Monday mints a fresh note. To move it over now instead, `tools/pnrepair/relayout_{daily,weekly,monthly,quarterly}.py` rebuilds it in place: your goals, journal answers and review ticks ride across, anything the new layout has no home for is kept verbatim at the bottom, it prints the result and changes nothing without `--apply`, and it refuses outright if a single line you wrote would be lost. Weeks already closed keep the shape they were written in - their numbers exist nowhere else. The one thing they do get is `tools/pnrepair/weekday_links.py`, which stamps the day links into any weekly note's head (dry run by default, `--apply` to write): it touches the breadcrumb and those seven lines and nothing else, so a closed week's numbers are safe.
 
 ## The monthly note
 
@@ -177,11 +177,11 @@ The monthly's shape counted by **month**, and the old skeleton is gone - 🎯 OK
 - **🏆 Goals** - 🎉 Yearly goal mirrors the year's note, 🌓 Quarterly goal is yours.
 - Then ✨ Highlight, 📊 Stats (with **Monthly Completed** bars and focus by month), 💿 Data (moods by month, income by month, the quarter's 🎂 dates), **⏪ Last quarter**, **📔 Quarterly journal** and **♻️ Quarterly Review**.
 
-A month never straddles a quarter, so none of the clipping the monthly needs applies: the quarter just sums its months' headlines. A month whose note cannot be read says `no note` rather than 0, exactly as a week does one tier down.
+A month never straddles a quarter, so none of the clipping the monthly needs applies: the quarter just sums its months' headlines. A month whose note cannot be read says `no note`, and one whose note exists but carries no numbers says `no numbers` - never 0. A roll-up summed out of only some of its children says so in its own header (`Completed: 466 · 1 of 3 months`) and draws no vs-last-period arrow, because half a quarter and a whole one are not comparable. `tools/pnrepair/relayout_quarterly.py` rebuilds a note minted under the old skeleton.
 
 **Yearly** still ships as a template + money roll-up - it gains its quarter links in the head, and the rest lands in a later release.
 
-The **📔 journal** runs at four tiers now: morning, evening, weekly, monthly and quarterly. Each has its own pool and its own draw.
+The **📔 journal** runs at five slots now: morning, evening, weekly, monthly and quarterly. Each has its own pool and its own draw.
 
 ## The 04:30 agent
 
