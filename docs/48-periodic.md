@@ -44,7 +44,7 @@ Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and sectio
 
 | Row | Does |
 |-----|------|
-| 💫 Today / ◀ Yesterday / 📆 Week / 🗓 Month / 🧭 Quarter / 📅 Year | ⏎ open instantly (refresh catches up in the background) - **⌃⇧⏎ opens as a [sticky note](44-notes-links-images.md#sticky-notes)** |
+| 💫 Today / ◀ Yesterday / 📆 Week / 🗓 Month / 🧭 Quarter / 📅 Year | ⏎ open instantly (refresh catches up in the background) - **⌃⇧⏎ opens as a [sticky note](44-notes-links-images.md#sticky-notes)**, **⌃⌥⏎ as a [live window](44-notes-links-images.md#live-window)** |
 | ➕ Entry | log a win, nag, thought, link, task, highlight or money - ⏎ shows the kind legend, or type straight: `+ w Shipped the thing` |
 | ☀️ Day goal | pick (or create) today's one thing - pinned + scheduled today |
 | ☀️ Add to today / 🌙 Add to tomorrow | pick any task or note → ⏎ schedules it (type `14:30` for a time) |

@@ -14,6 +14,9 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
 
     ping                  toast only (smoke test)
     focus:<tid>[:<pid>]   sticky (best effort) + timer
+    focuswindow:<tid>[:<pid>]  the same, with the floating window instead of
+                          the sticky - what every routine uses since
+                          2026-09-17
     sticky:<tid>[:<pid>]  sticky only
     window:<tid>[:<pid>]  the task in TickTick's own floating window: the
                           LIVE twin of sticky. A sticky never re-renders, so
@@ -46,6 +49,7 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
                           title date at click time (money_note); the newest
                           one until the month's note exists
     moneysticky           the same note, opened as a desktop sticky
+    moneywindow           the same note in a floating window, live
     note:<spec>           the CURRENT periodic note (daily|weekly|monthly|
                           quarterly|yearly) on whatever day the click
                           happens, lazy-minted. A pasted note link would
@@ -69,8 +73,9 @@ BUNDLE  = "com.vex.tickal"
 TRIGGER = "Link"
 MAX_LEN = 200
 
-TASK_VERBS = ("focus", "sticky", "window", "timer", "done")
-BARE_VERBS = ("ping", "pause", "resume", "money", "moneysticky")
+TASK_VERBS = ("focus", "focuswindow", "sticky", "window", "timer", "done")
+BARE_VERBS = ("ping", "pause", "resume", "money", "moneysticky",
+              "moneywindow")
 PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
           ("monthly", "this month's"), ("quarterly", "this quarter's"),
           ("yearly", "this year's"))
@@ -111,8 +116,8 @@ MONEY_LIST = "6a4bd07e4e3c910368319b6d"
 MONTHS = ("January", "February", "March", "April", "May", "June", "July",
           "August", "September", "October", "November", "December")
 _MONEY_RE = re.compile(r"(\d{4})\s+(" + "|".join(MONTHS) + r")\b", re.I)
-LABELS ={"focus": "🖥 Focus + sticky", "sticky": "🖥 Sticky",
-         "window": "🖥 Window", "timer": "🖥 Focus"}
+LABELS ={"focus": "🖥 Focus + sticky", "focuswindow": "🖥 Focus + window",
+         "sticky": "🖥 Sticky", "window": "🖥 Window", "timer": "🖥 Focus"}
 
 _TID = re.compile(r"[0-9a-f]{24}")
 _PID = re.compile(r"[0-9a-f]{24}|inbox\d{6,12}")
@@ -229,6 +234,8 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
                       _task_md(title, "sticky", tid, pid)),
                      ("window", "🪟 Window", "Live, sinks behind",
                       _task_md(title, "window", tid, pid)),
+                     ("focuswindow", "🪟 Focus + window", "Window + timer",
+                      _task_md(title, "focuswindow", tid, pid)),
                      ("timer", "⏱ Focus", "Timer only",
                       _task_md(title, "timer", tid, pid))]
         except ValueError:
@@ -250,7 +257,9 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
         rows += [("money", "💰 Money note", "Always this month's",
                   f"[🖥 Money note]({url('money')})"),
                  ("money_sticky", "🗒️ Money note sticky", "This month's, as sticky",
-                  f"[🖥 Money note sticky]({url('moneysticky')})")]
+                  f"[🖥 Money note sticky]({url('moneysticky')})"),
+                 ("money_window", "🪟 Money note window", "This month's, live",
+                  f"[🖥 Money note window]({url('moneywindow')})")]
     if periodic:
         for spec, now in PN_NOW:        # each note: open + sticky, side by side
             name = f"{spec.capitalize()} note"

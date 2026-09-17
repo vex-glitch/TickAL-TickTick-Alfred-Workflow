@@ -10,10 +10,11 @@ search-⏎ forwards to a script). Subtitles stay plain: no syntax in
 subtitles, ever - autocomplete rows teach by doing.
 
 Chord rule: the search SF has live mod edges (⌘ Actions chain, ⇧, ⌥,
-⌥⇧ X1 router, ⌥⌘ copy, ⌃⇧ modOpen) - a row with NO mods entry fires its
-DEFAULT arg down every one of them. Every row here carries a full mods dict:
-dead chords everywhere, ⌃⇧ = sticky on the six open rows. ⌘ physically
-routes to the Actions chain and can never reach dispatch.
+⌥⇧ X1 router, ⌥⌘ copy, ⌃⇧ and ⌃⌥ modOpen) - a row with NO mods entry fires
+its DEFAULT arg down every one of them. Every row here carries a full mods
+dict: dead chords everywhere, ⌃⇧ = sticky and ⌃⌥ = the floating window on
+the six open rows. ⌘ physically routes to the Actions chain and can never
+reach dispatch.
 """
 import base64
 import json
@@ -43,12 +44,18 @@ def _mods(sticky_spec=None):
     # ⌃ is NOT dead: the wired ⌃ edge is the universal 🔙 back-to-main-menu
     # (every other search row gets it via _output_backstamped).
     m = {k: dict(_DEAD)
-         for k in ("cmd", "shift", "alt", "alt+shift", "alt+cmd")}
+         for k in ("cmd", "shift", "alt", "alt+shift", "alt+cmd", "ctrl+alt")}
     m["ctrl"] = {"valid": True, "arg": "", "subtitle": "🔙 Main menu"}
     if sticky_spec:
         m["ctrl+shift"] = {"valid": True,
                            "arg": f"xact:pn_sticky:{sticky_spec}",
                            "subtitle": "📌 Open as sticky"}
+        # ⌃⌥ = the same note in TickTick's own floating window, which is the
+        # LIVE one: a sticky never re-renders, so an entry written while it
+        # is open is invisible in it (Vex tested File > Sync - no help).
+        m["ctrl+alt"] = {"valid": True,
+                         "arg": f"xact:pn_window:{sticky_spec}",
+                         "subtitle": "🪟 Floating Window"}
         # ⌥ = every note of this tier, newest first (Vex 2026-09-12: "I should
         # be able to enter a list of those notes ... so I can actually open any
         # note, not just this week's"). The search SF's ⌥ edge enters the

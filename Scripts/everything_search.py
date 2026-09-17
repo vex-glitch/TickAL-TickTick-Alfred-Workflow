@@ -515,8 +515,8 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
 
 
 def item_mods(pid, tid, title, item_type="task"):
-    """The three chords that belong to an ITEM, note or task alike:
-    ⌥⇧ buffer · ⌃⇧ sticky · ⌃⌘ start focus.
+    """The four chords that belong to an ITEM, note or task alike:
+    ⌥⇧ buffer · ⌃⇧ sticky · ⌃⌥ floating window · ⌃⌘ start focus.
 
     Note rows used to kill all three under a comment about having no
     children to browse - true of ⌥, and written before the 2026-09-08 remap
@@ -532,6 +532,12 @@ def item_mods(pid, tid, title, item_type="task"):
                        "subtitle": "🅿️ Add to buffer", "variables": v},
         "ctrl+shift": {"valid": True, "arg": f"xact:sticky:{pid}:{tid}",
                        "subtitle": "🗒️ Sticky note", "variables": v},
+        # ⌃⌥ = TickTick's own floating window, the LIVE one. A sticky never
+        # re-renders, so it misses everything we write after it opened; the
+        # window does not. It only opens from a KANBAN card though, so on a
+        # list-view list this says so instead (xact.task_window).
+        "ctrl+alt":   {"valid": True, "arg": f"xact:window:{pid}:{tid}",
+                       "subtitle": "🪟 Floating Window", "variables": v},
         "ctrl+cmd":   {"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
                        "subtitle": "Start focus", "variables": v},
     }
@@ -962,7 +968,14 @@ def render_vf_scope(scope, raw_query, all_tasks, projects):
 _orig_output = alfred.output
 def _output_backstamped(items, **kw):
     for _it in items:
-        _it.setdefault("mods", {}).setdefault("ctrl", {"valid": True, "arg": "", "subtitle": "🔙 Main menu"})
+        _m = _it.setdefault("mods", {})
+        _m.setdefault("ctrl", {"valid": True, "arg": "", "subtitle": "🔙 Main menu"})
+        # ⌃⌥ became a WIRED edge the day the floating window shipped, and a
+        # wired chord with no mods entry fires the row's DEFAULT arg. Item
+        # rows set their own (item_mods, periodic_rows); every other row -
+        # prompts, hints, pickers, scope headers - dies here, exactly the way
+        # ⌃ is stamped above, so nothing rides ⌃⌥ by accident.
+        _m.setdefault("ctrl+alt", {"valid": False, "subtitle": ""})
     return _orig_output(items, **kw)
 alfred.output = _output_backstamped
 

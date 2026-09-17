@@ -44,7 +44,8 @@ Task / subtask / note share one row set; lists and sections get the container su
 | 🖼️ Add image | Attach the clipboard image (needs the [v2 token](30-setup.md)) | ✓ | ✓ | ✓ | | |
 | 🔃 Convert to note / task | Flip the item's kind - title, dates and tags survive | ✓ | ✓ | ✓ | | |
 | 🎯 Focus | Timer or pomodoro on this task - see [Focus](46-focus.md) | ✓ | ✓ | ✓ | | |
-| 🗒️ Sticky note | Pin the task to the desktop as a TickTick sticky; ⌥ opens it in a live floating window instead | ✓ | ✓ | ✓ | | |
+| 🗒️ Sticky note | Pin the task to the desktop as a TickTick sticky | ✓ | ✓ | ✓ | | |
+| 🪟 Floating window | TickTick's own task window - live, and it can be typed in ([kanban lists only](44-notes-links-images.md#live-window)) | ✓ | ✓ | ✓ | | |
 | 🅿️ Add to buffer | Queue for batch actions (same as ⌥⇧⏎ on the row) | ✓ | ✓ | ✓ | | |
 | 🎯 Add to focus (…) | → checkbox in the running focus task's today block (only while a task-bound session runs; hidden on the focus task itself) | ✓ | ✓ | ✓ | | |
 | 🎯 Stage for Focus | Checkbox-link this task into another task/note | ✓ | ✓ | ✓ | | |

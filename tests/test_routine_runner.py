@@ -82,8 +82,13 @@ check("describe shows sticky + bar",
 for r in rt.ROUTINES:
     steps = [rr.expand(s, r["tid"], r["pid"]) for s in rr.default_steps()]
     args = [x.get("arg") for x in steps]
+    # focusWINDOW since 2026-09-17: every routine puts its task on screen in
+    # TickTick's live floating window, never a sticky (a sticky never
+    # re-renders, so a routine's own writes were invisible in it).
     check(f"{r['key']}: default list runs with its own ids",
-          rr.validate(steps) == [] and f"focus:{r['tid']}:{r['pid']}" in args)
+          rr.validate(steps) == [] and f"focuswindow:{r['tid']}:{r['pid']}" in args)
+    check(f"{r['key']}: no sticky verb left in the default list",
+          not any((a or "").split(":")[0].endswith("sticky") for a in args), args)
     check(f"{r['key']}: default list resets its own tree first",
           steps[0] == {"do": "reset", "tid": r["tid"], "pid": r["pid"]}, steps[0])
 

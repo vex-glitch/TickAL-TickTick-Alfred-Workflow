@@ -366,7 +366,7 @@ def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb=
             # hard chords are about an ITEM, not about having children, and
             # the legend was the half of that which still said otherwise.
             if item_type in ("Task", "Note"):
-                parts.append("⌃⇧🗒️ ⌃⌘🎯")
+                parts.append("⌃⇧🗒️ ⌃⌥🪟 ⌃⌘🎯")
         else:
             # Compact set - browse rows; buffer_mod=True only on task rows
             # (⌥⇧🅿️ is a task/subtask-only chord)

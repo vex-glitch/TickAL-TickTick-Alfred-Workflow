@@ -500,7 +500,7 @@ def run(verb, tid, pid_hint):
         if rolled:
             return rolled, False
         return _complete(pid, tid, title), True
-    if verb in ("focus", "timer"):
+    if verb in ("focus", "focuswindow", "timer"):
         clash = _timer_clash(xact, tid)
         if clash:
             return clash, False
@@ -516,7 +516,12 @@ def run(verb, tid, pid_hint):
             return "🗒️ TickTick not up · no sticky", False
         else:
             parts.append("🗒️ TickTick not up · no sticky")
-    if verb in ("focus", "timer"):
+    if verb == "focuswindow":            # the window twin: the timer still
+        if _tt_ready(xact):              # starts even if no window opens
+            parts.append(_quiet(xact.task_window, pid, tid))
+        else:
+            parts.append("🪟 TickTick not up · no window")
+    if verb in ("focus", "focuswindow", "timer"):
         st = xact._focus_state()
         if st and st.get("tid") == tid and st.get("paused_at"):     # "focus" on a paused timer = resume it
             parts.append(_bar_call(xact, lambda: _quiet(xact.focus_resume)))

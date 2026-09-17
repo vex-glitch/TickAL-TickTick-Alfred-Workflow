@@ -73,7 +73,7 @@ Per row type (⌘⏎ = Actions and ⌃⏎ = back everywhere; - = nothing bound):
 
 \* App-only smart lists (no in-Alfred view) open in TickTick instead. Inside the ⌘⏎ Actions menu, ⌃⏎ returns to the screen you came from.
 
-Task rows also wire **⌘⇧⏎** (Add here - the Add window prefilled with the row's context) and **⌃⇧⏎** (Start focus - the ⏱/🍅 flow on the task). On the Add window's Create row, **⌘⏎** chains the new task into the running focus (or opens the start flow on it) and **⇧⌘⏎** stages it. Periodic-note rows (the `pn` scope) open as a sticky note with **⌃⇧⏎**.
+Task rows also wire **⌘⇧⏎** (Add here - the Add window prefilled with the row's context) and **⌃⇧⏎** (Start focus - the ⏱/🍅 flow on the task). On the Add window's Create row, **⌘⏎** chains the new task into the running focus (or opens the start flow on it) and **⇧⌘⏎** stages it. Periodic-note rows (the `pn` scope) open as a sticky note with **⌃⇧⏎**. **⌃⌥⏎** opens any task, note or periodic note in TickTick's own floating window instead - live, kanban lists only.
 
 ## Add tokens
 

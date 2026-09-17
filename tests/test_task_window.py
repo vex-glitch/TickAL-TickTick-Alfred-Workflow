@@ -153,6 +153,38 @@ check("frame env reads a good one", xact._win_frame_env() == (10, 20, 400, 500))
 del os.environ["TICKAL_WIN_FRAME"]
 check("frame env unset → None", xact._win_frame_env() is None)
 
+# ── the finder line: shape, title frame, kanban flag ────────────────────────
+check("full line parses",
+      xact._parse_row("FOUND|1473|-738|282|48|1522|-729|206|21|1")
+      == ((1473, -738, 282, 48), (1522, -729, 206, 21), True))
+check("list row reads as NOT a card",
+      xact._parse_row("FOUND|1461|-472|634|44|1513|-461|562|21|0")[2] is False)
+check("no label → zeros, card flag still read",
+      xact._parse_row("FOUND|1|2|3|4|0|0|0|0|1")[1] == (0, 0, 0, 0))
+check("the short System-Events shape → card UNKNOWN",
+      xact._parse_row("FOUND|1|2|3|4")[2] is None)
+check("a miss is None", xact._parse_row("") is None)
+check("garbage is None", xact._parse_row("FOUND|a|b|c|d") is None)
+
+# ── what may be clicked ─────────────────────────────────────────────────────
+WIN = (1094, -848, 1517, 838)
+PTS = [(1200, -700), (1300, -700)]
+check("a point inside the window and clear is taken",
+      xact._pick_point(PTS, [], WIN) == (1200, -700))
+check("a covered point is skipped",
+      xact._pick_point(PTS, [(1150, -750, 100, 100)], WIN) == (1300, -700))
+check("all covered → None",
+      xact._pick_point(PTS, [(1000, -800, 600, 300)], WIN) is None)
+check("a scrolled-away row is never clicked (the sidebar sits at y -3164)",
+      xact._pick_point([(1200, -3164)], [], WIN) is None)
+check("a point past the window's right edge is never clicked",
+      xact._pick_point([(2700, -700)], [], WIN) is None)
+check("no window frame known → the clamp cannot refuse everything",
+      xact._pick_point([(1200, -3164)], [], None) == (1200, -3164))
+check("window edges are inclusive",
+      xact._pick_point([(1094, -848)], [], WIN) == (1094, -848))
+
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":
     sys.exit(1 if FAILS else 0)

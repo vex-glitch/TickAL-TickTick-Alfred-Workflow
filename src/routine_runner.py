@@ -12,7 +12,8 @@ A step is a dict {"do": <type>, …}:
     {"do": "activate", "app": <bundle id>[, "wait": true]}
     {"do": "hide_others"[, "keep": <bundle id>]}   default keep: TickTick
     {"do": "place",    "app": <bundle id>, "frame": [x, y, w, h]}
-    {"do": "link",     "arg": "<link verb>"[, "sticky": [x,y,w,h]][, "bar": [x,y]]}
+    {"do": "link",     "arg": "<link verb>"[, "sticky": [x,y,w,h]]
+                                      [, "window": [x,y,w,h]][, "bar": [x,y]]}
     {"do": "url",      "url": "<url>"}
     {"do": "pause",    "secs": 3}
     {"do": "key",      "key": "escape"[, "mods": ["shift", …]]}
@@ -80,6 +81,8 @@ def validate(steps):
                 out.append(f"step {i}: link needs arg")
             if "sticky" in s and not _frame_ok(s["sticky"], 4):
                 out.append(f"step {i}: sticky must be [x, y, w, h]")
+            if "window" in s and not _frame_ok(s["window"], 4):
+                out.append(f"step {i}: window must be [x, y, w, h]")
             if "bar" in s and not _frame_ok(s["bar"], 2):
                 out.append(f"step {i}: bar must be [x, y]")
         if kind == "hide_others" and "keep" in s and not isinstance(s["keep"], str):
@@ -121,6 +124,8 @@ def describe(step):
         bits = [step["arg"]]
         if step.get("sticky"):
             bits.append("sticky " + ",".join(f"{v:g}" for v in step["sticky"]))
+        if step.get("window"):
+            bits.append("window " + ",".join(f"{v:g}" for v in step["window"]))
         if step.get("bar"):
             bits.append("bar " + ",".join(f"{v:g}" for v in step["bar"]))
         return "link " + " · ".join(bits)
@@ -186,13 +191,13 @@ def completed_descendants(root_tid, tasks, cap=MAX_RESET):
 
 def default_steps(spec="daily"):
     """What a routine does with no config of its own: put the steps ticked in
-    the last occurrence back, focus the task with its sticky, open the period
-    note, show the calendar. No app juggling, no frames - a published user
+    the last occurrence back, focus the task with its floating window, open
+    the period note the same way, show the calendar. No app juggling, no frames - a published user
     gets something that works, and layout is what the config file adds."""
     return [
         {"do": "reset", "tid": "{tid}", "pid": "{pid}"},
         {"do": "activate", "app": "com.TickTick.task.mac", "wait": True},
-        {"do": "link", "arg": "focus:{tid}:{pid}"},
-        {"do": "link", "arg": f"notesticky:{spec}"},
+        {"do": "link", "arg": "focuswindow:{tid}:{pid}"},
+        {"do": "link", "arg": f"notewindow:{spec}"},
         {"do": "link", "arg": "view:calendar"},
     ]

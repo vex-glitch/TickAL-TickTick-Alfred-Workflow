@@ -49,9 +49,13 @@ The focus picker pairs stickies with sessions: **🗒️ Start + sticky note** (
 
 ### Live window
 
-A sticky is a snapshot. It never redraws, so anything written to the task after it opened - a journal answer, an entry, a refreshed note - stays invisible until the sticky is closed and opened again. ⌥ on the same **🗒️ Sticky note** row opens TickTick's own floating task window instead: the same task, live, and it can be typed in.
+A sticky is a snapshot. It never redraws, so anything written to the task after it opened - a journal answer, an entry, a refreshed note - stays invisible until the sticky is closed and opened again. TickTick's own floating task window is the same task, LIVE, and it can be typed in.
 
-The trade is which one stays in front. A sticky floats over every other app; a task window is an ordinary window and sinks behind whatever you switch to. So: sticky to keep something on screen while you work elsewhere, window to watch a note while the workflow writes to it.
+**⌃⌥⏎** on any task or note row opens it, and ⌘ Actions carries it as **🪟 Floating window**. In the `pn` scope the same chord opens that period's note.
+
+Two things to know. **It only opens from a kanban list** - the window is what a double click on a kanban card opens, and on a list-view list that same gesture starts an inline rename instead, so the workflow refuses and says which list is in list view. And **a sticky stays in front while a window does not**: a sticky floats over every other app, a task window is an ordinary window and sinks behind whatever you switch to. So: sticky to keep something on screen while you work elsewhere, window to watch a note while the workflow writes to it.
+
+Every routine puts its task and its period note in floating windows rather than stickies, on the spots the stickies used.
 
 ## Save a URL
 

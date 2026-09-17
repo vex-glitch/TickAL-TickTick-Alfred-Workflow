@@ -6880,6 +6880,8 @@ def _routine_step(step, wf, log):
             env = dict(os.environ)
             if step.get("sticky"):
                 env["TICKAL_STICKY_FRAME"] = ",".join(str(int(v)) for v in step["sticky"])
+            if step.get("window"):
+                env["TICKAL_WIN_FRAME"] = ",".join(str(int(v)) for v in step["window"])
             if step.get("bar"):
                 env["TICKAL_BAR_AT"] = ",".join(str(int(v)) for v in step["bar"])
             r = subprocess.run(
@@ -8240,7 +8242,12 @@ function run(argv) {
   // Same rule as _RAISE_MAIN: the window named "TickTick" wins, width
   // breaks the tie (a floating task window is a narrow panel).
   var SKIP = {AXRow:1, AXCell:1, AXStaticText:1, AXTextArea:1, AXWebArea:1, AXButton:1, AXImage:1, AXTextField:1};
-  var outlines = [], main = null, mainScore = -1;
+  // `boarded` = this outline hangs under an AXGroup, which is what a KANBAN
+  // column is: window > group (the board) > group (the column) > scroll >
+  // outline. A LIST view's outline hangs straight off the window through one
+  // scroll area, and so does the sidebar. That is the whole kanban test, and
+  // it needs no widths or magic numbers.
+  var outlines = [], boarded = [], main = null, mainScore = -1;
   each(ax(app, 'AXWindows'), function (w) {
     if (s(ax(w, 'AXSubrole')) !== 'AXStandardWindow') return;
     var szv = ax(w, 'AXSize');
@@ -8250,13 +8257,15 @@ function run(argv) {
     if (sc > mainScore) { mainScore = sc; main = w; }
   });
   if (main) {
-    (function collect(el, depth) {
+    (function collect(el, depth, grouped) {
       if (depth > 8) return;
       var r = s(ax(el, 'AXRole'));
-      if (r === 'AXOutline') { outlines.push(el); return; }
+      if (r === 'AXOutline') { outlines.push(el); boarded.push(grouped); return; }
       if (SKIP[r]) return;
-      each(ax(el, 'AXChildren'), function (c) { collect(c, depth + 1); });
-    })(main, 0);
+      each(ax(el, 'AXChildren'), function (c) {
+        collect(c, depth + 1, grouped || r === 'AXGroup');
+      });
+    })(main, 0, false);
   }
 
   // rightmost outline first (content panes sit right of the sidebar)
@@ -8266,7 +8275,9 @@ function run(argv) {
     var m = s($.CFCopyDescription(v)).match(/x:(-?[\\d.]+)/);
     return m ? parseFloat(m[1]) : -1000000;
   }
-  outlines.sort(function (a, b) { return xpos(b) - xpos(a); });
+  var order = [];
+  for (var i = 0; i < outlines.length; i++) order.push(i);
+  order.sort(function (a, b) { return xpos(outlines[b]) - xpos(outlines[a]); });
 
   function geom(el, name, rx) {
     var v = ax(el, name);
@@ -8275,7 +8286,8 @@ function run(argv) {
     return m ? [Math.round(parseFloat(m[1])), Math.round(parseFloat(m[2]))] : null;
   }
 
-  for (var oi = 0; oi < outlines.length; oi++) {
+  for (var k = 0; k < order.length; k++) {
+    var oi = order[k];
     var found = null, label = null;
     each(ax(outlines[oi], 'AXRows'), function (row) {
       if (found) return;
@@ -8302,8 +8314,13 @@ function run(argv) {
       // inline rename instead of the window.
       var lp = label ? geom(label, 'AXPosition', /x:(-?[\\d.]+)\\s+y:(-?[\\d.]+)/) : null;
       var lz = label ? geom(label, 'AXSize', /w:(-?[\\d.]+)\\s+h:(-?[\\d.]+)/) : null;
-      var tail = (lp && lz) ? ('|' + lp[0] + '|' + lp[1] + '|' + lz[0] + '|' + lz[1]) : '';
-      return 'FOUND|' + p[0] + '|' + p[1] + '|' + z[0] + '|' + z[1] + tail;
+      // Always nine fields + the kanban flag: callers older than the title
+      // frame read [1:5] and are untouched, and a missing label is zeros
+      // rather than a short line nobody can index into.
+      var tail = (lp && lz) ? (lp[0] + '|' + lp[1] + '|' + lz[0] + '|' + lz[1])
+                            : '0|0|0|0';
+      return 'FOUND|' + p[0] + '|' + p[1] + '|' + z[0] + '|' + z[1] + '|' + tail
+             + '|' + (boarded[oi] ? '1' : '0');
     }
   }
   return '';
@@ -8516,6 +8533,40 @@ tell application "System Events" to tell process "TickTick"
 end tell'''
 
 
+def _main_frame():
+    """(x, y, w, h) of TickTick's MAIN window, or None."""
+    r = subprocess.run(["osascript", "-e", '''
+tell application "System Events" to tell process "TickTick"
+  set ws to (windows whose subrole is "AXStandardWindow")
+  set bestI to 0
+  set bestScore to -1
+  repeat with i from 1 to count of ws
+    set sc to 0
+    try
+      set sz to size of (item i of ws)
+      set sc to item 1 of sz
+    end try
+    try
+      if (name of (item i of ws) as text) is "TickTick" then set sc to sc + 100000
+    end try
+    if sc > bestScore then
+      set bestScore to sc
+      set bestI to i
+    end if
+  end repeat
+  if bestI is 0 then return ""
+  set w to item bestI of ws
+  set p to position of w
+  set s to size of w
+  return "" & (item 1 of p) & " " & (item 2 of p) & " " & (item 1 of s) & " " & (item 2 of s)
+end tell'''], capture_output=True, text=True, check=False)
+    try:
+        x, y, w, h = (int(v) for v in (r.stdout or "").strip().split())
+        return (x, y, w, h)
+    except ValueError:
+        return None
+
+
 def _task_windows():
     """{title: (x, y, w, h)} of TickTick's floating task windows.
 
@@ -8573,8 +8624,15 @@ _WIN_SHOW = '''on run argv
           if (count of v) is 5 then
             set px to (item 2 of v) as integer
             set py to (item 3 of v) as integer
+            set pw to (item 4 of v) as integer
+            set ph to (item 5 of v) as integer
             set position of w to {px, py}
-            set size of w to {(item 4 of v) as integer, (item 5 of v) as integer}
+            set size of w to {pw, ph}
+            -- A window that just opened re-applies its REMEMBERED size a
+            -- moment later and eats the first one (the position survived,
+            -- the size did not - measured 2026-09-17). Place it twice.
+            delay 0.3
+            set size of w to {pw, ph}
             set position of w to {px, py}
           end if
           return "ok"
@@ -8672,29 +8730,78 @@ def _click_points(row, text=(0, 0, 0, 0), clicks=1):
     return out
 
 
-def _click_task_row(title, clicks=1):
-    """Find the row whose text contains `title` and land a REAL click on a
-    point of it that nothing of TickTick's floats over. True once clicked.
-    clicks=2 double-clicks it, which is how a task window is opened."""
-    out = _row_find(title[:60].strip())
+def _parse_row(out):
+    """A finder line → ((x, y, w, h), (title frame), card) or None.
+    card: True = a kanban card, False = a list row, None = the System-Events
+    fallback spoke, which says nothing about the view."""
     if not out.startswith("FOUND|"):
-        return False
+        return None
     parts = out.split("|")
     try:
-        x, y, w, h = (int(v) for v in parts[1:5])
+        row = tuple(int(v) for v in parts[1:5])
     except ValueError:
-        return False
+        return None
     try:
-        tx, ty, tw, th = (int(v) for v in parts[5:9])
+        text = tuple(int(v) for v in parts[5:9])
     except ValueError:
-        tx = ty = tw = th = 0          # older finder road: no title frame
-    frames = _float_frames()
-    for cx, cyy in _click_points((x, y, w, h), (tx, ty, tw, th), clicks):
-        if not any(fx <= cx <= fx + fw and fy <= cyy <= fy + fh
-                   for fx, fy, fw, fh in frames):
-            _cg_click(cx, cyy, clicks)
-            return True
-    return False   # the whole row is under stickies right now - let caller retry
+        text = (0, 0, 0, 0)
+    card = (parts[9] == "1") if len(parts) >= 10 else None
+    return row, text, card
+
+
+def _pick_point(points, frames, win=None):
+    """The first point that is safe to click, or None.
+
+    Two ways a point is not safe. It is COVERED by something of TickTick's
+    that floats (a sticky panel, a task window) - the click would go there
+    instead. Or it is OUTSIDE the main window: AX reports a scrolled-away
+    row at its true frame, which can be thousands of pixels off screen (the
+    sidebar's rows sit at y -3164 while the window ends at -10), and a click
+    there lands on whatever app is behind TickTick."""
+    for cx, cy in points:
+        if win and not (win[0] <= cx <= win[0] + win[2]
+                        and win[1] <= cy <= win[1] + win[3]):
+            continue
+        if any(fx <= cx <= fx + fw and fy <= cy <= fy + fh
+               for fx, fy, fw, fh in frames):
+            continue
+        return (cx, cy)
+    return None
+
+
+def _aim_click(row, text, clicks):
+    """Click the first safe point of the row. True once clicked."""
+    pt = _pick_point(_click_points(row, text, clicks), _float_frames(),
+                     _main_frame())
+    if pt is None:
+        return False   # covered or scrolled away right now - caller retries
+    _cg_click(pt[0], pt[1], clicks)
+    return True
+
+
+def _click_task_row(title, clicks=1):
+    """Find the row whose text contains `title` and land a REAL click on it.
+    True once clicked."""
+    got = _parse_row(_row_find(title[:60].strip()))
+    return bool(got) and _aim_click(got[0], got[1], clicks)
+
+
+def _dbl_card(title):
+    """Double click the task's KANBAN CARD: 'ok', 'list' or 'miss'.
+
+    The card is the only place a double click opens a window. On a list-view
+    list the same gesture opens an INLINE RENAME (Vex 2026-09-17: "it only
+    enters edit mode when double clicked on list that is set to list not
+    kanban view"), and half his lists are list view, so this refuses rather
+    than types into his tasks. The unknown case (the System-Events fallback,
+    which cannot see the view) counts as a refusal for the same reason."""
+    got = _parse_row(_row_find(title[:60].strip()))
+    if not got:
+        return "miss"
+    row, text, card = got
+    if card is not True:
+        return "list"
+    return "ok" if _aim_click(row, text, 2) else "miss"
 
 
 def _select_task(pid, tid):
@@ -9086,24 +9193,26 @@ def task_window(pid, tid):
         return True
 
     def _aim(settle):
+        """→ (window name, None) | (None, 'list'|'miss')."""
         # The board has to be in FRONT: a click into an inactive window is
         # spent activating it, and the second half of the pair then reads
         # as a lone click (proved on the first live run - same point, same
         # code, nothing opened until the main window was raised first).
         _raise_main_window()
         time.sleep(settle)
-        if not _click_task_row(title, clicks=2):
-            return None
+        how = _dbl_card(title)
+        if how != "ok":
+            return None, how
         for _ in range(10):                      # up to 2.5 s
             time.sleep(0.25)
             got = _win_match(title, _task_windows())
             if got:
-                return got
+                return got, None
         _esc()            # a double click that opened nothing may be editing
-        return None
+        return None, "miss"
 
-    got = _aim(0.3)                              # fast path: already on screen
-    if not got:
+    got, why = _aim(0.3)                         # fast path: already on screen
+    if not got and why != "list":
         before = _sticky_count()
         subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{tid}"],
                        check=False)
@@ -9124,11 +9233,20 @@ def task_window(pid, tid):
         if n > before >= 0:
             _esc()                               # the link's own detail pop-up
             time.sleep(0.4)
-        got = _aim(0.4) or _aim(0.8)
+        got, why = _aim(0.4)
+        if not got and why != "list":
+            got, why = _aim(0.8)
     if got:
         _win_show(got, frame)
         print(f"🪟 Window opened: {short}")
         return True
+    if why == "list":
+        # Naming the list is worth the cache lookup: the fix is one setting
+        # in THAT list, and half of his are in list view.
+        where = (_list_name_of(pid) or "").strip()
+        where = f" · {where[:24]} is in list view" if where else ""
+        print(f"🪟 No window{where} · a window only opens from kanban")
+        return False
     print(f"🪟 No window · couldn't find “{short}” on screen")
     return False
 
