@@ -271,6 +271,53 @@ def _day_links(p, index):
     return pm.day_link_lines(p, lambda q: _note_url(lookup(index, q)))
 
 
+def _week_goals_of(wdoc):
+    """(this week's OWN goal lines, the section that holds them).
+
+    Since 2026-09-17 a weekly note's 🏆 Goals holds one bullet per tier -
+    🌓 Quarterly and 🗓️ Monthly are mirrors of their own notes and ♻️ Weekly
+    is the week's own. Only the last one may travel into the daily note or
+    into "did you achieve your weekly goals?".
+
+    Which shape a note is in is decided by the two MIRROR bullets, never by
+    whether ♻️ Weekly resolves: deleting a bullet is the documented kill
+    switch, and falling back to the whole section there would push the
+    quarter's and the month's goals into the daily.
+    """
+    tiered = any(ps.find(wdoc, a, pm.SEC_GOALS) is not None
+                 for a in (pm.SEC_WK_QTR, pm.SEC_WK_MONTH))
+    sec = (ps.find(wdoc, pm.SEC_WK_WEEK, pm.SEC_GOALS) if tiered
+           else ps.find(wdoc, pm.SEC_GOALS))
+    return [ln for ln in (sec.body if sec else []) if ln.strip()], sec
+
+
+def _week_goal_home(doc):
+    """Where a NEW weekly goal is appended: the ♻️ Weekly bullet, or the whole
+    🏆 Goals section in a note minted before the tiered layout."""
+    return (pm.SEC_WK_WEEK
+            if ps.find(doc, pm.SEC_WK_WEEK, pm.SEC_GOALS) is not None
+            else pm.SEC_GOALS)
+
+
+def _mirror_goal(doc, anchor, kind, index, day, hint):
+    """Copy a parent period's goals into `anchor`, or reset it to its pointer
+    line when that parent has none - the 🗓️ Weekly mirror's rule: never keep
+    a stale copy. The source is pm.GOAL_SECTION[kind], so it follows the tier
+    wherever its goal setter writes. Silent when the anchor or the parent
+    note is missing (kill switch / bootstrap window)."""
+    if ps.find(doc, anchor, pm.SEC_GOALS) is None:
+        return
+    par = lookup(index, pm.period_for(kind, day))
+    if not par:
+        return
+    sec = ps.find(ps.parse_sections(par.get("content") or ""),
+                  pm.GOAL_SECTION[kind])
+    lines = [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])]
+    if not lines:                  # a bare "- [ ]" or an _(hint)_ is not a goal
+        lines = []
+    ps.set_body(doc, anchor, lines or [pm.T1 + hint], within=pm.SEC_GOALS)
+
+
 def _compose_lead(doc, p, index, refetch):
     """The lead is ENGINE-OWNED (hand-tuned layout): crumb / nav / ---,
     on weeklies the week's seven day links + a closing ---, and on dailies
@@ -722,6 +769,11 @@ def refresh_period(p, index=None, force=False):
                           refetch=(p.kind == "daily" and p.start == today))
         else:
             pm.set_breadcrumb(doc, _crumb(p, index))
+            # a sealed week's day links heal like the crumb above them, but
+            # only where the block already is: inserting one would RESHAPE a
+            # frozen note, and that is the opt-in tool's job, not a refresh's
+            if any(pm.DAY_LINK_RE.match(l) for l in doc.lead):
+                pm.set_day_links(doc, _day_links(p, index))
         # divider hygiene (--- hugs content - no blank lines around
         # separators): decor pre-lines lose stray blanks, and a body followed
         # by decor loses its trailing blanks
@@ -1025,8 +1077,7 @@ def _fill_daily(doc, p, index, is_today):
     wk = lookup(index, pm.period_for("weekly", day))
     if wk:
         wdoc = ps.parse_sections(wk.get("content") or "")
-        gsec = ps.find(wdoc, pm.SEC_GOALS)
-        goals = [ln for ln in (gsec.body if gsec else []) if ln.strip()]
+        goals, gsec = _week_goals_of(wdoc)
         if goals:
             ps.set_body(doc, pm.SEC_WEEK_GOALS, goals)
         elif gsec is not None:
@@ -1296,6 +1347,15 @@ def _fill_weekly(doc, p, index):
              f"alone (tools/pnrepair/relayout_weekly.py rebuilds it)")
         return
 
+    # ── 🏆 Goals - the two parents mirrored in (Vex 2026-09-17: "under goals
+    # … quarter goal, month goal and week goal", the daily's shape one tier
+    # up). ♻️ Weekly is HIS - nothing here ever writes it. The month/quarter
+    # of a week is its MONDAY's, the breadcrumb's own convention.
+    _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, p.start,
+                 pm.HINT_WK_QTR)
+    _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, p.start,
+                 pm.HINT_WK_MONTH)
+
     t2 = _tier2()
     prev = pm.prev_period(p)
     day_sums = _day_sums(index)
@@ -1431,8 +1491,7 @@ def _fill_weekly(doc, p, index):
     _fill_people(doc, t2, days=14, within=_in(pm.SEC_PEOPLE))
 
     # ── 📔 Weekly journal - seed + dynamic-goal prompt refresh
-    gsec = ps.find(doc, pm.SEC_GOALS)
-    goals = "; ".join(pm.goal_titles(gsec.body)[:5]) if gsec else ""
+    goals = "; ".join(pm.goal_titles(_week_goals_of(doc)[0])[:5])
     _seed_slot(doc, pm.SEC_WEEKLY_JNL, "weekly", p.start, {"goals": goals})
 
     # ── ♻️ Weekly Review mirror (sweep already completed ticked ones)
@@ -1970,6 +2029,9 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
     indent = pm.T1
 
     def mutate(doc, live):
+        nonlocal sec_name
+        if kind == "weekly":             # bullet on a tiered note, section on
+            sec_name = _week_goal_home(doc)      # one minted before it
         if ps.find(doc, sec_name) is None:
             return False
         if kind == "daily":
@@ -2018,8 +2080,7 @@ def _mirror_week_goals(wdoc):
     dtask = lookup(build_index(), pm.period_for("daily", _today()))
     if not dtask:
         return
-    gsec = ps.find(wdoc, pm.SEC_GOALS)
-    goals = [ln for ln in (gsec.body if gsec else []) if ln.strip()]
+    goals, _gsec = _week_goals_of(wdoc)
 
     def mirror(doc, live):
         if goals:
@@ -2230,8 +2291,7 @@ def journal_ctx(slot, doc):
         gsec = ps.find(doc, pm.SEC_DAY_GOAL)
         ctx["goal"] = pm.day_goal_title(gsec.body) if gsec else ""
     elif slot == "weekly":
-        gsec = ps.find(doc, pm.SEC_GOALS)
-        ctx["goals"] = "; ".join(pm.goal_titles(gsec.body)[:5]) if gsec else ""
+        ctx["goals"] = "; ".join(pm.goal_titles(_week_goals_of(doc)[0])[:5])
     return ctx
 
 
@@ -2342,7 +2402,7 @@ def set_goal(pid_or_text, tid=None, title=None, week="current"):
         line = f"{pm.T1}- [ ] {pid_or_text}"
 
     def mutate(doc, live):
-        return ps.append_body(doc, pm.SEC_GOALS, [line])
+        return ps.append_body(doc, _week_goal_home(doc), [line])
     ok, wdoc_out = _pn_rmw(wpid, wtask.get("id"), mutate)
     if not ok:
         return "💫 No 🎯 Goals section in the weekly note"
@@ -2352,8 +2412,7 @@ def set_goal(pid_or_text, tid=None, title=None, week="current"):
     # re-mirror today's daily from the fresh weekly body
     dtask = lookup(build_index(), pm.period_for("daily", _today()))
     if dtask:
-        gsec = ps.find(wdoc_out, pm.SEC_GOALS)
-        goals = [ln for ln in (gsec.body if gsec else []) if ln.strip()]
+        goals, _gsec = _week_goals_of(wdoc_out)
 
         def mirror(doc, live):
             if goals:

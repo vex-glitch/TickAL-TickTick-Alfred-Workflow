@@ -57,6 +57,17 @@ SEC_MONEY      = "💰 Money"
 # each holding a run of bullets, the emoji dropped off the numbers he reads
 # at a glance and kept on the things he reads one at a time.
 SEC_GOALS      = "🏆 Goals"
+# …holding one bullet per tier since 2026-09-17 (Vex: "we need under goals to
+# have same kind of thing as in daily … quarter goal, month goal and week
+# goal"). The two parents are MIRRORS of their own notes, the same way the
+# daily mirrors this note's ♻️ Weekly; only the last one is written here.
+# Emoji are Vex's own tier set (periodic_rows._OPEN_ROWS), which is why the
+# week reads ♻️ here and 🗓️ in the daily note - his older choice, kept.
+SEC_WK_QTR     = "🌓 Quarterly"            # mirror of the quarter's goals
+SEC_WK_MONTH   = "🗓️ Monthly"             # mirror of the month's goals
+SEC_WK_WEEK    = "♻️ Weekly"              # THIS week's own goals
+HINT_WK_QTR    = "- _(mirrors this quarter's note - set it there)_"
+HINT_WK_MONTH  = "- _(mirrors this month's note - set it there)_"
 # ✨ Highlight is in BOTH the weekly (the week's, set by the row or the weekly
 # journal) and the daily (the day's, asked at shutdown) - same name, different
 # notes. SEC_HL_WEEK is the weekly's by-day roll-up of the daily ones, and its
@@ -109,7 +120,7 @@ SEC_DECEMBER   = "🧪 December test"
 # them, so appending is safe and nothing can overwrite a goal.
 GOAL_SECTION = {
     "daily":     SEC_DAY_GOAL,      # the One Thing - REPLACES the body
-    "weekly":    SEC_GOALS,
+    "weekly":    SEC_WK_WEEK,       # the bullet, not the whole section
     "monthly":   SEC_MONTH_GOAL,
     "quarterly": SEC_OKR_REVIEW,
     "yearly":    SEC_SCORECARD,
@@ -149,7 +160,8 @@ WRITER_ANCHORS = {
                   SEC_YESTERDAY, SEC_YBRIDGE, SEC_HIGHLIGHT, SEC_TODAY,
                   SEC_TOMORROW, SEC_MORNING, SEC_NOTES, SEC_EVENING,
                   SEC_DAY_SUM, SEC_OTD],
-    "weekly":    [SEC_GOALS, SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
+    "weekly":    [SEC_GOALS, SEC_WK_QTR, SEC_WK_MONTH, SEC_WK_WEEK,
+                  SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK,
                   SEC_WEEKLY_JNL, SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME,
@@ -167,6 +179,7 @@ WRITER_ANCHORS = {
 # missing from here is searched document-wide, as it always was.
 SECTION_SCOPE = {
     "weekly": {
+        SEC_WK_QTR: SEC_GOALS, SEC_WK_MONTH: SEC_GOALS, SEC_WK_WEEK: SEC_GOALS,
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_WBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
@@ -381,8 +394,11 @@ def set_breadcrumb(doc, line):
 # the first two into the live note himself, so the label shape is his:
 # "Mon, 14th Sep". Matches a bullet whether we wrote it or he did (the app
 # escapes brackets on a hand edit: `- \[Mon, 14th Sep\]\(url\)`).
+# The WHOLE label has to be there - day, ordinal AND month. "- Mon, 3 people
+# coming" is a line Vex could write in the lead, and a looser match would eat it.
 DAY_LINK_RE = re.compile(
-    r"^\s*[-*]\s+\\?\[?(?:" + "|".join(DAY_ABBR) + r"), \d{1,2}")
+    r"^\s*[-*]\s+\\?\[?(?:" + "|".join(DAY_ABBR) + r"), "
+    r"\d{1,2}(?:st|nd|rd|th) (?:" + "|".join(MONTH_ABBR[1:]) + r")\b")
 
 
 def day_link_label(d):
@@ -413,18 +429,20 @@ def set_day_links(doc, lines):
     if not lines:
         return False
     lead = doc.lead
-    a = next((i for i, l in enumerate(lead) if DAY_LINK_RE.match(l)), None)
-    if a is not None:
-        b = a
-        while b + 1 < len(lead) and DAY_LINK_RE.match(lead[b + 1]):
-            b += 1
-        if lead[a:b + 1] == list(lines):
-            return False
-        doc.lead = lead[:a] + list(lines) + lead[b + 1:]
-        return True
-    at = next((i + 1 for i, l in enumerate(lead) if l.strip() == "---"),
-              1 if lead else 0)
-    doc.lead = lead[:at] + list(lines) + ["---"] + lead[at:]
+    hits = [i for i, l in enumerate(lead) if DAY_LINK_RE.match(l)]
+    if hits:
+        # EVERY day bullet goes, not just the first unbroken run: a hand-typed
+        # list with a line in the middle of it would otherwise keep the tail
+        # and end up with the week in the note twice.
+        kept = [l for i, l in enumerate(lead) if i not in set(hits)]
+        out = kept[:hits[0]] + list(lines) + kept[hits[0]:]
+    else:
+        at = next((i + 1 for i, l in enumerate(lead)
+                   if l.strip().startswith("---")), 1 if lead else 0)
+        out = lead[:at] + list(lines) + ["---"] + lead[at:]
+    if out == lead:
+        return False
+    doc.lead = out
     return True
 
 
@@ -1630,7 +1648,11 @@ def goal_titles(body_lines):
         s = unescape_md(ln.strip())
         if not s or PENDING_RE.match(s) or PENDING_RE.match(s[2:] if s.startswith("- ") else s):
             continue
-        s = re.sub(r"^- \[[ xX]\] ", "", s)
+        # \s* not " ": the monthly template ships a BARE "- [ ]" and the
+        # anchored form left it as "[ ]", which then read as a goal - the
+        # weekly journal asked "did you achieve your goals, [ ]?" and the
+        # 🗓️ Monthly mirror copied an empty box in as if it were one.
+        s = re.sub(r"^- \[[ xX]\]\s*", "", s)
         s = s[2:] if s.startswith("- ") else s
         s = strip_md_links(s)
         if s:

@@ -3,6 +3,14 @@
 {{daylinks}}
 ---
 #### 🏆 Goals
+- 🌓 Quarterly
+	- _(mirrors this quarter's note - set it there)_
+
+- 🗓️ Monthly
+	- _(mirrors this month's note - set it there)_
+
+- ♻️ Weekly
+
 #### ✨ Highlight
 ---
 #### 📌 This Week

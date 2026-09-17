@@ -829,7 +829,10 @@ check("27.ordinals", pm.day_link_label(date(2026, 9, 1)) == "Tue, 1st Sep"
       and pm.day_link_label(date(2026, 9, 22)) == "Tue, 22nd Sep")
 check("27.a-week-across-two-months-names-both",
       pm.day_link_lines(pm.period_for("weekly", date(2026, 9, 30)),
-                        lambda q: None)[:2] == ["- Mon, 28th Sep", "- Tue, 29th Sep"])
+                        lambda q: None)
+      == ["- Mon, 28th Sep", "- Tue, 29th Sep", "- Wed, 30th Sep",
+          "- Thu, 1st Oct", "- Fri, 2nd Oct", "- Sat, 3rd Oct",
+          "- Sun, 4th Oct"])
 # every other tier gets nothing - a yearly period would render 365 bullets
 check("27.weekly-only", all(pm.day_link_lines(pm.period_for(k, date(2026, 9, 17)),
                                               lambda q: "U") == []
@@ -849,6 +852,21 @@ check("27.a-hand-typed-run-is-replaced-in-place",
 check("27.day-bullets-stay-out-of-the-fillers-way",
       ps.find(_d27b, "Mon, 14th Sep") is None
       and ps.find(_d27b, "🏆 Goals") is not None)
+# a line of Vex's that only LOOKS like a day bullet is not a day bullet
+check("27.a-prose-bullet-is-not-a-day",
+      not pm.DAY_LINK_RE.match("- Mon, 3 people coming")
+      and not pm.DAY_LINK_RE.match("- Mon, 14 Sep")
+      and bool(pm.DAY_LINK_RE.match("- Mon, 14th Sep"))
+      and bool(pm.DAY_LINK_RE.match("* [Mon, 14th Sep](u)")))
+# a run he broke with a line of his own: the week lands ONCE, his line stays
+_d27c = ps.parse_sections("◀ crumb ▶\n---\n- Mon, 14th Sep\n"
+                          "- remember the dentist\n- Tue, 15th Sep\n"
+                          "---\n#### 🏆 Goals\nmine\n")
+pm.set_day_links(_d27c, _dl)
+check("27.a-broken-run-is-not-left-behind",
+      sum(1 for l in _d27c.lead if pm.DAY_LINK_RE.match(l)) == 7
+      and "- remember the dentist" in _d27c.lead, _d27c.lead)
+
 # the shipped template mints the block with the note
 _tpl27 = open(os.path.join(ROOT, "src", "periodic_templates", "weekly.md"),
               encoding="utf-8").read()
