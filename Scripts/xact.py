@@ -8086,6 +8086,56 @@ def _hidden_hint():
             "sticky opened") if n >= HIDDEN_WARN else ""
 
 
+# The app's MAIN window, picked by IDENTITY rather than by AX position.
+#
+# It used to be `window 1 whose subrole is "AXStandardWindow"`, which was
+# right while the main window was the only standard one - stickies are
+# AXSystemDialog, so nothing else could match. It stopped being right the day
+# Vex started double-clicking kanban cards: a FLOATING task window is an
+# AXStandardWindow too, and AX order is not stacking order, so `window 1`
+# became whichever floating window AX listed first. The raise then handed the
+# keystroke to THAT window and TickTick stickied its task - the "it opens
+# random notes" bug (2026-09-17: he asked for the daily, watched the row get
+# clicked correctly, and got his floating monthly note, which was window 1).
+#
+# The main window is the one called "TickTick" - a floating window carries its
+# task's title - and, failing that, the widest, since a floating task window
+# is a narrow panel. Width breaks the tie so a task actually NAMED "TickTick"
+# (he has one, in the review checklist) cannot steal it.
+_RAISE_MAIN = """
+tell application "System Events" to tell process "TickTick"
+  set best to missing value
+  set bestScore to -1
+  repeat with w in (every window whose subrole is "AXStandardWindow")
+    try
+      set sz to size of w
+      set sc to item 1 of sz
+      try
+        if (name of w as text) is "TickTick" then set sc to sc + 100000
+      end try
+      if sc > bestScore then
+        set bestScore to sc
+        set best to w
+      end if
+    end try
+  end repeat
+  if best is not missing value then
+    perform action "AXRaise" of best
+    return name of best as text
+  end if
+  return ""
+end tell
+"""
+
+
+def _raise_main_window():
+    """Bring TickTick's MAIN window forward so a shortcut lands on it.
+    Returns that window's name (diagnostics), "" when none was found."""
+    r = subprocess.run(["osascript", "-e", _RAISE_MAIN],
+                       capture_output=True, text=True, check=False)
+    return r.stdout.strip()
+
+
 def _sticky_count():
     """Open sticky notes present as AXSystemDialog windows of TickTick."""
     r = subprocess.run(
@@ -8670,12 +8720,10 @@ def sticky(pid, tid, assist=True):
 
     def _fire_and_wait(settle, before):
         # An open sticky panel HOLDS key-window status - raise the main
-        # window so the keystroke reaches it (root-caused 2026-07-07).
-        subprocess.run(["osascript", "-e",
-                        'tell application "System Events" to tell process "TickTick" '
-                        'to perform action "AXRaise" of '
-                        '(window 1 whose subrole is "AXStandardWindow")'],
-                       capture_output=True, check=False)
+        # window so the keystroke reaches it (root-caused 2026-07-07), and
+        # raise the RIGHT one: see _RAISE_MAIN. A floating task window is an
+        # AXStandardWindow too, and raising one sent the shortcut there.
+        _raise_main_window()
         time.sleep(settle)
         err = tt_shortcut.fire("hotkey_id_open_as_sticky")
         if err:
