@@ -102,6 +102,9 @@ LEGACY_TODAY   = "✅ Today"
 SEC_MTH_QTR    = "🌓 Quarterly goal"       # mirror of the quarter's goals
 SEC_MTH_MONTH  = "🗓️ Monthly goal"        # THIS month's own
 SEC_MBARS      = "Weekly Completed"       # per-week bars (the daily's twin)
+SEC_MDATES     = "⏳ Dates"                # birthdays + countdowns this month
+SEC_LAST_MONTH = "⏪ Last month"
+SEC_MREVIEW    = "♻️ Monthly Review"
 SEC_MONTH_GOAL = "🎯 Month goal"          # what monthly notes called it before
 SEC_SPARKS     = "📊 Sparklines"
 SEC_TOP_WINS   = "🏆 Top wins"
@@ -141,6 +144,13 @@ GOAL_SECTION_ALT = {"monthly": [SEC_MONTH_GOAL]}
 
 def goal_section_names(kind):
     return [GOAL_SECTION[kind]] + GOAL_SECTION_ALT.get(kind, [])
+
+
+# A bullet that is nothing but an unticked box is the TEMPLATE's placeholder,
+# not a goal: setting one must consume it rather than land underneath it (Vex
+# 2026-09-17: "new row appeared with new checkbox while our existing checkbox
+# in a row below monthly goal stayed unused").
+EMPTY_BOX_RE = re.compile(r"^[-*]\s*\[[ xX]\]\s*$")
 
 
 def goal_line(text="", pid=None, tid=None, title=None):
@@ -186,7 +196,7 @@ WRITER_ANCHORS = {
                   SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
                   SEC_MBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
-                  SEC_PEOPLE],
+                  SEC_MDATES, SEC_PEOPLE, SEC_LAST_MONTH, SEC_MREVIEW],
     "quarterly": [SEC_MONEY],            # v3.0: template + money only
     "yearly":    [SEC_MONEY],
 }
@@ -217,6 +227,7 @@ SECTION_SCOPE = {
         SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
         SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
+        SEC_MDATES: SEC_WK_DATA,
     },
 }
 

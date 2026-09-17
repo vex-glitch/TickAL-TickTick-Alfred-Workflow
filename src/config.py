@@ -98,6 +98,16 @@ def get_weekly_review_id():
         return os.environ["weekly_review_id"]
     return load().get("weekly_review_id", "")
 
+def get_monthly_review_id():
+    """♻️ Monthly-review source: the list/task id the monthly note mirrors.
+    Same env-present-wins semantics as weekly_review_id - but there is no
+    Configure-panel field for it yet, so in practice it comes from
+    config.json (the Settings row is a canvas phase of its own)."""
+    if "monthly_review_id" in os.environ:
+        return os.environ["monthly_review_id"]
+    return load().get("monthly_review_id", "")
+
+
 def get_folders():
     """{groupId: folderName} - v2 auto-names (the folder_groups cache, filled
     at sync when an Attachment-Login token exists) overlaid by manual names

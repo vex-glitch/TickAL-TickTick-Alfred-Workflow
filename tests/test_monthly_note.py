@@ -244,5 +244,33 @@ check("the face follows the printed average",
       pm.mood_span_lines([("W1", 3.45)])[0].endswith("🙂 3.5"),
       pm.mood_span_lines([("W1", 3.45)]))
 
+# ── the template's empty checkbox is a SLOT, not a goal (Vex 2026-09-17:
+# "new row appeared with new checkbox while our existing checkbox … stayed
+# unused")
+gdoc = ps.parse_sections(pm.render_template(
+    pe._load_template("monthly"), {"breadcrumbs": "C", "weeklinks": "- x"}))
+ps.set_body(gdoc, pm.SEC_MTH_MONTH, ["\t- [ ]"], pm.SEC_GOALS)
+pe._goal_append(gdoc, pm.SEC_MTH_MONTH, "\t- [ ] Ship the quarterly")
+gb = ps.find(gdoc, pm.SEC_MTH_MONTH, pm.SEC_GOALS).body
+check("setting a goal eats the empty box", gb == ["\t- [ ] Ship the quarterly"], gb)
+pe._goal_append(gdoc, pm.SEC_MTH_MONTH, "\t- [ ] And the journal")
+gb = ps.find(gdoc, pm.SEC_MTH_MONTH, pm.SEC_GOALS).body
+check("a second goal lands beside the first, not on it", len(gb) == 2, gb)
+check("a ticked box is never eaten",
+      pm.EMPTY_BOX_RE.match("- [ ]") and pm.EMPTY_BOX_RE.match("- [x]")
+      and not pm.EMPTY_BOX_RE.match("- [ ] a real goal"))
+
+# ── the three sections this run added ───────────────────────────────────────
+tpl_m = pe._load_template("monthly")
+mdoc2 = ps.parse_sections(pm.render_template(
+    tpl_m, {"breadcrumbs": "C", "weeklinks": "- x"}))
+for a in (pm.SEC_MDATES, pm.SEC_LAST_MONTH, pm.SEC_MREVIEW):
+    check(f"template carries {a}",
+          ps.find(mdoc2, a, pm.scope_of("monthly", a)) is not None)
+check("the monthly review sweeps like the weekly's",
+      pm.SEC_MREVIEW in pe._SWEEP_SECTIONS["monthly"])
+check("its source is its own id, not the weekly's",
+      pe._fill_review.__code__.co_argcount == 3)
+
 print(f"monthly note: {P} passed, {F} failed")
 sys.exit(1 if F else 0)

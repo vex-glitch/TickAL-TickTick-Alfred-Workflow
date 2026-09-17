@@ -244,11 +244,12 @@ def _load_template(kind):
 # used to sit under it (⏪ Yesterday · 📅 Today · 🌄 Tomorrow, then 7️⃣ Next 7 ·
 # ✔️ Completed · 🔄 Habits, plus 👥 CRM / ♻️ Review) are gone; those deep links
 # still live, verified, in everything_search's VIEWS table.
-def _review_target():
-    """weekly_review_id → (https_url, kind, obj) | None. kind: 'list' when the
+def _review_target(rid=None):
+    """A review id → (https_url, kind, obj) | None. kind: 'list' when the
     id names a project, 'task' when it names a cached task (its subtasks are
-    the checklist), else None (unknown id = feature off, honest silence)."""
-    rid = (cfg.get_weekly_review_id() or "").strip()
+    the checklist), else None (unknown id = feature off, honest silence).
+    Defaults to the weekly's."""
+    rid = ((rid if rid is not None else cfg.get_weekly_review_id()) or "").strip()
     if not rid:
         return None
     for pr in (cache_store.get("projects") or []):
@@ -303,6 +304,20 @@ def _week_goals_of(wdoc):
     sec = (ps.find(wdoc, pm.SEC_WK_WEEK, pm.SEC_GOALS) if tiered
            else ps.find(wdoc, pm.SEC_GOALS))
     return [ln for ln in (sec.body if sec else []) if ln.strip()], sec
+
+
+def _goal_append(doc, sec_name, line):
+    """Append a goal, EATING the template's bare "- [ ]" placeholder if the
+    section still carries one. Vex 2026-09-17, on setting the month goal:
+    "new row appeared with new checkbox while our existing checkbox in a row
+    below monthly goal stayed unused"."""
+    sec = ps.find(doc, sec_name)
+    if sec is None:
+        return False
+    keep = [l for l in sec.body if not pm.EMPTY_BOX_RE.match(l.strip())]
+    if keep != list(sec.body):
+        sec.body = keep
+    return ps.append_body(doc, sec_name, [line])
 
 
 def _week_goal_home(doc):
@@ -728,7 +743,8 @@ def _complete_many(pairs):
 # Sweepable checkbox sections per tier (⏩ Tomorrow and the ♻️ review
 # mirror sweep exactly like ✅ Today - tick anywhere, real task completes).
 _SWEEP_SECTIONS = {"daily": (pm.SEC_TODAY, pm.SEC_TOMORROW),
-                   "weekly": (pm.SEC_REVIEW,)}
+                   "weekly": (pm.SEC_REVIEW,),
+                   "monthly": (pm.SEC_MREVIEW,)}
 
 
 def refresh_period(p, index=None, force=False):
@@ -1551,16 +1567,16 @@ def _fill_weekly(doc, p, index):
         ps.set_body(doc, pm.SEC_LAST_WEEK, lw)
 
 
-def _fill_review(doc):
+def _fill_review(doc, sec_name=None, rid=None):
     """♻️ Weekly Review - a LIVE mirror of the weekly_review_id source
     (focus-bar semantics, both directions). The sweep (step 0) completes
     ticked boxes; this rebuild then re-pulls the source, so note and source
     converge on every refresh. Check-states of still-open tasks survive via
     the tid map. Unset/unknown id or a failed pull → section untouched."""
-    sec = ps.find(doc, pm.SEC_REVIEW)
+    sec = ps.find(doc, sec_name or pm.SEC_REVIEW)
     if sec is None:
         return
-    tgt = _review_target()
+    tgt = _review_target(rid)
     if not tgt:
         return
     url, kind, obj = tgt
@@ -1599,7 +1615,7 @@ def _fill_review(doc):
         for t in sorted(kids, key=lambda x: x.get("sortOrder") or 0):
             lines.append(_box(t.get("projectId") or t.get("_projectId") or pid,
                               t.get("id"), t.get("title")))
-    ps.set_body(doc, pm.SEC_REVIEW, lines)
+    ps.set_body(doc, sec_name or pm.SEC_REVIEW, lines)
 
 
 def _week_stats_of(index, wp, drop_names=()):
@@ -1932,6 +1948,45 @@ def _fill_monthly(doc, p, index):
 
     # ── 👽 People
     _fill_people(doc, t2, days=31, within=_in(pm.SEC_PEOPLE))
+
+    # ── ⏳ Dates - the calendar half: every birthday and countdown LANDING in
+    # this month, by date. Past days count: a birthday on the 3rd is still
+    # what the month held (Vex 2026-09-17).
+    dl = getattr(t2, "dates_in_span", lambda a, b: None)(p.start, p.end) \
+        if t2 else None
+    if dl is not None:
+        ps.set_body(doc, pm.SEC_MDATES, pm.ind(dl), _in(pm.SEC_MDATES))
+
+    # ── ⏪ Last month - the weekly's sealed composite one tier up: the five
+    # headline numbers, then the same two rankings. Every one of them reads
+    # the PREVIOUS month's weeks, so a month with none of them left just
+    # keeps whatever is already written.
+    if _month_done(prev_data, prev) is not None:
+        lm = [f"- Completed: {_month_done(prev_data, prev)}",
+              f"- Created: {sum(st['created'] for st in rank_prev)}"]
+        pf = getattr(t2, "focus_minutes", lambda a, b: None)(prev.start,
+                                                             prev.end) \
+            if t2 else None
+        if pf:
+            lm.append(f"- Focus: {pm.fmt_hm(pf)}")
+        pmood = _mood_avg(index, prev.start, prev.end)
+        if pmood is not None:
+            lm.append(f"- Mood: {pmood:.1f} avg")
+        lm.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        top_tasks = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
+                                                          for st in rank_prev]))
+        top_lists = [f"{pm.T1}- 🗂 {nm} · {c}" for nm, c in pm.top_n(
+            pm.merge_counts(*[st["by_proj"] for st in rank_prev]))]
+        if top_tasks or top_lists:
+            lm.append("")
+        if top_tasks:
+            lm += ["- Top Tasks:"] + top_tasks
+        if top_lists:
+            lm += ["- Top Lists"] + top_lists
+        ps.set_body(doc, pm.SEC_LAST_MONTH, lm)
+
+    # ── ♻️ Monthly Review - the weekly's mirror, its own source
+    _fill_review(doc, pm.SEC_MREVIEW, cfg.get_monthly_review_id())
 
 
 def _fill_rollup_money(doc, p, index):
@@ -2408,7 +2463,7 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
                     indent=pm.T2)
                 ps.set_body(doc, pm.SEC_TODAY, merged)
             return True
-        return ps.append_body(doc, sec_name, [indent + line])
+        return _goal_append(doc, sec_name, indent + line)
 
     ok, doc_out = _pn_rmw(npid, task.get("id"), mutate)
     if not ok:
@@ -2766,7 +2821,7 @@ def set_goal(pid_or_text, tid=None, title=None, week="current"):
         line = f"{pm.T1}- [ ] {pid_or_text}"
 
     def mutate(doc, live):
-        return ps.append_body(doc, _week_goal_home(doc), [line])
+        return _goal_append(doc, _week_goal_home(doc), line)
     ok, wdoc_out = _pn_rmw(wpid, wtask.get("id"), mutate)
     if not ok:
         return "💫 No 🎯 Goals section in the weekly note"

@@ -455,6 +455,51 @@ def _next_occurrence(cd, today):
     return -delta, " since"
 
 
+def dates_in_span(d0, d1):
+    """'- 🎂 Kira · Thu 3rd Sep' for every countdown LANDING inside [d0, d1],
+    by date, earliest first - the calendar half of a monthly note (Vex
+    2026-09-17). Past days in the span count: a birthday on the 3rd is still
+    what the month held, which is why this walks the occurrence rather than
+    asking _next_occurrence how far away it is. None on reader failure."""
+    import periodic_model as pm
+    j = _v2_get("countdown/list")
+    if not isinstance(j, dict):
+        return None
+    today = date.today()
+    rows = []
+    for cd in j.get("countdowns") or []:
+        if cd.get("status") != 0 or cd.get("archivedTime"):
+            continue
+        target = _cd_date(cd.get("date") or 0)
+        if not target:
+            continue
+        rule = cd.get("repeatFlag") or ""
+        hits = []
+        if "FREQ=YEARLY" in rule or cd.get("ignoreYear"):
+            for y in {d0.year, d1.year}:          # a span can cross New Year
+                try:
+                    hits.append(target.replace(year=y))
+                except ValueError:                 # 29 Feb in a common year
+                    hits.append(date(y, target.month, 28))
+        elif "FREQ=MONTHLY" in rule:
+            d = d0
+            while d <= d1:
+                if d.day == target.day:
+                    hits.append(d)
+                d += timedelta(days=1)
+        elif rule:
+            continue            # weekly and friends are not calendar dates
+        else:
+            hits.append(target)
+        for h in {x for x in hits if d0 <= x <= d1}:
+            glyph = "🎂" if cd.get("type") == 2 else "⏳"
+            when = (f"{pm.DAY_ABBR[h.weekday()]} {pm._ord(h.day)} "
+                    f"{pm.MONTH_ABBR[h.month]}")
+            tail = " · today 🎉" if h == today else ""
+            rows.append((h, f"- {glyph} {cd.get('name', '?')} · {when}{tail}"))
+    return [line for _d, line in sorted(rows)]
+
+
 def countdown_lines():
     """'- Name · 23d' soonest-first (cap 4, Vex 2026-09-12 - they were never
     random, just six deep); '· today' at zero. None on reader failure."""
