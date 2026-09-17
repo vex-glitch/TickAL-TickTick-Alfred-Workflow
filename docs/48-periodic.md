@@ -50,7 +50,7 @@ Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and sectio
 | ☀️ Add to today / 🌙 Add to tomorrow | pick any task or note → ⏎ schedules it (type `14:30` for a time) |
 | 🌅 / 🌙 / 📔 Journal | morning, evening, weekly - one macOS dialog per question |
 | 🎯 Weekly goal | pick a task (or type a plain goal) |
-| 🗓️ Week highlight | one thing that stands out - it becomes the weekly journal's highlight answer (and the ✨ Highlight section too, on a note that still has one) |
+| 🗓️ Week highlight | one thing that stands out - lands in the weekly note's ✨ Highlight (and in the weekly journal's highlight answer when the section is gone) |
 | 🔄 Refresh today | complete ticked boxes + rebuild the generated sections |
 
 Entry kinds, each with a one-letter prefix: 🟢 `w` win · 🔴 `n` nag · 💭 `t` thought (also the default - plain text works) · ❗️ `r` reminder · 🔗 `l` link (empty = clipboard) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · ⭐️ `h` highlight · 💰 `$` money. ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
@@ -87,7 +87,7 @@ Without `periodic_list_id`, every one of these shows a setup pointer instead. Op
 
 ![A daily note in TickTick](assets/shots/19-periodic-note.png)
 
-The head of the note (breadcrumbs, nav links, weather, the quote, your `Mood:` and `Day: ★★★` lines) is composed for you above the first section. Then, grouped under `#` headers with dividers: **🏆 Goals** (🗓️ Weekly mirror + ☀️ Daily one-thing) → **☀️ Today** (✅ Tasks - every task scheduled today as a checkbox link → 📓 Notes → 🔄 Habits → ⏳ Countdowns → 💰 Money) → **🔎 Summaries** (📊 Today → ⏪ Yesterday, the full list of what you completed → ⏩ Tomorrow) → 🌅 / 🌙 journals.
+The head of the note (breadcrumbs, nav links, weather, the quote, your `Mood:` and `Day: ★★★` lines) is composed for you above the first section. Then, grouped under `#` headers with dividers: **🌉 Yesterday's bridge** → **✨ Highlight** (the one thing the day is remembered for, asked at shutdown) → **🏆 Goals** (🗓️ Weekly mirror + ☀️ Daily one-thing) → **☀️ Today** (✅ Tasks - every task scheduled today as a checkbox link → 📓 Notes → 🔄 Habits → ⏳ Countdowns → 💰 Money) → **🔎 Summaries** (📊 Today → ⏪ Yesterday, the full list of what you completed → ⏩ Tomorrow) → 🌅 / 🌙 journals.
 
 **Tick a box in ✅ Tasks or ⏩ Tomorrow - in the app, on your phone, anywhere - and the next refresh completes the real task.** Refresh happens when you open the note through `pn`, when the agent runs, or on the 🔄 row; TickTick can't run code when a note opens, so a note opened via breadcrumbs shows its last-refreshed state.
 
@@ -96,7 +96,7 @@ The head of the note (breadcrumbs, nav links, weather, the quote, your `Mood:` a
 All three journals seed their questions into the note at mint, so you can answer from any device by typing after `A:`. Running them from Alfred asks each **unanswered** question in a dialog - ⏎ saves and advances, empty ⏎ skips, Cancel stops and keeps what you answered. Phone answers are never overwritten.
 
 - **Morning** (3 fixed + 3 drawn from an editable pool, below): mood (1-5), what's on your mind, the one thing - then, if no day goal is set, the ☀️ picker opens by itself.
-- **Evening** (4 fixed + 5 drawn): on your mind, *did you achieve your daily goal - {your goal}?*, money earned (auto-logs to 💰), rate the day (★ lands next to the quote).
+- **Evening** (6 fixed + 5 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, on your mind, *did you achieve your daily goal - {your goal}?*, money earned, rate the day (★ lands next to the quote).
 - **Weekly** (2 fixed + 5 drawn): the week's highlight (the answer IS the record, and 🕰️ On this day reads it back years later), *did you achieve your weekly goals?* - then a picker asks for **three things that would make next week a success**, written into next week's 🎯 Goals.
 
 Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
@@ -109,11 +109,11 @@ Log from the `pn` bar (`tpn`, or `tse pn`): type `$ 485 tattoo` → the daily ga
 
 Minted Sunday for the week ahead - and opening it midweek mints it on the spot, like every note. Top to bottom:
 
-- **🏆 Goals** - yours to write.
+- **🏆 Goals** → **✨ Highlight** - yours to write (the 🗓️ Week highlight row and the weekly journal both land in ✨).
 - **📌 This Week → 📊 Stats** - the numbers, each on its own bullet, most of them carrying the figure in the bullet itself with a vs-last-week chip in the daily note's arrow language (`- Completed: 78 · 🔴 ▼ 309 (−80%)`): Top lists · Top tasks · Created · Completed · Daily Completed (per-day bars) · Focus (by day, with the day's top task) · Habit consistency.
   - **Top lists** and **Top tasks** are the three busiest lists and the three most-completed tasks, and both skip your routines list - a thing you do seven days a week is not news. The headline counts still count everything, so they stay comparable with the weeks already written.
   - **Habit consistency** measures each habit against its OWN week: a once-a-week habit reads `0/1`, not `0/7`, and a habit with nothing due this week is not listed.
-- **📌 This Week → 💿 Data** - 📨 Entries (every win/nag/thought/link, grouped, newest first) · 😊 Moods (the average, with last week, in the bullet; the day's note underneath it) · 💰 Income (day lines) · 👽 People.
+- **📌 This Week → 💿 Data** - ✨ Highlights (each day's, newest first) · 📨 Entries (every win/nag/thought/link, grouped, newest first) · 😊 Moods (the average, with last week, in the bullet; the day's note underneath it) · 💰 Income (day lines) · 👽 People.
 - **⏪ Last week** - the five headline numbers, then the same two rankings.
 - **📔 Weekly journal**.
 - **♻️ Weekly Review** - a live mirror of your review list, sections preserved, both directions: tick in the note and the real task completes; the source re-mirrors on every refresh.

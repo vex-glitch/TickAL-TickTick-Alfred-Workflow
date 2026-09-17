@@ -183,10 +183,20 @@ check("14.fixed-morning-bridge",
       [k for k, _q in fixed_mb] == ["mood", "ybridge", "gcheck", "free"]
       and "Ship the bridge" in fixed_mb[1][1])
 fixed_e = pm.journal_fixed("evening", {"goal": "Ship the thing"})
-check("14.fixed-evening",                     # bridge FIRST (Vex 2026-09-12)
-      [k for k, _q in fixed_e] == ["bridge", "tgoal", "free", "goal", "money",
-                                   "rating"]
-      and "Ship the thing" in fixed_e[3][1], [k for k, _q in fixed_e])
+check("14.fixed-evening",                     # bridge FIRST (Vex 2026-09-12),
+      # then ✨ the day's highlight (Vex 2026-09-17: "logged on shutdown …
+      # after bridge"), ahead of tgoal because tgoal hands off to the picker
+      [k for k, _q in fixed_e] == ["bridge", "dhighlight", "tgoal", "free",
+                                   "goal", "money", "rating"]
+      and "Ship the thing" in fixed_e[4][1], [k for k, _q in fixed_e])
+check("14.the-two-highlights-never-cross",
+      # the day's and the week's are different answers in different notes
+      pm.journal_key("✨ What was the highlight of the day? Think of one "
+                     "thing that stands out.") == "dhighlight"
+      and pm.journal_key("What was the highlight of the week? Think of one "
+                         "thing that stands out.") == "highlight",
+      (pm.journal_key("✨ What was the highlight of the day?"),
+       pm.journal_key("What was the highlight of the week?")))
 fixed_w = pm.journal_fixed("weekly", {"goals": "A; B"})
 check("14.fixed-weekly", [k for k, _q in fixed_w] == ["highlight", "wgoals"]
       and "A; B" in fixed_w[1][1])

@@ -57,7 +57,12 @@ SEC_MONEY      = "💰 Money"
 # each holding a run of bullets, the emoji dropped off the numbers he reads
 # at a glance and kept on the things he reads one at a time.
 SEC_GOALS      = "🏆 Goals"
-SEC_HIGHLIGHT  = "✨ Highlight"           # RETIRED from the template 2026-09-17
+# ✨ Highlight is in BOTH the weekly (the week's, set by the row or the weekly
+# journal) and the daily (the day's, asked at shutdown) - same name, different
+# notes. SEC_HL_WEEK is the weekly's by-day roll-up of the daily ones, and its
+# name is PLURAL so neither can ever resolve to the other.
+SEC_HIGHLIGHT  = "✨ Highlight"
+SEC_HL_WEEK    = "✨ Highlights"          # weekly 💿 Data, one line per day
 SEC_WK_STATS   = "📊 Stats"               # group: the week's numbers
 SEC_WK_DATA    = "💿 Data"                # group: the week's texture
 SEC_TOP_LIST   = "Top lists:"             # plain bullet, 3 lines of body
@@ -141,15 +146,14 @@ WRITER_ANCHORS = {
     # journal, that is all that should be there"). Older notes that still
     # carry a 💰 section are still read, they just are not seeded any more.
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
-                  SEC_YESTERDAY, SEC_YBRIDGE, SEC_TODAY, SEC_TOMORROW,
-                  SEC_MORNING, SEC_NOTES, SEC_EVENING, SEC_DAY_SUM, SEC_OTD],
-    # no SEC_HIGHLIGHT: Vex deleted ✨ Highlight from the layout on
-    # 2026-09-17. set_highlight() still writes it wherever the header
-    # survives - a deleted header is this system's off switch, not a bug.
-    "weekly":    [SEC_GOALS, SEC_TOP_LIST, SEC_TOP_TASKS,
+                  SEC_YESTERDAY, SEC_YBRIDGE, SEC_HIGHLIGHT, SEC_TODAY,
+                  SEC_TOMORROW, SEC_MORNING, SEC_NOTES, SEC_EVENING,
+                  SEC_DAY_SUM, SEC_OTD],
+    "weekly":    [SEC_GOALS, SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
-                  SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK, SEC_WEEKLY_JNL,
-                  SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME, SEC_PEOPLE],
+                  SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK,
+                  SEC_WEEKLY_JNL, SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME,
+                  SEC_PEOPLE],
     "monthly":   [SEC_STATS, SEC_SPARKS, SEC_TOP_WINS, SEC_MONEY,
                   SEC_PEOPLE],
     "quarterly": [SEC_MONEY],            # v3.0: template + money only
@@ -167,6 +171,7 @@ SECTION_SCOPE = {
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_WBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
         SEC_HABIT_WEEK: SEC_WK_STATS,
+        SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
         SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
     },
@@ -1230,6 +1235,13 @@ def journal_fixed(slot, ctx=None):
         return [
             ("bridge", "🌉 Daily bridge - what should tomorrow-you know? "
                        "(saves to the Bridges board + tomorrow's note)"),
+            # ✨ right after the bridge (Vex 2026-09-17: "logged on shutdown …
+            # somewhere at the beggining, after bridge or whatever"). BEFORE
+            # the goal question on purpose: tgoal hands off to the Alfred goal
+            # picker, which stops the dialog run, so anything behind it is
+            # answered in a second sitting.
+            ("dhighlight", "✨ What was the highlight of the day? "
+                           "Think of one thing that stands out."),
             ("tgoal", "🎯 What is the goal for tomorrow? The one thing that, "
                       "if done, makes the day a success?"),
             ("free", "What is on your mind?"),
@@ -1265,6 +1277,9 @@ JOURNAL_KEY_RULES = (
     ("goal", re.compile(r"^Did you achieve your daily goal\b")),
     ("money", re.compile(r"^How much money did you earn today\?")),
     ("rating", re.compile(r"^Rate the day\b")),
+    # the day's and the week's highlights are DIFFERENT answers in different
+    # notes, so their rules must not be able to match each other's question
+    ("dhighlight", re.compile(r"^✨ What was the highlight of the day\?")),
     ("highlight", re.compile(r"^What was the highlight of the week\?")),
     ("wgoals", re.compile(r"^Did you achieve your weekly goals\b")),
 )

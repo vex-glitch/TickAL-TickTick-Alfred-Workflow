@@ -1,6 +1,7 @@
 {{breadcrumbs}}
 ---
 #### 🏆 Goals
+#### ✨ Highlight
 #### 📌 This Week
 ##### 📊 Stats
 - Top lists:
@@ -18,6 +19,8 @@
 - Habit consistency
 ---
 ##### 💿 Data
+- ✨ Highlights
+
 - 📨 Entries
 
 - 😊 Moods

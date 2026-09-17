@@ -47,8 +47,9 @@ def check(name, cond, detail=""):
 
 # ── 1. the fixed heads ────────────────────────────────────────────────────────
 ev = pm.journal_fixed("evening", {"goal": "Ship it"})
-check("evening order: bridge, tomorrow's goal, mind, review, money, rating",
-      [k for k, _ in ev] == ["bridge", "tgoal", "free", "goal", "money", "rating"], ev)
+check("evening order: bridge, ✨ highlight, tomorrow's goal, mind, review, money, rating",
+      [k for k, _ in ev] == ["bridge", "dhighlight", "tgoal", "free", "goal",
+                             "money", "rating"], ev)
 mo = pm.journal_fixed("morning", {"ybridge": "Call Anna", "goal": "Ship it"})
 check("morning order: mood, bridge, goal check, mind",
       [k for k, _ in mo] == ["mood", "ybridge", "gcheck", "free"], mo)
@@ -98,9 +99,14 @@ OLD_EVENING = [
 ]
 body, added = pm.insert_fixed_questions(OLD_EVENING, pm.journal_fixed("evening", {}))
 pairs = pm.journal_pairs(body)
-check("the goal question is inserted once", added == ["tgoal"], added)
-check("right after the bridge", pm.journal_key(pairs[1][1]) == "tgoal", pairs[1])
-check("numbered 1..7 in order", [n for n, *_ in pairs] == list(range(1, 8)), [n for n, *_ in pairs])
+# ✨ the day's highlight joined the evening set on 2026-09-17, right behind
+# the bridge and AHEAD of tgoal (tgoal hands off to the picker and stops the run)
+check("the missing fixed questions are inserted once",
+      added == ["dhighlight", "tgoal"], added)
+check("right after the bridge, in order",
+      [pm.journal_key(pairs[i][1]) for i in (0, 1, 2)]
+      == ["bridge", "dhighlight", "tgoal"], [p[1] for p in pairs[:3]])
+check("numbered 1..8 in order", [n for n, *_ in pairs] == list(range(1, 9)), [n for n, *_ in pairs])
 by_q = {q: a for _n, q, a, _i in pairs}
 check("every answer stays under its own question",
       by_q[OLD_EVENING[0][len("\t- *Q1 · "):-1]] == "call the printer"
@@ -109,7 +115,8 @@ check("every answer stays under its own question",
 again, added2 = pm.insert_fixed_questions(body, pm.journal_fixed("evening", {}))
 check("a second run inserts nothing", added2 == [] and again == body)
 check("routing follows the wording after the insert",
-      pm.journal_keys(pairs) == {1: "bridge", 2: "tgoal", 3: "free", 4: "goal", 5: "money", 6: "rating", 7: "free"},
+      pm.journal_keys(pairs) == {1: "bridge", 2: "dhighlight", 3: "tgoal", 4: "free",
+                                 5: "goal", 6: "money", 7: "rating", 8: "free"},
       pm.journal_keys(pairs))
 
 # an old morning journal (mood, mind, the retired one-thing question)
@@ -129,7 +136,7 @@ MULTI = ["\t- *Q1 · 🌉 Daily bridge - what should tomorrow-you know? (x)*", "
          "\t\t- and the bank", "", "\t- *Q2 · What is on your mind?*", "\t\t- A: "]
 mbody, _ = pm.insert_fixed_questions(MULTI, pm.journal_fixed("evening", {}))
 check("the insert lands after the answer's continuation lines",
-      mbody[:3] == MULTI[:3] and "goal for tomorrow" in mbody[3], mbody)
+      mbody[:3] == MULTI[:3] and "highlight of the day" in mbody[3], mbody)
 
 # answers only land under the question they were asked for
 FRESH = pm.seed_journal_lines(["Mood 1-5 (x) ·", "🌉 Yesterday's bridge: b - what carries into today?",
@@ -387,10 +394,11 @@ def run(slot, pairs, answers=None, button="", goal=""):
 
 
 EV_PAIRS = pm.journal_pairs(pm.seed_journal_lines([q for _k, q in pm.journal_fixed("evening", {})] + ["Pool?"]))
-fake, saved = run("evening", EV_PAIRS, answers=["the bridge"])
-check("evening: the bridge is asked, then the run stops at tomorrow's goal",
-      len(calls["ask"]) == 1 and saved == [("evening", date(2026, 9, 15), "set")], (calls["ask"], saved))
-check("the bridge answer is saved before the picker opens", fake.merged == {1: "the bridge"}, fake.merged)
+fake, saved = run("evening", EV_PAIRS, answers=["the bridge", "the highlight"])
+check("evening: bridge and highlight are asked, then the run stops at tomorrow's goal",
+      len(calls["ask"]) == 2 and saved == [("evening", date(2026, 9, 15), "set")], (calls["ask"], saved))
+check("both answers are saved before the picker opens",
+      fake.merged == {1: "the bridge", 2: "the highlight"}, fake.merged)
 check("the picker opens on the journal goal screen", calls["trigger"] == [("Search", "pn goals journal ")], calls["trigger"])
 
 MO_PAIRS = pm.journal_pairs(pm.seed_journal_lines(
@@ -414,7 +422,7 @@ check("the goal check has a real Cancel button", not saved and not calls["trigge
 
 # a question skipped before the pause stays skipped after the pick reopens the run
 gh.take_skips("evening", date(2026, 9, 15))
-fake, saved = run("evening", EV_PAIRS, answers=[""])                 # skip the bridge
+fake, saved = run("evening", EV_PAIRS, answers=["", ""])             # skip bridge + highlight
 check("skipping the bridge still pauses at tomorrow's goal", saved and not fake.merged, (saved, fake.merged))
 for v in calls.values():
     v.clear()

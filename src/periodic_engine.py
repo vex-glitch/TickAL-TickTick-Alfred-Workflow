@@ -487,6 +487,19 @@ def _entries_between(index, d0, d1):
     return out
 
 
+def _highlights_between(index, d0, d1):
+    """[(date, text)] - each day's ✨ highlight, from its evening journal
+    answer, oldest day last. Vex 2026-09-17 wanted the week to carry them
+    "by day" above the entries."""
+    out = []
+    for d, t in _dailies_between(index, d0, d1):
+        doc = ps.parse_sections(t.get("content") or "")
+        hl = _answer_in(doc, pm.SEC_EVENING, "highlight of the day")
+        if hl and hl.strip():
+            out.append((d, mdtext.flatten_links(hl).strip()))
+    return out
+
+
 def _created_between(d0, d1):
     """Created-in-window tasks (approximation: open cache + completed batch,
     deduped by id)."""
@@ -971,6 +984,13 @@ def _fill_daily(doc, p, index, is_today):
     btxt = _bridge_text(day - timedelta(days=1))
     if btxt:
         ps.set_body(doc, pm.SEC_YBRIDGE, bridge_quote(btxt))
+    # ✨ Highlight - a MIRROR of the evening journal's answer, the same way
+    # Mood, Day and Money are (Vex 2026-09-12: the answer is the record). It
+    # sits at the top because that is where he reads it (2026-09-17), not
+    # because anything is stored there; clearing the answer clears the line.
+    hl = _answer_in(doc, pm.SEC_EVENING, "highlight of the day")
+    if hl:
+        ps.set_body(doc, pm.SEC_HIGHLIGHT, [f"- ✨ {mdtext.flatten_links(hl)}"])
     # 🎯 Week goals mirror - verbatim copy; absent/empty weekly keeps the
     # template pointer line (bootstrap window)
     wk = lookup(index, pm.period_for("weekly", day))
@@ -1338,6 +1358,14 @@ def _fill_weekly(doc, p, index):
     # the unreadable-source case, which leaves the section alone.
     if hb is not None:
         ps.set_body(doc, pm.SEC_HABIT_WEEK, pm.ind(hb), _in(pm.SEC_HABIT_WEEK))
+
+    # ── ✨ Highlights - one line per day that named one, newest first
+    hls = _highlights_between(index, p.start, live_end)
+    if hls:
+        ps.set_body(doc, pm.SEC_HL_WEEK,
+                    pm.ind([f"- {pm.DAY_ABBR[d.weekday()]} · {txt}"
+                            for d, txt in reversed(hls)]),
+                    _in(pm.SEC_HL_WEEK))
 
     # ── 📨 Entries - wins/nags/thoughts/links, grouped, newest first
     items = _entries_between(index, p.start, live_end)
