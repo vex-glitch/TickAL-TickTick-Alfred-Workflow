@@ -104,7 +104,15 @@ def week_target(habit, d0, d1):
     if not due:
         return 0
     quota = times_per_week(habit)
-    return min(quota, due) if quota else due
+    if not quota:
+        return due
+    # the quota is PER WEEK, so a window longer than one week asks for it that
+    # many times over - a month of "3 times a week" is ~13, not 3 (found by
+    # review 2026-09-17, when the monthly note started passing whole months
+    # through here). Partial weeks count, rounded up, and the live days still
+    # cap it: a habit that only existed for four days cannot owe more than 4.
+    weeks = max(1, -(-((d1 - d0).days + 1) // 7))
+    return min(quota * weeks, due)
 
 
 def checkin_for(checkins, day_stamp):

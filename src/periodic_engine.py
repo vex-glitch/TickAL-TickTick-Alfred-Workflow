@@ -1602,7 +1602,7 @@ def _fill_review(doc):
     ps.set_body(doc, pm.SEC_REVIEW, lines)
 
 
-def _week_stats_of(index, wp):
+def _week_stats_of(index, wp, drop_names=()):
     """What a week contributed, read back off its own weekly note - the money
     pyramid, one tier up. None when there is no note for it.
 
@@ -1639,6 +1639,14 @@ def _week_stats_of(index, wp):
         name = sec.name if sec is not None else ""
         return name.split(":", 1)[1].strip() if ":" in name else ""
 
+    # A note that EXISTS but was never filled is NOT a zero week: mint_ahead
+    # mints the coming week every Sunday, and _fill_weekly writes the bars
+    # only when the completed feed answered. A filled week always carries all
+    # seven rows, zeros included (pm.done_week_lines), so no bars means
+    # unknown - and a hard 0 would read as a week he got nothing done in.
+    per_day = pm.parse_day_bars(body(pm.SEC_WBARS, pm.SEC_STATS), wp.start)
+    if not per_day:
+        return None
     tls = pm.parse_top_list_lines(body(pm.SEC_TOP_LIST))
     if not tls:
         tls = pm.parse_top_list_lines(["- " + legacy_head("🔥 Top list")])
@@ -1648,45 +1656,84 @@ def _week_stats_of(index, wp):
         # one counts as the single occurrence it is known to have
         tts = {t.strip(): 1 for t in legacy_head("🚀 Top tasks").split(",")
                if t.strip()}
-    return {"per_day": pm.parse_day_bars(body(pm.SEC_WBARS, pm.SEC_STATS),
-                                         wp.start),
-            "by_proj": pm.parse_proj_lines(body(pm.SEC_COMPLETED,
-                                                "✅ Completed")),
-            "top_lists": tls,
+    created = 0
+    csec = ps.find_prefix(doc, pm.SEC_CREATED, pm.scope_of("weekly",
+                                                           pm.SEC_CREATED)) \
+        or ps.find_prefix(doc, "➕ Created")
+    if csec is not None and ":" in csec.name:
+        head = pm.unescape_md(csec.name.split(":", 1)[1]).strip()
+        m = re.match(r"^\s*(\d+)", head)
+        created = int(m.group(1)) if m else 0
+    def keep(mp):
+        return {k: v for k, v in mp.items() if k not in drop_names}
+
+    return {"per_day": per_day,
+            "created": created,
+            "created_by_proj": pm.parse_proj_lines(
+                csec.body if csec is not None else []),
+            "by_proj": keep(pm.parse_proj_lines(body(pm.SEC_COMPLETED,
+                                                     "✅ Completed"))),
+            "top_lists": keep(tls),
             "top_tasks": tts}
 
 
-def _week_stats_live(wp, today, projects):
-    """The same shape, computed from the live feed - used for the week that is
-    still running, whose note may not have been refreshed yet."""
+def _ignored_names(projects):
+    """The routine lists BY NAME. A sealed week gives up its rankings as text,
+    so the pid filter the live path uses cannot reach them - and a week
+    written before the routines rule shipped (2026-09-17) has 🌅 Routines
+    sitting at the top of its Top list, which is exactly what Vex asked to
+    stop seeing."""
+    return {nm for pid, nm in (projects or {}).items()
+            if pid in _stats_ignored_pids()}
+
+
+def _week_stats_live(wp, today, projects, clip_start=None):
+    """The same shape, computed from the live feed - for the week that is
+    still running, whose note may not have been refreshed yet. `clip_start`
+    holds it inside the month asking (a week straddling two months must not
+    put the neighbour's days into either one's numbers).
+
+    Its rankings are cut to THREE, like a sealed week's: a weekly note only
+    ever kept its top three, so letting the live week hand over everything it
+    has would make the month's ranking a mix of two different questions.
+    """
+    start = max(wp.start, clip_start or wp.start)
     end = min(wp.end, today)
-    comp = _completed_between(wp.start, end)
+    if start > end:
+        return None
+    comp = _completed_between(start, end)
     if comp is None:
         return None
     rank = _drop_ignored(comp)
-    created = _drop_ignored(_created_between(wp.start, end))
+    created_all = _created_between(start, end)
+    created = _drop_ignored(created_all)
     done_bp, created_bp = _by_proj(rank, projects), _by_proj(created, projects)
     per_day = {}
-    for i in range(7):
-        d = wp.start + timedelta(days=i)
-        if d > end:
-            break
+    d = start
+    while d <= end:
         per_day[d] = sum(1 for t in comp
                          if utc_str_to_local_date(t.get("completedTime") or "")
                          == d.isoformat())
-    return {"per_day": per_day, "by_proj": done_bp,
-            "top_lists": {nm: (done_bp.get(nm, 0), created_bp.get(nm, 0))
-                          for nm in set(done_bp) | set(created_bp)},
-            "top_tasks": pm.task_counts(rank)}
+        d += timedelta(days=1)
+    pairs = {nm: (done_bp.get(nm, 0), created_bp.get(nm, 0))
+             for nm in set(done_bp) | set(created_bp)}
+    traffic = {nm: a + b for nm, (a, b) in pairs.items()}
+    return {"per_day": per_day,
+            "created": len(created_all),
+            "created_by_proj": dict(pm.top_n(_by_proj(created_all, projects))),
+            "by_proj": dict(pm.top_n(done_bp)),
+            "top_lists": {nm: pairs[nm] for nm, _c in pm.top_n(traffic)},
+            "top_tasks": dict(pm.top_n(pm.task_counts(rank)))}
 
 
 def _month_week_data(index, period, today, projects):
     """{week start: stats | None} for every week a month touches."""
-    out = {}
+    out, drop = {}, _ignored_names(projects)
     for _n, wp, _a, _b in pm.month_week_spans(period):
-        live = (_week_stats_live(wp, today, projects)
+        live = (_week_stats_live(wp, today, projects, period.start)
                 if wp.start <= today <= wp.end else None)
-        out[wp.start] = live if live is not None else _week_stats_of(index, wp)
+        out[wp.start] = (live if live is not None
+                         else _week_stats_of(index, wp, drop))
     return out
 
 
@@ -1694,9 +1741,11 @@ def _month_done(data, period):
     """Σ completions inside the month's own days, from its weeks' per-day
     numbers - the straddle rule money has always used. None when not one week
     could be read (an unreadable month must not report 0)."""
-    days = [n for st in data.values() if st
-            for d, n in st["per_day"].items() if period.start <= d <= period.end]
-    return sum(days) if any(st for st in data.values()) else None
+    known = [st for st in data.values() if st]
+    if not known:
+        return None
+    return sum(n for st in known for d, n in st["per_day"].items()
+               if period.start <= d <= period.end)
 
 
 def _fill_monthly(doc, p, index):
@@ -1733,25 +1782,45 @@ def _fill_monthly(doc, p, index):
     data = _month_week_data(index, p, today, projects)
     prev_data = _month_week_data(index, prev, today, projects)
 
-    # ── Top lists / Top tasks - the month's, summed from its weeks'
-    tl = pm.count_list_lines(pm.merge_pairs([st["top_lists"]
-                                             for st in data.values() if st]))
+    def ranked(period, wdata):
+        """The weeks whose RANKINGS belong to a month: the ones lying wholly
+        inside it, plus the live one, which _week_stats_live already clipped.
+        A sealed week straddling two months keeps its ranking in WEEK shape
+        and nothing can cut that by day, so it is left out rather than let
+        the neighbouring month's traffic into this month's numbers."""
+        out = []
+        for _n, wp, a, b in pm.month_week_spans(period):
+            st = wdata.get(wp.start)
+            if st and ((a, b) == (wp.start, wp.end)
+                       or wp.start <= today <= wp.end):
+                out.append(st)
+        return out
+
+    rank_cur, rank_prev = ranked(p, data), ranked(prev, prev_data)
+
+    # ── Top lists / Top tasks - the month's, summed from those weeks'
+    tl = pm.count_list_lines(pm.merge_pairs([st["top_lists"] for st in rank_cur]))
     if tl:
         ps.set_body(doc, pm.SEC_TOP_LIST, tl, _in(pm.SEC_TOP_LIST))
     tt = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
-                                               for st in data.values() if st]))
+                                               for st in rank_cur]))
     if tt:
         ps.set_body(doc, pm.SEC_TOP_TASKS, tt, _in(pm.SEC_TOP_TASKS))
 
-    # ── Created - recomputed, exact: createdTime survives in the task cache
-    created_cur = _created_between(p.start, live_end)
-    created_prev = _created_between(prev.start, prev.end)
-    created_bp = _by_proj(created_cur, projects)
-    ch = pm.chip(len(created_cur), len(created_prev))
-    _set_headed(doc, pm.SEC_CREATED,
-                str(len(created_cur)) + (f" · {ch}" if ch else ""),
-                pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(created_bp)]),
-                _in(pm.SEC_CREATED))
+    # ── Created - off the same pyramid as Completed. NOT from the task cache:
+    # that holds open tasks plus nine days of completed ones, so a month's own
+    # early days are already short and LAST month is a fiction - the chip read
+    # "🟢 ▲ 1204 (+1974%)" against an August that was really just its survivors.
+    created_cur = sum(st["created"] for st in rank_cur) if rank_cur else None
+    if created_cur is not None:
+        cprev = sum(st["created"] for st in rank_prev) if rank_prev else None
+        ch = pm.chip(created_cur, cprev)
+        _set_headed(doc, pm.SEC_CREATED,
+                    str(created_cur) + (f" · {ch}" if ch else ""),
+                    pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
+                        pm.merge_counts(*[st["created_by_proj"]
+                                          for st in rank_cur]))]),
+                    _in(pm.SEC_CREATED))
 
     # ── Completed + the per-week bars, both off the weeks' own numbers
     done_cur = _month_done(data, p)
@@ -1761,11 +1830,13 @@ def _fill_monthly(doc, p, index):
                     str(done_cur) + (f" · {ch}" if ch else ""),
                     pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
                         pm.merge_counts(*[st["by_proj"]
-                                          for st in data.values() if st]))]),
+                                          for st in rank_cur]))]),
                     _in(pm.SEC_COMPLETED))
         rows = []
         for n, wp, a, b in spans:
-            st = data.get(wp.start)
+            if a > today:
+                break                      # a week that has not started yet
+            st = data.get(wp.start)        # is not a week with a missing note
             rows.append((pm.week_span_label(n, a, b),
                          None if not st else
                          sum(v for d, v in st["per_day"].items() if a <= d <= b)))
@@ -1795,8 +1866,11 @@ def _fill_monthly(doc, p, index):
                     + [f"{pm.T3}- **Total = {pm.fmt_hm(tot[0])}**"],
                     _in(pm.SEC_FOCUS_WEEK))
 
-    # ── Habit consistency - each habit against its own MONTH
-    hb = getattr(t2, "habit_lines_weekly", lambda a, b: None)(p.start, p.end) \
+    # ── Habit consistency - each habit against its own MONTH SO FAR: the
+    # denominator has to stop where the numerator does, or a perfect month
+    # reads 6/19 on the 17th (every other section here stops at live_end)
+    hb = getattr(t2, "habit_lines_weekly", lambda a, b: None)(p.start,
+                                                              live_end) \
         if t2 else None
     if hb is not None:
         ps.set_body(doc, pm.SEC_HABIT_WEEK, pm.ind(hb), _in(pm.SEC_HABIT_WEEK))
@@ -1824,7 +1898,7 @@ def _fill_monthly(doc, p, index):
                             for i in range((b - a).days + 1)})
         ps.set_body(doc, pm.SEC_ENTRIES,
                     pm.entries_grouped(pm.top_entries(
-                        items, lambda d: week_of.get(d, 0))),
+                        items, lambda d: week_of.get(d, 0)), dated=True),
                     _in(pm.SEC_ENTRIES))
 
     # ── 😊 Moods - the month average in the header, one line per WEEK
@@ -2317,6 +2391,11 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
         nonlocal sec_name
         if kind == "weekly":             # bullet on a tiered note, section on
             sec_name = _week_goal_home(doc)      # one minted before it
+        else:                            # …and a note minted under an older
+            for nm in pm.goal_section_names(kind):   # name still answers
+                if ps.find(doc, nm) is not None:
+                    sec_name = nm
+                    break
         if ps.find(doc, sec_name) is None:
             return False
         if kind == "daily":

@@ -144,9 +144,15 @@ The weekly note's shape one tier up, counted by **week** instead of by day (Vex 
 - **🏆 Goals** - **🌓 Quarterly goal** mirrors the quarter's note; **🗓️ Monthly goal** is yours, and it is what the weekly notes mirror in turn.
 - **✨ Highlight**, then **📊 Stats** and **💿 Data** with the weekly's own bullets: Top lists · Top tasks · Created · Completed · Weekly Completed (per-week bars) · Focus (by week, with the week's top task) · Habit consistency, then ✨ Highlights · 📨 Entries · 😊 Moods · 💰 Income · 👽 People.
 - **😊 Moods** reads the month average with its vs-last-month arrow in the bullet, and one line per week underneath.
-- **📨 Entries** resurfaces **five of each kind** - wins, nags, reminders, thoughts, links. Nothing an entry carries says how big it was, so "top five" is a rule: **one per week, newest first, then fill what is left by recency**. Five wins therefore come from across the month rather than all from its last few days.
+- **📨 Entries** resurfaces **five of each kind** - wins, nags, reminders, thoughts, links - each carrying its date, because over a month "Thu" names four different days. Nothing an entry carries says how big it was, so "top five" is a rule: **one per week, newest first, then fill what is left by recency**. Five wins therefore come from across the month rather than all from its last few days. A month long enough to touch six weeks has more weeks than slots, and the oldest one loses its place.
 
-**Where the numbers come from, and the one thing that limits them.** Created, focus, money, moods, highlights, entries, habits and people are all recomputed from sources that keep, so they are exact for any month. **Completions are not**: TickTick's completed feed reaches back about nine days, so a month reads what it finished off its **weekly notes** - the same pyramid money has always used. A week whose note does not exist reads `no note` in the bars rather than `0`, and the month total counts only the weeks it could read. Weeks written before 2026-09-17 still give up their numbers; their rankings only partly survive, because the old layout kept those in the header.
+**Where the numbers come from, and the one thing that limits them.** Focus, money, moods, highlights, entries, habits and people are recomputed from sources that keep, so they are exact for any month. **What you finished and what you added are not**: TickTick's completed feed reaches back about nine days, and the task cache only holds what is still open, so both come off the **weekly notes** - the same pyramid money has always used.
+
+That has three consequences worth knowing:
+
+- A week whose note does not exist reads `no note` in the bars rather than `0`, and the month total counts only the weeks it could read. A week that has not started yet is simply not listed.
+- The **rankings** (Top lists, Top tasks, and the 🗂 breakdowns) come from the weeks lying **wholly inside** the month, plus the one still running. A sealed week straddling two months keeps its ranking in week shape and nothing can cut that by day, so it is left out rather than let the neighbouring month's traffic in. Like the weekly, the rankings skip your routines list; the headline counts do not.
+- Weeks written before 2026-09-17 still give up their numbers; their rankings only partly survive, because the old layout kept those in the header.
 
 **Quarterly** and **yearly** ship as templates + money roll-ups for now - their review sections land in a later release (the first real quarterly mint is Sep 30).
 

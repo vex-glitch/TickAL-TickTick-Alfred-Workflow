@@ -549,7 +549,11 @@ def mood_span_lines(rows, gi=T1):
     for label, avg in rows:
         if avg is None:
             continue
-        out.append(f"{gi}- {label} · {MOOD_FACES[int(round(avg))]} {avg:.1f}")
+        # round ONCE, then read the face off the rounded number: 3.45 printed
+        # "3.5" beside the face for 3
+        shown = round(avg, 1)
+        face = MOOD_FACES[max(1, min(5, int(shown + 0.5)))]
+        out.append(f"{gi}- {label} · {face} {shown:.1f}")
     return out
 
 
@@ -564,6 +568,9 @@ def top_entries(items, week_of, n=5):
     reading of "of the month" that survives being read once a month.
 
     items = [(date, hm, glyph, body)]; week_of(date) → the week it belongs to.
+
+    With more weeks than slots (a month can touch six ISO weeks) the oldest
+    weeks lose theirs: the walk is newest-first and stops at n.
     """
     out = []
     for glyph in GROUP_ORDER:
@@ -1011,7 +1018,7 @@ GROUP_LABELS = {"🟢": "Wins", "🔴": "Nags", "❗️": "Reminders",
                 "💭": "Thoughts", "🔗": "Links", "😊": "Moods"}
 
 
-def entries_grouped(items, glyphs=None, gi=T1, ei=T2):
+def entries_grouped(items, glyphs=None, gi=T1, ei=T2, dated=False):
     """items = [(date, hm, glyph, body)] → 📨 Entries body: grouped by type,
     newest first inside each group, timestamp AFTER the text
     ('- body · Thu 14:32'), tab-nested (gi = group indent, ei = entry
@@ -1030,7 +1037,9 @@ def entries_grouped(items, glyphs=None, gi=T1, ei=T2):
             lines.append("")
         lines.append(f"{gi}- **{glyph} {GROUP_LABELS[glyph]}**")
         for d, hm, _g, body in grp:
-            lines.append(f"{ei}- {body} · {DAY_ABBR[d.weekday()]} {hm}")
+            when = (f"{DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]}"
+                    if dated else DAY_ABBR[d.weekday()])
+            lines.append(f"{ei}- {body} · {when} {hm}")
     return lines
 
 

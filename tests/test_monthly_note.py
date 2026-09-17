@@ -187,5 +187,62 @@ check("a note minted under the old skeleton is left alone",
       "_(pending)_" in ps.serialize_sections(old_shape)
       and "Weekly Completed" not in ps.serialize_sections(old_shape))
 
+# ── what the 2026-09-17 review found ───────────────────────────────────────
+# a note that EXISTS but was never filled is not a zero week: mint_ahead mints
+# the coming week every Sunday, and the monthly refresh runs in the same pass
+fresh = ps.parse_sections(pm.render_template(
+    pe._load_template("weekly"), {"breadcrumbs": "C", "daylinks": "- d"}))
+W39 = pm.period_for("weekly", date(2026, 9, 21))
+check("an unfilled weekly note reads as unknown, not as zero",
+      pe._week_stats_of({("weekly", pm.title_key(W39)):
+                         {"id": "F", "projectId": "P",
+                          "content": ps.serialize_sections(fresh)}}, W39) is None)
+# …but a week he genuinely idled through has all seven rows and IS a zero week
+idle = ps.parse_sections(ps.serialize_sections(fresh))
+ps.set_body(idle, pm.SEC_WBARS,
+            pm.ind(pm.done_week_lines([(W39.start + __import__("datetime").timedelta(days=i), 0)
+                                       for i in range(7)])[:-1]), pm.SEC_WK_STATS)
+idle_st = pe._week_stats_of({("weekly", pm.title_key(W39)):
+                             {"id": "I", "projectId": "P",
+                              "content": ps.serialize_sections(idle)}}, W39)
+check("a real idle week is still a zero week",
+      idle_st is not None and sum(idle_st["per_day"].values()) == 0
+      and len(idle_st["per_day"]) == 7, idle_st)
+
+# the routines list never reaches a month's rankings, not even through a note
+# written before the rule shipped
+LEG2 = "C\n---\n##### 🔥 Top list: 🌅 Routines · 186 done · 335 added\n\n" \
+       "##### 📈 Stats\n\t\t- Mon ▇ 4\n\n" \
+       "##### ✅ Completed: 4\n\t\t- 🗂 🌅 Routines · 186\n"
+w37idx = {("weekly", pm.title_key(W37)): {"id": "L2", "projectId": "P",
+                                          "content": LEG2}}
+dropped = pe._week_stats_of(w37idx, W37, {"🌅 Routines"})
+check("routines are dropped from a sealed week's rankings",
+      dropped["top_lists"] == {} and dropped["by_proj"] == {}, dropped)
+check("…but its per-day numbers are untouched",
+      dropped["per_day"][date(2026, 9, 7)] == 4, dropped["per_day"])
+
+# a month's Created comes off the weeks, never off the task cache
+wk_created = ps.parse_sections(ps.serialize_sections(wdoc))
+pe._set_headed(wk_created, pm.SEC_CREATED, "214 · 🔴 ▼ 696 (−76%)",
+               pm.ind(["- 🗂 🍳Meal Prep · 92"]), pm.SEC_WK_STATS)
+cst = pe._week_stats_of({("weekly", pm.title_key(WK)):
+                         {"id": "C", "projectId": "P",
+                          "content": ps.serialize_sections(wk_created)}}, WK)
+check("a week's Created reads back off its header", cst["created"] == 214, cst)
+check("…with its breakdown", cst["created_by_proj"] == {"🍳Meal Prep": 92}, cst)
+
+# entries carry their date in a month, or "Thu" names four different days
+dated = pm.entries_grouped([(date(2026, 9, 17), "11:56", "🟢", "a win")],
+                           dated=True)
+check("monthly entries are dated", dated[-1].endswith("· Thu 17 Sep 11:56"), dated)
+check("weekly entries are not", pm.entries_grouped(
+    [(date(2026, 9, 17), "11:56", "🟢", "a win")])[-1].endswith("· Thu 11:56"))
+
+# the mood face and the number it sits beside are the same rounding
+check("the face follows the printed average",
+      pm.mood_span_lines([("W1", 3.45)])[0].endswith("🙂 3.5"),
+      pm.mood_span_lines([("W1", 3.45)]))
+
 print(f"monthly note: {P} passed, {F} failed")
 sys.exit(1 if F else 0)
