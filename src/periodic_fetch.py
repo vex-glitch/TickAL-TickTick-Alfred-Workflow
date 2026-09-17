@@ -22,6 +22,7 @@ import requests                                     # noqa: E402
 
 import cache as cache_store                         # noqa: E402
 import config as cfg                                # noqa: E402
+import habits_model as hm                           # noqa: E402
 
 _TIMEOUT = 3          # external HTTP
 _V2_TIMEOUT = 8
@@ -316,22 +317,43 @@ def habit_lines_daily():
 
 
 def habit_lines_weekly(d0, d1):
-    """'- Meditate · 5/7 · 71%' per habit over [d0, d1]."""
+    """'- Meditate · 5/7 · 71%' per habit over [d0, d1], each against ITS OWN
+    target for that week.
+
+    Vex 2026-09-17: "call mum is shown as 0/7 when it should be happening once
+    a week … Actually all of them are showing 7 … There are also some habits
+    that are not even supposed to happen this week like monthly and quarterly
+    review". The denominator used to be the number of DAYS in the window,
+    which is 7 for every habit that ever existed; it is now what the habit's
+    own repeatRule asks of that week, and a habit that asks for nothing is not
+    listed at all. The cap of 8 lines applies AFTER that filter, so the eight
+    that show are eight that are actually due.
+    """
     habits = _habits()
     if not habits:
         return None
     checks = _checkins(_stamp(d0 - timedelta(days=1)))
     if checks is None:
         return None
-    days = (d1 - d0).days + 1
     a, b = _stamp(d0), _stamp(d1)
     lines = []
-    for h in habits[:8]:
+    for h in habits:
         done = len({c.get("checkinStamp") for c in (checks.get(h["id"]) or [])
                     if a <= (c.get("checkinStamp") or 0) <= b
                     and c.get("status", 2) == 2})
-        lines.append(f"- {h.get('name', 'Habit')} · {done}/{days} · "
-                     f"{int(done / days * 100)}%")
+        # target first, but a habit you actually did is never dropped: doing
+        # something that was not asked of you this week still counts, and
+        # dropping the row would take its check-ins with it
+        target = hm.week_target(h, d0, d1) or done
+        if not target:
+            continue
+        # a check-in on a day the habit was not due still counts (TickTick
+        # lets you tick any day), so done CAN exceed target - "2/1" is the
+        # honest fraction, and the percentage is a consistency score, capped
+        lines.append(f"- {h.get('name', 'Habit')} · {done}/{target} · "
+                     f"{min(100, int(done / target * 100))}%")
+        if len(lines) >= 8:
+            break
     return lines
 
 

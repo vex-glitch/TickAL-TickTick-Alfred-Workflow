@@ -109,6 +109,44 @@ check("review-weekly", hm.review_slot("Weekly Review") == "weekly")
 check("review-quarter", hm.review_slot("Quarterly Retreat") == "quarterly")
 check("review-none", hm.review_slot("Call mum") is None)
 
+# ── week_target: the weekly note's denominator ────────────────────────────
+# Vex 2026-09-17: "call mum is shown as 0/7 when it should be happening once a
+# week ... Actually all of them are showing 7 ... There are also some habits
+# that are not even supposed to happen this week like monthly and quarterly
+# review". These seven ARE his live habits, rules and start dates verbatim,
+# against ISO week 2026-W38 (Mon 14 Sep - Sun 20 Sep).
+W0, W1 = date(2026, 9, 14), date(2026, 9, 20)
+LIVE = [
+    ("Weekly Review", "RRULE:FREQ=WEEKLY;BYDAY=SU", 20260913, 1),
+    ("Monthly Review", "RRULE:FREQ=DAILY;INTERVAL=30", 20260930, 0),
+    ("Quarterly Retreat", "RRULE:FREQ=DAILY;INTERVAL=90", 20260930, 0),
+    ("Call mum", "RRULE:FREQ=DAILY;INTERVAL=7", 20260913, 1),
+    ("Meal Prep", "RRULE:FREQ=DAILY;INTERVAL=7", 20260920, 1),
+    ("🌅 Startup", "RRULE:FREQ=DAILY;INTERVAL=1", 20260912, 7),
+    ("🌆 Shutdown", "RRULE:FREQ=DAILY;INTERVAL=1", 20260912, 7),
+]
+for nm, rule, start, want in LIVE:
+    got = hm.week_target(H(repeatRule=rule, targetStartDate=start), W0, W1)
+    check(f"wtarget[{nm}]", got == want, f"{got} != {want}")
+
+check("wtarget-weekdays",
+      hm.week_target(H(repeatRule="RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
+                     W0, W1) == 5)
+check("wtarget-quota", hm.week_target(
+    H(repeatRule="RRULE:FREQ=WEEKLY;TT_TIMES=3"), W0, W1) == 3)
+check("wtarget-quota-capped-by-start",
+      # a 3x-a-week habit that only starts on Saturday cannot owe 3 this week
+      hm.week_target(H(repeatRule="RRULE:FREQ=WEEKLY;TT_TIMES=3",
+                       targetStartDate=20260919), W0, W1) == 2)
+check("wtarget-exdates",
+      hm.week_target(H(repeatRule="RRULE:FREQ=DAILY;INTERVAL=1",
+                       exDates=[20260916, 20260917]), W0, W1) == 5)
+check("wtarget-never-negative-window",
+      hm.week_target(H(repeatRule="RRULE:FREQ=DAILY;INTERVAL=1"),
+                     W1, W0) == 0)
+check("wtarget-single-day", hm.week_target(
+    H(repeatRule="RRULE:FREQ=DAILY;INTERVAL=1"), W0, W0) == 1)
+
 print()
 if FAILS:
     print(f"{len(FAILS)} FAILED: {FAILS}")

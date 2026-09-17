@@ -1,35 +1,30 @@
 {{breadcrumbs}}
 ---
-##### 🏆 Goals
-
-##### ✨ Highlight
----
+#### 🏆 Goals
 #### 📌 This Week
-##### 🔥 Top list
+##### 📊 Stats
+- Top lists:
 
-##### 🚀 Top tasks
+- Top tasks:
 
-##### ➕ Created
+- Created
 
-##### 📈 Stats
-	_(pending)_
+- Completed
 
-##### 🎯 Focus
+- Daily Completed
 
-##### 📨 Entries
-	_(pending)_
+- Focus
 
-##### 😊 Moods
-	_(pending)_
+- Habit consistency
+---
+##### 💿 Data
+- 📨 Entries
 
-##### 🔄 Habit consistency
-	_(pending)_
+- 😊 Moods
 
-##### 💰 Income
-##### 👽 People
-	_(pending)_
+- 💰 Income
 
-##### ✅ Completed
+- 👽 People
 ---
 ##### ⏪ Last week
 	_(pending)_

@@ -62,13 +62,49 @@ def due_today(habit, today=None):
     if "FREQ=WEEKLY" in rule and m:
         days = {_BYDAY[d] for d in m.group(1).split(",") if d in _BYDAY}
         return today.weekday() in days
-    m = re.search(r"FREQ=DAILY;INTERVAL=(\d+)", rule)
+    # FREQ and INTERVAL matched separately: they are unordered RRULE parts and
+    # a single "FREQ=DAILY;INTERVAL=n" pattern silently fell through to the
+    # every-day default on "INTERVAL=7;FREQ=DAILY", which since 2026-09-17 is
+    # the weekly note's DENOMINATOR (found by review, no live rule hits it yet)
+    m = re.search(r"INTERVAL=(\d+)", rule) if "FREQ=DAILY" in rule else None
     if m:
         n = int(m.group(1))
         if n <= 1 or not start:
             return True
         return (today - start).days % n == 0
     return True
+
+
+def week_target(habit, d0, d1):
+    """How many times this habit is SUPPOSED to happen in [d0, d1] - the
+    denominator of the weekly note's consistency line. 0 means "nothing due
+    this window" - the weekly filler then leaves the habit out unless it was
+    checked in anyway, which is a thing you did and counts.
+
+    Vex 2026-09-17: "call mum is shown as 0/7 when it should be happening once
+    a week … Actually all of them are showing 7 … There are also some habits
+    that are not even supposed to happen this week like monthly and quarterly
+    review". The note used to divide by the number of DAYS in the window,
+    which is 7 for every habit that ever existed.
+
+    A flexible weekly habit (RRULE … TT_TIMES=N) is due every day and carries
+    its quota in the rule, so the quota is the target - capped by the days it
+    is actually live for, which is what bounds one that starts midweek.
+    Everything else is counted day by day through due_today, which knows
+    BYDAY, DAILY;INTERVAL anchored at targetStartDate, and exDates.
+
+    Known gap, deliberate: due_today answers True for a rule it cannot parse
+    (FREQ=MONTHLY / FREQ=YEARLY), so such a habit targets every day. TickTick's
+    own editor cannot make one - its "monthly" is FREQ=DAILY;INTERVAL=30,
+    which IS parsed - and the rule here is that an unknown rule shows a habit
+    rather than hides it.
+    """
+    due = sum(1 for i in range((d1 - d0).days + 1)
+              if due_today(habit, d0 + timedelta(days=i)))
+    if not due:
+        return 0
+    quota = times_per_week(habit)
+    return min(quota, due) if quota else due
 
 
 def checkin_for(checkins, day_stamp):

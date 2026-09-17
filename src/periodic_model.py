@@ -18,6 +18,7 @@ import random
 from datetime import date, timedelta
 
 import focus_blocks as fb
+import mdtext
 
 # ── English name tables (weekday() / month index) ────────────────────────────
 DAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -52,19 +53,23 @@ SEC_EVENING    = "🌙 Evening journal"
 SEC_DAY_SUM    = "📊 Today"               # under the # 🔎 Summaries group
 SEC_OTD        = "🕰️ On this day"         # past years' same date, last in the note
 SEC_MONEY      = "💰 Money"
-# weekly
+# weekly - Vex's 2026-09-17 relayout: two GROUP headers (📊 Stats · 💿 Data)
+# each holding a run of bullets, the emoji dropped off the numbers he reads
+# at a glance and kept on the things he reads one at a time.
 SEC_GOALS      = "🏆 Goals"
-SEC_HIGHLIGHT  = "✨ Highlight"
-SEC_TOP_LIST   = "🔥 Top list"            # prefix - header carries the data
-SEC_TOP_TASKS  = "🚀 Top tasks"           # prefix
-SEC_CREATED    = "➕ Created"             # prefix
-SEC_COMPLETED  = "✅ Completed"           # prefix
-SEC_WBARS      = "📈 Stats"               # per-day bars
-SEC_FOCUS_WEEK = "🎯 Focus"               # prefix
+SEC_HIGHLIGHT  = "✨ Highlight"           # RETIRED from the template 2026-09-17
+SEC_WK_STATS   = "📊 Stats"               # group: the week's numbers
+SEC_WK_DATA    = "💿 Data"                # group: the week's texture
+SEC_TOP_LIST   = "Top lists:"             # plain bullet, 3 lines of body
+SEC_TOP_TASKS  = "Top tasks:"             # plain bullet, 3 lines of body
+SEC_CREATED    = "Created"                # prefix - header carries the data
+SEC_COMPLETED  = "Completed"              # prefix
+SEC_WBARS      = "Daily Completed"        # per-day bars
+SEC_FOCUS_WEEK = "Focus"                  # prefix
 SEC_ENTRIES    = "📨 Entries"
-SEC_MOODS      = "😊 Moods"
+SEC_MOODS      = "😊 Moods"               # prefix - header carries the average
 SEC_LAST_WEEK  = "⏪ Last week"
-SEC_HABIT_WEEK = "🔄 Habit consistency"
+SEC_HABIT_WEEK = "Habit consistency"
 SEC_WEEKLY_JNL = "📔 Weekly journal"
 SEC_REVIEW     = "♻️ Weekly Review"
 SEC_INCOME     = "💰 Income"              # prefix
@@ -138,7 +143,10 @@ WRITER_ANCHORS = {
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
                   SEC_YESTERDAY, SEC_YBRIDGE, SEC_TODAY, SEC_TOMORROW,
                   SEC_MORNING, SEC_NOTES, SEC_EVENING, SEC_DAY_SUM, SEC_OTD],
-    "weekly":    [SEC_GOALS, SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
+    # no SEC_HIGHLIGHT: Vex deleted ✨ Highlight from the layout on
+    # 2026-09-17. set_highlight() still writes it wherever the header
+    # survives - a deleted header is this system's off switch, not a bug.
+    "weekly":    [SEC_GOALS, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK, SEC_WEEKLY_JNL,
                   SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME, SEC_PEOPLE],
@@ -147,6 +155,27 @@ WRITER_ANCHORS = {
     "quarterly": [SEC_MONEY],            # v3.0: template + money only
     "yearly":    [SEC_MONEY],
 }
+
+# Which GROUP header an anchor lives under, per tier. A weekly note now
+# repeats names on purpose - "- Completed: 78" is this week's and
+# "- Completed: 387" is last week's - so every writer that could collide
+# names its container and ps.find/find_prefix look nowhere else. An anchor
+# missing from here is searched document-wide, as it always was.
+SECTION_SCOPE = {
+    "weekly": {
+        SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
+        SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
+        SEC_WBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
+        SEC_HABIT_WEEK: SEC_WK_STATS,
+        SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
+        SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
+    },
+}
+
+
+def scope_of(kind, anchor):
+    """The container `anchor` must be looked up inside, or None."""
+    return SECTION_SCOPE.get(kind, {}).get(anchor)
 
 # Tab indents - the default layout nests section bodies. Parsers are
 # whitespace-tolerant; WRITERS use these so generated lines match the
@@ -622,21 +651,102 @@ GROUP_LABELS = {"🟢": "Wins", "🔴": "Nags", "❗️": "Reminders",
                 "💭": "Thoughts", "🔗": "Links", "😊": "Moods"}
 
 
-def entries_grouped(items, glyphs=None, gi=T2, ei=T3):
+def entries_grouped(items, glyphs=None, gi=T1, ei=T2):
     """items = [(date, hm, glyph, body)] → 📨 Entries body: grouped by type,
     newest first inside each group, timestamp AFTER the text
     ('- body · Thu 14:32'), tab-nested (gi = group indent, ei = entry
-    indent)."""
+    indent).
+
+    Each group heading is a BULLET with a blank line above it (Vex's
+    2026-09-17 layout): a week's worth of thoughts under one unbulleted bold
+    line ran together into a wall of text in the app."""
     lines = []
     for glyph in (glyphs or GROUP_ORDER):
         grp = sorted([it for it in items if it[2] == glyph],
                      key=lambda it: (it[0], it[1]), reverse=True)
         if not grp:
             continue
-        lines.append(f"{gi}**{glyph} {GROUP_LABELS[glyph]}**")
+        if lines:
+            lines.append("")
+        lines.append(f"{gi}- **{glyph} {GROUP_LABELS[glyph]}**")
         for d, hm, _g, body in grp:
             lines.append(f"{ei}- {body} · {DAY_ABBR[d.weekday()]} {hm}")
     return lines
+
+
+def mood_week_lines(moods, gi=T1, ei=T2):
+    """😊 Moods body from [(date, (score, note))]: one line per day, and the
+    day's note as a CHILD bullet rather than a `·` tail (Vex 2026-09-17 - a
+    paragraph about a bad night does not belong on the same line as a face).
+    The average is NOT here: it rides the section header."""
+    out = []
+    for d, m in moods or []:
+        score, note = (m + ("",))[:2] if isinstance(m, tuple) else (m, "")
+        out.append(f"{gi}- {DAY_ABBR[d.weekday()]} {MOOD_FACES[int(score)]}")
+        if note:
+            out.append(f"{ei}- {note}")
+    return out
+
+
+def drop_lists(tasks, skip):
+    """`tasks` minus the rows belonging to any project id in `skip`.
+
+    None passes straight through: an unreadable completed feed must stay
+    unreadable, never quietly read as empty. `projectId` first and the
+    workflow's own `_projectId` after it, the same order _by_proj uses - a
+    row off the completed feed carries only the former, a cached row both.
+    """
+    if tasks is None:
+        return None
+    skip = {s for s in (skip or ()) if s}
+    if not skip:
+        return list(tasks)
+    return [t for t in tasks
+            if (t.get("projectId") or t.get("_projectId") or "") not in skip]
+
+
+def top_list_lines(done_bp, created_bp, n=3, gi=T1):
+    """Top lists body: the n busiest lists (done + added), busiest first.
+    Ties break alphabetically so a refresh that changes nothing rewrites
+    nothing."""
+    traffic = {}
+    for src in (done_bp, created_bp):
+        for nm, c in (src or {}).items():
+            traffic[nm] = traffic.get(nm, 0) + c
+    top = sorted(traffic.items(), key=lambda kv: (-kv[1], kv[0]))[:n]
+    return [f"{gi}- {nm} · {(done_bp or {}).get(nm, 0)} done · "
+            f"{(created_bp or {}).get(nm, 0)} added" for nm, _c in top]
+
+
+def top_task_lines(tasks, n=3, gi=T1):
+    """Top tasks body: the n titles completed MOST OFTEN this week, ties
+    broken by the most recent completion.
+
+    Frequency, not recency (Vex 2026-09-17 reads it that way: "start up and
+    shutdown are always gonna appear as top tasks of the week since they are
+    done 7 days a week"), which also makes it the twin of Top lists.
+    Subtasks are their parent's detail and never a task of their own; a
+    repeating task leaves one completion record per occurrence, which is the
+    count.
+    """
+    counts, last, order = {}, {}, []
+    for t in (tasks or []):
+        if t.get("parentId"):
+            continue
+        name = mdtext.flatten_links(t.get("title") or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if key not in counts:
+            counts[key], order = 0, order + [(key, name)]
+        counts[key] += 1
+        ct = t.get("completedTime") or ""
+        if ct > last.get(key, ""):
+            last[key] = ct
+    ranked = sorted(order, key=lambda kn: last.get(kn[0], ""), reverse=True)
+    ranked.sort(key=lambda kn: -counts[kn[0]])          # stable: count, then recency
+    return [f"{gi}- {name[:64]}" + (f" · {counts[key]}×" if counts[key] > 1 else "")
+            for key, name in ranked[:n]]
 
 
 # ── 📌 This Week composite helpers ───────────────────────────────────────────
@@ -644,24 +754,37 @@ def indent(lines):
     return ["    " + ln for ln in lines]
 
 
-def chip(cur, prev, kind="count", unit="tasks"):
-    """vs-last-week chip: '🟢 12 ahead of last week (+9%)' / '🔴 7 behind
-    last week (−4%)' / '⚪ level with last week'. None prev → None."""
+def chip(cur, prev, kind="count"):
+    """vs-last-week chip: '🟢 ▲ 12 (+9%)' / '🔴 ▼ 714 (−78%)' / '⚪ ▬'.
+    None prev → None.
+
+    Arrows since 2026-09-17 (Vex: "changed comparisons to use the arrows like
+    we did in daily note"). The traffic light stays, because this line has to
+    read at a glance from across the room and the daily note's bare ▲/▼ does
+    not: colour says good/bad, the arrow says which way, and the sentence the
+    chip used to spell out ("7 tasks behind last week") was three words of
+    padding around one number.
+    """
     if prev is None or cur is None:
         return None
     diff = cur - prev
+    if kind == "avg":
+        # a mood average is one decimal - 2.74 vs 2.71 is the same mood, and
+        # rounding BEFORE the zero test keeps "⚪ ▬" honest rather than
+        # drawing an arrow over "0.0"
+        diff = round(diff, 1)
+    if not diff:
+        return "⚪ ▬"
     if kind == "duration":
-        mag = fmt_hm(abs(diff))
+        mag = fmt_hm(int(abs(diff)))
     elif kind == "money":
         mag = fmt_amount(abs(diff))
+    elif kind == "avg":
+        mag = f"{abs(diff):.1f}"
     else:
-        mag = f"{int(abs(diff))} {unit}".strip()
+        mag = f"{int(abs(diff))}"
     pct = f" ({'+' if diff > 0 else '−'}{abs(diff) / abs(prev) * 100:.0f}%)" if prev else ""
-    if diff > 0:
-        return f"🟢 {mag} ahead of last week{pct}"
-    if diff < 0:
-        return f"🔴 {mag} behind last week{pct}"
-    return "⚪ level with last week"
+    return f"{'🟢 ▲' if diff > 0 else '🔴 ▼'} {mag}{pct}"
 
 
 def same_day_back(day, years):

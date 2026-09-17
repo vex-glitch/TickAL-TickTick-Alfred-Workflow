@@ -279,11 +279,64 @@ for kind, anchors in pm.WRITER_ANCHORS.items():
     for a in anchors:
         # RESOLVES, rather than "appears as ### a": Vex's 2026-09-12 layout
         # made most anchors bullets, and a few renamed themselves as he
-        # dropped emoji - ps.find is the thing every filler actually uses
-        check(f"18.anchor[{kind}:{a}]", ps.find(_tdoc, a) is not None,
-              f"unreachable in {kind}.md")
+        # dropped emoji - ps.find is the thing every filler actually uses,
+        # through the same scope the filler passes it
+        w = pm.scope_of(kind, a)
+        check(f"18.anchor[{kind}:{a}]", ps.find(_tdoc, a, w) is not None,
+              f"unreachable in {kind}.md (within={w})")
+        if w is not None:
+            check(f"18.scoped[{kind}:{a}]", ps.find(_tdoc, a) is not None,
+                  "a scoped anchor must still be reachable in an EMPTY note - "
+                  "the scope exists for the FILLED one")
     check(f"18.tpl-roundtrip[{kind}]",
           ps.serialize_sections(ps.parse_sections(tpl)) == tpl)
+
+# ── 18b. the scope earns its keep: a FILLED weekly repeats bullet names
+# (Vex's 2026-09-17 layout puts "- Completed:" in 📊 Stats AND in ⏪ Last week),
+# so every Stats/Data anchor must still land on ITS OWN bullet ────────────────
+_wtpl = open(os.path.join(ROOT, "src", "periodic_templates", "weekly.md"),
+             encoding="utf-8").read()
+_filled = ps.parse_sections(_wtpl)
+ps.set_body(_filled, pm.SEC_LAST_WEEK, [
+    "- Completed: 387", "- Created: 910", "- Focus: 23h 56m",
+    "- Mood: 3.7 avg", "- Income: 495", "",
+    "- Top Tasks:", "\t- 🌆 Shutdown",
+    "- Top Lists", "\t- 🗂 🌅 Routines · 186"])
+for a in pm.WRITER_ANCHORS["weekly"]:
+    w = pm.scope_of("weekly", a)
+    hit = ps.find_prefix(_filled, a, w) if w else ps.find(_filled, a, w)
+    inside = None
+    if isinstance(hit, ps.Block):
+        inside = next((s.name for s in _filled.sections if s is hit.sec), None)
+    check(f"18b.filled[{a}]", hit is not None and (w is None or inside == w),
+          f"landed in {inside!r}, wanted {w!r}")
+check("18b.unscoped-would-collide",
+      ps.find(_filled, "Top lists:") is not None
+      and ps.find_prefix(_filled, "Completed") is not None)
+# _norm strips emoji, so the OLD layout's "📈 Stats" normalizes exactly like the
+# new "📊 Stats". Scoping the new writers must not latch onto the twin.
+_twin = ps.parse_sections(
+    "##### 📈 Stats\n- Created: 914\n\n##### 📊 Stats\n- Created: 12\n")
+_hit = ps.find_prefix(_twin, "Created", "📊 Stats")
+check("18b.emoji-twin-container-does-not-win",
+      _hit is not None and _hit.sec.name == "📊 Stats",
+      f"landed in {_hit and _hit.sec.name!r}")
+check("18b.unmigrated-twin-alone-finds-nothing",
+      # an old-layout note has ONLY "📈 Stats", and its bullets are per-day
+      # bars - the new writers must stay silent rather than rewrite one
+      ps.find_prefix(ps.parse_sections("##### 📈 Stats\n- Mon ▇ 44\n"),
+                     "Created", "📊 Stats") is None)
+check("18b.scope-does-not-reach-into-a-bullet",
+      # deleting "- Focus" is the kill switch; a habit line one level down
+      # named "Focus time" must NOT be rewritten in its place
+      ps.find_prefix(ps.parse_sections(
+          "##### 📊 Stats\n- Habit consistency\n\t- Focus time · 3/7 · 42%\n"),
+          "Focus", "📊 Stats") is None)
+check("18b.absent-container-is-silent",
+      ps.find(_filled, pm.SEC_COMPLETED, "🚫 nope") is None
+      and ps.set_body(_filled, pm.SEC_COMPLETED, ["x"], "🚫 nope") is False,
+      "a named container that is not in the note must resolve to NOTHING, "
+      "never fall back to the whole document")
 
 # ── 19. grammars: mood faces, day rating, 💬 merge, 📨 entries,
 # vs-last-week chips, day-goal titles ────────────────────────────────────────
@@ -311,15 +364,81 @@ ents = pm.entries_grouped([
     (date(2026, 7, 9), "21:00", "😊", "4 · ok"),    # moods excluded
 ])
 check("19.entries-grouped",
-      ents == ["\t\t**🟢 Wins**", "\t\t\t- Won · Fri 09:11",
-               "\t\t\t- Shipped · Thu 14:32",
-               "\t\t**❗️ Reminders**", "\t\t\t- Bank · Thu 18:00",
-               "\t\t**💭 Thoughts**", "\t\t\t- Hmm · Thu 20:00"], ents)
-check("19.chip-behind", pm.chip(114, 121) == "🔴 7 tasks behind last week (−6%)")
-check("19.chip-ahead", pm.chip(121, 114) == "🟢 7 tasks ahead of last week (+6%)")
-check("19.chip-level", pm.chip(5, 5) == "⚪ level with last week")
-check("19.chip-zero-prev", pm.chip(10, 0) == "🟢 10 tasks ahead of last week")
+      ents == ["\t- **🟢 Wins**", "\t\t- Won · Fri 09:11",
+               "\t\t- Shipped · Thu 14:32", "",
+               "\t- **❗️ Reminders**", "\t\t- Bank · Thu 18:00", "",
+               "\t- **💭 Thoughts**", "\t\t- Hmm · Thu 20:00"], ents)
+check("19.chip-behind", pm.chip(114, 121) == "🔴 ▼ 7 (−6%)", pm.chip(114, 121))
+check("19.chip-ahead", pm.chip(121, 114) == "🟢 ▲ 7 (+6%)")
+check("19.chip-level", pm.chip(5, 5) == "⚪ ▬")
+check("19.chip-zero-prev", pm.chip(10, 0) == "🟢 ▲ 10")
 check("19.chip-none", pm.chip(10, None) is None)
+# the four chips off Vex's own 2026-W38 note, to the character
+check("19.chip-created", pm.chip(196, 910) == "🔴 ▼ 714 (−78%)", pm.chip(196, 910))
+check("19.chip-completed", pm.chip(78, 387) == "🔴 ▼ 309 (−80%)")
+check("19.chip-focus", pm.chip(1061, 1436, "duration") == "🔴 ▼ 6h 15m (−26%)",
+      pm.chip(1061, 1436, "duration"))
+check("19.chip-income", pm.chip(100, 495, "money") == "🔴 ▼ 395 (−80%)")
+check("19.chip-mood", pm.chip(2.7, 3.7, "avg") == "🔴 ▼ 1.0 (−27%)",
+      pm.chip(2.7, 3.7, "avg"))
+check("19.chip-mood-noise", pm.chip(2.72, 2.70, "avg") == "⚪ ▬",
+      pm.chip(2.72, 2.70, "avg"))
+
+# ── 19b. the 📊 Stats bullet bodies (Vex 2026-09-17) ─────────────────────────
+tlx = pm.top_list_lines({"📌CTA": 13, "💰Money": 8, "🍳Meal Prep": 2},
+                        {"🍳Meal Prep": 92, "📌CTA": 14})
+check("19b.top-lists-three", tlx == [
+    "\t- 🍳Meal Prep · 2 done · 92 added",
+    "\t- 📌CTA · 13 done · 14 added",
+    "\t- 💰Money · 8 done · 0 added"], tlx)
+check("19b.top-lists-empty", pm.top_list_lines({}, {}) == [])
+check("19b.top-lists-tie-is-stable",
+      pm.top_list_lines({"b": 2, "a": 2}, {}, n=2)
+      == ["\t- a · 2 done · 0 added", "\t- b · 2 done · 0 added"])
+
+
+def _ct(title, when, parent=None):
+    return {"title": title, "completedTime": when, "parentId": parent}
+
+
+ttx = pm.top_task_lines([
+    _ct("Log the bank", "2026-09-14T10:00:00.000+0000"),
+    _ct("Log the bank", "2026-09-15T10:00:00.000+0000"),
+    _ct("Log the bank", "2026-09-16T10:00:00.000+0000"),
+    _ct("Cook the chicken", "2026-09-17T10:00:00.000+0000"),
+    _ct("Cook the chicken", "2026-09-15T10:00:00.000+0000"),
+    _ct("[Ship it](https://x/y)", "2026-09-18T10:00:00.000+0000"),
+    _ct("a one-off", "2026-09-13T10:00:00.000+0000"),
+    _ct("a subtask", "2026-09-18T11:00:00.000+0000", parent="p1"),
+])
+check("19b.top-tasks-by-frequency", ttx == [
+    "\t- Log the bank · 3×", "\t- Cook the chicken · 2×",
+    "\t- Ship it"], ttx)
+check("19b.top-tasks-skip-subtasks", "a subtask" not in "\n".join(ttx))
+check("19b.top-tasks-empty",
+      pm.top_task_lines([]) == [] and pm.top_task_lines(None) == [])
+mwx = pm.mood_week_lines([(date(2026, 9, 15), (3, "brain would not shut up")),
+                          (date(2026, 9, 17), (3, ""))])
+check("19b.mood-note-is-a-child", mwx == [
+    "\t- Tue 😐", "\t\t- brain would not shut up", "\t- Thu 😐"], mwx)
+
+# the routine-list exclusion: it fails SILENTLY if it keys on the wrong field
+ROUT = "6a268ea18f081f1de80eaeb5"
+_rows = [{"id": "a", "projectId": ROUT, "title": "🌅 Startup"},
+         {"id": "b", "projectId": "cta", "title": "Real work"},
+         {"id": "c", "_projectId": ROUT, "title": "cached routine row"},
+         {"id": "d", "title": "no project at all"}]
+check("19b.drop-lists-both-id-fields",
+      [t["id"] for t in pm.drop_lists(_rows, {ROUT})] == ["b", "d"],
+      pm.drop_lists(_rows, {ROUT}))
+check("19b.drop-lists-none-stays-none",
+      pm.drop_lists(None, {ROUT}) is None,
+      "an unreadable feed must not become an empty one")
+check("19b.drop-lists-empty-skip-is-a-copy",
+      pm.drop_lists(_rows, set()) == _rows
+      and pm.drop_lists(_rows, None) is not _rows)
+check("19b.drop-lists-ignores-blank-ids",
+      len(pm.drop_lists(_rows, {"", None})) == 4)
 check("19.goal-titles", pm.goal_titles(
     ["- [ ] [Ship](https://x)", "- plain goal", "_(pending)_", ""])
     == ["Ship", "plain goal"])

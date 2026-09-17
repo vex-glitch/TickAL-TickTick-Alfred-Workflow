@@ -17,6 +17,11 @@ Contracts:
   * find() is an EXACT header-name match; a missing/renamed header means the
     filler skips silently and the rest of the note is untouched. That is both
     the disclosed limitation and the universal per-section kill switch.
+  * find/find_prefix/set_body take an optional `within=<container name>` that
+    restricts the search to one section's own bullets - for a note that
+    repeats a name on purpose, like the 2026-09-17 weekly's "- Completed:"
+    under both 📊 Stats and ⏪ Last week. A `within` that is not in the note
+    resolves to NOTHING; it never falls back to the whole document.
   * set_body/append_body never reflow other sections: mutations are local to
     one section's line list.
   * TickTick's fold comment (`#### 🏆 Goals <!-- {"folded":true} -->`) is
@@ -238,7 +243,48 @@ def _only(cands):
     return cands[0] if len(cands) == 1 else None
 
 
-def find(doc, name):
+def _scope(doc, within):
+    """(candidate containers, may-a-HEADER-match) for an optional container.
+
+    `within=None` is the whole document, headers included. Naming a container
+    narrows the search to that section's bullets, because Vex's 2026-09-17
+    weekly layout repeats bullet names on purpose: "- Completed: 78" is this
+    week's and "- Completed: 387" is last week's. A container that is not in
+    the note yields an EMPTY scope - never a silent fall back to the whole
+    document, which would write this week's number into last week's line.
+
+    The exact name comes first and the normalized ones after it, ALL of them,
+    because _norm strips emoji and "📊 Stats" normalizes exactly like the old
+    layout's "📈 Stats". Picking the single normalized hit pointed the new
+    Stats writers at the old per-day-bars section on every note not yet
+    relaid out. The callers try each candidate and keep the one that actually
+    holds the anchor, so a wrong twin simply finds nothing.
+    """
+    if within is None:
+        return doc.sections, True
+    out = [s for s in doc.sections if s.name == within]
+    want = _norm(within)
+    if want:
+        out += [s for s in doc.sections
+                if _norm(s.name) == want and s not in out]
+    return out, False
+
+
+def _top_blocks(sec):
+    """A container's OWN bullets: the shallowest level only.
+
+    A scoped lookup addresses one of the bullets the group header holds, never
+    a line inside one of them. Without this, deleting `- Focus` (the per-
+    section kill switch) let find_prefix("Focus") fall through to a habit
+    line like "- Focus time · 3/7 · 42%" one level down and rewrite it."""
+    blocks = _blocks(sec)
+    if not blocks:
+        return []
+    top = blocks[0].indent                     # _blocks sorts by indent
+    return [b for b in blocks if b.indent == top]
+
+
+def find(doc, name, within=None):
     """The section or bullet BLOCK this name addresses.
 
     Four passes, most literal first: exact header, exact bullet, then the
@@ -246,33 +292,48 @@ def find(doc, name):
     is the intended target far more often than a group header that happens
     to normalize the same way. A normalized pass that finds two candidates
     returns None rather than pick one.
+
+    `within` names a container section and restricts the search to its
+    bullets (see _scope).
     """
-    for sec in doc.sections:
-        if sec.name == name:
-            return sec
-    for sec in doc.sections:
-        for blk in _blocks(sec):
+    secs, whole = _scope(doc, within)
+    pool = _blocks if whole else _top_blocks
+    if whole:
+        for sec in secs:
+            if sec.name == name:
+                return sec
+    for sec in secs:
+        for blk in pool(sec):
             if blk.name == name:
                 return blk
     want = _norm(name)
     if not want:
         return None
-    blocks = [b for sec in doc.sections for b in _blocks(sec) if _norm(b.name) == want]
+    blocks = [b for sec in secs for b in pool(sec) if _norm(b.name) == want]
     hit = _only(blocks)
     if hit is not None:
         return hit
-    return _only([sec for sec in doc.sections if _norm(sec.name) == want])
+    if not whole:
+        return None
+    return _only([sec for sec in secs if _norm(sec.name) == want])
 
 
-def find_prefix(doc, prefix):
+def find_prefix(doc, prefix, within=None):
     """First section whose name STARTS WITH prefix, else the first bullet
     block that does - the anchor form for data-in-header sections
-    ('### ✅ Completed: 121 · 🟢 …', or '- Completed: 121')."""
-    for sec in doc.sections:
-        if sec.name.startswith(prefix):
-            return sec
-    for sec in doc.sections:
-        for blk in _blocks(sec):
+    ('### ✅ Completed: 121 · 🟢 …', or '- Completed: 121').
+
+    `within` narrows it to one container's bullets (see _scope); without it
+    the first match in DOCUMENT ORDER wins, which is exactly the coin-flip
+    the weekly note's repeated names must not ride on."""
+    secs, whole = _scope(doc, within)
+    pool = _blocks if whole else _top_blocks
+    if whole:
+        for sec in secs:
+            if sec.name.startswith(prefix):
+                return sec
+    for sec in secs:
+        for blk in pool(sec):
             if blk.name.startswith(prefix):
                 return blk
     return None
@@ -326,10 +387,10 @@ def _gap(doc, sec):
     return [] if (nxt is not None and nxt.pre) else [""]
 
 
-def set_body(doc, name, lines):
+def set_body(doc, name, lines, within=None):
     """Rewrite a section's body (FILLER semantics). False when the section is
     absent or the canonical body is already identical."""
-    sec = find(doc, name)
+    sec = find(doc, name, within)
     if sec is None:
         return False
     return set_sec_body(doc, sec, lines)

@@ -7351,7 +7351,14 @@ def pn_journal(slot):
                 routed.append(pe.set_day_rating(int(m.group(1)), day=day0))
                 a = "★" * int(m.group(1))
         elif key == "highlight":
-            routed.append(pe.set_highlight(a, day=day0))
+            # the ANSWER is the record now (Vex's 2026-09-17 layout has no
+            # ✨ section); set_highlight only still runs for a note that
+            # carries one, exactly like append_income and 💰 above. Calling it
+            # unconditionally would write this answer a second time, and the
+            # merge below would then see the question as already answered and
+            # under-report "saved N/M".
+            if pe.weekly_has_highlight(day0):
+                routed.append(pe.set_highlight(a, day=day0))
         elif key == "bridge":
             # surfaced in the final banner - a swallowed bridge failure
             # would smile "saved 5/5" while the board got nothing
