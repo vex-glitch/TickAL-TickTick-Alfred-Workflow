@@ -597,7 +597,7 @@ check("20.lead-mood", pm.quote_mood(["crumb", "Mood: 😁 · great"]) == (5, "gr
 # ── weekly notes carry their date range (Vex 2026-09-12) ───────────────────
 _wk = pm.period_for("weekly", date(2026, 9, 12))
 check("weekly name carries the range",
-      pm.long_title(_wk) == "2026-W37 • 7th-13th Sep", pm.long_title(_wk))
+      pm.long_title(_wk) == "♻️ 2026-W37 • 7th-13th Sep", pm.long_title(_wk))
 check("a range crossing a month names both",
       pm.date_range(pm.period_for("weekly", date(2026, 9, 30)))
       == "28th Sep-4th Oct")
@@ -607,10 +607,34 @@ check("ordinals: the teens are all th",
       [pm._ord(n) for n in (11, 12, 13)] == ["11th", "12th", "13th"])
 check("ordinals: 21st 22nd 23rd 31st",
       [pm._ord(n) for n in (21, 22, 23, 31)] == ["21st", "22nd", "23rd", "31st"])
-check("the other tiers are unchanged",
+# The NAME carries the tier emoji since 2026-09-17, the stable id does not:
+# title() still builds the index keys and the crumb labels inside other notes.
+check("the other tiers are the emoji plus the id",
       all(pm.long_title(pm.period_for(k, date(2026, 9, 12)))
-          == pm.title(pm.period_for(k, date(2026, 9, 12)))
+          == f"{pm.TIER_EMOJI[k]} {pm.title(pm.period_for(k, date(2026, 9, 12)))}"
           for k in ("daily", "monthly", "quarterly", "yearly")))
+check("Vex's five emoji, in his order",
+      [pm.TIER_EMOJI[k] for k in pm.KINDS] == ["☀️", "♻️", "🗓️", "🌓", "🎉"])
+check("the emoji never reaches the stable id",
+      not any(pm.TIER_EMOJI[k] in pm.title(pm.period_for(k, date(2026, 9, 12)))
+              for k in pm.KINDS))
+# Old notes have no prefix, new ones do: both must land on the SAME key, or a
+# refresh would mint a second note for a period that already has one.
+for _k, _old, _new in (("weekly", "2026-W37 • 7th-13th Sep", "♻️ 2026-W37 • 7th-13th Sep"),
+                       ("monthly", "2026-09 September", "🗓️ 2026-09 September"),
+                       ("quarterly", "2026-Q3", "🌓 2026-Q3"),
+                       ("yearly", "2026", "🎉 2026")):
+    check(f"{_k}: prefixed and bare read the same",
+          pm.stable_key(_old) == pm.stable_key(_new), pm.stable_key(_new))
+check("daily: prefixed and bare read the same",
+      pm.parse_daily_title("2026-09-17 · Thu")
+      == pm.parse_daily_title("☀️ 2026-09-17 · Thu") == date(2026, 9, 17))
+check("a variation selector lost in transit still resolves",
+      pm.stable_key("\U0001f5d3 2026-09 September") == "2026-09 September")
+check("a title that is not prefixed is returned whole",
+      pm.strip_tier_emoji("2026-Q3") == "2026-Q3")
+check("a stranger's emoji is not stripped",
+      pm.strip_tier_emoji("🔥 2026-Q3") == "🔥 2026-Q3")
 check("the lookup key ignores the range",
       pm.title_key(_wk) == "2026-W37"
       and pm.stable_key("2026-W37 • 7th-13th Sep") == "2026-W37"

@@ -118,7 +118,7 @@ def idle_rows(frag):
         it = alfred.item(
             uid=f"pn-open-{spec}",
             title=f"{emoji} {label} · {pm.title(p)}",
-            subtitle="⏎↗️ Open  ⌥📚 All  ⌃⇧📌 Sticky",
+            subtitle="⏎↗️ Open  ⌥📚 All  ⌃⇧📌 Sticky  ⌃⌥🪟 Window",
             arg=f"xact:pn_open:{spec}", valid=True,
             mods=_mods(spec))
         it["_kw"] = f"{spec} {_OPEN_KW.get(spec, '')}"

@@ -33,6 +33,33 @@ TIER_TAGS = {"daily": "💫Daily", "weekly": "💫Weekly", "monthly": "💫Month
              "quarterly": "💫Quarterly", "yearly": "💫Yearly"}
 KINDS = ("daily", "weekly", "monthly", "quarterly", "yearly")
 
+# The note NAME carries its tier's emoji since 2026-09-17 (Vex: "Add emoji
+# prefixes to periodic notes for even easier visual orientation"). His own
+# five, the ones the pn rows already use (periodic_rows._OPEN_ROWS).
+TIER_EMOJI = {"daily": "☀️", "weekly": "♻️", "monthly": "🗓️",
+              "quarterly": "🌓", "yearly": "🎉"}
+# Both spellings of each: three of the five end in VARIATION SELECTOR-16, and
+# a title that loses it somewhere between TickTick, a phone and a hand edit
+# must still resolve to the same note.
+_TIER_PREFIXES = tuple(
+    f"{e}{sfx} " for e in TIER_EMOJI.values()
+    for sfx in ("", "\ufe0f") if not (sfx and e.endswith("\ufe0f"))
+) + tuple(f"{e.replace(chr(0xfe0f), '')} " for e in TIER_EMOJI.values())
+
+
+def strip_tier_emoji(s):
+    """A note title without its tier emoji, if it has one.
+
+    Every title MATCH goes through this, because notes minted before
+    2026-09-17 have no prefix and notes minted after do - and both have to
+    land on the same index key, or a refresh would mint a second note for a
+    period that already has one."""
+    t = (s or "").lstrip()
+    for pre in _TIER_PREFIXES:
+        if t.startswith(pre):
+            return t[len(pre):].lstrip()
+    return s or ""
+
 # ── Section header constants (one source of truth) ──────────────────────────
 # The shipped default layout: nav/quote/weather/mood live in the LEAD
 # (engine-composed), `#` group headers + `---` dividers are decor
@@ -390,13 +417,16 @@ def date_range(p):
 
 
 def long_title(p):
-    """The note's own NAME. Weekly carries its date range, because "2026-W37"
-    alone says nothing about which days it covers (Vex 2026-09-12). The
-    STABLE id stays in front and title_key still matches on it, so renaming a
-    note can never orphan it from the index."""
-    if p.kind == "weekly":
-        return f"{title(p)} • {date_range(p)}"
-    return title(p)
+    """The note's own NAME: the tier emoji, then the stable id, then (weekly
+    only) its date range - "2026-W37" alone says nothing about which days it
+    covers (Vex 2026-09-12).
+
+    The emoji is HERE and not in title(), which stays the bare stable id: it
+    is the note's name on the board, not its identity. title() goes on
+    building the index keys and the crumb link labels inside other notes,
+    where the arrows already say which way you are travelling."""
+    base = f"{title(p)} • {date_range(p)}" if p.kind == "weekly" else title(p)
+    return f"{TIER_EMOJI[p.kind]} {base}"
 
 
 def tag(p):
@@ -412,12 +442,16 @@ def title_key(p):
 
 
 def stable_key(note_title):
-    """The index key for a non-daily note TITLE: everything before " • "."""
-    return (note_title or "").split(" • ")[0].strip()
+    """The index key for a non-daily note TITLE: everything before " • ",
+    without the tier emoji."""
+    return strip_tier_emoji(note_title).split(" • ")[0].strip()
 
 
 def parse_daily_title(s):
-    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", s or "")
+    """The date a daily note's TITLE stands for, or None. Tolerates the tier
+    emoji, so a note minted before 2026-09-17 and one minted after land on
+    the same index key."""
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", strip_tier_emoji(s))
     if not m:
         return None
     try:
