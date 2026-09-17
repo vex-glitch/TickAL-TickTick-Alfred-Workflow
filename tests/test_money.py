@@ -146,6 +146,11 @@ class _FakeEngine:
     def week_answer_states(slot, needle, monday=None, today=None, money=False):
         return [(d, ) + WEEK[d] for d in sorted(WEEK, reverse=True)]
 
+    @staticmethod
+    def day_answer_state(day, slot, needle, notes=None):
+        st, _v, txt = WEEK.get(day, ("unasked", None, ""))
+        return st, txt
+
 
 prows._pe = lambda: _FakeEngine
 TODAY = date(2026, 9, 17)
@@ -219,3 +224,74 @@ prows.date = _real_date
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if FAILS:
     raise AssertionError(f"{len(FAILS)} failed: {FAILS}")
+
+# ── the review round, 2026-09-17: six real bugs in the machine as first built ─
+HL = {"letter": "h", "emoji": "✨", "label": "Highlight", "key": "dhighlight",
+      "slot": "evening", "needle": "highlight of the day",
+      "hint": "x", "prompt": "Type the highlight…",
+      "parse": prows._parse_text, "bad": "Words, not a number"}
+
+r = prows.day_strip_rows(HL, "Shipped the thing *finally", "pn + b h ")
+check("a trailing *word that is not a day stays in the text",
+      all("Shipped the thing *finally" in x.get("subtitle", "")
+          for x in r if x.get("valid")), [x.get("subtitle") for x in r])
+r = prows.day_strip_rows(HL, "Shipped it *mon", "pn + b h ")
+check("a trailing *day still targets a day",
+      len(r) == 1 and "14 Sep" in r[0]["title"], [x["title"] for x in r])
+
+check("the mood separator the hint teaches is shaved",
+      prows._parse_scale("4 · slept badly")[1] == {"score": 4, "note": "slept badly"},
+      prows._parse_scale("4 · slept badly"))
+check("and a note with no separator still works",
+      prows._parse_scale("4 slept badly")[1]["note"] == "slept badly")
+check("a scale value must be 1 to 5",
+      prows._parse_scale("7") is None and prows._parse_scale("x") is None
+      and prows._parse_scale("42") is None)
+
+check("the day rating does not wear the week highlight's glyph",
+      prows._BY_LETTER["r"]["emoji"] != "⭐️"
+      and "⭐️ Highlight" in dict(prows._KIND_LEGEND).get("h", "⭐️ Highlight"))
+
+r = prows.day_strip_rows(HL, "!2026-09-15 A highlight", "pn + b h ")
+keep = r[0]
+check("the Leave it row keeps what you typed in the bar",
+      keep["autocomplete"] == "pn + b h A highlight", keep.get("autocomplete"))
+check("and replacing is the second row",
+      "Replace" in r[1]["subtitle"] and r[1]["valid"] is True, r[1])
+
+check("a day you have not had yet is refused",
+      "Not a day you have had yet" in
+      prows.day_strip_rows(HL, "!2099-01-01 x", "pn + b h ")[0]["title"])
+
+
+class _Broken:
+    @staticmethod
+    def week_answer_states(*a, **k):
+        raise RuntimeError("cache is gone")
+
+    @staticmethod
+    def day_answer_state(*a, **k):
+        raise RuntimeError("cache is gone")
+
+
+_ok_pe = prows._pe
+prows._pe = lambda: _Broken
+r = prows.day_strip_rows(HL, "A highlight", "pn + b h ")
+check("an unreadable cache never becomes a one-keystroke overwrite",
+      not any(x.get("valid") for x in r)
+      and all("Cannot read" in x["subtitle"] for x in r),
+      [(x["subtitle"], x.get("valid")) for x in r])
+prows._pe = _ok_pe
+
+check("a date in another year says so",
+      pm.day_label(date(2025, 9, 15), date(2026, 9, 17)) == "Mon 15 Sep 2025"
+      and pm.day_label(date(2026, 9, 15), date(2026, 9, 17)) == "Tue 15 Sep")
+
+_doc = ps.parse_sections(
+    "- 🌙 Evening journal\n\t- *Q1 · ✨ What was the highlight of the day?*\n"
+    "\t\t- A: \n#### ✨ Highlight\n- ✨ yesterday's leftover\n")
+pe._fill_day_highlight(_doc)
+check("emptying the answer clears the ✨ mirror",
+      [l for l in (ps.find(_doc, pm.SEC_HIGHLIGHT) or ps.Section("", "")).body
+       if l.strip()] == [],
+      (ps.find(_doc, pm.SEC_HIGHLIGHT) or ps.Section("", "")).body)

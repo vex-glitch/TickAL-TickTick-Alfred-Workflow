@@ -498,10 +498,12 @@ def _fill_day_highlight(doc):
     left for "the next refresh" would never happen on the days this matters.
     """
     hl = _answer_in(doc, pm.SEC_EVENING, "highlight of the day")
-    if not hl:
-        return False
+    # an EMPTIED answer clears the line, which is what the contract above says
+    # and what the code did not do: skipping set_body left yesterday's ✨
+    # standing over a blank answer, permanently on a past note nothing can
+    # refresh (found by review 2026-09-17)
     return ps.set_body(doc, pm.SEC_HIGHLIGHT,
-                       [f"- ✨ {mdtext.flatten_links(hl)}"])
+                       [f"- ✨ {mdtext.flatten_links(hl)}"] if hl else [])
 
 
 def _highlights_between(index, d0, d1):

@@ -265,12 +265,25 @@ def _parse_text(rest):
     return (rest, {"text": rest}, rest) if rest else None
 
 
+_SCALE_RE = re.compile(r"^([1-5])(?!\d)(?:\s*·?\s*(.*))?$", re.S)
+
+
 def _parse_scale(rest):
-    head, _, tail = rest.partition(" ")
-    if not head.isdigit() or not 1 <= int(head) <= 5:
+    # the SAME shape xact's mood branch uses. The legend hint literally teaches
+    # the separator ("1 to 5, a note after ·"), so "4 · tired" must store
+    # "🙂 tired" and not "🙂 · tired" - two doors onto one answer cannot write
+    # two shapes of it (found by review 2026-09-17).
+    m = _SCALE_RE.match(rest.strip())
+    if not m:
         return None
-    note = tail.strip()
+    head, note = m.group(1), (m.group(2) or "").strip()
     return head, {"score": int(head), "note": note}, head + (f" {note}" if note else "")
+
+
+def _unknown_day_row(msg):
+    return [alfred.item(uid="pn-bk-noday", title=f"📋 {msg}",
+                        subtitle="Pick a day from the list",
+                        valid=False, mods=_mods())]
 
 
 # 📋 Backlog - ONE machine for "fill a day in after the fact" (Vex 2026-09-17:
@@ -291,7 +304,7 @@ BACKLOG_KINDS = (
      "slot": "morning", "needle": "mood 1-5",
      "hint": "1 to 5, a note after ·", "prompt": "Type 1 to 5…",
      "parse": _parse_scale, "bad": "1 to 5"},
-    {"letter": "r", "emoji": "⭐️", "label": "Day rating", "key": "rating",
+    {"letter": "r", "emoji": "★", "label": "Day rating", "key": "rating",
      "slot": "evening", "needle": "rate the day",
      "hint": "1 to 5 stars", "prompt": "Type 1 to 5…",
      "parse": _parse_scale, "bad": "1 to 5"},
@@ -309,13 +322,18 @@ def _pe():
 
 
 def _state(cfg, day):
-    """(state, shown value) for one day, live off the cache."""
-    pe = _pe()
-    if cfg.get("money"):
-        st, amt, txt = pe.day_money_state(day)
-        return st, (pm.fmt_amount(amt) if amt is not None else txt)
-    st, txt = pe.day_answer_state(day, cfg["slot"], cfg["needle"])
-    return st, txt
+    """(state, shown, raw) for one day, live off the cache. `shown` is for a
+    row, `raw` is the answer as written - the money confirm screen has to test
+    the real text to know whether adding would drop words from it."""
+    try:
+        pe = _pe()
+        if cfg.get("money"):
+            st, amt, txt = pe.day_money_state(day)
+            return st, (pm.fmt_amount(amt) if amt is not None else txt), txt
+        st, txt = pe.day_answer_state(day, cfg["slot"], cfg["needle"])
+        return st, txt, txt
+    except Exception:
+        return "unknown", "", ""
 
 
 def _week(cfg, today):
@@ -325,10 +343,13 @@ def _week(cfg, today):
         rows = _pe().week_answer_states(cfg["slot"], cfg["needle"],
                                         today=today, money=bool(cfg.get("money")))
         return [(d, st, (pm.fmt_amount(v) if cfg.get("money") and v is not None
-                         else (txt or ""))) for d, st, v, txt in rows]
+                         else (txt or "")), txt or "") for d, st, v, txt in rows]
     except Exception:
+        # "unknown", NEVER "unasked": an unreadable cache used to mark every
+        # day empty, which made every row a one-keystroke blind overwrite -
+        # the exact thing the confirm screen exists to prevent.
         monday = today - timedelta(days=today.weekday())
-        return [(monday + timedelta(days=i), "unasked", "")
+        return [(monday + timedelta(days=i), "unknown", "", "")
                 for i in range((today - monday).days, -1, -1)]
 
 
@@ -338,7 +359,7 @@ def _arg(cfg, payload, day, replace=False):
                                           replace=bool(replace)))
 
 
-def _confirm(cfg, day, shown, payload, had, prefix, typed):
+def _confirm(cfg, day, shown, payload, had, prefix, typed, shown_had=None):
     """Vex's fail-safe (2026-09-17): "if money is entered already for the day
     that I am trying to enter it again, it shows entered amount first row,
     enter confirms or second row to adjust entry."
@@ -349,6 +370,7 @@ def _confirm(cfg, day, shown, payload, had, prefix, typed):
     way nothing is overwritten that has not been read first.
     """
     when = pm.day_label(day)
+    shown_had = had if shown_had is None else shown_had
     rows = []
     if cfg.get("money"):
         amt, prev = payload["amount"], pm.parse_money_answer(had)
@@ -362,12 +384,15 @@ def _confirm(cfg, day, shown, payload, had, prefix, typed):
                 arg=_arg(cfg, payload, day), valid=True, mods=_mods()))
     else:
         rows.append(alfred.item(
-            uid="pn-bk-keep", title=f"{cfg['emoji']} {when} · {had[:60]}",
-            subtitle="⏎ Keep it", arg="", valid=False, mods=_mods()))
-        rows[-1]["autocomplete"] = prefix
+            uid="pn-bk-keep", title=f"{cfg['emoji']} {when} · {shown_had[:60]}",
+            subtitle="⏎ Leave it", arg="", valid=False, mods=_mods()))
+        # back to the strip WITH what he typed still in the bar: an invalid
+        # Alfred row performs its autocomplete on Return, and a bare prefix
+        # here wiped the answer he was in the middle of filing
+        rows[-1]["autocomplete"] = prefix + typed
     rows.append(alfred.item(
         uid="pn-bk-replace",
-        title=f"✏️ {when} · {had[:30]} → {shown[:30]}",
+        title=f"✏️ {when} · {shown_had[:30]} → {shown[:30]}",
         subtitle="⏎ Replace it",
         arg=_arg(cfg, payload, day, replace=True), valid=True, mods=_mods()))
     back = alfred.item(uid="pn-bk-back", title="🔙 Another day",
@@ -385,13 +410,14 @@ def _day_row(cfg, day, state, holds, shown, payload, today, prefix, typed=""):
         title = f"◀️ Yesterday · {when}"
     else:
         title = f"📅 {when}"
-    sub = f"Has {holds[:40]}" if (state == "answered" and holds) \
-        else "Has an answer" if state == "answered" else "Nothing yet"
+    sub = ("Cannot read that day" if state == "unknown"
+           else f"Has {holds[:40]}" if (state == "answered" and holds)
+           else "Has an answer" if state == "answered" else "Nothing yet")
     it = alfred.item(uid=f"pn-bk-{cfg['letter']}-{day.isoformat()}",
                      title=title, subtitle=sub, valid=False, mods=_mods())
     if shown is None:
         return it
-    if state == "answered":
+    if state in ("answered", "unknown"):
         it["subtitle"] = f"{sub}  ·  ⏎ " + ("Add or fix" if cfg.get("money")
                                             else "Keep or replace")
         it["autocomplete"] = f"{prefix}!{day.isoformat()} {typed}"
@@ -421,8 +447,12 @@ def day_strip_rows(cfg, rest, prefix):
     want = None
     m = _DAY_TOKEN_RE.search(rest)
     if m and not pin:
+        # ONLY strip it when it really is a day. The token was being cut off
+        # whatever it said, so "Shipped the thing *finally" silently lost its
+        # last word on a free-text answer (found by review 2026-09-17).
         want = pm.past_day(m.group(1))
-        rest = rest[:m.start()].rstrip()
+        if want is not None:
+            rest = rest[:m.start()].rstrip()
     parsed = cfg["parse"](rest) if rest else None
     today = date.today()
     strip = _week(cfg, today)
@@ -433,24 +463,33 @@ def day_strip_rows(cfg, rest, prefix):
             subtitle=cfg["bad"] if rest else "Then pick a day",
             valid=False, mods=_mods())
         return [first] + [_day_row(cfg, d, st, holds, None, None, today, prefix)
-                          for d, st, holds in strip]
+                          for d, st, holds, _raw in strip]
     shown, payload, typed = parsed
     if pin:
-        day = date.fromisoformat(pin.group(1))
-        st, holds = _state(cfg, day)
+        try:
+            day = date.fromisoformat(pin.group(1))
+        except ValueError:
+            return _unknown_day_row("Not a date")
+        if day > today:
+            # pm.past_day refuses the future on the *token road; the pin road
+            # has to refuse it too, or a typo back-mints and seeds a note for
+            # a day that has not happened
+            return _unknown_day_row("Not a day you have had yet")
+        st, shown_had, raw = _state(cfg, day)
         if st == "answered":
-            return _confirm(cfg, day, shown, payload, holds, prefix, typed)
-        return [_day_row(cfg, day, st, holds, shown, payload, today, prefix, typed)]
+            return _confirm(cfg, day, shown, payload, raw, prefix, typed, shown_had)
+        return [_day_row(cfg, day, st, shown_had, shown, payload, today, prefix, typed)]
     days = strip
     if want is not None:
         days = [r for r in strip if r[0] == want] or [(want, ) + _state(cfg, want)]
+        days = [d for d in days if d[0] <= today]
     if not days:
         return [alfred.item(uid="pn-bk-noday",
                             title=f"{cfg['emoji']} Not this week",
                             subtitle="Pick a day from Monday on",
                             valid=False, mods=_mods())]
     return [_day_row(cfg, d, st, holds, shown, payload, today, prefix, typed)
-            for d, st, holds in days]
+            for d, st, holds, _raw in days]
 
 
 def backlog_rows(rest):

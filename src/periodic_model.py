@@ -516,10 +516,15 @@ def money_entry_line(amount, label):
     return f"- {fmt_amount(amount)} · {label}" if label else f"- {fmt_amount(amount)}"
 
 
-def day_label(d):
-    """"Mon 14 Sep" - the short stamp the money rows and their toasts name a
-    day by. A retrospective entry must ALWAYS say which day it hit."""
-    return f"{DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]}"
+def day_label(d, today=None):
+    """"Mon 14 Sep", and "Mon 14 Sep 2025" when it is not this year.
+
+    A retrospective entry must ALWAYS say which day it hit, and a screen that
+    can reach any past date must not make last year look like this one - the
+    bare stamp rendered 2025-09-15 and 2026-09-15 identically."""
+    today = today or date.today()
+    base = f"{DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]}"
+    return base if d.year == today.year else f"{base} {d.year}"
 
 
 def money_day_line(d, total):
