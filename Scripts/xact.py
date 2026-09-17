@@ -6685,13 +6685,35 @@ _OSA_PLACE = """on run argv
 		end try
 		-- wait for a REAL window: an app just launched has none yet, and
 		-- TickTick's front window right after a deep link is the task
-		-- POP-UP (an AXSystemDialog), never the main window
+		-- POP-UP (an AXSystemDialog), never the main window.
+		-- And pick the app's MAIN window, not just the front one. A sticky is
+		-- an AXSystemDialog and this filter excluded it; a floating TASK
+		-- window is an AXStandardWindow like any other, and task_window ends
+		-- by raising it - so after the window steps this would have grabbed
+		-- the periodic note and yanked it off the portrait display on every
+		-- Weekly/Monthly/Quarterly Review. Same rule as _RAISE_MAIN: widest
+		-- wins, a window named after its app wins harder. Behaviour is
+		-- unchanged for every single-window app in the routine lists.
 		set win to missing value
 		repeat 24 times
 			try
 				set std to (windows of p whose subrole is "AXStandardWindow")
 				if (count of std) > 0 then
-					set win to item 1 of std
+					set bestScore to -1
+					repeat with ww in std
+						set sc to 0
+						try
+							set sz to size of ww
+							set sc to item 1 of sz
+						end try
+						try
+							if (name of ww as text) is (name of p as text) then set sc to sc + 100000
+						end try
+						if sc > bestScore then
+							set bestScore to sc
+							set win to ww
+						end if
+					end repeat
 					exit repeat
 				end if
 			end try
@@ -8247,7 +8269,7 @@ function run(argv) {
   // outline. A LIST view's outline hangs straight off the window through one
   // scroll area, and so does the sidebar. That is the whole kanban test, and
   // it needs no widths or magic numbers.
-  var outlines = [], boarded = [], main = null, mainScore = -1;
+  var outlines = [], boarded = [], clips = [], main = null, mainScore = -1;
   each(ax(app, 'AXWindows'), function (w) {
     if (s(ax(w, 'AXSubrole')) !== 'AXStandardWindow') return;
     var szv = ax(w, 'AXSize');
@@ -8256,16 +8278,38 @@ function run(argv) {
     if (s(ax(w, 'AXTitle')) === 'TickTick') sc += 100000;
     if (sc > mainScore) { mainScore = sc; main = w; }
   });
+  // ...and a CLIP rect, the intersection of every AXScrollArea on the way
+  // down. AX reports a row at its UNCLIPPED frame, so a horizontally
+  // scrolled kanban board hands back columns that are still inside the
+  // window but sit over the SIDEBAR - a double click there navigates away
+  // or renames a list. Clipping to the scroll areas is what "visible"
+  // actually means, and it subsumes the window clamp.
+  function rectOf(el) {
+    var p = geom(el, 'AXPosition', /x:(-?[\\d.]+)\\s+y:(-?[\\d.]+)/);
+    var z = geom(el, 'AXSize', /w:(-?[\\d.]+)\\s+h:(-?[\\d.]+)/);
+    return (p && z) ? [p[0], p[1], z[0], z[1]] : null;
+  }
+  function clipWith(a, b) {
+    if (!b) return a;
+    if (!a) return b;
+    var x0 = Math.max(a[0], b[0]), y0 = Math.max(a[1], b[1]);
+    var x1 = Math.min(a[0] + a[2], b[0] + b[2]);
+    var y1 = Math.min(a[1] + a[3], b[1] + b[3]);
+    return [x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0)];
+  }
   if (main) {
-    (function collect(el, depth, grouped) {
+    (function collect(el, depth, grouped, clip) {
       if (depth > 8) return;
       var r = s(ax(el, 'AXRole'));
-      if (r === 'AXOutline') { outlines.push(el); boarded.push(grouped); return; }
+      if (r === 'AXScrollArea') clip = clipWith(clip, rectOf(el));
+      if (r === 'AXOutline') {
+        outlines.push(el); boarded.push(grouped); clips.push(clip); return;
+      }
       if (SKIP[r]) return;
       each(ax(el, 'AXChildren'), function (c) {
-        collect(c, depth + 1, grouped || r === 'AXGroup');
+        collect(c, depth + 1, grouped || r === 'AXGroup', clip);
       });
-    })(main, 0, false);
+    })(main, 0, false, rectOf(main));
   }
 
   // rightmost outline first (content panes sit right of the sidebar)
@@ -8288,10 +8332,12 @@ function run(argv) {
 
   for (var k = 0; k < order.length; k++) {
     var oi = order[k];
-    var found = null, label = null;
+    // An EXACT label beats a substring: "Weekly note" must not double click
+    // "Weekly note archive" just because it is higher up the column.
+    var found = null, label = null, loose = null, looseLabel = null;
     each(ax(outlines[oi], 'AXRows'), function (row) {
       if (found) return;
-      var text = '', first = null, hit = null;
+      var text = '', first = null, hit = null, exact = null;
       each(ax(row, 'AXChildren'), function (cell) {
         each(ax(cell, 'AXChildren'), function (t) {
           var r = s(ax(t, 'AXRole'));
@@ -8300,11 +8346,14 @@ function run(argv) {
           if (!v) return;
           if (!first) first = t;
           if (!hit && v.indexOf(needle) >= 0) hit = t;
+          if (!exact && v.replace(/^\\s+|\\s+$/g, '') === needle) exact = t;
           text += v;
         });
       });
-      if (text.indexOf(needle) >= 0) { found = row; label = hit || first; }
+      if (exact) { found = row; label = exact; return; }
+      if (!loose && text.indexOf(needle) >= 0) { loose = row; looseLabel = hit || first; }
     });
+    if (!found && loose) { found = loose; label = looseLabel; }
     if (found) {
       var p = geom(found, 'AXPosition', /x:(-?[\\d.]+)\\s+y:(-?[\\d.]+)/);
       var z = geom(found, 'AXSize', /w:(-?[\\d.]+)\\s+h:(-?[\\d.]+)/);
@@ -8319,8 +8368,10 @@ function run(argv) {
       // rather than a short line nobody can index into.
       var tail = (lp && lz) ? (lp[0] + '|' + lp[1] + '|' + lz[0] + '|' + lz[1])
                             : '0|0|0|0';
+      var cl = clips[oi];
+      var clipTail = cl ? ('|' + cl[0] + '|' + cl[1] + '|' + cl[2] + '|' + cl[3]) : '';
       return 'FOUND|' + p[0] + '|' + p[1] + '|' + z[0] + '|' + z[1] + '|' + tail
-             + '|' + (boarded[oi] ? '1' : '0');
+             + '|' + (boarded[oi] ? '1' : '0') + clipTail;
     }
   }
   return '';
@@ -8603,9 +8654,15 @@ def _win_match(title, wins):
     for k in wins:
         if " ".join(k.split()) == want:
             return k
+    # A prefix ONLY counts when the window name is visibly truncated. Without
+    # that test a task genuinely called "Weekly review" hands its window to
+    # "Weekly review of the quarter" - raised, placed and reported as success.
     best = None
     for k in wins:
-        n = " ".join(k.split()).rstrip("… .").strip()
+        n = " ".join(k.split())
+        if not (n.endswith("…") or n.endswith("...")):
+            continue
+        n = n.rstrip("… .").strip()
         if len(n) >= 12 and want.startswith(n) and (best is None or len(n) > len(best)):
             best = k
     return best
@@ -8616,33 +8673,37 @@ _WIN_SHOW = '''on run argv
   repeat with a in argv
     set end of v to a as text
   end repeat
+  set nm to item 1 of v
   tell application "System Events" to tell process "TickTick"
-    repeat with w in (windows whose subrole is "AXStandardWindow")
-      try
-        if (name of w as text) is (item 1 of v) then
-          perform action "AXRaise" of w
-          if (count of v) is 5 then
-            set px to (item 2 of v) as integer
-            set py to (item 3 of v) as integer
-            set pw to (item 4 of v) as integer
-            set ph to (item 5 of v) as integer
-            set position of w to {px, py}
-            set size of w to {pw, ph}
-            -- A window that just opened re-applies its REMEMBERED size a
-            -- moment later and eats the first one (the position survived,
-            -- the size did not - measured 2026-09-17). Place it twice.
-            delay 0.3
-            set size of w to {pw, ph}
-            set position of w to {px, py}
-          end if
-          set p to position of w
-          set z to size of w
-          return "" & (item 1 of p) & " " & (item 2 of p) & " " & (item 1 of z) & " " & (item 2 of z)
-        end if
-      end try
-    end repeat
+    -- EVERY statement re-finds the window BY NAME. System Events hands out
+    -- INDEX specifiers ("window 3"), and "perform action AXRaise" reorders
+    -- the window list, so a reference taken before the raise points at a
+    -- DIFFERENT window after it: the raise landed on the right window and
+    -- the placement then moved whatever had slid into its index. That is
+    -- how an unrelated task window ended up wearing the daily note's frame.
+    try
+      set w to (first window whose name is nm)
+    on error
+      return ""
+    end try
+    perform action "AXRaise" of w
+    if (count of v) is 5 then
+      set px to (item 2 of v) as integer
+      set py to (item 3 of v) as integer
+      set pw to (item 4 of v) as integer
+      set ph to (item 5 of v) as integer
+      set position of (first window whose name is nm) to {px, py}
+      set size of (first window whose name is nm) to {pw, ph}
+      -- A window that just opened re-applies its REMEMBERED size a moment
+      -- later and eats the first one (position survived, size did not).
+      delay 0.3
+      set size of (first window whose name is nm) to {pw, ph}
+      set position of (first window whose name is nm) to {px, py}
+    end if
+    set p to position of (first window whose name is nm)
+    set z to size of (first window whose name is nm)
+    return "" & (item 1 of p) & " " & (item 2 of p) & " " & (item 1 of z) & " " & (item 2 of z)
   end tell
-  return ""
 end run'''
 
 
@@ -8751,23 +8812,35 @@ def _click_points(row, text=(0, 0, 0, 0), clicks=1):
     return out
 
 
+def _rect(parts):
+    """Four fields → (x, y, w, h), or None. A SHORT slice must come back as
+    None, not as a short tuple: the System-Events spoke still speaks the old
+    five-field line, `int(v) for v in parts[5:9]` over an empty slice raises
+    nothing, and a () handed on to a four-name unpack killed the whole verb."""
+    if len(parts) != 4:
+        return None
+    try:
+        return tuple(int(v) for v in parts)
+    except ValueError:
+        return None
+
+
 def _parse_row(out):
-    """A finder line → ((x, y, w, h), (title frame), card) or None.
-    card: True = a kanban card, False = a list row, None = the System-Events
-    fallback spoke, which says nothing about the view."""
+    """A finder line → ((x, y, w, h), title frame, card, clip) or None.
+
+    card: True a kanban card, False a list row, None the System-Events spoke,
+    which says nothing about the view. clip: the visible rectangle the row
+    lives in (every AXScrollArea on the way down, intersected), or None from
+    that same spoke."""
     if not out.startswith("FOUND|"):
         return None
     parts = out.split("|")
-    try:
-        row = tuple(int(v) for v in parts[1:5])
-    except ValueError:
+    row = _rect(parts[1:5])
+    if row is None:
         return None
-    try:
-        text = tuple(int(v) for v in parts[5:9])
-    except ValueError:
-        text = (0, 0, 0, 0)
+    text = _rect(parts[5:9]) or (0, 0, 0, 0)
     card = (parts[9] == "1") if len(parts) >= 10 else None
-    return row, text, card
+    return row, text, card, _rect(parts[10:14])
 
 
 def _pick_point(points, frames, win=None):
@@ -8775,10 +8848,11 @@ def _pick_point(points, frames, win=None):
 
     Two ways a point is not safe. It is COVERED by something of TickTick's
     that floats (a sticky panel, a task window) - the click would go there
-    instead. Or it is OUTSIDE the main window: AX reports a scrolled-away
-    row at its true frame, which can be thousands of pixels off screen (the
-    sidebar's rows sit at y -3164 while the window ends at -10), and a click
-    there lands on whatever app is behind TickTick."""
+    instead. Or it is outside `win`, the row's own VISIBLE rectangle: AX
+    reports a row at its unclipped frame, so the sidebar's scrolled-away
+    rows sit at y -3164 while the window ends at -10, and a horizontally
+    scrolled kanban column reports itself over the SIDEBAR - a double click
+    there navigates away or renames a list instead of opening a window."""
     for cx, cy in points:
         if win and not (win[0] <= cx <= win[0] + win[2]
                         and win[1] <= cy <= win[1] + win[3]):
@@ -8790,10 +8864,10 @@ def _pick_point(points, frames, win=None):
     return None
 
 
-def _aim_click(row, text, clicks):
+def _aim_click(row, text, clicks, clip=None):
     """Click the first safe point of the row. True once clicked."""
     pt = _pick_point(_click_points(row, text, clicks), _float_frames(),
-                     _main_frame())
+                     clip or _main_frame())
     if pt is None:
         return False   # covered or scrolled away right now - caller retries
     _cg_click(pt[0], pt[1], clicks)
@@ -8804,7 +8878,7 @@ def _click_task_row(title, clicks=1):
     """Find the row whose text contains `title` and land a REAL click on it.
     True once clicked."""
     got = _parse_row(_row_find(title[:60].strip()))
-    return bool(got) and _aim_click(got[0], got[1], clicks)
+    return bool(got) and _aim_click(got[0], got[1], clicks, got[3])
 
 
 def _dbl_card(title):
@@ -8819,10 +8893,10 @@ def _dbl_card(title):
     got = _parse_row(_row_find(title[:60].strip()))
     if not got:
         return "miss"
-    row, text, card = got
+    row, text, card, clip = got
     if card is not True:
         return "list"
-    return "ok" if _aim_click(row, text, 2) else "miss"
+    return "ok" if _aim_click(row, text, 2, clip) else "miss"
 
 
 def _select_task(pid, tid):
@@ -9233,7 +9307,11 @@ def task_window(pid, tid):
         return None, "miss"
 
     got, why = _aim(0.3)                         # fast path: already on screen
-    if not got and why != "list":
+    # A "list" here is NOT about the task's own list: the fast aim runs on
+    # whatever is on screen, so a task sitting in Today (a list view) whose
+    # own project is a kanban board would be refused without ever looking.
+    # Only the verdict AFTER the deep link is worth short-circuiting on.
+    if not got:
         before = _sticky_count()
         subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{tid}"],
                        check=False)

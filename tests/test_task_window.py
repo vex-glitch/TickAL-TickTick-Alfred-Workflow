@@ -133,12 +133,22 @@ check("an ellipsized window name matches its long title",
                       {"💼 P • Onboard TickTick 🔗…": (1, 2, 3, 4)})
       == "💼 P • Onboard TickTick 🔗…")
 check("a SHORT prefix never matches (it would hand back a stranger's window)",
-      xact._win_match("2026-Q3 review", {"2026-Q3": (1, 2, 3, 4)}) is None)
-check("the longest prefix wins",
+      xact._win_match("2026-Q3 review", {"2026-Q3…": (1, 2, 3, 4)}) is None)
+# A prefix only counts when the name is visibly TRUNCATED. Otherwise a task
+# genuinely called "Weekly review" hands its window to "Weekly review of the
+# quarter" - raised, placed, and reported as success.
+check("an untruncated name is never a prefix match",
       xact._win_match("Weekly review of the quarter",
-                      {"Weekly review": (1, 1, 1, 1),
-                       "Weekly review of the": (2, 2, 2, 2)})
-      == "Weekly review of the")
+                      {"Weekly review": (1, 1, 1, 1)}) is None)
+check("the longest ellipsized prefix wins",
+      xact._win_match("Weekly review of the quarter",
+                      {"Weekly review…": (1, 1, 1, 1),
+                       "Weekly review of the…": (2, 2, 2, 2)})
+      == "Weekly review of the…")
+check("three dots count as truncation too",
+      xact._win_match("Weekly review of the quarter",
+                      {"Weekly review of...": (1, 1, 1, 1)})
+      == "Weekly review of...")
 check("exact beats a prefix",
       xact._win_match("Weekly review",
                       {"Weekly review of the": (2, 2, 2, 2),
@@ -154,17 +164,37 @@ del os.environ["TICKAL_WIN_FRAME"]
 check("frame env unset → None", xact._win_frame_env() is None)
 
 # ── the finder line: shape, title frame, kanban flag ────────────────────────
-check("full line parses",
-      xact._parse_row("FOUND|1473|-738|282|48|1522|-729|206|21|1")
-      == ((1473, -738, 282, 48), (1522, -729, 206, 21), True))
+FULL = "FOUND|1211|-738|282|93|1260|-729|206|21|1|1377|-738|116|726"
+check("full line parses", xact._parse_row(FULL)
+      == ((1211, -738, 282, 93), (1260, -729, 206, 21), True, (1377, -738, 116, 726)))
 check("list row reads as NOT a card",
-      xact._parse_row("FOUND|1461|-472|634|44|1513|-461|562|21|0")[2] is False)
+      xact._parse_row("FOUND|1461|-472|634|44|1513|-461|562|21|0|1461|-708|634|694")[2]
+      is False)
 check("no label → zeros, card flag still read",
       xact._parse_row("FOUND|1|2|3|4|0|0|0|0|1")[1] == (0, 0, 0, 0))
-check("the short System-Events shape → card UNKNOWN",
-      xact._parse_row("FOUND|1|2|3|4")[2] is None)
 check("a miss is None", xact._parse_row("") is None)
 check("garbage is None", xact._parse_row("FOUND|a|b|c|d") is None)
+
+# The System-Events spoke still speaks the OLD five-field line. int() over an
+# empty slice raises NOTHING - it yields () - and a () handed to a four-name
+# unpack killed the whole verb: no pomo, no sticky, no honest toast.
+SHORT = xact._parse_row("FOUND|100|200|300|40")
+check("the short shape → card UNKNOWN", SHORT[2] is None)
+check("the short shape → title frame is ZEROS, never ()", SHORT[1] == (0, 0, 0, 0))
+check("the short shape → no clip", SHORT[3] is None)
+check("the short shape still aims (no exception)",
+      bool(xact._click_points(SHORT[0], SHORT[1], 2)))
+check("_rect refuses a short slice", xact._rect(["1", "2", "3"]) is None)
+check("_rect refuses a long slice", xact._rect(["1", "2", "3", "4", "5"]) is None)
+check("_rect refuses junk", xact._rect(["1", "x", "3", "4"]) is None)
+
+# The clip is what "visible" means: a horizontally scrolled kanban column is
+# reported at its UNCLIPPED frame, half of it lying over the sidebar.
+CLIP = (1377, -738, 116, 726)
+check("a point in the scrolled-away half of a card is refused",
+      xact._pick_point([(1352, -677)], [], CLIP) is None)
+check("a point in the visible sliver is taken",
+      xact._pick_point([(1352, -677), (1394, -692)], [], CLIP) == (1394, -692))
 
 # ── what may be clicked ─────────────────────────────────────────────────────
 WIN = (1094, -848, 1517, 838)
