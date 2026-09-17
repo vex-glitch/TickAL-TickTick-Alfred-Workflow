@@ -413,32 +413,75 @@ def fmt_amount(x):
 # parse_amount scrapes every digit in the string, which reads "500 for the
 # sleeve, 2 sessions" as 5002 - fine for the canonical "- 485 · label" entry
 # lines it was built for, wrong for a sentence.
-MONEY_ANSWER_RE = re.compile(r"(?<![\w.,])(\d[\d.,]*)")
+# The sign is INSIDE the group: parse_amount reads a leading "-" off the raw
+# string, so leaving it outside made a refund read back as income (found
+# 2026-09-17: "-50" parsed as 50, and a bump then ADDED it).
+MONEY_ANSWER_RE = re.compile(r"(?<![\w.,])([-−]?\d[\d.,]*)")
+MONEY_SEPS = (" · ", " - ", " • ")
+MONEY_LABEL_CAP = 6
 
 
 def parse_money_answer(text):
-    """Evening-journal money answer → amount | None (first number wins)."""
-    m = MONEY_ANSWER_RE.search(text or "")
+    """Evening-journal money answer → amount | None (first number wins).
+
+    Unescaped first: the TickTick app saves "1250\\.50", and reading that
+    without unescaping dropped the decimals."""
+    m = MONEY_ANSWER_RE.search(unescape_md(text or ""))
     return parse_amount(m.group(1)) if m else None
 
 
 def money_answer_line(total, labels):
-    """The canonical shape the 💰 verb writes back into that answer:
-    the running total, then what it was for."""
-    tail = ", ".join([l for l in labels if l])
+    """The canonical shape the 💰 verb writes back into that answer: the
+    running total, then what it was for. Labels are de-duplicated (case
+    blind) and capped - a bump appended unconditionally, so five entries for
+    the same client listed it five times."""
+    seen, out = set(), []
+    for l in labels or []:
+        l = " ".join((l or "").split())
+        if l and l.casefold() not in seen:
+            seen.add(l.casefold())
+            out.append(l)
+    tail = ", ".join(out[:MONEY_LABEL_CAP])
     return fmt_amount(total) + (f" · {tail}" if tail else "")
 
 
 def split_money_answer(text):
-    """An answer written by money_answer_line → (amount|None, [labels])."""
-    amt = parse_money_answer(text)
-    tail = ""
-    for sep in (" · ", " - "):
-        if sep in (text or ""):
-            tail = (text or "").split(sep, 1)[1]
-            break
-    labels = [x.strip() for x in tail.split(",") if x.strip()]
-    return amt, labels
+    """An answer → (amount|None, [labels]).
+
+    The canonical "485 · tattoo, deposit" splits on its separator. ANYTHING
+    ELSE is a sentence a human typed, and it is kept WHOLE as a single label
+    rather than thrown away: bumping "500 for the sleeve, 2 sessions" used to
+    rewrite it as "600 · deposit" and the sentence was simply gone
+    (2026-09-17). Keeping the original whole is mildly redundant - its number
+    appears twice - and that is the right trade against losing what he wrote.
+    """
+    raw = unescape_md(text or "")
+    amt = parse_money_answer(raw)
+    if amt is None:
+        rest = " ".join(raw.split())
+        return None, ([rest] if rest else [])
+    m = MONEY_ANSWER_RE.search(raw)
+    tail = raw[m.end():]
+    for sep in MONEY_SEPS:
+        if tail.startswith(sep):
+            return amt, [x.strip() for x in tail[len(sep):].split(",") if x.strip()]
+    rest = " ".join(raw.split())
+    # an answer that is ONLY the number carries no words to keep, and listing
+    # "0" or "-50" as its own label is noise
+    return amt, ([rest] if rest and rest != m.group(1).strip() else [])
+
+
+def money_answer_update(prev, amount, label="", replace=False):
+    """(new answer text, the amount it had before).
+
+    ONE rule for both doors into a day's money - the 💰 row and the evening
+    journal write the same line, so they cannot drift. `replace` swaps the
+    number for the new one; the default sums into it and keeps the labels.
+    """
+    had, labels = split_money_answer(prev)
+    if replace:
+        return money_answer_line(amount, [label]), had
+    return money_answer_line((had or 0) + amount, list(labels) + [label]), had
 
 
 def parse_money_entry(line):
@@ -466,6 +509,12 @@ def parse_money_entry(line):
 
 def money_entry_line(amount, label):
     return f"- {fmt_amount(amount)} · {label}" if label else f"- {fmt_amount(amount)}"
+
+
+def day_label(d):
+    """"Mon 14 Sep" - the short stamp the money rows and their toasts name a
+    day by. A retrospective entry must ALWAYS say which day it hit."""
+    return f"{DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]}"
 
 
 def money_day_line(d, total):
@@ -686,6 +735,63 @@ def mood_week_lines(moods, gi=T1, ei=T2):
         if note:
             out.append(f"{ei}- {note}")
     return out
+
+
+DAY_FULL = ["monday", "tuesday", "wednesday", "thursday", "friday",
+            "saturday", "sunday"]
+_DAY_AGO_RE = re.compile(r"^-?(\d{1,3})\s*(?:d|days?)?(?:\s+ago)?$")
+
+
+def past_day(token, today=None):
+    """A day token for a RETROSPECTIVE entry → date | None.
+
+    Looks BACKWARD, which is the whole point: you are filling in a day you
+    have already lived. A weekday name means the MOST RECENT one, today
+    included - never next week's. (dateutil.parse_date is parsedatetime and
+    resolves "tuesday" forward, so it is the wrong tool for this one job.)
+
+    Understood: "" or "today" · "yesterday" · a weekday name or any prefix of
+    one from three letters up · "-2" / "2d" / "2 days ago" · a day of the
+    month 1-31 (this month, or last month when that day has not come round
+    yet) · an ISO date. Anything else, or any day in the FUTURE, is None -
+    there is no money in a day you have not had.
+    """
+    today = today or date.today()
+    t = " ".join((token or "").split()).casefold().lstrip("*@").strip()
+    if not t or t == "today":
+        return today
+    if t == "yesterday":
+        return today - timedelta(days=1)
+    for i, name in enumerate(DAY_FULL):
+        if len(t) >= 3 and name.startswith(t):
+            back = (today.weekday() - i) % 7
+            return today - timedelta(days=back)
+    m = _DAY_AGO_RE.match(t)
+    if m:
+        n = int(m.group(1))
+        # a bare 1-31 with no unit is a day OF THE MONTH ("the 9th"), which is
+        # how the add bar already reads a bare number; "2d" or "-2" is an
+        # offset. The regex keeps them apart by whether a unit or sign is there
+        if t[0] in "-" or t.rstrip().endswith(("d", "day", "days", "ago")):
+            d = today - timedelta(days=n)
+            return d if d <= today else None
+        if 1 <= n <= 31:
+            for month_back in (0, 1):
+                y, mo = today.year, today.month - month_back
+                if mo < 1:
+                    y, mo = y - 1, mo + 12
+                try:
+                    d = date(y, mo, n)
+                except ValueError:
+                    continue
+                if d <= today:
+                    return d
+            return None
+    try:
+        d = date.fromisoformat(t)
+    except ValueError:
+        return None
+    return d if d <= today else None
 
 
 def drop_lists(tasks, skip):

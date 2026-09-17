@@ -31,6 +31,7 @@ test:
 	@$(PYTHON) tests/test_habits_model.py
 	@$(PYTHON) tests/test_on_this_day.py
 	@$(PYTHON) tests/test_recap_order.py
+	@$(PYTHON) tests/test_money.py
 	@$(PYTHON) tests/test_people.py
 	@$(PYTHON) tests/test_eagle.py
 	@$(PYTHON) tests/test_routine_link.py

@@ -45,8 +45,7 @@ Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and sectio
 | Row | Does |
 |-----|------|
 | 💫 Today / ◀ Yesterday / 📆 Week / 🗓 Month / 🧭 Quarter / 📅 Year | ⏎ open instantly (refresh catches up in the background) - **⌃⇧⏎ opens as a [sticky note](44-notes-links-images.md#sticky-notes)** |
-| ➕ Entry | log a win, nag, thought, link or task to today's note - ⏎ shows the kind legend, or type straight: `+ w Shipped the thing` |
-| 💰 Income | log money you made |
+| ➕ Entry | log a win, nag, thought, link, task, highlight or money - ⏎ shows the kind legend, or type straight: `+ w Shipped the thing` |
 | ☀️ Day goal | pick (or create) today's one thing - pinned + scheduled today |
 | ☀️ Add to today / 🌙 Add to tomorrow | pick any task or note → ⏎ schedules it (type `14:30` for a time) |
 | 🌅 / 🌙 / 📔 Journal | morning, evening, weekly - one macOS dialog per question |
@@ -54,7 +53,17 @@ Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and sectio
 | 🗓️ Week highlight | one thing that stands out - it becomes the weekly journal's highlight answer (and the ✨ Highlight section too, on a note that still has one) |
 | 🔄 Refresh today | complete ticked boxes + rebuild the generated sections |
 
-Entry kinds, each with a one-letter prefix: 🏆 `w` win · 👎 `n` nag · 💭 `t` thought (also the default - plain text works) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · 🔗 `l` link (empty = clipboard) · 😊 `m` mood - five faces 😢 😞 😐 🙂 😁, then an optional note. ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
+Entry kinds, each with a one-letter prefix: 🟢 `w` win · 🔴 `n` nag · 💭 `t` thought (also the default - plain text works) · ❗️ `r` reminder · 🔗 `l` link (empty = clipboard) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · ⭐️ `h` highlight · 💰 `$` money. ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
+
+### 💰 Money, any day this week
+
+Type the amount, pick the day. `+ $ 485 tattoo` lists this week Monday to today, today first, with what each day already holds, and ⏎ on a day logs it there. So a day you skipped the evening journal on is the same move as today, not a special mode.
+
+A day's money IS the evening journal's money answer for that day, and this row writes that same answer - there is no second record to disagree with it, and the weekly's 💰 Income sums those answers straight back up. A day that already holds a number therefore cannot be overwritten by a stray ⏎: it stops on a screen that shows you what is there, offers **Add it** first, and makes changing the number a second row you have to choose. Whatever you typed in the answer by hand survives being added to.
+
+Skip the picking with a trailing `*mon`, `*yesterday`, `*-2` or `*9` - day words look backwards here, because you are filling in a day you have already lived.
+
+One limit worth knowing: a week that has already closed keeps the numbers it was sealed with. The daily note takes your entry, but that older weekly note will not move - its totals cannot be safely recomputed once the completed-task feed has scrolled past them.
 
 The same moves work from a task's **⌘ Actions** menu: ☀️ Add to today, 🌙 Add to tomorrow, ☀️ Make day goal. The add window's `/` menu has ☀️ Today and 🌙 Tomorrow shortcuts too.
 

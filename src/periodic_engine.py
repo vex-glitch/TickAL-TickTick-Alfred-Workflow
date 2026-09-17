@@ -1981,39 +1981,122 @@ def _daily_has_money(day=None):
                    pm.SEC_MONEY) is not None
 
 
-def append_income(amount, label, day=None):
+MONEY_NEEDLE = "money did you earn"
+
+
+def day_money_state(day, notes=None):
+    """(state, amount, text) for a day's money, read from the CACHE so a
+    per-keystroke row can ask it. States:
+
+        "answered"  the money question has an answer (amount may still be
+                    None when he typed words with no number in them)
+        "blank"     the question is there, unanswered
+        "unasked"   that day has no money question, or no note at all
+
+    _day_money collapses all three into None-or-0, which is fine for a sum
+    and useless for Vex's fail-safe (2026-09-17: "if money is entered already
+    for the day ... it shows entered amount first row"). "Nothing yet" and
+    "he answered 0" must not read the same on a row that offers to overwrite.
+    """
+    rows = notes if notes is not None else (cache_store.get("all_notes") or [])
+    for t in rows:
+        if (t.get("projectId") or t.get("_projectId")) != areas.PERIODIC_LIST_ID:
+            continue
+        if pm.parse_daily_title(t.get("title") or "") != day:
+            continue
+        doc = ps.parse_sections(t.get("content") or "")
+        sec = ps.find(doc, pm.SEC_EVENING)
+        if sec is not None:
+            for _n, q, a, _i in pm.journal_pairs(sec.body):
+                if MONEY_NEEDLE not in (q or "").casefold():
+                    continue
+                if a and a.strip():
+                    return "answered", pm.parse_money_answer(a), a.strip()
+                return "blank", None, ""
+        msec = ps.find(doc, pm.SEC_MONEY)
+        if msec is not None and any(pm.parse_money_entry(l) for l in msec.body):
+            return "answered", pm.section_money_sum(msec.body), ""
+        return "unasked", None, ""
+    return "unasked", None, ""
+
+
+def week_money_states(monday=None, today=None):
+    """[(date, state, amount, text)] for Monday..today of that week, newest
+    day first - the 💰 day strip's whole data source, one cache read."""
+    today = today or _today()
+    monday = monday or (today - timedelta(days=today.weekday()))
+    notes = cache_store.get("all_notes") or []
+    out = []
+    d = monday
+    while d <= today:
+        st, amt, txt = day_money_state(d, notes)
+        out.append((d, st, amt, txt))
+        d += timedelta(days=1)
+    return list(reversed(out))
+
+
+def append_income(amount, label="", day=None, replace=False):
+    # a taught-separator answer like "500 · client" splits into head+tail
+    # leaving "· client" - shave leading separators, never double them
+    """Log money to a day. Sums into whatever is there; `replace` swaps it.
+
+    Money has ONE home since Vex moved it into the evening journal ("it is an
+    answer in the evening journal, that is all that should be there",
+    2026-09-12), so this verb and the journal write the SAME line and cannot
+    diverge. `day` makes it retrospective (2026-09-17: "add money entries
+    retrospectively to chosen day of the week ... like if I skip evening
+    journal"), and every message names the day it hit - a toast saying
+    "today" over a write into Tuesday reads as a failure.
+
+    Ordering matters. A note old enough to carry a 💰 SECTION with entries in
+    it keeps using that section, because that is where its history is and
+    because _day_money only falls back to a section while no answer exists -
+    writing the answer on such a note would hide its whole history behind one
+    number. Every other note takes the answer, seeding the evening journal
+    first when that day has no money question at all (a back-minted note has
+    none: create_note renders the template and the questions are planted on
+    refresh, which skips a past day).
+    """
     # a taught-separator answer like "500 · client" splits into head+tail
     # leaving "· client" - shave leading separators, never double them
     label = (label or "").strip().lstrip("·-•").strip()
-    p = pm.period_for("daily", day or _today())
+    d = day or _today()
+    when = pm.day_label(d)
+    p = pm.period_for("daily", d)
     task, _ = ensure_note(p)
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
-    entry = pm.money_entry_line(amount, label)
 
-    # Money has ONE home since Vex moved it into the evening journal ("it is
-    # an answer in the evening journal, that is all that should be there",
-    # 2026-09-12), so the verb sums into that answer. A note old enough to
-    # still carry a 💰 section keeps using it - that is where its history is.
-    def mutate(doc, live):
+    def legacy(doc, live):
         sec = ps.find(doc, pm.SEC_MONEY)
-        if sec is None:
+        if sec is None or not any(pm.parse_money_entry(l) for l in sec.body):
             return False
-        body = list(sec.body)
-        while body and not body[-1].strip():
-            body.pop()
-        ps.set_body(doc, pm.SEC_MONEY, pm.recompute_money_body(body + [entry]))
+        body = [] if replace else [l for l in sec.body if l.strip()]
+        ps.set_body(doc, pm.SEC_MONEY,
+                    pm.recompute_money_body(
+                        body + [pm.money_entry_line(amount, label)]))
         return True
-    ok, _doc = _pn_rmw(pid, tid, mutate)
+
+    ok, _doc = _pn_rmw(pid, tid, legacy)
+    seen = {}
     if not ok:
-        def bump(prev):
-            had, labels = pm.split_money_answer(prev)
-            if label:
-                labels.append(label)
-            return pm.money_answer_line((had or 0) + amount, labels)
-        ok = _journal_answer("evening", "money did you earn", bump, day=day)
+        def write(prev):
+            new, had = pm.money_answer_update(prev, amount, label, replace)
+            seen["had"], seen["now"] = had, pm.parse_money_answer(new)
+            return new
+        ok = _journal_answer("evening", MONEY_NEEDLE, write, day=d)
+        if not ok:
+            journal_seed("evening", day=d)       # mints the note AND the Qs
+            ok = _journal_answer("evening", MONEY_NEEDLE, write, day=d)
     if not ok:
-        return "💫 No money question in today's evening journal"
-    return f"💰 {pm.fmt_amount(amount)}" + (f" · {label}" if label else "")
+        return f"💫 {when} · no money question in that note"
+    had, now = seen.get("had"), seen.get("now")
+    if had is not None and now is not None:
+        return (f"💰 {when} · {pm.fmt_amount(now)} (was {pm.fmt_amount(had)})"
+                if replace else
+                f"💰 {when} · {pm.fmt_amount(had)} + {pm.fmt_amount(amount)}"
+                f" = {pm.fmt_amount(now)}")
+    return (f"💰 {when} · {pm.fmt_amount(amount)}"
+            + (f" · {label}" if label else ""))
 
 
 _JOURNAL_SECTIONS = {"morning": pm.SEC_MORNING, "evening": pm.SEC_EVENING,

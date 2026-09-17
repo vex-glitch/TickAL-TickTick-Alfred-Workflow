@@ -7194,7 +7194,19 @@ def pn_income(rest):
             print("💰 Amount first · e.g. 485 groceries")
             return
         spec = {"amount": amt, "label": tail.strip()}
-    msg = _pn().append_income(spec.get("amount") or 0, spec.get("label") or "")
+    # `day` makes it retrospective (Vex 2026-09-17). append_income has taken a
+    # day since it was written; nothing ever passed one, so the verb could
+    # only reach today. An unparseable day falls back to today rather than
+    # refusing - the rows always send an ISO string.
+    day = None
+    if spec.get("day"):
+        import datetime as _dt
+        try:
+            day = _dt.date.fromisoformat(str(spec["day"]))
+        except ValueError:
+            day = None
+    msg = _pn().append_income(spec.get("amount") or 0, spec.get("label") or "",
+                              day=day, replace=bool(spec.get("replace")))
     print(msg)
     # The add-to-today route discards stdout - banner or the log is silent.
     try:

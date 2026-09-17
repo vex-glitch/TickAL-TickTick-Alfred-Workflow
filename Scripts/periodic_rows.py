@@ -149,7 +149,7 @@ def idle_rows(frag):
 _KIND_LEGEND = [
     ("w", "🟢 Win"), ("n", "🔴 Nag"), ("t", "💭 Thought"),
     ("r", "❗️ Reminder"), ("l", "🔗 Link"), ("k", "☑️ Task"),
-    ("h", "⭐️ Highlight"),
+    ("h", "⭐️ Highlight"), ("$", "💰 Money"),
 ]
 _KINDS = {"w": "win", "n": "nag", "t": "thought", "r": "reminder",
           "l": "link"}
@@ -160,7 +160,12 @@ _LEGEND_SUBS = {"w": "Something went well", "n": "Something nagged you",
                 "r": "Something not to forget",
                 "l": "Clipboard is the link, you name it",
                 "k": "Put a task on today or tomorrow",
-                "h": "The one thing this week is remembered for"}
+                "h": "The one thing this week is remembered for",
+                "$": "Money you made, any day this week"}
+# k, h and $ own a whole screen rather than one text row. `$` is in the legend
+# because Vex asked for money back "under entries row" (2026-09-17), and the
+# `pn $ ` keyword caller still exists: both roads render income_rows, so there
+# is ONE money screen, not two doors onto the same answer.
 
 
 def entry_rows(rest):
@@ -179,6 +184,18 @@ def entry_rows(rest):
         return task_rows(tail.strip())
     if letter == "h":
         return highlight_rows(tail.strip())
+    if letter == "$":                     # 💰 Money owns the day strip
+        return income_rows(tail.strip())
+    if len(letter) == 1 and letter not in _KINDS:
+        # Everything unrecognised used to fall through to THOUGHT, so
+        # `pn + $ 485` logged a thought called "$ 485" and `pn + m 200` one
+        # called "m 200" - a valid row, no warning (found 2026-09-17). A
+        # single stray character is a mistyped kind, never a thought worth
+        # keeping; longer text still is one.
+        return [alfred.item(uid="pn-kind-unknown",
+                            title=f"No entry kind “{head}”",
+                            subtitle="⏎ see the kinds", valid=False,
+                            autocomplete="pn + ", mods=_mods())]
     kind, text = "thought", rest.strip()
     if letter in _KINDS and not tail and letter != "l":
         # bare kind letter (fresh from the legend) → prompt, never a valid
@@ -214,16 +231,149 @@ def highlight_rows(frag):
         valid=True, mods=_mods())]
 
 
+def _pe():
+    """periodic_engine, loaded ON DEMAND. It pulls in requests through api,
+    and this module renders on every keystroke of the pn scope - only the 💰
+    screen needs the engine, so only the 💰 screen pays for it."""
+    import periodic_engine
+    return periodic_engine
+
+
+_DAY_TOKEN_RE = re.compile(r"(?<!\S)\*(\S+)\s*$")
+_PIN_RE = re.compile(r"^!(\d{4}-\d{2}-\d{2})\b\s*")
+
+
+def _money_arg(amount, label, day, replace=False):
+    return "xact:pn_income:" + _b64({"amount": amount, "label": label,
+                                     "day": day.isoformat(),
+                                     "replace": bool(replace)})
+
+
+def _money_confirm(day, amount, label, state):
+    """Vex's fail-safe (2026-09-17): "if money is entered already for the day
+    that I am trying to enter it again, it shows entered amount first row,
+    enter confirms or second row to adjust entry."
+
+    So: what is already there leads, ⏎ on it adds to it, and changing the
+    number is a deliberate second row you have to arrow onto. Nothing here
+    overwrites a number you have not read."""
+    _st, had, text = state
+    when = pm.day_label(day)
+    shown = pm.fmt_amount(had) if had is not None else (text or "an answer")
+    rows = []
+    if had is not None:
+        rows.append(alfred.item(
+            uid="pn-money-add",
+            title=f"💰 {when} · {shown} + {pm.fmt_amount(amount)} "
+                  f"= {pm.fmt_amount(had + amount)}",
+            subtitle="⏎ Add it" + ("" if text.strip().startswith(
+                pm.fmt_amount(had)) else "  ·  keeps the number, not the words"),
+            arg=_money_arg(amount, label, day), valid=True, mods=_mods()))
+    rows.append(alfred.item(
+        uid="pn-money-replace",
+        title=f"✏️ {when} · {shown} → {pm.fmt_amount(amount)}",
+        subtitle="⏎ Replace it",
+        arg=_money_arg(amount, label, day, replace=True),
+        valid=True, mods=_mods()))
+    back = alfred.item(uid="pn-money-back", title="🔙 Another day",
+                       subtitle="Pick again", valid=False, mods=_mods())
+    back["autocomplete"] = f"pn $ {pm.fmt_amount(amount)}" + (f" {label}" if label else "")
+    rows.append(back)
+    return rows
+
+
+_MONEY_SUB = {"answered": "Has %s", "blank": "Nothing yet",
+              "unasked": "Nothing yet"}
+
+
 def income_rows(rest):
-    """💰 stopped being a list row (Vex 2026-09-12: "I will only answer the
-    question in the journal"). The caller ET still fires `pn $ `, so this
-    screen points at the one place the number lives now instead of dead-ending.
+    """The 💰 day strip: type the amount, pick the day it belongs to.
+
+    Vex 2026-09-17: "Can I add money entries retrospectively to chosen day of
+    the week? like if I skip evening journal". Every row names a day, today
+    included, so a retrospective entry is the same move as today's and there
+    is no separate mode to remember. Each day shows what it already holds,
+    read from the CACHE - this renders on every keystroke.
+
+    `!<ISO>` at the front pins a day (the rows autocomplete it in, he never
+    types it); a trailing `*tue` / `*-2` / `*9` targets one day by hand
+    through pm.past_day, which reads BACKWARD unlike dateutil.parse_date.
     """
-    return [alfred.item(
-        uid="pn-money-journal",
-        title="💰 Money is an evening journal answer",
-        subtitle="⏎ Open the evening journal",
-        arg="xact:pn_journal:evening", valid=True, mods=_mods())]
+    rest = (rest or "").strip()
+    pin = _PIN_RE.match(rest)
+    if pin:
+        rest = rest[pin.end():]
+    want = None
+    m = _DAY_TOKEN_RE.search(rest)
+    if m and not pin:
+        want = pm.past_day(m.group(1))
+        rest = rest[:m.start()].rstrip()
+    head, _, tail = rest.partition(" ")
+    amount = pm.parse_amount(head) if head else None
+    label = tail.strip()
+    today = date.today()
+    strip = _money_week(today)
+
+    if amount is None:
+        first = alfred.item(
+            uid="pn-money-prompt", title="💰 Type the amount…",
+            subtitle="Numbers first" if head else "Then pick a day",
+            valid=False, mods=_mods())
+        return [first] + [_money_day_row(d, st, amt, None, "", today)
+                          for d, st, amt, _t in strip]
+    if pin:
+        day = date.fromisoformat(pin.group(1))
+        state = _pe().day_money_state(day)
+        if state[0] == "answered":
+            return _money_confirm(day, amount, label, state)
+        return [_money_day_row(day, state[0], state[1], amount, label, today)]
+    days = strip
+    if want is not None:
+        days = [r for r in strip if r[0] == want] or [
+            (want, ) + _pe().day_money_state(want)]
+    if not days:
+        return [alfred.item(uid="pn-money-noday", title="💰 Not this week",
+                            subtitle="Pick a day from Monday on",
+                            valid=False, mods=_mods())]
+    return [_money_day_row(d, st, amt, amount, label, today)
+            for d, st, amt, _t in days]
+
+
+def _money_day_row(day, state, had, amount, label, today):
+    when = pm.day_label(day)
+    if day == today:
+        title = f"☀️ Today · {when}"
+    elif day == today - timedelta(days=1):
+        title = f"◀️ Yesterday · {when}"
+    else:
+        title = f"📅 {when}"
+    holds = (_MONEY_SUB["answered"] % pm.fmt_amount(had)
+             if state == "answered" and had is not None
+             else "Has an answer" if state == "answered" else "Nothing yet")
+    it = alfred.item(uid=f"pn-money-{day.isoformat()}", title=title,
+                     subtitle=holds, valid=False, mods=_mods())
+    if amount is None:
+        return it
+    if state == "answered":
+        it["subtitle"] = f"{holds}  ·  ⏎ Add or fix"
+        it["autocomplete"] = (f"pn $ !{day.isoformat()} {pm.fmt_amount(amount)}"
+                              + (f" {label}" if label else ""))
+        return it
+    it["subtitle"] = f"{holds}  ·  ⏎ Log {pm.fmt_amount(amount)}"
+    it["arg"] = _money_arg(amount, label, day)
+    it["valid"] = True
+    return it
+
+
+def _money_week(today):
+    """This week's money, Monday..today, newest first. Wrapped so a broken
+    cache costs the strip its numbers, never the screen."""
+    try:
+        return _pe().week_money_states(today=today)
+    except Exception:
+        monday = today - timedelta(days=today.weekday())
+        return [(monday + timedelta(days=i), "unasked", None, "")
+                for i in range((today - monday).days, -1, -1)]
 
 
 def _task_pool(include_notes=False):
