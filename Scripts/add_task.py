@@ -1823,6 +1823,14 @@ def task_preview(query, link=False):
     # Effective parent: explicit /task choice wins over env
     effective_parent_id = parent_id or env_task_id
 
+    # A pipe starts the next child of whatever the line hangs from. Aimed at
+    # a LIST there is no parent to hang from, so the segments are the next
+    # TASKS in that list (Vex 2026-09-17: "when I am in search, on a list, I
+    # can still only add one. Make it so that it works like other subtasks
+    # do."). The plain add bar is untouched: it carries no list in env, so
+    # "Buy groceries | Milk | Bread" still means a task and its subtasks.
+    siblings_in_list = bool(env_list_id) and not effective_parent_id
+
     # CRM bookings auto-attach the clipboard image (the reference-image step) - but
     # never the 🔥prepare follow-up. Manual ^ / 🖼️ Add image still works elsewhere.
     if (list_id == CRM_ID and PREPARE_TAG not in {t.lower() for t in tags}
@@ -1971,6 +1979,8 @@ def task_preview(query, link=False):
         payload["parentId"] = effective_parent_id
     if kid_titles:
         payload["_children"] = kid_titles
+        if siblings_in_list:
+            payload["_siblings"] = True
 
     payload["_notif_text"] = _build_notif(
         disp_title, list_display or "", env_list_id, env_section_id, effective_parent_id,
@@ -2009,7 +2019,8 @@ def task_preview(query, link=False):
                       "cmd+shift": {"valid": True, "arg": f"create:{enc_stage}",
                                     "subtitle": "📍 Stage for focus"}}
 
-    _kid_chip = sl.chip(kid_titles, sibling=bool(effective_parent_id))
+    _kid_chip = sl.chip(kid_titles,
+                        sibling=bool(effective_parent_id) or siblings_in_list)
     items = [alfred.item(
         title=f"✅ Create: {disp_title}" + (f"  {_kid_chip}" if _kid_chip else ""),
         subtitle=subtitle,
@@ -2033,7 +2044,8 @@ def task_preview(query, link=False):
         items.append(alfred.item(
             uid="u-note",
             title=f"📝 Create note: {disp_title}",
-            subtitle=("One note, no subtasks" if kid_titles
+            subtitle=(("One note, one task" if siblings_in_list
+                       else "One note, no subtasks") if kid_titles
                       else ("  ".join(parts) + "  |  " if parts else "")
                            + "📝 Note, nothing to tick"),
             arg=("" if kid_titles else "create:" + base64.b64encode(
@@ -2064,14 +2076,19 @@ def task_preview(query, link=False):
     # next subtask and first row is confirming I am done adding subtasks").
     # Offered once a pipe is in play, and from the first keystroke when the add
     # is already aimed into a parent (the ⌘ Actions "➕ Add task" road).
-    if kid_titles or sl.in_subtask_mode(query) or effective_parent_id:
+    if (kid_titles or sl.in_subtask_mode(query) or effective_parent_id
+            or siblings_in_list):
         _under = (parent_display or os.environ.get("task_title", "").strip()
                   if effective_parent_id else disp_title)
+        _where = (list_display or _list_display_name(env_list_id)
+                  if siblings_in_list else "")
         items.append(alfred.item(
             uid="add-another-sub",
-            title="➕ Another subtask",
-            subtitle=(f"Next one under “{_under[:30]}”" if _under
-                      else "Type the next one")
+            title="➕ Another task" if siblings_in_list else "➕ Another subtask",
+            subtitle=((f"Next one in “{_where[:30]}”" if _where
+                       else "Type the next one") if siblings_in_list else
+                      (f"Next one under “{_under[:30]}”" if _under
+                       else "Type the next one"))
                      + "  |  ⏎ keeps the line open",
             arg="", valid=False,
             autocomplete=sl.next_query(query)))

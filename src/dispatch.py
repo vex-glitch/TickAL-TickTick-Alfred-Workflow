@@ -939,7 +939,10 @@ def main():
             kid_titles = payload.get("_children") or []
             if kid_titles and result and result.get("id"):
                 kid_pid = result.get("projectId") or proj_id
-                kid_parent = payload.get("parentId") or result["id"]
+                # _siblings = the add was aimed at a LIST, so every segment is
+                # the next TASK in it, parented to nothing (Vex 2026-09-17).
+                kid_parent = (None if payload.get("_siblings")
+                              else payload.get("parentId") or result["id"])
                 made = []
                 for kt in kid_titles:
                     try:
@@ -953,7 +956,8 @@ def main():
                     _order_children(api, made, kid_pid, kid_parent)
                     _cache_children(made, kid_pid, kid_parent)
                 n_made = len(made)
-                kid_note = (f"\n↳ {n_made} subtask" + ("" if n_made == 1 else "s")
+                word = "task" if payload.get("_siblings") else "subtask"
+                kid_note = (f"\n↳ {n_made} more {word}" + ("" if n_made == 1 else "s")
                             + (f" · {len(kid_titles) - n_made} failed"
                                if n_made < len(kid_titles) else ""))
 

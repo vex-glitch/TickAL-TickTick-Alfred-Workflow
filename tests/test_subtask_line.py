@@ -170,6 +170,72 @@ check("a token inside a link is not a token",
       == "u [a](https://x.com/a?b=1) Name",
       sl.splice_title("u [a](https://x.com/a?b=1) ", "Name"))
 
+
+# ── aimed at a LIST, the pipes are SIBLINGS (Vex 2026-09-17) ───────────────
+# "when I am in search, on a list, I can still only add one. Make it so that
+# it works like other subtasks do." A pipe starts the next child of whatever
+# the line hangs from; hanging from a list, that is the next TASK in it. The
+# plain add bar has no list in env and must keep meaning task + subtasks.
+import base64                                                    # noqa: E402
+import json                                                      # noqa: E402
+import subprocess                                                # noqa: E402
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PY = os.environ.get("TICKAL_PY") or sys.executable
+
+
+def _preview(query, env=None):
+    """(payload dict, [row titles]) for the add bar's Create row."""
+    e = dict(os.environ)
+    for k in ("list_id", "task_list_id", "task_id", "item_type", "task_title",
+              "section_id"):
+        e.pop(k, None)
+    e.update(env or {})
+    out = subprocess.run([_PY, os.path.join(_ROOT, "Scripts", "add_task.py"), query],
+                         capture_output=True, text=True, env=e, cwd=_ROOT).stdout
+    d = json.loads(out)
+    arg = d["items"][0].get("arg") or ""
+    pay = json.loads(base64.b64decode(arg[7:])) if arg.startswith("create:") else {}
+    return pay, [i["title"] for i in d["items"]]
+
+
+_LIST = {"task_list_id": "6a8abb444e699108a4693fa5", "item_type": "list",
+         "task_title": "A list"}
+_pay, _rows = _preview("Chicken | Rice | Veg", _LIST)
+check("on a list: the segments are children of nothing",
+      _pay.get("parentId") is None, _pay.get("parentId"))
+check("on a list: they are flagged siblings", _pay.get("_siblings") is True)
+check("on a list: the first segment is the task",
+      _pay.get("title") == "Chicken", _pay.get("title"))
+check("on a list: the rest ride along", _pay.get("_children") == ["Rice", "Veg"])
+check("on a list: they land in THAT list",
+      _pay.get("projectId") == _LIST["task_list_id"], _pay.get("projectId"))
+check("on a list: the row says task, not subtask",
+      "➕ Another task" in _rows, [r for r in _rows if r.startswith("➕")])
+check("on a list: the chip does not call them subtasks",
+      "+ 2 more" in _rows[0], _rows[0])
+check("on a list: the keep-adding row is there from the first keystroke",
+      "➕ Another task" in _preview("Chicken", _LIST)[1])
+
+_pay, _rows = _preview("Buy groceries | Milk | Bread")
+check("plain bar: still a task and its subtasks",
+      _pay.get("_children") == ["Milk", "Bread"] and not _pay.get("_siblings"),
+      _pay.get("_siblings"))
+check("plain bar: the row still says subtask", "➕ Another subtask" in _rows,
+      [r for r in _rows if r.startswith("➕")])
+check("plain bar: the chip still counts subtasks",
+      "+ 2 subtasks" in _rows[0], _rows[0])
+
+# Aimed at a TASK, every segment is the next child of THAT task - untouched.
+_pay, _rows = _preview("Milk | Bread", dict(_LIST, task_id="6a93d9e43dbd51023710d507",
+                                            item_type="task"))
+check("on a task: nothing is flagged sibling-in-list",
+      not _pay.get("_siblings"), _pay.get("_siblings"))
+check("on a task: the parent is the task",
+      _pay.get("parentId") == "6a93d9e43dbd51023710d507", _pay.get("parentId"))
+check("on a task: the row still says subtask", "➕ Another subtask" in _rows)
+
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if FAILS:
     raise AssertionError(f"{len(FAILS)} checks failed: {FAILS}")
