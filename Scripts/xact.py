@@ -7176,6 +7176,48 @@ def pn_entry(rest):
     print(_pn().append_entry(kind, text))
 
 
+def pn_backlog(rest):
+    """📋 Backlog - fill ONE journal answer in on ANY day (Vex 2026-09-17:
+    "Make it one machinery, put it under Backlog in entries row").
+
+    Money, ✨ the day's highlight, 😊 mood and ★ the day rating are all one
+    answer on one day, so they share this verb and the screen that fires it.
+    Money keeps its own summing rule; the rest are single answers, so a
+    write there replaces, and the row that fired it has already shown Vex
+    what it is replacing.
+    """
+    if not _pn_gate():
+        return
+    spec = _pn_decode(rest) or {}
+    import datetime as _dt
+    try:
+        day = _dt.date.fromisoformat(str(spec.get("day") or ""))
+    except ValueError:
+        day = None
+    kind = (spec.get("kind") or "").lower()
+    pe = _pn()
+    if kind == "$":
+        msg = pe.append_income(spec.get("amount") or 0, spec.get("label") or "",
+                               day=day, replace=bool(spec.get("replace")))
+    elif kind == "m":
+        msg = pe.set_day_mood(int(spec.get("score") or 3),
+                              spec.get("note") or "", day=day)
+    elif kind == "r":
+        msg = pe.set_day_rating(int(spec.get("score") or 3), day=day)
+    elif kind == "h":
+        text = (spec.get("text") or "").strip()
+        msg = (f"✨ {pe._when(day)}{text[:48]}"
+               if pe.set_day_answer("evening", "dhighlight", text, day=day)
+               else f"💫 {pe._when(day)}no highlight question in that note")
+    else:
+        msg = "💫 Nothing to fill in there"
+    print(msg)
+    try:
+        _notify_banner(msg)
+    except Exception:
+        pass
+
+
 def pn_income(rest):
     if not _pn_gate():
         return
@@ -11543,6 +11585,8 @@ def main():
             pn_entry(rest)
         elif verb == "pn_income":
             pn_income(rest)
+        elif verb == "pn_backlog":
+            pn_backlog(rest)
         elif verb == "km_run":
             km_run(rest)
         elif verb == "routine_run":

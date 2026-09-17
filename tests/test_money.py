@@ -134,15 +134,17 @@ WEEK = {date(2026, 9, 17): ("blank", None, ""),
         date(2026, 9, 16): ("blank", None, ""),
         date(2026, 9, 15): ("answered", 100.0, "100"),
         date(2026, 9, 14): ("blank", None, "")}
-prows._money_week = lambda today: [(d, ) + WEEK[d] for d in sorted(WEEK, reverse=True)]
-
-
 class _FakeEngine:
-    """The confirm screen re-reads the day LIVE rather than trusting the
-    strip it came from, so the stub has to cover that road too."""
+    """The strip and the confirm screen both read the engine, and the confirm
+    screen re-reads the day LIVE rather than trusting the strip it came from,
+    so the stub has to cover both roads."""
     @staticmethod
     def day_money_state(day, notes=None):
         return WEEK.get(day, ("unasked", None, ""))
+
+    @staticmethod
+    def week_answer_states(slot, needle, monday=None, today=None, money=False):
+        return [(d, ) + WEEK[d] for d in sorted(WEEK, reverse=True)]
 
 
 prows._pe = lambda: _FakeEngine
@@ -169,7 +171,8 @@ r = prows.income_rows("485 tattoo")
 check("today is the first row, so plain ⏎ is today",
       r[0]["title"].startswith("☀️ Today") and r[0]["valid"] is True, r[0]["title"])
 check("a day with nothing writes straight away",
-      r[0]["arg"].startswith("xact:pn_income:") and "autocomplete" not in r[0])
+      r[0]["arg"].startswith("xact:pn_backlog:") and "autocomplete" not in r[0],
+      r[0].get("arg", "")[:30])
 day_with = next(x for x in r if "15 Sep" in x["title"])
 check("a day that ALREADY has money cannot be written by accident",
       day_with.get("valid") is False
@@ -193,8 +196,8 @@ import base64 as _b64mod
 import json as _json
 pay = _json.loads(_b64mod.b64decode(r[1]["arg"].split(":", 2)[2]))
 check("the replace row really means replace",
-      pay == {"amount": 485.0, "label": "tattoo", "day": "2026-09-15",
-              "replace": True}, pay)
+      pay == {"amount": 485.0, "label": "tattoo", "kind": "$",
+              "day": "2026-09-15", "replace": True}, pay)
 
 # ── the entry legend ─────────────────────────────────────────────────────────
 legend = prows.entry_rows("")

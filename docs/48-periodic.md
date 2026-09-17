@@ -53,11 +53,23 @@ Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and sectio
 | 🗓️ Week highlight | one thing that stands out - lands in the weekly note's ✨ Highlight (and in the weekly journal's highlight answer when the section is gone) |
 | 🔄 Refresh today | complete ticked boxes + rebuild the generated sections |
 
-Entry kinds, each with a one-letter prefix: 🟢 `w` win · 🔴 `n` nag · 💭 `t` thought (also the default - plain text works) · ❗️ `r` reminder · 🔗 `l` link (empty = clipboard) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · ⭐️ `h` highlight · 💰 `$` money. ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
+Entry kinds, each with a one-letter prefix: 🟢 `w` win · 🔴 `n` nag · 💭 `t` thought (also the default - plain text works) · ❗️ `r` reminder · 🔗 `l` link (empty = clipboard) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · ⭐️ `h` the week's highlight · 💰 `$` money · 📋 `b` [backlog](#-backlog-fill-in-a-day-you-missed). ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
+
+### 📋 Backlog, fill in a day you missed
+
+Skipped shutdown? `+ b` lists what a day can hold: ✨ its highlight, 💰 money, 😊 mood, ⭐️ the day rating. Pick one, type the value, and the same day strip appears: this week Monday to today, today first, each day showing what it already holds.
+
+Every one of these is a single answer in that day's journal, so they all ride one screen rather than four. A day you skipped entirely has no questions in it at all yet - they get planted the moment you fill one in, and planting them on an old day gives that day exactly the questions it would have had, nothing of today's.
+
+A day that already has an answer never takes a stray ⏎. It stops on a screen showing what's there: **Keep it** first, **Replace it** as a second row you have to choose. Money is the exception, because two payments in one day are two payments: there the first row **adds**.
+
+`*mon`, `*yesterday`, `*-2`, `*9` skip the picking. Day words look backwards here - you're filling in a day you have already lived.
+
+The daily note's ✨ line and the weekly's ✨ Highlights, 😊 Moods and 💰 Income all read those same answers, so filling a day in reaches every one of them. You can also just type the answer into the note by hand on your phone: the weekly picks it up on its next refresh either way.
 
 ### 💰 Money, any day this week
 
-Type the amount, pick the day. `+ $ 485 tattoo` lists this week Monday to today, today first, with what each day already holds, and ⏎ on a day logs it there. So a day you skipped the evening journal on is the same move as today, not a special mode.
+Money has its own front door, one step further into the same machine. Type the amount, pick the day. `+ $ 485 tattoo` lists this week Monday to today, today first, with what each day already holds, and ⏎ on a day logs it there. So a day you skipped the evening journal on is the same move as today, not a special mode.
 
 A day's money IS the evening journal's money answer for that day, and this row writes that same answer - there is no second record to disagree with it, and the weekly's 💰 Income sums those answers straight back up. A day that already holds a number therefore cannot be overwritten by a stray ⏎: it stops on a screen that shows you what is there, offers **Add it** first, and makes changing the number a second row you have to choose. Whatever you typed in the answer by hand survives being added to.
 

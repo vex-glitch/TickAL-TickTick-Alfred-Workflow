@@ -487,6 +487,23 @@ def _entries_between(index, d0, d1):
     return out
 
 
+def _fill_day_highlight(doc):
+    """✨ Highlight - a MIRROR of the evening journal's answer, the same way
+    Mood, Day and Money are (Vex 2026-09-12: the answer is the record). It
+    sits at the top because that is where he reads it (2026-09-17), not
+    because anything is stored there; clearing the answer clears the line.
+
+    Shared with the retro writer, which runs it in the SAME write as the
+    answer: nothing can refresh an arbitrary past daily note, so a mirror
+    left for "the next refresh" would never happen on the days this matters.
+    """
+    hl = _answer_in(doc, pm.SEC_EVENING, "highlight of the day")
+    if not hl:
+        return False
+    return ps.set_body(doc, pm.SEC_HIGHLIGHT,
+                       [f"- ✨ {mdtext.flatten_links(hl)}"])
+
+
 def _highlights_between(index, d0, d1):
     """[(date, text)] - each day's ✨ highlight, from its evening journal
     answer, oldest day last. Vex 2026-09-17 wanted the week to carry them
@@ -988,9 +1005,7 @@ def _fill_daily(doc, p, index, is_today):
     # Mood, Day and Money are (Vex 2026-09-12: the answer is the record). It
     # sits at the top because that is where he reads it (2026-09-17), not
     # because anything is stored there; clearing the answer clears the line.
-    hl = _answer_in(doc, pm.SEC_EVENING, "highlight of the day")
-    if hl:
-        ps.set_body(doc, pm.SEC_HIGHLIGHT, [f"- ✨ {mdtext.flatten_links(hl)}"])
+    _fill_day_highlight(doc)
     # 🎯 Week goals mirror - verbatim copy; absent/empty weekly keeps the
     # template pointer line (bootstrap window)
     wk = lookup(index, pm.period_for("weekly", day))
@@ -1739,18 +1754,18 @@ def set_day_mood(score, note="", day=None):
     fallback write there would be deleted within the hour. Better to say the
     question is missing than to pretend it landed."""
     shown = pm.mood_text(int(score), note)
-    if not _journal_answer("morning", "mood", shown, day=day):
-        return "💫 No mood question in today's morning journal (♻️ Refresh Today)"
-    return (f"{pm.MOOD_FACES[int(score)]} Mood logged"
+    if not _seeded_answer("morning", "mood", shown, day):
+        return f"💫 {_when(day)}no mood question in that morning journal"
+    return (f"{pm.MOOD_FACES[int(score)]} {_when(day)}Mood logged"
             + (f" · {note}" if note else ""))
 
 
 def set_day_rating(score, day=None):
     """The evening journal's rating answer (see set_day_mood on the fallback)."""
     stars = "★" * max(1, min(5, int(score)))
-    if not _journal_answer("evening", "rate the day", stars, day=day):
-        return "💫 No rating question in today's evening journal (♻️ Refresh Today)"
-    return f"{stars} Day rated"
+    if not _seeded_answer("evening", "rate the day", stars, day):
+        return f"💫 {_when(day)}no rating question in that evening journal"
+    return f"{stars} {_when(day)}Day rated"
 
 
 def weekly_has_highlight(day=None):
@@ -2012,55 +2027,77 @@ def _daily_has_money(day=None):
 MONEY_NEEDLE = "money did you earn"
 
 
-def day_money_state(day, notes=None):
-    """(state, amount, text) for a day's money, read from the CACHE so a
-    per-keystroke row can ask it. States:
-
-        "answered"  the money question has an answer (amount may still be
-                    None when he typed words with no number in them)
-        "blank"     the question is there, unanswered
-        "unasked"   that day has no money question, or no note at all
-
-    _day_money collapses all three into None-or-0, which is fine for a sum
-    and useless for Vex's fail-safe (2026-09-17: "if money is entered already
-    for the day ... it shows entered amount first row"). "Nothing yet" and
-    "he answered 0" must not read the same on a row that offers to overwrite.
-    """
+def _daily_note(day, notes=None):
+    """That day's daily note out of the CACHE, or None. No API call: the rows
+    that use this render on every keystroke."""
     rows = notes if notes is not None else (cache_store.get("all_notes") or [])
     for t in rows:
         if (t.get("projectId") or t.get("_projectId")) != areas.PERIODIC_LIST_ID:
             continue
-        if pm.parse_daily_title(t.get("title") or "") != day:
+        if pm.parse_daily_title(t.get("title") or "") == day:
+            return t
+    return None
+
+
+def day_answer_state(day, slot, needle, notes=None):
+    """(state, text) for ONE journal answer on ONE day, from the cache:
+
+        "answered"  the question has an answer
+        "blank"     the question is there, unanswered
+        "unasked"   that day has no such question, or no note at all
+
+    The three must stay apart. A reader that collapses them (_day_money does,
+    into None-or-0) is fine for a sum and useless for a row that offers to
+    overwrite: "nothing yet" and "he answered 0" cannot look the same there.
+    """
+    t = _daily_note(day, notes)
+    if t is None:
+        return "unasked", ""
+    sec = ps.find(ps.parse_sections(t.get("content") or ""),
+                  _JOURNAL_SECTIONS.get(slot, pm.SEC_EVENING))
+    if sec is None:
+        return "unasked", ""
+    for _n, q, a, _i in pm.journal_pairs(sec.body):
+        if needle.casefold() not in (q or "").casefold():
             continue
-        doc = ps.parse_sections(t.get("content") or "")
-        sec = ps.find(doc, pm.SEC_EVENING)
-        if sec is not None:
-            for _n, q, a, _i in pm.journal_pairs(sec.body):
-                if MONEY_NEEDLE not in (q or "").casefold():
-                    continue
-                if a and a.strip():
-                    return "answered", pm.parse_money_answer(a), a.strip()
-                return "blank", None, ""
-        msec = ps.find(doc, pm.SEC_MONEY)
+        return ("answered", a.strip()) if a and a.strip() else ("blank", "")
+    return "unasked", ""
+
+
+def day_money_state(day, notes=None):
+    """(state, amount, text) - day_answer_state plus the number, and plus the
+    legacy 💰 section that older notes still keep their history in."""
+    st, txt = day_answer_state(day, "evening", MONEY_NEEDLE, notes)
+    if st == "answered":
+        return "answered", pm.parse_money_answer(txt), txt
+    t = _daily_note(day, notes)
+    if t is not None:
+        msec = ps.find(ps.parse_sections(t.get("content") or ""), pm.SEC_MONEY)
         if msec is not None and any(pm.parse_money_entry(l) for l in msec.body):
             return "answered", pm.section_money_sum(msec.body), ""
-        return "unasked", None, ""
-    return "unasked", None, ""
+    return st, None, txt
 
 
-def week_money_states(monday=None, today=None):
-    """[(date, state, amount, text)] for Monday..today of that week, newest
-    day first - the 💰 day strip's whole data source, one cache read."""
+def week_answer_states(slot, needle, monday=None, today=None, money=False):
+    """[(date, state, value, text)] for Monday..today, NEWEST first - the day
+    strip's whole data source, one cache read for the week."""
     today = today or _today()
     monday = monday or (today - timedelta(days=today.weekday()))
     notes = cache_store.get("all_notes") or []
     out = []
     d = monday
     while d <= today:
-        st, amt, txt = day_money_state(d, notes)
-        out.append((d, st, amt, txt))
+        if money:
+            out.append((d, ) + day_money_state(d, notes))
+        else:
+            st, txt = day_answer_state(d, slot, needle, notes)
+            out.append((d, st, txt, txt))
         d += timedelta(days=1)
     return list(reversed(out))
+
+
+def week_money_states(monday=None, today=None):
+    return week_answer_states("evening", MONEY_NEEDLE, monday, today, money=True)
 
 
 def append_income(amount, label="", day=None, replace=False):
@@ -2184,10 +2221,51 @@ def journal_ctx(slot, doc):
     return ctx
 
 
-def journal_answer_key(slot, key, text, day):
+def _when(day):
+    """"Tue 15 Sep · " for a day that is not today, "" for today. Every verb
+    that can write BACKWARDS has to name the day it hit, or a toast reads as
+    a failure on today's note (Vex's retro entries, 2026-09-17)."""
+    return "" if day is None or day == _today() else pm.day_label(day) + " · "
+
+
+def _seeded_answer(slot, needle, text, day=None):
+    """_journal_answer, but planting that day's journal first when the
+    question is not there. A day he skipped has no questions at all until
+    they are seeded; see set_day_answer for why seeding an old day is safe."""
+    if _journal_answer(slot, needle, text, day=day):
+        return True
+    journal_seed(slot, day=day or _today())
+    return bool(_journal_answer(slot, needle, text, day=day))
+
+
+def set_day_answer(slot, key, text, day=None):
+    """Write one journal ANSWER on ANY day, seeding that day's journal first
+    when the question is not there yet. True when it landed.
+
+    Vex 2026-09-17: "What if I skip shutdown routine for whatever reason?" -
+    a day he skipped has no evening questions at all, so there is nothing to
+    answer until they are planted. Planting them on an old day is safe and
+    gives that day what it would have had: select_prompts is seeded by
+    f"{date}:{slot}" so the random prompts are the date's own, and journal_ctx
+    reads the goal off THAT day's note, so nothing of today leaks backwards.
+
+    The ✨ mirror rides the SAME write. Nothing in the UI can refresh an
+    arbitrary past daily note, so a mirror left to "the next refresh" would
+    never run on exactly the days this verb exists for.
+    """
+    d = day or _today()
+    after = _fill_day_highlight if key == "dhighlight" else None
+    if journal_answer_key(slot, key, text, d, also=after):
+        return True
+    journal_seed(slot, day=d)
+    return journal_answer_key(slot, key, text, d, also=after)
+
+
+def journal_answer_key(slot, key, text, day, also=None):
     """Write `text` as the answer to the journal question whose route key is
     `key` in `day`'s note, even over an earlier answer (the goal picker's
-    pick is the answer). True when it landed."""
+    pick is the answer). True when it landed. `also` is a callable(doc) run
+    inside the SAME read-modify-write, for anything that mirrors the answer."""
     p = _journal_target(slot, day)
     task, _ = ensure_note(p)
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
@@ -2205,6 +2283,8 @@ def journal_answer_key(slot, key, text, day):
             ws, dash, ital = m.group("ws"), m.group("dash") or "", m.group("ital")
             body[idx] = f"{ws}{dash}{ital}A: {text}{ital}"
             sec.body = body
+            if also is not None:
+                also(doc)
             return True
         return False
     ok, _doc = _pn_rmw(pid, tid, mutate)
