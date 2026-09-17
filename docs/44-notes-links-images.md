@@ -47,6 +47,12 @@ Start an add with a leading `N ` via the `tad` keyword to create a note; the `=`
 
 The focus picker pairs stickies with sessions: **🗒️ Start + sticky note** (timer + sticky) and **🗒️ Sticky note + Nm pomo** rows; on the staging screen's add row, ⌥⏎ adds the checkbox and opens the focus task's sticky so the day's list sits on your desktop. See [Focus](46-focus.md).
 
+### Live window
+
+A sticky is a snapshot. It never redraws, so anything written to the task after it opened - a journal answer, an entry, a refreshed note - stays invisible until the sticky is closed and opened again. ⌥ on the same **🗒️ Sticky note** row opens TickTick's own floating task window instead: the same task, live, and it can be typed in.
+
+The trade is which one stays in front. A sticky floats over every other app; a task window is an ordinary window and sinks behind whatever you switch to. So: sticky to keep something on screen while you work elsewhere, window to watch a note while the workflow writes to it.
+
 ## Save a URL
 
 **Keyword:** `tur` · **Hotkey:** (set in canvas) - grabs the front browser tab's URL and title, then opens the Add window with a markdown link already riding in the task description. Type the title as usual; every add token still works, and a typed `=` note stays above the link. Also reachable from the main menu's **🔗 Save URL...** row - there Alfred is frontmost, so running browsers are probed instead.

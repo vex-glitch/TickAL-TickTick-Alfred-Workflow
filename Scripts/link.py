@@ -26,6 +26,9 @@ Link-road rules (research 2026-09-10 against xact sticky/focus_start):
     step's sticky there, so routine macros land every sticky on Vex's
     layout (2026-09-11, Shutdown • Start). TICKAL_BAR_AT="x,y" does the
     same for the focus bar on focus/timer steps (_bar_call).
+  • a WINDOW step needs none of that snapshot machinery: a floating task
+    window carries its task's title, so it is found, raised and placed by
+    NAME (TICKAL_WIN_FRAME="x,y,w,h", the window twin of the sticky frame).
   • xact runs in-process on this node's own queue, never re-fired
     through the sequential ET XAct. Exception: journal dialog runs spawn
     DETACHED (xact._pn_bg, output → /tmp/tickal_periodic.log) so minutes
@@ -459,6 +462,10 @@ def run(verb, tid, pid_hint):
         if not _tt_ready(xact):
             return "🗒️ TickTick not up · no sticky", False
         return _sticky_call(lambda: _quiet(xact.pn_sticky, tid, assist=False)), True
+    if verb == "notewindow":             # same note, LIVE - none of the
+        if not _tt_ready(xact):          # snapshot machinery: a window is
+            return "🪟 TickTick not up · no window", False   # found by NAME
+        return _quiet(xact.pn_window, tid), True
     if verb == "view":                   # no ticktick:// route for these
         if tid == "calendar":
             xact._run_trigger("OpenCalendar")                 # its List-menu flow
@@ -497,6 +504,10 @@ def run(verb, tid, pid_hint):
         clash = _timer_clash(xact, tid)
         if clash:
             return clash, False
+    if verb == "window":                 # the live twin of sticky
+        if not _tt_ready(xact):
+            return "🪟 TickTick not up · no window", False
+        return _quiet(xact.task_window, pid, tid), True
     parts = []
     if verb in ("focus", "sticky"):
         if _tt_ready(xact):

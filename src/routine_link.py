@@ -15,6 +15,12 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
     ping                  toast only (smoke test)
     focus:<tid>[:<pid>]   sticky (best effort) + timer
     sticky:<tid>[:<pid>]  sticky only
+    window:<tid>[:<pid>]  the task in TickTick's own floating window: the
+                          LIVE twin of sticky. A sticky never re-renders, so
+                          anything written after it opened is invisible in
+                          it; the window shows it. It is an ordinary window
+                          though, so it sinks behind other apps where a
+                          sticky floats over them - hence both verbs
     timer:<tid>[:<pid>]   timer only
     done:<tid>[:<pid>]    tick the task off, through the same road the ⇧ chord
                           uses - a routine's habit gets today's check-in with
@@ -45,6 +51,7 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
                           happens, lazy-minted. A pasted note link would
                           be stuck on one period; this one never is
     notesticky:<spec>     the same note, opened as a desktop sticky
+    notewindow:<spec>     the same note in a floating window, live
 
 Destinations the app routes itself (APP_LINKS) are plain ticktick://
 links, no Alfred at all. ⌘ Actions "☑️ TickTick Internals" lists every
@@ -62,7 +69,7 @@ BUNDLE  = "com.vex.tickal"
 TRIGGER = "Link"
 MAX_LEN = 200
 
-TASK_VERBS = ("focus", "sticky", "timer", "done")
+TASK_VERBS = ("focus", "sticky", "window", "timer", "done")
 BARE_VERBS = ("ping", "pause", "resume", "money", "moneysticky")
 PN_NOW = (("daily", "today's"), ("weekly", "this week's"),
           ("monthly", "this month's"), ("quarterly", "this quarter's"),
@@ -84,7 +91,8 @@ SLOT_VERBS = {"journal": ("morning", "evening", "weekly", "monthly",
               "routine": _routine_keys(),
               "view": ("calendar", "countdowns", "crmcal"),
               "note": PN_SPECS,
-              "notesticky": PN_SPECS}
+              "notesticky": PN_SPECS,
+              "notewindow": PN_SPECS}
 
 # Plain app links. Probed live 2026-09-10 on TickTick 8.0.75: habit, matrix,
 # focus and v1/show smartlists navigate; ticktick://calendar, countdown,
@@ -103,7 +111,8 @@ MONEY_LIST = "6a4bd07e4e3c910368319b6d"
 MONTHS = ("January", "February", "March", "April", "May", "June", "July",
           "August", "September", "October", "November", "December")
 _MONEY_RE = re.compile(r"(\d{4})\s+(" + "|".join(MONTHS) + r")\b", re.I)
-LABELS ={"focus": "🖥 Focus + sticky", "sticky": "🖥 Sticky", "timer": "🖥 Focus"}
+LABELS ={"focus": "🖥 Focus + sticky", "sticky": "🖥 Sticky",
+         "window": "🖥 Window", "timer": "🖥 Focus"}
 
 _TID = re.compile(r"[0-9a-f]{24}")
 _PID = re.compile(r"[0-9a-f]{24}|inbox\d{6,12}")
@@ -218,6 +227,8 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
                       _task_md(title, "focus", tid, pid)),
                      ("sticky", "🗒️ Sticky", "Sticky only",
                       _task_md(title, "sticky", tid, pid)),
+                     ("window", "🪟 Window", "Live, sinks behind",
+                      _task_md(title, "window", tid, pid)),
                      ("timer", "⏱ Focus", "Timer only",
                       _task_md(title, "timer", tid, pid))]
         except ValueError:
@@ -247,7 +258,10 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
                       f"[🖥 {name}]({url('note', spec)})"),
                      (f"{spec}_sticky", f"🗒️ {name} sticky",
                       f"{now[0].upper()}{now[1:]}, as sticky",
-                      f"[🖥 {name} sticky]({url('notesticky', spec)})")]
+                      f"[🖥 {name} sticky]({url('notesticky', spec)})"),
+                     (f"{spec}_window", f"🪟 {name} window",
+                      f"{now[0].upper()}{now[1:]}, live",
+                      f"[🖥 {name} window]({url('notewindow', spec)})")]
         rows += [("morning", "🌅 Morning journal", "Journal dialogs",
                   f"[🖥 Morning journal]({url('journal', 'morning')})"),
                  ("evening", "🌙 Evening journal", "Journal dialogs",

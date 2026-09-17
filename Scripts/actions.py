@@ -851,8 +851,9 @@ def main():
             ("🎯 Focus",           "Timer or Pomodoro, sticky optional",
              f"xact:focus_open:{pid}:{tid}", "focus timer pomo pomodoro start track time",
              is_task_like and bool(tid) and _generic),
-            ("🗒️ Sticky note",     "Open as desktop sticky",
-             f"xact:sticky:{pid}:{tid}", "sticky note desktop pin", is_task_like and bool(tid)),
+            ("🗒️ Sticky note",     "Open as desktop sticky  |  ⌥ live window",
+             f"xact:sticky:{pid}:{tid}", "sticky note desktop pin window live float",
+             is_task_like and bool(tid)),
             ("🅿️ Add to buffer",   "Collect tasks, act on all (🅿️ in search)",
              f"xact:buffer_add:{pid}:{tid}", "buffer collect batch", is_task_like and bool(tid) and _generic),
             # Focus staging (subtasks): direct add when a task-bound session
@@ -892,6 +893,16 @@ def main():
             if not show:
                 continue
             extra = {"mods": open_link_mods} if (t == "🌐 Open link" and open_link_mods) else {}
+            if t == "🗒️ Sticky note":
+                # ⌥ = the LIVE twin, one row (never a second row for the same
+                # intent). A sticky is a snapshot: it never re-renders, so
+                # every entry we write to a note is invisible in it until it
+                # is closed and opened again. The floating window is the same
+                # task, live - and an ordinary window, so it sinks behind
+                # other apps where a sticky floats over them.
+                extra = {"mods": {"alt": {"valid": True,
+                                          "arg": f"xact:window:{pid}:{tid}",
+                                          "subtitle": "🪟 Live window"}}}
             row_vars = cta_vars if a.startswith("cta:") else vars_
             if a == "schedule":
                 # both rows ride the same picker; say which job it is, and set

@@ -60,6 +60,9 @@ One canvas branch (`xact:` prefix on the Actions router) fans out here:
     xact:sticky:<pid>:<tid>         open the task as a desktop sticky note
                                     (deep link + in-app ⌘⌥⇧S shortcut)
     xact:focus_sticky:<pid>:<tid>   sticky + start the focus timer
+    xact:window:<pid>:<tid>         open the task in its floating window
+                                    (a real double click - live, not a
+                                    snapshot; layer 0, so it goes behind)
 
 CRM records (customer notes + tattoo logbooks - src/crm_records.py):
     xact:crmnew_newcust:<kind>      dialogs: name/phone/mail/bday → customer
@@ -191,6 +194,7 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
     xact:pn_open:<spec>             daily|yesterday|weekly|monthly|quarterly|
                                     yearly → lazy-mint + refresh + deep link
     xact:pn_sticky:<spec>           same, then open the note as a sticky
+    xact:pn_window:<spec>           same, in a LIVE floating window
     xact:pn_setgoal:<b64>           set a goal on any tier: {kind, text, pid,
                                     tid, title} - text, a task, or both
     xact:pn_setloc[:<city>]         pin the daily note's weather location by
@@ -7125,6 +7129,26 @@ def pn_sticky(spec, assist=True):
     sticky(pid, task.get("id"), assist=assist)
 
 
+def pn_window(spec):
+    """The period's note in a floating window: the live twin of pn_sticky,
+    and the one that shows what we write while it is open."""
+    if not _pn_gate():
+        return
+    if spec not in _PN_SPECS:
+        print(f"💫 Unknown period {spec!r}")
+        return
+    pe = _pn()
+    p, task, minted = pe.resolve(spec)
+    if not task:
+        print(f"💫 No note for {spec} yet")
+        return
+    if minted or not pe._refresh_fresh(p):
+        _pn_bg(f"xact:pn_refresh:{spec}")     # window opens NOW, note catches up
+    pid = task.get("projectId") or task.get("_projectId") or ""
+    os.environ["task_title"] = task.get("title") or "Note"
+    task_window(pid, task.get("id"))
+
+
 def _pn_decode(rest):
     """b64-JSON dict first, plain-text fallback (the Shortcuts channel).
     Non-dict decodes (a plain word that happens to be valid b64) fall through
@@ -8107,17 +8131,18 @@ tell application "System Events" to tell process "TickTick"
   set best to missing value
   set bestScore to -1
   repeat with w in (every window whose subrole is "AXStandardWindow")
+    set sc to 0
     try
       set sz to size of w
       set sc to item 1 of sz
-      try
-        if (name of w as text) is "TickTick" then set sc to sc + 100000
-      end try
-      if sc > bestScore then
-        set bestScore to sc
-        set best to w
-      end if
     end try
+    try
+      if (name of w as text) is "TickTick" then set sc to sc + 100000
+    end try
+    if sc > bestScore then
+      set bestScore to sc
+      set best to w
+    end if
   end repeat
   if best is not missing value then
     perform action "AXRaise" of best
@@ -8207,20 +8232,32 @@ function run(argv) {
     try { var n = cfArr.count; for (var i = 0; i < n; i++) fn(cfArr.objectAtIndex(i)); } catch (e) {}
   }
 
-  // window 1 whose subrole is AXStandardWindow - parity with the SE walk
+  // The MAIN window, never a floating task window. This used to take
+  // "window 1 whose subrole is AXStandardWindow", which binds to whatever
+  // floats in FRONT: with one task window open the walk found no outlines
+  // and every lookup returned a CLEAN MISS - the sticky's row assist, pomo
+  // selection and the focus roads all went quietly dead (2026-09-17).
+  // Same rule as _RAISE_MAIN: the window named "TickTick" wins, width
+  // breaks the tie (a floating task window is a narrow panel).
   var SKIP = {AXRow:1, AXCell:1, AXStaticText:1, AXTextArea:1, AXWebArea:1, AXButton:1, AXImage:1, AXTextField:1};
-  var outlines = [], seen = false;
+  var outlines = [], main = null, mainScore = -1;
   each(ax(app, 'AXWindows'), function (w) {
-    if (seen || s(ax(w, 'AXSubrole')) !== 'AXStandardWindow') return;
-    seen = true;
+    if (s(ax(w, 'AXSubrole')) !== 'AXStandardWindow') return;
+    var szv = ax(w, 'AXSize');
+    var d = szv ? s($.CFCopyDescription(szv)).match(/w:(-?[\\d.]+)/) : null;
+    var sc = d ? parseFloat(d[1]) : 0;
+    if (s(ax(w, 'AXTitle')) === 'TickTick') sc += 100000;
+    if (sc > mainScore) { mainScore = sc; main = w; }
+  });
+  if (main) {
     (function collect(el, depth) {
       if (depth > 8) return;
       var r = s(ax(el, 'AXRole'));
       if (r === 'AXOutline') { outlines.push(el); return; }
       if (SKIP[r]) return;
       each(ax(el, 'AXChildren'), function (c) { collect(c, depth + 1); });
-    })(w, 0);
-  });
+    })(main, 0);
+  }
 
   // rightmost outline first (content panes sit right of the sidebar)
   function xpos(el) {
@@ -8239,23 +8276,34 @@ function run(argv) {
   }
 
   for (var oi = 0; oi < outlines.length; oi++) {
-    var found = null;
+    var found = null, label = null;
     each(ax(outlines[oi], 'AXRows'), function (row) {
       if (found) return;
-      var text = '';
+      var text = '', first = null, hit = null;
       each(ax(row, 'AXChildren'), function (cell) {
         each(ax(cell, 'AXChildren'), function (t) {
           var r = s(ax(t, 'AXRole'));
-          if (r === 'AXStaticText' || r === 'AXTextField') text += s(ax(t, 'AXValue'));
+          if (r !== 'AXStaticText' && r !== 'AXTextField') return;
+          var v = s(ax(t, 'AXValue'));
+          if (!v) return;
+          if (!first) first = t;
+          if (!hit && v.indexOf(needle) >= 0) hit = t;
+          text += v;
         });
       });
-      if (text.indexOf(needle) >= 0) found = row;
+      if (text.indexOf(needle) >= 0) { found = row; label = hit || first; }
     });
     if (found) {
       var p = geom(found, 'AXPosition', /x:(-?[\\d.]+)\\s+y:(-?[\\d.]+)/);
       var z = geom(found, 'AXSize', /w:(-?[\\d.]+)\\s+h:(-?[\\d.]+)/);
-      if (p && z) return 'FOUND|' + p[0] + '|' + p[1] + '|' + z[0] + '|' + z[1];
-      return '';
+      if (!p || !z) return '';
+      // ...plus the TITLE TEXT's own frame when we have it: the double-click
+      // road aims AROUND it, because a double click ON a task's text opens an
+      // inline rename instead of the window.
+      var lp = label ? geom(label, 'AXPosition', /x:(-?[\\d.]+)\\s+y:(-?[\\d.]+)/) : null;
+      var lz = label ? geom(label, 'AXSize', /w:(-?[\\d.]+)\\s+h:(-?[\\d.]+)/) : null;
+      var tail = (lp && lz) ? ('|' + lp[0] + '|' + lp[1] + '|' + lz[0] + '|' + lz[1]) : '';
+      return 'FOUND|' + p[0] + '|' + p[1] + '|' + z[0] + '|' + z[1] + tail;
     }
   }
   return '';
@@ -8376,9 +8424,12 @@ end scanFind
 '''
 
 
-def _sticky_frames():
-    """[(x, y, w, h)] of every open sticky panel (AXSystemDialog window)."""
-    r = subprocess.run(["osascript", "-e", '''
+# Everything of TickTick's that floats OVER the board, in one AppleScript:
+# the sticky panels AND the floating task windows. Both swallow a click
+# aimed at a row underneath them, which is the whole reason the click
+# picker sweeps for an uncovered point. The main window is excluded by the
+# _RAISE_MAIN rule (named "TickTick" wins, width breaks the tie).
+_FLOAT_FRAMES = '''
 tell application "System Events" to tell process "TickTick"
   set acc to ""
   repeat with w in (windows whose subrole is "AXSystemDialog")
@@ -8386,8 +8437,41 @@ tell application "System Events" to tell process "TickTick"
     set s to size of w
     set acc to acc & (item 1 of p) & " " & (item 2 of p) & " " & (item 1 of s) & " " & (item 2 of s) & linefeed
   end repeat
+  set ws to (windows whose subrole is "AXStandardWindow")
+  set bestI to 0
+  set bestScore to -1
+  repeat with i from 1 to count of ws
+    set sc to 0
+    try
+      set sz to size of (item i of ws)
+      set sc to item 1 of sz
+    end try
+    try
+      if (name of (item i of ws) as text) is "TickTick" then set sc to sc + 100000
+    end try
+    if sc > bestScore then
+      set bestScore to sc
+      set bestI to i
+    end if
+  end repeat
+  repeat with i from 1 to count of ws
+    if i is not bestI then
+      try
+        set w to item i of ws
+        set p to position of w
+        set s to size of w
+        set acc to acc & (item 1 of p) & " " & (item 2 of p) & " " & (item 1 of s) & " " & (item 2 of s) & linefeed
+      end try
+    end if
+  end repeat
   return acc
-end tell'''], capture_output=True, text=True, check=False)
+end tell'''
+
+
+def _float_frames():
+    """[(x, y, w, h)] of every sticky panel and floating task window."""
+    r = subprocess.run(["osascript", "-e", _FLOAT_FRAMES],
+                       capture_output=True, text=True, check=False)
     frames = []
     for ln in (r.stdout or "").strip().splitlines():
         try:
@@ -8398,43 +8482,217 @@ end tell'''], capture_output=True, text=True, check=False)
     return frames
 
 
-def _cg_click(x, y):
+_TASK_WINDOWS = '''
+tell application "System Events" to tell process "TickTick"
+  set ws to (windows whose subrole is "AXStandardWindow")
+  set bestI to 0
+  set bestScore to -1
+  repeat with i from 1 to count of ws
+    set sc to 0
+    try
+      set sz to size of (item i of ws)
+      set sc to item 1 of sz
+    end try
+    try
+      if (name of (item i of ws) as text) is "TickTick" then set sc to sc + 100000
+    end try
+    if sc > bestScore then
+      set bestScore to sc
+      set bestI to i
+    end if
+  end repeat
+  set acc to ""
+  repeat with i from 1 to count of ws
+    if i is not bestI then
+      try
+        set w to item i of ws
+        set p to position of w
+        set s to size of w
+        set acc to acc & (item 1 of p) & tab & (item 2 of p) & tab & (item 1 of s) & tab & (item 2 of s) & tab & (name of w as text) & linefeed
+      end try
+    end if
+  end repeat
+  return acc
+end tell'''
+
+
+def _task_windows():
+    """{title: (x, y, w, h)} of TickTick's floating task windows.
+
+    A sticky panel is ANONYMOUS - empty AX title over an opaque web view -
+    which is why a wrong-task sticky can never be spotted after the fact. A
+    task window is NAMED BY ITS TASK, and that one difference is what makes
+    the window road honest: the one already open can be raised instead of
+    duplicated, a new one is verified by title, and either can be placed."""
+    r = subprocess.run(["osascript", "-e", _TASK_WINDOWS],
+                       capture_output=True, text=True, check=False)
+    wins = {}
+    for ln in (r.stdout or "").split("\n"):
+        parts = ln.split("\t")
+        if len(parts) < 5:
+            continue
+        try:
+            x, y, w, h = (int(v) for v in parts[:4])
+        except ValueError:
+            continue
+        name = "\t".join(parts[4:]).strip()
+        if name:
+            wins[name] = (x, y, w, h)
+    return wins
+
+
+def _win_match(title, wins):
+    """The key of `wins` that belongs to `title`, or None. Exact on
+    collapsed whitespace first; then the longest window name the title
+    starts with (a long title comes back ellipsized), never shorter than
+    12 characters - a short prefix would hand back somebody else's window."""
+    want = " ".join((title or "").split())
+    if not want:
+        return None
+    for k in wins:
+        if " ".join(k.split()) == want:
+            return k
+    best = None
+    for k in wins:
+        n = " ".join(k.split()).rstrip("… .").strip()
+        if len(n) >= 12 and want.startswith(n) and (best is None or len(n) > len(best)):
+            best = k
+    return best
+
+
+_WIN_SHOW = '''on run argv
+  set v to {}
+  repeat with a in argv
+    set end of v to a as text
+  end repeat
+  tell application "System Events" to tell process "TickTick"
+    repeat with w in (windows whose subrole is "AXStandardWindow")
+      try
+        if (name of w as text) is (item 1 of v) then
+          perform action "AXRaise" of w
+          if (count of v) is 5 then
+            set px to (item 2 of v) as integer
+            set py to (item 3 of v) as integer
+            set position of w to {px, py}
+            set size of w to {(item 4 of v) as integer, (item 5 of v) as integer}
+            set position of w to {px, py}
+          end if
+          return "ok"
+        end if
+      end try
+    end repeat
+  end tell
+  return ""
+end run'''
+
+
+def _win_show(name, frame=None):
+    """Raise the named task window, and place it when a frame is given
+    (position, size, position again - the second one beats the app's own
+    re-centre, the same order link.py's sticky mover uses)."""
+    args = [name] + ([str(int(v)) for v in frame] if frame else [])
+    r = subprocess.run(["osascript", "-", *args], input=_WIN_SHOW,
+                       capture_output=True, text=True, check=False)
+    return (r.stdout or "").strip() == "ok"
+
+
+WIN_FRAME_ENV = "TICKAL_WIN_FRAME"   # "x,y,w,h": where a routine wants the window
+
+
+def _win_frame_env():
+    """TICKAL_WIN_FRAME as (x, y, w, h), or None. The window twin of
+    link.py's TICKAL_STICKY_FRAME, and far simpler: a window is found by
+    NAME, so there are no before/after snapshots to reason about."""
+    try:
+        x, y, w, h = (int(float(p)) for p in os.environ.get(WIN_FRAME_ENV, "").split(","))
+        return (x, y, w, h) if w > 0 and h > 0 else None
+    except ValueError:
+        return None
+
+
+def _cg_click(x, y, clicks=1):
     """Real left click at global point (x, y) via CGEvent (JXA bridge) -
-    reaches points that System Events element clicks can't target."""
+    reaches points that System Events element clicks can't target.
+    clicks=2 is a TRUE double click: the app reads the click-state field
+    (kCGMouseEventClickState, field 1), which counts 1 then 2. Two plain
+    clicks posted in a row are just two clicks and open nothing."""
     jxa = f'''
 ObjC.import('CoreGraphics');
 var pt = {{x: {x}, y: {y}}};
-var d = $.CGEventCreateMouseEvent($(), $.kCGEventLeftMouseDown, pt, $.kCGMouseButtonLeft);
-$.CGEventPost($.kCGHIDEventTap, d);
-delay(0.04);
-var u = $.CGEventCreateMouseEvent($(), $.kCGEventLeftMouseUp, pt, $.kCGMouseButtonLeft);
-$.CGEventPost($.kCGHIDEventTap, u);
+for (var i = 1; i <= {int(clicks)}; i++) {{
+  var d = $.CGEventCreateMouseEvent($(), $.kCGEventLeftMouseDown, pt, $.kCGMouseButtonLeft);
+  $.CGEventSetIntegerValueField(d, 1, i);
+  $.CGEventPost($.kCGHIDEventTap, d);
+  delay(0.04);
+  var u = $.CGEventCreateMouseEvent($(), $.kCGEventLeftMouseUp, pt, $.kCGMouseButtonLeft);
+  $.CGEventSetIntegerValueField(u, 1, i);
+  $.CGEventPost($.kCGHIDEventTap, u);
+  if (i < {int(clicks)}) delay(0.05);
+}}
 '''
     subprocess.run(["osascript", "-l", "JavaScript", "-e", jxa],
                    capture_output=True, check=False)
 
 
-def _click_task_row(title):
+def _click_points(row, text=(0, 0, 0, 0), clicks=1):
+    """Where to click inside a row, best first: [(x, y), ...].
+
+    A single click can land anywhere, so it sweeps the row past the ~40px
+    complete-checkbox zone, middle first (empty row space beats the title
+    text for a typical title). A DOUBLE click may NOT land on the title
+    text - that opens an inline RENAME instead of the window, and two of
+    them bumped a task's modifiedTime while this was being built - so when
+    the text's own frame is known it aims under the text first (a kanban
+    card has room below it), then past its right edge, and any fallback
+    point that would land on the text is dropped. No safe point = an empty
+    list and an honest miss, never a click that might rename his task."""
+    x, y, w, h = row
+    tx, ty, tw, th = text
+    known = clicks > 1 and tw > 0 and th > 0
+    cy = y + h // 2
+    pts = []
+    if known:
+        gap = y + h - (ty + th)
+        if gap >= 12:
+            band = ty + th + gap // 2
+            pts += [(x + w // 2, band), (x + max(48, w // 4), band)]
+        if tx + tw + 12 < x + w - 8:
+            pts += [(tx + tw + 12, cy), (x + w - 12, cy)]
+    for frac in (0.5, 0.35, 0.65, 0.8, 0.25, 0.92):
+        cx = x + max(48, int(w * frac))
+        if cx <= x + w - 8:
+            pts.append((cx, cy))
+    if known:
+        pts = [(px, py) for px, py in pts
+               if not (tx - 2 <= px <= tx + tw + 2 and ty - 2 <= py <= ty + th + 2)]
+    out = []
+    for p in pts:                       # order kept, duplicates dropped
+        if p not in out:
+            out.append(p)
+    return out
+
+
+def _click_task_row(title, clicks=1):
     """Find the row whose text contains `title` and land a REAL click on a
-    point of it that no floating sticky panel covers. True once clicked."""
+    point of it that nothing of TickTick's floats over. True once clicked.
+    clicks=2 double-clicks it, which is how a task window is opened."""
     out = _row_find(title[:60].strip())
     if not out.startswith("FOUND|"):
         return False
+    parts = out.split("|")
     try:
-        x, y, w, h = (int(v) for v in out.split("|")[1:5])
+        x, y, w, h = (int(v) for v in parts[1:5])
     except ValueError:
         return False
-    cy = y + h // 2
-    frames = _sticky_frames()
-    # Candidate points sweep the row past the ~40px complete-checkbox zone,
-    # middle first (empty row space for typical titles beats the title text).
-    for frac in (0.5, 0.35, 0.65, 0.8, 0.25, 0.92):
-        cx = x + max(48, int(w * frac))
-        if cx > x + w - 8:
-            continue
-        if not any(fx <= cx <= fx + fw and fy <= cy <= fy + fh
+    try:
+        tx, ty, tw, th = (int(v) for v in parts[5:9])
+    except ValueError:
+        tx = ty = tw = th = 0          # older finder road: no title frame
+    frames = _float_frames()
+    for cx, cyy in _click_points((x, y, w, h), (tx, ty, tw, th), clicks):
+        if not any(fx <= cx <= fx + fw and fy <= cyy <= fy + fh
                    for fx, fy, fw, fh in frames):
-            _cg_click(cx, cy)
+            _cg_click(cx, cyy, clicks)
             return True
     return False   # the whole row is under stickies right now - let caller retry
 
@@ -8767,6 +9025,111 @@ def sticky(pid, tid, assist=True):
         print(f"🗒️ Sticky opened: {short}{hint}")
         return True
     print(f"🗒️ No new sticky · “{short}” may already have one open{hint}")
+    return False
+
+
+def _esc():
+    """Escape into TickTick: closes the detail pop-up a deep link opens on a
+    kanban list, and cancels an inline title edit if a double click landed
+    on the text instead of opening a window."""
+    subprocess.run(["osascript", "-e", 'tell application "System Events" to '
+                    'tell process "TickTick" to key code 53'],
+                   capture_output=True, check=False)
+
+
+def task_window(pid, tid):
+    """Open the task in TickTick's OWN floating window - the one a double
+    click on a row or kanban card opens - and report honestly.
+
+    Why it exists: a sticky note is a dead snapshot. It never re-renders
+    when we write to the note, not even after an explicit File > Sync (Vex
+    tested it 2026-09-17), so every entry, mood and refresh we wrote was
+    invisible until he killed the sticky and opened it again. The floating
+    window is the same task, LIVE.
+
+    What it costs, measured the same day: a sticky is a floating panel (CG
+    layer 3) and stays over other apps; a task window is an ordinary window
+    (layer 0) and goes behind when he switches app. So this is the better
+    EDITOR and the worse always-on-top display, and BOTH roads stay - the
+    caller picks.
+
+    The double click IS the mechanism. Nothing else opens one: not a
+    shortcut (all 63 prefs censused), not a menu item, not any ticktick://
+    route. It is the ONE sanctioned exception to the no-UI-clicking rule
+    (Vex 2026-09-17: "I will live with small UI hack for this time").
+
+    Honest by construction, unlike sticky(): the window is NAMED, so an
+    already-open one is raised rather than duplicated and a new one is
+    verified BY TITLE. No match = we say nothing opened, and no double
+    click is left sitting in an inline edit (see _esc)."""
+    import time
+    from display import _MD_LINK_RE
+
+    # The aim is a SUBSTRING match on row text, so a generic fallback title
+    # would double-click the first row containing the word "Task". Refuse
+    # before anything is clicked - _title()'s default is not a needle.
+    raw = (cache_store.find_task(tid) or {}).get("title") or _title("")
+    title = _MD_LINK_RE.sub(r"\1", raw).strip() or raw
+    short = title[:40]
+    if not title.strip():
+        print("🪟 No title to aim at · nothing opened")
+        return False
+
+    subprocess.run(["open", "-a", "TickTick"], check=False)   # LS, no AE
+    time.sleep(0.4)
+    frame = _win_frame_env()
+
+    have = _win_match(title, _task_windows())
+    if have:
+        _win_show(have, frame)
+        print(f"🪟 Already open: {short}")
+        return True
+
+    def _aim(settle):
+        # The board has to be in FRONT: a click into an inactive window is
+        # spent activating it, and the second half of the pair then reads
+        # as a lone click (proved on the first live run - same point, same
+        # code, nothing opened until the main window was raised first).
+        _raise_main_window()
+        time.sleep(settle)
+        if not _click_task_row(title, clicks=2):
+            return None
+        for _ in range(10):                      # up to 2.5 s
+            time.sleep(0.25)
+            got = _win_match(title, _task_windows())
+            if got:
+                return got
+        _esc()            # a double click that opened nothing may be editing
+        return None
+
+    got = _aim(0.3)                              # fast path: already on screen
+    if not got:
+        before = _sticky_count()
+        subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{tid}"],
+                       check=False)
+        # Settle the way sticky() does: the link opens the task's DETAIL
+        # POP-UP (an AXSystemDialog) somewhere around 0.75-2 s in, and that
+        # pop-up sits over the board. A fixed sleep lands before it, the
+        # click goes into the pop-up and nothing opens - which is exactly
+        # how the first live run of this failed.
+        time.sleep(0.75)
+        n, still = _sticky_count(), 0
+        for _ in range(9):
+            time.sleep(0.25)
+            m = _sticky_count()
+            still = still + 1 if m == n else 0
+            n = m
+            if still >= 2:
+                break
+        if n > before >= 0:
+            _esc()                               # the link's own detail pop-up
+            time.sleep(0.4)
+        got = _aim(0.4) or _aim(0.8)
+    if got:
+        _win_show(got, frame)
+        print(f"🪟 Window opened: {short}")
+        return True
+    print(f"🪟 No window · couldn't find “{short}” on screen")
     return False
 
 
@@ -11611,6 +11974,8 @@ def main():
             print(rest or "TickAL")
         elif verb == "sticky":
             pid, tid = rest.split(":", 1); sticky(pid, tid)
+        elif verb == "window":
+            pid, tid = rest.split(":", 1); task_window(pid, tid)
         elif verb == "focus_sticky":
             pid, tid = rest.split(":", 1); focus_sticky(pid, tid)
         elif verb == "fx_add":
@@ -11691,6 +12056,8 @@ def main():
             pn_open(rest)
         elif verb == "pn_sticky":
             pn_sticky(rest)
+        elif verb == "pn_window":
+            pn_window(rest)
         elif verb == "pn_entry":
             pn_entry(rest)
         elif verb == "pn_income":

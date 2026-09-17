@@ -133,16 +133,19 @@ check("view habits refused (it has an app link)", refused("view:habits") is not 
 
 il = rl.internal_links("🌅 Startup", TID, PID)
 keys = [r[0] for r in il]
-check("full list order", keys == ["focus", "sticky", "timer", "calendar", "habits",
+check("full list order", keys == ["focus", "sticky", "window", "timer",
+                                  "calendar", "habits",
                                   "focusview", "matrix", "countdowns", "tasks",
                                   "inbox", "crmcal",
-                                  "daily", "daily_sticky", "weekly", "weekly_sticky",
-                                  "monthly", "monthly_sticky", "quarterly",
-                                  "quarterly_sticky", "yearly", "yearly_sticky",
+                                  "daily", "daily_sticky", "daily_window",
+                                  "weekly", "weekly_sticky", "weekly_window",
+                                  "monthly", "monthly_sticky", "monthly_window",
+                                  "quarterly", "quarterly_sticky", "quarterly_window",
+                                  "yearly", "yearly_sticky", "yearly_window",
                                   "morning", "evening", "weekly_journal",
                                   "monthly_journal", "quarterly_journal"], keys)
 check("no item → destinations + journals only",
-      [r[0] for r in rl.internal_links()] == keys[3:])
+      [r[0] for r in rl.internal_links()] == keys[4:])
 check("periodic off drops daily + journals",
       not {"daily", "morning", "evening", "weekly_journal"}
       & {r[0] for r in rl.internal_links(periodic=False)})
@@ -167,9 +170,10 @@ for k, _t, _s, md in il:
     target = md[md.rindex("(") + 1:-1]
     if target.startswith("alfred://"):
         arg = parse_qs(urlsplit(target).query)["argument"][0]
-        check(f"{k} link parses back", rl.parse(arg)[0] in ("focus", "sticky", "timer",
-                                                            "view", "journal", "note",
-                                                            "notesticky", "money",
+        check(f"{k} link parses back", rl.parse(arg)[0] in ("focus", "sticky", "window",
+                                                            "timer", "view", "journal",
+                                                            "note", "notesticky",
+                                                            "notewindow", "money",
                                                             "moneysticky"), arg)
 check("every row is markdown", all(r[3].startswith("[") and r[3].endswith(")") for r in il))
 
