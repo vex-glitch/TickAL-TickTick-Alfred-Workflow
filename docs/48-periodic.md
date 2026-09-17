@@ -121,6 +121,7 @@ Log from the `pn` bar (`tpn`, or `tse pn`): type `$ 485 tattoo` → the daily ga
 
 Minted Sunday for the week ahead - and opening it midweek mints it on the spot, like every note. Top to bottom:
 
+- **The week's days** - under the breadcrumb, one line per day of that week, linked to that day's note. A day whose note does not exist yet sits there as plain text and becomes a link the moment it does.
 - **🏆 Goals** → **✨ Highlight** - yours to write (the 🗓️ Week highlight row and the weekly journal both land in ✨).
 - **📌 This Week → 📊 Stats** - the numbers, each on its own bullet, most of them carrying the figure in the bullet itself with a vs-last-week chip in the daily note's arrow language (`- Completed: 78 · 🔴 ▼ 309 (−80%)`): Top lists · Top tasks · Created · Completed · Daily Completed (per-day bars) · Focus (by day, with the day's top task) · Habit consistency.
   - **Top lists** and **Top tasks** are the three busiest lists and the three most-completed tasks, and both skip your routines list - a thing you do seven days a week is not news. The headline counts still count everything, so they stay comparable with the weeks already written.
@@ -132,7 +133,7 @@ Minted Sunday for the week ahead - and opening it midweek mints it on the spot, 
 
 Rearranged it yourself? Sections are found BY NAME wherever you put them, so moving and renesting is free.
 
-A note's shape is fixed when it is minted - refresh fills bodies, it never reshapes. So when the shipped layout changes, the week already open keeps the old one and is left strictly alone (never half-rewritten) until the next Monday mints a fresh note. To move it over now instead, `tools/pnrepair/relayout_weekly.py` rebuilds it in place: your goals, journal answers and review ticks ride across, anything the new layout has no home for is kept verbatim at the bottom, it prints the result and changes nothing without `--apply`, and it refuses outright if a single line you wrote would be lost. Weeks already closed keep the shape they were written in - their numbers exist nowhere else.
+A note's shape is fixed when it is minted - refresh fills bodies, it never reshapes. So when the shipped layout changes, the week already open keeps the old one and is left strictly alone (never half-rewritten) until the next Monday mints a fresh note. To move it over now instead, `tools/pnrepair/relayout_weekly.py` rebuilds it in place: your goals, journal answers and review ticks ride across, anything the new layout has no home for is kept verbatim at the bottom, it prints the result and changes nothing without `--apply`, and it refuses outright if a single line you wrote would be lost. Weeks already closed keep the shape they were written in - their numbers exist nowhere else. The one thing they do get is `tools/pnrepair/weekday_links.py`, which stamps the day links into any weekly note's head (dry run by default, `--apply` to write): it touches the breadcrumb and those seven lines and nothing else, so a closed week's numbers are safe.
 
 **Monthly** adds sparklines and top wins; **quarterly** and **yearly** ship as templates + money roll-ups for now - their review sections land in a later release (the first real quarterly mint is Sep 30).
 

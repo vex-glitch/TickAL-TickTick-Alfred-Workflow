@@ -376,6 +376,58 @@ def set_breadcrumb(doc, line):
     return True
 
 
+# ── Week-day links (lead, under the crumb) ───────────────────────────────────
+# Vex 2026-09-17: "below breadcrumbs, links to days of that week". He typed
+# the first two into the live note himself, so the label shape is his:
+# "Mon, 14th Sep". Matches a bullet whether we wrote it or he did (the app
+# escapes brackets on a hand edit: `- \[Mon, 14th Sep\]\(url\)`).
+DAY_LINK_RE = re.compile(
+    r"^\s*[-*]\s+\\?\[?(?:" + "|".join(DAY_ABBR) + r"), \d{1,2}")
+
+
+def day_link_label(d):
+    return f"{DAY_ABBR[d.weekday()]}, {_ord(d.day)} {MONTH_ABBR[d.month]}"
+
+
+def day_link_lines(p, url_for):
+    """Weekly only: one bullet per day of the week, linked when that day's
+    note exists. A day with no note yet is plain text and self-heals into a
+    link on a later refresh - the breadcrumb rule (see render_breadcrumb).
+    Other tiers get [] - a yearly period would otherwise render 365 lines."""
+    if p.kind != "weekly":
+        return []
+    out, d = [], p.start
+    while d <= p.end:
+        label = day_link_label(d)
+        u = url_for(period_for("daily", d))
+        out.append(f"- [{label}]({u})" if u else f"- {label}")
+        d += timedelta(days=1)
+    return out
+
+
+def set_day_links(doc, lines):
+    """Splice the day bullets into the lead under the breadcrumb: replaces the
+    existing run in place, else inserts it (with its own `---`) after the
+    crumb's divider. For notes _compose_lead will never rebuild again - a week
+    sealed before this shipped. Returns changed?"""
+    if not lines:
+        return False
+    lead = doc.lead
+    a = next((i for i, l in enumerate(lead) if DAY_LINK_RE.match(l)), None)
+    if a is not None:
+        b = a
+        while b + 1 < len(lead) and DAY_LINK_RE.match(lead[b + 1]):
+            b += 1
+        if lead[a:b + 1] == list(lines):
+            return False
+        doc.lead = lead[:a] + list(lines) + lead[b + 1:]
+        return True
+    at = next((i + 1 for i, l in enumerate(lead) if l.strip() == "---"),
+              1 if lead else 0)
+    doc.lead = lead[:at] + list(lines) + ["---"] + lead[at:]
+    return True
+
+
 # ── Money ────────────────────────────────────────────────────────────────────
 # Whitespace-tolerant + total-as-bullet (the layout indents body lines with
 # tabs and bullets the Total - the old anchored regexes silently zeroed

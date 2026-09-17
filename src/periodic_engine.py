@@ -266,9 +266,15 @@ def _crumb(p, index):
         pm.breadcrumb_segments(p, lambda q: _note_url(lookup(index, q))))
 
 
+def _day_links(p, index):
+    """The week's seven day bullets, linked to the daily notes that exist."""
+    return pm.day_link_lines(p, lambda q: _note_url(lookup(index, q)))
+
+
 def _compose_lead(doc, p, index, refetch):
-    """The lead is ENGINE-OWNED (hand-tuned layout): crumb / nav / ---
-    and, on dailies, weather + quote + Mood/Day lines + a closing ---.
+    """The lead is ENGINE-OWNED (hand-tuned layout): crumb / nav / ---,
+    on weeklies the week's seven day links + a closing ---, and on dailies
+    weather + quote + Mood/Day lines + a closing ---.
     Existing weather/quote/mood/day lines carry over; refetch=True swaps in
     fresh weather+quote (today's note only). Returns changed?"""
     old = doc.lead
@@ -284,6 +290,11 @@ def _compose_lead(doc, p, index, refetch):
         if w:
             w_line = w
     out = [_crumb(p, index)] + ["---"]
+    if p.kind == "weekly":
+        # the week's own days, under the crumb (Vex 2026-09-17). Engine-owned
+        # like the crumb above them: a day minted later heals into a link on
+        # the next refresh.
+        out += _day_links(p, index) + ["---"]
     if p.kind == "daily":
         # Mood and the day rating are NOT in the lead any more - Vex moved
         # them into the journals, where the questions that produce them live
@@ -320,6 +331,7 @@ def create_note(p, index):
     tpl = _load_template(p.kind)
     content = pm.render_template(tpl, {
         "breadcrumbs": _crumb(p, index),
+        "daylinks": "\n".join(_day_links(p, index)),
     })
     # Child tag ONLY - TickTick's group-by-tag prefers the PARENT when both
     # are attached, which would collapse the kanban into one 💫Periodic

@@ -1,7 +1,10 @@
 {{breadcrumbs}}
 ---
+{{daylinks}}
+---
 #### 🏆 Goals
 #### ✨ Highlight
+---
 #### 📌 This Week
 ##### 📊 Stats
 - Top lists:

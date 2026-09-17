@@ -816,6 +816,48 @@ check("26.a-bracket-in-the-title-is-not-mistaken-for-the-box",
       pm.tick_lines([f"\t- [ ] [Buy [2] cables]({_u}{_ids['PLAIN']}) "], {_ids["PLAIN"]})[0][0]
       == f"\t- [x] [Buy [2] cables]({_u}{_ids['PLAIN']}) ")
 
+# ── 27. the week's days, linked under the crumb (Vex 2026-09-17) ─────────────
+_wk38 = pm.period_for("weekly", date(2026, 9, 17))
+_have = {date(2026, 9, 14), date(2026, 9, 15)}
+_dl = pm.day_link_lines(_wk38, lambda q: ("U" + q.start.isoformat()
+                                          if q.start in _have else None))
+check("27.one-bullet-per-day", len(_dl) == 7, _dl)
+check("27.label-is-vex-s", _dl[0] == "- [Mon, 14th Sep](U2026-09-14)", _dl[0])
+check("27.a-day-with-no-note-is-plain-text", _dl[2] == "- Wed, 16th Sep", _dl[2])
+check("27.ordinals", pm.day_link_label(date(2026, 9, 1)) == "Tue, 1st Sep"
+      and pm.day_link_label(date(2026, 9, 3)) == "Thu, 3rd Sep"
+      and pm.day_link_label(date(2026, 9, 22)) == "Tue, 22nd Sep")
+check("27.a-week-across-two-months-names-both",
+      pm.day_link_lines(pm.period_for("weekly", date(2026, 9, 30)),
+                        lambda q: None)[:2] == ["- Mon, 28th Sep", "- Tue, 29th Sep"])
+# every other tier gets nothing - a yearly period would render 365 bullets
+check("27.weekly-only", all(pm.day_link_lines(pm.period_for(k, date(2026, 9, 17)),
+                                              lambda q: "U") == []
+                            for k in ("daily", "monthly", "quarterly", "yearly")))
+_d27 = ps.parse_sections("◀ crumb ▶\n---\n#### 🏆 Goals\nmine\n")
+check("27.insert-under-the-divider", pm.set_day_links(_d27, _dl)
+      and _d27.lead == ["◀ crumb ▶", "---"] + _dl + ["---"], _d27.lead)
+check("27.the-note-below-is-untouched",
+      ps.serialize_sections(_d27).endswith("---\n#### 🏆 Goals\nmine\n"))
+check("27.idempotent", pm.set_day_links(_d27, _dl) is False)
+# Vex typed the first two by hand and the app escaped them: replaced, not doubled
+_d27b = ps.parse_sections("◀ crumb ▶\n---\n- Mon, 14th Sep\n"
+                          "- \\[Tue, 15th Sep\\]\\(x\\)\n---\n#### 🏆 Goals\nmine\n")
+pm.set_day_links(_d27b, _dl)
+check("27.a-hand-typed-run-is-replaced-in-place",
+      _d27b.lead == ["◀ crumb ▶", "---"] + _dl + ["---"], _d27b.lead)
+check("27.day-bullets-stay-out-of-the-fillers-way",
+      ps.find(_d27b, "Mon, 14th Sep") is None
+      and ps.find(_d27b, "🏆 Goals") is not None)
+# the shipped template mints the block with the note
+_tpl27 = open(os.path.join(ROOT, "src", "periodic_templates", "weekly.md"),
+              encoding="utf-8").read()
+check("27.template-carries-the-token", "{{daylinks}}" in _tpl27)
+check("27.template-renders-the-block",
+      pm.render_template(_tpl27, {"breadcrumbs": "C", "daylinks": "\n".join(_dl)})
+      .startswith("C\n---\n" + "\n".join(_dl) + "\n---\n#### 🏆 Goals"))
+
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)
