@@ -8635,7 +8635,9 @@ _WIN_SHOW = '''on run argv
             set size of w to {pw, ph}
             set position of w to {px, py}
           end if
-          return "ok"
+          set p to position of w
+          set z to size of w
+          return "" & (item 1 of p) & " " & (item 2 of p) & " " & (item 1 of z) & " " & (item 2 of z)
         end if
       end try
     end repeat
@@ -8644,14 +8646,33 @@ _WIN_SHOW = '''on run argv
 end run'''
 
 
-def _win_show(name, frame=None):
-    """Raise the named task window, and place it when a frame is given
-    (position, size, position again - the second one beats the app's own
-    re-centre, the same order link.py's sticky mover uses)."""
+def _win_place_once(name, frame=None):
+    """One raise + place. Returns the window's frame AFTER it, or None when
+    no window of that name is there."""
     args = [name] + ([str(int(v)) for v in frame] if frame else [])
     r = subprocess.run(["osascript", "-", *args], input=_WIN_SHOW,
                        capture_output=True, text=True, check=False)
-    return (r.stdout or "").strip() == "ok"
+    try:
+        x, y, w, h = (int(v) for v in (r.stdout or "").strip().split())
+        return (x, y, w, h)
+    except ValueError:
+        return None
+
+
+def _win_show(name, frame=None):
+    """Raise the named task window, and place it when a frame is given.
+
+    It READS THE FRAME BACK and places once more if it did not take. A place
+    right after the window appeared has been seen to do nothing at all while
+    reporting success - the app is still settling the new window - and a
+    routine that silently leaves its note in the middle of the screen is
+    exactly the kind of quiet wrong this road exists to avoid."""
+    got = _win_place_once(name, frame)
+    if got is None:
+        return False
+    if frame and tuple(int(v) for v in frame) != got:
+        got = _win_place_once(name, frame) or got
+    return True
 
 
 WIN_FRAME_ENV = "TICKAL_WIN_FRAME"   # "x,y,w,h": where a routine wants the window

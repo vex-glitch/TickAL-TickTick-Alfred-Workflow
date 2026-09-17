@@ -217,6 +217,26 @@ def _tt_age():
         return None
 
 
+def _window_call(call):
+    """Run a window-opening call with the ONE thing it shares with the sticky
+    road: the cold-start retry. A routine QUITS and relaunches TickTick and
+    asks for a window a few steps later, and on a cold app the board has not
+    rendered - the row is not there to double click, so task_window burns its
+    own retries and says it could not find it. While TickTick is younger than
+    COLD_S that answer gets ONE more go after COLD_WAIT.
+
+    It needs none of the sticky road's snapshot machinery: a window is found
+    by NAME, so placement and verification are already exact. A LIST-VIEW
+    refusal is never retried - waiting will not turn a list into a kanban."""
+    out = call() or ""
+    if "No window" in out and "list view" not in out:
+        age = _tt_age()
+        if age is not None and age < COLD_S:
+            time.sleep(COLD_WAIT)
+            out = call() or ""
+    return out
+
+
 def _sticky_call(call):
     """Run a sticky-opening call (xact.sticky / pn_sticky / the money
     sticky) with two KM-routine extras, both driven by TickTick's window
@@ -397,11 +417,12 @@ VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
             "crmcal": "ctx:crmcal"}           # exactly what CRM home > Calendar opens
 
 
-def _money(xact, as_sticky=False):
+def _money(xact, as_sticky=False, as_window=False):
     """Open THIS month's money note (routine_link.money_note): the cache
     first, a LIVE read of the list when the cache has no current-month note
     (made within the last sync hour), else the newest one, said out loud.
-    as_sticky = the same note as a desktop sticky (no row-click retry)."""
+    as_sticky = the same note as a desktop sticky (no row-click retry);
+    as_window = the same note in its live floating window."""
     from datetime import date
     today = date.today()
     pid, cs = rl.MONEY_LIST, xact.cache_store
@@ -423,11 +444,13 @@ def _money(xact, as_sticky=False):
     month = rl.MONTHS[today.month - 1]
     why = ("" if cur else
            f"No {month} note yet" if live_ok else f"{month} not cached, live read failed")
-    if as_sticky:
+    if as_sticky or as_window:
         if not _tt_ready(xact):
-            return "🗒️ TickTick not up · no sticky"
+            return ("🗒️ TickTick not up · no sticky" if as_sticky
+                    else "🪟 TickTick not up · no window")
         os.environ["task_title"] = target.get("title") or "Money"
-        done = _quiet(xact.sticky, pid, target["id"], assist=False)
+        done = (_quiet(xact.task_window, pid, target["id"]) if as_window else
+                _quiet(xact.sticky, pid, target["id"], assist=False))
         return f"💰 {why} · {done}" if why else done
     subprocess.run(["open", f"ticktick:///webapp/#p/{pid}/tasks/{target['id']}"],
                    check=False)
@@ -465,18 +488,22 @@ def run(verb, tid, pid_hint):
     if verb == "notewindow":             # same note, LIVE - none of the
         if not _tt_ready(xact):          # snapshot machinery: a window is
             return "🪟 TickTick not up · no window", False   # found by NAME
-        return _quiet(xact.pn_window, tid), True
+        return _window_call(lambda: _quiet(xact.pn_window, tid)), True
     if verb == "view":                   # no ticktick:// route for these
         if tid == "calendar":
             xact._run_trigger("OpenCalendar")                 # its List-menu flow
         else:
             xact._run_trigger("BrowseCtx", VIEW_CTX[tid])     # an Alfred screen
         return "", True
-    if verb in ("money", "moneysticky"):
+    if verb in ("money", "moneysticky", "moneywindow"):
         if verb == "moneysticky":        # TickTick up BEFORE the snapshots (like notesticky):
             if not _tt_ready(xact):      # else stickies it reopens at launch look new
                 return "🗒️ TickTick not up · no sticky", False
             return _sticky_call(lambda: _money(xact, as_sticky=True)), True
+        if verb == "moneywindow":        # no snapshots: a window is found by NAME
+            if not _tt_ready(xact):
+                return "🪟 TickTick not up · no window", False
+            return _window_call(lambda: _money(xact, as_window=True)), True
         return _money(xact), True
     got = _resolve(xact, tid, pid_hint)
     if not got:
@@ -507,7 +534,7 @@ def run(verb, tid, pid_hint):
     if verb == "window":                 # the live twin of sticky
         if not _tt_ready(xact):
             return "🪟 TickTick not up · no window", False
-        return _quiet(xact.task_window, pid, tid), True
+        return _window_call(lambda: _quiet(xact.task_window, pid, tid)), True
     parts = []
     if verb in ("focus", "sticky"):
         if _tt_ready(xact):
@@ -518,7 +545,7 @@ def run(verb, tid, pid_hint):
             parts.append("🗒️ TickTick not up · no sticky")
     if verb == "focuswindow":            # the window twin: the timer still
         if _tt_ready(xact):              # starts even if no window opens
-            parts.append(_quiet(xact.task_window, pid, tid))
+            parts.append(_window_call(lambda: _quiet(xact.task_window, pid, tid)))
         else:
             parts.append("🪟 TickTick not up · no window")
     if verb in ("focus", "focuswindow", "timer"):

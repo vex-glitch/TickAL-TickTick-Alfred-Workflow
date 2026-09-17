@@ -177,6 +177,15 @@ for k, _t, _s, md in il:
                                    "moneysticky", "moneywindow"), arg)
 check("every row is markdown", all(r[3].startswith("[") and r[3].endswith(")") for r in il))
 
+# A verb the GRAMMAR accepts but run() never names falls through to the task
+# road and answers "Task not found" - which is what happened to moneywindow
+# on the day it shipped, in a routine step nobody would have watched.
+_link_src = open(os.path.join(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))), "Scripts", "link.py"), encoding="utf-8").read()
+_run_src = _link_src[_link_src.index("\ndef run("):]
+for _v in sorted(set(rl.TASK_VERBS) | set(rl.BARE_VERBS) | set(rl.SLOT_VERBS)):
+    check(f"run() handles {_v}", f'"{_v}"' in _run_src, _v)
+
 # ── money + crmcal + inbox ──────────────────────────────────────────────────
 check("money bare", rl.parse("money") == ("money", "", ""))
 check("money takes no id", refused("money:6a955950b4839102c549b053") is not None)

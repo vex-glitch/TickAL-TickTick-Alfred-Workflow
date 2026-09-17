@@ -467,6 +467,7 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
         alt   = {"valid": False, "subtitle": ""}
         altshift = {"valid": False, "subtitle": ""}   # buffering done tasks = nonsense
         ctrlshift = {"valid": False, "subtitle": ""}  # sticky of a done task, too
+        ctrlalt = {"valid": False, "subtitle": ""}    # and a window of one
         ctrlcmd = {"valid": False, "subtitle": ""}    # focusing them, too
     else:
         sub_count = sum(1 for s in pool
@@ -478,22 +479,12 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
         alt   = {"arg": "", "subtitle": "Browse subtasks",
                  "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{tid}"}}
         # ⌥⇧ → buffer
-        altshift = {"valid": True, "arg": f"xact:buffer_add:{pid}:{tid}",
-                    "subtitle": "🅿️ Add to buffer",
-                    "variables": {"task_title": name, "task_id": tid,
-                                  "task_list_id": pid, "item_type": "task"}}
-        # ⌃⇧ → desktop sticky (Vex 2026-09-08); ⌃⌘ → the ⏱/🍅 start flow
-        ctrlshift = {"valid": True, "arg": f"xact:sticky:{pid}:{tid}",
-                     "subtitle": "🗒️ Sticky note",
-                     "variables": {"task_title": name, "task_id": tid,
-                                   "task_list_id": pid, "item_type": "task"}}
-        # notes focus too since 2026-09-17 - the timer is OURS (focus_start
-        # keeps its own state and writes its own record), so it binds to any
-        # id TickTick will open
-        ctrlcmd = {"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
-                   "subtitle": "Start focus",
-                   "variables": {"task_title": name, "task_id": tid,
-                                 "task_list_id": pid, "item_type": "task"}}
+        # The item chords come from ONE place (item_mods) so a row can never
+        # show a legend chip for a chord it does not carry - which is exactly
+        # what happened when ⌃⌥ shipped and this row still hand-wrote three.
+        _im = item_mods(pid, tid, name, "task")
+        altshift, ctrlshift = _im["alt+shift"], _im["ctrl+shift"]
+        ctrlalt, ctrlcmd = _im["ctrl+alt"], _im["ctrl+cmd"]
     return alfred.item(
         title=build_title(t, buffered=tid in buffered_ids()),
         subtitle=subtitle,
@@ -504,6 +495,7 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
             "alt":        alt,
             "alt+shift":  altshift,
             "ctrl+shift": ctrlshift,
+            "ctrl+alt":   ctrlalt,
             "ctrl+cmd":   ctrlcmd,
             "alt+cmd":    {"arg": f"copy:{link}"},
             "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
@@ -1304,30 +1296,10 @@ def main():
                         # ⌥ → unified Browse box (this task's subtasks)
                         "alt":       {"arg": "", "subtitle": "Browse subtasks",
                                       "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{tid}"}},
-                        # ⌥⇧ → buffer (the router node forwards xact: args to the executor)
-                        "alt+shift": {"valid": True,
-                                      "arg": f"xact:buffer_add:{pid}:{tid}",
-                                      "subtitle": "🅿️ Add to buffer",
-                                      "variables": {"task_title": name,
-                                                    "task_id": tid,
-                                                    "task_list_id": pid,
-                                                    "item_type": "task"}},
-                        # ⌃⇧ → desktop sticky (Vex 2026-09-08: the verb he
-                        # reaches for most), ⌃⌘ → the ⏱/🍅 start flow
-                        "ctrl+shift": {"valid": True,
-                                       "arg": f"xact:sticky:{pid}:{tid}",
-                                       "subtitle": "🗒️ Sticky note",
-                                       "variables": {"task_title": name,
-                                                     "task_id": tid,
-                                                     "task_list_id": pid,
-                                                     "item_type": "task"}},
-                        "ctrl+cmd": {"valid": True,
-                                     "arg": f"xact:focus_open:{pid}:{tid}",
-                                     "subtitle": "Start focus",
-                                     "variables": {"task_title": name,
-                                                   "task_id": tid,
-                                                   "task_list_id": pid,
-                                                   "item_type": "task"}},
+                        # ⌥⇧ buffer · ⌃⇧ sticky · ⌃⌥ floating window ·
+                        # ⌃⌘ the ⏱/🍅 start flow, all from item_mods so this
+                        # row and the note row can never drift apart
+                        **item_mods(pid, tid, name, "task"),
                         "alt+cmd":   {"arg": f"copy:{link}"},
                         "ctrl":      {"arg": "", "subtitle": "🔙 Main menu"},
                     },
