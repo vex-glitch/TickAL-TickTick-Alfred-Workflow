@@ -37,6 +37,24 @@ check("empty stays empty, so an empty Save still reads as skip",
       and ask_box._tidy(None) == "")
 check("one line is untouched", ask_box._tidy("just this") == "just this")
 
+# ── placement: centred on the menu-bar screen, a third of the spare height down
+WIDE = (0, 0, 3840, 1080)            # Vex's main display
+check("centred on the wide screen, and the live numbers reproduce",
+      ask_box._origin(WIDE, WIDE, (592, 478)) == (1624, 401),
+      ask_box._origin(WIDE, WIDE, (592, 478)))
+_x, _y = ask_box._origin(WIDE, WIDE, (592, 478))
+check("the window centre IS the screen centre", _x + 592 / 2 == 3840 / 2)
+check("the gap above is a third of the spare height",
+      round(1080 - (_y + 478)) == round((1080 - 478) / 3))
+check("a screen with an offset origin is handled",
+      ask_box._origin((3840, 15, 1080, 1920), (3840, 15, 1080, 1920), (592, 478))
+      == (4084, 976), ask_box._origin((3840, 15, 1080, 1920), (3840, 15, 1080, 1920), (592, 478)))
+check("the Dock and menu bar are never covered",
+      ask_box._origin(WIDE, (0, 80, 3840, 975), (592, 1040))[1] == 80,
+      ask_box._origin(WIDE, (0, 80, 3840, 975), (592, 1040)))
+check("a box wider than the screen still starts on it",
+      ask_box._origin(WIDE, WIDE, (5000, 478))[0] == 0)
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if FAILS:
     raise AssertionError(f"{len(FAILS)} checks failed: {FAILS}")

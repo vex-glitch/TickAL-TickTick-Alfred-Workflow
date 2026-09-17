@@ -69,6 +69,8 @@ def ask(prompt, title="TickAL", default=""):
 
     win = alert.window()
     win.setInitialFirstResponder_(view)
+    alert.layout()                      # so the frame below is the REAL size
+    place(win)
     app.activateIgnoringOtherApps_(True)
     win.makeKeyAndOrderFront_(None)
     # the caret starts AFTER any default text, where a typist expects it
@@ -78,6 +80,47 @@ def ask(prompt, title="TickAL", default=""):
     if clicked != 1000:                                 # NSAlertFirstButtonReturn
         return None
     return _tidy(str(view.string()))
+
+
+def place(win):
+    """Put the box where every other TickAL dialog goes: centred on the
+    MENU-BAR screen, a third of the spare height down.
+
+    Same rule as xact._DIALOG_MOVER, which parks the AppleScript dialogs
+    (Vex 2026-07-30: "it always appears on my secondary monitor", and
+    2026-09-16 about this box: "these ones pop up on the left of my screen").
+    NSScreen.screens() item 1 IS the menu-bar screen by definition, and an
+    NSAlert with no parent window is placed by AppKit relative to nothing in
+    a background app, so it has to be told.
+    """
+    from AppKit import NSMakePoint, NSScreen
+    screens = NSScreen.screens()
+    if not screens:
+        return
+    f, vis, size = screens[0].frame(), screens[0].visibleFrame(), win.frame().size
+    x, y = _origin((f.origin.x, f.origin.y, f.size.width, f.size.height),
+                   (vis.origin.x, vis.origin.y, vis.size.width, vis.size.height),
+                   (size.width, size.height))
+    win.setFrameOrigin_(NSMakePoint(x, y))
+
+
+def _origin(frame, visible, size):
+    """(x, y) for a window of `size` on a screen whose frame and visibleFrame
+    are (x, y, w, h): centred, a third of the spare height down, clamped so it
+    can never sit under the menu bar or hang off an edge.
+
+    Cocoa counts y UP from the bottom, AX counts DOWN from the top, so the
+    mover's `(sh - h) / 3` gap below the top is the same gap computed from the
+    other end here.
+    """
+    fx, fy, fw, fh = frame
+    vx, vy, vw, vh = visible
+    w, h = size
+    x = fx + (fw - w) / 2.0
+    y = fy + fh - (fh - h) / 3.0 - h
+    x = max(vx, min(x, vx + vw - w))
+    y = max(vy, min(y, vy + vh - h))
+    return round(x), round(y)
 
 
 def _tidy(text):
