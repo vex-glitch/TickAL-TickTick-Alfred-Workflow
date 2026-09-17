@@ -33,6 +33,7 @@ test:
 	@$(PYTHON) tests/test_recap_order.py
 	@$(PYTHON) tests/test_money.py
 	@$(PYTHON) tests/test_weekly_note.py
+	@$(PYTHON) tests/test_monthly_note.py
 	@$(PYTHON) tests/test_people.py
 	@$(PYTHON) tests/test_eagle.py
 	@$(PYTHON) tests/test_routine_link.py

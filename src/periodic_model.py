@@ -96,7 +96,13 @@ LEGACY_NAV     = "🧭 Nav"
 LEGACY_QUOTE   = "💬 Quote & weather"
 LEGACY_TODAY   = "✅ Today"
 # monthly
-SEC_MONTH_GOAL = "🎯 Month goal"
+# monthly - Vex's 2026-09-17 layout, the weekly's shape one tier up: the same
+# 📊 Stats / 💿 Data groups holding the same bullet names, counted by WEEK
+# instead of by day.
+SEC_MTH_QTR    = "🌓 Quarterly goal"       # mirror of the quarter's goals
+SEC_MTH_MONTH  = "🗓️ Monthly goal"        # THIS month's own
+SEC_MBARS      = "Weekly Completed"       # per-week bars (the daily's twin)
+SEC_MONTH_GOAL = "🎯 Month goal"          # what monthly notes called it before
 SEC_SPARKS     = "📊 Sparklines"
 SEC_TOP_WINS   = "🏆 Top wins"
 # quarterly
@@ -121,10 +127,20 @@ SEC_DECEMBER   = "🧪 December test"
 GOAL_SECTION = {
     "daily":     SEC_DAY_GOAL,      # the One Thing - REPLACES the body
     "weekly":    SEC_WK_WEEK,       # the bullet, not the whole section
-    "monthly":   SEC_MONTH_GOAL,
+    "monthly":   SEC_MTH_MONTH,
     "quarterly": SEC_OKR_REVIEW,
     "yearly":    SEC_SCORECARD,
 }
+
+
+# Names a tier's goal section used to have. A mirror or a setter tries the
+# current name first and these after it, so a note minted under an older
+# template still answers (and is never silently written twice).
+GOAL_SECTION_ALT = {"monthly": [SEC_MONTH_GOAL]}
+
+
+def goal_section_names(kind):
+    return [GOAL_SECTION[kind]] + GOAL_SECTION_ALT.get(kind, [])
 
 
 def goal_line(text="", pid=None, tid=None, title=None):
@@ -166,7 +182,10 @@ WRITER_ANCHORS = {
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK,
                   SEC_WEEKLY_JNL, SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME,
                   SEC_PEOPLE],
-    "monthly":   [SEC_STATS, SEC_SPARKS, SEC_TOP_WINS, SEC_MONEY,
+    "monthly":   [SEC_MTH_QTR, SEC_MTH_MONTH, SEC_HIGHLIGHT,
+                  SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
+                  SEC_MBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
+                  SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
                   SEC_PEOPLE],
     "quarterly": [SEC_MONEY],            # v3.0: template + money only
     "yearly":    [SEC_MONEY],
@@ -183,6 +202,17 @@ SECTION_SCOPE = {
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_WBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
+        SEC_HABIT_WEEK: SEC_WK_STATS,
+        SEC_HL_WEEK: SEC_WK_DATA,
+        SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
+        SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
+    },
+    # same two group headers, same bullet names, one tier up
+    "monthly": {
+        SEC_MTH_QTR: SEC_GOALS, SEC_MTH_MONTH: SEC_GOALS,
+        SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
+        SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
+        SEC_MBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
         SEC_HABIT_WEEK: SEC_WK_STATS,
         SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
@@ -445,6 +475,207 @@ def set_day_links(doc, lines):
     doc.lead = out
     return True
 
+
+
+# ── A month's weeks (Vex 2026-09-17: "Everywhere you write W1 add date range")
+def count_task_lines(counts, n=3, gi=T1):
+    """top_task_lines' rows from already-summed {title: times} - the monthly
+    reads its weeks' rankings rather than the completion records."""
+    return [f"{gi}- {nm[:64]}" + (f" · {c}×" if c > 1 else "")
+            for nm, c in top_n(counts, n)]
+
+
+def count_list_lines(pairs, n=3, gi=T1):
+    """top_list_lines' rows from already-summed {name: (done, added)}."""
+    traffic = {nm: d + a for nm, (d, a) in (pairs or {}).items()}
+    return [f"{gi}- {nm} · {pairs[nm][0]} done · {pairs[nm][1]} added"
+            for nm, _c in top_n(traffic, n)]
+
+
+def month_week_spans(p):
+    """[(n, week_period, start, end)] - the ISO weeks a month touches,
+    numbered 1..5 within the month and CLIPPED to it.
+
+    Numbered by MONTH, not by ISO year, because that is how Vex wrote the
+    layout ("Week1 1st-7th Sep"); the ISO number is one click away in the
+    week note's own title. Clipped, because every number in a monthly note is
+    about the month's own days - a week straddling two months contributes only
+    the part that is in this one, the rule the money roll-up has always used.
+    """
+    out, d, n = [], p.start, 0
+    while d <= p.end:
+        wp = period_for("weekly", d)
+        n += 1
+        out.append((n, wp, max(wp.start, p.start), min(wp.end, p.end)))
+        d = wp.end + timedelta(days=1)
+    return out
+
+
+def week_span_label(n, a, b):
+    """'W1 · 1st-6th Sep' · a one-day tail is just '30th Sep'."""
+    if a == b:
+        return f"W{n} · {_ord(a.day)} {MONTH_ABBR[a.month]}"
+    if a.month == b.month:
+        return f"W{n} · {_ord(a.day)}-{_ord(b.day)} {MONTH_ABBR[b.month]}"
+    return (f"W{n} · {_ord(a.day)} {MONTH_ABBR[a.month]}-"
+            f"{_ord(b.day)} {MONTH_ABBR[b.month]}")
+
+
+def done_span_lines(rows):
+    """'- W1 · 1st-6th Sep ▇▇▇ 12' per row, then the month total.
+
+    rows = [(label, count | None)]. None is NOT zero: it means that week has
+    no note to read the number off, and a 0 there would read as a week he got
+    nothing done in. The bar scales to the biggest week that IS known."""
+    nums = [c for _l, c in rows if c is not None]
+    mx = max(nums, default=0)
+    out = []
+    for label, c in rows:
+        if c is None:
+            out.append(f"- {label} · no note")
+            continue
+        bar = "▇" * max(1, round(c / mx * 7)) if mx and c else ""
+        out.append(f"- {label} " + (f"{bar} {c}" if bar else f"{c}"))
+    out.append(f"**Month: {sum(nums)}**")
+    return out
+
+
+def mood_span_lines(rows, gi=T1):
+    """😊 Moods body for a MONTH: one line per week (Vex 2026-09-17 - "in
+    moods instead of day, week 1, week 2… Average for month"). A week with no
+    mood logged is left out; the month average rides the section header, the
+    way the week's does."""
+    out = []
+    for label, avg in rows:
+        if avg is None:
+            continue
+        out.append(f"{gi}- {label} · {MOOD_FACES[int(round(avg))]} {avg:.1f}")
+    return out
+
+
+def top_entries(items, week_of, n=5):
+    """The n entries of each kind worth resurfacing at month's end.
+
+    Nothing an entry carries says how big it was, so "top 5" has to be a RULE
+    (Vex 2026-09-17: "it should resurface top 5 of the month for each … not
+    sure how you do those calculations"). The rule: one per week, newest
+    first, then fill what is left by recency. Five wins then come from across
+    the month instead of all from its last few days, which is the only
+    reading of "of the month" that survives being read once a month.
+
+    items = [(date, hm, glyph, body)]; week_of(date) → the week it belongs to.
+    """
+    out = []
+    for glyph in GROUP_ORDER:
+        grp = sorted([it for it in items if it[2] == glyph],
+                     key=lambda it: (it[0], it[1]), reverse=True)
+        picked, seen = [], set()
+        for it in grp:                       # one per week, newest first
+            if len(picked) >= n:
+                break
+            w = week_of(it[0])
+            if w not in seen:
+                seen.add(w)
+                picked.append(it)
+        for it in grp:                       # then the newest of what is left
+            if len(picked) >= n:
+                break
+            if it not in picked:
+                picked.append(it)
+        out.extend(picked)
+    return out
+
+
+# ── Reading a sealed week back (the money pyramid, one tier up) ─────────────
+# A month cannot recount its own completions: get_completed(days=15, limit=500)
+# reaches back about nine days at Vex's rate. The weekly notes ARE the record
+# for everything completed, so the monthly reads them - the same rule money has
+# always used, and the reason a weekly note's numbers are never refilled once
+# its week has closed. These are the inverses of the renderers above; anything
+# that does not parse is dropped, never guessed.
+_BAR_RE = re.compile(
+    r"^\s*[-*]\s+(?P<dow>" + "|".join(DAY_ABBR) + r")\s+[▇\s]*(?P<n>\d+)\s*$")
+_PROJ_RE = re.compile(r"^\s*[-*]\s+🗂\s+(?P<name>.+?)\s+·\s+(?P<n>\d+)\s*$")
+_TOPLIST_RE = re.compile(
+    r"^\s*[-*]\s+(?P<name>.+?)\s+·\s+(?P<done>\d+) done\s+·\s+(?P<add>\d+) added\s*$")
+_TOPTASK_RE = re.compile(r"^\s*[-*]\s+(?P<name>.+?)(?:\s+·\s+(?P<n>\d+)×)?\s*$")
+
+
+def parse_day_bars(lines, monday=None):
+    """'- Mon ▇▇▇ 12' rows → {weekday_index: count}, or {date: count} when a
+    monday is given. The bar itself is decoration; the number is the record."""
+    out = {}
+    for ln in lines or []:
+        m = _BAR_RE.match(unescape_md(ln))
+        if not m:
+            continue
+        i = DAY_ABBR.index(m.group("dow"))
+        out[monday + timedelta(days=i) if monday else i] = int(m.group("n"))
+    return out
+
+
+def parse_proj_lines(lines):
+    """'- 🗂 📌CTA · 13' rows → {list name: count}."""
+    out = {}
+    for ln in lines or []:
+        m = _PROJ_RE.match(unescape_md(ln))
+        if m:
+            out[m.group("name").strip()] = int(m.group("n"))
+    return out
+
+
+def parse_top_list_lines(lines):
+    """'- 📌CTA · 13 done · 14 added' rows → {name: (done, added)}."""
+    out = {}
+    for ln in lines or []:
+        m = _TOPLIST_RE.match(unescape_md(ln))
+        if m:
+            out[m.group("name").strip()] = (int(m.group("done")),
+                                            int(m.group("add")))
+    return out
+
+
+def parse_top_task_lines(lines):
+    """'- Commute · 4×' / '- Did a thing' rows → {title: times}. A line with
+    no ×N was done once - that is what top_task_lines renders."""
+    out = {}
+    for ln in lines or []:
+        raw = unescape_md(ln)
+        if _TOPLIST_RE.match(raw) or _PROJ_RE.match(raw) or _BAR_RE.match(raw):
+            continue                       # a neighbour's shape, not ours
+        m = _TOPTASK_RE.match(raw)
+        if not m:
+            continue
+        name = strip_md_links(m.group("name").strip())
+        if not name or PENDING_RE.match(name):
+            continue
+        out[name] = int(m.group("n") or 1)
+    return out
+
+
+def merge_counts(*maps):
+    """Sum {name: count} maps - the month's ranking from its weeks'."""
+    out = {}
+    for mp in maps:
+        for k, v in (mp or {}).items():
+            out[k] = out.get(k, 0) + v
+    return out
+
+
+def merge_pairs(maps):
+    """Sum {name: (done, added)} maps - Top lists, a month's worth."""
+    out = {}
+    for mp in maps or []:
+        for k, (d, a) in (mp or {}).items():
+            pd, pa = out.get(k, (0, 0))
+            out[k] = (pd + d, pa + a)
+    return out
+
+
+def top_n(counts, n=3):
+    """[(name, count)] busiest first, ties alphabetical (a refresh that
+    changes nothing must rewrite nothing)."""
+    return sorted((counts or {}).items(), key=lambda kv: (-kv[1], kv[0]))[:n]
 
 # ── Money ────────────────────────────────────────────────────────────────────
 # Whitespace-tolerant + total-as-bullet (the layout indents body lines with
@@ -902,6 +1133,20 @@ def top_list_lines(done_bp, created_bp, n=3, gi=T1):
     top = sorted(traffic.items(), key=lambda kv: (-kv[1], kv[0]))[:n]
     return [f"{gi}- {nm} · {(done_bp or {}).get(nm, 0)} done · "
             f"{(created_bp or {}).get(nm, 0)} added" for nm, _c in top]
+
+
+def task_counts(tasks):
+    """{display title: times completed} - the ranking behind top_task_lines,
+    exposed so a MONTH can sum its weeks' without re-deriving the rules
+    (top-level only, a repeating task counts once per occurrence)."""
+    counts = {}
+    for t in (tasks or []):
+        if t.get("parentId"):
+            continue
+        name = mdtext.flatten_links(t.get("title") or "").strip()
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+    return counts
 
 
 def top_task_lines(tasks, n=3, gi=T1):

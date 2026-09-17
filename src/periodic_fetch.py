@@ -224,6 +224,42 @@ def focus_minutes(d0, d1):
     return int(round(total))
 
 
+def focus_by_span(d0, d1):
+    """(minutes, top_task_title|None) for the whole span - focus_by_day's
+    bucket, one size up, so a MONTH can name the task a week actually went
+    into. Same rule: the top task is surfaced only when the span had more
+    than one distinct task. None when the timeline reader failed."""
+    recs = _timeline()
+    if recs is None:
+        return None
+    total, per_task = 0.0, {}
+    for r in recs:
+        ld = _rec_local_date(r.get("startTime") or "")
+        if not ld or not (d0 <= ld <= d1):
+            continue
+        try:
+            fmt = "%Y-%m-%dT%H:%M:%S"
+            st = datetime.strptime((r["startTime"] or "")[:19], fmt)
+            en = datetime.strptime((r["endTime"] or "")[:19], fmt)
+            mins = max(0.0, (en - st).total_seconds()
+                       - float(r.get("pauseDuration") or 0)) / 60.0
+        except Exception:
+            continue
+        total += mins
+        # a record's minutes are SPLIT across its tasks, exactly as
+        # focus_by_day does it - adding the full span to each would let a
+        # two-task pomodoro outrank a longer single-task one
+        rtasks = [t for t in (r.get("tasks") or [])
+                  if (t.get("title") or "").strip()]
+        for tk in rtasks:
+            ttl = tk["title"].strip()
+            per_task[ttl] = per_task.get(ttl, 0.0) + mins / len(rtasks)
+    top = None
+    if len(per_task) > 1:
+        top = max(per_task.items(), key=lambda kv: kv[1])[0]
+    return int(round(total)), top
+
+
 def focus_by_day(d0, d1):
     """{iso_date: (minutes, top_task_title|None)} for LOCAL start dates in
     [d0, d1]. Top task = the title with the most focused minutes that day,

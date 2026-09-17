@@ -1,22 +1,37 @@
 {{breadcrumbs}}
 ---
-##### 🎯 Month goal
-- [ ]
+{{weeklinks}}
+---
+#### 🏆 Goals
+- 🌓 Quarterly goal
+	- _(mirrors this quarter's note - set it there)_
 
-##### 📈 Stats
-_(pending)_
+- 🗓️ Monthly goal
 
-##### 📊 Sparklines
-_(pending)_
+#### ✨ Highlight
+---
+##### 📊 Stats
+- Top lists:
 
-##### 🏆 Top wins
-_(pending)_
+- Top tasks:
 
-##### 👽 People
-_(pending)_
+- Created
 
-##### 💡 Observations
+- Completed
 
-##### 💰 Money
-_week lines may straddle months - Total counts this month's days only_
-**Total = 0**
+- Weekly Completed
+
+- Focus
+
+- Habit consistency
+---
+##### 💿 Data
+- ✨ Highlights
+
+- 📨 Entries
+
+- 😊 Moods
+
+- 💰 Income
+
+- 👽 People

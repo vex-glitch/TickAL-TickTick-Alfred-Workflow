@@ -271,6 +271,20 @@ def _day_links(p, index):
     return pm.day_link_lines(p, lambda q: _note_url(lookup(index, q)))
 
 
+def _week_links(p, index):
+    """The month's weeks as bullets, linked to their weekly notes: the day
+    links one tier up (Vex 2026-09-17). Labels are month-local and clipped -
+    "W1 · 1st-6th Sep" - see pm.month_week_spans."""
+    if p.kind != "monthly":
+        return []
+    out = []
+    for n, wp, a, b in pm.month_week_spans(p):
+        label = pm.week_span_label(n, a, b)
+        u = _note_url(lookup(index, wp))
+        out.append(f"- [{label}]({u})" if u else f"- {label}")
+    return out
+
+
 def _week_goals_of(wdoc):
     """(this week's OWN goal lines, the section that holds them).
 
@@ -310,8 +324,10 @@ def _mirror_goal(doc, anchor, kind, index, day, hint):
     par = lookup(index, pm.period_for(kind, day))
     if not par:
         return
-    sec = ps.find(ps.parse_sections(par.get("content") or ""),
-                  pm.GOAL_SECTION[kind])
+    pdoc = ps.parse_sections(par.get("content") or "")
+    sec = next((x for x in (ps.find(pdoc, nm)
+                            for nm in pm.goal_section_names(kind))
+                if x is not None), None)
     lines = [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])]
     if not lines:                  # a bare "- [ ]" or an _(hint)_ is not a goal
         lines = []
@@ -342,6 +358,8 @@ def _compose_lead(doc, p, index, refetch):
         # like the crumb above them: a day minted later heals into a link on
         # the next refresh.
         out += _day_links(p, index) + ["---"]
+    if p.kind == "monthly":
+        out += _week_links(p, index) + ["---"]
     if p.kind == "daily":
         # Mood and the day rating are NOT in the lead any more - Vex moved
         # them into the journals, where the questions that produce them live
@@ -379,6 +397,7 @@ def create_note(p, index):
     content = pm.render_template(tpl, {
         "breadcrumbs": _crumb(p, index),
         "daylinks": "\n".join(_day_links(p, index)),
+        "weeklinks": "\n".join(_week_links(p, index)),
     })
     # Child tag ONLY - TickTick's group-by-tag prefers the PARENT when both
     # are attached, which would collapse the kanban into one 💫Periodic
@@ -787,11 +806,14 @@ def refresh_period(p, index=None, force=False):
             _fill_daily(doc, p, index, p.start == today)
         elif p.kind == "weekly":
             _fill_weekly(doc, p, index)
+        elif p.kind == "monthly":
+            _fill_monthly(doc, p, index)
+            # the old skeleton's 💰 Money section, for a note the layout
+            # guard left alone - harmless on a new one, which has no such
+            # section and whose 💰 Income _fill_monthly just wrote
+            _fill_rollup_money(doc, p, index)
         else:
             _fill_rollup_money(doc, p, index)
-            if p.kind == "monthly" and \
-                    p.start <= today <= p.end + timedelta(days=1):
-                _fill_people(doc, _tier2(), days=31)
         return True
 
     _res, doc_out = _pn_rmw(pid, tid, mutate)
@@ -848,6 +870,23 @@ def _mood_of_doc(doc):
     return None
 
 
+def _weekly_highlight_of(wdoc):
+    """A weekly note's ✨ highlight: the section where one survives, else the
+    weekly journal's first ANSWER (which is the record since 2026-09-17 - the
+    section was only ever its copy). '' when neither says anything."""
+    hsec = ps.find(wdoc, pm.SEC_HIGHLIGHT)
+    if hsec is not None:
+        # a divider can sit in the last section's body (decor only migrates
+        # when a NEXT section exists) - never let it through
+        parts = [ln.strip().lstrip("-").strip() for ln in hsec.body
+                 if ln.strip() and not ps.DECOR_RE.match(ln.strip())
+                 and not pm.PENDING_RE.match(ln.strip())]
+        hit = " ".join(x for x in parts if x)
+        if hit:
+            return hit
+    return _answer_in(wdoc, pm.SEC_WEEKLY_JNL, "highlight of the week")
+
+
 def _otd_memories(day, index):
     """[(date, url, stars, mood, wins, highlight)] for this date in every
     earlier year that has a daily note, newest first. Daily notes only exist
@@ -874,19 +913,7 @@ def _otd_memories(day, index):
         wk = lookup(index, pm.period_for("weekly", d))
         if wk:
             wdoc = ps.parse_sections(wk.get("content") or "")
-            hsec = ps.find(wdoc, pm.SEC_HIGHLIGHT)
-            if hsec is not None:
-                # a divider can sit in the last section's body (decor only
-                # migrates when a NEXT section exists) - never let it through
-                parts = [ln.strip().lstrip("-").strip() for ln in hsec.body
-                         if ln.strip() and not ps.DECOR_RE.match(ln.strip())
-                         and not pm.PENDING_RE.match(ln.strip())]
-                hl = " ".join(x for x in parts if x)
-            else:
-                # no ✨ section since 2026-09-17: the highlight is the weekly
-                # journal's first ANSWER now, and that is what this line has
-                # always been showing - the section was only ever its copy
-                hl = _answer_in(wdoc, pm.SEC_WEEKLY_JNL, "highlight of the week")
+            hl = _weekly_highlight_of(wdoc)
         out.append((d, _note_url(t), stars,
                     pm.mood_text(mood[0], mood[1]) if mood else "",
                     wins, mdtext.flatten_links(hl)))
@@ -1573,6 +1600,264 @@ def _fill_review(doc):
             lines.append(_box(t.get("projectId") or t.get("_projectId") or pid,
                               t.get("id"), t.get("title")))
     ps.set_body(doc, pm.SEC_REVIEW, lines)
+
+
+def _week_stats_of(index, wp):
+    """What a week contributed, read back off its own weekly note - the money
+    pyramid, one tier up. None when there is no note for it.
+
+    A month cannot recount its own completions (the completed feed reaches
+    back about nine days), and the weekly notes ARE the record for those.
+    Everything else a monthly shows - created, focus, money, moods,
+    highlights, entries, habits - is recomputed from sources that keep, so
+    only this one goes through the notes.
+
+    {"per_day": {date: n}, "by_proj": {list: n}, "top_lists": {list: (done,
+    added)}, "top_tasks": {title: n}}
+    """
+    t = lookup(index, wp)
+    if not t:
+        return None
+    doc = ps.parse_sections(t.get("content") or "")
+
+    def body(anchor, *legacy):
+        sec = ps.find_prefix(doc, anchor, pm.scope_of("weekly", anchor))
+        for nm in legacy:                  # pre-2026-09-17 weeklies
+            if sec is not None:
+                break
+            sec = ps.find_prefix(doc, nm)
+        return sec.body if sec is not None else []
+
+    # the old layout kept the same seven bars under "📈 Stats" and the
+    # headline under "✅ Completed:", so a week written before the relayout
+    # still gives up its numbers; its rankings do not survive (they lived in
+    # the header, one list deep) and read as empty.
+    def legacy_head(prefix):
+        """The old layout put a ranking IN its header: "🔥 Top list: 🌅
+        Routines · 186 done · 335 added". Returns what follows the colon."""
+        sec = ps.find_prefix(doc, prefix)
+        name = sec.name if sec is not None else ""
+        return name.split(":", 1)[1].strip() if ":" in name else ""
+
+    tls = pm.parse_top_list_lines(body(pm.SEC_TOP_LIST))
+    if not tls:
+        tls = pm.parse_top_list_lines(["- " + legacy_head("🔥 Top list")])
+    tts = pm.parse_top_task_lines(body(pm.SEC_TOP_TASKS))
+    if not tts:
+        # the old header listed the titles comma-joined and countless, so each
+        # one counts as the single occurrence it is known to have
+        tts = {t.strip(): 1 for t in legacy_head("🚀 Top tasks").split(",")
+               if t.strip()}
+    return {"per_day": pm.parse_day_bars(body(pm.SEC_WBARS, pm.SEC_STATS),
+                                         wp.start),
+            "by_proj": pm.parse_proj_lines(body(pm.SEC_COMPLETED,
+                                                "✅ Completed")),
+            "top_lists": tls,
+            "top_tasks": tts}
+
+
+def _week_stats_live(wp, today, projects):
+    """The same shape, computed from the live feed - used for the week that is
+    still running, whose note may not have been refreshed yet."""
+    end = min(wp.end, today)
+    comp = _completed_between(wp.start, end)
+    if comp is None:
+        return None
+    rank = _drop_ignored(comp)
+    created = _drop_ignored(_created_between(wp.start, end))
+    done_bp, created_bp = _by_proj(rank, projects), _by_proj(created, projects)
+    per_day = {}
+    for i in range(7):
+        d = wp.start + timedelta(days=i)
+        if d > end:
+            break
+        per_day[d] = sum(1 for t in comp
+                         if utc_str_to_local_date(t.get("completedTime") or "")
+                         == d.isoformat())
+    return {"per_day": per_day, "by_proj": done_bp,
+            "top_lists": {nm: (done_bp.get(nm, 0), created_bp.get(nm, 0))
+                          for nm in set(done_bp) | set(created_bp)},
+            "top_tasks": pm.task_counts(rank)}
+
+
+def _month_week_data(index, period, today, projects):
+    """{week start: stats | None} for every week a month touches."""
+    out = {}
+    for _n, wp, _a, _b in pm.month_week_spans(period):
+        live = (_week_stats_live(wp, today, projects)
+                if wp.start <= today <= wp.end else None)
+        out[wp.start] = live if live is not None else _week_stats_of(index, wp)
+    return out
+
+
+def _month_done(data, period):
+    """Σ completions inside the month's own days, from its weeks' per-day
+    numbers - the straddle rule money has always used. None when not one week
+    could be read (an unreadable month must not report 0)."""
+    days = [n for st in data.values() if st
+            for d, n in st["per_day"].items() if period.start <= d <= period.end]
+    return sum(days) if any(st for st in data.values()) else None
+
+
+def _fill_monthly(doc, p, index):
+    """Vex's 2026-09-17 monthly: the weekly note's shape one tier up, counted
+    by WEEK. Everything but the completions is recomputed from sources that
+    keep; the completions come off the weekly notes (see _week_stats_of)."""
+    today = _today()
+    if not (p.start <= today <= p.end + timedelta(days=1)):
+        return
+
+    def _in(anchor):
+        return pm.scope_of("monthly", anchor)
+
+    # ALL or NOTHING on the layout, the weekly's rule: a note minted under the
+    # old skeleton (🎯 Month goal · 📈 Stats · 📊 Sparklines · 🏆 Top wins) has
+    # none of these anchors, and half-filling it would be worse than leaving
+    # it alone until tools/pnrepair/relayout_monthly.py rebuilds it.
+    scoped = [a for a in pm.WRITER_ANCHORS["monthly"] if _in(a)]
+    if not any(ps.find_prefix(doc, a, _in(a)) is not None for a in scoped):
+        _log(f"monthly {pm.title(p)} predates the 2026-09-17 layout - left "
+             f"alone (tools/pnrepair/relayout_monthly.py rebuilds it)")
+        return
+
+    # 🏆 Goals - the quarter mirrored in; 🗓️ Monthly goal is his
+    _mirror_goal(doc, pm.SEC_MTH_QTR, "quarterly", index, p.start,
+                 pm.HINT_WK_QTR)
+
+    t2 = _tier2()
+    prev = pm.prev_period(p)
+    live_end = min(p.end, today)
+    spans = pm.month_week_spans(p)
+    projects = {pr.get("id"): pr.get("name")
+                for pr in (cache_store.get("projects") or [])}
+    data = _month_week_data(index, p, today, projects)
+    prev_data = _month_week_data(index, prev, today, projects)
+
+    # ── Top lists / Top tasks - the month's, summed from its weeks'
+    tl = pm.count_list_lines(pm.merge_pairs([st["top_lists"]
+                                             for st in data.values() if st]))
+    if tl:
+        ps.set_body(doc, pm.SEC_TOP_LIST, tl, _in(pm.SEC_TOP_LIST))
+    tt = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
+                                               for st in data.values() if st]))
+    if tt:
+        ps.set_body(doc, pm.SEC_TOP_TASKS, tt, _in(pm.SEC_TOP_TASKS))
+
+    # ── Created - recomputed, exact: createdTime survives in the task cache
+    created_cur = _created_between(p.start, live_end)
+    created_prev = _created_between(prev.start, prev.end)
+    created_bp = _by_proj(created_cur, projects)
+    ch = pm.chip(len(created_cur), len(created_prev))
+    _set_headed(doc, pm.SEC_CREATED,
+                str(len(created_cur)) + (f" · {ch}" if ch else ""),
+                pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(created_bp)]),
+                _in(pm.SEC_CREATED))
+
+    # ── Completed + the per-week bars, both off the weeks' own numbers
+    done_cur = _month_done(data, p)
+    if done_cur is not None:
+        ch = pm.chip(done_cur, _month_done(prev_data, prev))
+        _set_headed(doc, pm.SEC_COMPLETED,
+                    str(done_cur) + (f" · {ch}" if ch else ""),
+                    pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
+                        pm.merge_counts(*[st["by_proj"]
+                                          for st in data.values() if st]))]),
+                    _in(pm.SEC_COMPLETED))
+        rows = []
+        for n, wp, a, b in spans:
+            st = data.get(wp.start)
+            rows.append((pm.week_span_label(n, a, b),
+                         None if not st else
+                         sum(v for d, v in st["per_day"].items() if a <= d <= b)))
+        ps.set_body(doc, pm.SEC_MBARS, pm.ind(pm.done_span_lines(rows)[:-1]),
+                    _in(pm.SEC_MBARS))
+
+    # ── Focus - recomputed per week, with the week's own top task
+    fspan = getattr(t2, "focus_by_span", lambda a, b: None)
+    tot = fspan(p.start, live_end) if t2 else None
+    if tot is not None:
+        prev_min = getattr(t2, "focus_minutes", lambda a, b: None)(prev.start,
+                                                                  prev.end)
+        ch = pm.chip(tot[0], prev_min, "duration")
+        wk_lines = []
+        for n, wp, a, b in spans:
+            if a > today:
+                break
+            rec = fspan(a, min(b, today))
+            if rec and rec[0]:
+                ln = f"- {pm.week_span_label(n, a, b)} · {pm.fmt_hm(rec[0])}"
+                if rec[1]:
+                    ln += f" · {mdtext.flatten_links(rec[1])[:40]}"
+                wk_lines.append(ln)
+        _set_headed(doc, pm.SEC_FOCUS_WEEK,
+                    pm.fmt_hm(tot[0]) + (f" · {ch}" if ch else ""),
+                    pm.ind(wk_lines)
+                    + [f"{pm.T3}- **Total = {pm.fmt_hm(tot[0])}**"],
+                    _in(pm.SEC_FOCUS_WEEK))
+
+    # ── Habit consistency - each habit against its own MONTH
+    hb = getattr(t2, "habit_lines_weekly", lambda a, b: None)(p.start, p.end) \
+        if t2 else None
+    if hb is not None:
+        ps.set_body(doc, pm.SEC_HABIT_WEEK, pm.ind(hb), _in(pm.SEC_HABIT_WEEK))
+
+    # ── ✨ Highlights - the WEEK's highlight, one line each, newest first
+    hl_rows = []
+    for n, wp, a, b in spans:
+        wt = lookup(index, wp)
+        if not wt:
+            continue
+        hl = _weekly_highlight_of(ps.parse_sections(wt.get("content") or ""))
+        if hl and hl.strip():
+            hl_rows.append(f"- {pm.week_span_label(n, a, b)} · "
+                           f"{mdtext.flatten_links(hl).strip()}")
+    if hl_rows:
+        ps.set_body(doc, pm.SEC_HL_WEEK, pm.ind(list(reversed(hl_rows))),
+                    _in(pm.SEC_HL_WEEK))
+
+    # ── 📨 Entries - five a kind, spread across the month (pm.top_entries)
+    items = _entries_between(index, p.start, live_end)
+    if any(it[2] in pm.GROUP_ORDER for it in items):
+        week_of = {}
+        for n, _wp, a, b in spans:
+            week_of.update({a + timedelta(days=i): n
+                            for i in range((b - a).days + 1)})
+        ps.set_body(doc, pm.SEC_ENTRIES,
+                    pm.entries_grouped(pm.top_entries(
+                        items, lambda d: week_of.get(d, 0))),
+                    _in(pm.SEC_ENTRIES))
+
+    # ── 😊 Moods - the month average in the header, one line per WEEK
+    moods = _mood_by_day(index, p.start, live_end)
+    if moods:
+        avg = sum(m[0] for _d, m in moods) / len(moods)
+        pavg = _mood_avg(index, prev.start, prev.end)
+        ch = pm.chip(round(avg, 1),
+                     round(pavg, 1) if pavg is not None else None, "avg")
+        rows = []
+        for n, _wp, a, b in spans:
+            wk = [m[0] for d, m in moods if a <= d <= b]
+            rows.append((pm.week_span_label(n, a, b),
+                         sum(wk) / len(wk) if wk else None))
+        _set_headed(doc, pm.SEC_MOODS,
+                    f"Average {avg:.1f}" + (f" · {ch}" if ch else ""),
+                    pm.mood_span_lines(rows), _in(pm.SEC_MOODS))
+
+    # ── 💰 Income - week lines, month total, both off the daily notes
+    day_sums = _day_sums(index)
+    inc_cur = pm.sum_in_period(day_sums, p)
+    ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
+          if any(prev.start <= d <= prev.end for d in day_sums) else None)
+    _set_headed(doc, pm.SEC_INCOME,
+                pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
+                pm.ind([f"- {pm.week_span_label(n, a, b)} • "
+                        f"{pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))}"
+                        for n, _wp, a, b in spans])
+                + [pm.money_total_line(inc_cur, 3)],
+                _in(pm.SEC_INCOME))
+
+    # ── 👽 People
+    _fill_people(doc, t2, days=31, within=_in(pm.SEC_PEOPLE))
 
 
 def _fill_rollup_money(doc, p, index):

@@ -134,9 +134,21 @@ Minted Sunday for the week ahead - and opening it midweek mints it on the spot, 
 
 Rearranged it yourself? Sections are found BY NAME wherever you put them, so moving and renesting is free.
 
-A note's shape is fixed when it is minted - refresh fills bodies, it never reshapes. So when the shipped layout changes, the week already open keeps the old one and is left strictly alone (never half-rewritten) until the next Monday mints a fresh note. To move it over now instead, `tools/pnrepair/relayout_weekly.py` rebuilds it in place: your goals, journal answers and review ticks ride across, anything the new layout has no home for is kept verbatim at the bottom, it prints the result and changes nothing without `--apply`, and it refuses outright if a single line you wrote would be lost. Weeks already closed keep the shape they were written in - their numbers exist nowhere else. The one thing they do get is `tools/pnrepair/weekday_links.py`, which stamps the day links into any weekly note's head (dry run by default, `--apply` to write): it touches the breadcrumb and those seven lines and nothing else, so a closed week's numbers are safe.
+A note's shape is fixed when it is minted - refresh fills bodies, it never reshapes. So when the shipped layout changes, the week already open keeps the old one and is left strictly alone (never half-rewritten) until the next Monday mints a fresh note. To move it over now instead, `tools/pnrepair/relayout_weekly.py` (and `relayout_monthly.py`, and `relayout_daily.py`) rebuilds it in place: your goals, journal answers and review ticks ride across, anything the new layout has no home for is kept verbatim at the bottom, it prints the result and changes nothing without `--apply`, and it refuses outright if a single line you wrote would be lost. Weeks already closed keep the shape they were written in - their numbers exist nowhere else. The one thing they do get is `tools/pnrepair/weekday_links.py`, which stamps the day links into any weekly note's head (dry run by default, `--apply` to write): it touches the breadcrumb and those seven lines and nothing else, so a closed week's numbers are safe.
 
-**Monthly** adds sparklines and top wins; **quarterly** and **yearly** ship as templates + money roll-ups for now - their review sections land in a later release (the first real quarterly mint is Sep 30).
+## The monthly note
+
+The weekly note's shape one tier up, counted by **week** instead of by day (Vex rebuilt it by hand on 2026-09-17, same as the other two).
+
+- **The month's weeks** - under the breadcrumb, one line per week, linked to that week's note. Labels are month-local and clipped to the month: `W1 · 1st-6th Sep`, `W5 · 28th-30th Sep`. Every week number in the note carries its date range, everywhere.
+- **🏆 Goals** - **🌓 Quarterly goal** mirrors the quarter's note; **🗓️ Monthly goal** is yours, and it is what the weekly notes mirror in turn.
+- **✨ Highlight**, then **📊 Stats** and **💿 Data** with the weekly's own bullets: Top lists · Top tasks · Created · Completed · Weekly Completed (per-week bars) · Focus (by week, with the week's top task) · Habit consistency, then ✨ Highlights · 📨 Entries · 😊 Moods · 💰 Income · 👽 People.
+- **😊 Moods** reads the month average with its vs-last-month arrow in the bullet, and one line per week underneath.
+- **📨 Entries** resurfaces **five of each kind** - wins, nags, reminders, thoughts, links. Nothing an entry carries says how big it was, so "top five" is a rule: **one per week, newest first, then fill what is left by recency**. Five wins therefore come from across the month rather than all from its last few days.
+
+**Where the numbers come from, and the one thing that limits them.** Created, focus, money, moods, highlights, entries, habits and people are all recomputed from sources that keep, so they are exact for any month. **Completions are not**: TickTick's completed feed reaches back about nine days, so a month reads what it finished off its **weekly notes** - the same pyramid money has always used. A week whose note does not exist reads `no note` in the bars rather than `0`, and the month total counts only the weeks it could read. Weeks written before 2026-09-17 still give up their numbers; their rankings only partly survive, because the old layout kept those in the header.
+
+**Quarterly** and **yearly** ship as templates + money roll-ups for now - their review sections land in a later release (the first real quarterly mint is Sep 30).
 
 ## The 04:30 agent
 

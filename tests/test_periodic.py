@@ -695,7 +695,12 @@ check("22.stars-refuse", pm.answer_stars("0") == "" and pm.answer_stars("x") == 
 check("22.stars-cap", pm.answer_stars("9") == "")
 check("22.money-no-longer-seeded-daily",
       pm.SEC_MONEY not in pm.WRITER_ANCHORS["daily"]
-      and pm.SEC_MONEY in pm.WRITER_ANCHORS["monthly"])
+      and pm.SEC_MONEY in pm.WRITER_ANCHORS["quarterly"])
+# the monthly calls it 💰 Income under 💿 Data since Vex's 2026-09-17 layout,
+# the weekly's name one tier up - 💰 Money is the quarterly/yearly roll-up
+check("22.monthly-money-is-income-now",
+      pm.SEC_INCOME in pm.WRITER_ANCHORS["monthly"]
+      and pm.SEC_MONEY not in pm.WRITER_ANCHORS["monthly"])
 
 # ── 23. append_body into a BULLET block (Vex 2026-09-12: "I tried adding a
 # win, it did nothing") - a Block's .body is a COPY, so the old in-place
