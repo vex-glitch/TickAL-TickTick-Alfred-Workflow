@@ -110,9 +110,19 @@ All three journals seed their questions into the note at mint, so you can answer
 - **Morning** (3 fixed + 3 drawn from an editable pool, below): mood (1-5), what's on your mind, the one thing - then, if no day goal is set, the ☀️ picker opens by itself.
 - **Evening** (6 fixed + 5 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, on your mind, *did you achieve your daily goal - {your goal}?*, money earned, rate the day (the stars stay in the journal answer).
 - **Weekly** (2 fixed + 5 drawn): the week's highlight (the answer IS the record, and 🕰️ On this day reads it back years later), *did you achieve your weekly goals?* - then a picker asks for **three things that would make next week a success**, written into next week's 🎯 Goals.
-- **Monthly** (2 fixed + 5 drawn): the month's highlight and *did you achieve your monthly goals?*, named. No picker after it - a month is not a three-things horizon, and next month's goal is set from the 🎯 row like every other tier's.
+- **Monthly** and **Quarterly** (2 fixed + 5 drawn each): that period's highlight and *did you achieve your goals?*, named - then the goal editor opens aimed at the **next** month or quarter, and stays open until you Esc.
 
 Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly,monthly,quarterly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
+
+## Goals
+
+One 🏆 Goals screen per tier (`pn` → 🏆 Goals). The daily keeps **one** - the One Thing, which replaces itself. Every other tier **appends**, so a week, a month, a quarter or a year can carry several.
+
+Each screen shows **what is already there**, one row per goal, `⏎` to remove it, with a ✅ Done row underneath. Typing gives you the three shapes: plain text, a task to pick, or `text | task` for both. After each one it re-opens, so you can keep adding and Esc when you are finished - the way adding subtasks works.
+
+The weekly, monthly and quarterly journals end by opening that screen aimed at the **next** period: the weekly asks for three things, the month and the quarter for as many as you want.
+
+Goals mirror downward, read-only: the quarter's appear in each month, the month's in each week, the week's in each day. Setting them anywhere but their own note is not a thing - the mirror resets to a pointer the moment the parent's goal is cleared.
 
 ## Money - the roll-up pyramid
 

@@ -84,13 +84,21 @@ def _period_of(spec, today):
     return pm.period_for("daily" if spec == "daily" else spec, today)
 
 
-def _goalseq_active():
-    """The weekly journal's three-things sequence (xact writes the file)."""
+def _goalseq_active(kind=None):
+    """The journal's goal handoff (xact writes the file): the weekly's
+    three-things sequence, or the open-ended month/quarter one, which runs
+    until Esc (remaining None). `kind` filters to that tier's handoff."""
     try:
         with open(run_path("tickal_pn_goalseq.json")) as f:
             d = json.load(f)
-        return d if (time.time() - d.get("ts", 0) < 600
-                     and d.get("remaining", 0) > 0) else None
+        if time.time() - d.get("ts", 0) >= 600:
+            return None
+        left = d.get("remaining")
+        if left is not None and left <= 0:
+            return None
+        if kind and d.get("kind", "weekly") != kind:
+            return None
+        return d
     except Exception:
         return None
 
@@ -772,6 +780,12 @@ def tier_goal_rows(kind, rest, jnl=None):
     """
     label = _GOAL_TIERS[kind]
     prefix = f"pn goals {kind}"
+    # aimed at the NEXT period while a journal handoff is live (Vex
+    # 2026-09-17: the month's and the quarter's journals set the next one's
+    # goals, the way the weekly's always has)
+    ahead = bool(not jnl and kind != "daily" and _goalseq_active(kind))
+    if ahead:
+        label += " · next"
     if jnl:
         day = jnl["for_day"]
         label = ("☀️ Tomorrow" if jnl["slot"] == "evening" else "☀️ Today") \
@@ -783,6 +797,8 @@ def tier_goal_rows(kind, rest, jnl=None):
 
     def arg(txt, t=None):
         payload = {"kind": kind, "text": txt}
+        if ahead:
+            payload["ahead"] = True
         if t is not None:
             payload.update({"pid": t.get("projectId") or t.get("_projectId", ""),
                             "tid": t["id"], "title": t.get("title") or ""})
@@ -793,6 +809,27 @@ def tier_goal_rows(kind, rest, jnl=None):
         return "xact:pn_setgoal:" + _b64(payload)
 
     items = []
+    # what is already there, each one removable - a goal screen that cannot
+    # show you the goals is a write-only box
+    if not jnl and kind != "daily" and not (rest or "").strip():
+        try:
+            import periodic_engine as _pe
+            have = _pe.period_goals(kind, ahead=ahead)
+        except Exception:
+            have = []
+        for i, (shown, raw) in enumerate(have):
+            items.append(alfred.item(
+                uid=f"pn-goal-have-{kind}-{i}", title=f"🎯 {shown[:60]}",
+                subtitle="⏎ Remove it",
+                arg="xact:pn_goaldel:" + _b64({"kind": kind, "line": raw,
+                                               "ahead": ahead}),
+                valid=True, mods=_mods()))
+        if have:
+            items.append(alfred.item(
+                uid=f"pn-goal-done-{kind}", title="✅ Done",
+                subtitle=f"{len(have)} goal{'s' if len(have) > 1 else ''} set",
+                arg="xact:pn_goaldone:" + _b64({"kind": kind}),
+                valid=True, mods=_mods()))
     if combining and text:
         items.append(alfred.item(
             uid="pn-goal-textonly", title=f'🎯 {label} · "{text[:44]}"',

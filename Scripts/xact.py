@@ -7263,23 +7263,33 @@ _JOURNAL_UI = {"morning": ("🌅", "Morning"), "evening": ("🌙", "Evening"),
 _GOALSEQ = run_path("tickal_pn_goalseq.json")
 
 
-def _goalseq_load():
-    """Active three-things sequence (weekly journal handoff) | None."""
+def _goalseq_load(kind=None):
+    """Active goal handoff | None. The weekly's counts down from three; the
+    month's and the quarter's are OPEN-ENDED (remaining None) - Vex keeps
+    adding and Escs when he is done, the subtask-adding shape."""
     try:
         with open(_GOALSEQ) as f:
             d = json.load(f)
-        if time.time() - d.get("ts", 0) < 600 and d.get("remaining", 0) > 0:
-            return d
+        if time.time() - d.get("ts", 0) >= 600:
+            return None
+        left = d.get("remaining")
+        if left is not None and left <= 0:
+            return None
+        if kind and d.get("kind", "weekly") != kind:
+            return None
+        return d
     except Exception:
         pass
     return None
 
 
-def _goalseq_save(remaining):
+def _goalseq_save(remaining, kind="weekly"):
+    """remaining None = open-ended (until Esc), 0 = clear the handoff."""
     try:
-        if remaining > 0:
+        if remaining is None or remaining > 0:
             with open(_GOALSEQ, "w") as f:
-                json.dump({"remaining": remaining, "ts": time.time()}, f)
+                json.dump({"remaining": remaining, "kind": kind,
+                           "ts": time.time()}, f)
         elif os.path.exists(_GOALSEQ):
             os.remove(_GOALSEQ)
     except Exception:
@@ -7458,21 +7468,33 @@ def pn_journal(slot):
         _crm_say(" ".join(bits))
     if cancelled:
         return
-    # ── the weekly three-things handoff (dialogs can't host pickers)
+    # ── the goal handoff (dialogs can't host pickers). The weekly asks for
+    # three things; the month and the quarter are open-ended - Vex adds as
+    # many as he wants and Escs (2026-09-17: "both monthly and quarterly
+    # journals must have question to set goals for the period like weekly").
     if slot == "weekly":
         _goalseq_save(3)
         _run_trigger("Search", "pn goal ")
+    elif slot in ("monthly", "quarterly"):
+        _goalseq_save(None, slot)
+        _run_trigger("Search", f"pn goals {slot} ")
 
 
-def _goal_seq_step(toast):
-    """Three-things sequence bookkeeping: after each pick, re-arm the picker
-    until 3 are in (Esc simply doesn't come back; the state file expires)."""
-    seq = _goalseq_load()
+def _goal_seq_step(toast, kind="weekly"):
+    """Handoff bookkeeping: after each pick, re-arm the picker - until 3 are
+    in for the weekly, and until Esc for the open-ended month and quarter
+    (Esc simply doesn't come back; the state file expires)."""
+    seq = _goalseq_load(kind)
     if not seq:
         print(toast)
         return "current"
+    if seq.get("remaining") is None:            # open-ended
+        _goalseq_save(None, kind)
+        print(f"🎯 {toast[2:] if toast.startswith('🎯 ') else toast} · add another or Esc")
+        _run_trigger("Search", f"pn goals {kind} ")
+        return "next"
     remaining = seq.get("remaining", 0) - 1
-    _goalseq_save(remaining)
+    _goalseq_save(remaining, kind)
     if remaining > 0:
         print(f"🎯 {3 - remaining} of 3 · pick the next")
         _run_trigger("Search", "pn goal ")
@@ -7507,15 +7529,46 @@ def pn_setgoal(rest):
     if spec.get("jnl"):
         _goal_from_journal(spec, kind, pid, tid, title)
         return
-    # mid three-things (the weekly journal handoff), a weekly goal belongs to
-    # NEXT week - the same rule pn_goal follows, so both doors agree
-    ahead = bool(kind == "weekly" and _goalseq_load())
+    # mid handoff (a journal's), the goal belongs to the NEXT period - the
+    # same rule pn_goal follows, so both doors agree
+    ahead = bool(spec.get("ahead")) or bool(_goalseq_load(kind))
     toast = _pn().set_period_goal(kind, spec.get("text") or "", pid, tid,
                                   title, ahead=ahead)
-    if ahead:
-        _goal_seq_step(toast)
-    else:
+    if _goalseq_load(kind):
+        _goal_seq_step(toast, kind)
+    elif kind == "daily":
         print(toast)
+    else:
+        # every tier that APPENDS re-opens its screen, so he can keep adding
+        # or Esc - the add-a-subtask shape (Vex 2026-09-17)
+        print(toast)
+        _run_trigger("Search", f"pn goals {kind} ")
+
+
+def pn_goaldel(rest):
+    """🎯 Remove one goal from a tier, then re-open its screen so the editor
+    keeps its place."""
+    if not _pn_gate():
+        return
+    spec = _pn_decode(rest) or {}
+    kind = (spec.get("kind") or "").strip()
+    if kind not in ("weekly", "monthly", "quarterly", "yearly"):
+        print(f"💫 {kind or 'that tier'} has no goal list")
+        return
+    print(_pn().remove_period_goal(kind, spec.get("line") or "",
+                                   ahead=bool(spec.get("ahead"))))
+    _run_trigger("Search", f"pn goals {kind} ")
+
+
+def pn_goaldone(rest):
+    """✅ Done: end an open-ended handoff and say what stands."""
+    spec = _pn_decode(rest) or {}
+    kind = (spec.get("kind") or "").strip() or "weekly"
+    _goalseq_save(0, kind)
+    if not _pn_gate():
+        return
+    n = len(_pn().period_goals(kind))
+    print(f"🎯 {n} goal{'s' if n != 1 else ''} set")
 
 
 def _jnl_spec(raw):
@@ -11631,6 +11684,10 @@ def main():
             pn_setloc(rest)
         elif verb == "pn_setgoal":
             pn_setgoal(rest)
+        elif verb == "pn_goaldel":
+            pn_goaldel(rest)
+        elif verb == "pn_goaldone":
+            pn_goaldone(rest)
         elif verb == "pn_mint":
             pn_mint()
         else:

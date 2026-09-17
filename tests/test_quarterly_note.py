@@ -142,5 +142,51 @@ check("the journal writes the quarterly note",
 check("the goal question reads the quarter's own goal",
       pe.journal_ctx("quarterly", qdoc)["goals"] == "")
 
+# ── the multi-goal editor (Vex 2026-09-17) ─────────────────────────────────
+def _goal_doc(kind):
+    d = ps.parse_sections(pm.render_template(
+        pe._load_template(kind), {"breadcrumbs": "C", "monthlinks": "- x",
+                                  "weeklinks": "- x", "daylinks": "- x"}))
+    return d
+
+
+for kind, anchor in (("monthly", pm.SEC_MTH_MONTH),
+                     ("quarterly", pm.SEC_QTR_QTR),
+                     ("weekly", pm.SEC_WK_WEEK)):
+    d = _goal_doc(kind)
+    check(f"{kind}: the editor finds its goal home",
+          pe._goal_sec_of(d, kind) is not None)
+    pe._goal_append(d, anchor, "\t- [ ] First")
+    pe._goal_append(d, anchor, "\t- [ ] Second")
+    body = pe._goal_sec_of(d, kind).body
+    check(f"{kind}: a tier carries several goals", len(body) == 2, body)
+    keep = [l for l in body if pm.unescape_md(l.strip()) != "- [ ] First"]
+    check(f"{kind}: removal matches by text, not position",
+          keep == ["\t- [ ] Second"], keep)
+
+# a note minted under the OLD name is still the goal home
+oldshape = ps.parse_sections("C\n---\n##### 🎯 OKR review\n\t- [ ] Old goal\n")
+check("the quarterly's old goal section still answers",
+      pe._goal_sec_of(oldshape, "quarterly") is not None)
+oldm = ps.parse_sections("C\n---\n##### 🎯 Month goal\n\t- [ ] Old goal\n")
+check("the monthly's old goal section still answers",
+      pe._goal_sec_of(oldm, "monthly") is not None)
+check("a tier with no goal section resolves to nothing",
+      pe._goal_sec_of(ps.parse_sections("C\n---\n### Nothing\n"), "monthly") is None)
+
+# the screen: what is there, removable, plus Done
+sys.path.insert(0, os.path.join(ROOT, "Scripts"))
+import periodic_rows as pr                                       # noqa: E402
+import base64, json                                              # noqa: E402
+rows = pr.tier_goal_rows("monthly", "")
+kinds = [r["title"].split(" ")[0] for r in rows[:2]]
+check("the editor lists before it adds", "🎯" in kinds[0] or "📋" in kinds[0], kinds)
+addrow = next((r for r in rows if r["arg"].startswith("xact:pn_setgoal:")), None)
+check("the add rows are still there", addrow is not None)
+# an aimed-ahead payload reaches the verb
+pay = json.loads(base64.b64decode(addrow["arg"].split(":", 2)[2]))
+check("the payload names its tier", pay["kind"] == "monthly", pay)
+check("and is not aimed ahead by default", not pay.get("ahead"), pay)
+
 print(f"quarterly note: {P} passed, {F} failed")
 sys.exit(1 if F else 0)

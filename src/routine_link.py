@@ -24,7 +24,8 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
                           Keys come from src/routines.py, so a link can
                           only name a routine that exists
     pause | resume        the running timer
-    journal:<morning|evening|weekly>  the periodic journal dialogs. Even
+    journal:<morning|evening|weekly|monthly|quarterly>  the periodic
+                          journal dialogs. Even
                           with zero input it lazy-mints the note and seeds
                           its journal Qs (like any pn open); answers are
                           only what Vex types, the link carries no text.
@@ -78,7 +79,8 @@ def _routine_keys():
         return ()
 
 
-SLOT_VERBS = {"journal": ("morning", "evening", "weekly"),
+SLOT_VERBS = {"journal": ("morning", "evening", "weekly", "monthly",
+                          "quarterly"),
               "routine": _routine_keys(),
               "view": ("calendar", "countdowns", "crmcal"),
               "note": PN_SPECS,
@@ -251,7 +253,12 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
                  ("evening", "🌙 Evening journal", "Journal dialogs",
                   f"[🖥 Evening journal]({url('journal', 'evening')})"),
                  ("weekly_journal", "📔 Weekly journal", "Journal + next goals",
-                  f"[🖥 Weekly journal]({url('journal', 'weekly')})")]
+                  f"[🖥 Weekly journal]({url('journal', 'weekly')})"),
+                 ("monthly_journal", "📔 Monthly journal", "Journal + next goals",
+                  f"[🖥 Monthly journal]({url('journal', 'monthly')})"),
+                 ("quarterly_journal", "📔 Quarterly journal",
+                  "Journal + next goals",
+                  f"[🖥 Quarterly journal]({url('journal', 'quarterly')})")]
     return rows
 
 

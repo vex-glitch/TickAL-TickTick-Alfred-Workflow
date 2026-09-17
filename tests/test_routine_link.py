@@ -62,7 +62,12 @@ check("journal weekly url round trip",
       rl.url("journal", "weekly").endswith("?argument=journal%3Aweekly"))
 
 # ── parse: everything else is refused ───────────────────────────────────────
-check("journal monthly refused", refused("journal:monthly") is not None)
+# monthly and quarterly journals exist since 2026-09-17, and their review
+# tasks link to them; yearly still has none
+check("journal monthly opens", rl.parse("journal:monthly") == ("journal", "monthly", ""))
+check("journal quarterly opens",
+      rl.parse("journal:quarterly") == ("journal", "quarterly", ""))
+check("journal yearly refused", refused("journal:yearly") is not None)
 check("journal without slot", refused("journal") is not None)
 check("journal extra field", refused("journal:morning:x") is not None)
 check("empty", refused("") == "empty link")
@@ -134,7 +139,8 @@ check("full list order", keys == ["focus", "sticky", "timer", "calendar", "habit
                                   "daily", "daily_sticky", "weekly", "weekly_sticky",
                                   "monthly", "monthly_sticky", "quarterly",
                                   "quarterly_sticky", "yearly", "yearly_sticky",
-                                  "morning", "evening", "weekly_journal"], keys)
+                                  "morning", "evening", "weekly_journal",
+                                  "monthly_journal", "quarterly_journal"], keys)
 check("no item → destinations + journals only",
       [r[0] for r in rl.internal_links()] == keys[3:])
 check("periodic off drops daily + journals",

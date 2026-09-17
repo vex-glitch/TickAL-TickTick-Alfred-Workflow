@@ -305,6 +305,70 @@ def _week_goals_of(wdoc):
     return [ln for ln in (sec.body if sec else []) if ln.strip()], sec
 
 
+def _goal_sec_of(doc, kind):
+    """Where a tier's goals live in THIS note, under any name that tier has
+    used. The weekly's live in a bullet inside 🏆 Goals since the tiered
+    layout; every other tier's are a section or a bullet of their own."""
+    if kind == "weekly":
+        return _week_goals_of(doc)[1]
+    for nm in pm.goal_section_names(kind):
+        sec = ps.find(doc, nm, pm.SEC_GOALS) or ps.find(doc, nm)
+        if sec is not None:
+            return sec
+    return None
+
+
+def _goal_period(kind, ahead=False, day=None):
+    p = pm.period_for(kind, day or _today())
+    return pm.next_period(p) if ahead else p
+
+
+def period_goals(kind, ahead=False, day=None):
+    """[(display text, the raw line)] - what a tier's goals ARE right now.
+    The editor lists these so a goal can be seen and removed, not only added
+    (Vex 2026-09-17: "If a goal exists when I go and add one, it should show
+    and then I can remove, add more")."""
+    task = lookup(build_index(), _goal_period(kind, ahead, day))
+    if not task:
+        return []
+    sec = _goal_sec_of(ps.parse_sections(task.get("content") or ""), kind)
+    out = []
+    for ln in (sec.body if sec else []):
+        shown = pm.goal_titles([ln])
+        if shown:
+            out.append((shown[0], ln))
+    return out
+
+
+def remove_period_goal(kind, line, ahead=False, day=None):
+    """Drop ONE goal line. Matched by its text, never by position: the screen
+    that offered it can be a moment behind the note."""
+    p = _goal_period(kind, ahead, day)
+    task = lookup(build_index(), p)
+    if not task:
+        return f"💫 No {kind} note to edit"
+    want = pm.unescape_md((line or "").strip())
+
+    def mutate(doc, live):
+        sec = _goal_sec_of(doc, kind)
+        if sec is None:
+            return False
+        keep = [l for l in sec.body if pm.unescape_md(l.strip()) != want]
+        if keep == list(sec.body):
+            return False
+        sec.body = keep
+        return True
+
+    ok, doc_out = _pn_rmw(task.get("projectId") or areas.PERIODIC_LIST_ID,
+                          task.get("id"), mutate)
+    if not ok:
+        return "🎯 That goal is not there any more"
+    task["content"] = ps.serialize_sections(doc_out)
+    if kind == "weekly" and not ahead:
+        _mirror_week_goals(doc_out)          # the daily shows the week's
+    return "🎯 Goal removed"
+
+
 def _goal_append(doc, sec_name, line):
     """Append a goal, EATING the template's bare "- [ ]" placeholder if the
     section still carries one. Vex 2026-09-17, on setting the month goal:
