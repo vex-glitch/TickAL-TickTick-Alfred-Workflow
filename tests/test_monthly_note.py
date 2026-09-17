@@ -272,5 +272,47 @@ check("the monthly review sweeps like the weekly's",
 check("its source is its own id, not the weekly's",
       pe._fill_review.__code__.co_argcount == 3)
 
+# ── 📔 Monthly journal (run two) ───────────────────────────────────────────
+import periodic_journal as pj                                    # noqa: E402
+
+fixed_m = pm.journal_fixed("monthly", {"goals": "💼 P • TickAL 🔗"})
+check("two fixed questions, the weekly's pair one tier up",
+      [k for k, _q in fixed_m] == ["mhighlight", "mgoals"], fixed_m)
+check("the goal question names the goal",
+      "💼 P • TickAL 🔗" in fixed_m[1][1], fixed_m[1][1])
+check("…and stands alone when there is none",
+      pm.journal_fixed("monthly", {})[1][1]
+      == "Did you achieve your monthly goals? Describe success/fail factors on each.")
+# every rule must be unable to match another tier's question, or an answer
+# routes into the wrong note
+for key, q in (fixed_m + pm.journal_fixed("weekly", {})
+               + pm.journal_fixed("evening", {})):
+    check(f"'{q[:28]}' routes to {key}", pm.journal_key(q) == key,
+          pm.journal_key(q))
+check("the pool is its own", len(pj.load_pool("monthly")["random"]) >= 20)
+check("five drawn, like the weekly", pm.JOURNAL_RANDOM_K["monthly"] == 5)
+check("the draw is stable for a month",
+      pm.select_prompts(pj.load_pool("monthly"), date(2026, 9, 1), "monthly")
+      == pm.select_prompts(pj.load_pool("monthly"), date(2026, 9, 1), "monthly"))
+check("…and is not the weekly's draw",
+      pm.select_prompts(pj.load_pool("monthly"), date(2026, 9, 1), "monthly")
+      != pm.select_prompts(pj.load_pool("weekly"), date(2026, 9, 1), "weekly"))
+check("the journal writes the monthly note",
+      pe._journal_target("monthly", date(2026, 9, 17)).kind == "monthly"
+      and pe._JOURNAL_SECTIONS["monthly"] == pm.SEC_MONTHLY_JNL)
+jdoc = ps.parse_sections(pm.render_template(
+    pe._load_template("monthly"), {"breadcrumbs": "C", "weeklinks": "- x"}))
+ps.set_body(jdoc, pm.SEC_MTH_MONTH, ["\t- [ ] Ship it"], pm.SEC_GOALS)
+check("the goal reaches the question through journal_ctx",
+      pe.journal_ctx("monthly", jdoc)["goals"] == "Ship it",
+      pe.journal_ctx("monthly", jdoc))
+pe._seed_slot(jdoc, pm.SEC_MONTHLY_JNL, "monthly", date(2026, 9, 1),
+              pe.journal_ctx("monthly", jdoc))
+jb = ps.find(jdoc, pm.SEC_MONTHLY_JNL).body
+check("seven questions land in the note",
+      len(pm.journal_pairs(jb)) == 7, len(pm.journal_pairs(jb)))
+check("…and the goal one carries the goal",
+      any("Ship it" in (q or "") for _n, q, _a, _i in pm.journal_pairs(jb)), jb)
+
 print(f"monthly note: {P} passed, {F} failed")
 sys.exit(1 if F else 0)

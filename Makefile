@@ -103,12 +103,14 @@ sync-pull:
 # Push ONE .py file (a baked Scripts/assets/*.png, or a periodic-note
 # template) repo→live:
 #   make sync-push FILE=Scripts/foo.py
-# Templates are shipped code, not docs: create_note renders the LIVE copy at
-# mint time, so a template fixed only in the repo never reaches a new note
-# (found 2026-09-12 - the live weekly.md was months behind).
+# Templates and journal PROMPT POOLS are shipped code, not docs: create_note
+# renders the LIVE copy at mint time and periodic_journal reads the LIVE pool
+# when a journal seeds, so either one fixed only in the repo never reaches a
+# note (the template case bit us 2026-09-12 - the live weekly.md was months
+# behind - and the monthly pool would have seeded ZERO drawn questions).
 sync-push:
 	@test -n "$(FILE)" || (echo "usage: make sync-push FILE=Scripts/foo.py" && exit 1)
-	@case "$(FILE)" in *.py|Scripts/*.sh|Scripts/assets/*.png|src/periodic_templates/*.md) ;; *) echo "REFUSED: only .py files, Scripts/*.sh, Scripts/assets/*.png and src/periodic_templates/*.md sync repo→live"; exit 1;; esac
+	@case "$(FILE)" in *.py|Scripts/*.sh|Scripts/assets/*.png|src/periodic_templates/*.md|src/periodic_prompts/*.md) ;; *) echo "REFUSED: only .py files, Scripts/*.sh, Scripts/assets/*.png, src/periodic_templates/*.md and src/periodic_prompts/*.md sync repo→live"; exit 1;; esac
 	@mkdir -p "$(LIVE)/$(dir $(FILE))"
 	@cp "$(FILE)" "$(LIVE)/$(FILE)"
 	@echo "synced $(FILE) → live"

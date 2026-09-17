@@ -1985,6 +1985,10 @@ def _fill_monthly(doc, p, index):
             lm += ["- Top Lists"] + top_lists
         ps.set_body(doc, pm.SEC_LAST_MONTH, lm)
 
+    # ── 📔 Monthly journal - seed + dynamic-goal prompt refresh
+    _seed_slot(doc, pm.SEC_MONTHLY_JNL, "monthly", p.start,
+               journal_ctx("monthly", doc))
+
     # ── ♻️ Monthly Review - the weekly's mirror, its own source
     _fill_review(doc, pm.SEC_MREVIEW, cfg.get_monthly_review_id())
 
@@ -2255,6 +2259,16 @@ def set_day_rating(score, day=None):
     return f"{stars} {_when(day)}Day rated"
 
 
+def has_highlight(kind="weekly", day=None):
+    """Does that tier's note still carry an ✨ Highlight section? The journal
+    router asks before writing one, so an answer is never written twice."""
+    task = lookup(build_index(), pm.period_for(kind, day or _today()))
+    if not task:
+        return False
+    return ps.find(ps.parse_sections(task.get("content") or ""),
+                   pm.SEC_HIGHLIGHT) is not None
+
+
 def weekly_has_highlight(day=None):
     """Does this week's note still carry an ✨ Highlight section? Twin of
     _daily_has_money: Vex's 2026-09-17 layout dropped it, so the highlight
@@ -2267,15 +2281,15 @@ def weekly_has_highlight(day=None):
                    pm.SEC_HIGHLIGHT) is not None
 
 
-def set_highlight(text, day=None):
-    """✨ Highlight of the week containing `day` (default: current week).
+def set_highlight(text, day=None, kind="weekly"):
+    """✨ Highlight of the week (or month) containing `day`.
 
     Two homes, one verb: the ✨ section where a note still has one, and
     otherwise the weekly journal's highlight ANSWER, which is where the
     highlight lives since Vex dropped that section on 2026-09-17. The ⭐️ row
     keeps working either way, and 🕰️ On this day reads whichever exists.
     """
-    p = pm.period_for("weekly", day or _today())
+    p = pm.period_for(kind, day or _today())
     task, _ = ensure_note(p)
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
 
@@ -2288,9 +2302,9 @@ def set_highlight(text, day=None):
     ok, _doc = _pn_rmw(pid, tid, mutate)
     if ok:
         return "✨ Highlight saved"
-    if journal_answer_key("weekly", "highlight", text, p.start):
-        return "✨ Highlight saved to the weekly journal"
-    return "💫 Nowhere to save the highlight · the weekly note has no ✨ " \
+    if journal_answer_key(kind, "highlight", text, p.start):
+        return f"✨ Highlight saved to the {kind} journal"
+    return f"💫 Nowhere to save the highlight · the {kind} note has no ✨ " \
            "section and no highlight question"
 
 
@@ -2659,12 +2673,13 @@ def append_income(amount, label="", day=None, replace=False):
 
 
 _JOURNAL_SECTIONS = {"morning": pm.SEC_MORNING, "evening": pm.SEC_EVENING,
-                     "weekly": pm.SEC_WEEKLY_JNL}
+                     "weekly": pm.SEC_WEEKLY_JNL,
+                     "monthly": pm.SEC_MONTHLY_JNL}
 
 
 def _journal_target(slot, day=None):
-    if slot == "weekly":
-        return pm.period_for("weekly", day or _today())
+    if slot in ("weekly", "monthly"):
+        return pm.period_for(slot, day or _today())
     return pm.period_for("daily", day or _today())
 
 
@@ -2711,6 +2726,12 @@ def journal_ctx(slot, doc):
         ctx["goal"] = pm.day_goal_title(gsec.body) if gsec else ""
     elif slot == "weekly":
         ctx["goals"] = "; ".join(pm.goal_titles(_week_goals_of(doc)[0])[:5])
+    elif slot == "monthly":
+        sec = next((x for x in (ps.find(doc, nm, pm.SEC_GOALS)
+                                or ps.find(doc, nm)
+                                for nm in pm.goal_section_names("monthly"))
+                    if x is not None), None)
+        ctx["goals"] = "; ".join(pm.goal_titles(sec.body)[:5]) if sec else ""
     return ctx
 
 

@@ -722,6 +722,8 @@ _FAMILIES = {
          "xact:pn_journal:evening", None),
         ("pn-jw", "📔 Weekly journal",  "Review the week, set next week",
          "xact:pn_journal:weekly", None),
+        ("pn-jmo", "📔 Monthly journal", "Review the month",
+         "xact:pn_journal:monthly", None),
     ]),
 }
 

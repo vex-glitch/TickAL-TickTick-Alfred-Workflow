@@ -1,0 +1,21 @@
+## random
+- Which week of this month actually moved something, and what made it that week?
+- What did you carry all month without finishing?
+- Which of your habits held up over a whole month, and which only held up for a week?
+- What did this month cost you that no number here shows?
+- Who got the best of your attention this month, and who got the leftovers?
+- What did you stop doing this month, and has anything missed it?
+- Which decision from this month would you make again?
+- What was the most expensive hour of this month?
+- If next month is a copy of this one, what breaks first?
+- What did you learn this month that you will still use in a year?
+- Which problem did you solve twice because you did not write it down?
+- What were you avoiding at the start of the month, and where is it now?
+- What did you spend money on this month that you would happily pay again?
+- Which week were you proudest of yourself, and why that one?
+- What did you promise someone this month that is still outstanding?
+- Where did a small habit quietly compound this month?
+- What is one thing you did this month that nobody else knows about?
+- Which of this month's wins was really last month's work?
+- What has been on the list every month this year?
+- If this month were the whole year, what would that say?

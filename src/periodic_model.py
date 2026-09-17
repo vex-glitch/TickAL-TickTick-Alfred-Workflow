@@ -105,6 +105,7 @@ SEC_MBARS      = "Weekly Completed"       # per-week bars (the daily's twin)
 SEC_MDATES     = "⏳ Dates"                # birthdays + countdowns this month
 SEC_LAST_MONTH = "⏪ Last month"
 SEC_MREVIEW    = "♻️ Monthly Review"
+SEC_MONTHLY_JNL = "📔 Monthly journal"
 SEC_MONTH_GOAL = "🎯 Month goal"          # what monthly notes called it before
 SEC_SPARKS     = "📊 Sparklines"
 SEC_TOP_WINS   = "🏆 Top wins"
@@ -196,7 +197,8 @@ WRITER_ANCHORS = {
                   SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
                   SEC_MBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
-                  SEC_MDATES, SEC_PEOPLE, SEC_LAST_MONTH, SEC_MREVIEW],
+                  SEC_MDATES, SEC_PEOPLE, SEC_LAST_MONTH, SEC_MONTHLY_JNL,
+                  SEC_MREVIEW],
     "quarterly": [SEC_MONEY],            # v3.0: template + money only
     "yearly":    [SEC_MONEY],
 }
@@ -1527,7 +1529,8 @@ JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)
 # tells the merge step where the answer lands (mood → 💬 Mood line, money →
 # 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
 # live day-goal / weekly-goals text baked into the prompt.
-JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5}
+JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5,
+                    "monthly": 5}          # 2 fixed + 5, the weekly's shape
 
 
 def _clip(s, n=140):
@@ -1589,6 +1592,20 @@ def journal_fixed(slot, ctx=None):
             ("money", "How much money did you earn today?"),
             ("rating", "Rate the day, 1-5 stars"),
         ]
+    if slot == "monthly":
+        # the weekly's two, one tier up. No picker handoff: next month's goal
+        # is set from the 🎯 row like every other tier's, and a month is not
+        # a three-things horizon.
+        goals = (ctx.get("goals") or "").strip()
+        return [
+            ("mhighlight", "What was the highlight of the month? "
+                           "Think of one thing that stands out."),
+            ("mgoals", (f"Did you achieve your monthly goals, {goals}? "
+                        "Describe success/fail factors on each."
+                        if goals else
+                        "Did you achieve your monthly goals? "
+                        "Describe success/fail factors on each.")),
+        ]
     # weekly - the three-things picker is NOT a seeded question: it runs as
     # the Alfred goal-picker handoff after the dialogs (phones edit next
     # week's 🎯 Goals directly instead)
@@ -1622,6 +1639,11 @@ JOURNAL_KEY_RULES = (
     ("dhighlight", re.compile(r"^✨ What was the highlight of the day\?")),
     ("highlight", re.compile(r"^What was the highlight of the week\?")),
     ("wgoals", re.compile(r"^Did you achieve your weekly goals\b")),
+    # …and the month's are a third pair again: every rule here has to be
+    # unable to match any other key's question, or an answer routes into the
+    # wrong tier's note
+    ("mhighlight", re.compile(r"^What was the highlight of the month\?")),
+    ("mgoals", re.compile(r"^Did you achieve your monthly goals\b")),
 )
 
 

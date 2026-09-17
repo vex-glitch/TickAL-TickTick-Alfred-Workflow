@@ -110,8 +110,9 @@ All three journals seed their questions into the note at mint, so you can answer
 - **Morning** (3 fixed + 3 drawn from an editable pool, below): mood (1-5), what's on your mind, the one thing - then, if no day goal is set, the ☀️ picker opens by itself.
 - **Evening** (6 fixed + 5 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, on your mind, *did you achieve your daily goal - {your goal}?*, money earned, rate the day (the stars stay in the journal answer).
 - **Weekly** (2 fixed + 5 drawn): the week's highlight (the answer IS the record, and 🕰️ On this day reads it back years later), *did you achieve your weekly goals?* - then a picker asks for **three things that would make next week a success**, written into next week's 🎯 Goals.
+- **Monthly** (2 fixed + 5 drawn): the month's highlight and *did you achieve your monthly goals?*, named. No picker after it - a month is not a three-things horizon, and next month's goal is set from the 🎯 row like every other tier's.
 
-Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
+Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly,monthly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
 
 ## Money - the roll-up pyramid
 
@@ -146,6 +147,7 @@ The weekly note's shape one tier up, counted by **week** instead of by day (Vex 
 - **😊 Moods** reads the month average with its vs-last-month arrow in the bullet, and one line per week underneath.
 - **⏳ Dates** - every birthday and countdown landing in that month, by date. Days already past count: a birthday on the 3rd is still what the month held.
 - **⏪ Last month** - the five headline numbers and the same two rankings, read off last month's weeks. It stays `_(pending)_` rather than showing zeros when none of those weeks can be read.
+- **📔 Monthly journal** - seeded at mint like the other three, answerable from your phone by typing after `A:`.
 - **♻️ Monthly Review** - the weekly's mirror with its own source, ticking both ways. It reads `monthly_review_id` from `~/.ticktick_alfred/config.json`; there is no Configure-panel field for it yet, unlike the weekly's.
 - **📨 Entries** resurfaces **five of each kind** - wins, nags, reminders, thoughts, links - each carrying its date, because over a month "Thu" names four different days. Nothing an entry carries says how big it was, so "top five" is a rule: **one per week, newest first, then fill what is left by recency**. Five wins therefore come from across the month rather than all from its last few days. A month long enough to touch six weeks has more weeks than slots, and the oldest one loses its place.
 

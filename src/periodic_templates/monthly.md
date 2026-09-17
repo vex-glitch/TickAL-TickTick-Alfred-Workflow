@@ -41,5 +41,7 @@
 ##### ⏪ Last month
 	_(pending)_
 ---
+##### 📔 Monthly journal
+---
 ##### ♻️ Monthly Review
 	_(set "monthly_review_id" in ~/.ticktick_alfred/config.json to mirror your review here)_
