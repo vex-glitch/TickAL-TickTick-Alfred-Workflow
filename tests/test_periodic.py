@@ -883,6 +883,51 @@ check("27.template-renders-the-block",
       .startswith("C\n---\n" + "\n".join(_dl) + "\n---\n#### 🏆 Goals"))
 
 
+# ── 28. the summaries drop the small repeating tasks (Vex 2026-09-17) ───────
+# "Remove commute tasks from our summaries in periodics ... Those are small
+# repeating tasks that I do not have to see in my summaries." Rise and shine,
+# Self Care, Meds, Startup and Shutdown are covered by the 🌅 Routines LIST
+# rule; Commute lives in 📅Calendar scheduling beside real appointments, so
+# only its name can go.
+_IG = ["commute"]
+check("28.exact-name", pm.task_ignored("Commute", _IG))
+check("28.case-insensitive", pm.task_ignored("commute", _IG))
+check("28.a-duplicated-repeat-too", pm.task_ignored("Commute Copied Copied", _IG))
+check("28.the-timed-label-too", pm.task_ignored("Commute · 10:30", _IG))
+check("28.through-a-markdown-link",
+      pm.task_ignored("[Commute](https://ticktick.com/x)", _IG))
+check("28.never-a-longer-word", not pm.task_ignored("Commuter belt", _IG))
+check("28.never-mid-title", not pm.task_ignored("Plan the commute", _IG))
+check("28.empty-name-is-not-a-match", not pm.task_ignored("", _IG))
+check("28.no-names-drops-nothing", not pm.task_ignored("Commute", []))
+
+check("28.rows-filtered",
+      [t["title"] for t in pm.drop_task_names(
+          [{"title": "Commute"}, {"title": "Ship it"}], _IG)] == ["Ship it"])
+check("28.unreadable-feed-stays-unreadable",
+      pm.drop_task_names(None, _IG) is None)
+check("28.sealed-counts-filtered",
+      pm.drop_task_counts({"Commute": 4, "Commute Copied Copied": 2,
+                           "Ship it": 1}, _IG) == {"Ship it": 1})
+check("28.no-names-keeps-the-counts",
+      pm.drop_task_counts({"Commute": 4}, []) == {"Commute": 4})
+
+_U = "https://ticktick.com/webapp/#p/6a9d214c8f08ea0ec9b69e35/tasks/6aa6fb3b8f087a6320d0a07b"
+_LINES = [f"\t- [ ] [Commute · 10:30]({_U})",
+          f"\t- [x] [Commute · 17:00]({_U})",
+          f"\t- [ ] [Ship it · 18:00]({_U})",
+          "\t- [ ] Commute, typed by hand"]
+_kept = pm.drop_checkbox_lines(_LINES, _IG)
+check("28.unticked-linked-goes", _LINES[0] not in _kept)
+check("28.a-TICKED-one-stays", _LINES[1] in _kept, "it is a record of a real day")
+check("28.someone-elses-line-stays", _LINES[2] in _kept)
+check("28.a-hand-typed-line-is-never-touched", _LINES[3] in _kept)
+check("28.by-list-too",
+      pm.drop_checkbox_lines(_LINES, [], ["6a9d214c8f08ea0ec9b69e35"])
+      == [_LINES[1], _LINES[3]])
+check("28.no-rule-changes-nothing", pm.drop_checkbox_lines(_LINES) == _LINES)
+
+
 print(f"periodic suite: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)

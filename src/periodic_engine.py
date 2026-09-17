@@ -923,8 +923,13 @@ def _completed_tops(day):
     (a subtask is its parent's detail), deduped by title. A repeating task
     leaves one completion record per occurrence and testing can leave more -
     "I cannot complete the same recurring task twice that day" (Vex
-    2026-09-12). None when the completed feed is unreadable."""
-    comp = _completed_between(day, day)
+    2026-09-12). None when the completed feed is unreadable.
+
+    Without the routines and the small repeating names since 2026-09-17: Vex
+    reads this block to see what he DID, and "Rise and shine · Commute ·
+    Shutdown · Startup" is not that. The headline count beside it stays
+    whole, the same bargain the weekly rankings already make."""
+    comp = _drop_ignored(_completed_between(day, day))
     if comp is None:
         return None
     out, seen = [], set()
@@ -1256,12 +1261,20 @@ def _fill_daily(doc, p, index, is_today):
                                                  indent=pm.T2)
             ps.set_body(doc, pm.SEC_TODAY, pm.sort_checkboxes(merged))
 
-        # ⏩ Tomorrow - same checkbox links, tomorrow's schedule
+        # ⏩ Tomorrow - same checkbox links, tomorrow's schedule. It lives
+        # under 🔎 Summaries, so it drops the routines and the small
+        # repeating names both ways: out of the incoming schedule, and out
+        # of the lines a previous refresh already wrote (Vex 2026-09-17).
+        # ✅ Tasks above does NOT - that is the day's real agenda, and it is
+        # where he ticks Rise and shine off at 05:30.
         tmw = ps.find(doc, pm.SEC_TOMORROW)
         if tmw is not None:
             body = [ln for ln in tmw.body if not pm.PENDING_RE.match(ln.strip())]
+            body = pm.drop_checkbox_lines(body, _stats_ignored_tasks(),
+                                          _stats_ignored_pids())
             merged, _added = pm.merge_checkboxes(
-                body, _scheduled_today(day + timedelta(days=1)), indent=pm.T2)
+                body, _drop_ignored_rows(_scheduled_today(day + timedelta(days=1))),
+                indent=pm.T2)
             ps.set_body(doc, pm.SEC_TOMORROW, pm.sort_checkboxes(merged))
 
         # ☑️ ticks follow TickTick: a task completed anywhere shows ticked here
@@ -1419,9 +1432,33 @@ def _stats_ignored_pids():
     return {i for i in ids if i}
 
 
+def _stats_ignored_tasks():
+    """Small repeating tasks Vex does not want to read about (2026-09-17:
+    "Remove commute tasks from our summaries in periodics ... Those are small
+    repeating tasks that I do not have to see in my summaries").
+
+    The routine LIST already covers Rise and shine, Self Care, Meds, Startup
+    and Shutdown - they all live in 🌅 Routines. This is for the ones that do
+    not: Commute sits in 📅Calendar scheduling beside real appointments, so
+    the list cannot go, only the name."""
+    names = {"commute"}
+    names |= {x.strip().casefold() for x in
+              (os.environ.get("stats_ignore_tasks") or "").split(",") if x.strip()}
+    return {n for n in names if n}
+
+
+def _drop_ignored_rows(rows):
+    """The (pid, tid, title) rows _scheduled_today hands out, minus the same
+    two rules - the checkbox feeds speak in tuples, not task dicts."""
+    pids, names = _stats_ignored_pids(), _stats_ignored_tasks()
+    return [r for r in rows
+            if r[0] not in pids and not pm.task_ignored(r[2], names)]
+
+
 def _drop_ignored(tasks):
-    """`tasks` minus the ignored lists' rows (pm.drop_lists is the rule)."""
-    return pm.drop_lists(tasks, _stats_ignored_pids())
+    """`tasks` minus the ignored lists' rows AND the ignored task names."""
+    return pm.drop_task_names(pm.drop_lists(tasks, _stats_ignored_pids()),
+                              _stats_ignored_tasks())
 
 
 def _fill_people(doc, t2, days=14, within=None):
@@ -1766,6 +1803,8 @@ def _week_stats_of(index, wp, drop_names=()):
         # one counts as the single occurrence it is known to have
         tts = {t.strip(): 1 for t in legacy_head("🚀 Top tasks").split(",")
                if t.strip()}
+    # a note sealed before the rule shipped still carries the names as TEXT
+    tts = pm.drop_task_counts(tts, _stats_ignored_tasks())
     created = 0
     csec = ps.find_prefix(doc, pm.SEC_CREATED, pm.scope_of("weekly",
                                                            pm.SEC_CREATED)) \
@@ -1870,7 +1909,9 @@ def _month_stats_of(index, mp, drop_names=()):
             "by_proj": keep(pm.parse_proj_lines(done_body)),
             "created_by_proj": pm.parse_proj_lines(created_body),
             "top_lists": keep(pm.parse_top_list_lines(body(pm.SEC_TOP_LIST))),
-            "top_tasks": pm.parse_top_task_lines(body(pm.SEC_TOP_TASKS))}
+            "top_tasks": pm.drop_task_counts(
+                pm.parse_top_task_lines(body(pm.SEC_TOP_TASKS)),
+                _stats_ignored_tasks())}
 
 
 def _quarter_month_data(index, period, projects):

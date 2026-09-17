@@ -83,7 +83,8 @@ pe._set_headed(mdoc, pm.SEC_CREATED, "1129",
                pm.ind(["- 🗂 🌅 Routines · 379"]), pm.SEC_WK_STATS)
 ps.set_body(mdoc, pm.SEC_TOP_LIST, ["\t- 📌CTA · 13 done · 14 added"],
             pm.SEC_WK_STATS)
-ps.set_body(mdoc, pm.SEC_TOP_TASKS, ["\t- Commute · 4×"], pm.SEC_WK_STATS)
+ps.set_body(mdoc, pm.SEC_TOP_TASKS, ["\t- Commute · 9×", "\t- Paint it · 4×"],
+            pm.SEC_WK_STATS)
 idx = {("monthly", pm.title_key(SEP)): {"id": "M", "projectId": "P",
                                         "content": ps.serialize_sections(mdoc)}}
 st = pe._month_stats_of(idx, SEP)
@@ -91,7 +92,8 @@ check("a month's Completed reads back", st["done"] == 466, st)
 check("…with its breakdown", st["by_proj"] == {"📌CTA": 116}, st)
 check("a month's Created reads back", st["created"] == 1129, st)
 check("its rankings read back",
-      st["top_lists"] == {"📌CTA": (13, 14)} and st["top_tasks"] == {"Commute": 4})
+      st["top_lists"] == {"📌CTA": (13, 14)}
+      and st["top_tasks"] == {"Paint it": 4})   # Commute is on the ignore list
 check("a month with no note is None", pe._month_stats_of({}, SEP) is None)
 # an UNFILLED monthly note is not a month of zero
 fresh = pm.render_template(pe._load_template("monthly"),

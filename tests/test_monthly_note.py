@@ -112,7 +112,11 @@ pe._set_headed(wdoc, pm.SEC_COMPLETED, "79 · 🔴 ▼ 308 (−80%)",
                pm.ind(["- 🗂 📌CTA · 13", "- 🗂 💰Money · 8"]), pm.SEC_WK_STATS)
 ps.set_body(wdoc, pm.SEC_TOP_LIST, ["\t- 📌CTA · 13 done · 14 added"],
             pm.SEC_WK_STATS)
-ps.set_body(wdoc, pm.SEC_TOP_TASKS, ["\t- Commute · 4×", "\t- Ship it"],
+# "Commute" is on the ignore list since 2026-09-17, so it doubles as the
+# proof that a name Vex does not want to read about never survives a sealed
+# note's rankings into the month above it.
+ps.set_body(wdoc, pm.SEC_TOP_TASKS,
+            ["\t- Commute · 4×", "\t- Paint it · 4×", "\t- Ship it"],
             pm.SEC_WK_STATS)
 idx = {("weekly", pm.title_key(WK)): {"id": "W", "projectId": "P",
                                       "content": ps.serialize_sections(wdoc)}}
@@ -121,7 +125,9 @@ check("bars read back as dates", st["per_day"][date(2026, 9, 16)] == 60, st["per
 check("the whole week reads back", sum(st["per_day"].values()) == 79, st["per_day"])
 check("the breakdown reads back", st["by_proj"] == {"📌CTA": 13, "💰Money": 8}, st)
 check("top lists read back", st["top_lists"] == {"📌CTA": (13, 14)}, st)
-check("top tasks read back", st["top_tasks"] == {"Commute": 4, "Ship it": 1}, st)
+check("top tasks read back", st["top_tasks"] == {"Paint it": 4, "Ship it": 1}, st)
+check("an ignored name never survives a sealed week",
+      "Commute" not in st["top_tasks"], st["top_tasks"])
 check("a week with no note is None", pe._week_stats_of({}, WK) is None)
 
 # the PRE-2026-09-17 weekly layout still gives up its numbers

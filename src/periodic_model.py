@@ -1232,6 +1232,44 @@ def drop_lists(tasks, skip):
             if (t.get("projectId") or t.get("_projectId") or "") not in skip]
 
 
+def task_ignored(name, names):
+    """True when a task NAME is one the summaries are told to drop.
+
+    Matched on the flattened, casefolded title: exactly, or as its first
+    WORDS. "Commute" therefore also covers "Commute Copied Copied", which is
+    what a duplicated repeat leaves behind in a sealed ranking, and never
+    covers "Commuter belt"."""
+    n = mdtext.flatten_links(name or "").strip().casefold()
+    if not n:
+        return False
+    for want in names or ():
+        w = (want or "").strip().casefold()
+        if w and (n == w or n.startswith(w + " ")):
+            return True
+    return False
+
+
+def drop_task_names(tasks, names):
+    """`tasks` minus the rows whose title is ignored. None passes straight
+    through, the way drop_lists treats an unreadable feed."""
+    if tasks is None:
+        return None
+    names = [n for n in (names or ()) if n]
+    if not names:
+        return list(tasks)
+    return [t for t in tasks if not task_ignored(t.get("title") or "", names)]
+
+
+def drop_task_counts(counts, names):
+    """{name: count} minus the ignored names. A SEALED note hands its
+    rankings back as text, so the rule has to reach them there too - the
+    same reason _ignored_names exists for lists."""
+    names = [n for n in (names or ()) if n]
+    if not names:
+        return dict(counts or {})
+    return {k: v for k, v in (counts or {}).items() if not task_ignored(k, names)}
+
+
 def top_list_lines(done_bp, created_bp, n=3, gi=T1):
     """Top lists body: the n busiest lists (done + added), busiest first.
     Ties break alphabetically so a refresh that changes nothing rewrites
@@ -1401,6 +1439,29 @@ def checkbox_tids(body_lines):
         tail = fb.LINK_TAIL_RE.search(ln)
         if tail:
             out[tail.group("tid")] = cb.group("mark") in "xX"
+    return out
+
+
+def drop_checkbox_lines(body_lines, names=(), pids=()):
+    """Checkbox lines minus the ignored task names and the ignored lists.
+
+    Only LINKED lines are touched - a line Vex typed himself survives
+    whatever it says, because the engine did not put it there and has no
+    business taking it away. And only UNTICKED ones: a ticked line is a
+    record of something he did, and the sweep still has to read it."""
+    names = [n for n in (names or ()) if n]
+    pids = {p for p in (pids or ()) if p}
+    if not names and not pids:
+        return list(body_lines)
+    out = []
+    for ln in body_lines:
+        cb = fb.CHECKBOX_RE.match(ln)
+        tail = fb.LINK_TAIL_RE.search(ln) if cb else None
+        if tail and cb.group("mark") not in "xX" and (
+                tail.group("pid") in pids
+                or task_ignored(mdtext.flatten_links(cb.group("body")), names)):
+            continue
+        out.append(ln)
     return out
 
 
