@@ -359,9 +359,14 @@ def build_subtitle(sub_count=0, item_type="", child_label="Subtask", breadcrumb=
             parts += [MOD_OPEN, MOD_BACK]
             if item_type == "Task":
                 parts += ["⇧✅", MOD_BUFFER]
+            elif item_type == "Note":
+                parts.append(MOD_BUFFER)     # a note buffers; it does not ⇧✅
             parts += [MOD_URL, "⌘⇧➕"]
-            if item_type == "Task":
-                parts.append("⌃⇧🗒️ ⌃⌘🎯")   # sticky · start focus - search task rows
+            # sticky · start focus. NOTES TOO since 2026-09-17: the three
+            # hard chords are about an ITEM, not about having children, and
+            # the legend was the half of that which still said otherwise.
+            if item_type in ("Task", "Note"):
+                parts.append("⌃⇧🗒️ ⌃⌘🎯")
         else:
             # Compact set - browse rows; buffer_mod=True only on task rows
             # (⌥⇧🅿️ is a task/subtask-only chord)

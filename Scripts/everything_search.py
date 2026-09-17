@@ -482,18 +482,18 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
                     "subtitle": "🅿️ Add to buffer",
                     "variables": {"task_title": name, "task_id": tid,
                                   "task_list_id": pid, "item_type": "task"}}
-        # ⌃⇧ → desktop sticky (Vex 2026-09-08); ⌃⌘ → the ⏱/🍅 start
-        # flow; notes don't focus
+        # ⌃⇧ → desktop sticky (Vex 2026-09-08); ⌃⌘ → the ⏱/🍅 start flow
         ctrlshift = {"valid": True, "arg": f"xact:sticky:{pid}:{tid}",
                      "subtitle": "🗒️ Sticky note",
                      "variables": {"task_title": name, "task_id": tid,
                                    "task_list_id": pid, "item_type": "task"}}
-        ctrlcmd = ({"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
-                    "subtitle": "Start focus",
-                    "variables": {"task_title": name, "task_id": tid,
-                                  "task_list_id": pid, "item_type": "task"}}
-                   if t.get("kind") != "NOTE"
-                   else {"valid": False, "subtitle": ""})
+        # notes focus too since 2026-09-17 - the timer is OURS (focus_start
+        # keeps its own state and writes its own record), so it binds to any
+        # id TickTick will open
+        ctrlcmd = {"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
+                   "subtitle": "Start focus",
+                   "variables": {"task_title": name, "task_id": tid,
+                                 "task_list_id": pid, "item_type": "task"}}
     return alfred.item(
         title=build_title(t, buffered=tid in buffered_ids()),
         subtitle=subtitle,
@@ -514,6 +514,29 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
     )
 
 
+def item_mods(pid, tid, title, item_type="task"):
+    """The three chords that belong to an ITEM, note or task alike:
+    ⌥⇧ buffer · ⌃⇧ sticky · ⌃⌘ start focus.
+
+    Note rows used to kill all three under a comment about having no
+    children to browse - true of ⌥, and written before the 2026-09-08 remap
+    gave those chords these jobs. Vex 2026-09-17: "notes cannot be opened as
+    sticky, cannot be started focus on and cannot be added to buffer via
+    modifiers ... that happened since our last modifier adjustments". The
+    canvas carries all three edges already; only the rows said no.
+    """
+    v = {"task_title": title, "task_id": tid, "task_list_id": pid,
+         "item_type": item_type}
+    return {
+        "alt+shift":  {"valid": True, "arg": f"xact:buffer_add:{pid}:{tid}",
+                       "subtitle": "🅿️ Add to buffer", "variables": v},
+        "ctrl+shift": {"valid": True, "arg": f"xact:sticky:{pid}:{tid}",
+                       "subtitle": "🗒️ Sticky note", "variables": v},
+        "ctrl+cmd":   {"valid": True, "arg": f"xact:focus_open:{pid}:{tid}",
+                       "subtitle": "Start focus", "variables": v},
+    }
+
+
 def _bridge_search_row(n):
     """One bridge note row, note-scope shape (⏎↗️ open, ⌘⚡ Actions,
     ⌥⌘ copy link, ⌃ main menu; stray chords dead). The title already
@@ -531,10 +554,9 @@ def _bridge_search_row(n):
         mods={
             "shift":      {"valid": False, "subtitle": ""},
             "alt":        {"valid": False, "subtitle": ""},
-            "alt+shift":  {"valid": False, "subtitle": ""},
-            "ctrl+shift": {"valid": False, "subtitle": ""},
             "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
             "alt+cmd":    {"arg": f"copy:{link}"},
+            **item_mods(npid, nid, ntitle, "note"),
         },
         variables={"item_type": "note", "task_id": nid, "task_list_id": npid,
                    "task_title": ntitle, "search_name": ntitle,
@@ -1376,14 +1398,14 @@ def main():
                     subtitle=subtitle,
                     arg=f"open:{link}",
                     mods={
-                        # NOTE: everything but Complete (⇧). No children to browse
-                        # from the search view → suppress ⌥/⌥⇧/⌃⇧. ⌃ keeps note details.
+                        # A note has no children to browse (⌥ dead) and does
+                        # not complete (⇧ dead) - but it stickies, focuses
+                        # and buffers like anything else (item_mods).
                         "shift":      {"valid": False, "subtitle": ""},
                         "alt":        {"valid": False, "subtitle": ""},
-                        "alt+shift":  {"valid": False, "subtitle": ""},
-                        "ctrl+shift": {"valid": False, "subtitle": ""},
                         "ctrl":       {"arg": "", "subtitle": "🔙 Main menu"},
                         "alt+cmd":    {"arg": f"copy:{link}"},
+                        **item_mods(npid, nid, ntitle, "note"),
                     },
                     variables={
                         "item_type":    "note",
