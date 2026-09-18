@@ -31,6 +31,15 @@ Levels:
     ctx:albcust:<lib>:<stage>:<mode>[:<tid>] customer picker for an album,
                                         mode = new (stashed shots' new album)
                                         | adopt (a John Doe row gains one)
+    ctx:okr[:y|o:<id>]                  🥅 OKRs hub: the plan, or one Y / O
+                                        with its children (HANDOFF_OKR.md)
+    ctx:okrpace[:<tier>]                📈 Pace: quarter · month · week · day,
+                                        or that period's plan
+    ctx:okrsched:<id>                   📅 schedule an OKR item (extend,
+                                        tomorrow, a date - ripple previewed)
+    ctx:okraddkr:<oid>                  🔑 KRs under an O, "a | b | c =XY"
+    ctx:okrlink:<id>                    🔗 link an OKR item to a task / list
+    ctx:okrtag:<id>                     🏷 an OKR item's area / project tag
 
 Anything after the ctx token is the fuzzy filter query. `ctx:subtasks:<taskId>`
 (single id) is also accepted - the list is then
@@ -54,6 +63,7 @@ import sys
 import os
 import re
 import json
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 
@@ -123,7 +133,11 @@ def parse_ctx(raw):
                "view_today": "ctx:smart:today",
                "view_tomorrow": "ctx:smart:tomorrow",
                "view_7": "ctx:smart:next7", "view_inbox": "ctx:inbox"}
-    if token in ALIASES:
+    # On an OKR screen the bar is TEXT: a date ("tomorrow"), KR names ("today
+    # | review") or a search. An alias there would jump away mid-typing
+    # (verified: "tomorrow" typed over ctx:countdowns rendered smart:tomorrow).
+    riding = os.environ.get("browse_ctx", "") or os.environ.get("browse_back", "")
+    if token in ALIASES and not riding.startswith("ctx:okr"):
         token = ALIASES[token]
     if not token.startswith("ctx:"):
         # No ctx in the bar → context rides invisibly as session variables
@@ -4817,6 +4831,827 @@ def render_rtrack(ids, query):
                     "ctx:routines")
 
 
+# ── Level: okr (🥅 OKRs hub, HANDOFF_OKR.md) ─────────────────────────────────
+# "I see OKRs more like forecasting ... 'guiding star' rather than daily work
+# plan" (Vex 2026-09-18). The plan is ONE list of all-day planning copies
+# (src/okr.py reads it); these screens show it and hand every change to an
+# xact:okr_* verb, which re-reads LIVE before it writes (the writer rule in
+# okr.py's docstring). Nothing here writes TickTick, and a schedule preview
+# computed here is display only - the verb re-plans from a writable read.
+#
+# Chords, ALL SIX spelled out on EVERY row (a missing mod fires the row's
+# default arg down that chord's edge: ⌥ dumps it in the bar, ⇧ runs an
+# xact:crmbrowse through dispatch, ⌘⇧ with a ctx: arg navigates):
+#   Y / O row   ⏎⤵️ inside (xact:crmbrowse) · ⌥⤵️ the same hop, faster
+#               (a variable hop skips End's Sync click) · ⌥⇧📅 schedule ·
+#               ⌘⚡ Actions · ⌥⌘ copy link · ⇧ and ⌘⇧ dead
+#   KR row      ⏎↗️ opens the COPY · ⇧✅ ticks it (⇧↩️ reopens a done or
+#               won't-do one) · ⌥⤵️ the
+#               REAL thing it links, in Alfred · ⌥⇧📅 · ⌘⚡ · ⌥⌘ copy link
+#   any other   ⌘ pinned dead: a row that is not a task would otherwise
+#               open ⌘ Actions on the LAST task acted on (actions.py
+#               recovers /tmp/ticktick_reattribute.txt when vars are blank)
+# ⌘⇧ stays dead on items until the Add layer stamps "🔑 KR • … - CODE":
+# today it would open the Add bar under an O and mint an unprefixed child.
+_OKR_CHORDS = ("cmd", "shift", "alt", "alt+shift", "alt+cmd", "cmd+shift")
+_OKR_NO_TASK = {"task_id": "", "task_list_id": "", "list_id": "",
+                "section_id": "", "task_title": "", "item_type": ""}
+# A live okr.load() is ~1.6 s (v1 open + v2 completed, measured 2026-09-18),
+# too slow for every hop between hub screens. The last live read is reused
+# for this long, and only while nothing newer has touched the caches a write
+# patches (project_data of the list, all_tasks, completed_tasks) - so a ⇧ tick
+# or a verb's write is never shown stale, and a drag in the app is at most
+# this old when the hub reopens.
+_OKR_FRESH_S = 45
+_OKR_GLYPH = {"Y": "🏔️", "O": "🥅", "KR": "🔑"}
+
+
+def _okr_dead():
+    return {"arg": "", "valid": False}
+
+
+def _okr_dead_mods():
+    """Every chord dead, FRESH dicts: add_back rewrites mods in place, so
+    two rows sharing one dict would share their ⌃ too."""
+    return {k: _okr_dead() for k in _OKR_CHORDS}
+
+
+def _okr_nav_mods(ctx):
+    """A non-task navigation row: ⌥ makes the same hop as its ⏎."""
+    m = _okr_dead_mods()
+    m["alt"] = {"arg": "", "valid": True, "subtitle": "⤵️",
+                "variables": {"browse_ctx": ctx}}
+    return m
+
+
+def _okr_seal(rows):
+    """The two row invariants, enforced once at the end of every OKR render
+    rather than trusted to each builder: all six chords present (a missing
+    one is dead), and a row that is not a task says so in its variables, so
+    no task id from an earlier row rides along into whatever it opens."""
+    for r in rows:
+        mods = r.setdefault("mods", {})
+        for k in _OKR_CHORDS:
+            if k not in mods:
+                mods[k] = _okr_dead()
+        v = r.setdefault("variables", {})
+        if not v.get("task_id"):
+            for k, blank in _OKR_NO_TASK.items():
+                v.setdefault(k, blank)
+            mods["cmd"] = _okr_dead()
+    return rows
+
+
+def _okr_mtime(key):
+    try:
+        return os.path.getmtime(os.path.join(cache_store.CACHE_DIR, f"{key}.json"))
+    except OSError:
+        return None
+
+
+def _okr_cached(pid):
+    """The plan rebuilt from the local cache - source "cache", never
+    writable. The last live read (okr_rows) when nothing newer has touched
+    the list's project_data; else the synced OPEN rows plus every completed
+    one still known (okr_rows' own, then the account-wide completed feed),
+    because without the ticked KRs an O's total shrinks. None when the
+    cache has no row of the list at all."""
+    import okr
+    c = cache_store.get("okr_rows")
+    c = c if isinstance(c, dict) and c.get("list_id") == pid else None
+    pd = cache_store.get(f"project_data_{pid}")
+    pd = pd if isinstance(pd, dict) and isinstance(pd.get("tasks"), list) else None
+    name = (c or {}).get("name") or ((pd or {}).get("project") or {}).get("name") or ""
+    if c and (pd is None or (_okr_mtime("okr_rows") or 0)
+              >= (_okr_mtime(f"project_data_{pid}") or 0)):
+        rows = list(c.get("rows") or [])
+    else:
+        if pd is not None:
+            open_rows = list(pd["tasks"])
+        else:
+            open_rows = [t for t in cache_store.get("all_tasks") or []
+                         if isinstance(t, dict) and t.get("projectId") == pid]
+            if not open_rows and not c:
+                return None
+        seen = {t.get("id") for t in open_rows}
+        done = []
+        # okr_rows is this list's by construction; the feed is account-wide
+        feed = [t for t in cache_store.get("completed_tasks") or []
+                if isinstance(t, dict) and t.get("projectId") == pid]
+        for t in list((c or {}).get("rows") or []) + feed:
+            if isinstance(t, dict) and t.get("status") in (2, -1) and t.get("id") not in seen:
+                seen.add(t.get("id"))
+                done.append(t)
+        rows = open_rows + done
+    return okr.Snapshot(okr.items_from(rows), "cache", "local cache", pid, name)
+
+
+def _okr_fresh(pid):
+    t = _okr_mtime("okr_rows")
+    if t is None or time.time() - t > _OKR_FRESH_S:
+        return False
+    return all((_okr_mtime(k) or 0) <= t
+               for k in (f"project_data_{pid}", "all_tasks", "completed_tasks"))
+
+
+def _okr_snapshot(query, live=True):
+    """(Snapshot | None, why, live?) for an OKR screen.
+
+    The filter re-runs on EVERY keystroke, so the network is read only on an
+    EMPTY bar (the render_rtrack rule) and only on the screens that show
+    numbers (live=True): hub, Y/O, pace. A typed bar and the picker screens
+    read the cache. What a live read returns is kept as okr_rows, the cache
+    everything else reads - v1's project_data cache holds OPEN tasks only.
+    `live?` is what the head row's "cache" chip reads: False = these numbers
+    may be old."""
+    import okr
+    pid = cfg.get_okr_list_id()
+    if not pid:
+        return None, "off", False
+    if query or not live:
+        snap = _okr_cached(pid)
+        return snap, ("" if snap else "not synced yet"), False
+    if _okr_fresh(pid):
+        c = cache_store.get("okr_rows") or {}
+        if c.get("list_id") == pid:
+            return (okr.Snapshot(okr.items_from(c.get("rows") or []), "cache",
+                                 "live read, reused", pid, c.get("name") or ""),
+                    "", True)
+    try:
+        snap = okr.load(list_id=pid)
+    except okr.OkrLoadError as e:
+        return None, str(e), False
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}", False
+    if snap.source == "live":
+        try:
+            cache_store.set("okr_rows", {"list_id": pid, "name": snap.name,
+                                         "done_complete": snap.done_complete,
+                                         "rows": [i.raw for i in snap.items]})
+        except Exception:
+            pass
+    return snap, "", snap.source == "live"
+
+
+def _okr_problem(why, back="ctx:okr"):
+    """The one row a screen shows when the plan cannot be read."""
+    if why == "off":
+        row = alfred.item(uid="okr-off", title="🥅 OKRs need a list",
+                          subtitle="⚙️ Settings → OKR List  |  ⌃🔙", valid=False)
+    else:
+        row = alfred.item(uid="okr-err", title="🥅 OKR list unreadable",
+                          subtitle=f"{why}  |  ⌃🔙", valid=False)
+    return add_back(_okr_seal([row]), back)
+
+
+def _okr_gone(back="ctx:okr"):
+    return add_back(_okr_seal([alfred.item(
+        uid="okr-gone", title="Not in the plan · sync or reopen",
+        subtitle="Deleted, moved, or not synced yet  |  ⌃🔙", valid=False)]), back)
+
+
+def _okr_home(it, by):
+    """The screen that LISTS an item (its ⌃ target, and where a verb lands
+    after writing): its Y/O's screen, else the hub root."""
+    p = by.get(it.parent) if it.parent else None
+    return (f"ctx:okr:{p.kind.lower()}:{p.id}"
+            if p is not None and p.kind in ("Y", "O") else "ctx:okr")
+
+
+def _okr_span(it, want):
+    """The span a row SHOWS: an open Y/O on its wanted span (what its KRs
+    say, and what the next heal writes - a stale stored one is exactly what
+    the hub-open heal fixes), everything else as stored."""
+    if it.kind in ("Y", "O") and not it.history and want.get(it.id):
+        return want[it.id]
+    return it.start, it.end
+
+
+def _okr_real():
+    """{id: task} + {parent id: open children} over the open caches, built
+    once per render for the KR ⌥ hop (cache.find_task re-reads the whole
+    all_tasks file per call)."""
+    by, kids = {}, {}
+    for key in ("all_tasks", "all_notes"):
+        for t in cache_store.get(key) or []:
+            if isinstance(t, dict) and t.get("id") and t["id"] not in by:
+                by[t["id"]] = t
+                if t.get("parentId") and t.get("status", 0) == 0:
+                    kids[t["parentId"]] = kids.get(t["parentId"], 0) + 1
+    return by, kids
+
+
+def _okr_real_ctx(it, real):
+    """Where ⌥ on a linked KR goes in Alfred: the linked task's subtasks
+    when it has open ones, the linked list's tasks; else None (dead)."""
+    tg = it.target
+    if not tg or tg[0] not in ("task", "list"):
+        return None
+    if tg[0] == "list":
+        return f"ctx:tasks:{tg[1]}"
+    by, kids = real
+    t = by.get(tg[2]) or {}
+    if not kids.get(tg[2]):
+        return None
+    p = t.get("projectId") or t.get("_projectId") or tg[1]
+    return f"ctx:subtasks:{p}:{tg[2]}"
+
+
+def _okr_row(it, items, today, pid, want, real, head=False, where=None):
+    """One Y / O / KR as a FULL task row (task_id, task_list_id, list_id,
+    section_id, the RAW title, item_type), so ⌘ opens ⌘ Actions on it.
+    head=True is the item a Y/O screen is about: ⏎ opens it, no drill.
+    where = {id: item} on screens that mix parents (a flat search, a
+    period's plan): the row then names its O / Y, or two "🔑 Eagle" KRs
+    under two objectives read the same."""
+    import okr
+    link = f"ticktick:///webapp/#p/{pid}/tasks/{it.id}"
+    s, e = _okr_span(it, want)
+    bits = [okr.span_txt(s, e, today)]
+    up = where.get(it.parent) if where is not None and it.parent else None
+    if up is not None and up.kind in okr.PARENT_KINDS:
+        nm = up.name if len(up.name) <= 24 else up.name[:23] + "…"
+        bits.insert(0, f"{_OKR_GLYPH[up.kind]} {nm}")
+    parent = it.kind in okr.PARENT_KINDS
+    if parent:
+        d, n = okr.progress(it, items)
+        bits.append(f"{d}/{n} KRs")
+        if not it.history:
+            p = okr.pace(it, items, today)
+            if p.behind_days:
+                bits.append(f"behind {p.behind_days}d")
+            if p.elapsed:                      # 0 = not started: no chip
+                bits.append(f"⏳{round(p.elapsed * 100)}%")
+    elif it.dated and not it.history and it.end < today:
+        bits.append(f"late {(today - it.end).days}d")
+    mods = _okr_dead_mods()
+    mods["cmd"] = {"arg": "", "valid": True, "subtitle": "⌘ Actions"}
+    mods["alt+cmd"] = {"arg": f"copy:{link}", "valid": True, "subtitle": "Copy link"}
+    chips = []
+    drill = None if head or not parent else f"ctx:okr:{it.kind.lower()}:{it.id}"
+    if drill:
+        arg = f"xact:crmbrowse:{drill}"
+        chips.append("⏎⤵️")
+        mods["alt"] = {"arg": "", "valid": True, "subtitle": "⤵️ Inside",
+                       "variables": {"browse_ctx": drill}}
+    else:
+        arg = f"open:{link}"
+        chips.append("⏎↗️")
+    if not parent:
+        # a done KR reopens through dispatch's uncomplete:; a WON'T DO one
+        # through xact:wontdo_undo, which also drops it from the wontdo log
+        # and restores it into all_tasks (dispatch only knows completed_tasks
+        # and would invalidate the whole all_tasks cache - review 2026-09-18)
+        if it.abandoned:
+            sarg = f"xact:wontdo_undo:{pid}:{it.id}"
+        else:
+            verb = "uncomplete" if it.history else "complete"
+            sarg = f"{verb}:{pid}:{it.id}:{it.name}"
+        mods["shift"] = {"arg": sarg, "valid": True,
+                         "subtitle": "↩️ Reopen" if it.history else "✅ Done"}
+        chips.append("⇧↩️" if it.history else "⇧✅")
+    if not parent:
+        ctx = _okr_real_ctx(it, real)
+        if ctx:
+            mods["alt"] = {"arg": "", "valid": True, "subtitle": "⤵️ The real one",
+                           "variables": {"browse_ctx": ctx}}
+            chips.append("⌥⤵️")
+    if not it.history:
+        # actions_loop blanked: this road is the hub's, not ⌘ Actions' act-again
+        mods["alt+shift"] = {"arg": f"xact:crmbrowse:ctx:okrsched:{it.id}",
+                             "valid": True, "subtitle": "📅 Schedule",
+                             "variables": {"actions_loop": ""}}
+        chips.append("⌥⇧📅")
+    chips += ["⌘⚡", "⌃🔙"]
+    glyph = _OKR_GLYPH.get(it.kind, "▫️")
+    state = "✅ " if it.done else ("🚫 " if it.abandoned else "")
+    return alfred.item(
+        uid=f"okr-{it.id}{'-h' if head else ''}",
+        title=f"{state}{glyph} {it.name}{' 🔗' if it.link else ''}",
+        subtitle=" · ".join(bits) + "  |  " + "  ".join(chips),
+        arg=arg, valid=True, match=f"{it.name} {it.code or ''} {it.kind or ''}",
+        variables={"task_id": it.id, "task_list_id": pid, "list_id": pid,
+                   "section_id": "", "task_title": it.title,
+                   "item_type": "note" if (it.raw or {}).get("kind") == "NOTE" else "task"},
+        mods=mods)
+
+
+def _okr_open_first(xs):
+    """Open first, closed after - each half in plan order (dated by start,
+    then undated)."""
+    from datetime import date as _date
+    return sorted(xs, key=lambda x: (x.history, not x.dated,
+                                     x.start or _date.max, x.name))
+
+
+def _okr_heal_nudge():
+    """Hub open = a heal pass (HANDOFF_OKR section 4), fired DETACHED: the
+    verb loads live, refuses unless the read is writable, and spawn_heal
+    debounces it. Lazy and silent: the screens must work before the writer
+    layer exists."""
+    try:
+        import okr_write
+        okr_write.spawn_heal()
+    except Exception:
+        pass
+
+
+def render_okr(ids, query):
+    """ctx:okr - the hub: head row (list, counts, "cache" chip when the
+    numbers are not from a live read), 📈 Pace, then the plan's roots - Y's,
+    O's without a Y, KRs without an O, unprefixed items - open first. A typed
+    bar searches EVERY item, flat.
+    ctx:okr:y:<id> / ctx:okr:o:<id> - that item (head row) + its children."""
+    import okr
+    from datetime import date as _date
+    snap, why, live = _okr_snapshot(query)
+    if snap is None:
+        return _okr_problem(why, "ctx:folders" if not ids else "ctx:okr")
+    items, pid, today = snap.items, snap.list_id, _date.today()
+    by = okr.index(items)
+    want = okr.wanted_spans(items)
+    real = _okr_real()
+
+    def row(it, head=False):
+        return _okr_row(it, items, today, pid, want, real, head=head)
+
+    def search(rows):
+        return fuzz.filter_and_score(query, rows,
+                                     key_fn=lambda x: x.get("match") or x["title"])
+
+    if len(ids) >= 2 and ids[0] in ("y", "o"):
+        it = by.get(ids[1])
+        if it is None:
+            return _okr_gone()
+        rows = [row(c) for c in _okr_open_first(c for c in items if c.parent == it.id)]
+        if query:
+            rows = search(rows) or [alfred.item(
+                uid="okr-none", title=f'Nothing matching "{query}"',
+                subtitle="⌃🔙", valid=False)]
+        else:
+            if not rows:
+                rows = [alfred.item(
+                    uid="okr-empty", valid=False,
+                    title="No KRs yet" if it.kind == "O" else "No objectives yet",
+                    subtitle=("⌘ Actions → 🔑 Add KRs  |  ⌃🔙" if it.kind == "O"
+                              else "⌃🔙"))]
+            rows = [row(it, head=True)] + rows
+        return add_back(_okr_seal(rows), _okr_home(it, by))
+
+    pace_row = alfred.item(
+        uid="okr-pace", title="📈 Pace",
+        subtitle="Quarter · month · week · day  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:okrpace", valid=True, match="pace",
+        variables=dict(_OKR_NO_TASK), mods=_okr_nav_mods("ctx:okrpace"))
+    if query:
+        rows = search([_okr_row(x, items, today, pid, want, real, where=by)
+                       for x in _okr_open_first(items)] + [pace_row])
+        rows = rows or [alfred.item(uid="okr-none", title=f'No OKR matching "{query}"',
+                                    subtitle="⌃🔙", valid=False)]
+        return add_back(_okr_seal(rows), "ctx:folders")
+
+    t = okr.tree(items)
+    roots = [n[0] for key in ("years", "orphan_os", "orphan_krs", "loose")
+             for n in t[key]]
+    roots = [x for x in roots if not x.history] + [x for x in roots if x.history]
+    count = {k: sum(1 for x in items if x.kind == k and not x.history) for k in okr.KINDS}
+    n_done = sum(1 for x in items if x.history)
+    head = alfred.item(
+        uid="okr-head",
+        title=f"{snap.name or '🥅 OKRs'} · {sum(count.values())} open",
+        subtitle=(f"{count['Y']} Y · {count['O']} O · {count['KR']} KR"
+                  + (f" · {n_done} done" if n_done else "")
+                  + ("" if live else " · cache") + "  |  ⏎↗️  ⌃🔙"),
+        arg=f"open:ticktick:///webapp/#p/{pid}/tasks", valid=True,
+        variables=dict(_OKR_NO_TASK))
+    rows = [head, pace_row] + [row(x) for x in roots]
+    if not roots:
+        rows.append(alfred.item(uid="okr-empty", title="The plan is empty",
+                                subtitle="⌃🔙", valid=False))
+    _okr_heal_nudge()
+    return add_back(_okr_seal(rows), "ctx:folders")
+
+
+# tier, emoji, word, the kinds its plan lists (HANDOFF_OKR section 4:
+# 🌓 Quarter = O's · 🗓️ Month = O's + KRs · ♻️ Week and ☀️ Day = KRs)
+_OKR_TIERS = (("quarterly", "🌓", "Quarter", ("O",)),
+              ("monthly", "🗓️", "Month", ("O", "KR")),
+              ("weekly", "♻️", "Week", ("KR",)),
+              ("daily", "☀️", "Day", ("KR",)))
+
+
+def _okr_pace_bits(pp):
+    bits = [f"{pp.done}/{pp.total} KRs"]
+    if pp.expected:
+        bits.append(f"{pp.expected} due")
+    if pp.behind_days:
+        bits.append(f"behind {pp.behind_days}d")
+    return bits
+
+
+def render_okrpace(ids, query):
+    """ctx:okrpace - the four periods now running, each with its KR pace
+    (okr.period_pace: ticked / planned, how many should be done by now, how
+    far behind); ⏎ and ⌥ open one. ctx:okrpace:<tier> - that period's plan
+    (okr.overlapping, the tier's kinds), item rows with their pace."""
+    import okr
+    import periodic_model as pm
+    from datetime import date as _date
+    snap, why, _live = _okr_snapshot(query)
+    if snap is None:
+        return _okr_problem(why)
+    items, pid, today = snap.items, snap.list_id, _date.today()
+    tier = next((x for x in _OKR_TIERS if ids and x[0] == ids[0]), None)
+    if ids and tier is None:
+        return add_back(_okr_seal([alfred.item(
+            uid="okrp-bad", title=f"Unknown period “{ids[0]}”",
+            subtitle="quarterly · monthly · weekly · daily  |  ⌃🔙",
+            valid=False)]), "ctx:okrpace")
+    if tier is None:
+        rows = []
+        for kind, emo, word, _kinds in _OKR_TIERS:
+            p = pm.period_for(kind, today)
+            pp = okr.period_pace(items, p.start, p.end, today)
+            rows.append(alfred.item(
+                uid=f"okrp-{kind}", title=f"{emo} {word} · {pm.title(p)}",
+                subtitle=" · ".join([okr.span_txt(p.start, p.end, today)]
+                                    + _okr_pace_bits(pp)) + "  |  ⏎⤵️  ⌃🔙",
+                arg=f"xact:crmbrowse:ctx:okrpace:{kind}", valid=True,
+                match=f"{word} {kind} {pm.title(p)}",
+                variables=dict(_OKR_NO_TASK),
+                mods=_okr_nav_mods(f"ctx:okrpace:{kind}")))
+        if query:
+            rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["match"]) \
+                or [alfred.item(uid="okrp-none", title=f'No period matching "{query}"',
+                                subtitle="⌃🔙", valid=False)]
+        return add_back(_okr_seal(rows), "ctx:okr")
+    kind, emo, word, kinds = tier
+    p = pm.period_for(kind, today)
+    pp = okr.period_pace(items, p.start, p.end, today)
+    want = okr.wanted_spans(items)
+    real = _okr_real()
+    by = okr.index(items)
+    rows = [_okr_row(x, items, today, pid, want, real, where=by)
+            for x in okr.overlapping(items, p.start, p.end, kinds)]
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["match"]) \
+            or [alfred.item(uid="okrp-none", title=f'Nothing matching "{query}"',
+                            subtitle="⌃🔙", valid=False)]
+    else:
+        if not rows:
+            rows = [alfred.item(uid="okrp-empty", title=f"Nothing planned this {word.lower()}",
+                                subtitle="⌃🔙", valid=False)]
+        rows.insert(0, alfred.item(
+            uid=f"okrp-head-{kind}", title=f"{emo} {word} · {pm.title(p)}",
+            subtitle=" · ".join([okr.span_txt(p.start, p.end, today)]
+                                + _okr_pace_bits(pp)) + "  |  ⌃🔙",
+            valid=False))
+    return add_back(_okr_seal(rows), "ctx:okrpace")
+
+
+def _okr_item_for(ids):
+    """(snap, item, by, problem rows) for the screens about ONE item. They
+    read the CACHE: each is a picker reached from a hub row or ⌘ Actions a
+    moment after a live read, and it re-renders per keystroke."""
+    import okr
+    snap, why, _live = _okr_snapshot("", live=False)
+    if snap is None:
+        return None, None, {}, _okr_problem(why)
+    by = okr.index(snap.items)
+    it = by.get(ids[0]) if ids else None
+    if it is None:
+        return snap, None, by, _okr_gone()
+    return snap, it, by, None
+
+
+# "+3" · "+3d" · "- 2 days" · "+1w" · "+2 Weeks": a length, never a date
+# okr_write.MAX_EXTEND: a length the verb refuses is never offered as a ⏎
+_OKR_MAX_EXTEND = 3660
+_OKR_EXTEND_RE = re.compile(r"([+-])\s*(\d{1,3})\s*(d|days?|w|weeks?)?", re.I)
+
+
+def render_okrsched(ids, query):
+    """ctx:okrsched:<id> - the ONE schedule screen (⌥⇧ on a hub row, 📅
+    Schedule… in ⌘ Actions): ⏩ +1 / +3 / +7 days, 🌙 Tomorrow, or typed:
+    a bar led by + or - is ALWAYS a length ("+N", "+Nd", "+N days", "+Nw",
+    "+N weeks"; a bare number is a DAY of the month to dateutil, so
+    extending needs its sign) and never reaches dateutil; anything else is
+    a date, today or later. No time entry ("we can remove add time",
+    HANDOFF_OKR section 4): parsedatetime's own status refuses one, since
+    "2am" at UTC+2 is UTC midnight and reads as a date by its ISO alone.
+    Each row previews "<new span> · moves N" from okr.schedule_plan over
+    the cache; a refusal (closed item, undated extend, a parent that
+    cannot land) is the row's subtitle and the row is dead. Rows fire
+    xact:okr_sched:<b64>."""
+    import okr
+    import dateutil
+    import periodic_model as pm
+    from datetime import date as _date
+    from periodic_rows import _b64
+    snap, it, by, problem = _okr_item_for(ids)
+    if problem:
+        return problem
+    items, today = snap.items, _date.today()
+    home = _okr_home(it, by)
+    want = okr.wanted_spans(items)
+    cur = _okr_span(it, want)
+    head = alfred.item(uid="okrs-head",
+                       title=f"📅 {it.name} · {okr.span_txt(cur[0], cur[1], today)}",
+                       subtitle="Type +N · -N · a date  |  ⌃🔙", valid=False)
+    if it.history:
+        return add_back(_okr_seal([head, alfred.item(
+            uid="okrs-closed", title="Closed · never moves",
+            subtitle="Reopen it first  |  ⌃🔙", valid=False)]), home)
+
+    def plan(uid, title, action, arg, match):
+        pay = {"id": it.id, "action": action,
+               "arg": arg.isoformat() if isinstance(arg, _date) else arg,
+               "back": home}
+        if action == "extend" and abs(arg) > _OKR_MAX_EXTEND:
+            return alfred.item(uid=uid, title=title,
+                               subtitle="Too long · pick a date  |  ⌃🔙",
+                               valid=False, match=match)
+        try:
+            moves, heals = okr.schedule_plan(items, it.id, action, arg, today)
+        except ValueError as e:
+            # "bad span 2026-09-18..2026-09-16" = pulled in past its start:
+            # said in words, never as raw ISO dates
+            why = ("Longer than the item · pick a date"
+                   if str(e).startswith("bad span") else str(e))
+            return alfred.item(uid=uid, title=title, subtitle=f"{why}  |  ⌃🔙",
+                               valid=False, match=match)
+        new = {i: (s, e) for i, s, e in moves}
+        new.update({i: (s, e) for i, s, e in heals})
+        s, e = new.get(it.id, cur)
+        if action == "extend" and e is not None and e < today:
+            # the verb refuses it too (okr_write.schedule): never offer a ⏎
+            # that can only answer "no"
+            return alfred.item(uid=uid, title=title,
+                               subtitle="That end is gone · today or later  |  ⌃🔙",
+                               valid=False, match=match)
+        n = len({m[0] for m in moves} - {it.id})
+        return alfred.item(uid=uid, title=title,
+                           subtitle=f"{okr.span_txt(s, e, today)} · moves {n}  |  ⏎📅  ⌃🔙",
+                           arg=f"xact:okr_sched:{_b64(pay)}", valid=True, match=match)
+
+    fixed = [plan(f"okrs-x{n}", f"⏩ +{n} day{'s' if n > 1 else ''}", "extend", n,
+                  f"+{n} extend longer")
+             for n in (1, 3, 7)]
+    fixed.append(plan("okrs-tmrw", "🌙 Tomorrow", "tomorrow", None,
+                      "tomorrow move next day"))
+    q = query.strip()
+    if q[:1] in ("\u2212", "\u2013", "\u2014"):
+        # text substitution turns a typed "-" into these; read as a date,
+        # "-3 days" would become a FORWARD move (review 2026-09-18)
+        q = "-" + q[1:]
+    if not q:
+        return add_back(_okr_seal([head] + fixed + [alfred.item(
+            uid="okrs-date", title="📆 Pick a date · type it",
+            subtitle="12.10 · next mon · 12 oct  |  ⌃🔙", valid=False)]), home)
+    # ONE answer per bar: what was typed wins; a word that is no date
+    # ("tom") falls back to the fixed rows it names before saying so
+    if q[0] in "+-":
+        # a sign = a length, ALWAYS: "-2" must never reach dateutil
+        m = _OKR_EXTEND_RE.fullmatch(q)
+        if not m:
+            return add_back(_okr_seal([alfred.item(
+                uid="okrs-typed", title="+N longer · -N shorter",
+                subtitle="+3 · +3d · +2w · -1d  |  ⌃🔙", valid=False)]), home)
+        k = int(m.group(2))
+        weeks = (m.group(3) or "d")[:1].lower() == "w"
+        n = k * (7 if weeks else 1) * (-1 if m.group(1) == "-" else 1)
+        word = f"{k} {'week' if weeks else 'day'}{'s' if k > 1 else ''}"
+        rows = [plan("okrs-typed",
+                     f"⏩ Extend +{word}" if n > 0 else f"⏪ Pull in {word}",
+                     "extend", n, q) if n else
+                alfred.item(uid="okrs-typed", title="Nothing to move",
+                            subtitle="+N longer · -N shorter  |  ⌃🔙", valid=False)]
+        return add_back(_okr_seal(rows), home)
+    iso, status = dateutil.parse_date_status(q)
+    d = _date.fromisoformat(iso[:10]) if iso else None
+    if iso and status != 1:
+        rows = [alfred.item(uid="okrs-typed", title="Dates only · no time",
+                            subtitle="OKR items are all-day  |  ⌃🔙", valid=False)]
+    elif d is not None and d < today:
+        rows = [alfred.item(uid="okrs-typed", title="That day is gone · today or later",
+                            subtitle=f"{pm.DAY_ABBR[d.weekday()]} · "
+                                     f"{okr.span_txt(d, d, today)}  |  ⌃🔙",
+                            valid=False)]
+    elif d is not None:
+        rows = [plan("okrs-typed",
+                     f"📆 {pm.DAY_ABBR[d.weekday()]} · {okr.span_txt(d, d, today)}",
+                     "date", d, q)]
+    else:
+        rows = (fuzz.filter_and_score(q, fixed, key_fn=lambda x: x.get("match") or x["title"])
+                or [alfred.item(uid="okrs-typed", title=f'No date in "{q}"',
+                                subtitle="12.10 · next mon · 12 oct · +N  |  ⌃🔙",
+                                valid=False)])
+    return add_back(_okr_seal(rows), home)
+
+
+_OKR_CODE_TOKEN = re.compile(r"(?:^|(?<=\s))=(\w{1,16})(?=\s|$)")
+
+
+def render_okraddkr(ids, query):
+    """ctx:okraddkr:<oid> - KRs under an O from ONE line, the add bar's pipe
+    grammar (subtask_line): "Draft | Review | Ship" = three KRs, "=XY" as a
+    word of its own sets the code. Row 1 commits (⏎ = xact:okr_addkr with the NAMES
+    - the verb stamps "🔑 KR • <name> - <code>" from a live read), row 2
+    "➕ Another KR" puts one more pipe in the bar. The code shown is the one
+    the verb will use: the O's 🏷️ line / title code / KR majority
+    (okr.code_of), else a proposal (okr.propose_code) the verb writes into
+    the O's description. A closed O takes no new KRs."""
+    import okr
+    import subtask_line
+    from periodic_rows import _b64
+    snap, o, by, problem = _okr_item_for(ids)
+    if problem:
+        return problem
+    if o.kind != "O":
+        return add_back(_okr_seal([alfred.item(
+            uid="okra-no", title="KRs go under an objective",
+            subtitle=f"{_OKR_GLYPH.get(o.kind, '▫️')} {o.name} is not an O  |  ⌃🔙",
+            valid=False)]), _okr_home(o, by))
+    back = f"ctx:okr:o:{o.id}"
+    if o.history:
+        return add_back(_okr_seal([alfred.item(
+            uid="okra-closed", title=f"🥅 {o.name} is closed",
+            subtitle="Reopen it first  |  ⌃🔙", valid=False)]), back)
+    # "=XY" is read as a standalone word ANYWHERE (the last one wins), not
+    # only at the end: ➕ Another KR moves it to the FRONT of the bar,
+    # because Alfred leaves the cursor at the end and a name typed right
+    # after "=XY" would glue onto the code
+    found = _OKR_CODE_TOKEN.findall(query)
+    override = found[-1] if found else None
+    text = " ".join(_OKR_CODE_TOKEN.sub(" ", query).split())
+    head, kids = subtask_line.split_line(text)
+    names = [x for x in [head] + kids if x]
+    have = okr.code_of(o, okr.krs_of(o, snap.items))
+    code = override or have or okr.propose_code(o.name)
+    code_txt = f"code {code}" if code else "no code"
+    if code and not have:
+        code_txt += " · new 🏷️"
+    if not names:
+        return add_back(_okr_seal([alfred.item(
+            uid="okra-prompt", title=f"🔑 KRs under 🥅 {o.name} · {code_txt}",
+            subtitle="Type a name · | for more · =XY sets code  |  ⌃🔙",
+            valid=False)]), back)
+    n = len(names)
+    pay = {"oid": o.id, "names": names, "code": override, "back": back}
+    preview = " · ".join(names)
+    # an =XY the title would not read back ("=xy") is refused by the verb;
+    # the row says so first. Lazy and forgiving: no writer layer, no check
+    bad = False
+    if override:
+        try:
+            import okr_write
+            bad = not okr_write.code_ok(override)
+        except Exception:
+            bad = False
+    rows = [alfred.item(
+        uid="okra-go", title=f"✅ Add {n} KR{'s' if n > 1 else ''} under 🥅 {o.name} · {code_txt}",
+        subtitle=("Code: one word, capital first  |  ⌃🔙" if bad else
+                  (preview[:90] + ("…" if len(preview) > 90 else "")) + "  |  ⏎✅  ⌃🔙"),
+        arg="" if bad else f"xact:okr_addkr:{_b64(pay)}", valid=not bad),
+        alfred.item(uid="okra-more", title="➕ Another KR",
+                    subtitle="One more | in the bar  |  ⌃🔙", arg="", valid=False,
+                    autocomplete=(f"={override} " if override else "")
+                    + subtask_line.next_query(text))]
+    return add_back(_okr_seal(rows), back)
+
+
+def render_okrlink(ids, query):
+    """ctx:okrlink:<id> - what an OKR item plans: an open task, subtask or
+    note anywhere but the OKR list and the periodic list, or a list. ⏎ fires
+    xact:okr_link, which rewrites only the COPY's title ("moving a copy
+    NEVER moves the real task"). An O or Y usually plans a list, so lists
+    lead there; a KR plans a task, so tasks lead."""
+    import okr
+    from display import pick_title, pick_where, search_key
+    from periodic_rows import _b64
+    snap, it, by, problem = _okr_item_for(ids)
+    if problem:
+        return problem
+    home = _okr_home(it, by)
+    skip = {x for x in (snap.list_id, _areas.PERIODIC_LIST_ID) if x}
+    tasks, seen = [], set()
+    for key in ("all_tasks", "all_notes"):
+        for t in cache_store.get(key) or []:
+            if (not isinstance(t, dict) or not t.get("id") or t["id"] in seen
+                    or t["id"] == it.id or t.get("status", 0) != 0
+                    or (t.get("projectId") or t.get("_projectId")) in skip):
+                continue
+            seen.add(t["id"])
+            tasks.append(t)
+    tasks.sort(key=lambda t: t.get("modifiedTime") or t.get("createdTime") or "",
+               reverse=True)
+    lists = [p for p in (cache_store.get("projects") or [])
+             if isinstance(p, dict) and p.get("id") and p.get("kind") != "SMART_LIST"
+             and not p.get("closed") and p["id"] not in skip]
+    lists.sort(key=lambda p: p.get("sortOrder") or 0)
+    tmap = {t["id"]: t for t in tasks}
+    q = query.strip()
+
+    def pay(to, lpid, tid):
+        return f"xact:okr_link:{_b64({'id': it.id, 'to': to, 'pid': lpid, 'tid': tid, 'back': home})}"
+
+    def task_row(t):
+        tpid = t.get("projectId") or t.get("_projectId") or ""
+        mods = _picker_mods()
+        return alfred.item(
+            uid=f"okrl-{t['id']}", title=pick_title(t),
+            subtitle=f"{pick_where(t, tmap)}  |  ⏎🔗  ⌘⚡  ⌃🔙",
+            arg=pay("task", tpid, t["id"]), valid=True,
+            variables={"task_id": t["id"], "task_list_id": tpid, "list_id": tpid,
+                       "section_id": "", "task_title": t.get("title", ""),
+                       "item_type": "note" if t.get("kind") == "NOTE" else "task"},
+            mods=mods)
+
+    def list_row(p):
+        return alfred.item(uid=f"okrl-list-{p['id']}", title=f"📂 {p.get('name', '')}",
+                           subtitle="List  |  ⏎🔗  ⌃🔙",
+                           arg=pay("list", p["id"], None), valid=True)
+
+    if q:
+        # the kind this item usually plans wins a near tie ("tickal" on an O
+        # should put the list above the list's own bridge notes)
+        lead = 0 if it.kind in ("Y", "O") else 1
+        scored = [(fuzz.score(q, search_key(t.get("title", "")) + " "
+                              + (t.get("_projectName") or "")), 1, t) for t in tasks]
+        scored += [(fuzz.score(q, p.get("name", "")), 0, p) for p in lists]
+        scored = sorted((x for x in scored if x[0] > 0),
+                        key=lambda x: -(x[0] + (25 if x[1] == lead else 0)))[:60]
+        rows = [task_row(x) if kind else list_row(x) for _s, kind, x in scored]
+        rows = rows or [alfred.item(uid="okrl-none", title=f'Nothing matching "{q}"',
+                                    subtitle="⌃🔙", valid=False)]
+        return add_back(_okr_seal(rows), home)
+    tg = it.target
+    now = {"task": "a task", "list": "a list", "url": "a web link"}.get(tg[0] if tg else "", "text only")
+    head = alfred.item(uid="okrl-head", title=f"🔗 {_OKR_GLYPH.get(it.kind, '▫️')} {it.name}",
+                       subtitle=f"Links {now} · type to find  |  ⌃🔙", valid=False)
+    trows = [task_row(t) for t in tasks[:40]]
+    lrows = [list_row(p) for p in lists]
+    body = lrows + trows if it.kind in ("Y", "O") else trows + lrows
+    return add_back(_okr_seal([head] + body), home)
+
+
+def render_okrtag(ids, query):
+    """ctx:okrtag:<id> - the tag an OKR item carries, from a CLOSED pool:
+    the 0️⃣Area children and the tags the OKR list already uses (HANDOFF_OKR
+    section 4). No ➕ create row: area tags are never minted from a picker
+    (HANDOFF trap 11). ⏎ fires xact:okr_tag, which REPLACES the item's pool
+    tag and keeps its others; on an O its open KRs follow."""
+    import okr
+    import tagtree
+    from collections import Counter
+    from periodic_rows import _b64
+    snap, it, by, problem = _okr_item_for(ids)
+    if problem:
+        return problem
+    home = _okr_home(it, by)
+    labels = {(t.get("name") or "").lower(): t.get("label") or t.get("name")
+              for t in cache_store.get("tags_tree") or [] if isinstance(t, dict)}
+    rank = _tag_rank()
+    area = sorted({(n or "").lower() for n in tagtree.children_of("0️⃣area") if n},
+                  key=lambda n: (rank.get(n, len(rank)), n))
+    used = Counter(str(tg).lower() for x in snap.items for tg in x.tags if tg)
+    # the SAME pool retag accepts (0️⃣Area + every Y / O tag): a KR-only or
+    # loose tag offered here would be refused by the verb (review 2026-09-18)
+    try:
+        import okr_write
+        accepted = {str(n).lower() for n in okr_write.tag_pool(snap.items)}
+    except Exception:
+        accepted = None
+    pool = area + [n for n, _c in used.most_common()
+                   if n not in area and (accepted is None or n in accepted)]
+    mine = {str(tg).lower() for tg in it.tags}
+    rows = []
+    for name in pool:
+        bits = ["Area" if name in area else "In use"]
+        if used.get(name):
+            bits.append(f"{used[name]} item{'s' if used[name] > 1 else ''}")
+        if it.kind == "O":
+            bits.append("KRs follow")
+        rows.append(alfred.item(
+            uid=f"okrt-{name}",
+            title=f"🏷️ {labels.get(name, name)}{'  ✓' if name in mine else ''}",
+            subtitle=" · ".join(bits) + "  |  ⏎🏷️  ⌃🔙",
+            arg=f"xact:okr_tag:{_b64({'id': it.id, 'tag': name, 'back': home})}",
+            valid=True, match=f"{labels.get(name, name)} {name}"))
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["match"]) \
+            or [alfred.item(uid="okrt-none", title=f'No tag matching "{query}"',
+                            subtitle="Area tags are made in TickTick  |  ⌃🔙", valid=False)]
+        return add_back(_okr_seal(rows), home)
+    from display import fmt_tags
+    head = alfred.item(uid="okrt-head",
+                       title=f"🏷 {_OKR_GLYPH.get(it.kind, '▫️')} {it.name}",
+                       subtitle=f"{fmt_tags(it.tags) or 'No tag'}  |  ⌃🔙", valid=False)
+    return add_back(_okr_seal([head] + (rows or [alfred.item(
+        uid="okrt-empty", title="No area tags cached", subtitle="Run a sync  |  ⌃🔙",
+        valid=False)])), home)
+
+
 def render_habits(level, ids, query):
     """ctx:habits - the 🔄 hub, sections as headers, due-first: ⏎ TICKS
     today (value habits step; note dialog rides recordEnable habits).
@@ -5276,6 +6111,17 @@ def main():
 
         elif level == "rconfirm":
             items = render_rconfirm(ids, query)
+
+        elif level == "okr":
+            items = render_okr(ids, query)
+
+        elif level == "okrpace":
+            items = render_okrpace(ids, query)
+
+        elif level in ("okrsched", "okraddkr", "okrlink", "okrtag"):
+            items = ({"okrsched": render_okrsched, "okraddkr": render_okraddkr,
+                      "okrlink": render_okrlink, "okrtag": render_okrtag}[level](ids, query)
+                     if ids else _missing(level, "<itemId>"))
 
         elif level == "tph":
             items = render_tph(ids[0] if ids else "", query)

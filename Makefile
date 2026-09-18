@@ -37,6 +37,8 @@ test:
 	@$(PYTHON) tests/test_quarterly_note.py
 	@$(PYTHON) tests/test_task_window.py
 	@$(PYTHON) tests/test_okr.py
+	@$(PYTHON) tests/test_okr_screens.py
+	@$(PYTHON) tests/test_okr_write.py
 	@$(PYTHON) tests/test_people.py
 	@$(PYTHON) tests/test_eagle.py
 	@$(PYTHON) tests/test_routine_link.py

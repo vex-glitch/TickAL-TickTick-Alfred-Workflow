@@ -237,6 +237,18 @@ def do_sync():
     nudged = _people_nudge(api, all_tasks)
     if nudged:
         summary += f" · 🫂 {nudged} reach-out" + ("s" if nudged > 1 else "")
+    # 🥅 OKR heal + auto-tick, "on the hourly sync" (HANDOFF_OKR section 4).
+    # AFTER _people_nudge on purpose: it re-sets all_tasks from its own local
+    # list, which would erase the heal's cache patches. heal_and_tick refuses
+    # unless the read is live and complete, and never raises; the headless
+    # banner below rides XAct → End, which clicks Sync - so no click here.
+    try:
+        import okr_write
+        _okr = okr_write.heal_and_tick(api=api)
+        if _okr.chip:
+            summary += f" · {_okr.chip}"
+    except Exception:
+        pass
     print(summary)
     return summary
 

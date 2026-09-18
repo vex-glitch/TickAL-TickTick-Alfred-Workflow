@@ -236,6 +236,25 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     DETACHED (a routine macro runs 10-20 s and
                                     this node is sequential); 🌓 Routines ⌃
 
+🥅 OKRs (HANDOFF_OKR phase 2; writes in src/okr_write.py, screens browse.py
+ctx:okr*; b64 JSON payloads, each may carry "back": a ctx reopened after the
+write through BrowseCtx - clean bar):
+    xact:okr_sched:<b64>            📅 {"id","action":extend|tomorrow|date,
+                                    "arg":N|"YYYY-MM-DD"|null} - ripple in
+                                    the Y lane + parent heals, only from a
+                                    writable live read (okr.Snapshot)
+    xact:okr_addkr:<b64>            🔑 {"oid","names":[...],"code":str|null}
+                                    KRs under an O, coded + tagged like it
+                                    (a new code lands as its 🏷️ line)
+    xact:okr_link:<b64>             🔗 {"id","to":task|list,"pid","tid"} the
+                                    copy's title links the real thing
+    xact:okr_tag:<b64>              🏷 {"id","tag"} swap the OKR-pool tag; an
+                                    O takes its open KRs along
+    xact:okr_heal                   detached heal + auto-tick (the hub spawns
+                                    it on open, debounced; hourly sync too)
+    xact:okr_setlist                ⚙️ Settings → OKR List dialog (blank = off,
+                                    no kanban flip: a timeline list)
+
 stdout → the End notification. task_title rides the env.
 """
 import json
@@ -11940,6 +11959,116 @@ def focus_done():
     print("✅ No task-linked session running")
 
 
+# ── 🥅 OKRs (HANDOFF_OKR phase 2) ────────────────────────────────────────────
+# The writes live in src/okr_write.py (the hourly sync heals too, and it
+# cannot import Scripts/); these are the thin wrappers. Every road that fires
+# them ends at ET End - the browse ⏎ (modOpen → End), ⌥⇧ and the ⌘ Actions
+# ^xact leg (XAct → End) - so the toast is a PRINT, once. A refusal is caught
+# here: left to escape, main()'s catch-all prints AND banners it.
+
+def _okr_run(rest, fn):
+    """Decode the b64 payload, run the writer, print its one toast, then
+    reopen the screen it came from: "back" is a ctx the BrowseCtx trampoline
+    turns into the browse_ctx VARIABLE, so the bar lands clean (iron rule 8).
+    The screen reopens after a refusal too - the plan is unchanged and the
+    next try starts from where he was."""
+    import okr_write as ow
+    spec = _pn_decode(rest) if rest else None
+    if not isinstance(spec, dict):
+        print("🥅 Bad payload · nothing written")
+        return
+    try:
+        msg = fn(spec)
+    except ow.Refusal as e:
+        msg = str(e)
+    except Exception as e:
+        msg = f"🥅 Not written · {type(e).__name__}: {e}"
+    back = spec.get("back")
+    if isinstance(back, str) and back.startswith("ctx:"):
+        try:
+            _run_trigger("BrowseCtx", back)
+        except Exception:
+            pass
+    if msg:
+        print(msg)
+
+
+def okr_sched(rest):
+    """📅 extend +N / 🌙 tomorrow / pick a date on one OKR item, with the
+    ripple through its Y lane and the parent heals (okr.schedule_plan) -
+    only from a writable live read."""
+    import okr_write as ow
+    _okr_run(rest, ow.schedule)
+
+
+def okr_addkr(rest):
+    """🔑 several KRs under an O from one piped line, coded + tagged."""
+    import okr_write as ow
+    _okr_run(rest, ow.add_krs)
+
+
+def okr_link(rest):
+    """🔗 the copy's title links the real task, note or list."""
+    import okr_write as ow
+    _okr_run(rest, ow.link)
+
+
+def okr_tag(rest):
+    """🏷 swap the OKR-pool tag (an O takes its open KRs along)."""
+    import okr_write as ow
+    _okr_run(rest, ow.retag)
+
+
+def okr_heal():
+    """The detached pass the hub spawns on open (okr_write.spawn_heal,
+    debounced): heal every stale Y/O span, tick every KR whose linked
+    original is done. Refuses silently unless the read is writable. Run
+    DETACHED, stdout is the log (/tmp/tickal_okr.log), so it banners only
+    when something changed (_crm_say rides XAct → End, whose own Sync click
+    is the nudge - no second click here). Run on an Alfred road instead,
+    the print is the toast, and an empty stdout shows none."""
+    import okr_write as ow
+    r = ow.heal_and_tick()
+    if os.environ.get("TICKAL_DETACHED"):
+        print(f"{datetime.now():%Y-%m-%d %H:%M:%S} okr_heal: {r.note}")
+        if r.chip:
+            _crm_say(r.chip)
+    elif r.chip:
+        print(r.chip)
+
+
+def okr_setlist():
+    """⚙️ Settings → 🥅 OKR List: paste the plan list's id (⌘ Copy id on
+    any list row mints it). people_setlist's shape with two differences:
+    the list is NOT flipped to kanban - it is a TIMELINE Vex drags by hand
+    (HANDOFF_OKR section 1) - and a blank answer saves "" = OKRs OFF (a
+    present-but-blank okr_list_id means off; the built-in default applies
+    only while the key is absent, config.get_okr_list_id). The outcome is
+    PRINTED, never _crm_say'd: its Settings road already ends at ET End,
+    and a banner rides XAct → End again - two Ends, two unclaimed Sync
+    clicks (the 2026-09-12 wedge)."""
+    import okr_write as ow
+    cur = cfg.get_okr_list_id()
+    a = _ask("🥅 OKR list id (⌘ Copy id on any list · blank = off · Esc cancels)",
+             default=cur)
+    if a is None:
+        print("🥅 Cancelled")
+        return
+    val = ow.parse_list_answer(a)
+    if val is None:
+        print("🥅 That does not look like a list id · nothing saved")
+        return
+    data = cfg.load()
+    data["okr_list_id"] = val
+    cfg.save(data)
+    shadow = ("okr_list_id" in os.environ and os.environ["okr_list_id"] != val)
+    tail = " · env okr_list_id still wins" if shadow else ""
+    if not val:
+        print(f"🥅 OKRs off · no plan list{tail}")
+    else:
+        print(f"🥅 OKR list set · {_list_name_of(val) or val}{tail}")
+
+
 def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else ""
     if not arg.startswith("xact:"):
@@ -12150,6 +12279,18 @@ def main():
             person_setup()
         elif verb == "people_setlist":
             people_setlist()
+        elif verb == "okr_sched":
+            okr_sched(rest)
+        elif verb == "okr_addkr":
+            okr_addkr(rest)
+        elif verb == "okr_link":
+            okr_link(rest)
+        elif verb == "okr_tag":
+            okr_tag(rest)
+        elif verb == "okr_heal":
+            okr_heal()
+        elif verb == "okr_setlist":
+            okr_setlist()
         elif verb == "add_pre":
             add_pre(rest)
         elif verb == "crmtrash":

@@ -189,6 +189,27 @@ def parse_date(date_str):
         return None
 
 
+def parse_date_status(date_str):
+    """(parse_date(date_str), parsedatetime status) - status 0 = no date,
+    1 = a date only, 2 = a time only, 3 = a date and a time.
+
+    For a screen that must refuse ANY typed time: the ISO string alone
+    cannot say, because a time that lands on UTC midnight ("2am" at UTC+2)
+    encodes exactly like an all-day date. parse_date itself is untouched."""
+    iso = parse_date(date_str)
+    if not iso:
+        return None, 0
+    try:
+        import parsedatetime
+        _t, status = parsedatetime.Calendar().parse(_normalise_date(date_str))
+    except Exception:
+        status = 0
+    if status not in (1, 2, 3):
+        # parse_date read it a moment ago; fall back to what the ISO shows
+        status = 1 if iso[11:19] == "00:00:00" else 3
+    return iso, status
+
+
 # ── Display helpers ───────────────────────────────────────────────────────────
 def utc_to_local_display(iso_str):
     """'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM' in local time.

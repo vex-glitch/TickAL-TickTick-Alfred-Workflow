@@ -10,6 +10,7 @@ Args passed to Alfred (routed by conditional ▷50F14423):
   add      → ET Add
   URL      → ET SaveURL
   crm      → ET CRM
+  ctx:okr  → Call-ET BrowseCtx (the 🥅 OKRs hub, phase_okr)
   docs     → ET OpenDocs (the docs_menu.py surface)
   update   → ET Update
   open:*   → open the URL (Statistics row)
@@ -155,6 +156,17 @@ def build_items():
             title="🌓 Routines",
             subtitle="Start a routine",
             arg="routines",
+        ),
+        # arg "ctx:okr" = its OWN leg on 50F14423 (matchstring "ctx:okr",
+        # equality) → the shared Call-ET BrowseCtx, whose Arg&Vars plants
+        # browse_ctx="ctx:okr" directly (phase_okr). Deliberately NOT a bare
+        # ALIASES word like the rows above: parse_ctx maps an alias typed as
+        # the FIRST word of any browse bar, so "okr ..." would jump away.
+        alfred.item(
+            uid="okr",
+            title="🥅 OKRs",
+            subtitle="Plan · pace · KRs",
+            arg="ctx:okr",
         ),
         # The "🎬 Content pipeline" row DIED here 2026-07-28 (Vex: "kill the
         # main menu"). It sat directly above the CRM row, and once CRM and

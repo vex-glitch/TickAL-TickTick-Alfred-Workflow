@@ -631,6 +631,27 @@ check("an item ending ON the period's first day is in it",
 check("an undated O whose KRs are dated is in the plan",
       "o2" in [i.id for i in okr.overlapping(HI, d(11, 1), d(11, 30), kinds=("O",))])
 
+# ── 12b. the pace of one period (📈 Pace rows) ──────────────────────────────
+PP = okr.items_from([
+    D("o", "🥅 O • P", d(10, 1), d(10, 12), kids=["k1", "k2", "k3", "k4", "kw"]),
+    D("k1", "🔑 KR • early done", d(10, 1), d(10, 3), parent="o", status=2),
+    D("k2", "🔑 KR • late open", d(10, 4), d(10, 6), parent="o"),
+    D("k3", "🔑 KR • running", d(10, 7), d(10, 9), parent="o"),
+    D("k4", "🔑 KR • next week", d(10, 12), d(10, 12), parent="o"),
+    D("kw", "🔑 KR • won't do", d(10, 5), d(10, 5), parent="o", status=-1)])
+pp = okr.period_pace(PP, d(10, 1), d(10, 9), today=d(10, 8))
+check("period pace: KRs overlapping the period, won't-do left out",
+      (pp.total, pp.done) == (3, 1), str(pp))
+check("period pace: expected = ended before today", pp.expected == 2, str(pp))
+check("period pace: behind = today minus the earliest late OPEN end",
+      pp.behind_days == 2, str(pp))
+check("period pace: an empty period is all zeros",
+      tuple(okr.period_pace(PP, d(11, 1), d(11, 30), today=d(10, 8))) == (0, 0, 0, 0))
+check("span_txt: one day, a range, another year, undated",
+      (okr.span_txt(d(10, 1), d(10, 1), d(1, 1)), okr.span_txt(d(10, 1), d(10, 3), d(1, 1)),
+       okr.span_txt(d(1, 2, 2027), d(1, 2, 2027), d(1, 1)), okr.span_txt(None, None))
+      == ("Oct 1", "Oct 1 - Oct 3", "Jan 2 2027", "undated"))
+
 # ── 13. ripple ───────────────────────────────────────────────────────────────
 RIP = [
     D("y1", "🏔️ Y • Lane one", d(10, 1), d(10, 15), kids=["oa", "ob"]),

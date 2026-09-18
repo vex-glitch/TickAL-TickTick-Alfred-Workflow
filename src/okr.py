@@ -712,6 +712,29 @@ def pace(item, items, today=None):
     return Pace(expected, actual, behind, elapsed)
 
 
+PeriodPace = namedtuple("PeriodPace", "total done expected behind_days")
+
+
+def period_pace(items, start, end, today=None):
+    """The 📈 Pace line of ONE period (🌓 quarter, 🗓️ month, ♻️ week, ☀️ day):
+    the KRs the plan puts in start..end (overlapping, KRs only - they are
+    the deliverables every tier is counted in).
+
+      total        KRs overlapping the period (won't-do left out)
+      done         of those, ticked
+      expected     of those, dated to END before today (should be done by now)
+      behind_days  today minus the end of the earliest OPEN one already past
+                   its end, 0 when none is
+
+    Pure, like pace(): the dates are the plan, the ticks are reality."""
+    today = today or date.today()
+    krs = [k for k in overlapping(items, start, end, ("KR",)) if not k.abandoned]
+    done = sum(1 for k in krs if k.done)
+    expected = sum(1 for k in krs if k.end < today)
+    late = [k.end for k in krs if not k.done and k.end < today]
+    return PeriodPace(len(krs), done, expected, (today - min(late)).days if late else 0)
+
+
 def overlapping(items, start, end, kinds=KINDS):
     """The plan for a period: dated items of `kinds` whose span touches
     start..end (inclusive both ends), in start order. kinds=None = every
@@ -834,7 +857,7 @@ def ripple_plan(items, moved_id, new_start, new_end):
     by = index(plan)
     m = by[moved_id]
     if m.history:
-        raise ValueError(f"{m.name!r} is closed - reopen it before moving it")
+        raise ValueError(f"{m.name} is closed · reopen it first")
     kids = _kids(plan)
     anchor = None               # the parent an extend was handed down from
     if m.kind in PARENT_KINDS and m.dated and new_start == m.start and new_end != m.end:
@@ -843,8 +866,7 @@ def ripple_plan(items, moved_id, new_start, new_end):
         if leaves:
             live = [x for x in leaves if not x.history]
             if not live:
-                raise ValueError(f"nothing open to extend under {m.name!r}: "
-                                 f"every dated deliverable is done")
+                raise ValueError(f"{m.name}: every KR is done · nothing to extend")
             t = max(live, key=lambda x: (x.end, x.start, x.id))
             if new_end < t.start:
                 raise ValueError(f"bad span {t.start}..{new_end} for {t.name!r}")
@@ -881,9 +903,10 @@ def ripple_plan(items, moved_id, new_start, new_end):
                       if x.dated and x.end > new_end]
             x = longer[0] if longer else None
             who = ("" if x is None else
-                   f" - {x.name!r} is done and ends {x.end}" if x.history else
-                   f" - {x.name!r} ends {x.end}, move that one")
-            raise ValueError(f"{anchor.name!r} cannot end on {new_end}{who}")
+                   f" · {x.name} is done, ends {span_txt(x.end, x.end)}" if x.history else
+                   f" · {x.name} ends {span_txt(x.end, x.end)} · move that one first")
+            raise ValueError(f"{anchor.name} cannot end on "
+                             f"{span_txt(new_end, new_end)}{who}")
     first = [(m.id,) + moves[m.id]]
     rest = sorted(((i,) + se for i, se in moves.items() if i != m.id),
                   key=lambda r: (r[1], r[0]))
@@ -909,13 +932,13 @@ def schedule_plan(items, item_id, action, arg=None, today=None):
     length = (it.end - it.start).days if it.dated else 0
     if action == "extend":
         if not it.dated:
-            raise ValueError(f"{it.name!r} has no dates to extend - pick a date first")
+            raise ValueError(f"{it.name} has no dates to extend · pick a date first")
         return ripple_plan(items, item_id, it.start,
                            it.end + timedelta(days=int(arg or 0)))
     if action in ("tomorrow", "date"):
         start = today + timedelta(days=1) if action == "tomorrow" else arg
         if not isinstance(start, date):
-            raise ValueError(f"no date to move {it.name!r} to")
+            raise ValueError(f"no date to move {it.name} to")
         return ripple_plan(items, item_id, start, start + timedelta(days=length))
     raise ValueError(f"unknown schedule action {action!r}")
 
@@ -1314,10 +1337,18 @@ def _d(d, today):
     return s if d.year == today.year else f"{s} {d.year}"
 
 
-def _span_txt(s, e, today):
+def span_txt(s, e, today=None):
+    """"Sep 19 - Oct 14", "Dec 25", "undated" - an all-day span the way the
+    timeline shows it (INCLUSIVE end; display.fmt_date only knows a start,
+    and a raw due is an exclusive next-day midnight). The year only when it
+    is not this one."""
+    today = today or date.today()
     if s is None:
         return "undated"
     return _d(s, today) if s == e else f"{_d(s, today)} - {_d(e, today)}"
+
+
+_span_txt = span_txt
 
 
 def _link_txt(it):
