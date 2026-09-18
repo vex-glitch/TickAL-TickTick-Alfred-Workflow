@@ -91,6 +91,26 @@ def get_people_list_id():
         return os.environ["people_list_id"]
     return load().get("people_list_id", "")
 
+OKR_LIST_DEFAULT = "6aac1b808f089e43641f5e90"      # 🏆Goals Planning (timeline view)
+
+
+def get_okr_list_id():
+    """🏆 OKR plan list (HANDOFF_OKR section 5). Same env-present-wins
+    semantics as people_list_id, with one difference: it has a DEFAULT.
+    The feature is not dormant by default the way People or Bridges are -
+    Vex made the list first and the workflow second (2026-09-18), and the
+    ⚙️ Settings row only arrives with the hub's canvas phase, so until then
+    neither Alfred nor config.json carries the key. The default applies ONLY
+    while the key is ABSENT from config.json: a present-but-blank value
+    means OFF, exactly like a present-but-blank env var, like every other
+    list id here."""
+    if "okr_list_id" in os.environ:
+        return os.environ["okr_list_id"]
+    cfg = load()
+    if "okr_list_id" in cfg:
+        return cfg["okr_list_id"] or ""
+    return OKR_LIST_DEFAULT
+
 def get_weekly_review_id():
     """♻️ Weekly-review source: the list/task id the weekly note
     mirrors. Same env-present-wins semantics as periodic_list_id."""
