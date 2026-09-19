@@ -515,15 +515,27 @@ def _today():
     return date.today()
 
 
+def _okr_pid():
+    """The OKR plan list's id, "" when OKRs are off or config cannot say."""
+    try:
+        return cfg.get_okr_list_id() or ""
+    except Exception:
+        return ""
+
+
 def _scheduled_today(day):
     """Open tasks scheduled on `day` from the all_tasks cache (hourly-synced;
-    fresh installs pre-sync just render an empty Today). Excludes NOTE-kind
-    and the periodic list itself."""
+    fresh installs pre-sync just render an empty Today). Excludes NOTE-kind,
+    the periodic list itself, and the OKR plan list: its all-day copies are
+    the FORECAST, which 🥅 OKRs already shows - the Workbench is the real
+    agenda, and a ticked 🥅 box there would complete a planning copy (Vex
+    2026-09-19: "Keep them out")."""
     iso = day.isoformat()
     out = []
+    skip = {areas.PERIODIC_LIST_ID, _okr_pid()} - {"", None}
     for t in (cache_store.get("all_tasks") or []):
         pid = t.get("projectId") or t.get("_projectId") or ""
-        if pid == areas.PERIODIC_LIST_ID or t.get("kind") == "NOTE":
+        if pid in skip or t.get("kind") == "NOTE":
             continue
         when = t.get("startDate") or t.get("dueDate") or ""
         if when and utc_str_to_local_date(when) == iso:
@@ -1266,6 +1278,11 @@ def _fill_daily(doc, p, index, is_today):
         sec = ps.find(doc, pm.SEC_TODAY)
         if sec is not None:
             body = [ln for ln in sec.body if not pm.PENDING_RE.match(ln.strip())]
+            okr_pid = _okr_pid()
+            if okr_pid:
+                # an OKR copy a refresh wrote before the plan list was kept
+                # out leaves too (unticked only - a ticked line is the record)
+                body = pm.drop_checkbox_lines(body, (), {okr_pid})
             merged, _added = pm.merge_checkboxes(body, _scheduled_today(day),
                                                  indent=pm.T2)
             ps.set_body(doc, pm.SEC_TODAY, pm.sort_checkboxes(merged))
@@ -1280,7 +1297,8 @@ def _fill_daily(doc, p, index, is_today):
         if tmw is not None:
             body = [ln for ln in tmw.body if not pm.PENDING_RE.match(ln.strip())]
             body = pm.drop_checkbox_lines(body, _stats_ignored_tasks(),
-                                          _stats_ignored_pids())
+                                          set(_stats_ignored_pids())
+                                          | ({_okr_pid()} - {""}))
             merged, _added = pm.merge_checkboxes(
                 body, _drop_ignored_rows(_scheduled_today(day + timedelta(days=1))),
                 indent=pm.T2)

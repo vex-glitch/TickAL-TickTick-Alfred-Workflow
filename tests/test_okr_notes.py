@@ -441,6 +441,34 @@ mir = ps.find(qdoc, pm.SEC_QTR_YEAR, pm.SEC_GOALS).body
 check("10.quarterly-mirror-no-plan-lines",
       not any(pm.is_plan_line(x) for x in mir) and len(mir) == 2, mir)
 
+# ── 10b. the Workbench is the agenda: OKR copies stay out (Vex 2026-09-19) ──
+_real_get = pe.cache_store.get
+_env = os.environ.get("okr_list_id")
+try:
+    os.environ["okr_list_id"] = "okrplan00000000000000000"
+    day_iso = TODAY.isoformat()
+    rows = [{"id": "real1", "projectId": "work0000000000000000000", "title": "Real work",
+             "startDate": f"{day_iso}T08:00:00+0000", "isAllDay": False, "status": 0},
+            {"id": "kr1", "projectId": "okrplan00000000000000000", "title": "🔑 KR • Plan - TA",
+             "startDate": f"{day_iso}T00:00:00+0000", "isAllDay": True, "status": 0}]
+    pe.cache_store.get = lambda k: rows if k == "all_tasks" else _real_get(k)
+    got = [r[1] for r in pe._scheduled_today(TODAY)]
+    check("10b.workbench-skips-okr-copies", got == ["real1"], got)
+    os.environ["okr_list_id"] = ""
+    got = [r[1] for r in pe._scheduled_today(TODAY)]
+    check("10b.okrs-off-the-list-is-just-a-list", sorted(got) == ["kr1", "real1"], got)
+    body = ["\t- [ ] [🔑 KR • Plan - TA](https://ticktick.com/webapp/#p/okrplan00000000000000000/tasks/aaaaaaaaaaaaaaaaaaaaaaa1) ",
+            "\t- [x] [🔑 KR • Done - TA](https://ticktick.com/webapp/#p/okrplan00000000000000000/tasks/aaaaaaaaaaaaaaaaaaaaaaa2) ",
+            "\t- [ ] [Real work](https://ticktick.com/webapp/#p/work0000000000000000000/tasks/bbbbbbbbbbbbbbbbbbbbbbb1) "]
+    kept = pm.drop_checkbox_lines(body, (), {"okrplan00000000000000000"})
+    check("10b.old-copy-lines-leave-ticked-ones-stay", kept == body[1:], kept)
+finally:
+    pe.cache_store.get = _real_get
+    if _env is None:
+        os.environ.pop("okr_list_id", None)
+    else:
+        os.environ["okr_list_id"] = _env
+
 # ── 11. refresh_period: LIVE window only, for every tier ─────────────────────
 pe._log = lambda msg: None      # never the real /tmp/tickal_periodic.log
 STORE = {}
