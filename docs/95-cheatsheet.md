@@ -42,6 +42,7 @@ All 35 are defaults - remap any of them in Configure Workflow. Hotkey nodes ship
 | `tdg` | Set today's one thing | [Periodic notes](48-periodic.md) |
 | `tde` | Log an entry to today | [Periodic notes](48-periodic.md) |
 | `tat` | Schedule a task today | [Periodic notes](48-periodic.md) |
+| `tok` | OKRs hub - plan, pace, key results | [OKRs](50-okrs.md) |
 | `tha` | Habits view | [Views](45-views.md) |
 | `tpo` | Pomodoro / Focus view | [Views](45-views.md) |
 | `tmx` | Eisenhower Matrix view | [Views](45-views.md) |

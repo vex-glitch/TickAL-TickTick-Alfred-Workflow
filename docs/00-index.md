@@ -30,6 +30,7 @@ TickAL is a keyboard-driven TickTick front end for Alfred 5. It covers search, b
 | | [CRM](47-crm.md) | Booking hub with 🔥 group tags and auto Prepare follow-ups - set up + read first |
 | | [Periodic notes](48-periodic.md) | Daily → yearly notes: auto-mint, journals, money roll-ups, reviews - set up + read first |
 | | [Projects](49-projects.md) | 💼 project lists with one scheduled call-to-action task each - set up + read first |
+| | [OKRs](50-okrs.md) | A guiding-star plan: year objectives, objectives and key results on a timeline, with pace and moves that ripple - set up + read first |
 | **Reference** | [Setup](30-setup.md) | TickTick app credentials, OAuth login, first sync, optional extras |
 | | [Settings & sync](90-settings-sync.md) | Configure Workflow options, cache, optional hourly background sync |
 | | [Cheatsheet](95-cheatsheet.md) | Every keyword and keystroke on one page |
