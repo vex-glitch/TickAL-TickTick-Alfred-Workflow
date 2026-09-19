@@ -349,5 +349,7 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
   - the goal pickers' pool never offers the OKR list (a daily goal MOVES its
     task); a 🔮 row never targets the plan list, the periodic list, or an
     original already completed.
-  - OPEN QUESTION for Vex: dated OKR copies also appear in the daily note's
-    ⚔️ Workbench ✅ Tasks (and ⏩ Tomorrow) as agenda items with checkboxes.
+  - RULED (Vex, "Keep them out"): dated OKR copies never enter the daily
+    note's ⚔️ Workbench ✅ Tasks or ⏩ Tomorrow (`_scheduled_today` skips the
+    plan list; unticked copy lines already written are dropped; ticked ones
+    stay as the record) - `4378fe3`, read back on the server.
