@@ -1745,6 +1745,18 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>B31D6E02-8A5D-4B2F-A3D0-2026072100BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>OK00000A-0000-4000-9000-2026091800AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>51D50972-BAE6-4C3B-BFBF-40384532F712</key>
 		<array>
@@ -3567,6 +3579,18 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>OK000004-0000-4000-9000-2026091800AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>OK00000B-0000-4000-9000-2026091800AA</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>CD050B59-74DF-4DA4-B12B-8421590F3BCA</key>
 		<array>
@@ -4477,6 +4501,58 @@
 		</array>
 		<key>MO000001-0000-4000-9000-2026091200AA</key>
 		<array/>
+		<key>OK000001-0000-4000-9000-2026091800AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>OK000003-0000-4000-9000-2026091800AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>OK000002-0000-4000-9000-2026091800AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>OK000003-0000-4000-9000-2026091800AA</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>OK000003-0000-4000-9000-2026091800AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>60A44279-AF07-4968-8447-417747AD75F0</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>OK000004-0000-4000-9000-2026091800AA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>38EECB9D-1B7A-4C1F-983F-29F514A85C88</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>RT000001-0000-4000-9000-2026091200AA</key>
 		<array>
 			<dict>
@@ -6019,6 +6095,20 @@ esac</string>
 						<string>Routines</string>
 						<key>uid</key>
 						<string>RT00000A-0000-4000-9000-2026091200AA</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>ctx:okr</string>
+						<key>outputlabel</key>
+						<string>OKRs</string>
+						<key>uid</key>
+						<string>OK00000A-0000-4000-9000-2026091800AA</string>
 					</dict>
 				</array>
 				<key>elselabel</key>
@@ -8617,6 +8707,20 @@ esac</string>
 						<key>uid</key>
 						<string>WT000001-0000-4000-8000-000000000001</string>
 					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>13-</string>
+						<key>outputlabel</key>
+						<string>OKR List</string>
+						<key>uid</key>
+						<string>OK00000B-0000-4000-9000-2026091800AA</string>
+					</dict>
 				</array>
 				<key>elselabel</key>
 				<string>N/A</string>
@@ -8983,7 +9087,7 @@ esac</string>
 				<key>fixedorder</key>
 				<true/>
 				<key>items</key>
-				<string>[{"title": "Sync", "arg": "1-", "subtitle": "Refresh cache  \u2303 \ud83d\udd19"}, {"title": "Hourly Sync", "arg": "2-", "subtitle": "Hourly cache auto-refresh \u00b7 install / remove  \u2303 \ud83d\udd19"}, {"title": "Install PyObjC", "arg": "3-", "subtitle": "Focus bar + image attach dependency  \u2303 \ud83d\udd19"}, {"title": "Periodic Agent", "arg": "4-", "subtitle": "04:30 note pre-mint \u00b7 install / remove  \u2303 \ud83d\udd19"}, {"title": "Login", "arg": "5-", "subtitle": "Get token  \u2303 \ud83d\udd19"}, {"title": "Refresh TickTick", "arg": "6-", "subtitle": "Refresh app  \u2303 \ud83d\udd19"}, {"title": "Help \u2022 TickAL Docs", "arg": "7-", "subtitle": "GitHub \u00b7 TickAL  \u2303 \ud83d\udd19"}, {"title": "Attachment Token", "arg": "8-", "subtitle": "Save v2 token from clipboard  \u2303 \ud83d\udd19"}, {"title": "Attachment Login", "arg": "9-", "subtitle": "One-time sign-in for attachments &amp; auto-config  \u2303 \ud83d\udd19"}, {"title": "Bridges List", "arg": "10-", "subtitle": "\ud83c\udf09 Daily-bridge home \u00b7 paste list id  \u2303 \ud83d\udd19"}, {"title": "People List", "arg": "11-", "subtitle": "\ud83d\udc7d People home \u00b7 paste list id  \u2303 \ud83d\udd19"}, {"title": "Weather Town", "arg": "12-", "subtitle": "\ud83d\udcab Daily note weather \u00b7 type your town  \u2303 \ud83d\udd19"}]</string>
+				<string>[{"title": "Sync", "arg": "1-", "subtitle": "Refresh cache  \u2303 \ud83d\udd19"}, {"title": "Hourly Sync", "arg": "2-", "subtitle": "Hourly cache auto-refresh \u00b7 install / remove  \u2303 \ud83d\udd19"}, {"title": "Install PyObjC", "arg": "3-", "subtitle": "Focus bar + image attach dependency  \u2303 \ud83d\udd19"}, {"title": "Periodic Agent", "arg": "4-", "subtitle": "04:30 note pre-mint \u00b7 install / remove  \u2303 \ud83d\udd19"}, {"title": "Login", "arg": "5-", "subtitle": "Get token  \u2303 \ud83d\udd19"}, {"title": "Refresh TickTick", "arg": "6-", "subtitle": "Refresh app  \u2303 \ud83d\udd19"}, {"title": "Help \u2022 TickAL Docs", "arg": "7-", "subtitle": "GitHub \u00b7 TickAL  \u2303 \ud83d\udd19"}, {"title": "Attachment Token", "arg": "8-", "subtitle": "Save v2 token from clipboard  \u2303 \ud83d\udd19"}, {"title": "Attachment Login", "arg": "9-", "subtitle": "One-time sign-in for attachments &amp; auto-config  \u2303 \ud83d\udd19"}, {"title": "Bridges List", "arg": "10-", "subtitle": "\ud83c\udf09 Daily-bridge home \u00b7 paste list id  \u2303 \ud83d\udd19"}, {"title": "People List", "arg": "11-", "subtitle": "\ud83d\udc7d People home \u00b7 paste list id  \u2303 \ud83d\udd19"}, {"title": "Weather Town", "arg": "12-", "subtitle": "\ud83d\udcab Daily note weather \u00b7 type your town  \u2303 \ud83d\udd19"}, {"title": "OKR List", "arg": "13-", "subtitle": "\ud83e\udd45 OKR plan list \u00b7 paste list id  \u2303 \ud83d\udd19"}]</string>
 				<key>matchmode</key>
 				<integer>0</integer>
 				<key>runningsubtext</key>
@@ -14498,6 +14602,100 @@ fi</string>
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>{var:okr_kw}</string>
+				<key>skipuniversalaction</key>
+				<true/>
+				<key>subtext</key>
+				<string>Plan · pace · KRs</string>
+				<key>text</key>
+				<string>OKRs · TickAL</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>OK000001-0000-4000-9000-2026091800AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>2</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>OK000002-0000-4000-9000-2026091800AA</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argument</key>
+				<string>ctx:okr</string>
+				<key>passthroughargument</key>
+				<false/>
+				<key>variables</key>
+				<dict/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.argument</string>
+			<key>uid</key>
+			<string>OK000003-0000-4000-9000-2026091800AA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>bash "Scripts/py.sh" "Scripts/xact.py" "xact:okr_setlist"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>OK000004-0000-4000-9000-2026091800AA</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>**TickAL - TickTick, without opening TickTick.** 
@@ -18410,6 +18608,46 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<key>ypos</key>
 			<real>155.0</real>
 		</dict>
+		<key>OK000001-0000-4000-9000-2026091800AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>7</integer>
+			<key>note</key>
+			<string>OKRS</string>
+			<key>xpos</key>
+			<real>30.0</real>
+			<key>ypos</key>
+			<real>5595.0</real>
+		</dict>
+		<key>OK000002-0000-4000-9000-2026091800AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>4</integer>
+			<key>note</key>
+			<string>OKRS</string>
+			<key>xpos</key>
+			<real>220.0</real>
+			<key>ypos</key>
+			<real>5595.0</real>
+		</dict>
+		<key>OK000003-0000-4000-9000-2026091800AA</key>
+		<dict>
+			<key>note</key>
+			<string>→ ctx:okr</string>
+			<key>xpos</key>
+			<real>400.0</real>
+			<key>ypos</key>
+			<real>5625.0</real>
+		</dict>
+		<key>OK000004-0000-4000-9000-2026091800AA</key>
+		<dict>
+			<key>colorindex</key>
+			<integer>1</integer>
+			<key>xpos</key>
+			<real>1050.0</real>
+			<key>ypos</key>
+			<real>2260.0</real>
+		</dict>
 		<key>RT000001-0000-4000-9000-2026091200AA</key>
 		<dict>
 			<key>colorindex</key>
@@ -19657,6 +19895,27 @@ web pages, open sticky notes, organise projects, run a CRM, and more...
 			<string>textfield</string>
 			<key>variable</key>
 			<string>routines_kw</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>tok</string>
+				<key>placeholder</key>
+				<string>tok</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>🥅 OKRs - the goals plan, pace and key results</string>
+			<key>label</key>
+			<string>[keyword] OKRs</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>okr_kw</string>
 		</dict>
 	</array>
 	<key>version</key>
