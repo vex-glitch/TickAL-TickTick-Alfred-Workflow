@@ -2544,6 +2544,30 @@ def _okr_goal_lines(doc, kind):
     return [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])]
 
 
+# Which tiers' goals a note already shows in its own 🏆 Goals (or, yearly,
+# its 🎯 Goals scorecard) - their 🎯 lines in 🥅 OKRs would repeat them
+# ("Remove 🎯 items if we have them in a header below", Vex 2026-09-19).
+# Checked against the note in hand, by EXACT name: a bullet Vex deleted
+# (the kill switch of a mirror) brings the 🎯 line back.
+_GOALS_BELOW = {
+    "daily": {"weekly": (pm.SEC_WEEK_GOALS,), "daily": (pm.SEC_DAY_GOAL,)},
+    "weekly": {"quarterly": (pm.SEC_WK_QTR,), "monthly": (pm.SEC_WK_MONTH,),
+               "weekly": (pm.SEC_WK_WEEK,)},
+    "monthly": {"quarterly": (pm.SEC_MTH_QTR,),
+                "monthly": (pm.SEC_MTH_MONTH, pm.SEC_MONTH_GOAL)},
+    "quarterly": {"yearly": (pm.SEC_QTR_YEAR,), "quarterly": (pm.SEC_QTR_QTR,)},
+    "yearly": {"yearly": (pm.SEC_SCORECARD,)},
+}
+
+
+def _goals_below(doc, note_kind, tier):
+    for name in _GOALS_BELOW.get(note_kind, {}).get(tier, ()):
+        hit = ps.find(doc, name)
+        if hit is not None and hit.name == name:
+            return True
+    return False
+
+
 def _fill_okr(doc, p, index):
     """🥅 OKRs on every tier, plus the yearly 🎯 Goals scorecard.
 
@@ -2578,6 +2602,9 @@ def _fill_okr(doc, p, index):
             card.body, okr_notes.scorecard_lines(p, items, today, lid)))
     goals = {}
     for t in okr_notes.tiers_down_to(p.kind):
+        if _goals_below(doc, p.kind, t):
+            goals[t] = None               # 🏆 Goals below already shows them
+            continue
         if t == p.kind:
             tdoc = doc
         else:

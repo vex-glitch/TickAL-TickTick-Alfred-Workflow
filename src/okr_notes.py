@@ -6,20 +6,27 @@ that there will still exist our hand picked goals. I think those should
 appear in the same line as the forecasted goal for that period, kind of like
 our comparison for other data."
 
-He then picked, from mocks: a NEW section at the top of every tier, one line
-per tier from the year down to the note's own, the plan first and the goal
-he picked for that tier on the SAME line. The daily note of 2026-09-19:
+He then picked, from mocks: a NEW section at the top of every tier, the year
+down to the note's own, the plan first and the goal he picked after it. The
+same day he found the one-line version "too crammed" and reshaped a line by
+hand in the daily note; every period now takes that shape - its own bullet,
+the plan and the 🎯 goals indented under it, one per line:
 
     #### 🥅 OKRs
-    - 🎉 2026 · 6 🥅 · 0/41 KRs · 🔴 1d · 🎯 Productivity System
-    - 🌓 Q3 · 🥅 Onboard TickTicks 0/5 · 🥅 TickAL 0/6 · 🎯 none
-    - 🗓️ Sep · 🥅 Onboard TickTicks · 🥅 TickAL · 0/7 KRs · 🔴 1d · 🎯 TickAL • WF
-    - ♻️ W38 · 🔑 Finish periodic notes 🔴 1d · 🔑 Goals wf · 🎯 Onboard TickTick
-    - ☀️ Sat 19 · 🔑 Goals wf · 🎯 Onboard TickTick
+    - 🎉 2026 \u2022 0/41 KRs \u2022 🔴 1d
+    \t- 🥅 Onboard TickTicks 0/5 🔴 1d
+    \t- 🥅 TickAL 0/6
+    \t- 🎯 Productivity System
+    - ♻️ W38 \u2022 0/2 KRs \u2022 🔴 1d
+    \t- 🔑 Finish periodic notes 🔴 1d
+    \t- 🔑 Goals wf
 
 (every plan name and every linked goal is a markdown link in the note; the
-mock above shows the labels). The day line says "Sat 19", never "Today": a
-note stops refreshing once its day is over and keeps whatever text it had.
+mock above shows the labels). A tier whose goals already show in 🏆 Goals
+below gets no 🎯 line ("Remove 🎯 items if we have them in a header below").
+The separator is U+2022, never the middle dot. The day line says "Sat 19",
+never "Today": a note stops refreshing once its day is over and keeps
+whatever text it had.
 
 Three things read the plan here, and all three ask plan_for():
   * okr_section_lines - the 🥅 OKRs section of every tier,
@@ -55,9 +62,14 @@ PLAN_KINDS = {"yearly": ("Y", "O"), "quarterly": ("O",),
 
 GLYPH = {"Y": "🏔️", "O": "🥅", "KR": "🔑"}
 
-# How many names a line carries before the rest fold into "+N". A note line
-# is read at a glance; the hub (ctx:okr) is where the whole list lives.
-CAP = {"yearly": 3, "quarterly": 4, "monthly": 4, "weekly": 5, "daily": 5}
+# How many plan items a period lists under its bullet before the rest fold
+# into "+N more". A note is read at a glance; the hub (ctx:okr) holds it all.
+CAP = {"yearly": 8, "quarterly": 8, "monthly": 8, "weekly": 8, "daily": 8}
+
+# The separator on a period's own bullet. U+2022, never the middle dot:
+# "you are using some weird version of • Which I cannot use arrow keys to
+# move characters" (Vex 2026-09-19, about U+00B7 in these lines).
+SEP = " \u2022 "
 
 BAR_CELLS = 5
 
@@ -95,7 +107,7 @@ def goal_choices(kind, start, end, items, today=None):
 
 # ── pieces ───────────────────────────────────────────────────────────────────
 def tier_label(kind, p):
-    """🎉 2026 · 🌓 Q3 · 🗓️ Sep · ♻️ W38 · ☀️ Sat 19 - a name for the period
+    """🎉 2026, 🌓 Q3, 🗓️ Sep, ♻️ W38, ☀️ Sat 19 - a name for the period
     that stays true after it is over (never "Today", never "This week")."""
     s = p.start
     e = pm.TIER_EMOJI[kind]
@@ -124,72 +136,57 @@ def _late_days(it, today):
     return (today - it.end).days
 
 
-def _kr_piece(it, today, list_id):
+def _kr_line(it, today, list_id):
     if it.done:
         return f"✅ {item_link(it, list_id)}"
     late = _late_days(it, today)
     return f"🔑 {item_link(it, list_id)}" + (f" 🔴 {late}d" if late else "")
 
 
-def _capped(pieces, cap):
-    if len(pieces) <= cap:
-        return list(pieces)
-    return list(pieces[:cap]) + [f"+{len(pieces) - cap}"]
+def _parent_line(it, items, today, list_id):
+    """🏔️ / 🥅 <name> d/n, plus 🔴 Nd when the item's own pace is behind."""
+    d, n = okr.progress(it, items)
+    if it.done:
+        return f"✅ {item_link(it, list_id)} {d}/{n}"
+    behind = okr.pace(it, items, today).behind_days if today else 0
+    return (f"{GLYPH[it.kind]} {item_link(it, list_id)} {d}/{n}"
+            + (f" 🔴 {behind}d" if behind > 0 else ""))
 
 
-def _behind(items, start, end, today):
+def _capped(lines, cap):
+    if len(lines) <= cap:
+        return list(lines)
+    return list(lines[:cap]) + [f"+{len(lines) - cap} more"]
+
+
+def _summary(items, start, end, today):
+    """The chips on a period's own bullet: its KRs done over planned, and how
+    far behind the earliest late one is."""
     pp = okr.period_pace(items, start, end, today)
-    return pp, ([f"🔴 {pp.behind_days}d"] if pp.behind_days > 0 else [])
+    chips = [f"{pp.done}/{pp.total} KRs"] if pp.total else []
+    if pp.behind_days > 0:
+        chips.append(f"🔴 {pp.behind_days}d")
+    return chips
 
 
-def _year_pieces(items, start, end, today, list_id):
-    pp, chip = _behind(items, start, end, today)
-    ys = [it for it in plan_for("yearly", start, end, items) if it.kind == "Y"]
-    if ys:
-        pieces = _capped(
-            [f"{GLYPH['Y']} {item_link(y, list_id)} "
-             f"{'/'.join(map(str, okr.progress(y, items)))}" for y in ys],
-            CAP["yearly"])
+def _plan_lines(kind, items, start, end, today, list_id):
+    """What sits under a period's bullet, one item per line (Vex 2026-09-19,
+    after the one-line version: "It is too crammed. Make them like I did W38
+    ... indented bullet points below that periods bullet point"):
+
+      🎉 year     the 🏔️ Y's with their progress; with no Y, the 🥅 O's
+      🌓 quarter  the 🥅 O's overlapping it, with their progress
+      🗓️ month    the 🥅 O's overlapping it, with their progress
+      ♻️ week     the 🔑 KRs overlapping it (✅ done, 🔴 Nd late)
+      ☀️ day      the 🔑 KRs overlapping it"""
+    plan = plan_for(kind, start, end, items)
+    if kind in ("weekly", "daily"):
+        lines = [_kr_line(k, today, list_id) for k in plan]
     else:
-        # no Y yet (the live list on 2026-09-19): the year is its objectives
-        # and its deliverables, counted
-        os_ = [it for it in plan_for("yearly", start, end, items) if it.kind == "O"]
-        pieces = []
-        if os_:
-            pieces.append(f"{len(os_)} {GLYPH['O']}")
-        if pp.total:
-            pieces.append(f"{pp.done}/{pp.total} KRs")
-    return (pieces + chip) if pieces else ["no plan"]
-
-
-def _quarter_pieces(items, start, end, today, list_id):
-    os_ = plan_for("quarterly", start, end, items)
-    pieces = [f"{GLYPH['O']} {item_link(o, list_id)} "
-              f"{'/'.join(map(str, okr.progress(o, items)))}" for o in os_]
-    return _capped(pieces, CAP["quarterly"]) or ["no plan"]
-
-
-def _month_pieces(items, start, end, today, list_id):
-    pp, chip = _behind(items, start, end, today)
-    os_ = [it for it in plan_for("monthly", start, end, items) if it.kind == "O"]
-    pieces = _capped([f"{GLYPH['O']} {item_link(o, list_id)}" for o in os_],
-                     CAP["monthly"])
-    if pp.total:
-        pieces.append(f"{pp.done}/{pp.total} KRs")
-    return (pieces + chip) if pieces else ["no plan"]
-
-
-def _kr_pieces(kind):
-    def build(items, start, end, today, list_id):
-        krs = plan_for(kind, start, end, items)
-        return _capped([_kr_piece(k, today, list_id) for k in krs],
-                       CAP[kind]) or ["no plan"]
-    return build
-
-
-_PIECES = {"yearly": _year_pieces, "quarterly": _quarter_pieces,
-           "monthly": _month_pieces, "weekly": _kr_pieces("weekly"),
-           "daily": _kr_pieces("daily")}
+        ys = [it for it in plan if it.kind == "Y"]
+        tops = ys or [it for it in plan if it.kind == "O"]
+        lines = [_parent_line(it, items, today, list_id) for it in tops]
+    return _capped(lines, CAP[kind])
 
 
 # ── the goal Vex picked, on the same line ────────────────────────────────────
@@ -221,11 +218,16 @@ def goal_label(line):
     return name
 
 
-def goals_part(lines):
-    """"🎯 A · B" for a tier's goal lines, "🎯 none" when it has none - the
-    comparison is the point, so an empty side still says so."""
-    labels = list(dict.fromkeys(x for x in map(goal_label, lines or []) if x))
-    return "🎯 " + (" · ".join(labels) if labels else "none")
+def goal_lines(lines):
+    """The 🎯 lines under a period: one per goal Vex picked for it, "🎯 none"
+    when he picked none - the comparison is the point, so an empty side
+    still says so. None (not a list) = that tier's goals already show in
+    🏆 Goals below, so no 🎯 line at all ("Remove 🎯 items if we have them
+    in a header below", Vex 2026-09-19)."""
+    if lines is None:
+        return []
+    labels = list(dict.fromkeys(x for x in map(goal_label, lines) if x))
+    return [f"🎯 {x}" for x in labels] or ["🎯 none"]
 
 
 # ── the section ──────────────────────────────────────────────────────────────
@@ -236,20 +238,34 @@ def tiers_down_to(kind):
 
 
 def okr_section_lines(kind, p, items, goals_by_tier, today, list_id):
-    """The 🥅 OKRs body of a `kind` note for period p: one "- " line per tier
-    from the year down to the note's own, "<label> · <the plan> · 🎯 <the
-    goal>". The tiers above the note are the periods holding its FIRST day
-    (a week's month is its Monday's - the breadcrumb's own convention).
+    """The 🥅 OKRs body of a `kind` note for period p, the year first down to
+    the note's own tier, each period a bullet of its own with its plan and
+    its 🎯 goals indented under it:
 
-    goals_by_tier = {tier kind: [goal lines from THAT tier's own note]};
+        - ♻️ W38 \u2022 0/2 KRs \u2022 🔴 1d
+        \t- 🔑 Finish periodic notes 🔴 1d
+        \t- 🔑 Goals wf
+        \t- 🎯 Onboard TickTick
+
+    (Vex's own edit of the W38 line in the 2026-09-19 daily note.) The tiers
+    above the note are the periods holding its FIRST day (a week's month is
+    its Monday's - the breadcrumb's own convention).
+
+    goals_by_tier = {tier kind: [goal lines from THAT tier's own note] or
+    None}; None = that tier's goals show in 🏆 Goals below, so no 🎯 line;
     a tier missing from it reads "🎯 none"."""
     goals_by_tier = goals_by_tier or {}
     out = []
     for t in tiers_down_to(kind):
         tp = p if t == kind else pm.period_for(t, p.start)
-        pieces = _PIECES[t](items, tp.start, tp.end, today, list_id)
-        out.append("- " + " · ".join([tier_label(t, tp)] + pieces
-                                      + [goals_part(goals_by_tier.get(t))]))
+        chips = _summary(items, tp.start, tp.end, today)
+        plan = _plan_lines(t, items, tp.start, tp.end, today, list_id)
+        # "no plan" only when there is truly nothing: a month holding KRs
+        # but no objective still counts them on its bullet
+        head = [tier_label(t, tp)] + (chips if (plan or chips) else ["no plan"])
+        out.append("- " + SEP.join(head))
+        kids = plan + goal_lines(goals_by_tier.get(t, []))
+        out += [f"\t- {x}" for x in kids]
     return out
 
 
@@ -267,21 +283,21 @@ def bar(done, total, cells=BAR_CELLS):
 
 
 def _top_line(it, items, want, today, ref, list_id):
-    """"- 🏔️ <name> ▰▰▱▱▱ d/n · <span> · 🔴 Nd" - a scorecard's top line."""
+    """"- 🏔️ <name> ▰▰▱▱▱ d/n \u2022 <span> \u2022 🔴 Nd" - a scorecard's top line."""
     d, n = okr.progress(it, items)
     bits = [f"{GLYPH[it.kind]} {item_link(it, list_id)} {bar(d, n)} {d}/{n}",
             okr.span_txt(*okr._effective(it, want), ref)]
     behind = okr.pace(it, items, today).behind_days if today else 0
     if behind > 0:
         bits.append(f"🔴 {behind}d")
-    return "- " + " · ".join(bits)
+    return "- " + SEP.join(bits)
 
 
 def scorecard_lines(p, items, today, list_id):
     """The plan half of the yearly note's 🎯 Goals scorecard:
 
-        - 🏔️ Productivity System ▰▰▱▱▱ 4/10 · Jan 5 - Dec 20 · 🔴 3d
-        \t- 🥅 TickAL 2/6 · Sep 19 - Oct 14
+        - 🏔️ Productivity System ▰▰▱▱▱ 4/10 \u2022 Jan 5 - Dec 20 \u2022 🔴 3d
+        \t- 🥅 TickAL 2/6 \u2022 Sep 19 - Oct 14
 
     one line per 🏔️ Y overlapping the year, its O's tab-indented under it.
     With no Y (the live list on 2026-09-19) the O's overlapping the year
@@ -306,7 +322,7 @@ def scorecard_lines(p, items, today, list_id):
             if o.kind != "O" or o.abandoned:
                 continue
             d, n = okr.progress(o, items)
-            out.append(f"\t- {GLYPH['O']} {item_link(o, list_id)} {d}/{n} · "
+            out.append(f"\t- {GLYPH['O']} {item_link(o, list_id)} {d}/{n}{SEP}"
                        + okr.span_txt(*okr._effective(o, want), ref))
     return out
 
