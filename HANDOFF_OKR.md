@@ -456,3 +456,21 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
       pushes the lane's later open items ~8 months - the ripple rule as
       written; the preview says "moves N along"); capacity counts only
       KRs due AHEAD (overdue open ones show as "behind" on the pace rows).
+- 2026-09-19, after phase 5 (Vex: "Fix the links ... Link the three
+  objectives ... Yes, year objective per area", picked "Productivity System
+  now"):
+  - LINKED: 🥅 TickAL -> 📌 "💼 P • TickAL • WF", 🥅 Onboard TickTicks -> "💼 P •
+    Onboard TickTick", 🥅 KeyCue/MIAs/Shared actions -> "💼 P • Shortcuts"
+    (okr_write.link, CTA task links). W38's 🥅 Aligned read 72% • 46/64 at
+    once, last week 73% • 137/188.
+  - 🏔️ Y • Productivity System (4️⃣VexOS) holds ALL SIX O's (v2 taskParent,
+    one adopt op per O, subtrees along): the Sep 18 - Dec 25 chain is ONE
+    ripple lane now, and it has its own countdown (Dec 25). The other areas
+    get their Y when Vex names one.
+  - FOCUS PAGED EVERYWHERE: focus_minutes / focus_by_span / focus_by_day
+    read periodic_fetch.focus_records (page 1 alone was ~8 days: W37 read
+    17h 36m, really 23h 56m). TL_MAX_PAGES 40 is a guard; paging stops at
+    the window's start.
+  - Checklist links fixed: Shutdown "[D Note]" had an empty slot ->
+    notesticky:daily; Monthly and Quarterly "[Journal]" under TickTick
+    opened the WEEKLY journal -> journal:monthly / journal:quarterly.

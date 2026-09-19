@@ -233,10 +233,11 @@ def pts_chip(cur, prev):
     if cur is None or prev is None:
         return None
     d = cur - prev
+    unit = "pt" if abs(d) == 1 else "pts"
     if d > 0:
-        return f"🟢 ▲ {d} pts"
+        return f"🟢 ▲ {d} {unit}"
     if d < 0:
-        return f"🔴 ▼ {-d} pts"
+        return f"🔴 ▼ {-d} {unit}"
     return "⚪ ▬"
 
 

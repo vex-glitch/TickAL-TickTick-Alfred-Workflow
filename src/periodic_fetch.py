@@ -204,7 +204,7 @@ def _rec_local_date(ts):
 
 _TL_MORE = [None, False]     # [every record paged in so far, reached the end]
 TL_PAGE = 31                 # records per timeline page (probed 2026-09-19)
-TL_MAX_PAGES = 12
+TL_MAX_PAGES = 40            # a guard only: paging stops once a page reaches d0
 
 
 def focus_records(d0, d1):
@@ -214,8 +214,10 @@ def focus_records(d0, d1):
     (probed 2026-09-19 - one page reached back only eight days). Kept for
     the process like _timeline; page 1 IS _timeline's. None when page 1
     failed; a later page failing keeps what came (the window's oldest days
-    may then read short). The okr_stats focus-per-objective reader rides
-    this; the older Focus lines still read page 1 alone."""
+    may then read short). EVERY focus reader rides this (Vex 2026-09-19,
+    "will it always look at only this week? Fix that"): until then the
+    Focus lines read page 1 alone, so last week's chip, ⏪ Last week and
+    the month / quarter totals undercounted anything older than ~8 days."""
     first = _timeline()
     if first is None:
         return None
@@ -252,7 +254,7 @@ def focus_records(d0, d1):
 def focus_minutes(d0, d1):
     """True focused minutes across records whose LOCAL start date ∈ [d0, d1].
     None when the timeline reader failed (line dropped, never fake zeros)."""
-    recs = _timeline()
+    recs = focus_records(d0, d1)
     if recs is None:
         return None
     total = 0.0
@@ -276,7 +278,7 @@ def focus_by_span(d0, d1):
     bucket, one size up, so a MONTH can name the task a week actually went
     into. Same rule: the top task is surfaced only when the span had more
     than one distinct task. None when the timeline reader failed."""
-    recs = _timeline()
+    recs = focus_records(d0, d1)
     if recs is None:
         return None
     total, per_task = 0.0, {}
@@ -312,7 +314,7 @@ def focus_by_day(d0, d1):
     [d0, d1]. Top task = the title with the most focused minutes that day,
     surfaced only when the day had MORE than one distinct task.
     None when the timeline reader failed."""
-    recs = _timeline()
+    recs = focus_records(d0, d1)
     if recs is None:
         return None
     days = {}

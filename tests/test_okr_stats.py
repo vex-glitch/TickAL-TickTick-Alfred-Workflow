@@ -147,8 +147,9 @@ served, total, per = st.aligned_counts(done, al)
 check("1.counts", (served, total, per) == (3, 4, {"O1": 2, "O2": 1}), (served, total, per))
 check("1.pct", (st.pct(3, 4), st.pct(0, 0)) == (75, None))
 check("1.pts chip: points, never a relative %",
-      (st.pts_chip(68, 61), st.pts_chip(50, 57), st.pts_chip(5, 5), st.pts_chip(5, None))
-      == ("🟢 ▲ 7 pts", "🔴 ▼ 7 pts", "⚪ ▬", None))
+      (st.pts_chip(68, 61), st.pts_chip(50, 57), st.pts_chip(5, 5), st.pts_chip(5, None),
+       st.pts_chip(72, 73))
+      == ("🟢 ▲ 7 pts", "🔴 ▼ 7 pts", "⚪ ▬", None, "🔴 ▼ 1 pt"))
 
 # ── 2. focus segments + per owner ────────────────────────────────────────────
 one = {"startTime": "2026-09-19T08:00:00.000+0000", "endTime": "2026-09-19T09:00:00.000+0000",
@@ -206,6 +207,22 @@ try:
     n = len(asked)
     pf.focus_records(date(2026, 8, 1), date(2026, 8, 31))
     check("3.a short page = the end: no further calls", len(asked) == n, asked[n:])
+    # the Focus lines ride the same pages (Vex 2026-09-19: "will it always
+    # look at only this week? Fix that")
+    pf._TIMELINE = None
+    pf._TL_MORE[:] = [None, False]
+    WIDE = [dict(r, endTime=r["startTime"][:11] + "08:30:00.000+0000") for r in PAGE1]
+    WIDE2 = [dict(r, endTime=r["startTime"][:11] + "08:30:00.000+0000") for r in PAGE2]
+    pf._v2_get = lambda path, params=None: list(WIDE2 if params else WIDE)
+    old_week = (date(2026, 9, 7), date(2026, 9, 13))
+    check("3.an older week's Focus total counts page 2 too (was page 1 only)",
+          pf.focus_minutes(*old_week) == 30 * sum(
+              1 for r in WIDE + WIDE2
+              if old_week[0] <= pf._rec_local_date(r["startTime"]) <= old_week[1]),
+          pf.focus_minutes(*old_week))
+    check("3.focus_by_day and focus_by_span read the same pages",
+          sum(m for m, _t in pf.focus_by_day(*old_week).values())
+          == pf.focus_by_span(*old_week)[0] == pf.focus_minutes(*old_week))
     pf._TIMELINE = None
     pf._TL_MORE[:] = [None, False]
     pf._v2_get = lambda path, params=None: None
