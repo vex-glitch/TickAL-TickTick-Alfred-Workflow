@@ -363,3 +363,12 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
   everywhere the OKR code writes (he could not arrow across U+00B7); the
   rest of the notes keep their middle dots (titles and journal numbering are
   load-bearing). `34879ca`, read back on the server.
+- 2026-09-19: NO 🎯 LINES in the OKR section at all (Vex: "we still have
+  🎯 Productivity system and 🎯 none and 🎯 TickAL ... Please remove those").
+  The section is the PLAN only; picked goals live in 🏆 Goals below. The
+  goal plumbing (okr_notes.goal_label / goal_lines, periodic_engine
+  _okr_goal_lines / _GOALS_BELOW) is deleted, not switched off; this
+  supersedes the "plan · 🎯 pick on the same line" decision above. Note: the
+  daily's 🏆 Goals holds only the week and the day, so the year / quarter /
+  month goals now show in their own notes and the goal pickers, not in the
+  daily. `a7873b8`, read back on the server.
