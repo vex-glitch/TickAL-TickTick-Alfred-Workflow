@@ -97,17 +97,19 @@ The copy is made undated (drag it into place), named with the prefix and code, a
 
 ## In your periodic notes
 
-Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆 Goals: one line per tier, from the year down to the note's own, each with the plan for that period and, on the same line after 🎯, the goals you picked for it:
+Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆 Goals: one bullet per period, from the year down to the note's own, with that period's key results done and how far behind it runs; under it, one line per plan item, then 🎯 the goals you picked for it:
 
 ```
-- 🎉 2026 · 6 🥅 · 0/41 KRs · 🔴 1d · 🎯 Productivity System
-- 🌓 Q3 · 🥅 Onboard TickTicks 0/5 · 🥅 TickAL 0/6 · 🎯 none
-- 🗓️ Sep · 🥅 Onboard TickTicks · 🥅 TickAL · 0/7 KRs · 🔴 1d · 🎯 TickAL • WF
-- ♻️ W38 · 🔑 Finish periodic notes 🔴 1d · 🔑 Goals wf · 🎯 Onboard TickTick
-- ☀️ Sat 19 · 🔑 Goals wf · 🎯 Onboard TickTick
+- 🗓️ Sep • 0/7 KRs • 🔴 1d
+	- 🥅 Onboard TickTicks 0/5 🔴 1d
+	- 🥅 TickAL 0/6
+	- 🎯 TickAL • WF
+- ♻️ W38 • 0/2 KRs • 🔴 1d
+	- 🔑 Finish periodic notes 🔴 1d
+	- 🔑 Goals wf
 ```
 
-The daily shows all five tiers, the weekly four, the monthly three, the quarterly two, the yearly one. The yearly note's 🎯 Goals scorecard lists every objective with its progress bar and span. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
+The daily shows all five periods, the weekly four, the monthly three, the quarterly two, the yearly one. A period whose goals already show in the note's own 🏆 Goals below gets no 🎯 line (in the daily note: the week and the day). The yearly note's 🎯 Goals scorecard lists every objective with its progress bar and span. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
 
 **Setting goals from the plan:** every goal picker opens with 🔮 rows, the plan for that period. ⏎ on one makes it the goal - aimed at the real task the key result links, never at the planning copy. Then **📋 Pick a goal**, and the usual search below it (which never offers planning copies).
 

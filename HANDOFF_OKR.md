@@ -353,3 +353,13 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
     note's ⚔️ Workbench ✅ Tasks or ⏩ Tomorrow (`_scheduled_today` skips the
     plan list; unticked copy lines already written are dropped; ticked ones
     stay as the record) - `4378fe3`, read back on the server.
+- 2026-09-19: the OKR lines RESHAPED by Vex ("too crammed ... Make them like
+  I did W38 ... indented bullet points below that periods bullet point"):
+  every period is a bullet `<label> • d/n KRs • 🔴 Nd`, the plan items one per
+  line under it, then its 🎯 goals one per line - and NO 🎯 line for a tier
+  whose goals the note already shows below ("Remove 🎯 items if we have them
+  in a header below": `_GOALS_BELOW` in periodic_engine, checked by EXACT
+  bullet name, so a deleted mirror brings its 🎯 line back). Separator U+2022
+  everywhere the OKR code writes (he could not arrow across U+00B7); the
+  rest of the notes keep their middle dots (titles and journal numbering are
+  load-bearing). `34879ca`, read back on the server.
