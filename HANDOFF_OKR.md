@@ -330,3 +330,24 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
   picker gets 🔮 rows (the plan for its period, ⏎ = that goal, always the
   LINKED ORIGINAL, never the planning copy) and a 📋 Pick a goal row above
   the usual pool.
+- 2026-09-19: PHASE 4 SHIPPED to the live notes (`39e6383`): `src/okr_notes.py`
+  (pure: okr_section_lines, scorecard_lines, merge_scorecard, goal_choices),
+  `periodic_engine._fill_okr` in refresh_period's LIVE branch (plan from the
+  CACHE only, `_okr_plan` held 60 s; goals read from each tier's own note in
+  the refresh's index), `pm.SEC_OKR`, the five templates, and
+  `tools/pnrepair/okr_section.py` (applied to the five running notes: today,
+  W38, Sep, Q3, 2026 - inserts only, then refreshed and read back on the
+  server). Traps found and fixed on the way:
+  - the yearly `🎯 Goals scorecard` is ALSO where the yearly goals live
+    (pm.GOAL_SECTION["yearly"]): merge_scorecard replaces only the plan
+    lines (`pm.is_plan_line`: a bullet with no checkbox, 🏔️/🥅 first, a d/n
+    count) and keeps every goal line; `pm.goal_titles` skips plan lines.
+    The first fill re-based Vex's yearly goal to depth 0 (content intact).
+  - ONE kill switch: no `🥅 OKRs` section (EXACT name - ps.find's
+    normalized pass would return any "- OKRs" bullet) = nothing written,
+    the scorecard included.
+  - the goal pickers' pool never offers the OKR list (a daily goal MOVES its
+    task); a 🔮 row never targets the plan list, the periodic list, or an
+    original already completed.
+  - OPEN QUESTION for Vex: dated OKR copies also appear in the daily note's
+    ⚔️ Workbench ✅ Tasks (and ⏩ Tomorrow) as agenda items with checkboxes.

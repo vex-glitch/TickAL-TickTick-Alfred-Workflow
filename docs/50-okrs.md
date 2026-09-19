@@ -95,6 +95,22 @@ The copy is made undated (drag it into place), named with the prefix and code, a
 
 **🏷 Tag…** offers only plan tags (the area subtags and the tags your year objectives and objectives carry). It replaces the plan tag and keeps any other tag; on an objective, its open key results follow.
 
+## In your periodic notes
+
+Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆 Goals: one line per tier, from the year down to the note's own, each with the plan for that period and, on the same line after 🎯, the goals you picked for it:
+
+```
+- 🎉 2026 · 6 🥅 · 0/41 KRs · 🔴 1d · 🎯 Productivity System
+- 🌓 Q3 · 🥅 Onboard TickTicks 0/5 · 🥅 TickAL 0/6 · 🎯 none
+- 🗓️ Sep · 🥅 Onboard TickTicks · 🥅 TickAL · 0/7 KRs · 🔴 1d · 🎯 TickAL • WF
+- ♻️ W38 · 🔑 Finish periodic notes 🔴 1d · 🔑 Goals wf · 🎯 Onboard TickTick
+- ☀️ Sat 19 · 🔑 Goals wf · 🎯 Onboard TickTick
+```
+
+The daily shows all five tiers, the weekly four, the monthly three, the quarterly two, the yearly one. The yearly note's 🎯 Goals scorecard lists every objective with its progress bar and span. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
+
+**Setting goals from the plan:** every goal picker opens with 🔮 rows, the plan for that period. ⏎ on one makes it the goal - aimed at the real task the key result links, never at the planning copy. Then **📋 Pick a goal**, and the usual search below it (which never offers planning copies).
+
 ## Automations
 
 - **Heal:** a parent always runs from its first dated child's start to its last dated child's end.
@@ -111,5 +127,5 @@ Both run when you open the hub (at most every five minutes) and with the optiona
 ## Related
 
 - [Projects](49-projects.md) - the 📌CTA tasks objectives link to
-- [Periodic notes](48-periodic.md) - the notes the plan will feed
+- [Periodic notes](48-periodic.md) - the notes the plan feeds
 - [Settings & sync](90-settings-sync.md) - the hourly sync that runs the heal
