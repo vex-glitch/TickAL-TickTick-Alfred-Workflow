@@ -14,7 +14,7 @@ import os
 import re
 import sys
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 _SRC = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_SRC, "lib"))       # vendored requests (api_v2 pattern)
@@ -200,6 +200,53 @@ def _rec_local_date(ts):
         return dt.replace(tzinfo=timezone.utc).astimezone().date()
     except Exception:
         return None
+
+
+_TL_MORE = [None, False]     # [every record paged in so far, reached the end]
+TL_PAGE = 31                 # records per timeline page (probed 2026-09-19)
+TL_MAX_PAGES = 12
+
+
+def focus_records(d0, d1):
+    """The raw focus records whose LOCAL start date is in [d0, d1], PAGED
+    back as far as d0 needs: the timeline answers 31 records a call, newest
+    first, and ?to=<epoch ms of the oldest startTime> the next 31 older
+    (probed 2026-09-19 - one page reached back only eight days). Kept for
+    the process like _timeline; page 1 IS _timeline's. None when page 1
+    failed; a later page failing keeps what came (the window's oldest days
+    may then read short). The okr_stats focus-per-objective reader rides
+    this; the older Focus lines still read page 1 alone."""
+    first = _timeline()
+    if first is None:
+        return None
+    if _TL_MORE[0] is None:
+        _TL_MORE[0] = list(first)
+        _TL_MORE[1] = len(first) < TL_PAGE
+    recs = _TL_MORE[0]
+    pages = 1
+    while not _TL_MORE[1] and pages < TL_MAX_PAGES:
+        oldest = min((r.get("startTime") or "" for r in recs if r.get("startTime")),
+                     default="")
+        od = _rec_local_date(oldest) if oldest else None
+        if od is None or od < d0:
+            break
+        try:
+            ms = int(datetime.strptime(oldest[:19], "%Y-%m-%dT%H:%M:%S")
+                     .replace(tzinfo=timezone.utc).timestamp() * 1000)
+        except ValueError:
+            break
+        page = _v2_get("pomodoros/timeline", {"to": ms})
+        pages += 1
+        if not page:
+            _TL_MORE[1] = True
+            break
+        seen = {r.get("id") for r in recs}
+        recs.extend(r for r in page if r.get("id") not in seen)
+        if len(page) < TL_PAGE:
+            _TL_MORE[1] = True
+    return [r for r in recs
+            if (lambda ld: ld is not None and d0 <= ld <= d1)(
+                _rec_local_date(r.get("startTime") or ""))]
 
 
 def focus_minutes(d0, d1):

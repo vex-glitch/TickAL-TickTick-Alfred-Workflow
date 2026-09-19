@@ -267,6 +267,11 @@ try:
     # ── the hub root ─────────────────────────────────────────────────────
     rows = render("ctx:okr")
     check_rows("root", rows)
+    # ↪️ Carry-over shows only while the closing quarter leaves something
+    # open - on the fixture that depends on the calendar, so the positional
+    # checks read the rows without it (its own checks are under "carry")
+    carry_row = next((r for r in rows if r.get("uid") == "okr-carry"), None)
+    rows = [r for r in rows if r.get("uid") != "okr-carry"]
     titles = [r["title"] for r in rows]
     check("root: one live read, one heal spawn", len(LOADS) == 1 and len(SPAWNS) == 1,
           (LOADS, SPAWNS))
@@ -402,6 +407,14 @@ try:
     # ── pace ─────────────────────────────────────────────────────────────
     rows = render("ctx:okrpace")
     check_rows("pace", rows)
+    cap = next((r for r in rows if r.get("uid") == "okrp-capacity"), None)
+    c = okr.capacity(okr.items_from(OPEN_ROWS + DONE_ROWS), TODAY)
+    check("pace: ⚖️ capacity row last - KRs due next 4 wks vs ticked last 4, per week",
+          cap is rows[-1] and cap["valid"] is False
+          and cap["title"].startswith(f"⚖️ Capacity · plan {okr.rate_txt(c.planned, 4)} · "
+                                      f"done {okr.rate_txt(c.done, 4)}")
+          and f"{c.planned} KRs due" in cap["subtitle"], cap)
+    rows = [r for r in rows if r.get("uid") != "okrp-capacity"]
     check("pace: four periods, quarter to day",
           [r["title"].split(" · ")[0] for r in rows]
           == ["🌓 Quarter", "🗓️ Month", "♻️ Week", "☀️ Day"], [r["title"] for r in rows])
@@ -423,6 +436,90 @@ try:
           all(r["variables"]["browse_back"] == "ctx:okrpace" for r in rows))
     rows = render("ctx:okrpace:yearly")
     check("pace: an unknown period says so", rows[0]["title"].startswith("Unknown period"))
+
+    # ── ↪️ carry-over (phase 5) ──────────────────────────────────────────
+    import periodic_model as _pm                            # noqa: E402
+    ALL = okr.items_from(OPEN_ROWS + DONE_ROWS)
+    cq = okr.closing_quarter(TODAY)
+    left = okr.carry_candidates(ALL, cq.end)
+    check("carry: the hub row shows exactly while the closing quarter leaves something open",
+          (carry_row is not None) == bool(left)
+          and (carry_row is None or (
+              carry_row["title"] == f"↪️ Carry-over · {browse._okr_q(cq)} · {len(left)} open"
+              and carry_row["arg"] == "xact:crmbrowse:ctx:okrcarry"
+              and carry_row["mods"]["alt"]["variables"] == {"browse_ctx": "ctx:okrcarry"})),
+          (carry_row, [x.name for x in left]))
+    # the hub row, whatever the calendar says: the closing quarter pinned far
+    # ahead, so every dated open leaf is a leftover (review 2026-09-19)
+    _cq = okr.closing_quarter
+    okr.closing_quarter = lambda today=None, pinned=None: _cq(today, pinned or day(400))
+    try:
+        hub = render("ctx:okr")
+    finally:
+        okr.closing_quarter = _cq
+    far0 = _pm.period_for("quarterly", day(400))
+    crow = [r for r in hub if r.get("uid") == "okr-carry"]
+    check_rows("hub carry row", crow)
+    check("carry: the hub row, pinned - title, the clean-bar hop on ⏎ and ⌥, third on the hub",
+          len(crow) == 1 and hub.index(crow[0]) == 2
+          and crow[0]["title"] == f"↪️ Carry-over · {browse._okr_q(far0)} · 5 open"
+          and crow[0]["arg"] == "xact:crmbrowse:ctx:okrcarry"
+          and crow[0]["mods"]["alt"]["variables"] == {"browse_ctx": "ctx:okrcarry"}
+          and crow[0]["variables"]["browse_back"] == "ctx:folders", crow)
+    os.environ["browse_ctx"], os.environ["browse_back"] = "ctx:okrcarry", ""
+    check("parse_ctx: 'today' typed on the carry-over stays a search (ctx:okr* guard)",
+          browse.parse_ctx("today") == ("okrcarry", [], "today"), browse.parse_ctx("today"))
+    far = _pm.period_for("quarterly", day(400))
+    fk = far.start.isoformat()
+    rows = render(f"ctx:okrcarry:{fk}")
+    check_rows("carry", rows)
+    titles = [r["title"] for r in rows]
+    check("carry: a pinned quarter lists every open dated leaf ending by its end, end order",
+          titles == [f"↪️ Carry-over · {browse._okr_q(far)} · 5 open", "🔑 Goals wf 🔗",
+                     "🔑 Review", "🔑 Plan 🔗", "🔑 Publish", "🔑 Orphan deliverable"], titles)
+    kr = rows[2]
+    check("carry: ⏎ on a leftover opens its three choices, the other chords as on the hub",
+          kr["arg"] == f"xact:crmbrowse:ctx:okrcarry:{fk}:{KR2}" and "⏎↪️" in kr["subtitle"]
+          and kr["mods"]["shift"]["arg"] == f"complete:{PID}:{KR2}:Review"
+          and kr["mods"]["alt+shift"]["arg"] == f"xact:crmbrowse:ctx:okrsched:{KR2}"
+          and kr["variables"]["task_id"] == KR2, kr)
+    check("carry: ⌃ back to the hub", all(r["variables"]["browse_back"] == "ctx:okr" for r in rows))
+    rows = render(f"ctx:okrcarry:{fk}", "orphan")
+    check("carry search: filters the leftovers, the head steps aside",
+          [r["title"] for r in rows] == ["🔑 Orphan deliverable"], [r["title"] for r in rows])
+    rows = render(f"ctx:okrcarry:{fk}:{KR2}")
+    check_rows("carry decision", rows)
+    nq = _pm.next_period(far)
+    check("carry decision: head, then carry · won't do · someday",
+          rows[0]["title"].startswith("🔑 Review · ") and rows[0]["valid"] is False
+          and "🥅 TickAL" in rows[0]["subtitle"]
+          and [r["title"] for r in rows[1:]] == [f"↪️ Carry into {browse._okr_q(nq)}",
+                                                 "🚫 Won't do", "💤 Someday"],
+          [r["title"] for r in rows])
+    start = okr.carry_start(far.end, TODAY)
+    pays = {r["uid"]: b64(r["arg"], "xact:okr_carry:") for r in rows[1:]}
+    back = f"ctx:okrcarry:{fk}"
+    check("carry decision: one okr_carry payload each, landing back on the pinned list",
+          pays == {"okrc-carry": {"id": KR2, "action": "carry", "arg": start.isoformat(), "back": back},
+                   "okrc-wontdo": {"id": KR2, "action": "wontdo", "arg": None, "back": back},
+                   "okrc-someday": {"id": KR2, "action": "someday", "arg": None, "back": back}}, pays)
+    check("carry decision: the carry previews the new span and the ripple (Publish moves along)",
+          rows[1]["subtitle"].startswith(okr.span_txt(start, start + timedelta(days=2), TODAY)
+                                         + " · moves 1 along"), rows[1]["subtitle"])
+    check("carry decision: ⌃ back to the list it came from",
+          all(r["variables"]["browse_back"] == back for r in rows))
+    rows = render(f"ctx:okrcarry:{fk}:{KR4}")
+    check("carry decision: a closed item says so, nothing to press",
+          [r["title"] for r in rows][1:] == ["Closed already · nothing to decide"]
+          and all(r["valid"] is False for r in rows), [r["title"] for r in rows])
+    past = _pm.period_for("quarterly", day(-800))
+    rows = render(f"ctx:okrcarry:{past.start.isoformat()}")
+    check("carry: a quarter that left nothing open says it is clean",
+          [r["title"] for r in rows][1:] == [f"Nothing left open · {browse._okr_q(past)} is clean"],
+          [r["title"] for r in rows])
+    rows = render("ctx:okrcarry:nonsense")
+    check("carry: an unreadable pin falls back to the closing quarter",
+          rows[0]["title"].startswith(f"↪️ Carry-over · {browse._okr_q(cq)} · "), rows[0]["title"])
 
     # ── schedule ─────────────────────────────────────────────────────────
     n_loads = len(LOADS)

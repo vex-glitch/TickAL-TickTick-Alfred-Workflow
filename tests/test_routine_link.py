@@ -136,7 +136,7 @@ keys = [r[0] for r in il]
 check("full list order", keys == ["focus", "sticky", "window", "focuswindow",
                                   "timer", "calendar", "habits",
                                   "focusview", "matrix", "countdowns", "tasks",
-                                  "inbox", "crmcal",
+                                  "inbox", "crmcal", "okr",
                                   "daily", "daily_sticky", "daily_window",
                                   "weekly", "weekly_sticky", "weekly_window",
                                   "monthly", "monthly_sticky", "monthly_window",
@@ -186,6 +186,26 @@ _run_src = _link_src[_link_src.index("\ndef run("):]
 for _v in sorted(set(rl.TASK_VERBS) | set(rl.BARE_VERBS) | set(rl.SLOT_VERBS)):
     check(f"run() handles {_v}", f'"{_v}"' in _run_src, _v)
 
+# ── 🥅 the OKR steps (HANDOFF_OKR phase 5): colon-free view slots ────────────
+_OKR_VIEWS = {"okr": "ctx:okr", "okrdaily": "ctx:okrpace:daily",
+              "okrweekly": "ctx:okrpace:weekly", "okrmonthly": "ctx:okrpace:monthly",
+              "okrquarterly": "ctx:okrpace:quarterly", "okrcarry": "ctx:okrcarry"}
+for _slot, _ctx in _OKR_VIEWS.items():
+    check(f"view {_slot} parses", rl.parse(f"view:{_slot}") == ("view", _slot, ""))
+check("view okrpace:weekly refused (a slot never holds a colon)",
+      refused("view:okrpace:weekly") is not None)
+# a slot the grammar takes but VIEW_CTX lacks is a KeyError at click time,
+# reported as "🔗 Link failed" - in a checklist step nobody watches
+_vc = _link_src[_link_src.index("VIEW_CTX = {"):]
+_vc = _vc[:_vc.index("}") + 1]
+for _slot in rl.SLOT_VERBS["view"]:
+    if _slot != "calendar":
+        check(f"VIEW_CTX maps {_slot}", f'"{_slot}":' in _vc, _slot)
+for _slot, _ctx in _OKR_VIEWS.items():
+    check(f"VIEW_CTX {_slot} -> {_ctx}", f'"{_slot}": "{_ctx}"' in _vc, _vc)
+check("☑️ row: 🥅 OKRs opens the hub",
+      dict((r[0], r[3]) for r in il)["okr"].endswith("?argument=view%3Aokr)"))
+
 # ── money + crmcal + inbox ──────────────────────────────────────────────────
 check("money bare", rl.parse("money") == ("money", "", ""))
 check("money takes no id", refused("money:6a955950b4839102c549b053") is not None)
@@ -206,8 +226,8 @@ check("case-insensitive month", rl.money_note([N("c" * 24, "2026 september • M
 check("empty pool", rl.money_note(None, 2026, 9) == (None, None))
 check("money row gated off by default", "money" not in [r[0] for r in il])
 ilm = rl.internal_links("x", TID, PID, money=True)
-check("money row after crmcal when on",
-      [r[0] for r in ilm].index("money") == [r[0] for r in ilm].index("crmcal") + 1)
+check("money row after the destinations (🥅 OKRs last) when on",
+      [r[0] for r in ilm].index("money") == [r[0] for r in ilm].index("okr") + 1)
 check("money link", dict((r[0], r[3]) for r in ilm)["money"].endswith("?argument=money)"))
 check("moneysticky bare", rl.parse("moneysticky") == ("moneysticky", "", ""))
 check("moneysticky takes no id", refused("moneysticky:x") is not None)

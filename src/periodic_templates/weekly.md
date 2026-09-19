@@ -28,6 +28,8 @@
 
 - Daily Completed
 
+- 🥅 Aligned
+
 - Focus
 
 - Habit consistency

@@ -414,7 +414,14 @@ def _bar_call(xact, call):
 
 # view:<slot> → the Alfred screen BrowseCtx opens (calendar rides OpenCalendar)
 VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
-            "crmcal": "ctx:crmcal"}           # exactly what CRM home > Calendar opens
+            "crmcal": "ctx:crmcal",           # exactly what CRM home > Calendar opens
+            # 🥅 the OKR steps in the routines' checklists (HANDOFF_OKR phase 5)
+            "okr": "ctx:okr",
+            "okrdaily": "ctx:okrpace:daily",
+            "okrweekly": "ctx:okrpace:weekly",
+            "okrmonthly": "ctx:okrpace:monthly",
+            "okrquarterly": "ctx:okrpace:quarterly",
+            "okrcarry": "ctx:okrcarry"}
 
 
 def _money(xact, as_sticky=False, as_window=False):

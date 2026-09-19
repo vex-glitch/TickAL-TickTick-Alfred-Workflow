@@ -960,6 +960,130 @@ def autotick_candidates(items, is_done):
     return out
 
 
+# ── Phase 5: countdowns, the quarter carry-over, capacity ────────────────────
+def countdown_targets(items, today=None):
+    """The objectives a countdown follows (HANDOFF_OKR section 4: "one per
+    active objective, to its end"; Vex: "Automate so that they show ends of
+    goals periods") -> [(item, end)], soonest end first.
+
+    ACTIVE = an OPEN Y or O whose span has STARTED (start on or before
+    today), read on its wanted span - the end every screen shows. One
+    running late keeps its countdown (it then counts the days since, which
+    is the point); a done or won't-do one, an undated one and one that has
+    not started yet has none."""
+    today = today or date.today()
+    want = wanted_spans(items)
+    out = []
+    for it in items:
+        if it.kind not in PARENT_KINDS or it.history:
+            continue
+        s, e = _effective(it, want)
+        if s is None or s > today:
+            continue
+        out.append((it, e))
+    out.sort(key=lambda r: (r[1], r[0].name))
+    return out
+
+
+CARRY_LEAD_DAYS = 14      # the last two weeks of a quarter are review season
+
+
+def closing_quarter(today=None, pinned=None):
+    """The quarter the 🌓 carry-over screen closes -> pm.Period. `pinned`
+    (a date inside it: the ctx pins the quarter a screen opened on) wins;
+    else the quarter now running once its last CARRY_LEAD_DAYS have come
+    (the 🌓 Quarterly Review is due on the 30th), else the one before it:
+    a review run late, in the new quarter's first weeks, still closes the
+    quarter it was about."""
+    today = today or date.today()
+    if pinned is not None:
+        return pm.period_for("quarterly", pinned)
+    q = pm.period_for("quarterly", today)
+    if (q.end - today).days < CARRY_LEAD_DAYS:
+        return q
+    return pm.prev_period(q)
+
+
+def _leaf(it, want):
+    """An item that no dated child shapes: a KR, or a Y/O dated by hand
+    with no dated child of its own (wanted_spans leaves it on its stored
+    span). The carry-over decides these; a parent follows them."""
+    return it.kind == "KR" or (it.kind in PARENT_KINDS and it.id not in want)
+
+
+def carry_leaf(it, want, by):
+    """What the carry-over decides: a _leaf, or an UNPREFIXED step hung
+    straight under a Y/O - _deliverables counts it and wanted_spans shapes
+    its parent with it, so pace reads that parent behind on it, and the
+    carry-over must offer it (review 2026-09-19)."""
+    if it.kind is None:
+        p = by.get(it.parent) if it.parent else None
+        return p is not None and p.kind in PARENT_KINDS
+    return it.kind in KINDS and _leaf(it, want)
+
+
+def carry_candidates(items, q_end):
+    """The open work a quarter leaves behind (the carry-over screen, HANDOFF
+    _OKR phase 5): every OPEN dated carry_leaf whose end is on or before
+    the quarter's last day, end order. Earlier quarters' leftovers are in
+    too - they leaked past their own quarter and are still open. Each wants
+    ONE decision: carry into the next quarter, won't do, or someday."""
+    want = wanted_spans(items)
+    by = index(items)
+    out = [it for it in items
+           if not it.history and it.dated
+           and carry_leaf(it, want, by) and it.end <= q_end]
+    out.sort(key=lambda it: (it.end, it.start, it.name))
+    return out
+
+
+def carry_start(q_end, today=None):
+    """Where a carried item starts: the next quarter's first day, or today
+    when the review runs late and that day is gone (a schedule action never
+    starts in the past - the plan is a forecast)."""
+    return max(q_end + timedelta(days=1), today or date.today())
+
+
+Capacity = namedtuple("Capacity", "planned done weeks")
+
+
+def done_on(it):
+    """The LOCAL day a closed item was closed (raw completedTime in its own
+    zone, else Berlin), None when unknown. The copy's own tick: a KR the
+    auto-tick closed reads the hour the heal ran, not its original's."""
+    raw = (it.raw or {}).get("completedTime")
+    return to_date(raw, it.tz) if raw else None
+
+
+def capacity(items, today=None, weeks=4):
+    """The capacity check (HANDOFF_OKR phase 5: "KRs per week, not focus"):
+    what the plan asks for next against what gets finished ->
+    Capacity(planned, done, weeks).
+
+      planned  KRs (won't-do out, done ones in - they were planned there)
+               whose END falls in the next `weeks` weeks, today included
+      done     KRs ticked in the last `weeks` weeks, today included
+
+    Callers divide by `weeks` for the rate."""
+    today = today or date.today()
+    ahead = today + timedelta(days=7 * weeks - 1)
+    since = today - timedelta(days=7 * weeks - 1)
+    krs = [k for k in items if k.kind == "KR" and not k.abandoned]
+    planned = sum(1 for k in krs if k.dated and today <= k.end <= ahead)
+    done = 0
+    for k in krs:
+        d = done_on(k) if k.done else None
+        if d is not None and since <= d <= today:
+            done += 1
+    return Capacity(planned, done, weeks)
+
+
+def rate_txt(n, weeks):
+    """KRs per week as a person says it: "3/wk", "1.5/wk", "0/wk"."""
+    r = n / weeks if weeks else 0
+    return f"{r:.1f}".rstrip("0").rstrip(".") + "/wk"
+
+
 # ── Codes ────────────────────────────────────────────────────────────────────
 # An O's code lives in its DESCRIPTION (HANDOFF section 2), on a line of its
 # own led by the label emoji: "🏷️ TA" (VS16 optional, a "- " bullet allowed).

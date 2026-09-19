@@ -64,6 +64,7 @@ through the same End (xact _crm_say), and the hourly sync's headless banner
 does too.
 """
 import fcntl
+import json
 import os
 import re
 import subprocess
@@ -518,6 +519,7 @@ def schedule(spec, api=None, v2=None, today=None):
             if h.end + timedelta(days=arg) < today:
                 raise Refusal("📅 That end is gone · today or later")
         res = apply_spans(snap, list(moves) + list(heals), api, v2)
+        cd_chip = sync_countdowns(snap, v2, today)[0] if res.written else ""
     final = {}
     for i, s, e in list(moves) + list(heals):
         final[i] = (s, e)
@@ -546,6 +548,8 @@ def schedule(spec, api=None, v2=None, today=None):
         msg += f" · {healed} healed"
     if res.failed:
         msg += f" · ⚠️ {len(res.failed)} not written"
+    if cd_chip:
+        msg += f" · {cd_chip}"
     return msg
 
 
@@ -1658,6 +1662,9 @@ def heal_and_tick(api=None, v2=None, is_done=None, today=None):
                 return HealResult(0, 0, "", f"refused (not a complete live read): {snap.detail}")
             remember_complete(snap)
             res = apply_spans(snap, okr.heal_diff(snap.items), api, v2)
+            # the countdowns read the spans just healed (patch_cache folded
+            # them into snap.items); same hold, so two heals never mint twice
+            cd_chip, cd_note = sync_countdowns(snap, v2, today)
             linked = [k for k in snap.items if k.kind == "KR" and not k.history
                       and (k.target or ("",))[0] == "task"]
             left = cache_store.get(ROWS_KEY) if linked else None
@@ -1695,9 +1702,11 @@ def heal_and_tick(api=None, v2=None, is_done=None, today=None):
         if ticked:
             parts.append(f"🔑 {len(ticked)} KR{'' if len(ticked) == 1 else 's'} ticked · "
                          f"original{'' if len(ticked) == 1 else 's'} done")
+        if cd_chip:
+            parts.append(cd_chip)
         note = (f"healed {healed} (failed {len(res.failed)}), ticked {len(ticked)} "
                 f"(failed {tick_fail}, no longer open {moved_on}), "
-                f"{len(linked)} linked open KRs · {snap.detail}")
+                f"{len(linked)} linked open KRs · {cd_note} · {snap.detail}")
         return HealResult(healed, len(ticked), " · ".join(parts), note)
     except Exception as e:
         return HealResult(0, 0, "", f"failed: {type(e).__name__}: {e}")
@@ -1728,6 +1737,343 @@ def spawn_heal(debounce_s=300):
         return True
     except Exception:
         return False
+
+
+# ── ⏳ countdowns: one per active objective, to its end (phase 5) ─────────────
+# HANDOFF_OKR section 4: "auto-maintained, one per active objective, to its
+# end" (okr.countdown_targets: an open Y/O that has started). A countdown has
+# no list, tag or link to say whose it is, so OURS carry a marker in their
+# remark ("🥅 OKR · <item id>", shown on no card: showRemark false), and
+# ~/.ticktick_alfred/okr_countdowns.json remembers what was minted - {item
+# id: {"cid", "by_us"}} - so one Vex archived or deleted is never minted
+# again, while one WE archived (its objective closed, or lost its dates)
+# comes back when the objective does. Kind ⏳ Countdown (4, one-shot), no
+# reminders (the objective sits on the calendar already), dated on the
+# objective's INCLUSIVE end - it reads "today" on the last day.
+CD_KEY = "countdowns"
+CD_REGISTRY = os.path.join(cfg.CONFIG_DIR, "okr_countdowns.json")
+CD_MARK = "🥅 OKR · "
+_CD_MARK_RE = re.compile(re.escape(CD_MARK) + r"([0-9A-Za-z]+)")
+CD_STEP = 1048576         # xact.countdown_new's sortOrder gap (new = on top)
+
+CdPlan = namedtuple("CdPlan", "add update archive registry known")
+
+
+def cd_owner(cd):
+    """The plan item a countdown follows (its remark marker), else None."""
+    m = _CD_MARK_RE.search((cd or {}).get("remark") or "")
+    return m.group(1) if m else None
+
+
+def cd_name(it):
+    return f"{_glyph(it.kind)} {it.name}"
+
+
+def cd_date(d):
+    return d.year * 10000 + d.month * 100 + d.day
+
+
+def _cd_live(c):
+    return (c or {}).get("status", 0) == 0 and not (c or {}).get("archivedTime")
+
+
+def countdown_plan(items, existing, registry, today=None, new_id=None):
+    """Pure: what the OKR countdowns should become -> CdPlan(add, update,
+    archive, registry, known). Entities are FULL (the batch takes whole
+    objects: an update is the listed entity with the fields over it, as
+    xact's countdown_edit posts it). `registry` is the file's next content
+    once the batch landed; `known` is what is safe to save even when it did
+    not: the file reconciled with what the LIST shows (a live countdown of
+    ours is recorded as minted, not by us - back-filled after a lost save,
+    and a stale by_us cleared, so a later archive by Vex is never undone)
+    plus the archives this pass makes (by_us - a closed item is archived
+    again next pass if this one did not land). Adds and un-archives wait
+    for the ack (review 2026-09-19).
+
+      an open Y/O with an end    its countdown follows its name and end;
+                                 one it lacks is minted once it has STARTED
+                                 (okr.countdown_targets), unless Vex removed
+                                 an earlier one (minted, not by_us)
+      closed, or no dates left   its live countdown is archived (by_us)
+      gone from the plan         the same (a writable read is complete, so
+                                 absent = deleted or won't do)
+
+    One archived by us comes back for a started objective: updated back to
+    live when the list still shows it, minted afresh when it does not."""
+    import countdowns as cds
+    today = today or date.today()
+    if new_id is None:
+        from api_v2 import new_object_id as new_id
+    known = {k: dict(v) for k, v in (registry or {}).items()
+             if isinstance(k, str) and isinstance(v, dict)}
+    reg = known                  # read below; what is planned goes to `landed`
+    landed = {}
+    listed = [c for c in existing or [] if isinstance(c, dict) and c.get("id")]
+    by_cid = {c["id"]: c for c in listed}
+    ours = {}
+    for c in listed:
+        o = cd_owner(c)
+        if o and (o not in ours or _cd_live(c)):
+            ours[o] = c
+    for iid, rec in reg.items():
+        c = by_cid.get(rec.get("cid"))
+        if c is not None and iid not in ours:
+            ours[iid] = c                 # its remark was edited: still ours
+    want = okr.wanted_spans(items)
+    active = {it.id for it, _e in okr.countdown_targets(items, today)}
+    top = min((c.get("sortOrder") or 0 for c in listed), default=0)
+    add, update, archive = [], [], []
+    for it in items:
+        if it.kind not in okr.PARENT_KINDS:
+            continue
+        c, rec = ours.get(it.id), reg.get(it.id)
+        _s, e = okr._effective(it, want)
+        if it.history or e is None:
+            if c is not None and _cd_live(c):
+                archive.append({**c, "status": 1})
+                known[it.id] = {"cid": c["id"], "by_us": True}
+            continue
+        name, d = cd_name(it), cd_date(e)
+        if c is not None:
+            if _cd_live(c):
+                known[it.id] = {"cid": c["id"], "by_us": False}
+                if c.get("name") != name or c.get("date") != d:
+                    update.append({**c, "name": name, "date": d})
+            elif rec and rec.get("by_us") and it.id in active:
+                update.append({**c, "name": name, "date": d, "status": 0,
+                               "archivedTime": None})
+                landed[it.id] = {"cid": c["id"], "by_us": False}
+            continue
+        if it.id in active and (rec is None or rec.get("by_us")):
+            top -= CD_STEP
+            ent = cds.new_entity(new_id(), name, d, 4, appear=0, sort_order=top)
+            ent.update(reminders=[], remark=CD_MARK + it.id, showRemark=False)
+            add.append(ent)
+            landed[it.id] = {"cid": ent["id"], "by_us": False}
+    # "gone" = no longer a Y/O in the plan: deleted, won't do (a writable read
+    # is complete, so absent means one of those), or retitled into a KR or
+    # plain task - its countdown must not live on (review 2026-09-19)
+    present = {it.id for it in items if it.kind in okr.PARENT_KINDS}
+    for iid, c in ours.items():
+        if iid not in present and _cd_live(c):
+            archive.append({**c, "status": 1})
+            known[iid] = {"cid": c["id"], "by_us": True}
+    return CdPlan(add, update, archive, {**known, **landed}, dict(known))
+
+
+def _cd_registry():
+    try:
+        with open(CD_REGISTRY) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _cd_save(reg):
+    tmp = CD_REGISTRY + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(reg, f, indent=1, sort_keys=True)
+    os.replace(tmp, CD_REGISTRY)
+
+
+def _cd_patch_cache(plan):
+    """The countdowns cache (the ⏳ hub and search read it) follows the
+    write: new and updated live ones in, archived ones out - xact
+    _cd_patch's rule, which Scripts/ keeps and src/ cannot import."""
+    try:
+        rows = cache_store.get(CD_KEY)
+        if not isinstance(rows, list):
+            return
+        drop = {c["id"] for c in plan.archive}
+        put = {c["id"]: c for c in plan.add + plan.update}
+        out = [put.pop(c.get("id"), c) for c in rows
+               if isinstance(c, dict) and c.get("id") not in drop]
+        cache_store.set(CD_KEY, out + list(put.values()))
+    except Exception:
+        try:
+            cache_store.invalidate(CD_KEY)
+        except Exception:
+            pass
+
+
+def _plural(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def sync_countdowns(snap, v2, today=None):
+    """Bring the OKR countdowns in step with `snap` (countdown_plan) -> (chip,
+    note): chip "" when nothing was written. Only from a WRITABLE snap (a
+    partial read would archive the countdown of an objective it merely did
+    not see) and only with the v2 token (countdowns have no Open API road).
+    The registry's adds and un-archives are saved only after TickTick took
+    the batch: a registry naming a countdown that was never made would block
+    it for good; what the list itself shows (plan.known) is saved either
+    way. Call it inside the OKR lock. Never raises."""
+    try:
+        if snap is None or not snap.writable:
+            return "", "countdowns: not a complete live read"
+        if not _has_token(v2):
+            return "", "countdowns: no v2 token"
+        existing = v2.get_countdowns()
+        if existing is None:
+            return "", "countdowns: list unreadable"
+        loaded = _cd_registry()
+        plan = countdown_plan(snap.items, existing, loaded, today)
+
+        def keep(reg):
+            if reg != loaded:
+                try:
+                    _cd_save(reg)
+                except OSError:
+                    pass
+
+        if not (plan.add or plan.update or plan.archive):
+            keep(plan.known)
+            return "", "countdowns: in step"
+        if not v2.countdown_batch(add=plan.add, update=plan.update + plan.archive):
+            keep(plan.known)
+            return "", "countdowns: TickTick refused the batch"
+        keep(plan.registry)
+        _cd_patch_cache(plan)
+        parts = []
+        if plan.add:
+            parts.append(f"⏳ {_plural(len(plan.add), 'countdown')} added")
+        if plan.update:
+            parts.append(f"⏳ {_plural(len(plan.update), 'countdown')} updated")
+        if plan.archive:
+            parts.append(f"⏳ {_plural(len(plan.archive), 'countdown')} archived")
+        chip = " · ".join(parts)
+        return chip, "countdowns: " + chip
+    except Exception as e:
+        return "", f"countdowns failed: {type(e).__name__}: {e}"
+
+
+# ── ↪️ the quarter carry-over: carry / won't do / someday (phase 5) ──────────
+CARRY_ACTIONS = ("carry", "wontdo", "someday")
+
+
+def _carry_item(snap, iid):
+    """The item one carry-over decision is about, else Refusal: in the
+    plan, open, and a LEAF (okr.carry_candidates) - a parent follows its
+    KRs, and deciding one of its KRs is the decision."""
+    by = okr.index(snap.items)
+    it = by.get(iid)
+    if it is None:
+        raise Refusal("🥅 Not in the OKR list any more")
+    if it.history:
+        raise Refusal(f"🥅 {it.name} is closed already")
+    if not okr.carry_leaf(it, okr.wanted_spans(snap.items), by):
+        raise Refusal(f"🥅 {it.name} follows its KRs · decide those")
+    return it
+
+
+def _open_below(snap, it):
+    """The open items hanging under `it` (undated KRs under a hand-dated O,
+    a KR's own subtasks): a won't do on it alone would strand them under a
+    parent no later read returns (review 2026-09-19)."""
+    by = okr.index(snap.items)
+    return [by[x] for x in okr._descendants(it.id, okr._kids(snap.items))
+            if x in by and not by[x].history]
+
+
+def _mirror_wontdo(snap, it, live, stamp):
+    """xact.wontdo's cache mirror, from src/: the wontdo_tasks log (the 🚫
+    screen and ⇧ undo read it), out of all_tasks, completed_tasks and the
+    list's project_data; then patch_cache folds status -1 into snap.items
+    (so the heal that follows no longer counts it) and rebuilds okr_rows
+    LAST, where the hub shows it 🚫 with ⇧ ↩️ until the next live read."""
+    tid = it.id
+    try:
+        row = dict(it.raw or live or {}, status=-1, completedTime=stamp)
+        log = [t for t in (cache_store.get("wontdo_tasks") or [])
+               if isinstance(t, dict) and t.get("id") != tid]
+        cache_store.set("wontdo_tasks", ([row] + log)[:200])
+        for key in ("all_tasks", "completed_tasks"):
+            rows = cache_store.get(key)
+            if isinstance(rows, list):
+                cache_store.set(key, [t for t in rows
+                                      if not (isinstance(t, dict) and t.get("id") == tid)])
+        pk = _pd_key(it.pid or snap.list_id)
+        pd = cache_store.get(pk)
+        if isinstance(pd, dict) and isinstance(pd.get("tasks"), list):
+            pd = dict(pd)
+            pd["tasks"] = [t for t in pd["tasks"]
+                           if not (isinstance(t, dict) and t.get("id") == tid)]
+            cache_store.set(pk, pd)
+    except Exception:
+        pass
+    patch_cache(snap, patches={tid: {"status": -1, "completedTime": stamp}})
+
+
+def _after_close(snap, api, v2, today):
+    """A decision took an item off the timeline: its parents heal in the
+    same hold, the countdowns follow. -> toast tail."""
+    tail = ""
+    heals = okr.heal_diff(snap.items)
+    if heals:
+        res = apply_spans(snap, heals, api, v2)
+        if res.written:
+            tail += f" · {_plural(len(res.written), 'parent')} healed"
+    chip, _note = sync_countdowns(snap, v2, today)
+    return tail + (f" · {chip}" if chip else "")
+
+
+def carry(spec, api=None, v2=None, today=None):
+    """xact:okr_carry {"id", "action", "arg", "back"} - ONE decision on an
+    item a quarter leaves open (okr.carry_candidates), the three HANDOFF_OKR
+    phase 5 names ("carry / won't do / someday per open KR"):
+
+      carry    start on `arg` (okr.carry_start: the next quarter's first
+               day), same length, the lane rippling - schedule()'s "date",
+               refusals and toast included
+      wontdo   TickTick's won't do (v2 status -1 + a stamped completedTime,
+               the write xact.wontdo makes): out of progress, pace and
+               spans; the parents heal in the same hold
+      someday  undated (v1 nulls - the proven clear, dispatch
+               attr_cleardate): off the timeline, still in the plan and in
+               its O's KR count; the parents heal
+
+    All three from a writable read inside the lock, like every span write."""
+    iid = str(spec.get("id") or "")
+    action = spec.get("action")
+    if not iid or action not in CARRY_ACTIONS:
+        raise Refusal("↪️ Nothing to decide")
+    today = today or date.today()
+    if action == "carry":
+        return schedule({"id": iid, "action": "date", "arg": spec.get("arg")},
+                        api, v2, today)
+    api, v2 = _clients(api, v2)
+    if action == "wontdo" and not _has_token(v2):
+        raise Refusal("🚫 Won't do needs the Attachment Login token (⚙️ Settings)")
+    with _lock() as got:
+        if not got:
+            raise Refusal("🥅 Busy · another OKR write is running · try again")
+        snap = _load(api, v2, writable=True)
+        it = _carry_item(snap, iid)
+        if action == "wontdo":
+            below = _open_below(snap, it)
+            if below:
+                raise Refusal(f"🚫 {it.name} has {_plural(len(below), 'open item')} "
+                              f"under it · decide those first")
+            live = _live(api, snap, it)
+            stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+            if not v2.abandon_task(dict(live, completedTime=stamp)):
+                raise Refusal(f"🚫 TickTick refused won't do on {it.name} · try again")
+            _mirror_wontdo(snap, it, live, stamp)
+            return f"🚫 Won't do: {it.name}" + _after_close(snap, api, v2, today)
+        if not it.dated:
+            raise Refusal(f"💤 {it.name} is off the timeline already")
+        live = _live(api, snap, it)
+        try:
+            api.update_task(it.id, it.pid or snap.list_id, current=live,
+                            startDate=None, dueDate=None)
+        except Exception as e:
+            raise Refusal(f"💤 Not written · {type(e).__name__}")
+        patch_cache(snap, patches={it.id: {"startDate": None, "dueDate": None,
+                                           "isAllDay": False}})
+        return (f"💤 {it.name} → someday · off the timeline, still in the plan"
+                + _after_close(snap, api, v2, today))
 
 
 # ── ⚙️ Settings → OKR List ───────────────────────────────────────────────────

@@ -43,6 +43,10 @@ Levels:
     ctx:okrimport:<task|note|list>:<pid>:<tid|->
                                         🥅 Add to OKRs: as a KR under an O,
                                         a new O, a new Y (⌘ Actions)
+    ctx:okrcarry[:<quarter start>[:<id>]]
+                                        ↪️ quarter carry-over: what a quarter
+                                        leaves open, or one item's three
+                                        choices (carry · won't do · someday)
 
 Anything after the ctx token is the fuzzy filter query. `ctx:subtasks:<taskId>`
 (single id) is also accepted - the list is then
@@ -5231,12 +5235,23 @@ def render_okr(ids, query):
 
     pace_row = alfred.item(
         uid="okr-pace", title="📈 Pace",
-        subtitle="Quarter · month · week · day  |  ⏎⤵️  ⌃🔙",
-        arg="xact:crmbrowse:ctx:okrpace", valid=True, match="pace",
+        subtitle="Quarter · month · week · day · capacity  |  ⏎⤵️  ⌃🔙",
+        arg="xact:crmbrowse:ctx:okrpace", valid=True, match="pace capacity",
         variables=dict(_OKR_NO_TASK), mods=_okr_nav_mods("ctx:okrpace"))
+    # ↪️ only while the closing quarter leaves something open
+    cq = okr.closing_quarter(today)
+    left = okr.carry_candidates(items, cq.end)
+    extra = [pace_row]
+    if left:
+        extra.append(alfred.item(
+            uid="okr-carry", title=f"↪️ Carry-over · {_okr_q(cq)} · {len(left)} open",
+            subtitle="Carry · won't do · someday  |  ⏎⤵️  ⌃🔙",
+            arg="xact:crmbrowse:ctx:okrcarry", valid=True,
+            match="carry over quarter leftovers",
+            variables=dict(_OKR_NO_TASK), mods=_okr_nav_mods("ctx:okrcarry")))
     if query:
         rows = search([_okr_row(x, items, today, pid, want, real, where=by)
-                       for x in _okr_open_first(items)] + [pace_row])
+                       for x in _okr_open_first(items)] + extra)
         rows = (rows + _okr_plus_rows(None, query, items)) or [alfred.item(
             uid="okr-none", title=f'No OKR matching "{query}"',
             subtitle="⌃🔙", valid=False)]
@@ -5256,7 +5271,7 @@ def render_okr(ids, query):
                   + ("" if live else " · cache") + "  |  ⏎↗️  ⌃🔙"),
         arg=f"open:ticktick:///webapp/#p/{pid}/tasks", valid=True,
         variables=dict(_OKR_NO_TASK))
-    rows = [head, pace_row] + [row(x) for x in roots]
+    rows = [head] + extra + [row(x) for x in roots]
     if not roots:
         rows.append(alfred.item(uid="okr-empty", title="The plan is empty",
                                 subtitle="⌃🔙", valid=False))
@@ -5312,6 +5327,7 @@ def render_okrpace(ids, query):
                 match=f"{word} {kind} {pm.title(p)}",
                 variables=dict(_OKR_NO_TASK),
                 mods=_okr_nav_mods(f"ctx:okrpace:{kind}")))
+        rows.append(_okr_capacity_row(items, today))
         if query:
             rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["match"]) \
                 or [alfred.item(uid="okrp-none", title=f'No period matching "{query}"',
@@ -5338,7 +5354,155 @@ def render_okrpace(ids, query):
             subtitle=" · ".join([okr.span_txt(p.start, p.end, today)]
                                 + _okr_pace_bits(pp)) + "  |  ⌃🔙",
             valid=False))
+        if kind == "weekly":
+            # the weekly review opens this screen: the check sits where the
+            # next week gets planned
+            rows.append(_okr_capacity_row(items, today))
     return add_back(_okr_seal(rows), "ctx:okrpace")
+
+
+def _okr_capacity_row(items, today):
+    """⚖️ the capacity check (okr.capacity, HANDOFF_OKR phase 5: "KRs per
+    week, not focus"): the KRs the plan puts due in the next four weeks
+    against the KRs ticked in the last four, per week. ⚠️ when at least two
+    are due and the plan asks for more than half again what gets finished
+    (one KR due against none ticked is no overload). Display only."""
+    import okr
+    c = okr.capacity(items, today)
+    over = c.planned >= 2 and c.planned > 1.5 * c.done
+    return alfred.item(
+        uid="okrp-capacity",
+        title=(f"⚖️ Capacity · plan {okr.rate_txt(c.planned, c.weeks)} · "
+               f"done {okr.rate_txt(c.done, c.weeks)}" + (" · ⚠️ over" if over else "")),
+        subtitle=(f"Next {c.weeks} wks: {c.planned} KRs due · last {c.weeks} wks: "
+                  f"{c.done} ticked  |  ⌃🔙"),
+        valid=False, match="capacity load rate")
+
+
+def _okr_q(q):
+    """ "Q3" - the quarter's short name (okr_notes.tier_label without its
+    emoji)."""
+    return f"Q{(q.start.month - 1) // 3 + 1}"
+
+
+def render_okrcarry(ids, query):
+    """ctx:okrcarry[:<quarter start>] - the quarter carry-over (HANDOFF_OKR
+    phase 5: "Every open KR gets one decision: carry into next quarter /
+    won't do / someday. Nothing leaks silently from one quarter into the
+    next"): okr.carry_candidates for okr.closing_quarter - the quarter now
+    ending in its last two weeks, else the one just gone - each a full hub
+    row (⇧✅ ⌥⇧📅 ⌘⚡ as everywhere) whose ⏎ opens its three choices.
+    ctx:okrcarry:<quarter start>:<id> - those three, each an xact:okr_carry
+    that lands back on the list, pinned to the same quarter, so the next
+    leftover is on top. A carry ripples like any schedule action: the rest
+    of the lane moves along, often out of the quarter with it."""
+    import okr
+    import periodic_model as pm
+    from datetime import date as _date
+    from periodic_rows import _b64
+    pinned = None
+    if ids:
+        try:
+            pinned = _date.fromisoformat(ids[0])
+        except ValueError:
+            pinned = None
+    today = _date.today()
+    q = okr.closing_quarter(today, pinned)
+    nq = pm.next_period(q)
+    qkey = q.start.isoformat()
+    home = f"ctx:okrcarry:{qkey}"
+    if len(ids) >= 2:
+        snap, it, by, problem = _okr_item_for(ids[1:])
+        if problem:
+            return add_back(problem, home)
+        items = snap.items
+        want = okr.wanted_spans(items)
+        s, e = _okr_span(it, want)
+        up = by.get(it.parent) if it.parent else None
+        head = alfred.item(
+            uid="okrc-head",
+            title=f"{_OKR_GLYPH.get(it.kind, '▫️')} {it.name} · {okr.span_txt(s, e, today)}",
+            subtitle=((f"{_OKR_GLYPH[up.kind]} {up.name} · " if up is not None
+                       and up.kind in okr.PARENT_KINDS else "")
+                      + f"left open in {_okr_q(q)}  |  ⌃🔙"),
+            valid=False)
+        if it.history:
+            return add_back(_okr_seal([head, alfred.item(
+                uid="okrc-closed", title="Closed already · nothing to decide",
+                subtitle="⌃🔙", valid=False)]), home)
+        start = okr.carry_start(q.end, today)
+
+        def pay(action, arg=None):
+            return _b64({"id": it.id, "action": action, "arg": arg, "back": home})
+
+        try:
+            moves, heals = okr.schedule_plan(items, it.id, "date", start, today)
+            new = {i: (a, b) for i, a, b in list(moves) + list(heals)}
+            ns, ne = new.get(it.id, (s, e))
+            n = len({m[0] for m in moves} - {it.id})
+            carry = alfred.item(
+                uid="okrc-carry", title=f"↪️ Carry into {_okr_q(nq)}",
+                subtitle=(f"{okr.span_txt(ns, ne, today)}"
+                          + (f" · moves {n} along" if n else "") + "  |  ⏎↪️  ⌃🔙"),
+                arg=f"xact:okr_carry:{pay('carry', start.isoformat())}",
+                valid=True, match="carry next quarter")
+        except ValueError as ex:
+            carry = alfred.item(uid="okrc-carry", title=f"↪️ Carry into {_okr_q(nq)}",
+                                subtitle=f"{ex}  |  ⌃🔙", valid=False,
+                                match="carry next quarter")
+        # the verb refuses a won't do with open work under it (it would
+        # strand it): never offer that ⏎
+        kids = okr._kids(items)
+        below = [x for x in okr._descendants(it.id, kids) if x in by and not by[x].history]
+        wontdo = (alfred.item(uid="okrc-wontdo", title="🚫 Won't do",
+                              subtitle=(f"{len(below)} open under it · decide those first"
+                                        "  |  ⌃🔙"),
+                              valid=False, match="wont do drop abandon")
+                  if below else
+                  alfred.item(uid="okrc-wontdo", title="🚫 Won't do",
+                              subtitle="Out of progress and pace  |  ⏎🚫  ⌃🔙",
+                              arg=f"xact:okr_carry:{pay('wontdo')}", valid=True,
+                              match="wont do drop abandon"))
+        rows = [head, carry, wontdo,
+                alfred.item(uid="okrc-someday", title="💤 Someday",
+                            subtitle="Off the timeline · stays in the plan  |  ⏎💤  ⌃🔙",
+                            arg=f"xact:okr_carry:{pay('someday')}", valid=True,
+                            match="someday later undate park")]
+        if query:
+            rows = fuzz.filter_and_score(query, rows[1:], key_fn=lambda x: x["match"]) \
+                or [alfred.item(uid="okrc-none", title=f'Nothing matching "{query}"',
+                                subtitle="⌃🔙", valid=False)]
+        return add_back(_okr_seal(rows), home)
+    snap, why, _live = _okr_snapshot(query)
+    if snap is None:
+        return _okr_problem(why)
+    items, pid = snap.items, snap.list_id
+    by = okr.index(items)
+    want = okr.wanted_spans(items)
+    real = _okr_real()
+    left = okr.carry_candidates(items, q.end)
+    rows = []
+    for it in left:
+        r = _okr_row(it, items, today, pid, want, real, where=by)
+        r["arg"] = f"xact:crmbrowse:{home}:{it.id}"
+        r["subtitle"] = (r["subtitle"].replace("⏎↗️", "⏎↪️", 1)
+                         .replace("⏎⤵️", "⏎↪️", 1))
+        rows.append(r)
+    if query:
+        rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x.get("match") or x["title"]) \
+            or [alfred.item(uid="okrc-none", title=f'Nothing matching "{query}"',
+                            subtitle="⌃🔙", valid=False)]
+        return add_back(_okr_seal(rows), "ctx:okr")
+    head = alfred.item(
+        uid="okrc-list-head",
+        title=f"↪️ Carry-over · {_okr_q(q)} · {len(left)} open",
+        subtitle=(f"{_okr_q(q)} ends {okr.span_txt(q.end, q.end, today)} · "
+                  f"carry into {_okr_q(nq)} · won't do · someday  |  ⌃🔙"),
+        valid=False)
+    if not left:
+        rows = [alfred.item(uid="okrc-clean", title=f"Nothing left open · {_okr_q(q)} is clean",
+                            subtitle="⌃🔙", valid=False)]
+    return add_back(_okr_seal([head] + rows), "ctx:okr")
 
 
 def _okr_item_for(ids):
@@ -6661,6 +6825,9 @@ def main():
 
         elif level == "okrimport":
             items = render_okrimport(ids, query)
+
+        elif level == "okrcarry":
+            items = render_okrcarry(ids, query)
 
         elif level == "tph":
             items = render_tph(ids[0] if ids else "", query)

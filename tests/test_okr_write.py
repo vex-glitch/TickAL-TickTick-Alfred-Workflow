@@ -49,6 +49,7 @@ ow.LOCK_FILE = os.path.join(TMP, "okr.lock")
 ow.HEAL_STAMP = os.path.join(TMP, "okr_heal.stamp")
 ow.HEAL_LOG = os.path.join(TMP, "okr.log")
 ow.LOCK_WAIT = 0.4
+ow.CD_REGISTRY = os.path.join(TMP, "okr_countdowns.json")
 ow._mtime = lambda key: None       # the in-memory cache has no files to date
 TODAY = date(2026, 9, 18)
 
@@ -178,6 +179,11 @@ class FakeV2:
         self.ok = ok
         self.completed = completed
         self.batches = []
+        self.cds = None                    # the countdown list (None = the read fails)
+        self.cd_ok = True
+        self.cd_batches = []
+        self.abandon_ok = True
+        self.abandoned = []
 
     def project_completed(self, pid, days=120, limit=500):
         if not self.token or not self.completed:
@@ -192,6 +198,28 @@ class FakeV2:
             if b["id"] in self.api.store:
                 self.api.store[b["id"]] = cp({k: v for k, v in b.items()
                                               if not k.startswith("_")})
+        return True
+
+
+    def get_countdowns(self):
+        return None if self.cds is None else cp(self.cds)
+
+    def countdown_batch(self, add=None, update=None, delete=None):
+        self.cd_batches.append(cp({"add": add or [], "update": update or [],
+                                   "delete": delete or []}))
+        if not self.token or not self.cd_ok:
+            return False
+        by = {c["id"]: c for c in self.cds or []}
+        for c in (add or []) + (update or []):
+            by[c["id"]] = cp(c)
+        self.cds = list(by.values())
+        return True
+
+    def abandon_task(self, task):
+        self.abandoned.append(cp(task))
+        if not self.token or not self.abandon_ok:
+            return False
+        self.api.store.pop(task["id"], None)     # in no read any more
         return True
 
 
@@ -2429,6 +2457,312 @@ try:
         finally:
             xact.cfg.load, xact.cfg.save, xact._ask, xact._api = real_cfg
     finally:
+        xact._run_trigger, xact._crm_say = real
+
+    # ── 10. phase 5: ⏳ countdowns ───────────────────────────────────────────
+    print("countdowns")
+    SEP20 = d(9, 20)
+    items = okr.items_from(fixture()[0] + fixture()[1])
+    n = [0]
+
+    def nid():
+        n[0] += 1
+        return f"{n[0]:024x}"
+
+    def ours(iid, name, date_int, status=0, cid=None, **kw):
+        c = {"id": cid or ("c" + iid.lower()).ljust(24, "0"), "type": 4, "name": name,
+             "date": date_int, "remark": ow.CD_MARK + iid, "status": status,
+             "sortOrder": -5, "etag": "et", "showRemark": False}
+        c.update(kw)
+        return c
+
+    check("targets: an open O that has STARTED, on its wanted end; not-yet-started, "
+          "done and undated ones have none",
+          [(it.id, e) for it, e in okr.countdown_targets(items, SEP20)]
+          == [("O1", d(10, 14))], okr.countdown_targets(items, SEP20))
+    check("targets: the day before the start there is none",
+          okr.countdown_targets(items, d(9, 18)) == [])
+    check("targets: one running late keeps it (counts the days since)",
+          [it.id for it, _e in okr.countdown_targets(items, d(11, 1))] == ["O1", "O2"])
+
+    p = ow.countdown_plan(items, [{"id": "x" * 24, "name": "Mama", "sortOrder": 100}],
+                          {}, SEP20, nid)
+    a = p.add[0] if p.add else {}
+    check("plan: mints ONE for the started O - ⏳ kind 4, its inclusive end, named with its glyph",
+          len(p.add) == 1 and not p.update and not p.archive
+          and a["name"] == "🥅 TickAL" and a["date"] == 20261014 and a["type"] == 4
+          and a["repeatFlag"] is None, p)
+    check("plan: marked as ours in the remark, the remark hidden, no reminders, on top",
+          a.get("remark") == ow.CD_MARK + "O1" and a.get("showRemark") is False
+          and a.get("reminders") == [] and a.get("sortOrder") == 100 - ow.CD_STEP
+          and ow.cd_owner(a) == "O1", a)
+    check("plan: the registry remembers what was minted",
+          p.registry == {"O1": {"cid": a.get("id"), "by_us": False}}, p.registry)
+    mama = {"id": "x" * 24, "name": "Mama", "remark": "", "status": 0}
+    p = ow.countdown_plan(items, [mama, ours("O1", "🥅 TickAL", 20261014)], {}, SEP20, nid)
+    check("plan: in step = nothing to write", not (p.add or p.update or p.archive), p)
+    p = ow.countdown_plan(items, [ours("O1", "🥅 Old name", 20261001)], {}, SEP20, nid)
+    check("plan: a moved end or a new name updates the WHOLE listed entity",
+          p.update == [ours("O1", "🥅 TickAL", 20261014)] and not p.add, p)
+    p = ow.countdown_plan(items, [ours("O2", "🥅 Workflows", 20261001)], {}, SEP20, nid)
+    check("plan: one not started yet is kept in step, never archived for being early",
+          [c["date"] for c in p.update] == [20261020] and not p.archive
+          and [c["name"] for c in p.add] == ["🥅 TickAL"], p)
+    p = ow.countdown_plan(items, [ours("O3", "🥅 Other things", 20260830)], {}, SEP20, nid)
+    check("plan: a DONE objective's countdown is archived, by us",
+          [(c["id"], c["status"]) for c in p.archive] == [(ours("O3", "", 0)["id"], 1)]
+          and p.registry.get("O3", {}).get("by_us") is True, p)
+    p = ow.countdown_plan(items, [ours("GONE", "🥅 Deleted", 20261201)], {}, SEP20, nid)
+    check("plan: one whose objective left the plan is archived too",
+          [c["name"] for c in p.archive] == ["🥅 Deleted"], p)
+    p = ow.countdown_plan(items, [ours("O4", "🥅 ✨", 20261201)], {}, SEP20, nid)
+    check("plan: an objective that lost its dates loses its countdown",
+          [c["name"] for c in p.archive] == ["🥅 ✨"], p)
+    p = ow.countdown_plan(items, [], {"O1": {"cid": "9" * 24, "by_us": False}}, SEP20, nid)
+    check("plan: minted before and gone now = Vex removed it: never minted again",
+          not p.add, p)
+    p = ow.countdown_plan(items, [], {"O1": {"cid": "9" * 24, "by_us": True}}, SEP20, nid)
+    check("plan: archived by US and no longer listed: minted afresh",
+          [c["name"] for c in p.add] == ["🥅 TickAL"]
+          and p.registry["O1"]["by_us"] is False, p)
+    arch = ours("O1", "🥅 TickAL", 20261001, status=1)
+    p = ow.countdown_plan(items, [arch], {"O1": {"cid": arch["id"], "by_us": True}}, SEP20, nid)
+    check("plan: archived by us and still listed: brought back, on the new end",
+          [(c["status"], c["date"]) for c in p.update] == [(0, 20261014)] and not p.add, p)
+    p = ow.countdown_plan(items, [arch], {}, SEP20, nid)
+    check("plan: archived by VEX (no by_us record): left alone, nothing minted beside it",
+          not (p.add or p.update or p.archive), p)
+    edited = dict(ours("O1", "🥅 TickAL", 20261001), remark="my words")
+    p = ow.countdown_plan(items, [edited], {"O1": {"cid": edited["id"], "by_us": False}},
+                          SEP20, nid)
+    check("plan: a remark Vex edited: the registry still knows it is ours",
+          [c["id"] for c in p.update] == [edited["id"]] and not p.add, p)
+    live1 = ours("O1", "🥅 TickAL", 20261014)
+    p = ow.countdown_plan(items, [live1], {}, SEP20, nid)
+    check("plan: a live countdown of ours the registry lost (a failed save) is back-filled",
+          p.known == {"O1": {"cid": live1["id"], "by_us": False}}
+          and p.registry == p.known and not (p.add or p.update or p.archive), p)
+    p = ow.countdown_plan(items, [live1], {"O1": {"cid": live1["id"], "by_us": True}},
+                          SEP20, nid)
+    check("plan: a stale by_us on a LIVE countdown is cleared (a later archive by Vex holds)",
+          p.known["O1"]["by_us"] is False, p)
+    p2 = ow.countdown_plan(items, [dict(live1, status=1)], p.known, SEP20, nid)
+    check("... and Vex archiving it then is respected: nothing un-archived, nothing minted",
+          not (p2.add or p2.update or p2.archive), p2)
+    p = ow.countdown_plan(items, [], {}, SEP20, nid)
+    check("plan: an add waits for the ack - it is in registry, not in known",
+          "O1" in p.registry and "O1" not in p.known, p)
+    retitled = okr.items_from([D("O1", "TickAL (retitled)", d(9, 19), d(10, 14))]
+                              + fixture()[0][1:] + fixture()[1])
+    p = ow.countdown_plan(retitled, [live1], {}, SEP20, nid)
+    check("plan: an objective retitled into a plain task (or a KR) loses its countdown",
+          [c["id"] for c in p.archive] == [live1["id"]]
+          and p.known["O1"] == {"cid": live1["id"], "by_us": True}, p)
+
+    api, v2 = world()
+    snap = snapshot(api, v2)
+    v2.cds = []
+    r = ow.sync_countdowns(snap, v2, SEP20)
+    check("sync: writes the plan, says so", r[0] == "⏳ 1 countdown added"
+          and len(v2.cds) == 1 and v2.cds[0]["name"] == "🥅 TickAL", r)
+    reg = json.load(open(ow.CD_REGISTRY))
+    check("sync: the registry is saved after the write", list(reg) == ["O1"], reg)
+    r = ow.sync_countdowns(snap, v2, SEP20)
+    check("sync: a second pass is quiet", r[0] == "" and "in step" in r[1], r)
+    os.remove(ow.CD_REGISTRY)
+    api, v2 = world()
+    snap = snapshot(api, v2)
+    v2.cds, v2.cd_ok = [], False
+    r = ow.sync_countdowns(snap, v2, SEP20)
+    check("sync: a refused batch saves NO add record (it would block the mint for good)",
+          r[0] == "" and "refused" in r[1] and not os.path.exists(ow.CD_REGISTRY), r)
+    api, v2 = world()
+    snapd = snapshot(api, v2)
+    v2.cds = [ours("O3", "🥅 Other things", 20260830)]
+    v2.cd_ok = False
+    r = ow.sync_countdowns(snapd, v2, SEP20)
+    reg = json.load(open(ow.CD_REGISTRY)) if os.path.exists(ow.CD_REGISTRY) else {}
+    check("sync: a refused batch still saves its ARCHIVE records (by_us - safe either way)",
+          reg.get("O3", {}).get("by_us") is True and "O1" not in reg, reg)
+    os.remove(ow.CD_REGISTRY)
+    v2.cd_ok = True
+    v2.cds = [ours("O1", "🥅 TickAL", 20261014)]
+    r = ow.sync_countdowns(snapd, v2, SEP20)
+    reg = json.load(open(ow.CD_REGISTRY)) if os.path.exists(ow.CD_REGISTRY) else {}
+    check("sync: in step, but the registry lacked the live one: saved anyway",
+          r[0] == "" and "in step" in r[1] and reg.get("O1", {}).get("by_us") is False, (r, reg))
+    os.remove(ow.CD_REGISTRY)
+    api, v2 = world()
+    snap = snapshot(api, v2)
+    v2.cds, v2.cd_ok = [], True
+    v2.cds, v2.cd_ok = None, True
+    r = ow.sync_countdowns(snap, v2, SEP20)
+    check("sync: an unreadable list writes nothing", r[0] == "" and "unreadable" in r[1]
+          and not v2.cd_batches, r)
+    v2.cds = []
+    snap.done_complete = False
+    r = ow.sync_countdowns(snap, v2, SEP20)
+    check("sync: a read missing completed items writes nothing (THE WRITER RULE)",
+          r[0] == "" and not v2.cd_batches, r)
+    snap.done_complete = True
+    v2.token = ""
+    r = ow.sync_countdowns(snap, v2, SEP20)
+    check("sync: no v2 token, no countdowns", r[0] == "" and "token" in r[1], r)
+    MEM["countdowns"] = [{"id": "x" * 24, "name": "Mama", "status": 0}]
+    api, v2 = world()
+    MEM["countdowns"] = [{"id": "x" * 24, "name": "Mama", "status": 0},
+                         ours("O3", "🥅 Other things", 20260830)]
+    v2.cds = cp(MEM["countdowns"])
+    r = ow.sync_countdowns(snapshot(api, v2), v2, SEP20)
+    check("sync: the countdowns cache follows - the new one in, the archived one out",
+          sorted(c["name"] for c in MEM["countdowns"]) == ["Mama", "🥅 TickAL"], MEM["countdowns"])
+    os.remove(ow.CD_REGISTRY)
+
+    api, v2 = world()
+    v2.cds = []
+    r = ow.heal_and_tick(api, v2, is_done=lambda p_, t: None, today=SEP20)
+    check("heal: the countdown rides the heal pass, off the HEALED span, in the chip",
+          r.chip == "🥅 1 span healed · ⏳ 1 countdown added"
+          and v2.cds[0]["date"] == 20261014 and "countdowns: " in r.note, (r, v2.cds))
+    os.remove(ow.CD_REGISTRY)
+    api, v2 = world()
+    v2.cds = [ours("O1", "🥅 TickAL", 20261014)]
+    out = attempt(ow.schedule, {"id": "K2", "action": "extend", "arg": 2}, api, v2, SEP20)
+    check("schedule: an extend that moves the O's end moves its countdown, said in the toast",
+          isinstance(out, str) and out.endswith("· ⏳ 1 countdown updated")
+          and v2.cds[0]["date"] == 20261016, (out, v2.cds))
+    if os.path.exists(ow.CD_REGISTRY):
+        os.remove(ow.CD_REGISTRY)
+
+    # ── 11. phase 5: ↪️ the quarter carry-over ────────────────────────────────
+    print("carry")
+    check("closing quarter: inside the last two weeks = the quarter now ending",
+          okr.closing_quarter(d(9, 17)).start == d(7, 1))
+    check("closing quarter: earlier = the quarter before (a late review still closes it)",
+          okr.closing_quarter(d(10, 3)).start == d(7, 1)
+          and okr.closing_quarter(d(9, 16)).start == d(4, 1))
+    check("closing quarter: a pin wins", okr.closing_quarter(d(9, 17), d(2, 3)).start == d(1, 1))
+    check("carry start: the next quarter's first day, or today when that is gone",
+          okr.carry_start(d(9, 30), d(9, 20)) == d(10, 1)
+          and okr.carry_start(d(9, 30), d(10, 3)) == d(10, 3))
+    left = okr.carry_candidates(items, d(9, 30))
+    check("candidates: open dated LEAVES ending by the quarter's end, end order "
+          "(no parent with dated KRs, no done, no undated)",
+          [x.id for x in left] == ["K5", "K7"], [x.id for x in left])
+    solo = okr.items_from([D("OX", "🥅 O • Hand dated", d(9, 1), d(9, 2))])
+    check("candidates: a Y/O dated by hand with no dated child IS a leaf",
+          [x.id for x in okr.carry_candidates(solo, d(9, 30))] == ["OX"])
+
+    api, v2 = world()
+    out = attempt(ow.carry, {"id": "K5", "action": "carry", "arg": "2026-10-01"},
+                  api, v2, SEP20)
+    check("carry: rides schedule's date move (ripple, heals, its toast)",
+          out == "📅 Side quest → Oct 1 - Oct 2 · 2 moved along · 1 healed"
+          and okr.span(api.store["K5"]) == (d(10, 1), d(10, 2))
+          and okr.span(api.store["K7"]) == (d(10, 3), d(10, 4))
+          and okr.span(api.store["O1"]) == (d(9, 19), d(10, 25)),
+          (out, {k: okr.span(api.store[k]) for k in ("K5", "K7", "K2", "O1")}))
+    api, v2 = world()
+    out = attempt(ow.carry, {"id": "K7", "action": "wontdo"}, api, v2, SEP20)
+    ab = v2.abandoned[0] if v2.abandoned else {}
+    check("won't do: v2 abandon of the LIVE object with a stamped completedTime",
+          isinstance(out, str) and out.startswith("🚫 Won't do: Stray")
+          and ab.get("id") == "K7" and ab.get("completedTime", "").endswith(".000+0000"), out)
+    check("won't do: the wontdo log gets it; the open pools lose it",
+          (MEM.get("wontdo_tasks") or [{}])[0].get("id") == "K7"
+          and MEM["wontdo_tasks"][0]["status"] == -1
+          and cached("all_tasks", "K7") is None and cached(f"project_data_{PID}", "K7") is None)
+    check("won't do: okr_rows shows it 🚫 until the next live read (⇧ undo on the hub)",
+          cached("okr_rows", "K7")["status"] == -1)
+    api, v2 = world()
+    out = attempt(ow.carry, {"id": "K2", "action": "wontdo"}, api, v2, SEP20)
+    check("won't do: the last KR gone, its O heals in the same hold",
+          isinstance(out, str) and "1 parent healed" in out
+          and okr.span(api.store["O1"]) == (d(9, 19), d(10, 4)), (out, api.store.get("O1")))
+    api, v2 = world(token="")
+    check("won't do: no v2 token = refused, nothing written",
+          "Attachment Login" in (refused(ow.carry, {"id": "K7", "action": "wontdo"},
+                                         api, v2, SEP20) or "") and wrote_nothing(api, v2))
+    api, v2 = world()
+    v2.abandon_ok = False
+    check("won't do: TickTick refusing = refused, no mirror",
+          "refused" in (refused(ow.carry, {"id": "K7", "action": "wontdo"}, api, v2, SEP20) or "")
+          and cached("all_tasks", "K7") is not None)
+    trip = [D("OT", "🥅 O • Trip", d(9, 1), d(9, 10)),
+            D("KT", "🔑 KR • Book it", parent="OT")]
+    api, v2 = world()
+    for t in trip:
+        api.store[t["id"]] = cp(t)
+    check("won't do: a hand-dated O with open (undated) KRs is refused - they would be stranded",
+          "1 open item under it" in (refused(ow.carry, {"id": "OT", "action": "wontdo"},
+                                               api, v2, SEP20) or "")
+          and not v2.abandoned, v2.abandoned)
+    step = okr.items_from([D("OS", "🥅 O • Stepped", d(9, 1), d(9, 10)),
+                           D("ST", "Book flights", d(9, 1), d(9, 10), "OS")])
+    check("candidates: an unprefixed step under an O is a leftover (pace counts it)",
+          [x.id for x in okr.carry_candidates(step, d(9, 30))] == ["ST"])
+    api, v2 = world()
+    check("a parent with dated KRs is not decided on its own",
+          "follows its KRs" in (refused(ow.carry, {"id": "O1", "action": "wontdo"},
+                                         api, v2, SEP20) or "") and wrote_nothing(api, v2))
+    check("a done item is closed already",
+          "closed already" in (refused(ow.carry, {"id": "K4", "action": "someday"},
+                                        api, v2, SEP20) or ""))
+    check("an unknown action is refused",
+          refused(ow.carry, {"id": "K7", "action": "later"}, api, v2, SEP20) == "↪️ Nothing to decide")
+    api, v2 = world()
+    out = attempt(ow.carry, {"id": "K2", "action": "someday"}, api, v2, SEP20)
+    up = api.of("update_task")[0] if api.of("update_task") else ()
+    check("someday: v1 nulls both dates (the proven clear)",
+          up and up[1] == "K2" and up[3] == {"startDate": None, "dueDate": None}, up)
+    check("someday: toast + the O heals onto what is left",
+          isinstance(out, str) and out.startswith("💤 Hub → someday")
+          and "1 parent healed" in out
+          and okr.span(api.store["O1"]) == (d(9, 19), d(10, 4)), (out, api.store.get("O1")))
+    check("someday: the caches show it undated",
+          cached("all_tasks", "K2")["startDate"] is None
+          and cached("okr_rows", "K2")["dueDate"] is None)
+    api, v2 = world()
+    check("someday: an undated one is off the timeline already",
+          "already" in (refused(ow.carry, {"id": "K3", "action": "someday"}, api, v2, SEP20) or ""))
+
+    # ── 12. phase 5: okr.capacity ─────────────────────────────────────────────
+    print("capacity")
+    rows = [D("C1", "🔑 KR • a", d(9, 21), d(9, 22)),
+            D("C2", "🔑 KR • b", d(10, 10), d(10, 12)),
+            D("C3", "🔑 KR • c", d(10, 18), d(10, 20)),
+            D("C4", "🔑 KR • d", d(9, 1), d(9, 2), status=2,
+              completedTime="2026-09-10T08:00:00.000+0000"),
+            D("C5", "🔑 KR • e", d(8, 1), d(8, 2), status=2,
+              completedTime="2026-08-01T08:00:00.000+0000"),
+            D("C6", "🔑 KR • f", d(9, 25), d(9, 26), status=-1),
+            D("C7", "🥅 O • not a KR", d(9, 21), d(9, 30))]
+    c = okr.capacity(okr.items_from(rows), SEP20)
+    check("capacity: due in the next 4 wks (won't-do and non-KRs out) vs ticked in the last 4",
+          (c.planned, c.done, c.weeks) == (2, 1, 4), c)
+    check("capacity: rates read like a person says them",
+          (okr.rate_txt(2, 4), okr.rate_txt(4, 4), okr.rate_txt(0, 4), okr.rate_txt(7, 4))
+          == ("0.5/wk", "1/wk", "0/wk", "1.8/wk"))
+
+    # ── 13. the xact carry verb ──────────────────────────────────────────────
+    print("xact carry")
+    trig, said = [], []
+    real = (xact._run_trigger, xact._crm_say)
+    xact._run_trigger = lambda name, arg=None: trig.append((name, arg))
+    xact._crm_say = lambda m: said.append(m)
+    real_carry = ow.carry
+    ow.carry = lambda spec: f"↪️ got {spec['action']}"
+    old_argv = sys.argv
+    try:
+        sys.argv = ["xact.py", "xact:okr_carry:" + b64({"id": "K7", "action": "wontdo",
+                                                         "back": "ctx:okrcarry:2026-07-01"})]
+        out = run(xact.main)
+        check("main routes xact:okr_carry, lands back on the pinned list (BrowseCtx)",
+              out == "↪️ got wontdo\n" and trig == [("BrowseCtx", "ctx:okrcarry:2026-07-01")]
+              and not said, (out, trig))
+    finally:
+        sys.argv = old_argv
+        ow.carry = real_carry
         xact._run_trigger, xact._crm_say = real
 finally:
     cache.get, cache.set, cache.invalidate, cache.age_seconds = _orig

@@ -41,10 +41,16 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
                           weekly rides the weekly note and ends in the
                           three-things picker into next week's 🏆 Goals,
                           so in a KM macro it goes LAST (Alfred opens)
-    view:<calendar|countdowns|crmcal>  destinations the app has NO link
-                          for: calendar = ET OpenCalendar's List-menu flow,
-                          countdowns = the Alfred ⏳ hub, crmcal = the
-                          Alfred CRM calendar (what CRM > Calendar opens)
+    view:<calendar|countdowns|crmcal|okr...>  destinations the app has NO
+                          link for: calendar = ET OpenCalendar's List-menu
+                          flow, countdowns = the Alfred ⏳ hub, crmcal = the
+                          Alfred CRM calendar (what CRM > Calendar opens),
+                          okr = the 🥅 OKRs hub, okrdaily | okrweekly |
+                          okrmonthly | okrquarterly = that 📈 Pace period's
+                          plan, okrcarry = the quarter carry-over (the OKR
+                          steps in the routines, HANDOFF_OKR phase 5). A
+                          slot never holds a colon: link.py VIEW_CTX maps
+                          each to its full ctx
     money                 THIS month's money-tracking note, found by its
                           title date at click time (money_note); the newest
                           one until the month's note exists
@@ -94,7 +100,8 @@ def _routine_keys():
 SLOT_VERBS = {"journal": ("morning", "evening", "weekly", "monthly",
                           "quarterly"),
               "routine": _routine_keys(),
-              "view": ("calendar", "countdowns", "crmcal"),
+              "view": ("calendar", "countdowns", "crmcal", "okr", "okrdaily",
+                       "okrweekly", "okrmonthly", "okrquarterly", "okrcarry"),
               "note": PN_SPECS,
               "notesticky": PN_SPECS,
               "notewindow": PN_SPECS}
@@ -252,6 +259,8 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
         ("inbox", "📥 Inbox", "App inbox", f"[📥 Inbox]({APP_LINKS['inbox']})"),
         ("crmcal", "📅 CRM calendar", "Alfred, like CRM > Calendar",
          f"[🖥 CRM calendar]({url('view', 'crmcal')})"),
+        ("okr", "🥅 OKRs", "Alfred hub, the plan",
+         f"[🖥 OKRs]({url('view', 'okr')})"),
     ]
     if money:
         rows += [("money", "💰 Money note", "Always this month's",

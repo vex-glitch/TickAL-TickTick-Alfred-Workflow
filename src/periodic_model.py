@@ -109,6 +109,8 @@ SEC_CREATED    = "Created"                # prefix - header carries the data
 SEC_COMPLETED  = "Completed"              # prefix
 SEC_WBARS      = "Daily Completed"        # per-day bars
 SEC_FOCUS_WEEK = "Focus"                  # prefix
+SEC_ALIGNED    = "🥅 Aligned"             # prefix - the week's work that served an
+                                          # objective (HANDOFF_OKR phase 5)
 SEC_ENTRIES    = "📨 Entries"
 SEC_MOODS      = "😊 Moods"               # prefix - header carries the average
 SEC_LAST_WEEK  = "⏪ Last week"
@@ -235,7 +237,7 @@ WRITER_ANCHORS = {
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK,
                   SEC_WEEKLY_JNL, SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME,
-                  SEC_PEOPLE],
+                  SEC_PEOPLE, SEC_ALIGNED],
     "monthly":   [SEC_OKR, SEC_MTH_QTR, SEC_MTH_MONTH, SEC_HIGHLIGHT,
                   SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
                   SEC_MBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
@@ -262,7 +264,7 @@ SECTION_SCOPE = {
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_WBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
-        SEC_HABIT_WEEK: SEC_WK_STATS,
+        SEC_HABIT_WEEK: SEC_WK_STATS, SEC_ALIGNED: SEC_WK_STATS,
         SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
         SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,

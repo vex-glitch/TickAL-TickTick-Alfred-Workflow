@@ -259,8 +259,14 @@ write through BrowseCtx - clean bar):
                                     copy's title links the real thing
     xact:okr_tag:<b64>              🏷 {"id","tag"} swap the OKR-pool tag; an
                                     O takes its open KRs along
-    xact:okr_heal                   detached heal + auto-tick (the hub spawns
-                                    it on open, debounced; hourly sync too)
+    xact:okr_heal                   detached heal + auto-tick + the ⏳
+                                    countdowns (the hub spawns it on open,
+                                    debounced; hourly sync too)
+    xact:okr_carry:<b64>            ↪️ {"id","action":carry|wontdo|someday,
+                                    "arg":"YYYY-MM-DD"|null} one quarter
+                                    carry-over decision (phase 5): carry =
+                                    okr_sched's date move, wontdo = v2
+                                    status -1, someday = undated
     xact:okr_setlist                ⚙️ Settings → OKR List dialog (blank = off,
                                     no kanban flip: a timeline list)
 
@@ -12045,6 +12051,15 @@ def okr_tag(rest):
     _okr_run(rest, ow.retag)
 
 
+def okr_carry(rest):
+    """↪️ one quarter carry-over decision (HANDOFF_OKR phase 5): carry into
+    the next quarter (the ripple of a schedule action), won't do, or
+    someday (undated) - from a writable live read, parents healed, the
+    countdowns in step. Lands back on the carry-over list."""
+    import okr_write as ow
+    _okr_run(rest, ow.carry)
+
+
 def okr_heal():
     """The detached pass the hub spawns on open (okr_write.spawn_heal,
     debounced): heal every stale Y/O span, tick every KR whose linked
@@ -12317,6 +12332,8 @@ def main():
             okr_tag(rest)
         elif verb == "okr_heal":
             okr_heal()
+        elif verb == "okr_carry":
+            okr_carry(rest)
         elif verb == "okr_setlist":
             okr_setlist()
         elif verb == "add_pre":
