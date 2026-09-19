@@ -49,6 +49,7 @@ ow.LOCK_FILE = os.path.join(TMP, "okr.lock")
 ow.HEAL_STAMP = os.path.join(TMP, "okr_heal.stamp")
 ow.HEAL_LOG = os.path.join(TMP, "okr.log")
 ow.LOCK_WAIT = 0.4
+ow._mtime = lambda key: None       # the in-memory cache has no files to date
 TODAY = date(2026, 9, 18)
 
 
@@ -112,6 +113,9 @@ class FakeAPI:
         self.fail_update = False
         self.fail_ids = set()              # update_task refuses these ids only
         self.create_tz = None              # a zone the create response carries
+        self.create_order = None           # a sortOrder EVERY create gets (a tie)
+        self.create_orders = None          # one sortOrder per create, in order
+        self.fail_create = None            # an exception every create raises
 
     def get_project_data(self, pid):
         self.calls.append(("get_project_data", pid))
@@ -134,13 +138,21 @@ class FakeAPI:
         self.store[tid] = cp(body)
         return cp(body)
 
-    def create_task(self, title, project_id=None, parent_id=None, tags=None, **kw):
+    def create_task(self, title, project_id=None, parent_id=None, tags=None,
+                    content=None, **kw):
         self.n += 1
         tid = f"new{self.n}"
-        self.calls.append(("create_task", title, project_id, parent_id, tags))
+        self.calls.append(("create_task", title, project_id, parent_id, tags, content, kw))
+        if self.fail_create is not None:
+            raise self.fail_create
+        order = (self.create_orders[self.n - 1] if self.create_orders
+                 else 1000 - self.n * 100 if self.create_order is None
+                 else self.create_order)
         t = {"id": tid, "projectId": project_id, "title": title,
              "tags": list(tags or []), "parentId": parent_id, "status": 0,
-             "sortOrder": 1000 - self.n * 100, "isAllDay": False}
+             "sortOrder": order, "isAllDay": False}
+        if content:
+            t["content"] = content
         if self.create_tz:
             t["timeZone"] = self.create_tz
         self.store[tid] = cp(t)
@@ -258,6 +270,28 @@ def refused(fn, *a, **kw):
     return None
 
 
+def refusal(fn, *a, **kw):
+    """The Refusal itself (its reopen matters), or None."""
+    try:
+        fn(*a, **kw)
+    except ow.Refusal as e:
+        return e
+    return None
+
+
+def attempt(fn, *a, **kw):
+    """What the call returned, or the Refusal it raised: a write that should
+    go through then FAILS its check instead of aborting the whole run."""
+    try:
+        return fn(*a, **kw)
+    except ow.Refusal as e:
+        return e
+
+
+def ids(out):
+    return getattr(out, "ids", None)
+
+
 try:
     # ── 1. apply_spans: stored items, later wins, v2 then v1, the cache ──────
     print("apply_spans")
@@ -284,10 +318,20 @@ try:
               and c["dueDate"] == body["dueDate"], c)
     check("cache: the unrelated row survives", cached("all_tasks", "zz") is not None)
     rc = MEM["okr_rows"]
-    check("okr_rows REBUILT from the live read: its shape, the done KR, no seed detail",
+    check("okr_rows REBUILT from the live read: its shape, the done KR, the read's own "
+          "detail (never the seed's)",
           rc.get("list_id") == PID and rc.get("name") == "🏆Goals Planning"
-          and rc.get("done_complete") is True and "detail" not in rc
+          and rc.get("done_complete") is True and rc.get("detail") == snap.detail != "t"
+          and sorted(rc) == ["detail", "done_complete", "list_id", "name", "rows"]
           and cached("okr_rows", "K4")["status"] == 2, sorted(rc))
+    oc = MEM.get("okr_complete") or {}
+    check("C3 a complete live read is kept as okr_complete too: list, ts, every row with "
+          "the write over it",
+          sorted(oc) == ["list_id", "rows", "ts"] and oc["list_id"] == PID
+          and isinstance(oc["ts"], int)
+          and sorted(t["id"] for t in oc["rows"]) == sorted(t["id"] for t in rc["rows"])
+          and cached("okr_complete", "O1")["startDate"] == body["startDate"]
+          and cached("okr_complete", "K4")["status"] == 2, oc and sorted(oc))
     check("the write folds back into the snap (a second mirror builds on it)",
           okr.index(snap.items)["O1"].start == d(9, 19))
 
@@ -433,6 +477,48 @@ try:
     api, v2 = world(token="")
     r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
     check("no v2 token: the toast names the Attachment Login", r and "Attachment Login" in r, r)
+
+    # B2 the rate limit (300 / 5 min) says to WAIT. It reaches a toast by v1
+    # only: api.RateLimitError is the v1 client's, and api_v2.
+    # project_completed never raises - a v2 limit answers None, which reads
+    # "completed KRs unreadable" like any other v2 blip.
+    from api import RateLimitError
+    RATE = "🥅 Not written · TickTick rate limit · try again in a minute"
+
+    class RateAPI(FakeAPI):
+        def get_project_data(self, pid):
+            self.calls.append(("get_project_data", pid))
+            raise RateLimitError("exceed_query_limit")
+
+    o, dn = fixture()
+    seed_cache(o, dn)
+    api = RateAPI(o, dn)
+    v2 = FakeV2(api)
+    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
+    check("B2 v1 rate-limited (only the cache answered): 'rate limit · try again in a "
+          "minute'", r == RATE and ow.RATE_LIMITED == RATE and wrote_nothing(api, v2), r)
+    r = refused(ow.add_items, {"kind": "O", "names": ["x"],
+                               "link": {"to": "list", "pid": "3" * 24}}, api, v2)
+    check("B2 ... a linked add says the same", r == RATE and wrote_nothing(api, v2), r)
+    r = refused(ow.add_items, {"kind": "O", "names": ["x"]}, api, v2)
+    check("B2 ... and a typed one, never 'unreachable'", r == RATE and wrote_nothing(api, v2), r)
+    MEM.clear()
+    r = refused(ow.retag, {"id": "K1", "tag": "1️⃣work"}, api, FakeV2(api))
+    check("B2 v1 rate-limited with no cache to fall back on (OkrLoadError): the same",
+          r == RATE, r)
+
+    class LimitedV2(FakeV2):
+        """What a v2 rate limit really looks like: project_completed None."""
+        def project_completed(self, pid, days=120, limit=500):
+            return None
+
+    api, _v = world()
+    v2 = LimitedV2(api)
+    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
+    check("B2 v2 limited (project_completed None, it never raises): 'completed KRs "
+          "unreadable', not the rate-limit wording",
+          r == "🥅 Not written · completed KRs unreadable right now · try again"
+          and wrote_nothing(api, v2), r)
 
     api, v2 = world()
     import fcntl
@@ -605,6 +691,82 @@ try:
     ow.add_krs({"oid": "O1", "names": ["Solo"]}, api, v2)
     check("W4 one KR already in the O's zone: nothing posted after the create",
           not v2.batches and not api.of("update_task"), (v2.batches, api.of("update_task")))
+    check("B8 ... and the cache still carries its parent (the response said null)",
+          all((cached(k, "new1") or {}).get("parentId") == "O1"
+              for k in ("all_tasks", f"project_data_{PID}", "okr_rows")),
+          [cached(k, "new1") for k in ("all_tasks", "okr_rows")])
+
+    # B1 the server TIED the new siblings' sortOrder: dealt back out they
+    # would still tie, so strictly increasing ones are made, below the rest.
+    # The O's KRs carry DISTINCT orders (the fixture's are all 0, where
+    # "below every sibling" would only ever test "below 0")
+    def spread(api, parent="O1", base=-3 * 2 ** 29, step=2 ** 29):
+        """Distinct sortOrders on `parent`'s children, open and done; -> them."""
+        kids = [t for t in list(api.store.values()) + list(api.done.values())
+                if t.get("parentId") == parent]
+        for i, t in enumerate(sorted(kids, key=lambda t: t["id"])):
+            t["sortOrder"] = base + i * step
+        return [t["sortOrder"] for t in kids]
+
+    api, v2 = world()
+    sibs = spread(api)
+    api.create_order = 5
+    ow.add_krs({"oid": "O1", "names": ["Alpha", "Beta", "Gamma"]}, api, v2)
+    got = {b["title"]: b["sortOrder"] for b in v2.batches[-1]}
+    seq = [got.get(f"🔑 KR • {n} - TA") for n in ("Alpha", "Beta", "Gamma")]
+    check("B1 fixture: the O's siblings carry distinct orders, some below 0",
+          len(set(sibs)) == len(sibs) >= 6 and min(sibs) < 0, sibs)
+    check("B1 tied orders: strictly increasing in TYPED order",
+          None not in seq and seq[0] < seq[1] < seq[2], got)
+    check("B1 ... all below every existing sibling of the O: max(new) < min(existing)",
+          None not in seq and max(seq) < min(sibs), (seq, min(sibs)))
+    check("B1 ... a step apart, ORDER_STEP", None not in seq
+          and seq[1] - seq[0] == seq[2] - seq[1] == ow.ORDER_STEP, seq)
+    check("B1 ... and they read back in that order",
+          [api.store[b["id"]]["title"] for b in sorted(v2.batches[-1],
+                                                       key=lambda b: b["sortOrder"])]
+          == ["🔑 KR • Alpha - TA", "🔑 KR • Beta - TA", "🔑 KR • Gamma - TA"])
+    api, v2 = world()
+    api.create_order = 7
+    ow.add_krs({"oid": "O4", "names": ["Alpha", "Beta"]}, api, v2)
+    got = [b["sortOrder"] for b in sorted(v2.batches[-1], key=lambda b: b["title"])]
+    check("B1 tied under an O with no KRs: the block ENDS on the server's value",
+          got == [7 - ow.ORDER_STEP, 7], got)
+    api, v2 = world(token="")
+    api.create_order = 0
+    ow.add_krs({"oid": "O1", "names": ["Alpha", "Beta"]}, api, v2)
+    up = [c for c in api.of("update_task") if c[1].startswith("new")]
+    check("B1 tied, no v2 token: v1 carries the synthesized order too",
+          [c[1] for c in up] == ["new1", "new2"]
+          and up[0][3]["sortOrder"] < up[1][3]["sortOrder"] < 0, up)
+    api, v2 = world()
+    sibs = spread(api)
+    api.create_orders = [5, 5, 3]
+    ow.add_krs({"oid": "O1", "names": ["Alpha", "Beta", "Gamma"]}, api, v2)
+    got = {b["title"]: b["sortOrder"] for b in v2.batches[-1]}
+    seq = [got.get(f"🔑 KR • {n} - TA") for n in ("Alpha", "Beta", "Gamma")]
+    check("B1 a PARTIAL tie [5, 5, 3] is a tie: strictly increasing in TYPED order, "
+          "a step apart", None not in seq and seq[0] < seq[1] < seq[2]
+          and seq[1] - seq[0] == seq[2] - seq[1] == ow.ORDER_STEP, got)
+    check("B1 ... and below every existing sibling", None not in seq
+          and max(seq) < min(sibs), (seq, min(sibs)))
+    check("B1 ... read back in that order",
+          [api.store[b["id"]]["title"] for b in sorted(v2.batches[-1],
+                                                       key=lambda b: b["sortOrder"])]
+          == ["🔑 KR • Alpha - TA", "🔑 KR • Beta - TA", "🔑 KR • Gamma - TA"])
+    check("B1 _typed_orders: [5, 5, 3] with no siblings ends on the server's lowest",
+          ow._typed_orders([{"sortOrder": 5}, {"sortOrder": 5}, {"sortOrder": 3}], [])
+          == [3 - 2 * ow.ORDER_STEP, 3 - ow.ORDER_STEP, 3])
+    check("B1 distinct orders are the server's own, dealt out ascending (no synthesis)",
+          ow._typed_orders([{"sortOrder": 900}, {"sortOrder": 800}], [0]) == [800, 900])
+    check("B1 no sortOrder at all is a tie too",
+          ow._typed_orders([{}, {}], []) == [-ow.ORDER_STEP, 0])
+
+    api, v2 = world()
+    r = refused(ow.add_krs, {"oid": "O3", "names": ["a"]}, api, v2)
+    check("B4 the alias's closed-O refusal speaks 🔑", r == "🔑 Other things is closed · "
+          "reopen it first", r)
+
 
     api, v2 = world(token="")
     ow.add_krs({"oid": "O1", "names": ["Alpha", "Beta"]}, api, v2)
@@ -618,6 +780,1044 @@ try:
     r = refused(ow.add_krs, {"oid": "O1", "names": ["Delta"]}, api, v2)
     check("W11 v1 down (only the cache answered): add_krs refused, nothing created",
           r and "unreachable" in r and wrote_nothing(api, v2), r)
+
+    # ── 3b. add_items (phase 3: Y / O / KR, typed or imported) ───────────────
+    print("add_items")
+    P2, T2 = "b" * 24, "c" * 24
+    L = "d" * 24                       # "Workflows" in the projects cache
+    E, F = "e" * 24, "f" * 24          # what K9 already links (LINK_T)
+
+    def put(api, *rows, done=False):
+        for r in rows:
+            (api.done if done else api.store)[r["id"]] = cp(r)
+
+    def years(api):
+        put(api, D("Y1", "🏔️ Y • Productivity System", tags=["1️⃣work"],
+                   timeZone="America/New_York"))
+        put(api, D("Y2", "🏔️ Y • Old year", status=2), done=True)
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "parent": None, "names": ["Travel plans"],
+                        "code": None, "link": None, "then": "tag", "back": "ctx:okr"}, api, v2)
+    made = api.of("create_task")
+    check("a root O, text only: its prefix, NO suffix, no parent, no tags",
+          [(c[1], c[2], c[3], c[4]) for c in made]
+          == [("🥅 O • Travel plans", PID, None, None)], made)
+    check("... its OWN code proposed and written as ITS 🏷️ line at the create",
+          made[0][5] == "🏷️ TP", made)
+    check("... read back: an O named Travel plans, code TP",
+          (lambda it: (it.kind, it.name, okr.code_of(it, [])))(
+              okr.from_task(api.store["new1"])) == ("O", "Travel plans", "TP"))
+    check("the toast", out.msg == "🥅 Added · 🥅 Travel plans · code TP", out.msg)
+    check("then:tag + one O = its tag picker", out.reopen == "ctx:okrtag:new1"
+          and out.ids == ["new1"], out)
+    body = v2.batches[-1][0] if v2.batches else {}
+    check("the zone lands (Europe/Berlin, no parent to take one from), one body",
+          len(v2.batches) == 1 and body.get("timeZone") == "Europe/Berlin", v2.batches)
+    check("... and a ROOT body states no parentId at all", "parentId" not in body, body)
+    check("nothing else written (no heal: undated)", not api.of("update_task"))
+    for key in ("all_tasks", f"project_data_{PID}", "okr_rows"):
+        c = cached(key, "new1")
+        check(f"cache {key}: the new O, root, with its 🏷️ line (the tag screen finds it)",
+              c and c.get("parentId") is None and c.get("content") == "🏷️ TP", c)
+
+    api, v2 = world()
+    years(api)
+    out = ow.add_items({"kind": "O", "parent": "Y1", "names": ["Health plan"],
+                        "then": "tag", "back": "ctx:okr:y:Y1"}, api, v2)
+    made = api.of("create_task")
+    check("an O under an open Y: parented, inherits NO tag (the picker follows)",
+          [(c[1], c[3], c[4], c[5]) for c in made]
+          == [("🥅 O • Health plan", "Y1", None, "🏷️ HP")], made)
+    check("... the Y's zone, the parent restated", [(b.get("timeZone"), b.get("parentId"))
+          for b in v2.batches[-1]] == [("America/New_York", "Y1")], v2.batches)
+    check("... toast names the Y", out.msg == "🥅 Added · 🥅 Health plan under "
+          "🏔️ Productivity System · code HP", out.msg)
+    check("... and goes to its tag picker", out.reopen == "ctx:okrtag:new1", out)
+    check("cache okr_rows: under Y1", cached("okr_rows", "new1")["parentId"] == "Y1")
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "names": ["Alpha", "Beta two"], "then": "tag"}, api, v2)
+    made = api.of("create_task")
+    check("pipe = sibling O's, each with its own code",
+          [(c[1], c[5]) for c in made] == [("🥅 O • Alpha", "🏷️ A"),
+                                           ("🥅 O • Beta two", "🏷️ BT")], made)
+    order = v2.batches[-1]
+    check("... in TYPED order (ascending sortOrder Alpha, Beta two)",
+          [b["title"] for b in sorted(order, key=lambda b: b["sortOrder"])]
+          == ["🥅 O • Alpha", "🥅 O • Beta two"], order)
+    check("... two made: no tag picker (it is for ONE item), the back instead",
+          out.reopen is None and out.ids == ["new1", "new2"], out)
+    check("... toast", out.msg == "🥅 Added · 2 🥅 objectives · codes A, BT", out.msg)
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "names": ["Travel plans"], "code": "XY"}, api, v2)
+    check("a given code on a new O is its 🏷️ line", api.of("create_task")[0][5] == "🏷️ XY"
+          and out.msg.endswith("· code XY"), (api.of("create_task"), out.msg))
+    check("no then: the back (reopen None)", out.reopen is None)
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "Y", "names": ["Health"], "code": "XY", "then": "tag"},
+                       api, v2)
+    made = api.of("create_task")
+    check("a Y: its prefix, no code (a given one ignored), no description, no parent",
+          [(c[1], c[3], c[4], c[5]) for c in made] == [("🏔️ Y • Health", None, None, None)],
+          made)
+    check("... toast + tag picker", out.msg == "🥅 Added · 🏔️ Health"
+          and out.reopen == "ctx:okrtag:new1", out)
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "KR", "parent": "O1", "names": ["Goals wf"],
+                        "link": {"to": "task", "pid": P2, "tid": T2}, "then": "tag"}, api, v2)
+    made = api.of("create_task")
+    url = f"https://ticktick.com/webapp/#p/{P2}/tasks/{T2}"
+    check("an imported KR: prefix + code OUTSIDE the link, the O's tags",
+          [(c[1], c[3], c[4], c[5]) for c in made]
+          == [(f"🔑 KR • [Goals wf]({url}) - TA", "O1", ["💼tickal"], None)], made)
+    check("... reads back", okr.parse_title(made[0][1]) == ("KR", "Goals wf", url, "TA"))
+    check("B4 ... a KR never goes to the tag picker (it inherits); an IMPORT toasts "
+          "like the other levels", out.reopen is None
+          and out.msg == "🥅 Added · 🔑 Goals wf under TickAL · code TA", out)
+    check("... the target is never touched", not any(c[1] == T2 for c in api.of("update_task")))
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "names": ["Workflows 2"],
+                        "link": {"to": "list", "pid": "5" * 24, "tid": "-"}}, api, v2)
+    t1 = api.of("create_task")[0][1]
+    lurl = f"ticktick:///webapp/#p/{'5' * 24}/tasks"
+    check("an O imported from a list: the list link, no suffix, its code in the description",
+          t1 == f"🥅 O • [Workflows 2]({lurl})" and api.of("create_task")[0][5] == "🏷️ W2"
+          and okr.parse_title(t1) == ("O", "Workflows 2", lurl, None), (t1, api.of("create_task")))
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "names": ["Trip - USA", "Plan - Monday"]}, api, v2)
+    check("an O whose name ends in a code-like word would lose it: skipped, both",
+          not api.of("create_task") and out.msg == "🥅 No objective added · skipped "
+          "'Trip - USA', 'Plan - Monday' (reads as a code)", out.msg)
+    check("... nothing made: the back", out.reopen is None and out.ids == [])
+
+    api, v2 = world(completed=False)
+    out = ow.add_items({"kind": "O", "names": ["Delta"]}, api, v2)
+    check("adding needs a live read, not the completed feed", out.ids == ["new1"], out)
+
+    # B8 the survivors
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "names": "Solo trip"}, api, v2)
+    check("B8 names as a bare string: one item of that name",
+          [c[1] for c in api.of("create_task")] == ["🥅 O • Solo trip"] and out.ids == ["new1"],
+          api.of("create_task"))
+    api, v2 = world()
+    out = ow.add_items({"kind": "KR", "parent": "O1", "names": ["Plain"], "link": {}}, api, v2)
+    check("B8 link {} = no link: a text-only KR, the typed toast",
+          [c[1] for c in api.of("create_task")] == ["🔑 KR • Plain - TA"]
+          and out.msg == "🔑 1 KR under TickAL · code TA", (api.of("create_task"), out.msg))
+    api, v2 = world()
+    out = ow.add_items({"kind": "KR", "parent": "O1", "names": ["Plain", "Two"]}, api, v2)
+    check("B4 typed KRs through okr_add keep the count toast",
+          out.msg == "🔑 2 KRs under TickAL · code TA", out.msg)
+    r = refused(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["a"],
+                               "link": {"to": "task", "pid": P2, "tid": "-"}}, api, v2)
+    check("B8 a '-' tid on a task link is no task: refused, nothing read",
+          r == "🔗 Nothing to link" and len(api.of("get_project_data")) == 1, r)
+
+    api, v2 = world(token="")
+    ow.add_items({"kind": "O", "names": ["Travel plans"]}, api, v2)
+    up = [c for c in api.of("update_task") if c[1] == "new1"]
+    check("B8 a root O with no v2 token: v1 posts the zone, and NO parentId anywhere "
+          "(not in the fields, not in the current)",
+          len(up) == 1 and up[0][3].get("timeZone") == "Europe/Berlin"
+          and "parentId" not in up[0][3] and "parentId" not in up[0][4], up)
+
+    api, v2 = world()
+    put(api, D("O6", "🥅 O • Dropped", status=-1), D("Y6", "🏔️ Y • Shelved", status=-1),
+        done=True)
+    r = refused(ow.add_items, {"kind": "KR", "parent": "O6", "names": ["a"]}, api, v2)
+    check("B8 a won't-do O is closed too: refused, in 🔑", r == "🔑 Dropped is closed · "
+          "reopen it first", r)
+    r = refused(ow.add_items, {"kind": "O", "parent": "Y6", "names": ["a"]}, api, v2)
+    check("B8 ... and a won't-do Y for an O", r == "🏔️ Shelved is closed · reopen it first", r)
+    check("... nothing created", not api.of("create_task"))
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "names": ["日本語 計画"]}, api, v2)
+    made = api.of("create_task")
+    check("B8 a caseless O name: no code (none would read back), its whole name kept",
+          [(c[1], c[5]) for c in made] == [("🥅 O • 日本語 計画", None)]
+          and out.msg == "🥅 Added · 🥅 日本語 計画 · no code", (made, out.msg))
+    check("... and it reads back as that O", okr.parse_title(made[0][1])
+          == ("O", "日本語 計画", None, None) if made else False)
+
+    api, v2 = world()
+    out = ow.add_items({"kind": "O", "names": ["Trip - USA", "Health"], "then": "tag"}, api, v2)
+    check("B8 one name skipped, one made: the made one named, the skipped one too",
+          [c[1] for c in api.of("create_task")] == ["🥅 O • Health"]
+          and out.msg == "🥅 Added · 🥅 Health · code H · skipped 'Trip - USA' (reads as a code)",
+          out.msg)
+    check("... one Y / O made: its tag picker", out.reopen == "ctx:okrtag:new1"
+          and out.ids == ["new1"], out)
+
+    # M60 a caseless O name proposes no code that reads back: no code, and
+    # EVERY KR is created (no name lost to a code, nothing stamped)
+    api, v2 = world()
+    api.store["OJ"] = D("OJ", "🥅 O • 日本語 計画")
+    out = ow.add_items({"kind": "KR", "parent": "OJ", "names": ["調査", "Draft two"]}, api, v2)
+    made = api.of("create_task")
+    check("M60 a caseless-named O: no code, both KRs created",
+          [c[1] for c in made] == ["🔑 KR • 調査", "🔑 KR • Draft two"]
+          and out.ids == ["new1", "new2"], made)
+    check("M60 ... nothing stamped on the O, the toast says no code",
+          not [c for c in api.of("update_task") if c[1] == "OJ"]
+          and out.msg == "🔑 2 KRs under 日本語 計画 · no code", out.msg)
+    check("M60 kr_code agrees: (None, None)",
+          ow.kr_code(okr.index(snapshot(api, v2).items)["OJ"], []) == (None, None))
+
+    # C5 a skip is worded by its CAUSE: an O whose own 🏷️ line holds a code
+    # a KR title cannot read back skips every name for the CODE, not the name
+    api, v2 = world()
+    api.store["O1"]["content"] = "notes\n🏷️ xy"
+    out = ow.add_items({"kind": "KR", "parent": "O1", "names": ["Alpha", "Beta"]}, api, v2)
+    BAD = "TickAL's code 'xy' does not read back · fix its 🏷️ line"
+    check("C5 the O's code does not read back: nothing created, the code named, "
+          "not 'reads as a code'",
+          not api.of("create_task") and out.ids == []
+          and out.msg == f"🔑 No KR added under TickAL · {BAD}", out.msg)
+    check("C5 ... and nothing written to the O (its code is never rewritten)",
+          not api.of("update_task") and not v2.batches)
+    check("C5 code_problem words it, and passes a code that reads back",
+          ow.code_problem("TickAL", "xy") == BAD and ow.code_problem("TickAL", "TA") is None
+          and ow.code_problem("TickAL", None) is None)
+    api, v2 = world()
+    api.store["O1"]["content"] = "🏷️ xy"
+    out = ow.add_items({"kind": "KR", "parent": "O1", "names": ["Goals wf"],
+                        "link": {"to": "task", "pid": P2, "tid": T2}}, api, v2)
+    check("C5 ... an import says it as the import's refusal",
+          out.msg == f"🥅 Not added · 🔑 Goals wf under TickAL · {BAD}" and out.ids == [],
+          out.msg)
+    api, v2 = world()
+    out = ow.add_items({"kind": "KR", "parent": "O4", "names": ["Trip - USA", "Fine"]}, api, v2)
+    check("C5 a NAME that reads as a code keeps its own wording",
+          out.msg == "🔑 1 KR under ✨ · no code · skipped 'Trip - USA' (reads as a code)",
+          out.msg)
+
+    # the import's create fails: the toast says the import did not land, and why
+    api, v2 = world()
+    api.fail_create = RuntimeError("HTTP 500")
+    out = ow.add_items({"kind": "KR", "parent": "O1", "names": ["Goals wf"],
+                        "link": {"to": "task", "pid": P2, "tid": T2}}, api, v2)
+    check("an import whose create FAILED: 'Not added', named, a retry offered",
+          out.msg == "🥅 Not added · 🔑 Goals wf under TickAL · TickTick refused the create "
+          "· try again" and out.ids == [] and out.reopen is None, out)
+    check("... nothing written after it", not api.of("update_task") and not v2.batches,
+          api.of("update_task"))
+    api, v2 = world()
+    api.fail_create = RuntimeError("HTTP 500")
+    out = ow.add_items({"kind": "KR", "parent": "O2", "names": ["Goals wf"],
+                        "link": {"to": "task", "pid": P2, "tid": T2}}, api, v2)
+    check("... under an O with NO code yet: the proposed code is not stamped on it, a KR "
+          "that never landed names nothing", out.ids == [] and not api.of("update_task")
+          and "🏷️" not in (api.store["O2"].get("content") or ""),
+          (out, api.of("update_task")))
+    api, v2 = world()
+    out = ow.add_items({"kind": "KR", "parent": "O2", "names": ["Goals wf"],
+                        "link": {"to": "task", "pid": P2, "tid": T2}}, api, v2)
+    check("... and when it lands, the code is stamped after it (the control)",
+          out.ids == ["new1"] and (api.store["O2"].get("content") or "").endswith(
+              okr.code_line(ow.kr_code(okr.from_task(api.store["O2"]), [])[0])),
+          (out, api.store["O2"].get("content")))
+    api, v2 = world()
+    years(api)
+    api.fail_create = RateLimitError("exceed_query_limit")
+    out = ow.add_items({"kind": "O", "parent": "Y1", "names": ["Proj"], "then": "tag",
+                        "link": {"to": "list", "pid": "3" * 24}}, api, v2)
+    check("... a rate-limited create says to wait, and no tag picker follows",
+          out.msg == "🥅 Not added · 🥅 Proj under 🏔️ Productivity System · TickTick rate "
+          "limit · try again in a minute" and out.reopen is None, out)
+    api, v2 = world()
+    api.fail_create = RuntimeError("HTTP 500")
+    out = ow.add_items({"kind": "KR", "parent": "O1", "names": ["Alpha", "Beta"]}, api, v2)
+    check("typed KRs whose creates fail keep the count toast and its warning",
+          out.msg == "🔑 No KR added under TickAL · code TA · ⚠️ 2 not created", out.msg)
+
+    # refusals before any read
+    api, v2 = world()
+    for spec, want, why in [
+        ({"kind": "Z", "names": ["a"]}, "🥅 Add what? A 🏔️ Y, 🥅 O or 🔑 KR", "a bad kind"),
+        ({"kind": "O", "names": ["", " "]}, "🥅 No names", "no names"),
+        ({"kind": "KR", "parent": "O1", "names": []}, "🔑 No KR names", "no KR names"),
+        ({"kind": "Y", "parent": "Y1", "names": ["a"]},
+         "🏔️ A year objective is top level · no parent", "a Y with a parent"),
+        ({"kind": "KR", "names": ["a"]}, "🔑 KRs go under a 🥅 O · pick one", "a KR with none"),
+        ({"kind": "O", "names": ["a"], "code": "xy"},
+         "🥅 Code 'xy' would not read back · one word, capital first", "a bad code"),
+        ({"kind": "O", "names": ["a", "b"], "code": "XY"},
+         "🥅 =XY codes ONE objective · add them one at a time", "one code, two O's"),
+        ({"kind": "KR", "parent": "O1", "names": ["a", "b"],
+          "link": {"to": "task", "pid": P2, "tid": T2}},
+         "🔗 A link copies ONE item · one name, or no link", "a link with two names"),
+        ({"kind": "KR", "parent": "O1", "names": ["a"], "link": {"to": "task", "pid": P2}},
+         "🔗 Nothing to link", "a task link with no task"),
+        ({"kind": "KR", "parent": "O1", "names": ["a"], "link": "junk"},
+         "🔗 Nothing to link", "a link that is not a dict"),
+        ({"kind": "KR", "parent": "O1", "names": ["a"],
+          "link": {"to": "task", "pid": PID, "tid": "K2"}},
+         "🥅 That is a planning copy · add the original", "a task in the plan list"),
+        ({"kind": "O", "names": ["a"], "link": {"to": "list", "pid": PID}},
+         "🥅 That is the plan list · add the real one", "the plan list itself"),
+    ]:
+        r = refused(ow.add_items, spec, api, v2)
+        check(f"refused before any read: {why}", r == want and not api.calls, r)
+
+    # refusals after the read
+    api, v2 = world()
+    years(api)
+    for spec, want, why in [
+        ({"kind": "KR", "parent": "O1", "names": ["a"],
+          "link": {"to": "task", "pid": P2, "tid": "K2"}},
+         "🥅 That is a planning copy · add the original", "a plan item under a stale list id"),
+        ({"kind": "O", "parent": "O1", "names": ["a"]},
+         "🥅 Objectives go under a 🏔️ Y · TickAL is not one", "an O under an O"),
+        ({"kind": "O", "parent": "Y2", "names": ["a"]},
+         "🏔️ Old year is closed · reopen it first", "an O under a closed Y"),
+        ({"kind": "O", "parent": "nope", "names": ["a"]},
+         "🥅 That year objective is gone from the list", "an O under nothing"),
+        ({"kind": "KR", "parent": "Y1", "names": ["a"]},
+         "🔑 KRs go under a 🥅 O · Productivity System is not one", "a KR under a Y"),
+    ]:
+        r = refused(ow.add_items, spec, api, v2)
+        check(f"refused: {why}", r == want, r)
+    check("... and nothing created", not api.of("create_task") and not v2.batches)
+
+    # the dedupe
+    api, v2 = world()
+    e = refusal(ow.add_items, {"kind": "O", "names": ["Ship it"],
+                               "link": {"to": "task", "pid": E, "tid": F},
+                               "back": "ctx:okrimport:task:x:y"}, api, v2)
+    check("DEDUPE: the task is already planned (K9): refused, named",
+          e and str(e) == "🥅 Already in the plan · 🔑 Ship it", e)
+    check("... and it lands on K9's screen (its O's), not the back",
+          e and e.reopen == "ctx:okr:o:O1", e and e.reopen)
+    check("... nothing created", not api.of("create_task"))
+    e = refusal(ow.add_items, {"kind": "KR", "parent": "O2", "names": ["x"],
+                               "link": {"to": "task", "pid": P2, "tid": F}}, api, v2)
+    check("... by task id, whatever list the payload names (a task keeps its id)",
+          e and e.reopen == "ctx:okr:o:O1", e)
+
+    api, v2 = world()
+    L2 = "5" * 24
+    put(api, D("O5", f"🥅 O • [Old proj](ticktick:///webapp/#p/{L2}/tasks)", status=2),
+        done=True)
+    e = refusal(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("DEDUPE counts a CLOSED item too, and lands on its own screen (an O)",
+          e and str(e) == "🥅 Already in the plan · 🥅 Old proj"
+          and e.reopen == "ctx:okr:o:O5", e and (str(e), e.reopen))
+
+    import areas
+    real_cta = areas.CTA_LIST_ID
+    CTA, CT, L3 = "7" * 24, "8" * 24, "6" * 24
+    try:
+        areas.CTA_LIST_ID = CTA
+        cta_row = {"id": CT, "projectId": CTA, "status": 0,
+                   "title": f"💼 P • [Proj](ticktick:///webapp/#p/{L3}/tasks) 🔗"}
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(cta_row))
+        put(api, D("O7", f"🥅 O • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        e = refusal(ow.add_items, {"kind": "O", "names": ["Proj"],
+                                   "link": {"to": "task", "pid": CTA, "tid": CT}}, api, v2)
+        check("DEDUPE by project: the CTA task of a list an O already links",
+              e and e.reopen == "ctx:okr:o:O7", e and (str(e), e.reopen))
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(cta_row))
+        put(api, D("O8", f"🥅 O • [Proj](https://ticktick.com/webapp/#p/{CTA}/tasks/{CT})"))
+        e = refusal(ow.add_items, {"kind": "O", "names": ["Proj"],
+                                   "link": {"to": "list", "pid": L3}}, api, v2)
+        check("... and the list whose CTA task an O already links",
+              e and e.reopen == "ctx:okr:o:O8", e and (str(e), e.reopen))
+
+        # B6 the list <-> CTA face is a GOAL's (Y / O); a KR plans exactly
+        # what it links
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(cta_row))
+        put(api, D("KL", f"🔑 KR • [Proj list](ticktick:///webapp/#p/{L3}/tasks)", parent="O2"))
+        out = attempt(ow.add_items, {"kind": "O", "names": ["Proj"],
+                      "link": {"to": "task", "pid": CTA, "tid": CT}}, api, v2)
+        check("B6 a KR on the LIST does not plan the project's CTA task", ids(out) == ["new1"],
+              out)
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(cta_row))
+        put(api, D("KC", f"🔑 KR • [Proj](https://ticktick.com/webapp/#p/{CTA}/tasks/{CT})",
+                   parent="O2"))
+        out = attempt(ow.add_items, {"kind": "O", "names": ["Proj"],
+                      "link": {"to": "list", "pid": L3}}, api, v2)
+        check("B6 ... nor a KR on the CTA task the list", ids(out) == ["new1"], out)
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(cta_row))
+        put(api, D("KC", f"🔑 KR • [Proj](https://ticktick.com/webapp/#p/{CTA}/tasks/{CT})",
+                   parent="O2"))
+        e = refusal(ow.add_items, {"kind": "O", "names": ["Proj"],
+                                   "link": {"to": "task", "pid": CTA, "tid": CT}}, api, v2)
+        check("B6 ... the KR's own exact task IS planned", e and e.reopen == "ctx:okr:o:O2"
+              and str(e) == "🥅 Already in the plan · 🔑 Proj", e and (str(e), e.reopen))
+        # (the 📌CTA row is still cached from the world above: planned reads it)
+        items = okr.items_from([
+            D("KL", f"🔑 KR • [x](ticktick:///webapp/#p/{L3}/tasks)", parent="O2"),
+            D("OC", f"🥅 O • [y](https://ticktick.com/webapp/#p/{CTA}/tasks/{CT})")])
+        got = [getattr(ow.planned(items, *a), "id", None)
+               for a in (("list", L3), ("task", CTA, CT))]
+        check("B6 planned (pure): the list = the KR on it (exact); the CTA task = the O on "
+              "it, never the KR through the list's face", got == ["KL", "OC"], got)
+        check("B6 ... a KR alone never answers for the other face",
+              ow.planned(okr.items_from([D("KL", f"🔑 KR • [x](ticktick:///webapp/#p/{L3}/tasks)",
+                                           parent="O2")]), "task", CTA, CT) is None)
+
+        # C7 a 🏔️ Y is a goal too: it plans the project through either face
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(cta_row))
+        put(api, D("YP", f"🏔️ Y • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        e = refusal(ow.add_items, {"kind": "O", "names": ["Proj"],
+                                   "link": {"to": "task", "pid": CTA, "tid": CT}}, api, v2)
+        check("C7 a Y on the LIST plans the project's CTA task: refused, lands on the Y",
+              e and str(e) == "🥅 Already in the plan · 🏔️ Proj" and e.reopen == "ctx:okr:y:YP",
+              e and (str(e), e.reopen))
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(cta_row))
+        put(api, D("YC", f"🏔️ Y • [Proj](https://ticktick.com/webapp/#p/{CTA}/tasks/{CT})"))
+        e = refusal(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["Proj"],
+                                   "link": {"to": "list", "pid": L3}}, api, v2)
+        check("C7 ... and a Y on the CTA task plans the list",
+              e and e.reopen == "ctx:okr:y:YC", e and (str(e), e.reopen))
+
+        # B8 the app backslash-escapes a saved title: the CTA still maps
+        esc_row = {"id": CT, "projectId": CTA, "status": 0,
+                   "title": f"💼 P • \\[Proj\\]\\(ticktick:///webapp/#p/{L3}/tasks\\) 🔗"}
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(esc_row))
+        put(api, D("O7", f"🥅 O • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        e = refusal(ow.add_items, {"kind": "O", "names": ["Proj"],
+                                   "link": {"to": "task", "pid": CTA, "tid": CT}}, api, v2)
+        check("B8 an app-escaped 📌CTA title: the O on its list still plans the CTA task",
+              e and e.reopen == "ctx:okr:o:O7", e and (str(e), e.reopen))
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(esc_row))
+        put(api, D("O8", f"🥅 O • [Proj](https://ticktick.com/webapp/#p/{CTA}/tasks/{CT})"))
+        e = refusal(ow.add_items, {"kind": "O", "names": ["Proj"],
+                                   "link": {"to": "list", "pid": L3}}, api, v2)
+        check("B8 ... and the list, through its escaped CTA task",
+              e and e.reopen == "ctx:okr:o:O8", e and (str(e), e.reopen))
+
+        # B8 a task OUTSIDE the 📌CTA list that links the list is no CTA
+        NT = "9" * 24
+        not_cta = {"id": NT, "projectId": P2, "status": 0,
+                   "title": f"💼 P • [Proj](ticktick:///webapp/#p/{L3}/tasks) 🔗"}
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(not_cta))
+        put(api, D("O9", f"🥅 O • [Notes](https://ticktick.com/webapp/#p/{P2}/tasks/{NT})"))
+        out = attempt(ow.add_items, {"kind": "O", "names": ["Proj"],
+                      "link": {"to": "list", "pid": L3}}, api, v2)
+        check("B8 an O on a non-CTA task linking the list does not plan the list",
+              ids(out) == ["new1"], out)
+        api, v2 = world()
+        MEM["all_tasks"].append(cp(not_cta))
+        put(api, D("O7", f"🥅 O • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        out = attempt(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["Proj notes"],
+                      "link": {"to": "task", "pid": P2, "tid": NT}}, api, v2)
+        check("B8 ... nor does an O on the list plan that task", ids(out) == ["new1"], out)
+    finally:
+        areas.CTA_LIST_ID = real_cta
+
+    # B3 a task that lives IN the plan list, by what it is
+    api, v2 = world()
+    r = refused(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["a"],
+                               "link": {"to": "task", "pid": PID, "tid": "U1"}}, api, v2)
+    check("B3 an unprefixed item of the plan list: wants its prefix, not a copy",
+          r == "🥅 Already in the plan list · give it a 🏔️ / 🥅 / 🔑 prefix"
+          and not api.calls, r)
+    r = refused(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["a"],
+                               "link": {"to": "task", "pid": P2, "tid": "U1"}}, api, v2)
+    check("B3 ... under a stale list id too (found by its id in the live read)",
+          r == "🥅 Already in the plan list · give it a 🏔️ / 🥅 / 🔑 prefix", r)
+    r = refused(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["a"],
+                               "link": {"to": "task", "pid": P2, "tid": "O2"}}, api, v2)
+    check("B3 an item WITH a kind stays a planning copy", r == "🥅 That is a planning copy · "
+          "add the original", r)
+    r = refused(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["a"],
+                               "link": {"to": "task", "pid": PID, "tid": "gone"}}, api, v2)
+    check("B3 a plan-list task nobody knows: the planning-copy wording",
+          r == "🥅 That is a planning copy · add the original", r)
+    check("... nothing created", not api.of("create_task"))
+
+    # B5 / C3 the dedupe must see CLOSED items; a read without them borrows
+    # the last COMPLETE read (okr_complete - never okr_rows, which is the
+    # LAST read, complete or not), and with neither a linked add is refused
+    L2 = "5" * 24
+    done_o = D("O5", f"🥅 O • [Old proj](ticktick:///webapp/#p/{L2}/tasks)", status=2)
+    UNREAD = "🥅 Not written · completed KRs unreadable right now · try again"
+
+    def full(*extra, list_id=PID):
+        """okr_complete: the fixture's complete read, plus `extra` rows."""
+        o, dn = fixture()
+        MEM["okr_complete"] = {"list_id": list_id, "ts": 1,
+                               "rows": cp(o) + cp(dn) + [cp(x) for x in extra]}
+
+    api, v2 = world(completed=False)
+    put(api, done_o, done=True)                  # there, but v2 cannot hand it over
+    full(done_o)
+    e = refusal(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("B5 completed KRs unreadable: the done O comes from the last complete read",
+          e and str(e) == "🥅 Already in the plan · 🥅 Old proj" and e.reopen == "ctx:okr:o:O5"
+          and not api.of("create_task"), e and (str(e), e.reopen))
+    out = attempt(ow.add_items, {"kind": "O", "names": ["Fresh"],
+                  "link": {"to": "list", "pid": "3" * 24}}, api, v2)
+    check("B5 ... a target nothing plans is added", ids(out) == ["new1"], out)
+    check("C3 ... and an incomplete read never overwrites okr_complete",
+          cached("okr_complete", "O5") is not None and cached("okr_complete", "new1") is None,
+          MEM.get("okr_complete"))
+
+    api, v2 = world(completed=False)
+    put(api, done_o, done=True)
+    MEM["okr_rows"]["rows"].append(cp(done_o))
+    MEM["okr_rows"]["done_complete"] = True      # okr_rows says complete: still never asked
+    r = refused(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("C3 no okr_complete: a LINKED add is refused, okr_rows is never the memory",
+          r == UNREAD and not api.of("create_task"), r)
+    out = attempt(ow.add_items, {"kind": "O", "names": ["Typed"]}, api, v2)
+    check("B5 ... a typed add has nothing to dedupe: it goes", ids(out) == ["new1"], out)
+    e = refusal(ow.add_items, {"kind": "O", "names": ["Ship it"],
+                               "link": {"to": "task", "pid": E, "tid": F}}, api, v2)
+    check("C1 blind, but an OPEN item of the live read plans it: that answer stands",
+          e and str(e) == "🥅 Already in the plan · 🔑 Ship it" and e.reopen == "ctx:okr:o:O1",
+          e and (str(e), e.reopen))
+    api, v2 = world(completed=False)
+    full(done_o, list_id="other")
+    r = refused(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("B5 another list's complete read answers nothing here", r == UNREAD, r)
+    api, v2 = world(completed=False, token="")
+    r = refused(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("B5 ... no v2 token: the Attachment Login wording", r and "Attachment Login" in r, r)
+    api, v2 = world(completed=False)
+    # the complete read held K9 CLOSED on the old project; live, K9 is open on its task
+    full(dict(cp(done_o), id="K9"))
+    out = attempt(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                  "link": {"to": "list", "pid": L2}}, api, v2)
+    check("B5 the live read wins on an id both hold (the remembered K9 is not asked)",
+          ids(out) == ["new1"], out)
+
+    # C3 open THEN, gone NOW: closed or deleted, and nothing can tell which
+    gone_o = D("OG", f"🥅 O • [Gone proj](ticktick:///webapp/#p/{L2}/tasks)")
+    api, v2 = world(completed=False)
+    full(gone_o)
+    r = refused(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("C3 the only hit is a row open in the complete read, gone from this one: "
+          "refused, the _why_not wording", r == UNREAD and not api.of("create_task"), r)
+    api, v2 = world(completed=False)
+    full(gone_o, done_o)
+    e = refusal(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("C3 ... a KNOWN closed hit beside it is the answer: Already in the plan",
+          e and str(e) == "🥅 Already in the plan · 🥅 Old proj" and e.reopen == "ctx:okr:o:O5",
+          e and (str(e), e.reopen))
+    api, v2 = world(completed=False)
+    full(D("OW", f"🥅 O • [Shelved proj](ticktick:///webapp/#p/{L2}/tasks)", status=-1))
+    e = refusal(ow.add_items, {"kind": "O", "names": ["Old proj"],
+                               "link": {"to": "list", "pid": L2}}, api, v2)
+    check("C7 a WON'T-DO row of okr_complete is known closed too: Already in the plan",
+          e and str(e) == "🥅 Already in the plan · 🥅 Shelved proj"
+          and e.reopen == "ctx:okr:o:OW", e and (str(e), e.reopen))
+    check("C3 closed_cached = okr_complete's done AND won't-do rows",
+          sorted(t["id"] for t in ow.closed_cached(PID)) == ["K4", "O3", "OW"]
+          and ow.closed_cached("other") is None, ow.closed_cached(PID))
+
+    # M24 a closed planning copy the live read missed, found by its id in
+    # okr_complete (the payload's list is stale, so nothing refused it earlier)
+    api, v2 = world(completed=False)
+    full(D("KX", "🔑 KR • Old deliverable - TA", parent="O1", status=2))
+    r = refused(ow.add_items, {"kind": "KR", "parent": "O1", "names": ["Old deliverable"],
+                               "link": {"to": "task", "pid": P2, "tid": "KX"}}, api, v2)
+    check("M24 a closed copy known only to okr_complete: the planning-copy refusal",
+          r == "🥅 That is a planning copy · add the original" and not api.of("create_task"), r)
+
+    # C3 remember_complete: only a complete live read is kept
+    api, v2 = world(completed=False)
+    MEM.pop("okr_complete", None)
+    check("C3 remember_complete refuses a read missing completed KRs",
+          ow.remember_complete(snapshot(api, v2)) is False and "okr_complete" not in MEM)
+    api, v2 = boom_world()
+    check("C3 ... and a cache read", ow.remember_complete(snapshot(api, v2)) is False
+          and "okr_complete" not in MEM)
+    check("C3 ... never raises on junk", ow.remember_complete(None) is False
+          and ow.remember_complete(object()) is False)
+    api, v2 = world()
+    MEM.pop("okr_complete", None)
+    r = refused(ow.add_items, {"kind": "O", "names": ["Ship it"],
+                               "link": {"to": "task", "pid": E, "tid": F}}, api, v2)
+    check("C3 a writer's complete read is kept even when the verb then refuses",
+          r and r.startswith("🥅 Already in the plan")
+          and sorted(t["id"] for t in (MEM.get("okr_complete") or {}).get("rows", []))
+          == sorted(t["id"] for t in fixture()[0] + fixture()[1]), MEM.get("okr_complete"))
+
+    api, v2 = boom_world()
+    r = refused(ow.add_items, {"kind": "O", "names": ["Delta"]}, api, v2)
+    check("v1 down (only the cache answered): add_items refused, nothing created",
+          r and "unreachable" in r and wrote_nothing(api, v2), r)
+
+    api, v2 = world()
+    with open(ow.LOCK_FILE, "a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        r = refused(ow.add_items, {"kind": "O", "names": ["Delta"]}, api, v2)
+        fcntl.flock(held, fcntl.LOCK_UN)
+    check("the lock held elsewhere: busy, nothing read", r and "Busy" in r
+          and not api.of("get_project_data"), r)
+
+    # planned + screen_of (pure)
+    rows = [r for r in fixture()[0]] + [
+        D("Y1", "🏔️ Y • Productivity System"),
+        D("OY", "🥅 O • Under Y", parent="Y1"),
+        D("KY", "🔑 KR • Straight under Y", parent="Y1"),
+        D("KL", "🔑 KR • Loose"),
+    ]
+    items = okr.items_from(rows)
+    by = okr.index(items)
+    check("screen_of: an O / a Y = its own screen",
+          (ow.screen_of(by["O1"], items), ow.screen_of(by["Y1"], items))
+          == ("ctx:okr:o:O1", "ctx:okr:y:Y1"))
+    check("screen_of: a KR = its parent's (O or Y), a loose one = the root",
+          [ow.screen_of(by[k], items) for k in ("K1", "KY", "KL", "U1")]
+          == ["ctx:okr:o:O1", "ctx:okr:y:Y1", "ctx:okr", "ctx:okr"])
+    edge = okr.items_from(rows + [
+        D("KG", "🔑 KR • Orphan", parent="GONE"),             # its O deleted since
+        D("KK", "🔑 KR • Sub-deliverable", parent="K1"),      # a KR under a KR
+        D("OD", "🥅 O • Done one", status=2, parent="Y1"),
+        D("KD", "🔑 KR • Under a done O", parent="OD", status=2),
+        D("UL", "Loose parent"),
+        D("KU", "🔑 KR • Under a loose item", parent="UL"),
+        D("YW", "🏔️ Y • Shelved", status=-1),
+    ])
+    eby = okr.index(edge)
+    check("screen_of edges: a KR whose O is gone, under a KR, under a loose item = the root",
+          [ow.screen_of(eby[k], edge) for k in ("KG", "KK", "KU")]
+          == ["ctx:okr", "ctx:okr", "ctx:okr"])
+    check("screen_of edges: a closed O / Y still has its own screen (never its Y's), a "
+          "KR of a closed O lands on that O",
+          [ow.screen_of(eby[k], edge) for k in ("OD", "YW", "KD", "OY")]
+          == ["ctx:okr:o:OD", "ctx:okr:y:YW", "ctx:okr:o:OD", "ctx:okr:o:OY"])
+    check("planned: K9 by its task id", getattr(ow.planned(items, "task", E, F), "id", None)
+          == "K9")
+    three = okr.items_from(rows + [
+        D("OX", f"🥅 O • [Doubt](ticktick:///webapp/#p/{L}/tasks)"),
+        D("OC", f"🥅 O • [Closed](ticktick:///webapp/#p/{L}/tasks)", status=2)])
+    check("planned: a doubt id answers LAST, after a closed one",
+          getattr(ow.planned(three, "list", L, doubt={"OX"}), "id", None) == "OC"
+          and getattr(ow.planned(three, "list", L), "id", None) == "OX")
+    check("planned: nothing for an unplanned task or list",
+          ow.planned(items, "task", P2, T2) is None and ow.planned(items, "list", L) is None)
+    two = okr.items_from(rows + [
+        D("OC", f"🥅 O • [Closed](ticktick:///webapp/#p/{L}/tasks)", status=2),
+        D("OO", f"🥅 O • [Open](ticktick:///webapp/#p/{L}/tasks)")])
+    check("planned: an open item answers before a closed one",
+          getattr(ow.planned(two, "list", L), "id", None) == "OO")
+
+    # ── 3c. import_source (pure over the caches) ─────────────────────────────
+    print("import_source")
+    real_cta = areas.CTA_LIST_ID
+    CTA, CT, L3, L4 = "7" * 24, "8" * 24, "6" * 24, "4" * 24
+    real_get = cache.get
+    try:
+        areas.CTA_LIST_ID = CTA
+        api, v2 = world()
+        MEM["all_tasks"] += [
+            {"id": "t1", "projectId": P2, "title": "Write the [docs](https://x.y/z) 🔗"},
+            {"id": CT, "projectId": CTA,
+             "title": f"💼 P • [Proj](ticktick:///webapp/#p/{L3}/tasks) 🔗"},
+            {"id": "t2", "projectId": P2,
+             "title": "💼P • \\[Esc \\[2\\]\\]\\(https://ticktick.com/webapp/#p/x/tasks/y\\) 🔗"},
+            {"id": "t3", "projectId": P2, "title": "🔑 KR • Old thing - OT"},
+            {"id": "t4", "projectId": P2, "title": "🔑 KR • Call Anna - Monday"},
+            {"id": "t5", "projectId": P2, "title": " 🔗 "},
+            {"id": "t6", "_projectId": P2, "title": "Moved   here"},
+        ]
+        MEM["all_notes"] = [{"id": "n1", "projectId": P2, "title": "A note"}]
+        MEM["projects"] += [{"id": L3, "name": "💼P • Proj 4️⃣"},
+                            {"id": L4, "name": "🏆 Plain list"}]
+
+        r = ow.import_source("task", P2, "t1")
+        check("a task: links flattened, 🔗 dropped, the task linked, a KR hint",
+              r == {"name": "Write the docs", "link": {"to": "task", "pid": P2, "tid": "t1"},
+                    "kind_hint": "KR"}, r)
+        r = ow.import_source("task", CTA, CT)
+        check("a 📌CTA task: its 💼 P • lead dropped, an O hint",
+              r == {"name": "Proj", "link": {"to": "task", "pid": CTA, "tid": CT},
+                    "kind_hint": "O"}, r)
+        r = ow.import_source("task", P2, "t2")
+        check("the app's escapes, a nested bracket label, the glued 💼P • lead",
+              isinstance(r, dict) and r["name"] == "Esc [2]", r)
+        r = ow.import_source("task", P2, "t3")
+        check("an old planning copy: its level prefix and all-caps code dropped",
+              isinstance(r, dict) and r["name"] == "Old thing", r)
+        r = ow.import_source("task", P2, "t4")
+        check("... a code that is not all caps stays in the name",
+              isinstance(r, dict) and r["name"] == "Call Anna - Monday", r)
+        r = ow.import_source("task", "stale", "t6")
+        check("the CACHED list wins over the payload's (the task moved), spaces collapsed",
+              isinstance(r, dict) and r["link"]["pid"] == P2 and r["name"] == "Moved here", r)
+        r = ow.import_source("note", P2, "n1")
+        check("a note from all_notes", isinstance(r, dict) and r["name"] == "A note"
+              and r["link"] == {"to": "task", "pid": P2, "tid": "n1"}, r)
+        r = ow.import_source("list", L3, "-")
+        check("a project list: its clean name, linked to its 📌CTA TASK, an O hint",
+              r == {"name": "Proj", "link": {"to": "task", "pid": CTA, "tid": CT},
+                    "kind_hint": "O"}, r)
+        r = ow.import_source("list", L4, None)
+        check("B7 a list with no CTA: the list itself, its leading emoji dropped",
+              r == {"name": "Plain list", "link": {"to": "list", "pid": L4, "tid": None},
+                    "kind_hint": "O"}, r)
+        for a, want, why in [
+            (("task", P2, "t5"), "🥅 No name to copy · give it a title first", "nothing to name"),
+            (("task", PID, "K1"), "🥅 That is a planning copy · add the original",
+             "a planning copy"),
+            (("task", P2, "K1"), "🥅 That is a planning copy · add the original",
+             "a planning copy by its cached list"),
+            (("list", PID, "-"), "🥅 That is the plan list · add the real one", "the plan list"),
+            (("task", P2, "nope"), "🥅 Not cached yet · sync or reopen", "an uncached task"),
+            (("list", "z" * 24, "-"), "🥅 List not cached yet · sync or reopen",
+             "an uncached list"),
+            (("task", P2, "-"), "🥅 Nothing to add", "a task with no id"),
+            (("habit", P2, "t1"), "🥅 Nothing to add", "a kind it does not know"),
+        ]:
+            r = ow.import_source(*a)
+            check(f"import_source RETURNS a Refusal: {why}",
+                  isinstance(r, ow.Refusal) and str(r) == want, r)
+
+        # B3 an unprefixed item of the plan list: the verb's wording, both ways in
+        for a in (("task", PID, "U1"), ("task", P2, "U1")):
+            r = ow.import_source(*a)
+            check(f"B3 import_source: an unprefixed plan-list item wants its prefix {a[1][:1]}",
+                  isinstance(r, ow.Refusal)
+                  and str(r) == "🥅 Already in the plan list · give it a 🏔️ / 🥅 / 🔑 prefix", r)
+
+        # B7 a plain list's leading emoji run is decoration; a title is Vex's
+        LR, LK, LE, LD = "r" * 24, "k" * 24, "m" * 24, "q" * 24
+        MEM["projects"] += [{"id": LR, "name": "🌅 Routines"},
+                            {"id": LK, "name": "1️⃣ Work"},
+                            {"id": LE, "name": "🌅"},
+                            {"id": LD, "name": "[Draft] notes"},
+                            {"id": "j" * 24, "name": "👨‍👩‍👧 🏠Family"}]
+        MEM["all_tasks"].append({"id": "t7", "projectId": P2, "title": "🌅 Morning run"})
+        got = [(ow.import_source("list", x) or {}).get("name")
+               for x in (LR, LK, LE, LD, "j" * 24)]
+        check("B7 a plain list loses its leading emoji run (keycap, ZWJ family, spaced "
+              "run); all-emoji keeps itself; punctuation is no emoji",
+              got == ["Routines", "Work", "🌅", "[Draft] notes", "Family"], got)
+        got = [ow._strip_lead_emoji(x) for x in
+               ("⚙️ Settings", "⚙ Settings", "👍🏽 Approved", "`dev` tools", "^Top",
+                "🇩🇪 Berlin")]
+        check("C6 VS16 and a skin tone are part of the run; an ASCII backtick or caret "
+              "starts a word and stays",
+              got == ["Settings", "Settings", "Approved", "`dev` tools", "^Top", "Berlin"], got)
+        LB = "u" * 24
+        MEM["projects"].append({"id": LB, "name": "`dev` tools"})
+        r = ow.import_source("list", LB)
+        check("C6 ... through import_source: the list keeps its backtick",
+              isinstance(r, dict) and r["name"] == "`dev` tools", r)
+        r = ow.import_source("list", LR)
+        check("B7 ... so the link label reads the name", isinstance(r, dict)
+              and okr.parse_title(okr.build_title("O", r["name"], link=okr.list_link(LR)))[1]
+              == "Routines", r)
+        r = ow.import_source("task", P2, "t7")
+        check("B7 a task title keeps its emoji", isinstance(r, dict)
+              and r["name"] == "🌅 Morning run", r)
+
+        # Vex's notes lists lead with "N - " / "N • " (live: "🗒N - Work",
+        # "🗒N •\u200b \u200b×15Manager") - filing, not the name; zero-width
+        # marks never reach a planning copy's label
+        LN1, LN2, LN3 = "v" * 24, "w" * 24, "x" * 24
+        MEM["projects"] += [{"id": LN1, "name": "🗒N - Work"},
+                            {"id": LN2, "name": "🗒N \u2022\u200b \u200bManager"},
+                            {"id": LN3, "name": "Nature walks"}]
+        got = [(ow.import_source("list", x) or {}).get("name") for x in (LN1, LN2, LN3)]
+        check("notes lists lose their 'N - ' lead and zero-width marks; a name that "
+              "merely starts with N keeps it",
+              got == ["Work", "Manager", "Nature walks"], got)
+        MEM["all_tasks"].append({"id": "t8", "projectId": P2, "title": "Plan\u200b trip"})
+        r = ow.import_source("task", P2, "t8")
+        check("a task title loses zero-width marks too", isinstance(r, dict)
+              and r["name"] == "Plan trip", r)
+
+        # B8 an app-escaped 📌CTA title still maps its list; a task outside
+        # the 📌CTA list that links a list is not that list's CTA
+        L5, C5, L6 = "2" * 24, "1" * 24, "3" * 24
+        MEM["projects"] += [{"id": L5, "name": "💼P • Esc proj"},
+                            {"id": L6, "name": "💼P • Other proj"}]
+        MEM["all_tasks"] += [
+            {"id": C5, "projectId": CTA,
+             "title": f"💼 P • \\[Esc proj\\]\\(ticktick:///webapp/#p/{L5}/tasks\\) 🔗"},
+            {"id": "t8", "projectId": P2,
+             "title": f"💼 P • [Other proj](ticktick:///webapp/#p/{L6}/tasks) 🔗"}]
+        r = ow.import_source("list", L5)
+        check("B8 import: an app-escaped CTA title still maps the list to its CTA task",
+              isinstance(r, dict) and r["link"] == {"to": "task", "pid": CTA, "tid": C5}
+              and r["name"] == "Esc proj", r)
+        r = ow.import_source("list", L6)
+        check("B8 import: a non-CTA task linking the list is not taken as its CTA",
+              isinstance(r, dict) and r["link"] == {"to": "list", "pid": L6, "tid": None}, r)
+        os.environ["okr_list_id"] = ""
+        try:
+            r = ow.import_source("task", P2, "t1")
+        finally:
+            os.environ["okr_list_id"] = PID
+        check("OKRs off", isinstance(r, ow.Refusal) and "OKRs are off" in str(r), r)
+
+        def broken(k):
+            raise OSError("disk")
+        cache.get = broken
+        r = ow.import_source("task", P2, "t1")
+        check("an unreadable cache: a Refusal, never a raise",
+              isinstance(r, ow.Refusal) and str(r) == "🥅 Unreadable · OSError", r)
+        cache.get = real_get
+        check("import_source reads nothing live", not api.calls, api.calls)
+    finally:
+        cache.get = real_get
+        areas.CTA_LIST_ID = real_cta
+
+    # ── 3d. import_plan: THE answer, the same as the verb's ─────────────────
+    print("import_plan")
+    L2, LF, L3 = "5" * 24, "3" * 24, "6" * 24
+    CTA, CT = "7" * 24, "8" * 24
+    UNREAD = "🥅 Not written · completed KRs unreadable right now · try again"
+    done_o = D("O5", f"🥅 O • [Old proj](ticktick:///webapp/#p/{L2}/tasks)", status=2)
+    gone_o = D("OG", f"🥅 O • [Gone proj](ticktick:///webapp/#p/{L2}/tasks)")
+    lazy = []
+    real_lazy = ow._lazy_v2
+
+    def at(completed=True, token="tok", complete_rows=None, extra_done=(), last=True):
+        """A world whose caches know the targets; okr_rows marks its last
+        read complete or not, okr_complete holds `complete_rows`."""
+        api, v2 = world(completed=completed, token=token)
+        for x in extra_done:
+            api.done[x["id"]] = cp(x)
+            MEM["okr_rows"]["rows"].append(cp(x))
+        MEM["okr_rows"]["done_complete"] = completed
+        if not last:
+            MEM.pop("okr_rows")
+        MEM["projects"] += [{"id": L2, "name": "Old proj"}, {"id": LF, "name": "Fresh proj"},
+                            {"id": L3, "name": "💼P • Proj"}]
+        MEM["all_tasks"] += [{"id": F, "projectId": E, "title": "Ship it"},
+                             {"id": CT, "projectId": CTA,
+                              "title": f"💼 P • [Proj](ticktick:///webapp/#p/{L3}/tasks) 🔗"},
+                             {"id": "KX", "projectId": P2, "title": "🔑 KR • Old - TA"}]
+        if complete_rows is not None:
+            o, dn = fixture()
+            MEM["okr_complete"] = {"list_id": PID, "ts": 1, "rows": cp(o) + cp(dn)
+                                   + [cp(x) for x in complete_rows]}
+        return api, v2
+
+    def both(kind, pid, tid, api, v2, okind="O", parent=None, v2_plan="same"):
+        """(import_plan's answer, the verb's) over the same caches: the verb
+        gets the payload the screen's row would carry."""
+        p = ow.import_plan(kind, pid, tid, v2=v2 if v2_plan == "same" else v2_plan)
+        link = p["link"] or {"to": "list" if kind == "list" else "task", "pid": pid,
+                             "tid": tid}
+        out = attempt(ow.add_items, {"kind": okind, "parent": parent,
+                                     "names": [p["name"] or "x"], "link": link}, api, v2)
+        return p, out
+
+    def agree(p, out):
+        if p["hit"] is not None:
+            h = p["hit"]
+            return (isinstance(out, ow.Refusal) and out.reopen == p["screen"]
+                    and str(out) == f"🥅 Already in the plan · {ow.GLYPH[h.kind]} {h.name}")
+        if p["blocked"] is not None:
+            return isinstance(out, ow.Refusal) and str(out) == p["blocked"]
+        return isinstance(out, ow.Outcome) and bool(out.ids)
+
+    real_cta, real_per = areas.CTA_LIST_ID, areas.PERIODIC_LIST_ID
+    try:
+        areas.CTA_LIST_ID = CTA
+        ow._lazy_v2 = lambda: (lazy.append(1), None)[1]
+        api, v2 = at()
+        p, out = both("task", E, F, api, v2, okind="KR", parent="O2")
+        check("import_plan: planned by an OPEN KR = hit + its screen, not blocked",
+              getattr(p["hit"], "id", None) == "K9" and p["screen"] == "ctx:okr:o:O1"
+              and p["blocked"] is None and p["name"] == "Ship it"
+              and p["link"] == {"to": "task", "pid": E, "tid": F} and p["kind_hint"] == "KR", p)
+        check("... the verb gives the SAME answer (refused, lands on the same screen)",
+              agree(p, out), (p, out))
+        api, v2 = at()
+        p, out = both("list", LF, None, api, v2)
+        check("import_plan: nothing plans it = free (no hit, not blocked)",
+              p["hit"] is None and p["blocked"] is None
+              and p["link"] == {"to": "list", "pid": LF, "tid": None}, p)
+        check("... and the verb adds it", agree(p, out), out)
+        check("... no Keychain read for an answer that needs no wording", not lazy, lazy)
+        api, v2 = at(extra_done=[done_o])
+        p, out = both("list", L2, None, api, v2)
+        check("import_plan: a DONE O of the last complete read = hit (closed ones count)",
+              getattr(p["hit"], "id", None) == "O5" and p["screen"] == "ctx:okr:o:O5", p)
+        check("... the verb agrees", agree(p, out), (p, out))
+
+        api, v2 = at(completed=False)
+        p, out = both("list", L2, None, api, v2)
+        check("C1 blocked: the last read missed completed KRs and none is remembered - "
+              "the verb's own refusal text", p["blocked"] == UNREAD and p["hit"] is None
+              and p["link"] is not None, p)
+        check("... the verb refuses in exactly those words", agree(p, out), (p, out))
+        api, v2 = at(completed=False, token="")
+        p, out = both("list", L2, None, api, v2)
+        check("C1 ... no v2 token: both say Attachment Login",
+              "Attachment Login" in (p["blocked"] or "") and agree(p, out), (p, out))
+        lazy.clear()
+        api, v2 = at(completed=False)
+        p = ow.import_plan("list", L2, None)
+        check("C1 ... with no client handed in, the token is looked up only now, once",
+              lazy == [1] and "Attachment Login" in (p["blocked"] or ""), (lazy, p))
+        api, v2 = at(completed=False)
+        MEM["okr_rows"]["detail"] = "v1 open 9; v2 completed 500 (120 d) - TRUNCATED"
+        lazy.clear()
+        p = ow.import_plan("list", L2, None)
+        check("C1 ... a TRUNCATED last read words it so, no token lookup",
+              p["blocked"] == "🥅 Not written · too many completed KRs to read them all"
+              and not lazy, (p, lazy))
+        api, v2 = at(completed=False)
+        p, out = both("task", E, F, api, v2, okind="KR", parent="O2")
+        check("C1 blind, but an OPEN item plans it: the hit, on both sides",
+              getattr(p["hit"], "id", None) == "K9" and agree(p, out), (p, out))
+
+        api, v2 = at(completed=False, complete_rows=[done_o])
+        p, out = both("list", L2, None, api, v2)
+        check("C3 a remembered DONE O answers for an incomplete read: hit, both sides",
+              getattr(p["hit"], "id", None) == "O5" and agree(p, out), (p, out))
+        api, v2 = at(completed=False, complete_rows=[gone_o])
+        p, out = both("list", L2, None, api, v2)
+        check("C3 only a row gone since (closed or deleted): blocked, both sides",
+              p["blocked"] == UNREAD and p["hit"] is None and agree(p, out), (p, out))
+        api, v2 = at(completed=False, complete_rows=[gone_o, done_o])
+        p, out = both("list", L2, None, api, v2)
+        check("C3 ... a known closed one beside it is the answer", getattr(p["hit"], "id", None)
+              == "O5" and agree(p, out), (p, out))
+        api, v2 = at(completed=False, complete_rows=[])
+        p, out = both("list", LF, None, api, v2)
+        check("C3 a remembered read and no hit: free, both sides",
+              p["hit"] is None and p["blocked"] is None and agree(p, out), (p, out))
+        api, v2 = at(completed=False,
+                     complete_rows=[D("KX", "🔑 KR • Old - TA", parent="O1", status=2)])
+        p, out = both("task", P2, "KX", api, v2, okind="KR", parent="O1")
+        check("M24 a closed planning copy known only to okr_complete: the planning-copy "
+              "refusal, both sides", p["blocked"] == "🥅 That is a planning copy · add the "
+              "original" and agree(p, out), (p, out))
+
+        api, v2 = at()
+        put(api, D("O7", f"🥅 O • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        MEM["okr_rows"]["rows"].append(D("O7", f"🥅 O • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        p, out = both("list", L3, None, api, v2)
+        check("import_plan: a list whose 📌CTA task is the payload is planned by the O on "
+              "the list (the goal's other face), ONE question",
+              p["link"] == {"to": "task", "pid": CTA, "tid": CT}
+              and getattr(p["hit"], "id", None) == "O7" and agree(p, out), (p, out))
+        api, v2 = at()
+        put(api, D("KL", f"🔑 KR • [Proj list](ticktick:///webapp/#p/{L3}/tasks)", parent="O2"))
+        MEM["okr_rows"]["rows"].append(
+            D("KL", f"🔑 KR • [Proj list](ticktick:///webapp/#p/{L3}/tasks)", parent="O2"))
+        p, out = both("list", L3, None, api, v2)
+        check("C1 ... a KR on the LIST is never asked about through its CTA payload (no "
+              "second question): free, both sides",
+              p["hit"] is None and p["blocked"] is None and agree(p, out), (p, out))
+        api, v2 = at()
+        put(api, D("YP", f"🏔️ Y • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        MEM["okr_rows"]["rows"].append(D("YP", f"🏔️ Y • [Proj](ticktick:///webapp/#p/{L3}/tasks)"))
+        p, out = both("list", L3, None, api, v2)
+        check("C7 ... a Y on the list: hit, its own screen, both sides",
+              p["screen"] == "ctx:okr:y:YP" and agree(p, out), (p, out))
+
+        # the source's refusals are the verb's
+        api, v2 = at()
+        for a, want, why in [
+            (("list", PID, None), ow.PLAN_LIST, "the plan list"),
+            (("task", PID, "U1"), ow.IN_PLAN_LOOSE, "an unprefixed item of it"),
+            (("task", P2, "K2"), ow.IN_PLAN_COPY, "a planning copy under a stale list"),
+        ]:
+            p, out = both(*a, api, v2, okind="KR", parent="O1")
+            check(f"import_plan blocked by the source, the verb agrees: {why}",
+                  p["blocked"] == want and p["link"] is None and agree(p, out), (p, out))
+        PER = "p" * 24
+        areas.PERIODIC_LIST_ID = PER
+        MEM["projects"].append({"id": PER, "name": "💫Periodic notes"})
+        MEM["all_tasks"].append({"id": "pn1", "projectId": PER, "title": "2026-09-19"})
+        for a, why in [(("list", PER, None), "the periodic list"),
+                       (("task", PER, "pn1"), "a periodic note"),
+                       (("task", P2, "pn1"), "a periodic note under a stale list")]:
+            api.calls.clear()
+            p, out = both(*a, api, v2, okind="KR", parent="O1")
+            check(f"import_plan: {why} stays out, the verb refuses it before any read",
+                  p["blocked"] == ow.PERIODIC and agree(p, out) and not api.calls, (p, out))
+        areas.PERIODIC_LIST_ID = real_per
+        os.environ["okr_list_id"] = ""
+        try:
+            p, out = both("list", LF, None, api, v2)
+        finally:
+            os.environ["okr_list_id"] = PID
+        check("import_plan: OKRs off, the verb's words",
+              p["blocked"] == "🥅 OKRs are off · ⚙️ Settings → OKR List" and agree(p, out),
+              (p, out))
+
+        # the plan: the caller's items win; else the hub's cached rows
+        api, v2 = at()
+        p = ow.import_plan("task", E, F, items=[])
+        check("import_plan asks the items it is handed (the screen's snapshot), not the cache",
+              p["hit"] is None and p["blocked"] is None, p)
+        p = ow.import_plan("task", E, F, items=okr.items_from(fixture()[0]))
+        check("... a hit among them", getattr(p["hit"], "id", None) == "K9", p)
+        api, v2 = at(last=False)
+        p = ow.import_plan("list", L2, None, v2=FakeV2(api))
+        check("import_plan: no last read known, a v2 token = the verb's read is predicted "
+              "whole (nothing to block on)", p["blocked"] is None and p["hit"] is None, p)
+        p = ow.import_plan("list", L2, None, v2=FakeV2(api, token=""))
+        check("import_plan: no last read known and NO v2 token = blocked like the verb "
+              "(no read is ever complete without it)",
+              p["blocked"] == "🥅 Not written · completed KRs need the Attachment Login "
+                             "token (⚙️ Settings)", p)
+        p = ow.import_plan("list", LF, None, list_id="other", v2=FakeV2(api))
+        check("import_plan: another list's okr_rows says nothing about this one",
+              p["blocked"] is None, p)
+        real_cp = ow.cached_plan
+        ow.cached_plan = lambda list_id: 1 / 0
+        try:
+            p = ow.import_plan("list", LF, None)
+        finally:
+            ow.cached_plan = real_cp
+        check("import_plan never raises: an unreadable plan is a blocked answer, never a "
+              "live row", p["blocked"] == "🥅 Unreadable · ZeroDivisionError"
+              and p["hit"] is None, p)
+
+        # cached_plan: okr_rows while nothing newer touched project_data;
+        # else the synced open rows plus every closed row still known
+        api, v2 = at(extra_done=[done_o])
+        check("cached_plan: okr_rows as kept (fresh), closed rows in",
+              {i.id for i in ow.cached_plan(PID)} >= {"K4", "O3", "O5", "K1"})
+        MEM[f"project_data_{PID}"]["tasks"].append(
+            D("ON", "🥅 O • Synced since", tags=[]))
+        MEM["okr_complete"] = {"list_id": PID, "ts": 1, "rows": [
+            D("OQ", f"🥅 O • [Quiet](ticktick:///webapp/#p/{LF}/tasks)", status=2)]}
+        MEM["completed_tasks"] = [D("KF", "🔑 KR • From the feed", parent="O1", status=2)]
+        try:
+            ow._mtime = lambda k: 2 if k.startswith("project_data") else 1
+            ids_ = {i.id for i in ow.cached_plan(PID)}
+            check("cached_plan: project_data newer than okr_rows = its open rows + the closed "
+                  "ones of okr_rows, okr_complete and the feed",
+                  {"ON", "O5", "K4", "OQ", "KF"} <= ids_, sorted(ids_))
+            p = ow.import_plan("list", LF, None)
+            check("... so a closed O only okr_complete still knows is found by the screen too",
+                  getattr(p["hit"], "id", None) == "OQ", p)
+        finally:
+            ow._mtime = lambda key: None
+        MEM.clear()
+        check("cached_plan: nothing cached = no items", ow.cached_plan(PID) == [])
+    finally:
+        areas.CTA_LIST_ID, areas.PERIODIC_LIST_ID = real_cta, real_per
+        ow._lazy_v2 = real_lazy
 
     # ── 4. link ──────────────────────────────────────────────────────────────
     print("link")
@@ -874,8 +2074,13 @@ try:
     api, v2 = world()
     api.store["O1"] = cp(dict(api.store["O1"], **okr.write_fields(
         okr.from_task(api.store["O1"]), d(9, 19), d(10, 14))))
+    MEM.pop("okr_complete", None)
     r = ow.heal_and_tick(api, v2, is_done=lambda p, t: False)
     check("nothing stale, nothing done: an empty chip", r.chip == "" and not v2.batches, r)
+    check("C3 ... and its complete read is kept as okr_complete all the same",
+          cached("okr_complete", "K4") is not None
+          and len(MEM["okr_complete"]["rows"]) == len(fixture()[0]) + len(fixture()[1]),
+          MEM.get("okr_complete"))
 
     b, bv2 = boom_world()
     r = ow.heal_and_tick(b, bv2, is_done=is_done)
@@ -958,6 +2163,30 @@ try:
     check("rebuild=False drops okr_rows (the heal's second hold, a newer copy about)",
           "okr_rows" not in MEM and cached("all_tasks", "K1")["title"] == "x")
 
+    # C3 okr_complete in the mirror
+    api, v2 = world()
+    snap = snapshot(api, v2)
+    MEM["okr_complete"] = {"list_id": PID, "ts": 7, "rows": [
+        dict(cp(fixture()[0][2]), status=0),                       # K2, open
+        {"id": "NEWER", "title": "🔑 KR • another writer's", "status": 0}]}
+    ow.patch_cache(snap, done=["K2"], rebuild=False)
+    check("C3 rebuild=False: okr_complete is not replaced (a newer read may be about); "
+          "only this write's tick goes in",
+          MEM["okr_complete"]["ts"] == 7 and cached("okr_complete", "K2")["status"] == 2
+          and cached("okr_complete", "NEWER")["status"] == 0, MEM["okr_complete"])
+    MEM["okr_complete"]["list_id"] = "other"
+    before = cp(MEM["okr_complete"])
+    ow.patch_cache(snap, done=["NEWER"], rebuild=False)
+    check("C3 ... another list's okr_complete is left alone", MEM["okr_complete"] == before)
+    api, v2 = world(completed=False)
+    isnap = snapshot(api, v2)
+    MEM["okr_complete"] = {"list_id": PID, "ts": 7, "rows": [{"id": "OLD", "status": 2}]}
+    before = cp(MEM["okr_complete"])
+    ow.patch_cache(isnap, patches={"K1": {"title": "t"}}, add=[new])
+    check("C3 a read missing completed KRs never writes okr_complete (its mirror rebuilds "
+          "okr_rows only)", MEM["okr_complete"] == before
+          and MEM["okr_rows"]["done_complete"] is False, MEM["okr_complete"])
+
     b, bv2 = boom_world()
     csnap = snapshot(b, bv2)
     ow.patch_cache(csnap, patches={"K1": {"title": "y"}})
@@ -966,9 +2195,11 @@ try:
 
     MEM.clear()
     ow.patch_cache(snap, patches={"K1": {"title": "x"}}, done=["K2"], add=[new])
-    check("no caches at all: no crash, nothing invented but the rebuilt okr_rows",
+    check("no caches at all: no crash, nothing invented but the rebuilt okr_rows "
+          "and okr_complete (the snap is a complete read)",
           "all_tasks" not in MEM and "project_data_" + PID not in MEM
-          and cached("okr_rows", "n1") is not None)
+          and cached("okr_rows", "n1") is not None
+          and cached("okr_complete", "n1") is not None, sorted(MEM))
     ow.patch_cache("not a snap", patches={"K1": {"title": "x"}})
     check("junk in: never raises, okr_rows dropped", "okr_rows" not in MEM)
 
@@ -1057,6 +2288,86 @@ try:
             sys.argv = old_argv
             ow.schedule = real_sched
         check("main routes xact:okr_sched", out == "📅 got K2\n", out)
+
+        # phase 3: xact:okr_add, and where a write may land instead of back
+        real_add = ow.add_items
+        trig.clear()
+        ow.add_items = lambda spec: ow.Outcome(f"🥅 got {spec['names'][0]}",
+                                               "ctx:okrtag:n1", ["n1"])
+        try:
+            sys.argv = ["xact.py", "xact:okr_add:" + b64({"kind": "O", "names": ["A"],
+                                                           "back": "ctx:okr"})]
+            out = run(xact.main)
+        finally:
+            sys.argv = old_argv
+            ow.add_items = real_add
+        check("main routes xact:okr_add; an Outcome prints its toast ONCE",
+              out == "🥅 got A\n" and not said, (out, said))
+        check("... and lands where the Outcome says (the tag picker), not the back",
+              trig == [("BrowseCtx", "ctx:okrtag:n1")], trig)
+
+        trig.clear()
+        out = run(xact._okr_run, b64({"back": "ctx:okr:y:Y1"}),
+                  lambda spec: ow.Outcome("🥅 ok", None, []))
+        check("an Outcome with no reopen: the payload's back",
+              out == "🥅 ok\n" and trig == [("BrowseCtx", "ctx:okr:y:Y1")], (out, trig))
+
+        def planned_already(spec):
+            raise ow.Refusal("🥅 Already in the plan · 🔑 Ship it", reopen="ctx:okr:o:O1")
+        trig.clear()
+        out = run(xact._okr_run, b64({"back": "ctx:okrimport:task:p:t"}), planned_already)
+        check("a Refusal that names a landing: toasted once, lands THERE",
+              out == "🥅 Already in the plan · 🔑 Ship it\n" and not said
+              and trig == [("BrowseCtx", "ctx:okr:o:O1")], (out, trig))
+
+        def odd_reopen(spec):
+            raise ow.Refusal("🥅 no", reopen="okr")
+        trig.clear()
+        run(xact._okr_run, b64({"back": "ctx:okr"}), odd_reopen)
+        check("a reopen that is not a ctx is never fired: the back instead",
+              trig == [("BrowseCtx", "ctx:okr")], trig)
+
+        # end to end over the fakes: the real writer through the real wrapper
+        api, v2 = world()
+        trig.clear()
+        out = run(xact._okr_run, b64({"kind": "O", "parent": None, "names": ["Travel plans"],
+                                      "code": None, "link": None, "then": "tag",
+                                      "back": "ctx:okr"}),
+                  lambda spec: ow.add_items(spec, api, v2))
+        check("okr_add end to end: one toast, the new O's tag picker",
+              out == "🥅 Added · 🥅 Travel plans · code TP\n"
+              and trig == [("BrowseCtx", "ctx:okrtag:new1")] and not said, (out, trig))
+        trig.clear()
+        out = run(xact._okr_run, b64({"kind": "KR", "parent": "O2", "names": ["Ship"],
+                                      "link": {"to": "task", "pid": "e" * 24, "tid": "f" * 24},
+                                      "back": "ctx:okrimport:task:x:y"}),
+                  lambda spec: ow.add_items(spec, api, v2))
+        check("okr_add end to end, already planned: one toast, K9's screen",
+              out == "🥅 Already in the plan · 🔑 Ship it\n"
+              and trig == [("BrowseCtx", "ctx:okr:o:O1")], (out, trig))
+        api, v2 = world()
+        trig.clear()
+        out = run(xact._okr_run, b64({"kind": "KR", "parent": "O2", "names": ["Zapier"],
+                                      "link": {"to": "task", "pid": "b" * 24, "tid": "c" * 24},
+                                      "back": "ctx:okr:o:O2"}),
+                  lambda spec: ow.add_items(spec, api, v2))
+        check("B4 okr_add end to end, an imported KR: the other levels' toast, the O's "
+              "new code stamped, back to the O",
+              out == "🥅 Added · 🔑 Zapier under Workflows · code W\n"
+              and trig == [("BrowseCtx", "ctx:okr:o:O2")] and not said, (out, trig))
+
+        real_krs = ow.add_krs
+        trig.clear()
+        ow.add_krs = lambda spec: f"🔑 got {spec['oid']}"
+        try:
+            sys.argv = ["xact.py", "xact:okr_addkr:" + b64({"oid": "O1", "names": ["a"],
+                                                             "back": "ctx:okr:o:O1"})]
+            out = run(xact.main)
+        finally:
+            sys.argv = old_argv
+            ow.add_krs = real_krs
+        check("xact:okr_addkr still routes (phase-2 rows), a plain toast, the back",
+              out == "🔑 got O1\n" and trig == [("BrowseCtx", "ctx:okr:o:O1")], (out, trig))
 
         real_heal = ow.heal_and_tick
         ow.heal_and_tick = lambda: ow.HealResult(1, 0, "🥅 1 span healed", "healed 1")

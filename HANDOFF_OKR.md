@@ -179,7 +179,7 @@ Not wanted: KRs as numbers. The weekly confidence score (skipped, Vex may ask).
 
 | What | Where |
 |---|---|
-| OKR list | `config.get_okr_list_id()` - key `okr_list_id`, env wins; default 🏆Goals Planning `6aac1b808f089e43641f5e90` (timeline view) ONLY while the key is absent from config.json - a blank value (env or config.json) means OFF. A ⚙️ Settings row comes with the hub's canvas phase. |
+| OKR list | `config.get_okr_list_id()` - key `okr_list_id`, env wins; default 🏆Goals Planning `6aac1b808f089e43641f5e90` (timeline view) ONLY while the key is absent from config.json - a blank value (env or config.json) means OFF. Set from ⚙️ Settings → OKR List (xact:okr_setlist: a dialog, 24-hex id, blank = OFF, never flips the view mode - the list is a TIMELINE). |
 | Old lists (leave alone) | 💫 OKRs 2026 `6a268ea18f081f1de80eaeae`, 💫 OKRs 2027 `6a268ea18f081f1de80eaeaf` - migrated later, not now |
 | 📌CTA list | `6a3413e02522110c0d06e678` (project CTA tasks: `💼 P • [name](list link) 🔗`) |
 | Area tag root | `0️⃣area` (tags_tree cache: name `0️⃣area`, children parent=`0️⃣area`) |
@@ -256,3 +256,64 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
   - v1 answering {} (a list id that does not exist) says "list not found".
   Reviewers' probes rerun: 44,141 random plans, 0 parents missing their
   requested end (was ~4,300); property and pipeline probes clean.
+- 2026-09-19: PHASE 2 SHIPPED (smoke-green from Vex). Code `5ccd77f`, canvas
+  `f2cedd3` (phase_okr: main-menu leg `ctx:okr` → B31D6E02, caller chain
+  keyword {var:okr_kw} + hotkey → Arg&Vars ctx:okr → BrowseCtx 60A44279,
+  ⚙️ Settings "OKR List" 13- → xact:okr_setlist → End; 415/375/7-0-0).
+  Vex bound the hotkey the same day: ⇧⌃⌥⌘R (`5c2730c`). What ships:
+  - screens `ctx:okr` (root / `:y:<id>` / `:o:<id>`), `ctx:okrpace[:tier]`,
+    `ctx:okrsched:<id>`, `ctx:okraddkr:<oid>`, `ctx:okrlink:<id>`,
+    `ctx:okrtag:<id>` (Scripts/browse.py); ⌘ Actions OKR rows (Schedule…,
+    Link…, Tag…, Add KRs, Done) with the generic verbs pruned (actions.py).
+  - `src/okr_write.py` = the ONLY writer: flock `~/.ticktick_alfred/okr.lock`,
+    live read, `Snapshot.writable` gate for dates and ticks, STORED items to
+    write_fields, v2 full-object batches with a v1 fallback, `patch_cache`
+    rebuilds okr_rows from the fresh snap and writes it LAST.
+  - verbs `xact:okr_sched|okr_addkr|okr_link|okr_tag|okr_heal|okr_setlist`.
+  - the hourly sync (`src/sync.py`, after `_people_nudge`) and a debounced
+    detached heal on hub open run `heal_and_tick`: spans healed, KRs whose
+    linked single task is done ticked (re-read inside the lock first).
+  - rulings taken while building (review 2026-09-18/19): a leading +/- on
+    the schedule screen is ALWAYS a length (+3, +3d, +2w; the minus sign,
+    en and em dash count as "-"), a typed time is refused, a date before
+    today is refused, an extend ending before today is refused; the tag
+    pool = 0️⃣Area children + every tag on a Y or O, retag replaces the
+    pool tags and keeps the rest, an O cascades to its open KRs; ⇧ reopens
+    a done KR (uncomplete:) and a won't-do one (xact:wontdo_undo); a link
+    target inside the plan list is refused.
+  - A throwaway list "🧪 OKR scratch (delete me)" `6aad841a8f082f9dd43967c8`
+    was used for live write tests (archived, empty); Vex removes it by hand.
+- 2026-09-19: phase 3 (import) started - contract: `xact:okr_add` (Y / O /
+  KR, text-only or linked, dedupe, CTA substitution for a list, tag picker
+  after a Y/O), `okr_write.import_source`, `ctx:okrimport:<kind>:<pid>:<tid>`,
+  ⌘ Actions "🥅 Add to OKRs", typed ➕ rows on the hub screens.
+- 2026-09-19: PHASE 3 BUILT (import). `xact:okr_add` (Y / O / KR, linked or
+  text-only, several via the pipe) over `okr_write.add_items`; the ⌘ Actions
+  row "🥅 Add to OKRs" (or "🥅 In the OKRs · <name>") and the screen
+  `ctx:okrimport:<task|note|list>:<pid>:<tid|->`; typed ➕ rows on the hub
+  root (objective / year objective), a Y screen (objective) and an O screen
+  (KR). Rulings taken while building:
+  - ONE question, one answer: `okr_write.import_plan` is the only thing the
+    ⌘ Actions row and the import screen ask, and `add_items` asks the same
+    `planned()` / `plan_of` inside its lock - a screen never offers a ⏎ the
+    verb can only refuse (a 140-state x 10-target agreement matrix, 682 real
+    verb runs, 0 disagreements outside the transient cases below).
+  - dedupe: the exact task / list for any item; a list and its 📌CTA task
+    count as one only when the hit is a 🏔️ Y / 🥅 O. A LIST import links the
+    project's 📌CTA task when one exists, so it asks with that link.
+  - the last COMPLETE read is kept under `okr_complete` (never overwritten
+    by an incomplete one); an incomplete live read adds its closed rows,
+    and a hit on a row that vanished since (done or deleted - unknowable)
+    refuses rather than risking a second copy. No v2 token = linked adds
+    blocked on every surface (no read is ever complete without it).
+  - names: a CTA "💼 P • " lead, a notes-list "N - " lead, a trailing 🔗,
+    zero-width marks and a plain list's leading emoji are dropped; a name
+    that would read back as a code ("Trip - USA") is a dead row, and so is a
+    KR under an O whose 🏷️ code does not read back.
+  - new O: code proposed (`okr_write` filters one that would not read back)
+    or `=XY`, written as the O's 🏷️ line; "=XY" with several objectives is
+    refused (two O's cannot share one code); a new Y / O opens the tag
+    picker; a KR takes its O's tag; created undated in typed order (tied
+    server sortOrders are re-dealt).
+  - KNOWN EXCEPTION to "no ⏎ the verb refuses": a v1 rate limit between the
+    cached read and the ⏎ (nothing local can see it) - the toast says wait.

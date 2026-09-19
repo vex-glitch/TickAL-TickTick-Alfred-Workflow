@@ -243,9 +243,18 @@ write through BrowseCtx - clean bar):
                                     "arg":N|"YYYY-MM-DD"|null} - ripple in
                                     the Y lane + parent heals, only from a
                                     writable live read (okr.Snapshot)
+    xact:okr_add:<b64>              ➕ {"kind":Y|O|KR,"parent":id|null,
+                                    "names":[...],"code":str|null,"link":
+                                    {"to":task|list,"pid","tid"}|null,
+                                    "then":"tag"|null} new planning copies
+                                    (phase 3 import + typed adds): stamped,
+                                    coded, a KR tagged like its O; a thing
+                                    already planned reopens THAT item, a new
+                                    Y / O with then:tag its tag picker
     xact:okr_addkr:<b64>            🔑 {"oid","names":[...],"code":str|null}
                                     KRs under an O, coded + tagged like it
-                                    (a new code lands as its 🏷️ line)
+                                    (a new code lands as its 🏷️ line);
+                                    okr_add with kind KR since phase 3
     xact:okr_link:<b64>             🔗 {"id","to":task|list,"pid","tid"} the
                                     copy's title links the real thing
     xact:okr_tag:<b64>              🏷 {"id","tag"} swap the OKR-pool tag; an
@@ -11971,19 +11980,25 @@ def _okr_run(rest, fn):
     reopen the screen it came from: "back" is a ctx the BrowseCtx trampoline
     turns into the browse_ctx VARIABLE, so the bar lands clean (iron rule 8).
     The screen reopens after a refusal too - the plan is unchanged and the
-    next try starts from where he was."""
+    next try starts from where he was. A writer may name ANOTHER landing:
+    an okr_write.Outcome's reopen (a new Y / O goes on to its tag picker) or
+    a Refusal's (an "Already in the plan" goes to the item that plans it).
+    Either rides the same BrowseCtx road, so the bar stays clean."""
     import okr_write as ow
     spec = _pn_decode(rest) if rest else None
     if not isinstance(spec, dict):
         print("🥅 Bad payload · nothing written")
         return
+    reopen = None
     try:
         msg = fn(spec)
     except ow.Refusal as e:
-        msg = str(e)
+        msg, reopen = str(e), getattr(e, "reopen", None)
     except Exception as e:
         msg = f"🥅 Not written · {type(e).__name__}: {e}"
-    back = spec.get("back")
+    if isinstance(msg, ow.Outcome):
+        msg, reopen = msg.msg, msg.reopen
+    back = reopen if isinstance(reopen, str) and reopen.startswith("ctx:") else spec.get("back")
     if isinstance(back, str) and back.startswith("ctx:"):
         try:
             _run_trigger("BrowseCtx", back)
@@ -12001,8 +12016,19 @@ def okr_sched(rest):
     _okr_run(rest, ow.schedule)
 
 
+def okr_add(rest):
+    """🥅 new 🏔️ Y / 🥅 O / 🔑 KR planning copies (HANDOFF_OKR phase 3):
+    typed text (the pipe = siblings) or ONE imported task, note or list
+    with its link. Stamped, coded and tagged by okr_write.add_items; a
+    thing the plan already holds lands on that item instead, and a new
+    Y / O with then:"tag" lands on its tag picker."""
+    import okr_write as ow
+    _okr_run(rest, ow.add_items)
+
+
 def okr_addkr(rest):
-    """🔑 several KRs under an O from one piped line, coded + tagged."""
+    """🔑 several KRs under an O from one piped line, coded + tagged
+    (phase 2's rows; add_items with kind KR since phase 3)."""
     import okr_write as ow
     _okr_run(rest, ow.add_krs)
 
@@ -12281,6 +12307,8 @@ def main():
             people_setlist()
         elif verb == "okr_sched":
             okr_sched(rest)
+        elif verb == "okr_add":
+            okr_add(rest)
         elif verb == "okr_addkr":
             okr_addkr(rest)
         elif verb == "okr_link":

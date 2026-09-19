@@ -130,6 +130,50 @@ def section_name(task):
     return ""
 
 
+def okr_import_row(kind, pid, tid):
+    """(title, subtitle, arg) of the ONE ⌘ Actions row that imports a task,
+    note or list into the OKR plan (HANDOFF_OKR section 4, Import; Vex
+    2026-09-19: "a row add OKRs which would then open list"). Not planned:
+    "🥅 Add to OKRs" → ctx:okrimport, where the level and the parent are
+    picked. Already planned: "🥅 In the OKRs · <name>" → that item's screen.
+    Refused (not cached, no complete read to check it against): the Add
+    row with the reason as its subtitle, still opening the import screen,
+    which says the same on a dead row. One smart row, never a road to a
+    second copy.
+
+    Every answer is okr_write.import_plan's and nothing else: the SAME call
+    the import screen makes (browse._okr_import_plan), over the same cached
+    plan, and add_items asks planned() the same question inside its lock -
+    so this row, that screen and the verb never disagree. It is pure over
+    the caches (never the network: this is the hottest render in the
+    workflow; only a refusal looks up the v2 token, to word itself);
+    okr_write is ~22 ms with okr. A writer layer that cannot
+    answer shows the plain Add row: the import screen and the verb still
+    decide. The caller gates it (the plan list and the periodic list get
+    no row)."""
+    add = ("🥅 Add to OKRs", "As 🏔️ Y · 🥅 O · 🔑 KR",
+           f"xact:crmbrowse:ctx:okrimport:{kind}:{pid}:{tid or '-'}")
+    try:
+        import okr_write
+        plan = okr_write.import_plan(kind, pid, tid)
+    except Exception:
+        return add
+    if not isinstance(plan, dict):
+        return add
+    hit = plan.get("hit")
+    if hit is not None:
+        screen = plan.get("screen") or "ctx:okr"
+        kind_of = getattr(hit, "kind", None)
+        glyph = {"Y": "🏔️", "O": "🥅", "KR": "🔑"}.get(kind_of, "▫️")
+        done = " · done" if getattr(hit, "history", False) else ""
+        return (f"🥅 In the OKRs · {getattr(hit, 'name', '')}",
+                f"{glyph} {kind_of or 'Item'}{done} · open it",
+                f"xact:crmbrowse:{screen}")
+    if plan.get("blocked"):
+        return (add[0], str(plan["blocked"]), add[2])
+    return add
+
+
 # ☑️ TickTick Internals sub-list sentinel: the parent row autocompletes the
 # bar to this and the SF re-runs with it (alfredfiltersresults is off).
 INTERNALS_Q = "☑️ "
@@ -600,6 +644,23 @@ def main():
         _okr_hist = _is_okr and (not task or task.get("status") in (2, -1))
         if _okr_kind in ("Y", "O"):
             browse_ctxs["⤵️ Browse subtasks"] = f"ctx:okr:{_okr_kind.lower()}:{tid}"
+        # 🥅 Add to OKRs: any OPEN task, note or list outside the plan list
+        # and the periodic list (a planning copy of a planning copy, or of a
+        # dated note, plans nothing). Entities too: "any task". A failure
+        # here costs the row, never the menu.
+        _okr_imp = None
+        if _okr_pid:
+            try:
+                _skip = {_okr_pid, areas.PERIODIC_LIST_ID} - {""}
+                if itype == "list" and pid and pid not in _skip:
+                    _okr_imp = okr_import_row("list", pid, None)
+                elif is_task_like and tid and task:
+                    _rp = task.get("projectId") or task.get("_projectId") or pid
+                    if _rp and _rp not in _skip:
+                        _okr_imp = okr_import_row("note" if is_note else "task", _rp, tid)
+            except Exception:
+                _okr_imp = None
+        _oi_t, _oi_s, _oi_a = _okr_imp or ("", "", "")
         _entity = _is_logbook or _is_customer or _sess_done or _is_content or _is_okr
         _generic = not _entity
 
@@ -705,6 +766,10 @@ def main():
                 ("🔑 Add KRs", "Pipe for more · code kept",
                  f"xact:crmbrowse:ctx:okraddkr:{tid}",
                  "add key result kr krs subtask", _okr_kind == "O" and not _okr_hist),
+                # the Y's own screen adds them: a typed name = its ➕ row
+                ("🥅 Add objectives", "Type names · | for more",
+                 f"xact:crmbrowse:ctx:okr:y:{tid}",
+                 "add objective objectives goal", _okr_kind == "Y" and not _okr_hist),
                 ("✔️ Done", "Tick KR", f"complete:{pid}:{tid}:{title}",
                  "complete done tick", _okr_kind == "KR" and not _okr_hist),
             ]
@@ -837,6 +902,11 @@ def main():
             (f"✉️ Mail · {_p_mail}", "From the card",
              f"open:mailto:{_p_mail}", "mail email person people",
              _is_person_card and bool(_p_mail)),
+            # ONE drill row (Vex 2026-09-10: ⌘ Actions is crowded enough):
+            # the level, the parent and the tag are picked on its screen
+            (_oi_t, _oi_s, _oi_a,
+             "okr okrs goal goals objective key result kr plan import add",
+             bool(_okr_imp)),
             ("👽 Attach to person", "Becomes a CTA under a card",
              f"xact:crmbrowse:ctx:people:attach:{pid}:{tid}",
              "person people attach cta assign",
