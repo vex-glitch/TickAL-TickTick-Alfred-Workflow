@@ -126,11 +126,14 @@ cache) - all in the Makefile `test:` list.
 4. Writers + verbs - zero canvas.
 5. Weekly note block + template synced live.
 6. Routine registry entry + sync hitchhiker.
-7. **Canvas phase** `phase_meal.py`: main-menu leg `ctx:meal` → B31D6E02,
-   caller chain keyword `{var:meal_kw}` (default `tml`) + UNSET hotkey →
-   Arg&Vars → BrowseCtx 60A44279, Settings row `14-` → `xact:meal_setlist`
-   → End. 415/375/7-0-0 → 419/381/7-0-0, userconfig 55 → 56. Paired with
-   the 🥘 row in `main_menu.py`. Vex smoke-gates.
+7. **Canvas phase** `phase_meal.py` - APPLIED LIVE 2026-09-19 20:59:
+   main-menu leg `ctx:meal` → B31D6E02, caller chain keyword `{var:meal_kw}`
+   (default `tml`) + UNSET hotkey → Arg&Vars → BrowseCtx 60A44279, Settings
+   row `14-` → `xact:meal_setlist` → End. 415/375/7-0-0 → 419/381/7-0-0,
+   userconfig 55 → 56 (audit verified after `make sync-pull`). `main_menu.py`
+   pushed in the same breath. Migration `--apply` done the same evening:
+   112/112, 0 mismatches. Vex smoke-gates the canvas (tal → 🥘, tml,
+   ⚙️ Meal Prep List).
 8. Docs: vault `X • docs/X • 51-meal-prep.md` (+ index, cheatsheet, 48-periodic,
    CHANGELOG), `Scripts/docs_menu.py`.
 

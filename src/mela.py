@@ -52,7 +52,10 @@ except ImportError:                    # standalone: a local one is enough
 DB_DIR = os.path.expanduser("~/Library/Group Containers/66JC38RDUD.recipes.mela/Data")
 DB_PATH = os.path.join(DB_DIR, "Curcuma.sqlite")
 SNAP_DIR = os.path.expanduser("~/.ticktick_alfred/run/mela")   # 0700, on demand
-SNAP_TTL = 60                          # seconds an unchanged copy is reused
+SNAP_TTL = 600                         # seconds an unchanged copy is reused
+                                       # (sources' mtimes are compared too, so
+                                       # the TTL is a safety net; at 60 s every
+                                       # browse render re-copied 19 MB)
 PRUNE_AFTER = 600                      # older sibling copies are removed
 APPLE_EPOCH = 978307200                # 2001-01-01 UTC as a unix timestamp
 LINK_RE = re.compile(r"mela://recipe/([0-9A-Fa-f-]{36})")
