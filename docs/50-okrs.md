@@ -26,6 +26,7 @@ The plan lives in ONE TickTick list you schedule by hand in the **timeline view*
 | **The code** | A short suffix per objective (TickAL → `TA`), stamped on every KR under it | The automation - proposed, you can override |
 | **Area tags** | The lanes of the timeline: the subtags of your `0️⃣Area` tag (plus the tags your Y/O items carry) | You, once |
 | **Heal + auto-tick** | Parents re-cover their children; a KR whose linked task is done gets ticked | The automation - on hub open and on the hourly sync |
+| **Countdowns** | One TickTick countdown per started objective, to its end | The automation - the same passes, and every schedule action |
 
 ## Planning copies
 
@@ -61,6 +62,10 @@ Open it from the main menu or its keyword. The root shows your year objectives, 
 | ⌃ | Back | Back |
 
 **📈 Pace** opens four rows - 🌓 Quarter, 🗓️ Month, ♻️ Week, ☀️ Day - each counting the key results the plan puts in that period, how many are done, and how far behind the late ones are. ⏎ on a row shows that period's plan.
+
+The last row is **⚖️ Capacity**: the key results your plan puts due in the next four weeks against the ones you ticked in the last four, per week (`plan 1.8/wk · done 0.5/wk`), with ⚠️ when two or more are due and the plan asks for more than half again what you finish. The week's plan (♻️ Week) shows it too, since that is where the weekly review plans the next week.
+
+**↪️ Carry-over** shows up under 📈 Pace while a quarter leaves key results open - see [The quarter carry-over](#the-quarter-carry-over).
 
 **Typing** in the hub searches every item. With no match (or below the matches), ➕ rows add what you typed: **➕ New objective / year objective** on the root, **➕ New objective** on a year objective, **➕ New KR** on an objective. A pipe adds several: `Draft spec | Review | Publish`. `=XY` sets a new objective's code.
 
@@ -110,14 +115,53 @@ Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆
 
 The daily shows all five periods, the weekly four, the monthly three, the quarterly two, the yearly one. It is the plan only: the goals you pick stay in 🏆 Goals below. The yearly note's 🎯 Goals scorecard lists every objective with its progress bar and span. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
 
+**Aligned work (weekly note):** the weekly note's 📊 Stats carries
+
+```
+- 🥅 Aligned: 68% • 17/25 • 🟢 ▲ 7 pts
+	- 🥅 TickAL • 12 done • 4h 10m
+	- 🥅 Onboard TickTicks • 5 done • 1h 05m
+```
+
+Of the tasks you finished this week (routine lists, the plan's own copies and won't-dos left out), how many served an objective, the change against last week in points, and one line per objective: its done count and the focus time that went into it. A task serves an objective when it is the real thing a plan item links, a subtask of one at any depth, or in a list an item links. An objective linked to its project's 📌CTA covers the whole project list, and the CTA's focus counts even after the CTA is re-made. Links are the only join: until your plan items link something, the line says `no linked OKR items`. Delete the bullet and it stays gone.
+
 **Setting goals from the plan:** every goal picker opens with 🔮 rows, the plan for that period. ⏎ on one makes it the goal - aimed at the real task the key result links, never at the planning copy. Then **📋 Pick a goal**, and the usual search below it (which never offers planning copies).
+
+## The quarter carry-over
+
+When a quarter ends, every key result it leaves open gets one decision, so nothing leaks silently into the next one. During a quarter's last two weeks (and after it ends, while its leftovers are still open) the hub shows **↪️ Carry-over · Q3 · 5 open**. It lists every open, dated key result that ends by the quarter's last day, earlier quarters' leftovers included. ⏎ on one opens its three choices:
+
+| Choice | Does |
+|---|---|
+| ↪️ Carry into Q4 | Starts it on the next quarter's first day (today, when that day is already past), same length. The rest of its line moves along, like any schedule action. |
+| 🚫 Won't do | TickTick's won't do: out of progress and pace. Undo it from 🚫 Won't Do. |
+| 💤 Someday | Takes its dates away: off the timeline, still in the plan and in its objective's count. |
+
+On the list, ⇧ still ticks a key result done and ⌥⇧ still schedules it to any date. After each decision the list reopens with the next leftover on top. The 🌓 Quarterly Review's checklist opens this screen (see below).
+
+## Countdowns
+
+Every objective and year objective that has **started** gets a TickTick countdown to its end, named like the plan item (`🥅 TickAL`). It moves when the end moves, and it is archived when the objective is done, won't do, deleted or loses its dates. Archive or delete one yourself and it is never made again. The countdowns show in TickTick's countdown view, the ⏳ hub and the daily note's ⏳ Countdowns. They need the v2 token.
+
+## OKR steps in your routines
+
+Each routine checklist can open an OKR screen with a Link verb (`alfred://runtrigger/com.vex.tickal/Link/?argument=view%3A<slot>`):
+
+| Slot | Opens |
+|---|---|
+| `okr` | The hub |
+| `okrdaily` · `okrweekly` · `okrmonthly` · `okrquarterly` | That 📈 Pace period's plan |
+| `okrcarry` | The quarter carry-over |
+
+⌘⏎ → ☑️ TickTick Internals → **🥅 OKRs** copies the hub's link.
 
 ## Automations
 
 - **Heal:** a parent always runs from its first dated child's start to its last dated child's end.
 - **Auto-tick:** a key result that links a single task is ticked when that task is completed.
+- **Countdowns:** kept in step with the started objectives (above).
 
-Both run when you open the hub (at most every five minutes) and with the optional hourly sync ([Settings & sync](90-settings-sync.md)). Writes only happen from a complete live read of the list; anything less and the automation waits.
+All three run when you open the hub (at most every five minutes) and with the optional hourly sync ([Settings & sync](90-settings-sync.md)). Writes only happen from a complete live read of the list; anything less and the automation waits.
 
 ## Limitations
 

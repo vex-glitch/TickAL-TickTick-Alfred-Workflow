@@ -372,3 +372,87 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
   daily's 🏆 Goals holds only the week and the day, so the year / quarter /
   month goals now show in their own notes and the goal pickers, not in the
   daily. `a7873b8`, read back on the server.
+- 2026-09-19: PHASE 5 BUILT (the rest), zero canvas. What ships:
+  - COUNTDOWNS (`okr.countdown_targets`, `okr_write.countdown_plan` pure +
+    `sync_countdowns`): one ⏳ kind-4 countdown per OPEN Y/O that has
+    STARTED, on its wanted INCLUSIVE end, named `🥅 <name>` / `🏔️ <name>`, no
+    reminders, remark `🥅 OKR · <item id>` (hidden, showRemark false) = the
+    ownership marker. `~/.ticktick_alfred/okr_countdowns.json` = {item id:
+    {cid, by_us}}: one Vex archived or deleted is NEVER minted again; one WE
+    archived (objective done / won't do / deleted / undated) comes back when
+    the objective does. A not-yet-started O keeps a countdown it has (kept in
+    step, never archived for being early). Written only from a writable read
+    inside the lock: heal_and_tick's first hold (hub open, hourly sync) and
+    schedule() after its spans (the toast says "⏳ 1 countdown updated").
+    The registry is saved only after TickTick took the batch. They show in
+    the daily ⏳ Countdowns (cap 4, soonest first) and the monthly ⏳ Dates
+    like any countdown - offered to Vex to keep out if they crowd.
+  - CARRY-OVER (`okr.closing_quarter` / `carry_candidates` / `carry_start`,
+    `okr_write.carry`, `ctx:okrcarry[:<quarter start>[:<id>]]`,
+    `xact:okr_carry`): the closing quarter = the running one in its last 14
+    days, else the one before (a late review still closes its quarter); a
+    ctx pins it. Candidates = open dated LEAVES (a KR, or a Y/O dated by
+    hand with no dated child) ending by the quarter's end, earlier leftovers
+    included. Per item: ↪️ carry = schedule's "date" to the next quarter's
+    first day (or today when that is gone) with the ripple; 🚫 won't do = v2
+    abandon inside the lock + xact.wontdo's cache mirror from src/ + parent
+    heal; 💤 someday = v1 null dates (the proven clear) + parent heal. The
+    hub shows `↪️ Carry-over · Q3 · N open` only while N > 0. The list rows
+    are full hub rows (⇧✅ ⌥⇧📅 ⌘⚡) whose ⏎ opens the three choices; each
+    verb lands back on the PINNED list.
+  - ROUTINE STEPS: colon-free Link slots `view:okr | okrdaily | okrweekly |
+    okrmonthly | okrquarterly | okrcarry` (routine_link SLOT_VERBS + link.py
+    VIEW_CTX, a test pins that every slot has a VIEW_CTX entry) and a ☑️
+    TickTick Internals row "🥅 OKRs". The checklists, Vex's words kept and
+    wrapped: Startup "Make sure your daily plan alligns with your goals" ->
+    okrdaily; the three review "[Check OKRs]" (they linked the OLD 💫 OKRs
+    2026 list) -> okrweekly / okrmonthly / okrquarterly; Quarterly "Adjust
+    OKRs if needed" -> okrcarry; Shutdown > [Plan tomorrow] gains "[Check
+    the OKR plan]" (okrweekly) before "Set Tomorrow's MIT". routines.json
+    (the automation) is untouched: an Alfred screen popping at a routine's
+    start would come before the step it belongs to.
+  - ALIGNED + FOCUS PER OBJECTIVE (`src/okr_stats.py` pure,
+    `periodic_engine._fill_aligned`, `pm.SEC_ALIGNED` in 📊 Stats): `- 🥅
+    Aligned: 68% • 17/25 • 🟢 ▲ 7 pts`, one line per objective under it
+    (done count, focus). Work = the week's completed rows, status 2, minus
+    the routine lists / small repeats (_drop_ignored), the plan list and
+    the periodic list. Served = the linked original (or its repeat series),
+    a subtask at any depth, a list an item links, and a CTA's two faces (an
+    O linked to its CTA covers the project list; a list-linked O covers its
+    CTA, and a focus segment whose CTA was re-minted still counts through
+    the list link in its title). Owner = the KR's O. LINKS ARE THE ONLY
+    JOIN: the 💼 tags live on the plan copies alone (checked live), so an
+    unlinked plan says "no linked OKR items". Focus comes from
+    `periodic_fetch.focus_records` - the timeline PAGED back with ?to= (page
+    1 alone reaches ~8 days) - each task entry's own segment scaled to the
+    record's net minutes. ⏪ Last week gets the prior week's line. W38 got
+    the bullet from `tools/pnrepair/aligned_bullet.py` (gitignored).
+  - CAPACITY (`okr.capacity`, `rate_txt`): ⚖️ row last on 📈 Pace and on the
+    ♻️ Week plan: KRs due in the next 4 weeks vs KRs ticked in the last 4
+    (the copy's completedTime), per week, ⚠️ when planned >= 2 and
+    planned > 1.5 x done.
+  - REVIEW (2026-09-19, 4 reviewers + adversarial verifiers; 10 confirmed,
+    4 rejected, all 10 fixed with a test each):
+    - countdown registry: `CdPlan.known` = the file reconciled with the
+      LIST (a live countdown of ours is recorded minted/not by_us - a lost
+      save is back-filled, a stale by_us cleared, so Vex archiving it later
+      holds) + this pass's archives (by_us); saved even when nothing is
+      written or the batch is refused. Adds and un-archives only after the
+      ack. An objective retitled into a KR or a plain task loses its
+      countdown ("gone" = no longer a Y/O).
+    - carry: won't do REFUSES while open items hang under the item (a
+      hand-dated O with undated KRs, a KR with subtasks), and the decision
+      row is dead with the count; an UNPREFIXED dated step under a Y/O is a
+      leftover (okr.carry_leaf - pace already counts it).
+    - aligned: an OPEN item claims a shared task/list before a closed one;
+      the CTA faces only for real CTAs (the 📌CTA list, or the "💼 P • ["
+      title shape - launchd runs have no cta_list_id env); a kept map
+      `okr_cta_lists` (cache, {CTA id: [lists]}) answers for a CTA gone from
+      every cache; per-objective lines in a full order (no flip between
+      runs).
+    - capacity ⚠️ needs at least 2 KRs due (documented, it was already so).
+    - REJECTED, for Vex to rule on if he wants: carrying an OLD leftover
+      ripples its lane by its full age (a February KR carried in October
+      pushes the lane's later open items ~8 months - the ripple rule as
+      written; the preview says "moves N along"); capacity counts only
+      KRs due AHEAD (overdue open ones show as "behind" on the pace rows).
