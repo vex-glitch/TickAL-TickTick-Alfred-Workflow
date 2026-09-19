@@ -2,6 +2,9 @@
 ---
 {{daylinks}}
 ---
+#### 🥅 OKRs
+- _(pending)_
+---
 #### 🏆 Goals
 - 🌓 Quarterly
 	- _(mirrors this quarter's note - set it there)_

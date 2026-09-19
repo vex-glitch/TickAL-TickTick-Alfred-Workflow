@@ -537,10 +537,19 @@ def income_rows(rest):
 
 
 def _task_pool(include_notes=False):
+    # Never the OKR planning copies (review 2026-09-19): a daily goal set
+    # from a task MOVES it onto the day, which would drag a KR copy into a
+    # time block - the 🔮 rows offer the plan, aimed at the linked originals
+    try:
+        import config as _cfg
+        okr_pid = _cfg.get_okr_list_id()
+    except Exception:
+        okr_pid = ""
+    skip = {areas.PERIODIC_LIST_ID, okr_pid} - {"", None}
     pool = [t for t in (cache_store.get("all_tasks") or [])
             if t.get("status", 0) == 0
             and (include_notes or t.get("kind") != "NOTE")
-            and (t.get("projectId") or t.get("_projectId")) != areas.PERIODIC_LIST_ID]
+            and (t.get("projectId") or t.get("_projectId")) not in skip]
     return pool
 
 
@@ -568,6 +577,26 @@ def goal_rows(frag):
             valid=True, mods=_mods())
     items = _picker_rows(frag, _task_pool(), row,
                          "Type to pick a goal task…")
+    if not frag.strip():
+        # 🔮 the weekly journal's three-things screen is a goal picker too
+        # (HANDOFF_OKR section 4: every one of them). Its OWN verbs, so a
+        # plan pick counts down the three exactly like a picked task.
+        def arg(text, t=None):
+            if t is not None:
+                return f"xact:pn_goal:{t['projectId']}:{t['id']}"
+            return f"xact:pn_goal_text:{_b64({'text': text})}"
+        gp = pm.period_for("weekly", date.today())
+        if seq:
+            gp = pm.next_period(gp)
+        try:
+            held = [raw for _s, raw in _pe().period_goals("weekly", ahead=bool(seq))]
+        except Exception:
+            held = []
+        plan = plan_goal_rows("weekly", gp, "♻️ Weekly" + (" · next" if seq else ""),
+                              arg, held)
+        if plan and items and items[0].get("valid") is False:
+            items = []                    # the "Type to pick…" hint: the 📋 row says it
+        items = plan + items
     if frag.strip():
         items.append(alfred.item(
             title=f'➕ Goal: "{frag.strip()[:50]}"',
@@ -771,6 +800,159 @@ _GOAL_TIERS = {"daily": "☀️ Daily", "weekly": "♻️ Weekly",
                "yearly": "🎉 Yearly"}
 
 
+# ── 🔮 the plan on every goal screen (HANDOFF_OKR section 4) ────────────────
+# Vex 2026-09-19: "We could when setting goals have two rows: 1. First row
+# could say something like: '<mimic objective or key result for respective
+# period>', enter would set that as goal. 2. Second row could say something
+# like: 'Pick a goal' and open goal picker as is."
+#
+# The plan is a FORECAST and the goal is the pick; these rows only make the
+# forecast one ⏎ away. They read the CACHE (okr_write.cached_plan), never the
+# network, and only on an empty bar - the screen renders on every keystroke.
+_GOAL_URL_RE = re.compile(r"#p/(?P<pid>\w+)/tasks/(?P<tid>\w+)")
+
+
+def _norm(s):
+    return " ".join(pm.unescape_md(s or "").split()).casefold()
+
+
+def _goal_keys(lines, clean=None):
+    """(task ids, names) of the goals a note already holds, so a plan item
+    that is already the goal is not offered a second time. A task goal is
+    known by its link's id; a text goal by its words (and each side of the
+    "text · task" shape, which pm.goal_titles hands back joined). `clean`
+    (okr_write._clean_name) reads a goal the way an import named its plan
+    item - no "💼 P • " lead, no trailing 🔗 - so both sides compare alike."""
+    tids, names = set(), set()
+    for ln in lines or ():
+        for m in _GOAL_URL_RE.finditer(pm.unescape_md(ln or "")):
+            tids.add(m.group("tid"))
+        for shown in pm.goal_titles([ln]):
+            for part in [shown] + shown.split(" · "):
+                names.add(_norm(part))
+                if clean is not None:
+                    try:
+                        names.add(_norm(clean(part)))
+                    except Exception:
+                        pass
+    names.discard("")
+    return tids, names
+
+
+def _day_goal_lines(day):
+    """The ☀️ Daily goal lines of `day`'s note, out of the CACHE (the same
+    lookup periodic_engine._daily_note does, without loading the engine and
+    its api import on a keystroke screen). [] when there is no such note."""
+    try:
+        import periodic_sections as ps
+        for t in cache_store.get("all_notes") or []:
+            if not isinstance(t, dict):
+                continue
+            if (t.get("projectId") or t.get("_projectId")) != areas.PERIODIC_LIST_ID:
+                continue
+            if pm.parse_daily_title(t.get("title") or "") != day:
+                continue
+            sec = ps.find(ps.parse_sections(t.get("content") or ""), pm.SEC_DAY_GOAL)
+            return list(sec.body) if sec else []
+    except Exception:
+        pass
+    return []
+
+
+def _plan_original(it, list_id, by_id):
+    """The task a 🔮 row sets as the goal: the LINKED ORIGINAL, never the
+    planning copy. HANDOFF_OKR section 4's trap: a daily goal set from a
+    task MOVES that task onto the day (set_period_goal -> _goal_task_to_day),
+    so a goal aimed at the copy would drag the KR into a time block and
+    break the timeline Vex drags by hand.
+
+    None = set a TEXT goal with the item's name: a text-only item, an O that
+    links a list, a foreign URL, and - defensively - a link that points back
+    into the plan list itself (a copy of a copy is still a copy)."""
+    tg = it.target
+    if not tg or tg[0] != "task":
+        return None
+    _k, pid, tid = tg
+    closed = {list_id, areas.PERIODIC_LIST_ID} - {"", None}
+    if not tid or tid == it.id or pid in closed:
+        return None
+    t = by_id.get(tid) or {}
+    if (t.get("projectId") or t.get("_projectId")) in closed:
+        return None
+    # the cache's list over the link's when it knows the task: same id, and
+    # a task moved to another list since the link was pasted lives THERE
+    return {"id": tid,
+            "projectId": t.get("projectId") or t.get("_projectId") or pid,
+            "title": t.get("title") or it.name}
+
+
+def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None):
+    """🔮 one row per OPEN plan item of period `p`, then 📋 Pick a goal.
+
+    `kind` is the tier the plan is read for (the journal's day screen is
+    "daily"), `p` the period the goal lands in - the screen's own rule
+    (a journal's for_day, the next period while a handoff runs ahead, else
+    today's). `arg(text, t)` is the screen's EXISTING payload builder, so a
+    🔮 pick goes down exactly the road a picked task or typed text does.
+    The plan selection is okr_notes.goal_choices, the same one the notes'
+    🥅 OKRs lines read, so a note and its picker never disagree.
+
+    [] - and the screen is exactly what it was - when OKRs are off, nothing
+    is cached, nothing is planned for the period, or anything at all fails:
+    the plan is a convenience here, never a reason the picker cannot open."""
+    today = today or date.today()
+    try:
+        import config
+        import okr
+        import okr_write
+        from okr_notes import goal_choices
+        list_id = config.get_okr_list_id()
+        if not list_id:
+            return []
+        items = okr_write.cached_plan(list_id)
+        if not items:
+            return []
+        picks = goal_choices(kind, p.start, p.end, items, today) or []
+        want = okr.wanted_spans(items)
+    except Exception:
+        return []
+    tids, names = _goal_keys(have_lines, getattr(okr_write, "_clean_name", None))
+    by_id = {t.get("id"): t for t in cache_store.get("all_tasks") or []
+             if isinstance(t, dict) and t.get("id")}
+    done_ids = {t.get("id") for t in cache_store.get("completed_tasks") or []
+                if isinstance(t, dict)} - set(by_id)
+    rows, seen = [], set()
+    for it in picks:
+        if it.history or not (it.name or "").strip() or it.id in seen:
+            continue
+        seen.add(it.id)
+        t = _plan_original(it, list_id, by_id)
+        if t is not None and (t["id"] in tids or t["id"] in done_ids):
+            continue                      # already the goal, or already done
+        if _norm(it.name) in names or (
+                t is not None and _norm(pm.strip_md_links(t["title"])) in names):
+            continue                      # already the goal, as text or by title
+        try:
+            s, e = okr._effective(it, want)
+            when = okr.span_txt(s, e, today)
+        except Exception:
+            when = okr.span_txt(it.start, it.end, today)
+        rows.append(alfred.item(
+            uid=f"pn-goal-plan-{kind}-{it.id}",
+            title=f"🔮 {okr_write.GLYPH.get(it.kind, '▫️')} {it.name[:60]}",
+            subtitle=f"{when} · the plan  |  ⏎ The {label} goal",
+            arg=arg("" if t is not None else it.name, t),
+            valid=True, mods=_mods()))
+    if rows:
+        # the divider between the forecast and the picker as it always was;
+        # with no 🔮 row there is nothing to divide, and the screen stays
+        # exactly the one Vex already knows
+        rows.append(alfred.item(
+            uid=f"pn-goal-pick-{kind}", title="📋 Pick a goal",
+            subtitle="Type to search every task", valid=False, mods=_mods()))
+    return rows
+
+
 def tier_goal_rows(kind, rest, jnl=None):
     """One screen, Vex's three shapes (2026-09-12):
         "<text>"              -> ➕ the text alone
@@ -816,6 +998,7 @@ def tier_goal_rows(kind, rest, jnl=None):
         return "xact:pn_setgoal:" + _b64(payload)
 
     items = []
+    have = []
     # what is already there, each one removable - a goal screen that cannot
     # show you the goals is a write-only box
     if not jnl and kind != "daily" and not (rest or "").strip():
@@ -837,6 +1020,19 @@ def tier_goal_rows(kind, rest, jnl=None):
                 subtitle=f"{len(have)} goal{'s' if len(have) > 1 else ''} set",
                 arg="xact:pn_goaldone:" + _b64({"kind": kind}),
                 valid=True, mods=_mods()))
+    if not (rest or "").strip():
+        # 🔮 the plan for the period the goal LANDS in, then 📋 Pick a goal.
+        # The daily's goal lines are read for the skip too: the journal's
+        # Change… screen must not offer back the goal being changed.
+        if jnl:
+            gp = pm.period_for("daily", jnl["for_day"])
+        else:
+            gp = pm.period_for(kind, date.today())
+            if ahead:
+                gp = pm.next_period(gp)
+        held = ([raw for _shown, raw in have] if kind != "daily"
+                else _day_goal_lines(gp.start))
+        items.extend(plan_goal_rows(kind, gp, label, arg, held))
     if combining and text:
         items.append(alfred.item(
             uid="pn-goal-textonly", title=f'🎯 {label} · "{text[:44]}"',

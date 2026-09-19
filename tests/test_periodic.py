@@ -902,9 +902,11 @@ check("27.a-broken-run-is-not-left-behind",
 _tpl27 = open(os.path.join(ROOT, "src", "periodic_templates", "weekly.md"),
               encoding="utf-8").read()
 check("27.template-carries-the-token", "{{daylinks}}" in _tpl27)
+# (the first section under the block is 🥅 OKRs since 2026-09-19 - HANDOFF_OKR
+# phase 4 put the plan above 🏆 Goals on every tier)
 check("27.template-renders-the-block",
       pm.render_template(_tpl27, {"breadcrumbs": "C", "daylinks": "\n".join(_dl)})
-      .startswith("C\n---\n" + "\n".join(_dl) + "\n---\n#### 🏆 Goals"))
+      .startswith("C\n---\n" + "\n".join(_dl) + "\n---\n#### 🥅 OKRs"))
 
 
 # ── 28. the summaries drop the small repeating tasks (Vex 2026-09-17) ───────

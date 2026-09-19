@@ -2,6 +2,9 @@
 ---
 {{quarterlinks}}
 ---
+##### 🥅 OKRs
+- _(pending)_
+---
 ##### 📊 Dashboard
 _(pending)_
 

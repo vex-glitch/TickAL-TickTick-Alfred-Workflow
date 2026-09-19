@@ -160,6 +160,11 @@ SEC_BEST_OF    = "⭐ Best of"
 SEC_THEME      = "🧭 Theme of the year"
 SEC_ANTI       = "🚫 Anti-goals"
 SEC_DECEMBER   = "🧪 December test"
+# every tier, at the top (HANDOFF_OKR phase 4, Vex 2026-09-19: "We should
+# also then have the OKRs section in periodic notes. All of them. With all
+# levels."). One line per tier, the plan and his picked goal side by side;
+# filled by periodic_engine._fill_okr from src/okr_notes.py.
+SEC_OKR        = "🥅 OKRs"
 
 # Where a goal lands, per tier (Vex 2026-09-12: "There should be goal setting
 # for every periodic note"). Only daily and weekly had a setter before; the
@@ -224,26 +229,26 @@ WRITER_ANCHORS = {
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
                   SEC_YESTERDAY, SEC_YBRIDGE, SEC_HIGHLIGHT, SEC_TODAY,
                   SEC_TOMORROW, SEC_MORNING, SEC_NOTES, SEC_EVENING,
-                  SEC_DAY_SUM, SEC_OTD],
-    "weekly":    [SEC_GOALS, SEC_WK_QTR, SEC_WK_MONTH, SEC_WK_WEEK,
+                  SEC_DAY_SUM, SEC_OTD, SEC_OKR],
+    "weekly":    [SEC_OKR, SEC_GOALS, SEC_WK_QTR, SEC_WK_MONTH, SEC_WK_WEEK,
                   SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK,
                   SEC_WEEKLY_JNL, SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME,
                   SEC_PEOPLE],
-    "monthly":   [SEC_MTH_QTR, SEC_MTH_MONTH, SEC_HIGHLIGHT,
+    "monthly":   [SEC_OKR, SEC_MTH_QTR, SEC_MTH_MONTH, SEC_HIGHLIGHT,
                   SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
                   SEC_MBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
                   SEC_MDATES, SEC_PEOPLE, SEC_LAST_MONTH, SEC_MONTHLY_JNL,
                   SEC_MREVIEW],
-    "quarterly": [SEC_QTR_YEAR, SEC_QTR_QTR, SEC_HIGHLIGHT,
+    "quarterly": [SEC_OKR, SEC_QTR_YEAR, SEC_QTR_QTR, SEC_HIGHLIGHT,
                   SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
                   SEC_QBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
                   SEC_MDATES, SEC_PEOPLE, SEC_LAST_QTR, SEC_QTR_JNL,
                   SEC_QREVIEW],
-    "yearly":    [SEC_MONEY],
+    "yearly":    [SEC_OKR, SEC_MONEY],
 }
 
 # Which GROUP header an anchor lives under, per tier. A weekly note now
@@ -2126,9 +2131,28 @@ def strip_md_links(s):
     return re.sub(r"\(https?://[^)\s]*\)?", "", s).strip()
 
 
+# A line the ENGINE writes into the yearly 🎯 Goals scorecard (okr_notes.
+# scorecard_lines): "- 🏔️ <name> ▰▰▱▱▱ 4/10 · …" and "\t- 🥅 <name> 2/6 · …".
+# That section is ALSO where the yearly goal setter appends Vex's picked
+# goals (GOAL_SECTION["yearly"]), so every goal reader has to tell the two
+# apart - or the plan's own rows come back as "goals": in the 🎉 year line
+# beside the plan, in the quarterly note's 🎉 Yearly goal mirror, and as
+# removable rows in the yearly goal editor. The shape is narrow on purpose:
+# a bullet with NO checkbox, a 🏔️ or 🥅 straight after the dash, a d/n
+# count - a picked goal is always "- [ ] …" (goal_line).
+PLAN_LINE_RE = re.compile(
+    r"^\s*- (?:\U0001F3D4\ufe0f?|\U0001F945\ufe0f?) .*\b\d+/\d+\b")
+
+
+def is_plan_line(line):
+    """True for a scorecard line the OKR filler owns (PLAN_LINE_RE)."""
+    return bool(PLAN_LINE_RE.match(unescape_md(line or "")))
+
+
 def goal_titles(body_lines):
     """Every real line of a goals-ish section → display text (checkbox +
-    md-link stripped)."""
+    md-link stripped). The OKR plan's scorecard lines are not goals
+    (PLAN_LINE_RE)."""
     out = []
     for ln in body_lines:
         # the TickTick app backslash-escapes markdown when the note is edited
@@ -2136,6 +2160,8 @@ def goal_titles(body_lines):
         # as the goal: "Did you achieve your daily goal, _(pick one...)?"
         s = unescape_md(ln.strip())
         if not s or PENDING_RE.match(s) or PENDING_RE.match(s[2:] if s.startswith("- ") else s):
+            continue
+        if PLAN_LINE_RE.match(s):
             continue
         # \s* not " ": the monthly template ships a BARE "- [ ]" and the
         # anchored form left it as "[ ]", which then read as a goal - the

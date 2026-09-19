@@ -4,6 +4,9 @@
 ---
 #### ✨ Highlight
 ---
+#### 🥅 OKRs
+- _(pending)_
+---
 #### 🏆 Goals
 - 🗓️ Weekly
 	- _(mirrors this week's weekly note - edit goals there)_

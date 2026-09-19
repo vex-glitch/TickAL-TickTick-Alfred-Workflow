@@ -2,6 +2,9 @@
 ---
 {{monthlinks}}
 ---
+#### 🥅 OKRs
+- _(pending)_
+---
 #### 🏆 Goals
 - 🎉 Yearly goal
 	- _(mirrors this year's note - set it there)_

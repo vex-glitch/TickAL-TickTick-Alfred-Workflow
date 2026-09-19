@@ -317,3 +317,16 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
     server sortOrders are re-dealt).
   - KNOWN EXCEPTION to "no ⏎ the verb refuses": a v1 rate limit between the
     cached read and the ⏎ (nothing local can see it) - the toast says wait.
+- 2026-09-19: phase 3 smoke-green from Vex. PHASE 4 (periodic notes)
+  started with Vex's layout decision, picked from mocks built on his real
+  notes: a NEW section `🥅 OKRs` at the top of every note (right above
+  `#### 🏆 Goals`; in the yearly note above `##### 📊 Dashboard`), ONE LINE
+  PER TIER from the year down to the note's own tier (daily 5, weekly 4,
+  monthly 3, quarterly 2, yearly 1): the plan for that period, then
+  ` · 🎯 ` + the goals picked for it, on the SAME line ("like our comparison
+  for other data"). 🏆 Goals stays untouched as the home of the picked goals
+  (checkboxes, pickers and journals keep working). The yearly
+  `🎯 Goals scorecard` gets each 🏔️ Y / 🥅 O with its progress. Every goal
+  picker gets 🔮 rows (the plan for its period, ⏎ = that goal, always the
+  LINKED ORIGINAL, never the planning copy) and a 📋 Pick a goal row above
+  the usual pool.

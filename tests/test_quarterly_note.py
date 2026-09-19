@@ -182,7 +182,10 @@ import periodic_rows as pr                                       # noqa: E402
 import base64, json                                              # noqa: E402
 rows = pr.tier_goal_rows("monthly", "")
 kinds = [r["title"].split(" ")[0] for r in rows[:2]]
-check("the editor lists before it adds", "🎯" in kinds[0] or "📋" in kinds[0], kinds)
+# 🔮 = the OKR plan's rows (HANDOFF_OKR section 4), which lead whenever the
+# month has no goal yet (or the network is out and the goals cannot be read)
+check("the editor lists before it adds",
+      "🎯" in kinds[0] or "📋" in kinds[0] or "🔮" in kinds[0], kinds)
 addrow = next((r for r in rows if r["arg"].startswith("xact:pn_setgoal:")), None)
 check("the add rows are still there", addrow is not None)
 # an aimed-ahead payload reaches the verb

@@ -908,6 +908,15 @@ def refresh_period(p, index=None, force=False):
             _fill_rollup_money(doc, p, index)
         else:
             _fill_rollup_money(doc, p, index)
+        # 🥅 OKRs, every tier, LIVE window only (a sealed note keeps the plan
+        # it had). Last, so it reads the goals the fillers above just
+        # mirrored. Never allowed to cost the rest of the refresh: it reads
+        # caches that another process may be rewriting.
+        if p.start <= today <= p.end + timedelta(days=1):
+            try:
+                _fill_okr(doc, p, index)
+            except Exception as e:
+                _log(f"okr fill {pm.title(p)}: {e}")
         return True
 
     _res, doc_out = _pn_rmw(pid, tid, mutate)
@@ -2466,6 +2475,99 @@ def _fill_rollup_money(doc, p, index):
                          f"{pm.fmt_amount(pm.sum_in_period(day_sums, qp))}")
     ps.set_body(doc, pm.SEC_MONEY,
                 pm.rollup_money_lines(lines, pm.sum_in_period(day_sums, p)))
+
+
+# ── 🥅 OKRs (HANDOFF_OKR phase 4) ────────────────────────────────────────────
+# Vex 2026-09-19: "We should also then have the OKRs section in periodic
+# notes. All of them. With all levels." The lines are built in src/okr_notes.py
+# (pure); this is only the plumbing: the plan from the CACHE, the goals from
+# each tier's own note, one write per section.
+_OKR_PLAN = [0.0, None, []]       # [read at, list id, items] - one read per run
+OKR_PLAN_TTL = 60
+
+
+def _okr_plan():
+    """(list id, [okr.Item]) from the caches only (okr_write.cached_plan) -
+    never the network: a refresh runs on every note open and at 04:30, and
+    the plan's live read belongs to the hub and the hourly sync. OKRs off
+    (a blank okr_list_id) or nothing cached = ("", []) / (id, []), and the
+    section stays as it is. Held for a minute, so the 04:30 run's five
+    refreshes read the caches once."""
+    try:
+        lid = (cfg.get_okr_list_id() or "").strip()
+    except Exception:
+        lid = ""
+    if not lid:
+        return "", []
+    now = time.time()
+    if _OKR_PLAN[1] == lid and now - _OKR_PLAN[0] < OKR_PLAN_TTL:
+        return lid, _OKR_PLAN[2]
+    try:
+        import okr_write
+        items = okr_write.cached_plan(lid)
+    except Exception as e:
+        _log(f"okr plan: {e}")
+        items = []
+    _OKR_PLAN[:] = [now, lid, items]
+    return lid, items
+
+
+def _okr_goal_lines(doc, kind):
+    """The goal LINES a `kind` note carries, read by the same readers every
+    goal screen uses: a weekly's own ♻️ Weekly bullet (never its two mirrors),
+    the daily's ☀️ Daily, every other tier's pm.GOAL_SECTION under any name
+    it has had. goal_titles is the filter, so pointers and placeholders are
+    not goals - and neither are the scorecard's own plan lines."""
+    if doc is None:
+        return []
+    if kind == "weekly":
+        return _week_goals_of(doc)[0]
+    sec = _goal_sec_of(doc, kind)
+    return [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])]
+
+
+def _fill_okr(doc, p, index):
+    """🥅 OKRs on every tier, plus the yearly 🎯 Goals scorecard.
+
+    LIVE notes only - refresh_period calls this inside its live window; a
+    sealed note keeps the plan it had while it was running, the way it keeps
+    its numbers. The section missing = Vex deleted it = the kill switch, and
+    nothing is written. The goal half of each line comes from THAT tier's
+    own note, found in the index the refresh already has (the note being
+    refreshed is read from the doc in hand, which is newer than its index
+    copy)."""
+    import okr_notes
+    sec = ps.find(doc, pm.SEC_OKR)
+    # EXACT hits only: ps.find's normalized pass would hand back any bullet
+    # that normalizes to "okrs" ("- OKRs" under 📓 Notes) once the section is
+    # deleted, and the plan would overwrite what Vex wrote under it
+    if sec is not None and sec.name != pm.SEC_OKR:
+        sec = None
+    if sec is None:
+        # ONE kill switch for all OKR output: the yearly scorecard is only
+        # filled while the note carries 🥅 OKRs (deleting the scorecard
+        # would also delete the yearly goals, which live there)
+        return
+    card = ps.find(doc, pm.SEC_SCORECARD) if p.kind == "yearly" else None
+    lid, items = _okr_plan()
+    if not items:
+        return
+    today = _today()
+    if card is not None:
+        # the plan half only: the scorecard is also where the yearly goals
+        # live (pm.GOAL_SECTION), and merge_scorecard keeps every one of them
+        ps.set_sec_body(doc, card, okr_notes.merge_scorecard(
+            card.body, okr_notes.scorecard_lines(p, items, today, lid)))
+    goals = {}
+    for t in okr_notes.tiers_down_to(p.kind):
+        if t == p.kind:
+            tdoc = doc
+        else:
+            task = lookup(index, pm.period_for(t, p.start))
+            tdoc = ps.parse_sections(task.get("content") or "") if task else None
+        goals[t] = _okr_goal_lines(tdoc, t)
+    ps.set_sec_body(doc, sec, okr_notes.okr_section_lines(
+        p.kind, p, items, goals, today, lid))
 
 
 # ── the 04:30 run ────────────────────────────────────────────────────────────
