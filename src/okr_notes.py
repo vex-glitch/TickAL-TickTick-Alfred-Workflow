@@ -7,24 +7,22 @@ appear in the same line as the forecasted goal for that period, kind of like
 our comparison for other data."
 
 He then picked, from mocks: a NEW section at the top of every tier, the year
-down to the note's own, the plan first and the goal he picked after it. The
-same day he found the one-line version "too crammed" and reshaped a line by
-hand in the daily note; every period now takes that shape - its own bullet,
-the plan and the 🎯 goals indented under it, one per line:
+down to the note's own. The same day he found the one-line version "too
+crammed" and reshaped a line by hand; every period now takes that shape -
+its own bullet, the plan indented under it, one item per line:
 
     #### 🥅 OKRs
     - 🎉 2026 \u2022 0/41 KRs \u2022 🔴 1d
     \t- 🥅 Onboard TickTicks 0/5 🔴 1d
     \t- 🥅 TickAL 0/6
-    \t- 🎯 Productivity System
     - ♻️ W38 \u2022 0/2 KRs \u2022 🔴 1d
     \t- 🔑 Finish periodic notes 🔴 1d
     \t- 🔑 Goals wf
 
-(every plan name and every linked goal is a markdown link in the note; the
-mock above shows the labels). A tier whose goals already show in 🏆 Goals
-below gets no 🎯 line ("Remove 🎯 items if we have them in a header below").
-The separator is U+2022, never the middle dot. The day line says "Sat 19",
+(every plan name is a markdown link in the note; the mock shows the
+labels). The goals he picks stay in 🏆 Goals below and are NOT repeated here
+- the 🎯 lines an earlier version carried were removed at his request. The
+separator is U+2022, never the middle dot. The day line says "Sat 19",
 never "Today": a note stops refreshing once its day is over and keeps
 whatever text it had.
 
@@ -42,15 +40,10 @@ Tier -> what the plan means there (HANDOFF_OKR section 4): 🎉 year = the Y's
 = O's + KRs, ♻️ week and ☀️ day = the KRs overlapping them.
 
 PURE: no I/O. The engine (periodic_engine._fill_okr) hands in the cached
-plan (okr_write.cached_plan - never the network inside a refresh), the goal
-lines it read out of each tier's own note, and today.
+plan (okr_write.cached_plan - never the network inside a refresh) and today.
 """
-import re
-
-import focus_blocks as fb
 import mdtext
 import okr
-import okr_write
 import periodic_model as pm
 
 TIERS = ("yearly", "quarterly", "monthly", "weekly", "daily")
@@ -189,47 +182,6 @@ def _plan_lines(kind, items, start, end, today, list_id):
     return _capped(lines, CAP[kind])
 
 
-# ── the goal Vex picked, on the same line ────────────────────────────────────
-_BOX_RE = re.compile(r"^- \[[ xX]\]\s*")
-
-
-def goal_label(line):
-    """One goal LINE out of a tier's goal section -> its label on an OKR
-    line, '' when the line is not a goal (a pointer, a placeholder, a bare
-    box - pm.goal_titles decides, the same reader every goal screen uses).
-
-    The name is cleaned the way a planning copy's is (okr_write._clean_name:
-    link labels, no "💼 P • " lead, no trailing 🔗) and linked to its task
-    when the goal line links one, so "[💼 P • TickAL • WF 🔗](…/tasks/T)"
-    reads "[TickAL • WF](…/tasks/T)". The app's backslash escapes go first:
-    an escaped link would otherwise keep its task out of reach."""
-    if not pm.goal_titles([line]):
-        return ""
-    raw = pm.unescape_md((line or "").strip())
-    raw = _BOX_RE.sub("", raw)
-    raw = raw[2:] if raw.startswith("- ") else raw
-    name = okr_write._clean_name(raw)
-    if not name:
-        return ""
-    tail = fb.LINK_TAIL_RE.search(raw)
-    if tail:
-        return mdtext.md_link(name, okr.task_link(tail.group("pid"),
-                                                  tail.group("tid")))
-    return name
-
-
-def goal_lines(lines):
-    """The 🎯 lines under a period: one per goal Vex picked for it, "🎯 none"
-    when he picked none - the comparison is the point, so an empty side
-    still says so. None (not a list) = that tier's goals already show in
-    🏆 Goals below, so no 🎯 line at all ("Remove 🎯 items if we have them
-    in a header below", Vex 2026-09-19)."""
-    if lines is None:
-        return []
-    labels = list(dict.fromkeys(x for x in map(goal_label, lines) if x))
-    return [f"🎯 {x}" for x in labels] or ["🎯 none"]
-
-
 # ── the section ──────────────────────────────────────────────────────────────
 def tiers_down_to(kind):
     """The tiers a `kind` note shows, the year first: a daily note all five,
@@ -237,24 +189,21 @@ def tiers_down_to(kind):
     return TIERS[:TIERS.index(kind) + 1]
 
 
-def okr_section_lines(kind, p, items, goals_by_tier, today, list_id):
+def okr_section_lines(kind, p, items, today, list_id):
     """The 🥅 OKRs body of a `kind` note for period p, the year first down to
-    the note's own tier, each period a bullet of its own with its plan and
-    its 🎯 goals indented under it:
+    the note's own tier, each period a bullet of its own with its plan
+    indented under it:
 
         - ♻️ W38 \u2022 0/2 KRs \u2022 🔴 1d
         \t- 🔑 Finish periodic notes 🔴 1d
         \t- 🔑 Goals wf
-        \t- 🎯 Onboard TickTick
 
-    (Vex's own edit of the W38 line in the 2026-09-19 daily note.) The tiers
-    above the note are the periods holding its FIRST day (a week's month is
-    its Monday's - the breadcrumb's own convention).
-
-    goals_by_tier = {tier kind: [goal lines from THAT tier's own note] or
-    None}; None = that tier's goals show in 🏆 Goals below, so no 🎯 line;
-    a tier missing from it reads "🎯 none"."""
-    goals_by_tier = goals_by_tier or {}
+    (Vex's own edit of the W38 line in the 2026-09-19 daily note.) The PLAN
+    only: the goals he picks live in 🏆 Goals below, and the 🎯 lines that
+    once repeated them here are gone ("we still have 🎯 Productivity system
+    and 🎯 none and 🎯 TickAL ... Please remove those", Vex 2026-09-19). The
+    tiers above the note are the periods holding its FIRST day (a week's
+    month is its Monday's - the breadcrumb's own convention)."""
     out = []
     for t in tiers_down_to(kind):
         tp = p if t == kind else pm.period_for(t, p.start)
@@ -264,8 +213,7 @@ def okr_section_lines(kind, p, items, goals_by_tier, today, list_id):
         # but no objective still counts them on its bullet
         head = [tier_label(t, tp)] + (chips if (plan or chips) else ["no plan"])
         out.append("- " + SEP.join(head))
-        kids = plan + goal_lines(goals_by_tier.get(t, []))
-        out += [f"\t- {x}" for x in kids]
+        out += [f"\t- {x}" for x in plan]
     return out
 
 
@@ -346,8 +294,8 @@ def _pending(line):
 def merge_scorecard(body, plan_lines):
     """The scorecard body with the plan half replaced and EVERYTHING else
     kept - above all the yearly goals: the 🎯 Goals scorecard is where the
-    yearly goal setter appends them (pm.GOAL_SECTION["yearly"]), and the
-    🎉 year line of every OKR section reads them back from here.
+    yearly goal setter appends them (pm.GOAL_SECTION["yearly"]) and the
+    quarterly note's 🎉 Yearly goal mirror reads them back from here.
 
     Ours are the lines pm.is_plan_line recognizes; they are regenerated.
     The rest keep their order and come after the plan, re-based to its

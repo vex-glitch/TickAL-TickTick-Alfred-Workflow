@@ -2530,54 +2530,14 @@ def _okr_plan():
     return lid, items
 
 
-def _okr_goal_lines(doc, kind):
-    """The goal LINES a `kind` note carries, read by the same readers every
-    goal screen uses: a weekly's own ♻️ Weekly bullet (never its two mirrors),
-    the daily's ☀️ Daily, every other tier's pm.GOAL_SECTION under any name
-    it has had. goal_titles is the filter, so pointers and placeholders are
-    not goals - and neither are the scorecard's own plan lines."""
-    if doc is None:
-        return []
-    if kind == "weekly":
-        return _week_goals_of(doc)[0]
-    sec = _goal_sec_of(doc, kind)
-    return [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])]
-
-
-# Which tiers' goals a note already shows in its own 🏆 Goals (or, yearly,
-# its 🎯 Goals scorecard) - their 🎯 lines in 🥅 OKRs would repeat them
-# ("Remove 🎯 items if we have them in a header below", Vex 2026-09-19).
-# Checked against the note in hand, by EXACT name: a bullet Vex deleted
-# (the kill switch of a mirror) brings the 🎯 line back.
-_GOALS_BELOW = {
-    "daily": {"weekly": (pm.SEC_WEEK_GOALS,), "daily": (pm.SEC_DAY_GOAL,)},
-    "weekly": {"quarterly": (pm.SEC_WK_QTR,), "monthly": (pm.SEC_WK_MONTH,),
-               "weekly": (pm.SEC_WK_WEEK,)},
-    "monthly": {"quarterly": (pm.SEC_MTH_QTR,),
-                "monthly": (pm.SEC_MTH_MONTH, pm.SEC_MONTH_GOAL)},
-    "quarterly": {"yearly": (pm.SEC_QTR_YEAR,), "quarterly": (pm.SEC_QTR_QTR,)},
-    "yearly": {"yearly": (pm.SEC_SCORECARD,)},
-}
-
-
-def _goals_below(doc, note_kind, tier):
-    for name in _GOALS_BELOW.get(note_kind, {}).get(tier, ()):
-        hit = ps.find(doc, name)
-        if hit is not None and hit.name == name:
-            return True
-    return False
-
-
 def _fill_okr(doc, p, index):
     """🥅 OKRs on every tier, plus the yearly 🎯 Goals scorecard.
 
     LIVE notes only - refresh_period calls this inside its live window; a
     sealed note keeps the plan it had while it was running, the way it keeps
     its numbers. The section missing = Vex deleted it = the kill switch, and
-    nothing is written. The goal half of each line comes from THAT tier's
-    own note, found in the index the refresh already has (the note being
-    refreshed is read from the doc in hand, which is newer than its index
-    copy)."""
+    nothing is written. The plan only: the goals he picks stay in 🏆 Goals
+    below and are not repeated here (Vex 2026-09-19, "Please remove those")."""
     import okr_notes
     sec = ps.find(doc, pm.SEC_OKR)
     # EXACT hits only: ps.find's normalized pass would hand back any bullet
@@ -2600,19 +2560,8 @@ def _fill_okr(doc, p, index):
         # live (pm.GOAL_SECTION), and merge_scorecard keeps every one of them
         ps.set_sec_body(doc, card, okr_notes.merge_scorecard(
             card.body, okr_notes.scorecard_lines(p, items, today, lid)))
-    goals = {}
-    for t in okr_notes.tiers_down_to(p.kind):
-        if _goals_below(doc, p.kind, t):
-            goals[t] = None               # 🏆 Goals below already shows them
-            continue
-        if t == p.kind:
-            tdoc = doc
-        else:
-            task = lookup(index, pm.period_for(t, p.start))
-            tdoc = ps.parse_sections(task.get("content") or "") if task else None
-        goals[t] = _okr_goal_lines(tdoc, t)
     ps.set_sec_body(doc, sec, okr_notes.okr_section_lines(
-        p.kind, p, items, goals, today, lid))
+        p.kind, p, items, today, lid))
 
 
 # ── the 04:30 run ────────────────────────────────────────────────────────────
