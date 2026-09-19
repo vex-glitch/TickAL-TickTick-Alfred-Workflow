@@ -3,6 +3,20 @@
 All notable user-visible changes to TickAL. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **🥘 Meal prep hub** (`tml`, main menu, or the Routines screen) - plan the
+  week's breakfast, lunch and snack from the recipe library (least recently
+  cooked first, 🎲 Surprise), commit it as three subtasks on the Sunday
+  routine plus one 🛒 grocery checklist per meal scaled to seven portions,
+  and a 🥘 bullet in the weekly note. Change one meal with ⌥ on it.
+- **Recipes flow in from Mela** - a recipe tagged Breakfast / Meal / Snack in
+  Mela becomes a library task with the tag and the recipe text, ten per
+  hourly sync or forty from the 📥 row; empty descriptions fill themselves.
+- **Weekly note: 🥘 Meal prep** bullet under 💿 Data.
+
 ## [2.7] - 2026-07-17
 
 ### Added

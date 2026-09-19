@@ -189,15 +189,20 @@ def completed_descendants(root_tid, tasks, cap=MAX_RESET):
     return out, unknown
 
 
-def default_steps(spec="daily"):
+def default_steps(spec="daily", reset=True):
     """What a routine does with no config of its own: put the steps ticked in
     the last occurrence back, focus the task with its floating window, open
     the period note the same way, show the calendar. No app juggling, no frames - a published user
-    gets something that works, and layout is what the config file adds."""
-    return [
+    gets something that works, and layout is what the config file adds.
+
+    reset=False leaves the ticked children alone: a routine whose subtasks
+    are re-minted for every occurrence (🥘 Meal Prep's three meal pointers)
+    must never get last week's back (routines.py, "reset": False)."""
+    steps = [
         {"do": "reset", "tid": "{tid}", "pid": "{pid}"},
         {"do": "activate", "app": "com.TickTick.task.mac", "wait": True},
         {"do": "link", "arg": "focuswindow:{tid}:{pid}"},
         {"do": "link", "arg": f"notewindow:{spec}"},
         {"do": "link", "arg": "view:calendar"},
     ]
+    return steps if reset else steps[1:]

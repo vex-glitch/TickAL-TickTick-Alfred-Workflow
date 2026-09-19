@@ -111,6 +111,48 @@ def get_okr_list_id():
         return cfg["okr_list_id"] or ""
     return OKR_LIST_DEFAULT
 
+MEAL_LIST_DEFAULT = "6a8abb444e699108a4693fa5"     # 🍳Meal Prep (recipe library)
+MEAL_ROUTINE_DEFAULT = "6a9ed0dc0eecd103a69febee"  # 🥘 Meal Prep (Sunday routine)
+
+
+def _defaulted(key, default):
+    """The okr_list_id rule: env-present-wins; the default applies ONLY while
+    the key is ABSENT from config.json (present-but-blank = OFF). No
+    Configure-panel field may ever be added for such a key - Alfred exports
+    every field as an env var, blank = OFF, which would kill the default."""
+    if key in os.environ:
+        return os.environ[key]
+    cfg = load()
+    if key in cfg:
+        return cfg[key] or ""
+    return default
+
+
+def get_meal_list_id():
+    """🥘 the recipe library list (🍳Meal Prep). Defaulted like okr_list_id:
+    Vex made the list first and the workflow second (2026-09-19)."""
+    return _defaulted("meal_list_id", MEAL_LIST_DEFAULT)
+
+
+def get_meal_routine_id():
+    """🥘 the repeating Sunday routine task the weekly plan hangs off."""
+    return _defaulted("meal_routine_id", MEAL_ROUTINE_DEFAULT)
+
+
+def get_meal_tag_map():
+    """Mela category → TickTick tag overrides ({"02 • Breakfast":
+    "🍳breakfast", …}); None = mela.DEFAULT_TAG_MAP. config.json only."""
+    m = load().get("meal_tag_map")
+    return m if isinstance(m, dict) and m else None
+
+
+def get_meal_wake_mela():
+    """True = the hourly sync may launch Mela in the background (open -gj)
+    when its database is stale, so iCloud brings the phone's recipes over.
+    Off by default: launching an app every hour is a choice, not a default."""
+    return bool(load().get("meal_wake_mela", False))
+
+
 def get_weekly_review_id():
     """♻️ Weekly-review source: the list/task id the weekly note
     mirrors. Same env-present-wins semantics as periodic_list_id."""

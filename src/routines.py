@@ -42,6 +42,14 @@ ROUTINES = (
      "tid": "6aa520b28f084b1907ea08e2", "pid": ROUTINES_LIST,
      "macro": "28115256-AF19-42FC-A6DA-5CAF2F18D6C6",
      "habit": "6a271c1c30a9d158ed6ab8ad"},          # Quarterly Retreat (90d)
+    # 🥘 Meal Prep (Sun 19:00): no KM macro - its workspace is the 🥘 hub
+    # (ctx:meal). "reset": False on purpose: its children are the week's
+    # THREE meal pointers, minted fresh by every plan commit (src/meal_write),
+    # so nothing must ever reopen the ones already cooked (HANDOFF_MEAL.md).
+    {"key": "meal", "label": "🥘 Meal Prep",
+     "tid": "6a9ed0dc0eecd103a69febee", "pid": ROUTINES_LIST,
+     "macro": "", "reset": False,
+     "habit": "6aa27acd557832cfc9ea5d77"},          # Meal Prep (7d)
 )
 
 _HEX = "0123456789abcdefABCDEF"

@@ -168,6 +168,14 @@ def build_items():
             subtitle="Plan · pace · KRs",
             arg="ctx:okr",
         ),
+        # arg "ctx:meal" = its OWN leg on 50F14423 (phase_meal), the OKR
+        # shape: the picker bars are recipe searches, so no ALIASES word.
+        alfred.item(
+            uid="meal",
+            title="🥘 Meal Prep",
+            subtitle="Plan the week · groceries · library",
+            arg="ctx:meal",
+        ),
         # The "🎬 Content pipeline" row DIED here 2026-07-28 (Vex: "kill the
         # main menu"). It sat directly above the CRM row, and once CRM and
         # Content merged into one home that row was the same world twice -

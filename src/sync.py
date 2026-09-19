@@ -249,6 +249,16 @@ def do_sync():
             summary += f" · {_okr.chip}"
     except Exception:
         pass
+    # 🥘 Meal Prep: import Mela's newly categorised recipes, then fill empty
+    # library descriptions, within one paced request budget (HANDOFF_MEAL).
+    # Same placement rule as the OKR heal: after _people_nudge. Never raises.
+    try:
+        import meal_write
+        _meal = meal_write.hourly(api=api)
+        if _meal:
+            summary += f" · {_meal}"
+    except Exception:
+        pass
     print(summary)
     return summary
 

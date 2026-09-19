@@ -6807,8 +6807,10 @@ def _routine_steps(r):
     import json as _json
     import routine_runner as rr
     spec = {"weekly": "weekly", "monthly": "monthly",
-            "quarterly": "quarterly"}.get(r["key"], "daily")
-    steps, src = rr.default_steps(spec), "built-in default"
+            "quarterly": "quarterly", "meal": "weekly"}.get(r["key"], "daily")
+    # "reset": False in the registry = its children are minted per
+    # occurrence (🥘 Meal Prep), never reopened (routine_runner.default_steps)
+    steps, src = rr.default_steps(spec, reset=r.get("reset", True)), "built-in default"
     try:
         with open(ROUTINE_CFG) as f:
             entry = (_json.load(f) or {}).get(r["key"]) or {}
@@ -11446,7 +11448,10 @@ def routine_checkin(tid):
         r = rt.by_tid(tid)
         if r:
             _confetti()        # every routine completion road lands here
-            _routine_reset_bg(r["key"])   # its steps back now, not at next start
+            if r.get("reset", True):
+                # its steps back now, not at next start - unless the registry
+                # says its children are per-occurrence (🥘 Meal Prep's pointers)
+                _routine_reset_bg(r["key"])
         if not r or not r.get("habit"):
             return ""
         import habits_model as hm
@@ -12014,6 +12019,120 @@ def _okr_run(rest, fn):
         print(msg)
 
 
+# ── 🥘 Meal Prep verbs (HANDOFF_MEAL.md) - thin wrappers over src/meal_write ──
+def _meal_run(rest, fn):
+    """_okr_run for the meal verbs: decode, run the writer, print its one
+    toast, reopen the payload's back (or the Outcome's) through BrowseCtx
+    so the bar lands clean. A dry run prints the writer's plan text."""
+    import meal_write as mw
+    spec = _pn_decode(rest) if rest else None
+    spec = spec if isinstance(spec, dict) else {}
+    reopen = None
+    try:
+        msg = fn(spec)
+    except mw.Refusal as e:
+        msg, reopen = str(e), getattr(e, "reopen", None)
+    except Exception as e:
+        msg = f"🥘 Not written · {type(e).__name__}: {e}"
+    if isinstance(msg, mw.Outcome):
+        msg, reopen = msg.msg, msg.reopen
+    back = reopen if isinstance(reopen, str) and reopen.startswith("ctx:") else spec.get("back")
+    if isinstance(back, str) and back.startswith("ctx:") and not _dry_meal(spec):
+        try:
+            _run_trigger("BrowseCtx", back)
+        except Exception:
+            pass
+    if msg:
+        print(msg)
+
+
+def _dry_meal(spec):
+    return bool((spec or {}).get("dry")) or os.environ.get("TICKAL_MEAL_DRY") == "1"
+
+
+def meal_commit(rest):
+    """✅ Commit the week: three pointers under the Sunday routine, three 🛒
+    checklists, the weekly note's 🥘 bullet, the ledger (meal_write.commit).
+    {"dry": true} or TICKAL_MEAL_DRY=1 prints the plan and writes nothing."""
+    import meal_write as mw
+    _meal_run(rest, mw.commit)
+
+
+def meal_import(rest):
+    """📥 Import from Mela now: every recipe carrying a meal category that
+    is not in the library yet (the hourly sync does 10 per run; this does
+    up to 40, half-second paced)."""
+    import meal_write as mw
+
+    def fn(spec):
+        r = mw.import_new(_api(), cap=40, pace=0.5)
+        if r.get("error"):
+            return f"🥘 Mela unreadable · {r['error']}"
+        if r.get("rate_limited"):
+            return f"🥘 Imported {r['created']} · TickTick rate limit · the rest later"
+        left = f" · {r['remaining']} more next time" if r["remaining"] else ""
+        return f"🥘 Imported {r['created']} recipe" + ("s" if r["created"] != 1 else "") + left
+    _meal_run(rest, fn)
+
+
+def meal_fill(rest):
+    """📝 Fill empty library descriptions from Mela in the foreground
+    (1.5 s paced, a banner every 25). The hourly sync fills ~10 per run
+    on its own; this is the fast road for the backlog."""
+    import meal_write as mw
+
+    def fn(spec):
+        entries = mw.missing_descriptions()
+        if not entries:
+            return "🥘 Every description is filled"
+        n = min(len(entries), mw.CAP_FG)
+        _crm_say(f"🥘 Filling {n} description" + ("s" if n != 1 else "")
+                 + f" · about {max(1, round(n * mw.PACE_FG / 60))} min")
+
+        def progress(i, total):
+            if i % 25 == 0 and i < total:
+                _crm_say(f"🥘 {i}/{total} filled…")
+        r = mw.backfill_descriptions(_api(), entries=entries, cap=mw.CAP_FG,
+                                     pace=mw.PACE_FG, progress=progress)
+        if r.get("error"):
+            return f"🥘 Mela unreadable · {r['error']}"
+        bits = [f"🥘 {r['filled']} filled"]
+        if r["not_in_mela"]:
+            bits.append(f"{r['not_in_mela']} not in Mela")
+        if r["rate_limited"]:
+            bits.append("rate limit · the rest later")
+        elif r["remaining"]:
+            bits.append(f"{r['remaining']} left")
+        return " · ".join(bits)
+    _meal_run(rest, fn)
+
+
+def meal_groceries(rest):
+    """🛒 Rebuild this week's grocery lists from Mela (meal_write)."""
+    import meal_write as mw
+    _meal_run(rest, mw.rebuild_groceries)
+
+
+def meal_setlist():
+    """⚙️ Settings → 🥘 Meal Prep list: paste the library list's id (⌘ Copy
+    id on any list row mints it). Saves config meal_list_id. PRINTED, not
+    _crm_say'd: its Settings road ends at ET End already (okr_setlist)."""
+    import re as _re
+    cur = cfg.get_meal_list_id()
+    a = _ask("🥘 Meal Prep list id (⌘ Copy id on any list · Esc cancels)", default=cur)
+    if a is None:
+        print("🥘 Cancelled")
+        return
+    a = a.strip()
+    if not _re.fullmatch(r"[0-9a-fA-F]{24}", a or ""):
+        print("🥘 That does not look like a list id · nothing saved")
+        return
+    data = cfg.load()
+    data["meal_list_id"] = a
+    cfg.save(data)
+    print(f"🥘 Meal Prep list set · {_list_name_of(a) or a}")
+
+
 def okr_sched(rest):
     """📅 extend +N / 🌙 tomorrow / pick a date on one OKR item, with the
     ripple through its Y lane and the parent heals (okr.schedule_plan) -
@@ -12336,6 +12455,16 @@ def main():
             okr_carry(rest)
         elif verb == "okr_setlist":
             okr_setlist()
+        elif verb == "meal_commit":
+            meal_commit(rest)
+        elif verb == "meal_import":
+            meal_import(rest)
+        elif verb == "meal_fill":
+            meal_fill(rest)
+        elif verb == "meal_groceries":
+            meal_groceries(rest)
+        elif verb == "meal_setlist":
+            meal_setlist()
         elif verb == "add_pre":
             add_pre(rest)
         elif verb == "crmtrash":

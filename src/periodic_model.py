@@ -119,6 +119,7 @@ SEC_WEEKLY_JNL = "📔 Weekly journal"
 SEC_REVIEW     = "♻️ Weekly Review"
 SEC_INCOME     = "💰 Income"              # prefix
 SEC_PEOPLE     = "👽 People"              # birthdays + stale cards
+SEC_MEALPREP   = "🥘 Meal prep"           # the week's three meals (src/meal_notes.py)
 SEC_STATS      = "📈 Stats"               # monthly
 # LEGACY names (older notes) - readers fall back to these, writers don't
 LEGACY_NAV     = "🧭 Nav"
@@ -268,6 +269,7 @@ SECTION_SCOPE = {
         SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
         SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
+        SEC_MEALPREP: SEC_WK_DATA,
     },
     # same two group headers, same bullet names, one tier up
     "monthly": {

@@ -254,21 +254,27 @@ check("sticky_target = sticky_step's frame", ST([], [S1]) == (10, 10, 400, 900) 
 # ── the routine registry (src/routines.py) ─────────────────────────────────
 import routines as rt  # noqa: E402
 
-check("five routines", len(rt.ROUTINES) == 5, len(rt.ROUTINES))
-check("keys unique", len({r["key"] for r in rt.ROUTINES}) == 5)
-check("task ids unique", len({r["tid"] for r in rt.ROUTINES}) == 5)
-check("every routine is complete",
-      all(r.get("tid") and r.get("pid") and r.get("macro") and r.get("habit")
-          for r in rt.ROUTINES),
+N_ROUTINES = 6          # five workspace routines + 🥘 Meal Prep (no macro)
+check("six routines", len(rt.ROUTINES) == N_ROUTINES, len(rt.ROUTINES))
+check("keys unique", len({r["key"] for r in rt.ROUTINES}) == N_ROUTINES)
+check("task ids unique", len({r["tid"] for r in rt.ROUTINES}) == N_ROUTINES)
+check("every routine is complete (a macro is optional)",
+      all(r.get("tid") and r.get("pid") and r.get("habit") for r in rt.ROUTINES),
       [r["key"] for r in rt.ROUTINES if not r.get("habit")])
+check("meal prep: no macro, reset off",
+      rt.by_key("meal") is not None and not rt.by_key("meal")["macro"]
+      and rt.by_key("meal").get("reset") is False)
+check("every other routine keeps its reset",
+      all(r.get("reset", True) for r in rt.ROUTINES if r["key"] != "meal"))
 check("task ids parse as link ids",
       all(rl.parse(f"done:{r['tid']}")[1] == r["tid"] for r in rt.ROUTINES))
 check("habit ids are 24-hex",
       all(len(r["habit"]) == 24 and all(c in "0123456789abcdef" for c in r["habit"])
           for r in rt.ROUTINES))
-check("macro uids all valid", all(rt.valid_macro(r["macro"]) for r in rt.ROUTINES))
-check("macro uids unique", len({r["macro"] for r in rt.ROUTINES}) == 5)
-check("habits unique per routine", len({r["habit"] for r in rt.ROUTINES}) == 5)
+_MACROS = [r["macro"] for r in rt.ROUTINES if r.get("macro")]
+check("macro uids all valid", all(rt.valid_macro(m) for m in _MACROS))
+check("macro uids unique", len(set(_MACROS)) == len(_MACROS) == 5)
+check("habits unique per routine", len({r["habit"] for r in rt.ROUTINES}) == N_ROUTINES)
 check("by_tid finds each", all(rt.by_tid(r["tid"])["key"] == r["key"] for r in rt.ROUTINES))
 check("by_tid misses a stranger (the done: gate refuses any other task)",
       rt.by_tid("0123456789abcdef01234567") is None)

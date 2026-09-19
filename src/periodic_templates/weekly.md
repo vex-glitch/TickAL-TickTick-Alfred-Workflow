@@ -44,6 +44,8 @@
 - 💰 Income
 
 - 👽 People
+
+- 🥘 Meal prep
 ---
 ##### ⏪ Last week
 	_(pending)_
