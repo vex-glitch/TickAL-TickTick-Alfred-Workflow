@@ -16,6 +16,39 @@ All notable user-visible changes to TickAL. Format follows
   Mela becomes a library task with the tag and the recipe text, ten per
   hourly sync or forty from the 📥 row; empty descriptions fill themselves.
 - **Weekly note: 🥘 Meal prep** bullet under 💿 Data.
+- **✏️ Rename tag** in the tag's ⌘ menu - a dialog asks the new name and
+  every task that carries the tag follows. A name already in use is refused
+  rather than merged.
+- **🎯 Merge/Stage for Focus** in the buffer's ⌘ menu - stage the row under
+  the cursor, the same flow the task menu has.
+- **↑📆 inherited date** - a subtask with no date of its own shows its
+  nearest dated parent's date, marked ↑, in search and browse. A CTA block's
+  agenda items are scheduled on the block.
+
+### Fixed
+
+- Search and browse subtitles rendered a parent's markdown link raw
+  (`🗒N - 📌 CTA>💼 P • [TickAL • WF](ticktick:///…) 🔗`); parent titles now
+  render like titles, `[TickAL • WF]🔗`. The same sweep caught every other
+  place a link-titled task was printed raw: the Move picker (list, section
+  and make-a-subtask scopes), the focus stage picker and its confirm row,
+  the timer / pomodoro link rows, the add window's `↳ parent` chips and its
+  toast, the schedule, priority and rename pickers, CRM calendar and
+  back-office rows, the completed and won't-do lists, the meal hub head
+  row, the `nc` note-body snippet, and the toasts after complete, move,
+  schedule, priority, tag, buffer and focus actions.
+- A CTA parent's title showed its link chip twice (`[Name]🔗 🔗`).
+- The `📝` description snippet skipped a first line that was a bulleted
+  link (`- [name](url)`), so link-list notes showed their second line or
+  nothing.
+- A picker's `↳ parent` crumb could cut a link in half (`🥅 O • [Onboard
+  TickTicks`); the cut now lands inside the label and keeps the chip.
+- Titles the app had backslash-escaped rendered with the backslashes.
+- The `[[ ]]` link picker in the add window filled `Name 🔗` into the bar
+  and minted the chip into the link; the label is clean now. The `~p`
+  parent picker fills a link-titled parent's label only when that label
+  names one open task, otherwise the raw title, so twins such as `Eagle`
+  and `[Eagle](kmtrigger://…)` never swap.
 
 ## [2.7] - 2026-07-17
 

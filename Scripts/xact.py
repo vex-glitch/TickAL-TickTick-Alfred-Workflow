@@ -172,6 +172,9 @@ Focus staging (SUBTASKS - revamp 2026-07-21; NOTE targets keep checkboxes):
     xact:wontdo_undo:<pid>:<tid>    Won't Do → open again
     xact:tag_create_under:<parent>  ⌘ tag menu "➕ Add nested tag": dialog
                                     asks the name, creates under parent
+    xact:tag_rename:<tag>           ⌘ tag menu "✏️ Rename tag": dialog asks
+                                    the new name; v2 tag/rename, every task
+                                    follows server-side, caches patched
     xact:fx_link:<pid>:<tid>        attribute a running unattributed session
                                     (timer file or pomo sidecar) to the task
     xact:buffer_focus               buffer → subtasks (buffer order), clears
@@ -286,6 +289,11 @@ bootstrap()
 
 import config as cfg
 import cache as cache_store
+try:
+    from display import md_links_display as _disp   # toasts only ([name]🔗)
+except Exception:                                    # Vex 2026-09-20: raw md
+    def _disp(s):                                    # links in staging toasts
+        return s
 import focus_blocks as fb          # NOTE targets + legacy content only
 import focus_subtasks as fsub      # the subtask staging model (pure)
 
@@ -373,11 +381,11 @@ def buffer_add(pid, tid):
     if any(ln.split(":", 1)[-1] == tid for ln in lines):
         # honest toast - the silent dedupe read as "buffer broken" when
         # the same task was added twice (Vex 2026-07-24)
-        print(f"🅿️ {_title()} already in buffer ({len(lines)} total)")
+        print(f"🅿️ {_disp(_title())} already in buffer ({len(lines)} total)")
     else:
         lines.append(key)
         _write_buffer(lines)
-        print(f"🅿️ {_title()} buffered ({len(lines)} in buffer)")
+        print(f"🅿️ {_disp(_title())} buffered ({len(lines)} in buffer)")
     _run_trigger("Search")
 
 
@@ -7837,7 +7845,7 @@ def pn_sched(rest):
     _patch_task_cache(tid, startDate=iso, dueDate=iso)
     title = _task_title(tid, default="Task", pid=pid)
     label = "today" if when == "today" else "tomorrow"
-    print(f"{'☀️' if when == 'today' else '🌙'} {title[:40]} → {label}"
+    print(f"{'☀️' if when == 'today' else '🌙'} {_disp(title)[:40]} → {label}"
           + (f" {hhmm}" if hhmm else ""))
     import areas
     if areas.periodic_configured():
@@ -9595,12 +9603,12 @@ def fx_add(pid, tid, open_sticky=False):
         return
     title = _task_title(tid, pid=pid)
     staged, _skipped, failed = _stage_into(fpid, ftid, [(pid, tid, title)])
-    if staged:
-        print(f"🎯 {title[:40]} → {ftitle[:30]}")
+    if staged:      # render BEFORE the slice so the 🔗 chip survives it
+        print(f"🎯 {_disp(title)[:40]} → {_disp(ftitle)[:30]}")
     elif failed:
         print("🎯 Staging failed · sync and retry")
     else:
-        print(f"🎯 already under {ftitle[:30]}")
+        print(f"🎯 already under {_disp(ftitle)[:30]}")
     if open_sticky:
         sticky(fpid, ftid)
 
@@ -9619,17 +9627,17 @@ def fx_add_to(tpid, ttid, spid, stid):
             lambda doc, today: fb.insert_checkboxes(doc, today,
                                                     [(spid, stid, title)]))
         tname = live.get("title") or "target"
-        print(f"🎯 {title[:40]} → {tname[:30]}" if added
-              else f"🎯 already staged today in {tname[:30]}")
+        print(f"🎯 {_disp(title)[:40]} → {_disp(tname)[:30]}" if added
+              else f"🎯 already staged today in {_disp(tname)[:30]}")
         return
     tname = _task_title(ttid, default="target", pid=tpid)
     staged, _skipped, failed = _stage_into(tpid, ttid, [(spid, stid, title)])
     if staged:
-        print(f"🎯 {title[:40]} → {tname[:30]}")
+        print(f"🎯 {_disp(title)[:40]} → {_disp(tname)[:30]}")
     elif failed:
         print("🎯 Staging failed · sync and retry")
     else:
-        print(f"🎯 already under {tname[:30]}")
+        print(f"🎯 already under {_disp(tname)[:30]}")
 
 
 def fx_add_multi(b64):
@@ -9648,14 +9656,14 @@ def fx_add_multi(b64):
             tpid, ttid,
             lambda doc, today: fb.insert_checkboxes(doc, today, items))
         tname = live.get("title") or "target"
-        msg = f"🎯 {added} staged → {tname[:30]}"
+        msg = f"🎯 {added} staged → {_disp(tname)[:30]}"
         if skipped:
             msg += f" · {skipped} already there"
         print(msg)
         return
     tname = _task_title(ttid, default="target", pid=tpid)
     staged, skipped, failed = _stage_into(tpid, ttid, items)
-    msg = f"🎯 {staged} staged → {tname[:30]}"
+    msg = f"🎯 {staged} staged → {_disp(tname)[:30]}"
     if skipped:
         msg += f" · {skipped} already there"
     if failed:
@@ -9721,7 +9729,7 @@ def fx_unstage(pid, tid):
     except Exception:
         print("➖ Task not found · sync and retry")
         return
-    title = (live.get("title") or _title())[:40]
+    title = _disp(live.get("title") or _title())[:40]   # toast-only local
     parent = live.get("parentId")
     if not parent:
         _origins_update(drop=tid)
@@ -9783,7 +9791,7 @@ def fx_oneliner():
         print("✏️ No task-linked session running")
         return
     fpid, ftid, ftitle = cur
-    text = " ".join((_ask(f"One line for {ftitle[:30]}") or "").split())
+    text = " ".join((_ask(f"One line for {_disp(ftitle)[:30]}") or "").split())
     if not text:
         return   # cancelled or empty - silence, not an error toast
     api = _api()
@@ -9793,7 +9801,7 @@ def fx_oneliner():
     api.update_task(ftid, fpid, current=live, content=new)
     _patch_content_cache(ftid, new)
     app_sync_after_write()
-    print(f"✏️ noted on {ftitle[:30]}")
+    print(f"✏️ noted on {_disp(ftitle)[:30]}")
 
 
 def fx_copy(pid=None, tid=None):
@@ -9923,7 +9931,7 @@ def wontdo(pid, tid):
     except Exception:
         print("Error: task not found · sync and retry")
         return
-    title = (live.get("title") or _title())[:40]
+    title = _disp(live.get("title") or _title())[:40]   # toast-only local
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
     import api_v2
     v2 = api_v2.TickTickV2()
@@ -9977,7 +9985,7 @@ def wontdo_undo(pid, tid):
         cache_store.set("wontdo_tasks",
                         [t for t in log if t.get("id") != tid])
         if snap:
-            title = (snap.get("title") or title)[:40]
+            title = _disp(snap.get("title") or title)[:40]
         cached = cache_store.get("all_tasks")
         if cached is not None and snap is not None:
             restored = dict(snap)
@@ -11753,6 +11761,97 @@ def tag_delete(name):
         print(f"Could not delete #{name}")
 
 
+_TAG_BAD_CHARS = set('\\/"#:*?<>|,')   # TickTick's own rule + the csv/grammar
+                                       # shredders tag_create strips (, : >)
+
+
+def _tag_rename_caches(old, new):
+    """Mirror a server-side tag rename into every local pool: the label
+    list, the tree (its own name AND children's parent link), and the tag
+    arrays on all_tasks / all_notes / every project_data_* file - the
+    server rewrote them already, this only stops search lying until the
+    next sync. Case-insensitive on the old name (labels vs names)."""
+    import cache as cache_store
+    low = old.lower()
+
+    def swap(tags):
+        return [new if str(t).lower() == low else t for t in (tags or [])]
+
+    cache_store.set("tags", [new if t.lower() == low else t
+                             for t in (cache_store.get("tags") or [])])
+    tree = cache_store.get("tags_tree")
+    if tree is not None:
+        out = []
+        for t in tree:
+            t = dict(t)
+            if (t.get("name") or "").lower() == low:
+                t["name"], t["label"] = new.lower(), new
+            if (t.get("parent") or "").lower() == low:
+                t["parent"] = new.lower()
+            out.append(t)
+        cache_store.set("tags_tree", out)
+    for key in ("all_tasks", "all_notes"):
+        pool = cache_store.get(key)
+        if pool is None:
+            continue
+        cache_store.set(key, [dict(t, tags=swap(t.get("tags"))) if t.get("tags") else t
+                              for t in pool])
+    try:
+        names = os.listdir(cache_store.CACHE_DIR)
+    except OSError:
+        names = []
+    for name in names:
+        if not (name.startswith("project_data_") and name.endswith(".json")):
+            continue
+        key = name[:-5]
+        data = cache_store.get(key)
+        if not isinstance(data, dict) or not data.get("tasks"):
+            continue
+        data = dict(data, tasks=[dict(t, tags=swap(t.get("tags"))) if t.get("tags") else t
+                                 for t in data["tasks"]])
+        cache_store.set(key, data)
+
+
+def tag_rename(name):
+    """⌘ tag menu '✏️ Rename tag': dialog-ask the new name (the old one
+    prefilled), then v2 tag/rename - the server renames the tag on every
+    task, so no per-task writes. Same character rule as tag_create plus
+    TickTick's own (no whitespace, \\ / \" # : * ? < > |); an existing tag
+    of that name is refused rather than merged (Vex 2026-09-20: "I cannot
+    rename a tag" - there was no road at all)."""
+    name = (name or "").strip().lstrip("#")
+    if not name:
+        print("Error: no tag name")
+        return
+    raw = _ask(f"Rename #{name} to", default=name)
+    if raw is None:
+        return   # cancelled - silence, not an error toast
+    new = "".join((raw or "").split()).lstrip("#")
+    if not new or new == name:
+        return   # empty or unchanged - nothing to do
+    bad = sorted({c for c in new if c in _TAG_BAD_CHARS})
+    if bad:
+        print(f"A tag can't contain {' '.join(bad)}")
+        return
+    import cache as cache_store
+    from display import tag_match_key
+    if new.lower() != name.lower():
+        known = {tag_match_key(t) for t in (cache_store.get("tags") or [])}
+        if tag_match_key(new) in known:
+            print(f"#{new} already exists · delete or pick another name")
+            return
+    import api_v2
+    v2 = api_v2.TickTickV2()
+    if not v2.token:
+        print("Renaming a tag needs the Attachment Login token (Settings)")
+        return
+    if v2.rename_tag(name, new):
+        _tag_rename_caches(name, new)
+        print(f"Tag #{name} → #{new}")
+    else:
+        print(f"Could not rename #{name}")
+
+
 def tag_create_under(parent):
     """⌘ tag menu '➕ Add nested tag': dialog-ask the name, then the
     normal create path with THIS tag as the parent. A dialog because an
@@ -11960,7 +12059,7 @@ def focus_done():
             _api().complete_task(pid, tid)
             plog = person_autolog(tid) + routine_checkin(tid)   # the bar's ● is
             _complete_cache_patch(pid, tid)                     # a completion road too
-            print(f"✅ {title[:40]} completed{plog}")
+            print(f"✅ {_disp(title)[:40]} completed{plog}")
         except Exception as e:
             print(f"✅ complete failed: {type(e).__name__}")
         return
@@ -11972,7 +12071,7 @@ def focus_done():
             _api().complete_task(pid, tid)
             plog = person_autolog(tid) + routine_checkin(tid)   # the bar's ● is
             _complete_cache_patch(pid, tid)                     # a completion road too
-            print(f"✅ {title[:40]} completed{plog}")
+            print(f"✅ {_disp(title)[:40]} completed{plog}")
         except Exception as e:
             print(f"✅ complete failed: {type(e).__name__}")
         return
@@ -12566,6 +12665,8 @@ def main():
             tag_create(rest)
         elif verb == "tag_delete":
             tag_delete(rest)
+        elif verb == "tag_rename":
+            tag_rename(rest)
         elif verb == "fx_move":
             tid, direction = rest.split(":", 1); fx_move(tid, direction)
         elif verb == "fx_parent":

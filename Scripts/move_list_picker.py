@@ -34,7 +34,7 @@ try:
     import cache as cache_store
     import alfred
     import fuzzy as fuzz
-    from display import pick_title, pick_where
+    from display import pick_title, pick_where, md_links_display
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -170,7 +170,7 @@ def task_picker(query, current_tid, task_title, back):
                     + f"  |  Make \"{task_title}\" a subtask  ⌃ 🔙")
 
         items.append(alfred.item(
-            title=pick_title(t),
+            title=pick_title(t, task_map=task_map),
             subtitle=subtitle,
             arg=f"task:{pid}:{tid}",
             mods=back,
@@ -186,7 +186,11 @@ def task_picker(query, current_tid, task_title, back):
 def main():
     list_id    = os.environ.get("task_list_id", os.environ.get("list_id", ""))
     tid        = os.environ.get("task_id", "")
-    task_title = os.environ.get("task_title", "task")
+    # Rendered ONCE at the read: task_title is display-only in this file (the
+    # picker args and the ⌃ back variables never carry it), so the raw link
+    # still reaches move_action via env - Vex 2026-09-20: raw link in the
+    # Move picker
+    task_title = md_links_display(os.environ.get("task_title", "task"))
     raw_query  = sys.argv[1] if len(sys.argv) > 1 else ""
 
     # Fall back to temp file if env vars are missing

@@ -383,6 +383,24 @@ class TickTickV2:
         except Exception:
             return False
 
+    def rename_tag(self, name, new_name):
+        """PUT /api/v2/tag/rename {name, newName} (probe-verified 2026-09-20
+        on a scratch tag: name becomes newName lowercased, label becomes
+        newName as typed, and the server rewrites the tag on every task).
+        True on a 2xx ack; the response body is empty."""
+        name = (name or "").strip().lstrip("#").lower()
+        new_name = (new_name or "").strip().lstrip("#")
+        if not self.token or not name or not new_name:
+            return False
+        try:
+            r = requests.put("https://api.ticktick.com/api/v2/tag/rename",
+                             headers={**_base_headers(), "cookie": f"t={self.token}",
+                                      "content-type": "application/json"},
+                             json={"name": name, "newName": new_name}, timeout=15)
+            return bool(r.ok)
+        except Exception:
+            return False
+
     def delete_tag(self, name):
         """DELETE /api/v2/tag?name= (probe-verified 2026-07-09). Tasks keep
         living - only the tag entity goes. True on a 2xx ack."""

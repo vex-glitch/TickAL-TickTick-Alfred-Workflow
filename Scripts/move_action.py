@@ -20,6 +20,7 @@ bootstrap()
 import config as cfg
 import cache as cache_store
 from api import TickTickAPI
+from display import md_links_display   # toasts only - args/env stay raw
 
 
 def _list_name(pid):
@@ -120,8 +121,9 @@ def _buffer_move(api, rest):
         _, parent_pid, parent_tid = rest.split(":", 2)
         import focus_subtasks as fsub
         all_tasks = cache_store.get("all_tasks") or []
-        pname = next((t.get("title", "") for t in all_tasks
-                      if t["id"] == parent_tid), "the task")
+        # rendered BEFORE the [:30] slice below, so the chip survives the cut
+        pname = md_links_display(next((t.get("title", "") for t in all_tasks
+                                       if t["id"] == parent_tid), "the task"))
         lname = _list_name(parent_pid)
         skipped = 0
         for bpid, btid in lines:
@@ -159,7 +161,8 @@ def _buffer_move(api, rest):
 
 def main():
     arg        = sys.argv[1] if len(sys.argv) > 1 else ""
-    task_title = os.environ.get("task_title", "Task")
+    # display-only here: task_title only ever lands in the printed toast
+    task_title = md_links_display(os.environ.get("task_title", "Task"))
 
     try:
         old_pid, tid, rest = arg.split(":", 2)
@@ -248,7 +251,8 @@ def main():
                 return
             # Resolve parent title before any mutation
             all_tasks    = cache_store.get("all_tasks") or []
-            parent_title = next((t.get("title", "") for t in all_tasks if t["id"] == parent_tid), "")
+            parent_title = md_links_display(
+                next((t.get("title", "") for t in all_tasks if t["id"] == parent_tid), ""))
             # live BEFORE any move: a GET from the new project right after
             # move_task races replication (empty-200 → 'Expecting value')
             live = api.get_task(old_pid, tid)

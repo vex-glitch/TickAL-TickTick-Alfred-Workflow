@@ -199,7 +199,10 @@ os.environ.pop("browse_ctx", None)
 
 # ── the picker chain ──────────────────────────────────────────────────────────
 led = {"weeks": []}
-meal.ledger_add(led, TODAY - __import__("datetime").timedelta(days=7 * 1 + TODAY.weekday() + 1),
+# LAST week's Sunday: 7..13 days back, so last_cooked says 1 whatever today
+# is (the old "7 + weekday + 1" gave 14 on a Sunday = "2 weeks ago", and the
+# suite went red on 2026-09-20 for no code reason)
+meal.ledger_add(led, TODAY - __import__("datetime").timedelta(days=7 + (TODAY.weekday() + 1) % 7),
                 {"l": {"tid": "t2", "uuid": U1, "name": "Beef Bulgogi"}})
 meal.save_ledger(mw.LEDGER, led)
 rows = rows_for("ctx:mealplan")

@@ -54,7 +54,8 @@ Typing `/` alone lists every scope in place - ⏎ inserts the scope's prefix, �
 | Part | Content |
 |------|---------|
 | Title | Name · priority dot (⚫️ none / 🟡 low / 🟠 medium / 🔴 high) · 📆 date or time span (if set) · #tags |
-| Subtitle | Item type · breadcrumb `List>Section>Parent` · chord legend |
+| ↑📆 | A subtask with no date of its own shows its nearest dated parent's date, marked ↑ - a CTA block's agenda items are scheduled on the block |
+| Subtitle | Item type · breadcrumb `List>Section>Parent` (parent titles rendered like titles, `[name]🔗`) · chord legend |
 | 🅿️ | Appended to the title when the task sits in the buffer |
 | 🔗 | Markdown links render as `[name]🔗` - display only, raw titles stay intact |
 

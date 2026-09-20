@@ -93,6 +93,7 @@ Tag screens filter tasks while typing: matching tagged tasks follow the tag rows
 | ✔️ Complete all | Complete all |
 | ⚡ Priority all… | Set priority on all |
 | 🎯 Add buffer to focus | Stage all into the focus task's today block, then clear (shown only during a task [focus session](46-focus.md)) |
+| 🎯 Merge/Stage for Focus | Stage THIS row under another task or into a note - the task menu's own flow |
 | 🗑️ Remove this | Drop the selected task from the buffer |
 | 🧹 Clear buffer | Empty the buffer without touching the tasks |
 | 🗑️ Delete all | Move all buffered tasks to TickTick's Trash - type-to-confirm |

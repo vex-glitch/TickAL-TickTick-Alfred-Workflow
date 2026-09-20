@@ -23,6 +23,7 @@ except Exception as e:
 try:
     import alfred
     import fuzzy as fuzz
+    from display import md_links_display
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -38,7 +39,9 @@ PRIORITIES = [
 def main():
     list_id    = os.environ.get("task_list_id", os.environ.get("list_id", ""))
     tid        = os.environ.get("task_id", "")
-    task_title = os.environ.get("task_title", "task")
+    # display-only here (subtitle only; arg is the priority, variables are
+    # ids) - Vex 2026-09-20: raw link in the Priority picker
+    task_title = md_links_display(os.environ.get("task_title", "task"))
     query      = sys.argv[1] if len(sys.argv) > 1 else ""
 
     if not list_id or not tid:

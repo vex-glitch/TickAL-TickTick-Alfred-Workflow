@@ -27,7 +27,7 @@ import areas
 import cache as cache_store
 import fuzzy as fuzz
 import periodic_model as pm
-from display import pick_title, pick_where
+from display import md_links_display, pick_title, pick_where
 from script_base import run_path
 
 
@@ -642,8 +642,11 @@ def task_rows(rest):
         if not pid or not tid:            # hand-typed '!' junk - no valid row
             return [alfred.item(title="Type to pick a task…",
                                 valid=False, mods=_mods())]
-        title = next((t.get("title") for t in (cache_store.get("all_tasks") or [])
-                      if t.get("id") == tid), "Task") or "Task"
+        # rendered BEFORE the slices below, so a link title shows its chip,
+        # not a URL cut mid-way (Vex 2026-09-20)
+        title = md_links_display(next((t.get("title") for t in
+                                       (cache_store.get("all_tasks") or [])
+                                       if t.get("id") == tid), "Task") or "Task")
         frag = frag.strip()
         m = _TIME_RE.match(frag)
         hhmm = (f"{int(m.group(1)):02d}:{m.group(2) or '00'}"
@@ -705,8 +708,11 @@ def sched_rows(rest, when):
         if not pid or not tid:            # hand-typed '!' junk - no valid row
             return [alfred.item(title="Type to pick a task…",
                                 valid=False, mods=_mods())]
-        title = next((t.get("title") for t in (cache_store.get("all_tasks") or [])
-                      if t.get("id") == tid), "Task") or "Task"
+        # rendered BEFORE the slices below, so a link title shows its chip,
+        # not a URL cut mid-way (Vex 2026-09-20)
+        title = md_links_display(next((t.get("title") for t in
+                                       (cache_store.get("all_tasks") or [])
+                                       if t.get("id") == tid), "Task") or "Task")
         rows = [alfred.item(
             uid="pn-sched-add",
             title=f"{emoji} {title[:50]} → {label}",

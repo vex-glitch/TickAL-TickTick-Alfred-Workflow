@@ -283,6 +283,11 @@ def main():
                  f"xact:tag_focus:{pid}:{tag}", "focus send all stage checkbox",
                  (fx_session() or ("",))[0] == "task"),
                 ("🔗 Copy link", "Copy tag URL",  f"copy:{link}", "copy url link", True),
+                # Dialog asks the new name; the server renames it on every
+                # task (v2 tag/rename, probe-verified 2026-09-20)
+                ("✏️ Rename tag",
+                 f"Rename {fmt_tags([tag]) or '#' + tag} everywhere, tasks follow",
+                 f"xact:tag_rename:{tag}", "rename tag edit name change", True),
                 ("🗑️ Delete tag",
                  f"Remove {fmt_tags([tag]) or '#' + tag} everywhere, tasks survive",
                  f"xact:tag_delete:{tag}", "delete remove tag",   True),
@@ -349,6 +354,13 @@ def main():
                 ("🎯 Add buffer to focus", f"All {_n} → subtasks of the focus task, clears buffer",
                  "xact:buffer_focus", "focus add all stage checkbox",
                  _n > 0 and (fx_session() or ("",))[0] == "task", sent),
+                # THIS task's stage flow, the task menu's row word for word -
+                # the buffer had no way to stage one of its rows (Vex
+                # 2026-09-20). Real ids: stage_open needs the task, not the
+                # BUFFER sentinel.
+                ("🎯 Merge/Stage for Focus", "Subtask THIS one under another task, or into a note…",
+                 f"xact:stage_open:{pid}:{tid}", "merge stage focus link checkbox block this",
+                 bool(pid) and bool(tid), real),
                 ("❌ Remove this",  "Drop this task from the buffer",
                  f"xact:buffer_remove:{pid}:{tid}", "remove drop", bool(tid), real),
                 ("🧹 Clear buffer", "Empty the buffer",    "xact:buffer_clear",
@@ -986,7 +998,7 @@ def main():
             # runs; the stage screen (both directions) always; live-link only
             # while a session runs unattributed. Never on an OKR copy: the
             # add MOVES it under the focus task, out of the plan.
-            (f"🎯 Add to focus ({(_sess[3][:24] if _sess and _sess[0] == 'task' else '')})",
+            (f"🎯 Add to focus ({(md_links_display(_sess[3])[:24] if _sess and _sess[0] == 'task' else '')})",
              "→ subtask of the focus task (moves under it)",
              f"xact:fx_add:{pid}:{tid}", "focus add stage checkbox now",
              is_task_like and bool(tid) and bool(_sess) and _sess[0] == "task"
@@ -1084,8 +1096,10 @@ def main():
                     ).total_seconds()
             _mins = max(0, int(_secs // 60))
             _pause_tag = " ⏸" if _fs.get("paused_at") else ""
+            # Display-only: the focus file keeps the RAW title (focus_subtasks
+            # .title_link parses its URL) - Vex 2026-09-20, raw link on the row.
             items.insert(0, alfred.item(
-                title=f"⏹ Stop focus · {_fs.get('title','task')[:30]} · {_mins}m{_pause_tag}",
+                title=f"⏹ Stop focus · {md_links_display(_fs.get('title','task'))[:30]} · {_mins}m{_pause_tag}",
                 subtitle="Log to calendar  |  ⌥ discard",
                 arg="xact:focus_stop", match="stop focus timer",
                 mods={"alt": {"arg": "xact:focus_discard",
@@ -1107,7 +1121,7 @@ def main():
             _m = _re.fullmatch(r"log\s+(\d{1,3})", query.strip())
             if _m and is_task_like and tid:
                 items.insert(0, alfred.item(
-                    title=f"🎯 Log {_m.group(1)}m on {name[:28]}",
+                    title=f"🎯 Log {_m.group(1)}m on {md_links_display(name)[:28]}",
                     subtitle="Record ends now → calendar",
                     arg=f"xact:focus_log:{pid}:{tid}:{_m.group(1)}", variables=vars_))
         if not items:

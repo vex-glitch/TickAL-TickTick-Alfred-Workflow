@@ -49,6 +49,7 @@ try:
     from dateutil import (parse_date, utc_to_picker_display, utc_to_local_display,
                           build_date_shortcuts)
     import reminders as rem
+    from display import md_links_display
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -241,7 +242,9 @@ def strip_prefix(raw):
 def main():
     list_id    = os.environ.get("task_list_id", os.environ.get("list_id", ""))
     tid        = os.environ.get("task_id", "")
-    task_title = os.environ.get("task_title", "task")
+    # display-only here: the three subtitles are its only readers; the
+    # attr_ args carry ids and dates - Vex 2026-09-20: raw link in Schedule
+    task_title = md_links_display(os.environ.get("task_title", "task"))
     raw        = strip_prefix(sys.argv[1] if len(sys.argv) > 1 else "")
 
     has_date = False

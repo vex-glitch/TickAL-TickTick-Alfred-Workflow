@@ -165,11 +165,13 @@ def note_snippet(content, limit=48):
     description."""
     for ln in (content or "").splitlines():
         s = ln.strip()
+        # "- [" alone also swallowed a "- [name](url)" bullet - the FIRST line
+        # of every link-list note - so the 📝 showed the second bullet or
+        # nothing (Vex 2026-09-20); only a real checkbox marker skips
         if (not s or re.match(r"### 20\d\d-\d\d-\d\d", s)
-                or s.startswith("- [") or s in ("---", "***")):
+                or re.match(r"- \[[ xX]\]", s) or s in ("---", "***")):
             continue
-        s = md_links_display(s)
-        return s[:limit] + ("…" if len(s) > limit else "")
+        return clip_links(md_links_display(s), limit)
     return ""
 
 
@@ -193,11 +195,85 @@ def tag_link(tag):
     return f"https://ticktick.com/webapp/#t/{enc}/tasks"
 
 
+_CHIP_RUN_RE   = re.compile(r'\]🔗(?:\s*🔗)+')      # "[name]🔗 🔗" → "[name]🔗"
+_CHIP_INNER_RE = re.compile(r'(?:\s*🔗)+(?=\]🔗)')   # "[name 🔗]🔗" → "[name]🔗"
+_MD_ESCAPE_RE  = re.compile(r"\\([!-/:-@\[-`{-~])")  # periodic_model.unescape_md's pattern
+
+
 def md_links_display(text):
     """DISPLAY-ONLY link rendering: '[name](url)' → '[name]🔗'.
     Never applied to data - raw titles keep round-tripping through
-    add_task's [[ ]] link syntax and actions.py's Open-link URL counting."""
-    return _MD_LINK_RE.sub(r'[\1]🔗', text or "")
+    add_task's [[ ]] link syntax and actions.py's Open-link URL counting.
+
+    The app's backslash escapes ("\\[Name\\]\\(url\\)", "TOTAL \\=") are
+    dropped first, display-only, or the link never matches and the
+    backslashes show.
+
+    A title that ALREADY ends in " 🔗" (every CTA parent: areas.py and
+    dispatch.py mint "💼 P • [Name](url) 🔗") would render its chip twice -
+    "[Name]🔗 🔗" (Vex 2026-09-20) - so a run of chips AFTER a rendered
+    link collapses to one (a bare "Ship it 🔗 🔗" is left alone), and a
+    label that itself ends in the chip ("[Name 🔗]🔗", the shape link_label
+    minted before 2026-09-20) folds into the rendered one."""
+    text = text or ""
+    for _ in range(4):                  # the app can escape an escape again
+        out = _MD_ESCAPE_RE.sub(r"\1", text)
+        if out == text:
+            break
+        text = out
+    text = _MD_LINK_RE.sub(r'[\1]🔗', text)
+    return _CHIP_INNER_RE.sub('', _CHIP_RUN_RE.sub(']🔗', text))
+
+
+def clip_links(text, limit):
+    """Cut RENDERED text at `limit` without leaving an open "[name…" link:
+    the cut moves inside the label and the chip is kept ("[Process my
+    digital i…]🔗"), and a cut landing on the "]" itself keeps its chip
+    too. Plain text just gets the ellipsis (Vex 2026-09-20: the pickers'
+    ↳ parent crumb read "🥅 O • [Onboard TickTicks")."""
+    text = text or ""
+    if len(text) <= limit:
+        return text
+    cut, rest = text[:limit], text[limit:]
+    if cut.endswith("]") and rest.startswith("🔗"):
+        return cut + "🔗" + ("…" if rest[1:].strip() else "")
+    if cut.count("[") > cut.count("]"):
+        close = rest.find("]")
+        if close >= 0 and rest[close + 1:close + 2] == "🔗":  # inside a rendered link
+            head = cut[:max(limit - 3, 1)]
+            # keep the LAST opening bracket - an earlier closed link's "["
+            # must not satisfy the check ("[a]🔗 and [bcdef]🔗" at 12 gave
+            # "[a]🔗 and…]🔗", a phantom chip with no bracket)
+            if cut.rfind("[") >= len(head):
+                head = cut[:cut.rfind("[") + 1]
+            return head.rstrip() + "…]🔗"
+    return cut.rstrip() + "…"
+
+
+def inherited_date(task, task_map, depth=6):
+    """The date chip a DATELESS subtask borrows from its nearest dated
+    ancestor: '↑📆 21/09/2026 19:00-21:00' (the ↑ says whose it is), or ''.
+
+    A CTA block is scheduled on the PARENT and its agenda hangs under it
+    undated, so a search hit on an agenda item showed no date at all (Vex
+    2026-09-20: "there is no scheduled date"). Only with a task_map - a
+    caller without the parents to hand gets the plain title as before."""
+    if not task_map or fmt_date(task):
+        return ""
+    seen, cur = set(), task
+    while depth > 0:
+        depth -= 1
+        pid = (cur or {}).get("parentId") or ""
+        if not pid or pid in seen:
+            return ""
+        seen.add(pid)
+        cur = task_map.get(pid)
+        if not cur:
+            return ""
+        chip = fmt_date(cur)
+        if chip:
+            return "↑" + chip
+    return ""
 
 
 _BUFFERED_IDS = None
@@ -266,20 +342,23 @@ def buffer_pairs():
     return healed
 
 
-def build_title(task, buffered=False):
+def build_title(task, buffered=False, task_map=None):
     """
     Build the Alfred item title field (the breadcrumb now lives in the subtitle).
     Format: 'Task Name ⚫️ 📆 13/05/2026 08:00-17:00 #🔥Active #🔥Lead'
              'Task Name ⚫️ #🔥Active'                  (no date)
              'Task Name ⚫️'                            (no date, no tags)
              'Task Name 🅿️ ⚫️'                         (buffered)
+             'Task Name ⚫️ ↑📆 21/09/2026 19:00-21:00' (dateless subtask,
+                                                       task_map given: the
+                                                       nearest dated ancestor)
     Markdown links in the name render as '[name]🔗' (display-only).
     """
     name     = md_links_display(task.get("title", "Untitled"))
     if buffered:
         name += " 🅿️"
     priority = PRIORITY.get(task.get("priority", 0), "⚫️")
-    date_str = fmt_date(task)                        # "" when no date
+    date_str = fmt_date(task) or inherited_date(task, task_map)   # "" when no date
     tag_str  = fmt_tags(task.get("tags"))
 
     core = f"{name} {priority} {date_str}".rstrip() if date_str else f"{name} {priority}"
@@ -296,19 +375,25 @@ def link_label(title):
     """
     title = title or ""
     # search_key also drops bare URLs and tag suffixes, which a PLAIN title
-    # must keep - so only a title that really carries a link goes through it
-    return mdtext.flatten_links(title) if "](" in title else title
+    # must keep - so only a title that really carries a link goes through it.
+    # A CTA parent's own trailing " 🔗" is a chip, not a name: kept, the
+    # [[ ]] picker offered "[[💼 P • TickAL • WF 🔗]]" and the minted link
+    # rendered "[… 🔗]🔗" (Vex 2026-09-20)
+    if "](" not in title:
+        return title
+    return re.sub(r"\s*🔗\s*$", "", mdtext.flatten_links(title)).strip()
 
 
-def pick_title(task, mark=""):
+def pick_title(task, mark="", task_map=None):
     """A PICKER row's title, in the shape search and browse already use:
     markdown links rendered, priority dot, date, tags.
 
     Pickers used to print the bare title, so two tasks with the same name in
     two lists were the same row twice with nothing to choose between them
     (Vex 2026-09-12). Pair it with pick_where for the list itself.
+    `task_map` (id → task) lets a dateless subtask borrow its parent's date.
     """
-    return build_title(task) + (mark or "")
+    return build_title(task, task_map=task_map) + (mark or "")
 
 
 def pick_where(task, task_map=None):
@@ -320,7 +405,7 @@ def pick_where(task, task_map=None):
     parent = (task_map or {}).get((task or {}).get("parentId") or "")
     if not parent:
         return home
-    ptitle = md_links_display(parent.get("title", ""))[:24]
+    ptitle = clip_links(md_links_display(parent.get("title", "")), 24)
     return f"↳ {ptitle} · {home}" if ptitle else home
 
 

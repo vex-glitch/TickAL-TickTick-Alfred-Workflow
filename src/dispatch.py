@@ -24,6 +24,7 @@ import cache as cache_store
 import areas
 import reminders as rem
 from dateutil import utc_to_local_display, utc_to_long_display
+from display import md_links_display   # toasts only - args/env stay raw
 from script_base import run_path
 
 # CRM booking flow - a new CRM task carrying a booking tag auto-prefills a
@@ -382,7 +383,7 @@ def main():
         elif arg.startswith("copy:"):
             payload = arg[5:]
             subprocess.run(["pbcopy"], input=payload.encode(), check=False)
-            task_title = os.environ.get("task_title", "")
+            task_title = md_links_display(os.environ.get("task_title", ""))
             # Bare TickTick ids ride the same verb as URLs (Copy id rows)
             what = "URL" if "://" in payload else "id"
             title = (f"{task_title} · {what} Copied" if task_title
@@ -475,7 +476,8 @@ def main():
                 log_suffix += _xact.routine_checkin(tid)
             except Exception:
                 pass
-            print(f"{title} completed{guard_note}{log_suffix}")
+            # Vex 2026-09-20: raw md link in the ⇧ complete toast
+            print(f"{md_links_display(title)} completed{guard_note}{log_suffix}")
 
         elif arg.startswith("attr_date:"):
             # attr_date:projectId:taskId:isoDate[;R:tok,tok]
@@ -504,7 +506,7 @@ def main():
             api.update_task(tid, pid, current=current, **fields)
             _patch_task_cache(tid, **fields)
 
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             verb = "Rescheduled" if had_date else "Scheduled"
             rem_line = f"\n🔔 {', '.join(rem.human(t) for t in rem_tokens)}" if rem_tokens else ""
             new_display = utc_to_long_display(due)
@@ -531,7 +533,7 @@ def main():
             api.update_task(tid, pid, current=current, **fields)
             _patch_task_cache(tid, **fields)
 
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             verb = "Rescheduled" if had_date else "Scheduled"
             start_disp = utc_to_long_display(start_iso)
             end_disp   = utc_to_local_display(end_iso)[11:16]  # HH:MM
@@ -559,7 +561,7 @@ def main():
             new_root, kids, problems = duplicate.run(
                 api, api_v2.TickTickV2(), pid, tid, start_iso, end_iso, extra)
             _cache_new_tasks([new_root] + kids)
-            task_title = new_root.get("title") or os.environ.get("task_title", "Task")
+            task_title = md_links_display(new_root.get("title") or os.environ.get("task_title", "Task"))
             when_disp = utc_to_long_display(new_root.get("startDate") or new_root.get("dueDate") or start_iso)
             n = len(kids)
             kid_note = f" · {n} subtask{'' if n == 1 else 's'}" if n else ""
@@ -573,7 +575,7 @@ def main():
             api = TickTickAPI(cfg.get_token())
             api.update_task(tid, pid, current=_cached_task(tid), startDate=None, dueDate=None)
             _patch_task_cache(tid, startDate=None, dueDate=None)
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             print(f"{task_title} · Unscheduled")
 
         elif arg.startswith("attr_priority:"):
@@ -585,7 +587,7 @@ def main():
             api.update_task(tid, pid, current=_cached_task(tid), priority=pval)
             _patch_task_cache(tid, priority=pval)
             labels = {0: "None", 1: "Low", 3: "Medium", 5: "High"}
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             print(f"{task_title} → {labels.get(pval, pval)}")
 
         elif arg.startswith("attr_tag:"):
@@ -606,7 +608,7 @@ def main():
             merged = _norm_tags(existing + [tag])  # deduplicated, lowercase (server case)
             api.update_task(tid, pid, current=(task or None), tags=merged)
             _patch_task_cache(tid, tags=merged)
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             print(f"{task_title} tagged #{tag}")
 
         elif arg.startswith("attr_tags_multi:"):
@@ -630,7 +632,7 @@ def main():
             merged = _norm_tags(existing + new_tags)
             api.update_task(tid, pid, current=current, tags=merged)
             _patch_task_cache(tid, tags=merged)
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             tags_display = "  ".join(f"#{t}" for t in new_tags)
             print(f"{task_title} tagged {tags_display}")
 
@@ -644,7 +646,7 @@ def main():
             updated = [t for t in (current.get("tags") or []) if t.lower() != tag.lower()]
             api.update_task(tid, pid, current=current, tags=updated)
             _patch_task_cache(tid, tags=updated)
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             print(f"{task_title} tag #{tag} removed")
 
         elif arg.startswith("attr_tag_clear:"):
@@ -654,7 +656,7 @@ def main():
             api = TickTickAPI(cfg.get_token())
             api.update_task(tid, pid, current=_cached_task(tid), tags=[])
             _patch_task_cache(tid, tags=[])
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             print(f"{task_title} · all tags removed")
 
         elif arg.startswith("attr_move:"):
@@ -676,7 +678,7 @@ def main():
                 print(f"🅿️ {done} tasks moved to {new_list or 'list'}")
                 return
             api.move_task(tid, old_pid, new_pid)
-            task_title = os.environ.get("task_title", "Task")
+            task_title = md_links_display(os.environ.get("task_title", "Task"))
             projects = cache_store.get("projects") or []
             new_list = next((p["name"] for p in projects if p["id"] == new_pid), "")
             _patch_task_cache(tid,
@@ -696,7 +698,7 @@ def main():
             api = TickTickAPI(cfg.get_token())
             api.update_task(tid, pid, current=_cached_task(tid), title=new_title)
             _patch_task_cache(tid, title=new_title)
-            print(f"{new_title} renamed")
+            print(f"{md_links_display(new_title)} renamed")
 
         elif arg.startswith("uncomplete:"):
             # uncomplete:projectId:taskId:title
@@ -729,7 +731,7 @@ def main():
                     cache_store.invalidate("all_tasks")
             except Exception:
                 cache_store.invalidate("all_tasks")
-            print(f"{title} uncompleted")
+            print(f"{md_links_display(title)} uncompleted")
 
         elif arg.startswith("attr_delete:"):
             # attr_delete:projectId:taskId:title
@@ -751,7 +753,7 @@ def main():
                 _patch_project_data(tid, pid_old=pid, remove=True)
             except Exception:
                 cache_store.invalidate("all_tasks")
-            print(f"{title} deleted")
+            print(f"{md_links_display(title)} deleted")
 
         elif arg.startswith("create_project_meta:"):
             # create_project_meta:<base64 {name, tag, emoji}>

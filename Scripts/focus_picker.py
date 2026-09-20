@@ -100,6 +100,18 @@ def _open_tasks():
             if t.get("status", 0) == 0 and t.get("kind") != "NOTE"]
 
 
+def _tmap():
+    """id -> task over the WHOLE cache (tasks + notes) for pick_title /
+    pick_where: a dateless subtask borrows its parent's date and shows the
+    '↳ parent' crumb only with the parents to hand. Without it the stage
+    picker showed a CTA agenda item with no date and three identical rows
+    (Vex 2026-09-20). Built once per render, never filtered - a NOTE or
+    completed parent must still resolve."""
+    m = {x["id"]: x for x in (cache_store.get("all_tasks") or []) if x.get("id")}
+    m.update({x["id"]: x for x in (cache_store.get("all_notes") or []) if x.get("id")})
+    return m
+
+
 def _task_vars(t):
     pid = t.get("projectId") or t.get("_projectId", "")
     return pid, t["id"], {"task_title": t.get("title", ""), "task_id": t["id"],
@@ -327,13 +339,14 @@ def _add_search(frag, focus_tid):
     hits = filter_and_score(frag, pool,
                             key_fn=lambda t: search_key(t.get("title", "")))[:40]
     items = []
+    tmap = _tmap()
     for t in hits:
         pid, tid, tvars = _task_vars(t)
         mark = " 🎯" if tid in staged else ""
         items.append(alfred.item(
             uid=f"fp-add-{tid}",
-            title=pick_title(t, mark),
-            subtitle=pick_where(t) + ("  |  Already in focus  ⌃🔙" if mark
+            title=pick_title(t, mark, task_map=tmap),
+            subtitle=pick_where(t, tmap) + ("  |  Already in focus  ⌃🔙" if mark
                                       else "  |  Add to current focus  ⌥🗒  ⌃🔙"),
             arg=f"xact:fx_add:{pid}:{tid}", valid=True, variables=tvars,
             mods={"alt": {"valid": True, "arg": f"xact:fx_add_sticky:{pid}:{tid}",
@@ -395,12 +408,13 @@ def _remove_search(frag, fpid, ftid):
         kids = filter_and_score(frag, kids,
                                 key_fn=lambda t: search_key(t.get("title", "")))
     items = []
+    tmap = _tmap()
     for t in kids[:40]:
         pid = t.get("projectId") or t.get("_projectId", "") or fpid
         items.append(alfred.item(
             uid=f"fp-rm-{t['id']}",
-            title=_indent(t) + pick_title(t),
-            subtitle=pick_where(t) + "  |  Un-stage · send it home  ⌃🔙",
+            title=_indent(t) + pick_title(t, task_map=tmap),
+            subtitle=pick_where(t, tmap) + "  |  Un-stage · send it home  ⌃🔙",
             arg=f"xact:fx_unstage:{pid}:{t['id']}", valid=True, mods=BACK))
     if not items:
         items = [alfred.item(
@@ -415,12 +429,13 @@ def _link_search(frag):
     hits = filter_and_score(frag, _open_tasks(),
                             key_fn=lambda t: search_key(t.get("title", "")))[:40]
     items = []
+    tmap = _tmap()
     for t in hits:
         pid, tid, tvars = _task_vars(t)
         items.append(alfred.item(
             uid=f"fp-lk-{tid}",
-            title=pick_title(t),
-            subtitle=pick_where(t) + "  |  Link the running session  ⌃🔙",
+            title=pick_title(t, task_map=tmap),
+            subtitle=pick_where(t, tmap) + "  |  Link the running session  ⌃🔙",
             arg=f"xact:fx_link:{pid}:{tid}", valid=True, variables=tvars,
             mods=BACK))
     if not items:
@@ -526,7 +541,7 @@ def render_running(st, raw):
                     pid, tid, tvars = _task_vars(t)
                     print(alfred.output([alfred.item(
                         uid="fp-stopas",
-                        title=f"⏹️ Log {mins}m on {t.get('title', '')[:50]}",
+                        title=f"⏹️ Log {mins}m on {md_links_display(t.get('title', ''))[:50]}",
                         subtitle="Stop and record on this task  ⌃🔙",
                         arg=f"xact:focus_stop_as:{pid}:{tid}",
                         valid=True, variables=tvars, mods=BACK,
@@ -630,7 +645,9 @@ def render_idle(raw):
                 t = find_by_title(frag)
                 if t:
                     pid, tid, tvars = _task_vars(t)
-                    name = t.get("title", "")[:50]
+                    # Display-only: tvars carry the raw title (Vex 2026-09-20:
+                    # raw link cut mid-URL on the confirm row).
+                    name = md_links_display(t.get("title", ""))[:50]
                     if mode == "timer":
                         items = [
                             alfred.item(uid="fp-go",
@@ -793,6 +810,7 @@ def render_stage(raw):
     else:   # normal path: ids ride the handshake file, the bar stays clean
         spid, stid = _handshake()
         rest = raw[6:].lstrip(" ") if len(raw) > 5 else ""
+    tmap = _tmap()   # one build per render: S0 + S3 rows borrow parent dates
     # S0 - no handshake (the Focus menu's 🎯 row clears it via
     # xact:stage_pick before opening this screen): pick WHICH task to stage
     # first. ⏎ routes through xact:stage_open (fresh handshake, re-fires
@@ -806,8 +824,8 @@ def render_stage(raw):
             tpid = t.get("projectId") or t.get("_projectId", "")
             items.append(alfred.item(
                 uid=f"fp-st-src-{t['id']}",
-                title=pick_title(t),
-                subtitle=pick_where(t) + "  |  Stage this task  ⌃🔙",
+                title=pick_title(t, task_map=tmap),
+                subtitle=pick_where(t, tmap) + "  |  Stage this task  ⌃🔙",
                 arg=f"xact:stage_open:{tpid}:{t['id']}",
                 valid=True, mods=BACK))
         if not items:
@@ -872,7 +890,7 @@ def render_stage(raw):
                 items.append(alfred.item(
                     uid="fp-st-confirm",
                     title=f"✅ Stage {len(resolved)} under {sname}",
-                    subtitle=" · ".join(r[2][:24] for r in resolved)[:96],
+                    subtitle=" · ".join(md_links_display(r[2])[:24] for r in resolved)[:96],
                     arg=f"xact:fx_add_multi:{payload}", valid=True, mods=BACK))
             if missing:
                 items.append(alfred.item(
@@ -895,8 +913,8 @@ def render_stage(raw):
             mark = " 🎯" if t["id"] in staged else ""
             items.append(alfred.item(
                 uid=f"fp-st-pick-{t['id']}",
-                title=pick_title(t, mark),
-                subtitle=pick_where(t) + ("  |  Already in focus  ⌃🔙" if mark
+                title=pick_title(t, mark, task_map=tmap),
+                subtitle=pick_where(t, tmap) + ("  |  Already in focus  ⌃🔙" if mark
                                           else "  |  Queue, confirm on the ✅ row  ⌃🔙"),
                 arg="", valid=False,
                 autocomplete=f"{prefix}from {' | '.join(committed + [nt])} | ",
@@ -1034,11 +1052,12 @@ def render_backlog(raw):
     else:
         pool = sorted(pool, key=lambda t: t.get("modifiedTime")
                       or t.get("createdTime") or "", reverse=True)
+    tmap = _tmap()
     for t in pool[:40]:
         pid, tid, tvars = _task_vars(t)
         items.append(alfred.item(
             uid=f"fp-log-{tid}",
-            title=pick_title(t),
+            title=pick_title(t, task_map=tmap),
             subtitle=f"📂 {t.get('_projectName') or 'Inbox'}  |  "
                      f"⏎🕰️ {rng}  ⌃🔙",
             arg=f"xact:focus_backlog:{s_ep}:{e_ep}:{pid}:{tid}",

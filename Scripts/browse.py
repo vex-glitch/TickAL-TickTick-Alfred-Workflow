@@ -94,7 +94,7 @@ try:
     from display import (build_title, build_subtitle, fmt_tags, tag_link,
                          col_lookup, list_name_for, join_breadcrumb, search_key,
                          PRIORITY, MOD_BACK, MODS_COMPLETED, buffered_ids,
-                         note_snippet)
+                         note_snippet, md_links_display)
     # Smart-list helpers live in src/filtering.py (shared with
     # everything_search's inline views).
     from filtering import (SMART_LABELS, smart_filter, task_local_date,
@@ -330,9 +330,11 @@ def add_back(items, back):
     return items
 
 # ── Shared task-row builder ──────────────────────────────────────────────────
-def task_item(t, pid, sub_count, breadcrumb="", uid="", child_level="subtasks"):
+def task_item(t, pid, sub_count, breadcrumb="", uid="", child_level="subtasks",
+              task_map=None):
     """Canonical task row (tasks.py rendering): build_title + actions subtitle,
-    ⏎ open, ⇧ complete, ⌥ drill ctx (valid only with children), ⌥⌘ copy."""
+    ⏎ open, ⇧ complete, ⌥ drill ctx (valid only with children), ⌥⌘ copy.
+    `task_map` (id → task): a dateless subtask borrows its parent's date."""
     tid  = t["id"]
     name = t.get("title", "Untitled")
     link = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"
@@ -356,7 +358,7 @@ def task_item(t, pid, sub_count, breadcrumb="", uid="", child_level="subtasks"):
                                            "item_type": "task"}}
     return alfred.item(
         uid=uid,
-        title=build_title(t, buffered=tid in buffered_ids()),
+        title=build_title(t, buffered=tid in buffered_ids(), task_map=task_map),
         subtitle=build_subtitle(sub_count, breadcrumb=breadcrumb, actions=True,
                                 buffer_mod=not is_note,
                                 note="" if is_note else note_snippet(t.get("content"))),
@@ -693,7 +695,8 @@ def render_children(list_id, task_id, query, level):
         cur = task_by_id.get(cur.get("parentId") or "")
     top      = chain[-1] if chain else None
     top_col  = col_name_by_id.get((top or {}).get("columnId") or "", "")
-    titles   = [c.get("title", "") for c in reversed(chain)]
+    # display-only '[name]🔗': a CTA parent's title IS a link (Vex 2026-09-20)
+    titles   = [md_links_display(c.get("title", "")) for c in reversed(chain)]
     breadcrumb = join_breadcrumb(lname, top_col, *titles)
 
     children = [t for t in all_tasks
@@ -705,6 +708,7 @@ def render_children(list_id, task_id, query, level):
             t, list_id, _child_count(all_tasks, t["id"]),
             breadcrumb=breadcrumb,
             child_level="subsubtasks",
+            task_map=task_by_id,      # dateless child → the parent's ↑📆
         ))
 
     if query:
@@ -713,7 +717,9 @@ def render_children(list_id, task_id, query, level):
     if not items:
         link = f"ticktick:///webapp/#p/{list_id}/tasks/{task_id}"
         items.append(alfred.item(
-            title=f'No subtasks matching "{query}"' if query else f'No subtasks in "{parent_title}"',
+            # display-only: a childless task's title can BE a link (every
+            # routine step, the Todoist imports) - Vex 2026-09-20
+            title=f'No subtasks matching "{query}"' if query else f'No subtasks in "{md_links_display(parent_title)}"',
             subtitle=MOD_BACK,
             arg=f"open:{link}",
             valid=True,
@@ -986,7 +992,7 @@ def render_crmdone(query):
 
     rows = []
     for t in pool:
-        disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+        disp = md_links_display(cr.LINK_RE.sub(r"\1", t.get("title") or ""))   # see _crm_task_row
         mods = _picker_mods()
         _l = cr.parse_first_link(t.get("title") or "")
         if _l:
@@ -1120,7 +1126,11 @@ def _crm_task_row(cr, t, uid_prefix="crms"):
         day = utc_str_to_local_date(due) if due else ""
     except Exception:
         day = ""
-    disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+    # LINK_RE first (the logbook link → its bare name), THEN any other
+    # link a title carries renders '[name]🔗' - a pasted ticktick:/// or
+    # web link showed raw markdown here (Vex 2026-09-20). Display-only:
+    # task_title and every arg keep the raw title.
+    disp = md_links_display(cr.LINK_RE.sub(r"\1", t.get("title") or ""))
     linked = cr.is_session_task(t.get("title") or "")
     chip = "" if linked else " · 🔗 unlinked"
     mods = _picker_mods()
@@ -1217,7 +1227,7 @@ def render_crmweek(query):
         return ""
 
     for d, t in pool:
-        disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+        disp = md_links_display(cr.LINK_RE.sub(r"\1", t.get("title") or ""))   # see _crm_task_row
         when = ("Today" if d.date() == today else
                 ("Tomorrow" if d.date() == today + _td(days=1)
                  else d.strftime("%a %d")))
@@ -3814,7 +3824,7 @@ def render_crmback(query):
             due = t.get("dueDate") or t.get("startDate")
             rows.append(alfred.item(
                 uid=f"back-a-{t['id']}",
-                title=title or "Untitled",
+                title=md_links_display(title) or "Untitled",   # display-only (Vex 2026-09-20)
                 subtitle="⏎ Customer → logbook → link"
                          + ("" if due else " · dormant"),
                 arg=f"xact:crmlink:{CRM_ID}:{t['id']}",
@@ -3878,7 +3888,7 @@ def render_crmsched(query):
     for t in _crm_open_tasks():
         if t.get("dueDate") or t.get("startDate"):
             continue
-        disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+        disp = md_links_display(cr.LINK_RE.sub(r"\1", t.get("title") or ""))   # see _crm_task_row
         linked = cr.is_session_task(t.get("title") or "")
         rows.append(alfred.item(
             uid=f"sched-{t['id']}",
@@ -3933,7 +3943,7 @@ def render_crmprep(query):
     sched.sort(key=lambda x: x[0])
     rows = []
     for d, t in sched + dormant:
-        disp = cr.LINK_RE.sub(r"\1", t.get("title") or "")
+        disp = md_links_display(cr.LINK_RE.sub(r"\1", t.get("title") or ""))   # see _crm_task_row
         if d:
             dd = d.date()
             if dd == today:
@@ -3980,7 +3990,8 @@ def render_buffer(query):
         if not t:
             continue   # stray (completed/deleted since buffering) - skip
         it = task_item(t, pid, _child_count(all_tasks, tid),
-                       breadcrumb=t.get("_projectName", ""), uid=f"buf-{tid}")
+                       breadcrumb=t.get("_projectName", ""), uid=f"buf-{tid}",
+                       task_map=by_id)
         it["variables"]["item_type"] = "buffer_item"   # ⌘ → batch menu
         items.append(it)
     if query:
@@ -4264,7 +4275,7 @@ def render_people(level, ids, query):
             tlink = f"ticktick:///webapp/#p/{areas.PEOPLE_ID}/tasks/{t['id']}"
             due = (t.get("dueDate") or "")[:10]
             rows.append(alfred.item(
-                uid=f"pc-{t['id']}", title=f"📌 {t.get('title', '')}",
+                uid=f"pc-{t['id']}", title=f"📌 {md_links_display(t.get('title', ''))}",
                 subtitle=(f"{due}  |  " if due else "") + "⏎↗️  ⌘⚡  ⌃🔙",
                 arg=f"open:{tlink}", valid=True,
                 variables={"task_id": t["id"],
@@ -5844,7 +5855,7 @@ def render_okrlink(ids, query):
         tpid = t.get("projectId") or t.get("_projectId") or ""
         mods = _picker_mods()
         return alfred.item(
-            uid=f"okrl-{t['id']}", title=pick_title(t),
+            uid=f"okrl-{t['id']}", title=pick_title(t, task_map=tmap),
             subtitle=f"{pick_where(t, tmap)}  |  ⏎🔗  ⌘⚡  ⌃🔙",
             arg=pay("task", tpid, t["id"]), valid=True,
             variables={"task_id": t["id"], "task_list_id": tpid, "list_id": tpid,
@@ -6633,7 +6644,7 @@ def render_completed(query):
 
         items.append(alfred.item(
             uid=f"done-{tid}",
-            title=f"{name} {priority_dot}{tag_str}",
+            title=f"{md_links_display(name)} {priority_dot}{tag_str}",   # display-only; name stays raw below
             subtitle=subtitle,
             arg=f"open:{link}",
             mods={
@@ -6689,7 +6700,7 @@ def render_wontdo(query):
 
         items.append(alfred.item(
             uid=f"wontdo-{tid}",
-            title=f"{name} {priority_dot}{tag_str}",
+            title=f"{md_links_display(name)} {priority_dot}{tag_str}",   # display-only; name stays raw below
             subtitle=subtitle,
             arg=f"open:{link}",
             mods={
@@ -6872,7 +6883,7 @@ def render_meal(ids, query):
         uid="meal-head",
         title=f"🥘 {meal.week_label(sunday)} · cook {sunday:%a %-d %b} · {planned}/3 planned",
         subtitle=f"groceries {meal.grocery_day(sunday, today):%a %-d %b} · "
-                 f"{routine.get('title') or '🥘 Meal Prep'}  |  ⌃🔙",
+                 f"{md_links_display(routine.get('title') or '🥘 Meal Prep')}  |  ⌃🔙",
         valid=False)]
     # the library ids behind the pointers, for the swap hops
     slot_tids = []

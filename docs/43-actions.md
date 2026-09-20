@@ -74,6 +74,7 @@ Notes never show Priority or Complete. Deleting a list is guarded: the `🗑️ 
 | ➕ Add nested tag | New child tag under this one - a dialog asks the name (top-level tags only; needs the [v2 token](30-setup.md)) |
 | 🎯 Send all to focus | Every open tagged task → the focus task's today block (only during a task-bound session) |
 | 🔗 Copy link | Copy the tag URL |
+| ✏️ Rename tag | A dialog asks the new name (the old one prefilled); every task that carries the tag follows, server-side. No spaces or `\ / " # : * ? < > \| ,`; a name already in use is refused, not merged (needs the [v2 token](30-setup.md)) |
 | 🗑️ Delete tag | Remove the tag everywhere - the tasks that carried it survive |
 | 🔙 Go back | Back to search |
 
@@ -94,6 +95,7 @@ Notes never show Priority or Complete. Deleting a list is guarded: the `🗑️ 
 | ✔️ Complete all | Complete all |
 | ⚡ Priority all… | Set priority on all |
 | 🎯 Add buffer to focus | All → the focus task's today block, then clears the buffer |
+| 🎯 Merge/Stage for Focus | THIS task's stage flow - the task menu's row, same screens ([Focus](46-focus.md)) |
 | 🗑️ Remove this | Drop the selected task from the buffer |
 | 🧹 Clear buffer | Empty the buffer (tasks untouched) |
 | 🗑️ Delete all | Typed confirm - autocompletes `delete all yes`, then ⏎; tasks move to TickTick's Trash |

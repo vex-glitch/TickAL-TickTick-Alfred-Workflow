@@ -22,6 +22,7 @@ except Exception as e:
 
 try:
     import alfred
+    from display import md_links_display
 except Exception as e:
     emit_error(f"Import failed: {e}")
     sys.exit(0)
@@ -31,6 +32,7 @@ def main():
     list_id    = os.environ.get("task_list_id", os.environ.get("list_id", ""))
     tid        = os.environ.get("task_id", "")
     task_title = os.environ.get("task_title", "task")
+    shown      = md_links_display(task_title)   # as SHOWN; new_name stays raw
     query      = sys.argv[1] if len(sys.argv) > 1 else ""
 
     if not list_id or not tid:
@@ -54,7 +56,7 @@ def main():
                                                 "task_id": tid}}}
         if not new_name:
             items = [alfred.item(
-                title=f"Rename: {task_title}",
+                title=f"Rename: {shown}",
                 subtitle="Type new name",
                 valid=False,
                 mods=back_mod,
@@ -62,7 +64,7 @@ def main():
         else:
             items = [alfred.item(
                 title=f"Rename to: {new_name}",
-                subtitle=f"Was: {task_title}  Confirm",
+                subtitle=f"Was: {shown}  Confirm",
                 arg=new_name,
                 mods=back_mod,
                 variables={"task_list_id": list_id, "task_id": tid},

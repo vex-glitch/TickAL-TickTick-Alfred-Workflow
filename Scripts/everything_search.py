@@ -72,7 +72,10 @@ def get_task_breadcrumb(task, task_by_id):
         parent = task_by_id.get(pid)
         if not parent:
             break
-        ancestor_titles.append(parent.get("title", "?"))
+        # Display-only '[name]🔗' - a CTA parent's title IS a markdown link
+        # and the raw "[TickAL • WF](ticktick:///…) 🔗" filled the subtitle
+        # (Vex 2026-09-20)
+        ancestor_titles.append(md_links_display(parent.get("title", "?")))
         current = parent
     col_name  = current.get("_columnName", "")
     list_name = task.get("_projectName", "")
@@ -614,8 +617,10 @@ def _person_search_row(t, today=None):
     link = f"ticktick:///webapp/#p/{areas.PEOPLE_ID}/tasks/{tid}"
     chip = pe.circle_chip(t.get("tags"))
     sub = f"{chip + '  ' if chip else ''}{pe.age_chip(content)}  |  ⏎⤵️ card  ⌘⚡  ⌃🔙"
+    # Display-only: a card renamed with a link shows its chip; task_title /
+    # search_name below stay raw (Vex 2026-09-20 link sweep).
     return alfred.item(
-        uid=f"pe-{tid}", title=title, subtitle=sub,
+        uid=f"pe-{tid}", title=md_links_display(title), subtitle=sub,
         arg=f"xact:crmbrowse:ctx:person:{tid}",
         mods={
             "shift":      {"valid": False, "subtitle": ""},
@@ -1285,7 +1290,10 @@ def main():
                 link = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"
 
                 items.append(alfred.item(
-                    title=build_title(t, buffered=tid in buffered_ids()),
+                    # task_by_id: a dateless subtask shows its parent's date
+                    # as ↑📆 (a CTA agenda item is scheduled on its block)
+                    title=build_title(t, buffered=tid in buffered_ids(),
+                                      task_map=task_by_id),
                     subtitle=build_subtitle(sub_count, "Task", breadcrumb=breadcrumb, actions=True,
                                             note=note_snippet(t.get("content"))
                                             if t.get("kind") != "NOTE" else ""),
@@ -1337,7 +1345,10 @@ def main():
                 ndisp    = md_links_display(ntitle)
                 nfolder  = n.get("_projectName", "")
                 ncontent = (n.get("content") or "").strip()
-                snippet  = (md_links_display(ncontent[:160]).replace("\n", " ")[:120]
+                # The whole body goes through the renderer BEFORE the cut - a
+                # link whose ")" sat past a pre-slice never matched and its raw
+                # head landed in the row title (Vex 2026-09-20, 'nc ' rows).
+                snippet  = (md_links_display(ncontent).replace("\n", " ")[:120]
                             if ncontent else "")
                 link     = f"ticktick:///webapp/#p/{npid}/tasks/{nid}"
 

@@ -44,6 +44,9 @@ try:
                            trigger as _reminder_trigger,
                            human   as _reminder_human)
     import clipboard as clip_util
+    # Vex 2026-09-20: raw md links in the add bar, previews and toasts.
+    # md_links_display is DISPLAY ONLY - variables and payloads stay raw.
+    from display import md_links_display, link_label, search_key
 except Exception as e:
     print(json.dumps({"items": [{"title": "Import error", "subtitle": str(e), "valid": False}]}))
     sys.exit(0)
@@ -56,6 +59,65 @@ PRIORITY_OPTIONS = [
 ]
 PRIORITY_VAL = {"1": 1, "2": 3, "3": 5}
 PRIORITY_LABEL = {1: "🟡", 3: "🟠", 5: "🔴"}
+
+
+def _norm_title(s):
+    # The ~p picker fills the LABEL of a link-titled task (2026-09-20), so the
+    # resolver must find it by that label too: links flattened, the CTA
+    # convention's trailing 🔗 dropped (link_label drops it on the fill side),
+    # whitespace folded, case dropped. The focus_picker._norm shape.
+    flat = re.sub(r"(?:\s*🔗)+\s*$", "", search_key(s or ""))
+    return " ".join(flat.split()).lower()
+
+
+def _label_unique(all_tasks_cache, label):
+    """True when exactly ONE open task answers to this normalized label -
+    the only case task_picker fills the label instead of the raw title.
+    Routine steps repeat labels across routines ("[Journal](…)" x3) and a
+    plain "Eagle" lives next to "[Eagle](kmtrigger://…)": a label fill
+    there would reparent into the wrong task and list (verifier census
+    2026-09-20: 116 of 2233 rows), so those keep the raw title."""
+    want = _norm_title(label)
+    if not want:
+        return False
+    n = 0
+    for t in all_tasks_cache:
+        if t.get("status", 0) == 0 and _norm_title(t.get("title", "")) == want:
+            n += 1
+            if n > 1:
+                return False
+    return n == 1
+
+
+def _resolve_parent(all_tasks_cache, parent_name, open_only):
+    # Raw exact FIRST (the bar carries the raw title unless the label is
+    # unique - task_picker), then the normalized label when exactly one
+    # task answers to it, then the substring pass (the typed-name road).
+    # Never the label first: "Eagle" would win over "[Eagle](kmtrigger…)"
+    # whichever was picked.
+    def ok(t):
+        return not open_only or t.get("status", 0) == 0
+    hit = next(
+        (t for t in all_tasks_cache
+         if t.get("title", "").lower() == parent_name.lower() and ok(t)),
+        None,
+    )
+    if hit:
+        return hit
+    want = _norm_title(parent_name)
+    if want:
+        hits = [t for t in all_tasks_cache
+                if ok(t) and _norm_title(t.get("title", "")) == want]
+        live = [t for t in hits if t.get("status", 0) == 0]
+        if len(live) == 1:
+            return live[0]
+        if len(hits) == 1:
+            return hits[0]
+    return next(
+        (t for t in all_tasks_cache
+         if parent_name.lower() in t.get("title", "").lower() and ok(t)),
+        None,
+    )
 
 # 🔥CRM - the bookings list. Adds targeting it auto-attach a clipboard image
 # (except 🔥prepare follow-ups) and scope the [[ task-link picker to CRM bookings.
@@ -635,10 +697,14 @@ def task_picker(fill, fragment):
         title = t.get("title", "Untitled")
         # The PLAIN title fills the bar (the ~p token is matched against real
         # titles); the row only DISPLAYS the house shape, so two same-named
-        # tasks in two lists are telling apart (Vex 2026-09-12).
-        filled = f"{fill}{title} "
+        # tasks in two lists are telling apart (Vex 2026-09-12). A link-titled
+        # task fills its LABEL (Vex 2026-09-20: the raw URL sat in the bar) -
+        # but only when that label names ONE open task; otherwise the raw
+        # title stays, because the URL is what tells the twins apart.
+        label = link_label(title)
+        filled = f"{fill}{label if label != title and _label_unique(all_tasks, label) else title} "
         items.append(alfred.item(
-            title=pick_title(t),
+            title=pick_title(t, task_map=task_map),
             subtitle=pick_where(t, task_map),
             arg="",
             valid=False,
@@ -681,7 +747,7 @@ def link_picker(prefix, fragment, scope_list_id=None):
         seen.add(tid)
         title = t.get("title", "Untitled")
         items.append(alfred.item(
-            title=pick_title(t),
+            title=pick_title(t, task_map=task_map),
             subtitle="🔗 " + pick_where(t, task_map),
             arg="", valid=False,
             # the [[ ]] form is resolved by name, and a link-titled task is
@@ -945,7 +1011,7 @@ def subtask_parent_items(fragment):
         variables.update({k: "" for k in _ST_BLANK})
         items.append(alfred.item(
             uid=f"st-{t['id']}",
-            title="🧬 " + pick_title(t),
+            title="🧬 " + pick_title(t, task_map=task_map),
             subtitle=pick_where(t, task_map) + "  |  ⏎ Add subtasks",
             arg=f"addunder:{pid}:{t['id']}", valid=True,
             variables=variables,
@@ -1441,7 +1507,8 @@ def _build_notif(title, list_display, env_list_id, env_section_id, env_task_id,
             t = task_map.get(pid)
             if not t:
                 break
-            parent_titles.insert(0, t.get("title", "?"))
+            # display only: the crumb is the toast, parentId rides the payload
+            parent_titles.insert(0, md_links_display(t.get("title", "?")))
             pid = t.get("parentId")
 
     depth = len(parent_titles)   # 0 = new top-level task, 1 = subtask, 2 = sub-subtask, …
@@ -1607,7 +1674,7 @@ def _append_rows(query, frag):
         spec = {"pid": pid, "tid": t["id"], "text": md_title}
         items.append(alfred.item(
             uid=f"uto-{t['id']}",
-            title="📄 " + pick_title(t),
+            title="📄 " + pick_title(t, task_map=task_map),
             subtitle=pick_where(t, task_map) + "  |  ⏎ onto its description",
             arg="xact:u_append:" + base64.b64encode(
                 json.dumps(spec).encode()).decode(),
@@ -1801,17 +1868,7 @@ def task_preview(query, link=False):
     parent_display = None
     if parent_name:
         all_tasks_cache = cache_store.get("all_tasks") or []
-        resolved = next(
-            (t for t in all_tasks_cache
-             if t.get("title", "").lower() == parent_name.lower()
-             and t.get("status", 0) == 0),
-            None,
-        ) or next(
-            (t for t in all_tasks_cache
-             if parent_name.lower() in t.get("title", "").lower()
-             and t.get("status", 0) == 0),
-            None,
-        )
+        resolved = _resolve_parent(all_tasks_cache, parent_name, open_only=True)
         if resolved:
             parent_id      = resolved["id"]
             parent_display = resolved.get("title", parent_name)
@@ -1874,7 +1931,8 @@ def task_preview(query, link=False):
     elif section_name:
         parts.append(f"§{section_name}?")
     if parent_display:
-        parts.append(f"↳{parent_display}")
+        # Vex 2026-09-20: raw link in the ↳ chip; parent_display stays raw
+        parts.append(f"↳{md_links_display(parent_display)}")
     elif parent_name:
         parts.append(f"↳{parent_name}?")
     if date_str or time_str:
@@ -2078,7 +2136,9 @@ def task_preview(query, link=False):
     # is already aimed into a parent (the ⌘ Actions "➕ Add task" road).
     if (kid_titles or sl.in_subtask_mode(query) or effective_parent_id
             or siblings_in_list):
-        _under = (parent_display or os.environ.get("task_title", "").strip()
+        # wrapped BEFORE the [:30] slice so the 🔗 chip survives truncation
+        _under = (md_links_display(parent_display
+                                   or os.environ.get("task_title", "").strip())
                   if effective_parent_id else disp_title)
         _where = (list_display or _list_display_name(env_list_id)
                   if siblings_in_list else "")
@@ -2171,15 +2231,7 @@ def note_preview(query):
     parent_display = None
     if parent_name:
         all_tasks_cache = cache_store.get("all_tasks") or []
-        resolved = next(
-            (t for t in all_tasks_cache
-             if t.get("title", "").lower() == parent_name.lower()),
-            None,
-        ) or next(
-            (t for t in all_tasks_cache
-             if parent_name.lower() in t.get("title", "").lower()),
-            None,
-        )
+        resolved = _resolve_parent(all_tasks_cache, parent_name, open_only=False)
         if resolved:
             parent_id      = resolved["id"]
             parent_display = resolved.get("title", parent_name)
@@ -2218,7 +2270,8 @@ def note_preview(query):
     elif section_name:
         parts.append(f"§{section_name}?")
     if parent_display:
-        parts.append(f"↳{parent_display}")
+        # Vex 2026-09-20: raw link in the ↳ chip; parent_display stays raw
+        parts.append(f"↳{md_links_display(parent_display)}")
     elif parent_name:
         parts.append(f"↳{parent_name}?")
     if date_str or time_str:
@@ -2281,7 +2334,7 @@ def note_preview(query):
     if section_display and not effective_parent_id:
         notif = f"Note {title} added to {section_display}\n{list_label} › {section_display} › {title}"
     elif effective_parent_id:
-        parent_label = parent_display or "note"
+        parent_label = md_links_display(parent_display) if parent_display else "note"
         notif = f"Sub-note {title} added\n{list_label} › {parent_label} › {title}"
     else:
         notif = f"Note {title} added to {list_label}"
