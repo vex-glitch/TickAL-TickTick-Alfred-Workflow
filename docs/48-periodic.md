@@ -124,6 +124,8 @@ The weekly, monthly and quarterly journals end by opening that screen aimed at t
 
 Goals mirror downward, read-only: the quarter's appear in each month, the month's in each week, the week's in each day. Setting them anywhere but their own note is not a thing - the mirror resets to a pointer the moment the parent's goal is cleared.
 
+A goal line you edit in the TickTick app comes back with its markdown escaped; every refresh heals the note's own goal lines, so a link never stays as literal brackets. A goal picked from a task is written with that task's real title, or refused with a toast when the title cannot be read - never as a link that only says "Task".
+
 ## Money - the roll-up pyramid
 
 Log from the `pn` bar (`tpn`, or `tse pn`): type `$ 485 tattoo` → the daily gains `- 485 · tattoo` and the day **Total** recomputes (the `tmo` keyword jumps straight to the `$`). The weekly's 📌 This Week section shows one line per day - `- Sat 11 Jul 2026 • 485` - with the total; monthly shows week sums; quarterly shows months; yearly shows quarters. Roll-ups always recompute from the daily notes, so a week straddling two months never double-counts.

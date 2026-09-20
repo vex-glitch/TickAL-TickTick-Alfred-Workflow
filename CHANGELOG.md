@@ -27,6 +27,13 @@ All notable user-visible changes to TickAL. Format follows
 
 ### Fixed
 
+- **Weekly 🏆 Goals showed a goal as literal brackets** when the app had
+  re-saved the note; a note's own goal lines heal on every refresh now.
+- **A goal that only said "Task"**: a task picked before the cache knew it
+  got the fallback label. The title is read live now, or the goal is refused
+  with a toast - never written blind.
+- **Deleting a list left its 📌CTA behind**; the list's open CTAs go to the
+  Trash with it (matched by the list link in the CTA, never by name).
 - Search and browse subtitles rendered a parent's markdown link raw
   (`🗒N - 📌 CTA>💼 P • [TickAL • WF](ticktick:///…) 🔗`); parent titles now
   render like titles, `[TickAL • WF]🔗`. The same sweep caught every other

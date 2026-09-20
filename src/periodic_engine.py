@@ -380,12 +380,65 @@ def _goal_append(doc, sec_name, line):
     sec = ps.find(doc, sec_name)
     if sec is None:
         return False
-    keep = [l for l in sec.body
+    keep = [pm.unescape_md(l) for l in sec.body
             if not pm.EMPTY_BOX_RE.match(l.strip())
             and not pm.PENDING_RE.match(pm.unescape_md(l.strip()))]
     if keep != list(sec.body):
         sec.body = keep
     return ps.append_body(doc, sec_name, [line])
+
+
+# the label make_line falls back to when no title was resolved - a goal
+# line wearing it says nothing (Vex 2026-09-20: "this link that only says
+# task"), so it is never WRITTEN any more and an existing one heals
+_FALLBACK_LABEL_RE = re.compile(
+    r"\[(?P<label>Task)\]\(https://ticktick\.com/webapp/#p/(?P<pid>\w+)"
+    r"/tasks/(?P<tid>\w+)\)")
+
+
+def _linked_title(pid, tid, given=None):
+    """The title a goal line shows for its task: the one handed in unless
+    it is the fallback, else the cache, else ONE live GET (a task picked
+    seconds after it was made is not in the hourly cache yet). '' when
+    nothing answers - the caller refuses rather than write "Task"."""
+    if given and given != "Task":
+        return given
+    t = cache_store.find_task(tid)
+    if t and t.get("title"):
+        return t["title"]
+    if pid and tid:
+        try:
+            live = _api().get_task(pid, tid)
+            if live and live.get("title"):
+                return live["title"]
+        except Exception:
+            pass
+    return ""
+
+
+def _heal_own_goals(doc, kind):
+    """Drop the app's backslash escapes from a tier's OWN goal lines and
+    relabel a "Task" link from its task. Runs on every refresh; the mirrors
+    one tier down already unescaped their COPIES (pm.unescape_md_lines), so
+    the source note was the only place the goal still rendered broken.
+    Returns changed?"""
+    sec = _goal_sec_of(doc, kind)
+    if sec is None:
+        return False
+    out = []
+    for ln in sec.body:
+        fixed = pm.unescape_md(ln)
+        m = _FALLBACK_LABEL_RE.search(fixed)
+        if m:
+            real = _linked_title(m.group("pid"), m.group("tid"))
+            if real:
+                fixed = (fixed[:m.start("label")] + mdtext.link_text(real)
+                         + fixed[m.end("label"):])
+        out.append(fixed)
+    if out == list(sec.body):
+        return False
+    sec.body = out
+    return True
 
 
 def _week_goal_home(doc):
@@ -905,6 +958,13 @@ def refresh_period(p, index=None, force=False):
                 prevb = doc.sections[i - 1].body if i else doc.lead
                 while prevb and not prevb[-1].strip():
                     prevb.pop()
+        # the note's OWN goal lines heal on every refresh (Vex 2026-09-20,
+        # on the weekly): the app backslash-escapes a link it re-saves, so
+        # the goal rendered as literal brackets in the note it lives in
+        # while every mirror of it read fine; and a task picked before the
+        # cache knew it wore the "Task" fallback label. Escapes drop, the
+        # label heals from the task itself, the text is never touched.
+        _heal_own_goals(doc, p.kind)
         if p.kind == "daily":
             _fill_daily(doc, p, index, p.start == today)
         elif p.kind == "weekly":
@@ -3083,6 +3143,10 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
     """
     if kind not in pm.GOAL_SECTION:
         return f"💫 {kind} has no goal section"
+    if tid:
+        title = _linked_title(pid, tid, title)
+        if not title:
+            return "🎯 Can't read that task's title · try again"
     line = pm.goal_line(text, pid, tid, title)
     if not line:
         return "🎯 Nothing to set"
@@ -3491,7 +3555,10 @@ def set_goal(pid_or_text, tid=None, title=None, week="current"):
     wtask, _ = ensure_note(wkp)
     wpid = wtask.get("projectId") or areas.PERIODIC_LIST_ID
     if tid:
-        line = pm.T1 + fb.make_line(pid_or_text, tid, title or "Task").raw
+        title = _linked_title(pid_or_text, tid, title)
+        if not title:
+            return "🎯 Can't read that task's title · try again"
+        line = pm.T1 + fb.make_line(pid_or_text, tid, title).raw
     else:
         line = f"{pm.T1}- [ ] {pid_or_text}"
 
