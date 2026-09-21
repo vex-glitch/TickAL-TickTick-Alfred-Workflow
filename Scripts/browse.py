@@ -4706,7 +4706,7 @@ def render_routines(query):
     # trampoline (a plain row cannot switch ctx on ⏎); ⌃ stays dead here.
     rows.append(alfred.item(
         uid="rt-meal-hub", title="🥘 Meal Prep hub",
-        subtitle="Plan the week · groceries · library  |  ⏎⤵️  ⌥⤵️",
+        subtitle="This week · the next 13 weeks · groceries · library  |  ⏎⤵️  ⌥⤵️",
         arg="xact:crmbrowse:ctx:meal", valid=True,
         variables={"task_id": "", "task_list_id": "", "task_title": "",
                    "item_type": ""},
@@ -6773,14 +6773,24 @@ def render_filter(index, query):
 # The OKR screens' row invariants, reused as they are: six chords stamped as
 # fresh dicts (_okr_seal), ⌘ dead on anything that is not a task, never an
 # xact arg on ⌘ or ⌥, ⏎ navigation through the BrowseCtx trampoline (iron
-# rule 8), ⌥ the same hop by variable. The hub's numbers come from the caches
-# and Mela's local snapshot (no network); the ONE network read is the routine
-# list on an EMPTY bar, reused for _MEAL_FRESH_S, so "This week" survives a
-# routine reset dropping all_tasks (the _okr_snapshot rule).
+# rule 8), ⌥ the same hop by variable. Since 2026-09-21 the PLAN is read off
+# Apple Calendar (Mela's "Add to Calendar", src/mela_cal.py) through
+# meal_write.plan_view - the screens never write (Vex: "I will be scheduling
+# in Mela, it is nicer"; "get rid of Plan the week / Schedule a meal"). The
+# ONE network read is the routine list on an EMPTY bar, reused for
+# _MEAL_FRESH_S, so the cook Sunday survives a routine reset dropping
+# all_tasks (the _okr_snapshot rule).
+#
+# THE MEAL ROW (hub this-week, ctx:mealw, ctx:meallib): ⏎ open:mela://recipe
+# (Vex: "open the link to Mela"), ⇧ open:<web> ("and a link to the web" -
+# the Browse SF's ⇧ edge is junction 581BB8A1 → Call-ET modComplete →
+# dispatch.py, whose first branch executes open: args; traced 2026-09-21),
+# ⌥⌘ copy:mela://recipe, ⌘ live only when the meal maps to a library task.
 _MEAL_FRESH_S = 45
 _MEAL_SLUG = {"b": "breakfast", "l": "lunch", "s": "snack"}
 _MEAL_KEY = {v: k for k, v in _MEAL_SLUG.items()}
 _MEAL_PLURAL = {"Breakfast": "Breakfasts", "Lunch": "Lunches", "Snack": "Snacks"}
+_MEAL_LEGEND = "⏎🍴 Mela  ⇧🌐 web  ⌥⌘🔗  ⌘⚡"
 
 
 def _meal_b64(d):
@@ -6854,12 +6864,105 @@ def _meal_routine(rid, live=False):
     return t, meal.pointers_of(tasks, rid), pid
 
 
+def _meal_plan(sunday, n_weeks, today=None):
+    """meal_write.plan_view anchored on a cook SUNDAY (the routine's, via
+    first_sunday), so its first week IS that week; never raises - a broken
+    read side is an error line for the status row."""
+    import meal_write as mw
+    try:
+        pv = mw.plan_view(today=today, n_weeks=n_weeks, first_sunday=sunday) or {}
+    except Exception as e:
+        pv = {"weeks": [], "first_sunday": sunday, "planned_count": 0, "error": str(e)}
+    pv.setdefault("weeks", [])
+    pv.setdefault("planned_count", 0)
+    pv.setdefault("error", "")
+    return pv
+
+
+def _meal_week(pv, sunday):
+    """The Week for this Sunday out of plan_view's rows, empty when absent."""
+    import meal
+    return next((w for w in pv.get("weeks") or [] if w.sunday == sunday),
+                meal.Week(sunday=sunday, meals=[]))
+
+
+def _meal_history(today):
+    """The calendar rows a library chip reads: a year back (cooked N weeks
+    ago) and the horizon ahead (next Sun …). [] when the store is
+    unreadable - the chip then says "never cooked", the hub's status row
+    says why."""
+    import meal_write as mw
+    import mela_cal
+    try:
+        return mela_cal.plan(since=today - timedelta(days=364),
+                             until=today + timedelta(days=7 * mw.HORIZON_WEEKS))
+    except Exception:
+        return []
+
+
+def _meal_recipes():
+    """{UUID: mela.Recipe} from the Mela snapshot (the web link lives on
+    the recipe, ZLINK); {} when Mela's DB is missing or unreadable."""
+    import mela
+    try:
+        return {(r.id or "").upper(): r for r in mela.library()}
+    except Exception:
+        return {}
+
+
+def _meal_row(uid, m, chip, when=None, lib_kids=None, lib_title=""):
+    """THE MEAL ROW. `m` = meal.Meal (slot, name, uuid, web, tid, pid).
+    `when` (a date) stamps ' · Sun 27 Sep' on a plan row; `lib_kids`
+    (a count, or None on plan rows) makes ⌥ the subtask drill of a library
+    row. ⌘ Actions is live ONLY with a library task behind the meal - the
+    row then carries the task variables; else _okr_seal blanks them."""
+    import meal
+    title = f"{m.glyph} {m.name}" + (f" · {when:%a %-d %b}" if when else "")
+    mods = _okr_dead_mods()
+    mods["alt+cmd"] = {"arg": f"copy:{m.url}", "valid": True, "subtitle": "Copy Mela link"}
+    if m.web:
+        mods["shift"] = {"arg": f"open:{m.web}", "valid": True, "subtitle": "🌐 Open the web page"}
+    else:
+        mods["shift"] = {"arg": "", "valid": False, "subtitle": "No web page"}
+    variables = None
+    if m.tid:
+        mods["cmd"] = {"arg": "", "valid": True, "subtitle": "⌘ Actions"}
+        variables = _meal_task_vars({"id": m.tid, "title": lib_title or meal.md_link(m.name, m.uuid)},
+                                    m.pid)
+    if lib_kids is not None:
+        mods["alt"] = {"arg": "", "valid": bool(lib_kids), "subtitle": "⤵️ Subtasks",
+                       "variables": {"browse_ctx": f"ctx:subtasks:{m.pid}:{m.tid}"}}
+    legend = _MEAL_LEGEND.replace("⌥⌘", "⌥⤵️  ⌥⌘") if lib_kids is not None else _MEAL_LEGEND
+    return alfred.item(uid=uid, title=title,
+                       subtitle=f"{chip}  |  {legend}" if chip else legend,
+                       arg=f"open:{m.url}", valid=True, variables=variables, mods=mods)
+
+
+def _meal_cook(sunday, today):
+    """'cooked Sun 20 Sep' once the cook day is past, 'cook Sun 27 Sep' ahead
+    (the hub shows THIS week, the one being eaten; next Sunday is a week row)."""
+    return ("cooked" if sunday < today else "cook") + f" {sunday:%a %-d %b}"
+
+
+def _meal_head(uid, week, sunday, today, routine=None, cache=False):
+    import meal
+    n = len(week.meals)
+    what = (f"{n} meal" + ("" if n == 1 else "s")) if n else "nothing planned in Mela"
+    title = f"🥘 {week.label} · {_meal_cook(sunday, today)} · {what}" + (" · cache" if cache else "")
+    # a past cook day has no shopping left to do
+    sub = (f"groceries {meal.grocery_day(sunday, today):%a %-d %b}" if sunday >= today
+           else "eating this week")
+    if routine is not None:
+        sub += f" · {md_links_display(routine.get('title') or '🥘 Meal Prep')}"
+    elif not n:
+        sub += " · Plan it in Mela: ⌘⌥A Add to Calendar"
+    return alfred.item(uid=uid, title=title, subtitle=sub + "  |  ⌃🔙", valid=False)
+
+
 def render_meal(ids, query):
-    """The hub root: this week's three meals (pointers on the Sunday
-    routine), plan / groceries / import / fill / library rows, a status
-    line. ⏎ on a planned meal opens the recipe in Mela (the cooking
-    action); ⇧ ticks it cooked; ⌥ swaps that one slot; ⌥⌘ copies the
-    task link, as everywhere."""
+    """The hub root: the cook week's meals (the routine's cook Sunday, read
+    off the calendar plan), 📆 the next 13 weeks, 🔄 the one sync verb,
+    🛒 groceries, the three 📚 libraries, a status line."""
     import meal
     import meal_write as mw
     from datetime import date as _date
@@ -6867,99 +6970,58 @@ def render_meal(ids, query):
     if not list_id or not rid:
         return _meal_off()
     today = _date.today()
-    routine, kids, rpid = _meal_routine(rid, live=not query)
-    sunday = meal.cook_sunday(routine, today)
+    routine, _kids, _rpid = _meal_routine(rid, live=not query)
+    sunday = meal.cook_week_of(today)     # THIS week, the one being eaten (Vex
+                                          # 2026-09-21: "this week's breakfast,
+                                          # lunch, snack"), never next Sunday's
+    next_cook = meal.cook_sunday(routine, today)   # the routine's: what 🔄 mirrors
     pool = _meal_pool(list_id)
     entries = meal.library_entries(pool, list_id)
-    by_uuid = {e["uuid"]: e for e in entries}
     by_slot = meal.entries_by_slot(entries)
-    ledger = meal.load_ledger(mw.LEDGER)
+    pv = _meal_plan(sunday, mw.HORIZON_WEEKS, today)
+    week = _meal_week(pv, sunday)
     try:
         counts = mw.hub_counts()
     except Exception as e:
         counts = {"new": 0, "missing": 0, "uncategorised": 0, "mela_error": str(e)}
-    planned = sum(1 for k in meal.SLOT_KEYS if k in kids)
-    rows = [alfred.item(
-        uid="meal-head",
-        title=f"🥘 {meal.week_label(sunday)} · cook {sunday:%a %-d %b} · {planned}/3 planned",
-        subtitle=f"groceries {meal.grocery_day(sunday, today):%a %-d %b} · "
-                 f"{md_links_display(routine.get('title') or '🥘 Meal Prep')}  |  ⌃🔙",
-        valid=False)]
-    # the library ids behind the pointers, for the swap hops
-    slot_tids = []
-    for key in meal.SLOT_KEYS:
-        u = meal.link_uuid((kids.get(key) or {}).get("title") or "")
-        slot_tids.append((by_uuid.get(u) or {}).get("tid", "") if u else "")
-    for idx, (key, tag, glyph, label) in enumerate(meal.SLOTS):
-        t = kids.get(key)
-        if t:
-            parsed = meal.parse_title(t.get("title") or "")
-            name, uuid = parsed if parsed else (t.get("title", ""), "")
-            link = _meal_link(rpid, t["id"])
-            swap = list(slot_tids)
-            swap[idx] = ""
-            before = meal.last_cooked(ledger, uuid, sunday - timedelta(days=1))
-            mods = _okr_dead_mods()
-            mods["cmd"] = {"arg": "", "valid": True, "subtitle": "⌘ Actions"}
-            mods["shift"] = {"arg": f"complete:{rpid}:{t['id']}:{t.get('title', '')}",
-                             "valid": True, "subtitle": "✅ Cooked"}
-            mods["alt"] = {"arg": "", "valid": True, "subtitle": "🔁 Swap",
-                           "variables": {"browse_ctx": meal.ctx_for(swap)}}
-            mods["alt+cmd"] = {"arg": f"copy:{link}", "valid": True, "subtitle": "Copy link"}
-            rows.append(alfred.item(
-                uid=f"meal-{key}", title=f"{glyph} {name}",
-                subtitle=f"{label} · last {meal.cooked_chip(before)}  |  ⏎🍴 Mela  ⇧✅  ⌥🔁  ⌥⌘🔗  ⌘⚡",
-                arg=f"open:mela://recipe/{uuid}" if uuid else f"open:{link}",
-                valid=True, variables=_meal_task_vars(t, rpid), mods=mods))
-        else:
-            ctx = meal.ctx_for(slot_tids)
-            rows.append(alfred.item(
-                uid=f"meal-{key}", title=f"{glyph} {label} · not planned",
-                subtitle=f"⏎ pick this week's {label.lower()}  |  ⌥⤵️",
-                arg=f"xact:crmbrowse:{ctx}", valid=True, mods=_okr_nav_mods(ctx)))
+    rows = [_meal_head("meal-head", week, sunday, today, routine=routine, cache=bool(pv["error"]))]
+    for m in week.meals:
+        rows.append(_meal_row(f"meal-{m.slot}-{m.uuid[:8]}", m,
+                              (meal.slot(m.slot) or meal.SLOT_X)[3], when=m.date))
+    n_plan = pv["planned_count"]
     rows.append(alfred.item(
-        uid="meal-plan", title="🎲 Plan the week",
-        subtitle=f"{len(by_slot['b'])} breakfasts · {len(by_slot['l'])} lunches · "
-                 f"{len(by_slot['s'])} snacks to pick from  |  ⏎⤵️  ⌥⤵️",
-        arg="xact:crmbrowse:ctx:mealplan", valid=True, mods=_okr_nav_mods("ctx:mealplan")))
+        uid="meal-next", title=f"📆 Next {mw.HORIZON_WEEKS} weeks",
+        subtitle=f"{n_plan} planned meal" + ("" if n_plan == 1 else "s")
+                 + " in the Mela calendar · by week  |  ⏎⤵️  ⌥⤵️",
+        arg="xact:crmbrowse:ctx:mealq", valid=True, mods=_okr_nav_mods("ctx:mealq")))
+    n_new, n_missing = counts.get("new", 0), counts.get("missing", 0)
+    sync_arg = f"xact:meal_sync:{_meal_b64(meal.sync_payload('ctx:meal'))}"
+    sm = _okr_dead_mods()
+    sm["alt+shift"] = {"arg": sync_arg, "valid": True, "subtitle": "🔄 Sync with Mela"}
+    rows.append(alfred.item(
+        uid="meal-sync",
+        title=f"🔄 Sync with Mela · {n_new} new · {n_missing} to fill",
+        subtitle=f"Recipes in, descriptions filled, Sun {next_cook:%-d %b}'s meals onto the routine + groceries + note",
+        arg=sync_arg, valid=True, mods=sm))
     groc = meal.groceries_of(pool, list_id)
-    gm = _okr_nav_mods("ctx:mealgroc")
-    gm["alt+shift"] = {"arg": f"xact:meal_groceries:{_meal_b64({'back': 'ctx:meal'})}",
-                       "valid": True, "subtitle": "🔁 Rebuild from Mela"}
     rows.append(alfred.item(
         uid="meal-groc",
         title=f"🛒 Groceries · {len(groc)} open list" + ("" if len(groc) == 1 else "s"),
-        subtitle="this week's shopping checklists  |  ⏎⤵️  ⌥⤵️  ⌥⇧🔁 rebuild",
-        arg="xact:crmbrowse:ctx:mealgroc", valid=True, mods=gm))
-    n_new, n_unc = counts.get("new", 0), counts.get("uncategorised", 0)
-    rows.append(alfred.item(
-        uid="meal-import", title=f"📥 Import from Mela · {n_new} new",
-        subtitle=((f"{n_new} categorised recipe" + ("" if n_new == 1 else "s")
-                   + " not in the library yet · ⏎ import now")
-                  if n_new else "Nothing new · the hourly sync imports on its own")
-                 + (f" · {n_unc} uncategorised in Mela" if n_unc else ""),
-        arg=f"xact:meal_import:{_meal_b64({'back': 'ctx:meal'})}",
-        valid=bool(n_new), mods=_okr_dead_mods()))
-    n_missing = counts.get("missing", 0)
-    rows.append(alfred.item(
-        uid="meal-fill", title=f"📝 Fill descriptions · {n_missing} missing",
-        subtitle=(f"⏎ fill from Mela now · about {max(1, round(min(n_missing, mw.CAP_FG) * mw.PACE_FG / 60))} min"
-                  if n_missing else "Every library entry carries its recipe"),
-        arg=f"xact:meal_fill:{_meal_b64({'back': 'ctx:meal'})}",
-        valid=bool(n_missing), mods=_okr_dead_mods()))
+        subtitle="this week's shopping checklists  |  ⏎⤵️  ⌥⤵️",
+        arg="xact:crmbrowse:ctx:mealgroc", valid=True, mods=_okr_nav_mods("ctx:mealgroc")))
     for key, tag, glyph, label in meal.SLOTS:
         ctx = f"ctx:meallib:{_MEAL_SLUG[key]}"
         rows.append(alfred.item(
             uid=f"meal-lib-{key}", title=f"📚 {glyph} {_MEAL_PLURAL.get(label, label + 's')} · {len(by_slot[key])}",
             subtitle=f"the {tag} library  |  ⏎⤵️  ⌥⤵️",
             arg=f"xact:crmbrowse:{ctx}", valid=True, mods=_okr_nav_mods(ctx)))
-    if counts.get("mela_error"):
+    if pv["error"]:
+        st = pv["error"]
+    elif counts.get("mela_error"):
         st = f"Mela: {counts['mela_error']}"
     else:
-        age = counts.get("mela_age_s")
-        st = f"Mela data {_meal_age(age)} old"
-        if age is not None and age > 6 * 3600:
-            st += " · open Mela to sync the phone's recipes"
+        st = (f"Mela data {_meal_age(counts.get('mela_age_s'))} old · calendar {n_plan} planned meal"
+              + ("" if n_plan == 1 else "s"))
     rows.append(alfred.item(uid="meal-status", title=f"ℹ️ {st}",
                             subtitle=f"{len(entries)} recipes in the library  |  ⌃🔙",
                             valid=False))
@@ -6969,13 +7031,11 @@ def render_meal(ids, query):
     return add_back(_okr_seal(rows), "ctx:folders")
 
 
-def render_mealplan(ids, query):
-    """The picker chain: breakfast → lunch → snack, the picks riding in the
-    ctx (ctx:mealplan[:<b>[:<l>[:<s>]]], '-' = pick this one next), then
-    the summary with ✅ Commit. Rows are library tasks (⌘ Actions works);
-    ⏎ carries the pick through the trampoline, ⌥ the same hop by variable,
-    ⌥⌘ opens the recipe in Mela. 🎲 Surprise picks among what has not been
-    cooked in meal.SURPRISE_WEEKS."""
+def render_mealq(ids, query):
+    """The quarter: one row per cook week for HORIZON_WEEKS from the
+    routine's cook Sunday (Vex: "all the next meals for a quarter, by
+    week"). This week starred; an empty week is a dead row that says
+    where to plan it. ⏎ / ⌥ open that week (ctx:mealw:<sunday>)."""
     import meal
     import meal_write as mw
     from datetime import date as _date
@@ -6983,106 +7043,71 @@ def render_mealplan(ids, query):
     if not list_id or not rid:
         return _meal_off("ctx:meal")
     today = _date.today()
-    slots = meal.slots_from_ids(ids)
-    i = meal.next_slot(slots)
-    pool = _meal_pool(list_id)
-    entries = meal.library_entries(pool, list_id)
-    by_tid = {e["tid"]: e for e in entries}
-    by_slot = meal.entries_by_slot(entries)
-    ledger = meal.load_ledger(mw.LEDGER)
-    routine, _kids, _rpid = _meal_routine(rid, live=False)
-    sunday = meal.cook_sunday(routine, today)
+    sunday = meal.cook_week_of(today)     # this week first, starred
+    pv = _meal_plan(sunday, mw.HORIZON_WEEKS, today)
+    weeks = list(pv["weeks"])
+    if not weeks:
+        weeks = [meal.Week(sunday=sunday + timedelta(days=7 * i), meals=[])
+                 for i in range(mw.HORIZON_WEEKS)]
     rows = []
-    if i is None:
-        rows.append(alfred.item(
-            uid="mp-head",
-            title=f"🥘 {meal.week_label(sunday)} · cook {sunday:%a %-d %b}",
-            subtitle="✅ commit, or ⏎ a meal to change it  |  ⌃🔙", valid=False))
-        complete = True
-        for idx, (key, tag, glyph, label) in enumerate(meal.SLOTS):
-            e = by_tid.get(slots[idx])
-            other = list(slots)
-            other[idx] = ""
-            ctx = meal.ctx_for(other)
-            mods = _okr_nav_mods(ctx)
-            if e:
-                mods["cmd"] = {"arg": "", "valid": True, "subtitle": "⌘ Actions"}
-                mods["alt+cmd"] = {"arg": f"open:mela://recipe/{e['uuid']}", "valid": True,
-                                   "subtitle": "🍴 Open in Mela"}
-                chip = meal.cooked_chip(meal.last_cooked(ledger, e["uuid"], today))
-                rows.append(alfred.item(
-                    uid=f"mp-{key}", title=f"{glyph} {e['name']}",
-                    subtitle=f"{label} · {chip}  |  ⏎ change  ⌥⤵️  ⌥⌘🍴  ⌘⚡",
-                    arg=f"xact:crmbrowse:{ctx}", valid=True,
-                    variables=_meal_task_vars({"id": e["tid"], "title": e["title"]}, e["pid"]),
-                    mods=mods))
-            else:
-                complete = False
-                rows.append(alfred.item(
-                    uid=f"mp-{key}", title=f"{glyph} {label} · not in the library",
-                    subtitle="sync, or ⏎ to pick again  |  ⌥⤵️",
-                    arg=f"xact:crmbrowse:{ctx}", valid=True, mods=mods))
-        pay = meal.commit_payload(slots, sunday, back="ctx:meal")
-        rows.append(alfred.item(
-            uid="mp-commit", title="✅ Commit the plan",
-            subtitle=("3 meals on the Sunday routine · 3 grocery checklists · the weekly note"
-                      if complete else "a pick is not in the library · sync first"),
-            arg=f"xact:meal_commit:{_meal_b64(pay)}", valid=complete, mods=_okr_dead_mods()))
-        back = "ctx:meal"
-    else:
-        key, tag, glyph, label = meal.SLOTS[i]
-        cands = meal.sort_for_pick(by_slot[key], ledger, today)
-        if query:
-            cands = fuzz.filter_and_score(query, cands, key_fn=lambda e: e["name"])
-        so_far = " · ".join(f"{g} {by_tid[s]['name'][:18]}" for (k, t_, g, l_), s in zip(meal.SLOTS, slots)
-                            if s and s in by_tid)
-        rows.append(alfred.item(
-            uid="mp-head", title=f"{glyph} Pick this week's {label.lower()} · {i + 1}/3",
-            subtitle=(so_far or "least recently cooked first · type to search") + "  |  ⌃🔙",
-            valid=False))
-        if not query and cands:
-            pick = meal.surprise(cands, ledger, today)
-            s2 = list(slots)
-            s2[i] = pick["tid"]
-            ctx = meal.ctx_for(s2)
+    for w in weeks:
+        star = "⭐️ " if w.sunday == sunday else ""
+        ctx = f"ctx:mealw:{w.sunday.isoformat()}"
+        names = " · ".join(f"{m.glyph} {m.name}" for m in w.meals)
+        if w.meals:
             rows.append(alfred.item(
-                uid="mp-surprise", title=f"🎲 Surprise me · {pick['name']}",
-                subtitle=f"random among {label.lower()}s not cooked in {meal.SURPRISE_WEEKS} weeks  |  ⏎ take it  ⌥⤵️",
+                uid=f"mq-{w.sunday.isoformat()}", title=f"{star}{w.label} · {names}",
+                subtitle=f"{_meal_cook(w.sunday, today)} · {len(w.meals)} meal"
+                         + ("" if len(w.meals) == 1 else "s") + "  |  ⏎⤵️  ⌥⤵️",
                 arg=f"xact:crmbrowse:{ctx}", valid=True, mods=_okr_nav_mods(ctx)))
-        for e in cands:
-            s2 = list(slots)
-            s2[i] = e["tid"]
-            ctx = meal.ctx_for(s2)
-            mods = _okr_nav_mods(ctx)
-            mods["cmd"] = {"arg": "", "valid": True, "subtitle": "⌘ Actions"}
-            mods["alt+cmd"] = {"arg": f"open:mela://recipe/{e['uuid']}", "valid": True,
-                               "subtitle": "🍴 Open in Mela"}
-            chip = meal.cooked_chip(meal.last_cooked(ledger, e["uuid"], today))
-            rows.append(alfred.item(
-                uid=f"mp-{e['tid']}", title=f"{glyph} {e['name']}",
-                subtitle=f"{chip}  |  ⏎ pick  ⌥⤵️  ⌥⌘🍴  ⌘⚡",
-                arg=f"xact:crmbrowse:{ctx}", valid=True,
-                variables=_meal_task_vars({"id": e["tid"], "title": e["title"]}, e["pid"]),
-                mods=mods))
-        if not cands:
-            rows.append(alfred.item(uid="mp-none",
-                                    title=f"No {label.lower()} matches" if query
-                                    else f"No {tag} recipes in the library yet",
-                                    subtitle="tag a recipe in Mela, or 📥 import  |  ⌃🔙",
-                                    valid=False))
-        if i == 0:
-            back = "ctx:meal"
         else:
-            prev = list(slots)
-            prev[i - 1] = ""
-            back = meal.ctx_for(prev)
-    return add_back(_okr_seal(rows), back)
+            rows.append(alfred.item(
+                uid=f"mq-{w.sunday.isoformat()}", title=f"{star}{w.label} · nothing planned",
+                subtitle=f"{_meal_cook(w.sunday, today)} · Plan it in Mela: ⌘⌥A Add to Calendar",
+                valid=False, mods=_okr_nav_mods(ctx)))
+    if pv["error"]:
+        rows.insert(0, alfred.item(uid="mq-err", title=f"ℹ️ {pv['error']}",
+                                   subtitle="the weeks below come from the cache  |  ⌃🔙",
+                                   valid=False))
+    if query:
+        rows = [r for r in rows if fuzz.score(query, r["title"]) > 0] or \
+               [alfred.item(uid="mq-none", title=f'No week matching "{query}"', valid=False)]
+    return add_back(_okr_seal(rows), "ctx:meal")
+
+
+def render_mealw(ids, query):
+    """One cook week (ctx:mealw:<YYYY-MM-DD of its Sunday>): the head line
+    and that week's MEAL ROWS."""
+    import meal
+    from datetime import date as _date
+    list_id = cfg.get_meal_list_id()
+    if not list_id:
+        return _meal_off("ctx:mealq")
+    try:
+        sunday = meal.cook_week_of(_date.fromisoformat((ids[0] or "").strip()))
+    except (ValueError, IndexError, TypeError):
+        return _missing("mealw", "<YYYY-MM-DD sunday>")
+    today = _date.today()
+    pv = _meal_plan(sunday, 1, today)
+    week = _meal_week(pv, sunday)
+    rows = [_meal_head("mw-head", week, sunday, today, cache=bool(pv["error"]))]
+    meals = week.meals
+    if query:
+        meals = fuzz.filter_and_score(query, meals, key_fn=lambda m: m.name)
+    for m in meals:
+        rows.append(_meal_row(f"mw-{m.slot}-{m.uuid[:8]}", m,
+                              (meal.slot(m.slot) or meal.SLOT_X)[3], when=m.date))
+    if query and not meals:
+        rows.append(alfred.item(uid="mw-none", title="No meal matches", valid=False))
+    return add_back(_okr_seal(rows), "ctx:mealq")
 
 
 def render_meallib(ids, query):
-    """One tag's library: ⏎ opens the recipe in Mela, ⌥ drills open
-    subtasks, ⌥⌘ copies the task link, ⌘ Actions."""
+    """One tag's library, never-cooked first: MEAL ROWS with the cooked chip
+    read off the calendar plan ('never cooked' / 'cooked 2 weeks ago' /
+    'next Sun 4 Oct'); ⌥ drills open subtasks."""
     import meal
+    from datetime import date as _date
     list_id = cfg.get_meal_list_id()
     if not list_id:
         return _meal_off("ctx:meal")
@@ -7090,9 +7115,12 @@ def render_meallib(ids, query):
     if key is None:
         return _missing("meallib", "<breakfast|lunch|snack>")
     _k, tag, glyph, label = meal.slot(key)
+    today = _date.today()
     pool = _meal_pool(list_id)
-    entries = sorted((e for e in meal.library_entries(pool, list_id) if e["slot"] == key),
-                     key=lambda e: e["name"].lower())
+    planned = _meal_history(today)
+    recipes = _meal_recipes()
+    entries = meal.sort_for_lib([e for e in meal.library_entries(pool, list_id) if e["slot"] == key],
+                                planned, today)
     kids = {}
     for t in cache_store.get("all_tasks") or []:
         if t.get("parentId") and t.get("status", 0) == 0:
@@ -7100,22 +7128,15 @@ def render_meallib(ids, query):
     if query:
         entries = fuzz.filter_and_score(query, entries, key_fn=lambda e: e["name"])
     rows = [alfred.item(uid="ml-head", title=f"📚 {glyph} {_MEAL_PLURAL.get(label, label + 's')} · {len(entries)}",
-                        subtitle=f"{tag} · ⏎ opens the recipe in Mela  |  ⌃🔙", valid=False)]
+                        subtitle=f"{tag} · never cooked first · ⏎ opens the recipe in Mela  |  ⌃🔙", valid=False)]
     for e in entries:
-        link = _meal_link(e["pid"], e["tid"])
-        mods = _okr_dead_mods()
-        mods["cmd"] = {"arg": "", "valid": True, "subtitle": "⌘ Actions"}
-        mods["alt+cmd"] = {"arg": f"copy:{link}", "valid": True, "subtitle": "Copy link"}
-        n = kids.get(e["tid"], 0)
-        mods["alt"] = {"arg": "", "valid": bool(n), "subtitle": "⤵️ Subtasks",
-                       "variables": {"browse_ctx": f"ctx:subtasks:{e['pid']}:{e['tid']}"}}
-        has_body = "recipe in the description" if e.get("content") else "no description yet"
-        rows.append(alfred.item(
-            uid=f"ml-{e['tid']}", title=f"{glyph} {e['name']}",
-            subtitle=f"{has_body}  |  ⏎🍴 Mela  ⌥⤵️  ⌥⌘🔗  ⌘⚡",
-            arg=f"open:mela://recipe/{e['uuid']}", valid=True,
-            variables=_meal_task_vars({"id": e["tid"], "title": e["title"]}, e["pid"]),
-            mods=mods))
+        r = recipes.get(e["uuid"])
+        m = meal.Meal(slot=key, name=e["name"], uuid=e["uuid"], date=today,
+                      web=(getattr(r, "link", "") or "").strip(), tid=e["tid"], pid=e["pid"])
+        chip = meal.lib_chip(planned, e["uuid"], today)
+        chip += " · " + ("recipe in the description" if e.get("content") else "no description yet")
+        rows.append(_meal_row(f"ml-{e['tid']}", m, chip, lib_kids=kids.get(e["tid"], 0),
+                              lib_title=e["title"]))
     if not entries:
         rows.append(alfred.item(uid="ml-none", title="No recipe matches" if query
                                 else f"No {tag} recipes yet", valid=False))
@@ -7158,7 +7179,7 @@ def render_mealgroc(query):
             arg=f"open:{link}", valid=True, variables=_meal_task_vars(t, pid), mods=mods))
     if not groc:
         rows.append(alfred.item(uid="mg-none", title="No grocery lists open",
-                                subtitle="🎲 Plan the week to make them  |  ⌃🔙", valid=False))
+                                subtitle="🔄 Sync with Mela to make them  |  ⌃🔙", valid=False))
     return add_back(_okr_seal(rows), "ctx:meal")
 
 
@@ -7238,8 +7259,11 @@ def main():
         elif level == "meal":
             items = render_meal(ids, query)
 
-        elif level == "mealplan":
-            items = render_mealplan(ids, query)
+        elif level == "mealq":
+            items = render_mealq(ids, query)
+
+        elif level == "mealw":
+            items = render_mealw(ids, query) if ids else _missing(level, "<YYYY-MM-DD sunday>")
 
         elif level == "meallib":
             items = render_meallib(ids, query) if ids else _missing(level, "<breakfast|lunch|snack>")

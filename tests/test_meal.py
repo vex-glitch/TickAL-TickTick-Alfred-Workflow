@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Unit suite for src/meal.py (the 🥘 model) and src/meal_notes.py (the
-weekly note's bullet). Pure: no network, no cache, a temp dir for the
-ledger. Run: python3 tests/test_meal.py
+weekly note's bullet). Pure: no network, no cache, no Calendar store and
+no Mela DB - the plan rows are tiny duck-typed objects (date/uuid/title,
+the mela_cal.Planned shape) and the recipes duck-type mela.Recipe
+(id/title/link/categories). Run: python3 tests/test_meal.py
 """
 import os
 import sys
 import tempfile
-from datetime import date
+from datetime import date, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
@@ -30,7 +32,15 @@ def check(name, cond, detail=""):
 U1 = "A84938FE-88F9-467C-9D01-745D92E75EE1"
 U2 = "62946285-B1C4-4A50-BB17-6CA9B1417EA3"
 U3 = "7EB6A2B6-0C98-4B8A-B10F-86E0C3CCA3D3"
+U4 = "F3F9B0BC-E4FD-4CE0-A463-608A5603C218"
+U5 = "0B2B9C6E-4C2A-4D6E-9B0A-1C2D3E4F5A6B"
 LIST, RLIST, RID = "5eed00000000000000000a01", "5eed00000000000000000b01", "5eed00000000000000000b02"
+
+# ── the picker era is gone ───────────────────────────────────────────────────
+for gone in ("ledger_add", "ledger_week", "surprise", "surprise_pool", "SURPRISE_WEEKS",
+             "sort_for_pick", "slots_from_ids", "ctx_for", "next_slot", "commit_payload",
+             "outcome_text"):
+    check(f"removed: {gone}", not hasattr(meal, gone))
 
 # ── title grammar ─────────────────────────────────────────────────────────────
 check("parse_title: plain", meal.parse_title(f"[Beef Bulgogi](mela://recipe/{U1.lower()})") == ("Beef Bulgogi", U1))
@@ -46,8 +56,19 @@ check("is_pointer", meal.is_pointer(ptr) and meal.is_pointer(f"🌮 [X](mela://r
 check("is_pointer: library entry is not one", not meal.is_pointer(f"[Oats](mela://recipe/{U2})"))
 check("is_pointer: grocery is not one", not meal.is_pointer(meal.grocery_title("Oats", U2)))
 check("pointer_slot", meal.pointer_slot(ptr) == "b" and meal.pointer_slot(f"🌮 [X](mela://recipe/{U3})") == "s")
+# slot "x" = 🍽️: a planned recipe outside the three Mela categories
+xptr = meal.pointer_title("x", "Cake", U4)
+check("pointer_title: x → 🍽️", xptr == f"🍽️ [Cake](mela://recipe/{U4})", xptr)
+check("pointer_title: unknown key falls to 🍽️", meal.pointer_title("zz", "Cake", U4) == xptr)
+check("is_pointer: 🍽️ with VS16", meal.is_pointer(xptr))
+check("is_pointer: 🍽 without VS16 (the app drops it)", meal.is_pointer(xptr.replace("\ufe0f", "")))
+check("pointer_slot: x both ways", meal.pointer_slot(xptr) == "x" and meal.pointer_slot(xptr.replace("\ufe0f", "")) == "x")
+check("slot(): x known, SLOTS untouched", meal.slot("x") == meal.SLOT_X and meal.slot("q") is None
+      and meal.SLOT_KEYS == ("b", "l", "s") and meal.ALL_SLOT_KEYS == ("b", "l", "s", "x"))
+check("GLYPH", meal.GLYPH == {"b": "🍳", "l": "🍛", "s": "🌮", "x": "🍽️"})
 check("grocery_title / is_grocery", meal.is_grocery(meal.grocery_title("Oats", U2)) and not meal.is_grocery(ptr))
-check("is_library_title", meal.is_library_title(f"[Oats](mela://recipe/{U2})") and not meal.is_library_title(ptr))
+check("is_library_title", meal.is_library_title(f"[Oats](mela://recipe/{U2})") and not meal.is_library_title(ptr)
+      and not meal.is_library_title(xptr))
 check("slot_of_tags", meal.slot_of_tags(["🍛lunch", "asian"]) == "l" and meal.slot_of_tags(["🍳BREAKFAST"]) == "b"
       and meal.slot_of_tags(["🛒groceries"]) is None and meal.slot_of_tags(None) is None)
 check("slot_of_tags: SLOTS order wins", meal.slot_of_tags(["🌮snack", "🍳breakfast"]) == "b")
@@ -75,6 +96,8 @@ TASKS = [
     T("p3", meal.pointer_title("s", "Ghost", U3), pid=RLIST, parent=RID, repeatTaskId="arch"),
     T("p4", "1. Combine everything", pid=RLIST, parent=RID),
     T("p5", meal.pointer_title("s", "Other list", U3), pid=LIST, parent=RID),
+    T("p6", meal.pointer_title("x", "Cake", U4), pid=RLIST, parent=RID),
+    T("p7", meal.pointer_title("b", "Second breakfast", U5), pid=RLIST, parent=RID),
     T("r0", "🥘 Meal Prep", pid=RLIST, startDate="2026-09-27T17:00:00.000+0000"),
 ]
 ents = meal.library_entries(TASKS, LIST)
@@ -84,8 +107,10 @@ check("library_entries: untagged has no slot", ents[3]["slot"] is None)
 by = meal.entries_by_slot(ents)
 check("entries_by_slot", [e["tid"] for e in by["b"]] == ["t1"] and [e["tid"] for e in by["s"]] == ["t3"])
 kids = meal.pointers_of(TASKS, RID)
-check("pointers_of: by slot, archived + strangers skipped", sorted(kids) == ["b", "l", "s"]
-      and kids["b"]["id"] == "p1" and kids["s"]["id"] == "p5", sorted(kids))
+check("pointers_of: by slot incl. x, archived + strangers skipped", sorted(kids) == ["b", "b:p7", "l", "s", "x"]
+      and kids["b"]["id"] == "p1" and kids["s"]["id"] == "p5" and kids["x"]["id"] == "p6", sorted(kids))
+check("pointers_of: a twin slot rides under key:tid, so .values() is every pointer",
+      kids["b:p7"]["id"] == "p7" and sorted(t["id"] for t in kids.values()) == ["p1", "p2", "p5", "p6", "p7"])
 check("pointers_of: archived occurrence never counts", all(k["id"] != "p3" for k in kids.values()))
 groc = meal.groceries_of(TASKS, LIST)
 check("groceries_of", set(groc) == {U2, "22222222-2222-2222-2222-222222222222"} and groc[U2]["id"] == "g1")
@@ -93,6 +118,13 @@ check("groceries_of", set(groc) == {U2, "22222222-2222-2222-2222-222222222222"} 
 # ── week arithmetic ──────────────────────────────────────────────────────────
 sat, sun, mon = date(2026, 9, 19), date(2026, 9, 20), date(2026, 9, 21)
 check("next_sunday", meal.next_sunday(sat) == sun and meal.next_sunday(sun) == sun and meal.next_sunday(mon) == date(2026, 9, 27))
+# cook_week_of over all seven weekdays: Sun 20 Sep .. Sat 26 Sep → 20 Sep, Sun 27 → 27
+week = [meal.cook_week_of(sun + timedelta(days=i)) for i in range(8)]
+check("cook_week_of: Sun..Sat fold to that Sunday", week[:7] == [sun] * 7, week)
+check("cook_week_of: the next Sunday is its own", week[7] == date(2026, 9, 27))
+check("cook_week_of: a Monday folds back a day", meal.cook_week_of(mon) == sun and meal.cook_week_of(sat) == date(2026, 9, 13))
+check("cook_week_of: matches the given formula", all(meal.cook_week_of(d) == d - timedelta(days=(d.weekday() + 1) % 7)
+                                                     for d in (sun + timedelta(days=i) for i in range(-10, 30))))
 check("cook_sunday: the routine's occurrence when it is a Sunday ahead",
       meal.cook_sunday({"startDate": "2026-09-27T17:00:00.000+0000"}, sat) == date(2026, 9, 27))
 check("cook_sunday: a stale (past) occurrence → next Sunday",
@@ -105,52 +137,118 @@ check("grocery_day: the Saturday before, or today", meal.grocery_day(sun, sat) =
 check("note_day + week_label", meal.note_day(sun) == mon and meal.week_label(sun) == "Week of 21 Sep")
 check("api_day", meal.api_day(sun) == "2026-09-20")
 
-# ── the ledger ────────────────────────────────────────────────────────────────
-tmp = tempfile.mkdtemp(prefix="tickal-meal-")
-path = os.path.join(tmp, "sub", "meal_ledger.json")
-led = meal.load_ledger(path)
-check("load_ledger: missing reads empty", led == {"weeks": []})
-picks = {"b": {"tid": "t1", "uuid": U2, "name": "Oats"}, "l": {"tid": "t2", "uuid": U1, "name": "Bulgogi"}}
-meal.ledger_add(led, date(2026, 9, 6), picks, pointers=["p1"], groceries=["g1"])
-meal.ledger_add(led, date(2026, 9, 13), {"s": {"tid": "t3", "uuid": U3, "name": "Pockets"}})
-meal.ledger_add(led, date(2026, 9, 13), {"s": {"tid": "t3", "uuid": U3, "name": "Pockets v2"}})
-check("ledger_add: one entry per Sunday, latest wins", len(led["weeks"]) == 2 and led["weeks"][1]["s"]["name"] == "Pockets v2")
-check("ledger_add: missing slots are blank", led["weeks"][1]["b"] == {"tid": "", "uuid": "", "name": ""})
-meal.save_ledger(path, led)
-check("save/load round trip (dirs made)", meal.load_ledger(path) == led)
-with open(path, "w") as f:
-    f.write("{not json")
-check("corrupt ledger reads empty", meal.load_ledger(path) == {"weeks": []})
-check("last_cooked: weeks ago", meal.last_cooked(led, U2, sat) == 1 and meal.last_cooked(led, U3, sat) == 0)
-check("last_cooked: case-insensitive, never", meal.last_cooked(led, U2.lower(), sat) == 1 and meal.last_cooked(led, "zz", sat) is None)
-check("last_cooked: a future week does not count", meal.last_cooked(led, U3, date(2026, 9, 12)) is None)
+
+# ── slot_for_recipe (duck-typed mela.Recipe) ─────────────────────────────────
+class R:
+    def __init__(self, id, title, categories=(), link=""):
+        self.id, self.title, self.categories, self.link = id, title, list(categories), link
+
+
+check("slot_for_recipe: breakfast", meal.slot_for_recipe(R(U2, "Oats", ["02 • Breakfast"])) == "b")
+check("slot_for_recipe: meal → lunch", meal.slot_for_recipe(R(U1, "Bulgogi", ["01 • Meal", "Asian"])) == "l")
+check("slot_for_recipe: snack", meal.slot_for_recipe(R(U3, "Pockets", ["03 • Snack"])) == "s")
+check("slot_for_recipe: none of the three → x", meal.slot_for_recipe(R(U4, "Cake", ["Dessert"])) == "x"
+      and meal.slot_for_recipe(R(U4, "Cake", [])) == "x")
+check("slot_for_recipe: None recipe → x", meal.slot_for_recipe(None) == "x")
+check("slot_for_recipe: the NN • prefix is optional", meal.slot_for_recipe(R(U2, "Oats", ["breakfast"])) == "b")
+check("slot_for_recipe: a custom tag map", meal.slot_for_recipe(R(U4, "Cake", ["Sweets"]), {"Sweets": "🌮snack"}) == "s")
+check("slot_for_recipe: an unknown tag in the map → x", meal.slot_for_recipe(R(U4, "Cake", ["Sweets"]), {"Sweets": "🍰cake"}) == "x")
+
+
+# ── the plan, folded into weeks ──────────────────────────────────────────────
+class P:
+    """A mela_cal.Planned-like row: date, uuid, title."""
+    def __init__(self, d, uuid, title=""):
+        self.date, self.uuid, self.title = d, uuid, title
+
+
+S27, S04, S11 = date(2026, 9, 27), date(2026, 10, 4), date(2026, 10, 11)
+RECIPES = {
+    U2: R(U2, "Oats", ["02 • Breakfast"], link="https://example.com/oats"),
+    U1: R(U1, "Beef Bulgogi", ["01 • Meal"]),
+    U3: R(U3, "Pockets", ["03 • Snack"], link="https://example.com/pockets"),
+    U4: R(U4, "Cake", ["Dessert"]),
+}
+PLANNED = [
+    P(S27, U3, "Pockets"),                       # snack first in the list, sorted last of the three
+    P(S27, U2.lower(), "Oats"),                   # lowercase uuid in the calendar url
+    P(S27, U1, "Beef Bulgogi"),
+    P(S27 + timedelta(days=3), U4, "Cake"),       # a Wednesday: still the 27 Sep cook week
+    P(S27, U4, "Cake"),                           # Add to Calendar fired twice: one meal
+    P(S11, U5, "Mystery Pie"),                    # Mela no longer knows this uuid
+    P(S11, U2, "Oats"),
+    P(date(2026, 9, 13), U1, "Beef Bulgogi"),     # the past: cooked history
+    P(date(2026, 9, 6), U2, "Oats"),
+]
+weeks = meal.weeks_plan(PLANNED, RECIPES, None, ents, S27, 3)
+check("weeks_plan: every week present, in order", [w.sunday for w in weeks] == [S27, S04, S11])
+check("weeks_plan: Week.label", weeks[0].label == "Week of 28 Sep")
+w0 = weeks[0].meals
+check("weeks_plan: b, l, s, x order", [m.slot for m in w0] == ["b", "l", "s", "x"], [m.slot for m in w0])
+check("weeks_plan: names from the recipe", [m.name for m in w0] == ["Oats", "Beef Bulgogi", "Pockets", "Cake"])
+check("weeks_plan: uuid upper-cased", w0[0].uuid == U2)
+check("weeks_plan: a Wednesday folds to the Sunday before, twice-planned = one meal, earliest date kept",
+      len(w0) == 4 and w0[3].date == S27)
+check("weeks_plan: web from the recipe link, '' when none", w0[0].web == "https://example.com/oats" and w0[1].web == "")
+check("weeks_plan: tid/pid resolve through the library entries", w0[0].tid == "t1" and w0[0].pid == LIST
+      and w0[3].tid == "" and w0[3].pid == "")
+check("weeks_plan: an empty week is present and empty", weeks[1].meals == [])
+w2 = weeks[2].meals
+check("weeks_plan: an unknown recipe = a 🍽️ meal named after the event, no web",
+      [(m.slot, m.name) for m in w2] == [("b", "Oats"), ("x", "Mystery Pie")] and w2[1].web == "" and w2[1].uuid == U5)
+check("Meal.glyph / Meal.url", w0[0].glyph == "🍳" and w2[1].glyph == "🍽️" and w0[0].url == f"mela://recipe/{U2}")
+check("weeks_plan: first_sunday given as a weekday folds back", meal.weeks_plan(PLANNED, RECIPES, None, ents, S27 + timedelta(days=2), 1)[0].sunday == S27)
+check("weeks_plan: n_weeks 0 → [], no planned → empty weeks",
+      meal.weeks_plan(PLANNED, RECIPES, None, ents, S27, 0) == []
+      and [w.meals for w in meal.weeks_plan([], RECIPES, None, ents, S27, 2)] == [[], []])
+check("weeks_plan: a row without uuid is skipped", meal.weeks_plan([P(S27, "", "Blank")], RECIPES, None, [], S27, 1)[0].meals == [])
+check("weeks_plan: same slot twice keeps both, by date then name",
+      [m.name for m in meal.weeks_plan([P(S27, U2, "Oats"), P(S27, U5, "Bagels")],
+                                        {U2: RECIPES[U2], U5: R(U5, "Bagels", ["02 • Breakfast"])}, None, [], S27, 1)[0].meals]
+      == ["Bagels", "Oats"])
+check("weeks_plan: a custom tag map decides the slot",
+      meal.weeks_plan([P(S27, U4, "Cake")], RECIPES, {"Dessert": "🌮snack"}, [], S27, 1)[0].meals[0].slot == "s")
+wm = meal.week_meals(PLANNED, RECIPES, None, ents, S27)
+check("week_meals: the one week", isinstance(wm, meal.Week) and wm.sunday == S27 and [m.name for m in wm.meals] == [m.name for m in w0])
+check("week_meals: an empty week", meal.week_meals(PLANNED, RECIPES, None, ents, S04).meals == [])
+
+# ── cooked history off the calendar ──────────────────────────────────────────
+today = date(2026, 9, 28)      # Monday after the 27 Sep cooking
+check("last_cooked: 0 = this cook week", meal.last_cooked(PLANNED, U2, today) == 0 and meal.last_cooked(PLANNED, U4, today) == 0)
+check("last_cooked: whole cook-weeks (13 Sep vs the 20 Sep cook week = 1)", meal.last_cooked(PLANNED, U1, date(2026, 9, 21)) == 1
+      and meal.last_cooked(PLANNED, U2, date(2026, 9, 21)) == 2)
+check("last_cooked: the future never counts", meal.last_cooked(PLANNED, U5, today) is None
+      and meal.last_cooked(PLANNED, U2, date(2026, 9, 5)) is None)
+check("last_cooked: the cook Sunday itself is 0, the Saturday before still counts the old week",
+      meal.last_cooked(PLANNED, U2, S27) == 0 and meal.last_cooked(PLANNED, U2, date(2026, 9, 26)) == 2)
+check("last_cooked: never / blank / lowercase", meal.last_cooked(PLANNED, "zz", today) is None
+      and meal.last_cooked(PLANNED, "", today) is None and meal.last_cooked(PLANNED, U1.lower(), date(2026, 9, 21)) == 1
+      and meal.last_cooked([], U1, today) is None)
+check("next_planned: the first day after today", meal.next_planned(PLANNED, U2, today) == S11
+      and meal.next_planned(PLANNED, U2, date(2026, 9, 20)) == S27)
+check("next_planned: the day itself is not next", meal.next_planned(PLANNED, U1, S27) is None)
+check("next_planned: none / blank", meal.next_planned(PLANNED, U3, today) is None and meal.next_planned(PLANNED, "", today) is None)
 check("cooked_chip", meal.cooked_chip(None) == "never cooked" and meal.cooked_chip(0) == "cooked this week"
       and meal.cooked_chip(1) == "cooked last week" and meal.cooked_chip(3) == "cooked 3 weeks ago")
+check("lib_chip", meal.lib_chip(PLANNED, U2, today) == "cooked this week · next Sun 11 Oct"
+      and meal.lib_chip(PLANNED, U3, today) == "cooked this week" and meal.lib_chip(PLANNED, "zz", today) == "never cooked")
 pool = [{"tid": "a", "uuid": U2, "name": "Oats"}, {"tid": "b", "uuid": "N1", "name": "Zebra"},
-        {"tid": "c", "uuid": U3, "name": "Pockets"}, {"tid": "d", "uuid": "N2", "name": "Apple"}]
-order = [e["tid"] for e in meal.sort_for_pick(pool, led, sat)]
-check("sort_for_pick: never first (by name), then oldest", order == ["d", "b", "a", "c"], order)
-sp = [e["tid"] for e in meal.surprise_pool(pool, led, sat)]
-check("surprise_pool: not cooked in 4 weeks", sp == ["b", "d"], sp)
-check("surprise_pool: falls back to everything", len(meal.surprise_pool(pool[:1], led, sat)) == 1)
-check("surprise: from the pool", meal.surprise(pool, led, sat)["tid"] in ("b", "d"))
-check("surprise: empty", meal.surprise([], led, sat) is None)
+        {"tid": "c", "uuid": U1, "name": "Bulgogi"}, {"tid": "d", "uuid": "N2", "name": "Apple"}]
+order = [e["tid"] for e in meal.sort_for_lib(pool, PLANNED, date(2026, 9, 21))]
+check("sort_for_lib: never first (by name), then least recently cooked", order == ["d", "b", "a", "c"], order)
 
-# ── the picker chain's ctx ────────────────────────────────────────────────────
-check("slots_from_ids", meal.slots_from_ids(["-", "x"]) == ["", "x", ""] and meal.slots_from_ids(None) == ["", "", ""]
-      and meal.slots_from_ids(["a", "b", "c", "d"]) == ["a", "b", "c"])
-check("ctx_for: trailing empties dropped, interior ride as -",
-      meal.ctx_for(["", "", ""]) == "ctx:mealplan" and meal.ctx_for(["", "l", ""]) == "ctx:mealplan:-:l"
-      and meal.ctx_for(["b", "l", "s"]) == "ctx:mealplan:b:l:s" and meal.ctx_for(["b"]) == "ctx:mealplan:b")
-rt = meal.slots_from_ids(meal.ctx_for(["", "l", ""]).split(":")[2:])
-check("ctx round trip", rt == ["", "l", ""], rt)
-check("next_slot", meal.next_slot(["", "l", ""]) == 0 and meal.next_slot(["b", "", ""]) == 1 and meal.next_slot(["b", "l", "s"]) is None)
-pay = meal.commit_payload(["b", "l", "s"], sun)
-check("commit_payload", pay == {"b": "b", "l": "l", "s": "s", "sunday": "2026-09-20", "back": "ctx:meal"})
-check("outcome_text", meal.outcome_text(sun, 3, 3) == "🥘 Week of 21 Sep planned · 3 meals · 3 grocery lists"
-      and meal.outcome_text(sun, 3, 2, False).endswith("· note not written"))
+# ── the sync verb ────────────────────────────────────────────────────────────
+check("sync_payload", meal.sync_payload() == {"back": "ctx:meal"} and meal.sync_payload("ctx:mealq") == {"back": "ctx:mealq"})
+txt = meal.sync_text(S27, [w0[0]], 2, 2, 3)
+check("sync_text: the contract line", txt == "🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Oats · 2 grocery lists", txt)
+check("sync_text: a count, singular", meal.sync_text(S27, 1, 1, 1, 0) == "🔄 Mela · +1 recipe · Week of 28 Sep: 1 meal · 1 grocery list")
+check("sync_text: nothing new, nothing planned", meal.sync_text(S27, 0, 0, 0, 0)
+      == "🔄 Mela · nothing new · Week of 28 Sep: nothing planned in Mela · 0 grocery lists")
+check("sync_text: (slot, name) pairs", "🍳 Oats · 🍽️ Cake" in meal.sync_text(S27, [("b", "Oats"), ("x", "Cake")], 2, 0, 0))
+check("sync_text: note not written", meal.sync_text(S27, 3, 3, 0, 0, note_ok=False).endswith(" · note not written"))
 
 # ── meal_notes over the shipped weekly template ───────────────────────────────
+picks = {"b": {"tid": "t1", "uuid": U2, "name": "Oats"}, "l": {"tid": "t2", "uuid": U1, "name": "Bulgogi"}}
 TPL = open(os.path.join(ROOT, "src", "periodic_templates", "weekly.md"), encoding="utf-8").read()
 doc = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
 check("template carries the bullet under 💿 Data", ps.find(doc, pm.SEC_MEALPREP, within=pm.SEC_WK_DATA) is not None)

@@ -146,13 +146,6 @@ def get_meal_tag_map():
     return m if isinstance(m, dict) and m else None
 
 
-def get_meal_wake_mela():
-    """True = the hourly sync may launch Mela in the background (open -gj)
-    when its database is stale, so iCloud brings the phone's recipes over.
-    Off by default: launching an app every hour is a choice, not a default."""
-    return bool(load().get("meal_wake_mela", False))
-
-
 def get_weekly_review_id():
     """♻️ Weekly-review source: the list/task id the weekly note
     mirrors. Same env-present-wins semantics as periodic_list_id."""

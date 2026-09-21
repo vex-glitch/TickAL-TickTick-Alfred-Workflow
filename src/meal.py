@@ -1,28 +1,36 @@
 #!/usr/bin/env python3
-"""meal.py - the 🥘 Meal Prep model (PURE: stdlib only; the ledger helpers
-take a path and are the only I/O).
+"""meal.py - the 🥘 Meal Prep model (PURE: stdlib only, no I/O).
 
-Vex cooks THREE meals every Sunday evening for the week ahead - one
-breakfast, one lunch, one snack, seven portions each - and keeps the recipe
-library in Mela. In TickTick the library is the 🍳Meal Prep list: one task
-per recipe, title `[Name](mela://recipe/<UUID>)`, tagged 🍳breakfast /
-🍛lunch / 🌮snack. The plan for a week is three POINTER tasks minted under
-the repeating 🥘 Meal Prep routine (`🍳 [Name](mela://…)` …) and three
-🛒 grocery checklists in the library list; the library entries themselves
-never move (HANDOFF_MEAL.md). This module holds the grammar of those titles,
-the slot logic, the week arithmetic and the cooked-history ledger; nothing
-here talks to TickTick or Mela.
+Vex cooks on SUNDAY for the week ahead - a breakfast, a lunch, a snack,
+seven portions each - and keeps the recipe library in Mela. Since
+2026-09-21 the PLAN lives in Mela too (Vex: "I will be scheduling in Mela,
+it is nicer"): Mela's "Add to Calendar" puts an event on the cook Sunday
+whose url ends in the recipe UUID, and TickAL only MIRRORS that plan (the
+calendar reader is src/mela_cal.py; this module turns its rows into weeks).
+In TickTick the library is the 🍳Meal Prep list: one task per recipe,
+title `[Name](mela://recipe/<UUID>)`, tagged 🍳breakfast / 🍛lunch /
+🌮snack. The mirrored week is a POINTER task per meal under the repeating
+🥘 Meal Prep routine (`🍳 [Name](mela://…)`, 🍽️ for a recipe outside the
+three slots) plus a 🛒 grocery checklist per meal in the library list; the
+library entries themselves never move (HANDOFF_MEAL.md). This module holds
+the grammar of those titles, the slot logic, the week arithmetic and the
+plan-to-weeks fold; nothing here talks to TickTick, Mela or the calendar.
 
 The Mela UUID is the join key everywhere: Mela kept Crouton's ids on import,
-the TickTick titles carry them, and `mela://recipe/<UUID>` opens the recipe
-on the Mac (verified 2026-09-19). Titles saved by the TickTick app may be
-backslash-escaped, so every reader goes through `parse_title`.
+the TickTick titles carry them, the calendar url carries them, and
+`mela://recipe/<UUID>` opens the recipe on the Mac (verified 2026-09-19).
+Titles saved by the TickTick app may be backslash-escaped, so every reader
+goes through `parse_title`.
+
+"Cooked" history is READ OFF THE CALENDAR PLAN (a past planned Sunday =
+cooked): the cooked-history ledger of the picker era is gone with the
+picker ("get rid of Plan the week / Schedule a meal").
 """
 import json
 import os
-import random
 import re
-from datetime import date, datetime, timedelta, timezone
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 
 try:
     import periodic_model as _pm
@@ -39,6 +47,11 @@ except Exception:                       # pure fallback, same effect
             text = out
         return text
 
+try:
+    import mela as _mela
+except Exception:                       # standalone: the mapping is small
+    _mela = None
+
 PORTIONS = 7
 GROCERY_TAG = "🛒groceries"
 GROCERY_GLYPH = "🛒"
@@ -47,14 +60,23 @@ SLOTS = (("b", "🍳breakfast", "🍳", "Breakfast"),
          ("l", "🍛lunch", "🍛", "Lunch"),
          ("s", "🌮snack", "🌮", "Snack"))
 SLOT_KEYS = tuple(s[0] for s in SLOTS)
+# a planned recipe in none of the three Mela categories: shown, never
+# dropped, no TickTick tag of its own
+SLOT_X = ("x", "", "🍽️", "Other")
+ALL_SLOTS = SLOTS + (SLOT_X,)
+ALL_SLOT_KEYS = tuple(s[0] for s in ALL_SLOTS)
+GLYPH = {s[0]: s[2] for s in ALL_SLOTS}
+_SLOT_RANK = {k: i for i, k in enumerate(ALL_SLOT_KEYS)}
 # Weekly notes minted before this day never had the 🥘 bullet: a missing
 # bullet there is seeded once, a missing bullet later is Vex's deletion.
 NOTE_SINCE = date(2026, 9, 20)
-SURPRISE_WEEKS = 4                      # 🎲 avoids anything cooked this recently
 
 LINK_RE = re.compile(r"mela://recipe/([0-9A-Fa-f-]{36})")
 _TITLE_RE = re.compile(r"\[(?P<name>[^\]]*)\]\(mela://recipe/(?P<id>[0-9A-Fa-f-]{36})\)")
-_GLYPHS = {s[2]: s[0] for s in SLOTS}
+# glyph -> key, with the 🍽️ pointer read both with and without its VS16
+# (TickTick's app has been seen dropping the variation selector)
+_GLYPHS = {s[2]: s[0] for s in ALL_SLOTS}
+_GLYPHS[SLOT_X[2].replace("\ufe0f", "")] = SLOT_X[0]
 
 
 # ── title grammar ────────────────────────────────────────────────────────────
@@ -83,8 +105,9 @@ def md_link(name, uuid):
 
 
 def slot(key):
-    """The SLOTS tuple for a key ('b' | 'l' | 's'), else None."""
-    return next((s for s in SLOTS if s[0] == key), None)
+    """The SLOTS tuple for a key ('b' | 'l' | 's', and 'x' for 🍽️), else
+    None."""
+    return next((s for s in ALL_SLOTS if s[0] == key), None)
 
 
 def slot_of_tags(tags):
@@ -98,12 +121,13 @@ def slot_of_tags(tags):
 
 
 def pointer_title(key, name, uuid):
-    s = slot(key)
+    s = slot(key) or SLOT_X
     return f"{s[2]} {md_link(name, uuid)}"
 
 
 def is_pointer(title):
-    """A pointer WE minted: a slot glyph, a space, then the Mela link."""
+    """A pointer WE minted: a slot glyph (🍳 🍛 🌮 🍽️), a space, then the
+    Mela link."""
     t = unescape(title or "").strip()
     return any(t.startswith(g + " [") for g in _GLYPHS) and bool(LINK_RE.search(t))
 
@@ -167,7 +191,10 @@ def entries_by_slot(entries):
 
 def pointers_of(tasks, routine_id):
     """The open pointer children of the routine among `tasks`, keyed by
-    slot ({key: task}). Archived occurrences (repeatTaskId) never count."""
+    slot ({key: task}); a SECOND pointer of an already-taken slot (the
+    calendar can plan two breakfasts in a week) rides under "<key>:<tid>",
+    so `.values()` is EVERY pointer and a delete-all never leaves a stale
+    twin. Archived occurrences (repeatTaskId) never count."""
     out = {}
     for t in tasks or []:
         if not isinstance(t, dict) or t.get("status", 0) != 0:
@@ -177,8 +204,12 @@ def pointers_of(tasks, routine_id):
         if not is_pointer(t.get("title") or ""):
             continue
         k = pointer_slot(t.get("title"))
-        if k and k not in out:
+        if not k:
+            continue
+        if k not in out:
             out[k] = t
+        else:
+            out[f"{k}:{t.get('id') or len(out)}"] = t
     return out
 
 
@@ -217,6 +248,13 @@ def next_sunday(today):
     return today + timedelta(days=(6 - today.weekday()) % 7)
 
 
+def cook_week_of(d):
+    """The Sunday on or before d: the cook day of the week d is eaten in
+    (Vex puts a meal on the Sunday it is cooked; a meal dropped on a
+    Wednesday still belongs to the Sunday before it)."""
+    return d - timedelta(days=(d.weekday() + 1) % 7)
+
+
 def cook_sunday(routine_task, today):
     """The Sunday the plan is FOR: the routine's live occurrence date when
     it is a Sunday on or after today (a repeating task rolls forward on
@@ -250,69 +288,150 @@ def api_day(d):
     return d.isoformat()
 
 
-# ── the ledger (cooked history) ──────────────────────────────────────────────
-def load_ledger(path):
-    """{"weeks": [...]} - missing or corrupt reads as empty."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, dict) and isinstance(data.get("weeks"), list):
-            return data
-    except (OSError, ValueError):
-        pass
-    return {"weeks": []}
+# ── the plan, folded into weeks ──────────────────────────────────────────────
+@dataclass
+class Meal:
+    slot: str                   # "b" | "l" | "s" | "x"
+    name: str
+    uuid: str                   # UPPERCASE recipe id
+    date: date                  # the planned (calendar) day
+    web: str = ""               # the recipe's own web page (Mela ZLINK), or ""
+    tid: str = ""               # the library task carrying this uuid, else ""
+    pid: str = ""
+
+    @property
+    def glyph(self):
+        return GLYPH.get(self.slot, SLOT_X[2])
+
+    @property
+    def url(self):
+        return f"mela://recipe/{self.uuid}"
 
 
-def save_ledger(path, data):
-    """Atomic, 0600, like config.save - never a half-written history."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, path)
+@dataclass
+class Week:
+    sunday: date                # the cook Sunday
+    meals: list = field(default_factory=list)
+
+    @property
+    def label(self):
+        return week_label(self.sunday)
 
 
-def ledger_add(data, sunday, picks, pointers=(), groceries=(), when=None):
-    """Record a committed week (replacing an earlier entry for the same
-    Sunday: a re-plan is the plan). picks = {key: {tid, uuid, name}}."""
-    stamp = (when or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%S+0000")
-    entry = {"sunday": sunday.isoformat(), "at": stamp,
-             "pointers": list(pointers), "groceries": list(groceries)}
-    for k in SLOT_KEYS:
-        p = picks.get(k) or {}
-        entry[k] = {"tid": p.get("tid", ""), "uuid": p.get("uuid", ""),
-                    "name": p.get("name", "")}
-    weeks = [w for w in data.get("weeks", []) if w.get("sunday") != entry["sunday"]]
-    weeks.append(entry)
-    weeks.sort(key=lambda w: w.get("sunday", ""))
-    data["weeks"] = weeks
-    return entry
+def _fallback_tag_for(recipe, tag_map):
+    """mela.meal_tag_for's rule when mela is not importable: exact key, or
+    both stripped of a leading 'NN • ' and casefolded."""
+    def plain(c):
+        return re.sub(r"^\d+\s*[•·-]\s*", "", (c or "").strip()).casefold()
+    tag_map = tag_map or {"02 • Breakfast": "🍳breakfast", "01 • Meal": "🍛lunch",
+                          "03 • Snack": "🌮snack"}
+    cats = list(getattr(recipe, "categories", None) or [])
+    for key, tag in tag_map.items():
+        if any(c == key or plain(c) == plain(key) for c in cats):
+            return tag
+    return None
 
 
-def ledger_week(data, sunday):
-    iso = sunday.isoformat()
-    return next((w for w in data.get("weeks", []) if w.get("sunday") == iso), None)
+def slot_for_recipe(recipe, tag_map=None):
+    """"b" | "l" | "s" from the recipe's Mela category through the tag map
+    (mela.meal_tag_for), "x" when it sits in none of the three - the slot
+    comes from the RECIPE, never from the event's time of day."""
+    if recipe is None:
+        return SLOT_X[0]
+    if _mela is not None:
+        tag = _mela.meal_tag_for(recipe, tag_map)
+    else:
+        tag = _fallback_tag_for(recipe, tag_map)
+    want = (tag or "").lower()
+    return next((s[0] for s in SLOTS if s[1].lower() == want), SLOT_X[0])
 
 
-def last_cooked(data, uuid, today):
-    """Whole weeks since this recipe was last planned for a Sunday on or
-    before today (0 = this week's), None = never."""
-    if not uuid:
+def _uuid_of(p):
+    return (getattr(p, "uuid", None) or "").strip().upper()
+
+
+def _meal_sort_key(m):
+    return (_SLOT_RANK.get(m.slot, len(_SLOT_RANK)), m.date, (m.name or "").casefold())
+
+
+def _meal_from(p, by_id, tag_map, by_uuid):
+    u = _uuid_of(p)
+    r = (by_id or {}).get(u)
+    e = (by_uuid or {}).get(u) or {}
+    if r is not None:
+        name = (getattr(r, "title", "") or getattr(p, "title", "") or "").strip()
+        return Meal(slot=slot_for_recipe(r, tag_map), name=name or "Recipe", uuid=u,
+                    date=p.date, web=(getattr(r, "link", "") or "").strip(),
+                    tid=e.get("tid") or "", pid=e.get("pid") or "")
+    # a planned uuid Mela no longer knows: still a meal, named after the
+    # event, in the 🍽️ slot - never dropped
+    return Meal(slot=SLOT_X[0], name=(getattr(p, "title", "") or "").strip() or "Recipe",
+                uuid=u, date=p.date, web="", tid=e.get("tid") or "", pid=e.get("pid") or "")
+
+
+def weeks_plan(planned, by_id, tag_map, entries, first_sunday, n_weeks):
+    """[Week] for n_weeks cook Sundays from first_sunday, EVERY week present
+    even when empty. `planned` = mela_cal.Planned-like rows (date, uuid,
+    title); `by_id` = {UUID: mela.Recipe}; `entries` = library_entries()
+    output, so tid/pid resolve to the library task. A meal belongs to the
+    week of cook_week_of(its date); one row per recipe per week (Mela's
+    Add to Calendar fired twice is still one meal, the earliest date
+    kept); meals ordered b, l, s, x, then date, then name."""
+    first_sunday = cook_week_of(first_sunday)
+    n_weeks = max(0, int(n_weeks or 0))
+    by_uuid = {}
+    for e in entries or []:
+        u = (e.get("uuid") or "").upper()
+        if u and u not in by_uuid:
+            by_uuid[u] = e
+    buckets = {}
+    for p in sorted(planned or [], key=lambda p: (p.date, getattr(p, "title", "") or "")):
+        u = _uuid_of(p)
+        if not u:
+            continue
+        sun = cook_week_of(p.date)
+        seen = buckets.setdefault(sun, {})
+        if u not in seen:
+            seen[u] = _meal_from(p, by_id, tag_map, by_uuid)
+    out = []
+    for i in range(n_weeks):
+        sun = first_sunday + timedelta(days=7 * i)
+        meals = sorted(buckets.get(sun, {}).values(), key=_meal_sort_key)
+        out.append(Week(sunday=sun, meals=meals))
+    return out
+
+
+def week_meals(planned, by_id, tag_map, entries, sunday):
+    """The one Week cooked on `sunday` (see weeks_plan)."""
+    return weeks_plan(planned, by_id, tag_map, entries, sunday, 1)[0]
+
+
+def last_cooked(planned, uuid, today):
+    """Whole cook-weeks since this recipe was last planned on or before
+    today (0 = this week's cooking, i.e. the same cook Sunday as today),
+    None = never. A planned Sunday in the past IS the cooked history."""
+    u = (uuid or "").strip().upper()
+    if not u:
         return None
-    u = uuid.upper()
     best = None
-    for w in data.get("weeks", []):
-        try:
-            sun = date.fromisoformat(w.get("sunday", ""))
-        except (ValueError, TypeError):
+    for p in planned or []:
+        if _uuid_of(p) != u or p.date > today:
             continue
-        if sun > today:
-            continue
-        if any((w.get(k) or {}).get("uuid", "").upper() == u for k in SLOT_KEYS):
-            if best is None or sun > best:
-                best = sun
-    return None if best is None else (today - best).days // 7
+        if best is None or p.date > best:
+            best = p.date
+    if best is None:
+        return None
+    return (cook_week_of(today) - cook_week_of(best)).days // 7
+
+
+def next_planned(planned, uuid, today):
+    """The first day this recipe is planned AFTER today, else None (the
+    day itself counts as last_cooked's "this week")."""
+    u = (uuid or "").strip().upper()
+    if not u:
+        return None
+    days = [p.date for p in planned or [] if _uuid_of(p) == u and p.date > today]
+    return min(days) if days else None
 
 
 def cooked_chip(weeks):
@@ -325,56 +444,55 @@ def cooked_chip(weeks):
     return f"cooked {weeks} weeks ago"
 
 
-def sort_for_pick(entries, data, today):
-    """Least recently cooked first (never first), then by name."""
+def lib_chip(planned, uuid, today):
+    """The library row's chip: 'never cooked' / 'cooked 2 weeks ago', with
+    ' · next Sun 4 Oct' when the calendar has it coming."""
+    chip = cooked_chip(last_cooked(planned, uuid, today))
+    nxt = next_planned(planned, uuid, today)
+    return chip + (f" · next {nxt:%a %-d %b}" if nxt else "")
+
+
+def sort_for_lib(entries, planned, today):
+    """Library order: never cooked first, then least recently cooked, then
+    by name."""
     def key(e):
-        w = last_cooked(data, e.get("uuid"), today)
-        return (0 if w is None else 1, -(w or 0), e.get("name", "").lower())
+        w = last_cooked(planned, e.get("uuid"), today)
+        return (0 if w is None else 1, -(w or 0), (e.get("name") or "").lower())
     return sorted(entries, key=key)
 
 
-def surprise_pool(entries, data, today, weeks=SURPRISE_WEEKS):
-    pool = [e for e in entries
-            if (lambda w: w is None or w >= weeks)(last_cooked(data, e.get("uuid"), today))]
-    return pool or list(entries)
+# ── the sync verb ────────────────────────────────────────────────────────────
+def sync_payload(back="ctx:meal"):
+    """The b64-able spec behind xact:meal_sync."""
+    return {"back": back}
 
 
-def surprise(entries, data, today, weeks=SURPRISE_WEEKS, rng=None):
-    pool = surprise_pool(entries, data, today, weeks)
-    if not pool:
-        return None
-    return (rng or random).choice(pool)
-
-
-# ── the picker chain's ctx ───────────────────────────────────────────────────
-def slots_from_ids(ids):
-    """['b tid' | '', 'l tid' | '', 's tid' | ''] from a ctx's ids; '-' and
-    missing both mean 'not picked yet'."""
-    ids = list(ids or [])[:3]
-    ids += [""] * (3 - len(ids))
-    return [("" if i in ("", "-") else i) for i in ids]
-
-
-def ctx_for(slots):
-    """The mealplan ctx that carries these picks: trailing empties are
-    dropped, interior ones ride as '-' so positions hold."""
-    parts = [s or "-" for s in list(slots)[:3]]
-    while parts and parts[-1] == "-":
-        parts.pop()
-    return "ctx:mealplan" + ("".join(":" + p for p in parts) if parts else "")
-
-
-def next_slot(slots):
-    """Index of the first unpicked slot, None when all three are picked."""
-    return next((i for i, s in enumerate(slots) if not s), None)
-
-
-def commit_payload(slots, sunday=None, back="ctx:meal"):
-    b, l, s = (list(slots) + ["", "", ""])[:3]
-    return {"b": b, "l": l, "s": s, "sunday": sunday.isoformat() if sunday else None,
-            "back": back}
-
-
-def outcome_text(sunday, n_meals, n_groceries, note_ok=True):
-    txt = f"🥘 {week_label(sunday)} planned · {n_meals} meals · {n_groceries} grocery lists"
+def sync_text(sunday, n_meals, n_groceries, imported, filled, note_ok=True):
+    """The toast: '🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Hot
+    Pockets · 2 grocery lists'. `n_meals` is a count OR the week's meals
+    (Meal objects, (slot, name) pairs or plain names) - names read better
+    than a number when the writer has them."""
+    parts = ["🔄 Mela"]
+    if imported:
+        parts.append(f"+{imported} recipe{'s' if imported != 1 else ''}")
+    if filled:
+        parts.append(f"{filled} filled")
+    if not imported and not filled:
+        parts.append("nothing new")
+    if isinstance(n_meals, int):
+        what = (f"{n_meals} meal{'s' if n_meals != 1 else ''}" if n_meals
+                else "nothing planned in Mela")
+    else:
+        names = []
+        for m in n_meals or []:
+            if isinstance(m, Meal):
+                names.append(f"{m.glyph} {m.name}")
+            elif isinstance(m, (tuple, list)) and len(m) >= 2:
+                names.append(f"{GLYPH.get(m[0], SLOT_X[2])} {m[1]}")
+            else:
+                names.append(str(m))
+        what = " · ".join(names) if names else "nothing planned in Mela"
+    parts.append(f"{week_label(sunday)}: {what}")
+    parts.append(f"{n_groceries} grocery list{'s' if n_groceries != 1 else ''}")
+    txt = " · ".join(parts)
     return txt if note_ok else txt + " · note not written"

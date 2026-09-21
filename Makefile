@@ -64,6 +64,7 @@ test:
 	@$(PYTHON) tests/test_mela.py
 	@$(PYTHON) tests/test_meal_write.py
 	@$(PYTHON) tests/test_meal_screens.py
+	@$(PYTHON) tests/test_mela_cal.py
 	@$(PYTHON) tests/test_row_display.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────

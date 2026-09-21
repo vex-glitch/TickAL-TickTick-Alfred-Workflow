@@ -173,7 +173,7 @@ def build_items():
         alfred.item(
             uid="meal",
             title="🥘 Meal Prep",
-            subtitle="Plan the week · groceries · library",
+            subtitle="This week · next 13 weeks · groceries · library",
             arg="ctx:meal",
         ),
         # The "🎬 Content pipeline" row DIED here 2026-07-28 (Vex: "kill the

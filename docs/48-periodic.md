@@ -155,7 +155,7 @@ The weekly note's shape one tier up, counted by **week** instead of by day (Vex 
 
 - **The month's weeks** - under the breadcrumb, one line per week, linked to that week's note. Labels are month-local and clipped to the month: `W1 · 1st-6th Sep`, `W5 · 28th-30th Sep`. Every week number in the note carries its date range, everywhere.
 - **🏆 Goals** - **🌓 Quarterly goal** mirrors the quarter's note; **🗓️ Monthly goal** is yours, and it is what the weekly notes mirror in turn.
-- **✨ Highlight**, then **📊 Stats** and **💿 Data** with the weekly's own bullets: Top lists · Top tasks · Created · Completed · Weekly Completed (per-week bars) · Focus (by week, with the week's top task) · Habit consistency, then ✨ Highlights · 📨 Entries · 😊 Moods · 💰 Income · 👽 People · 🥘 Meal prep (the week's three meals, written when a plan is committed in the [🥘 hub](51-meal-prep.md)).
+- **✨ Highlight**, then **📊 Stats** and **💿 Data** with the weekly's own bullets: Top lists · Top tasks · Created · Completed · Weekly Completed (per-week bars) · Focus (by week, with the week's top task) · Habit consistency, then ✨ Highlights · 📨 Entries · 😊 Moods · 💰 Income · 👽 People · 🥘 Meal prep (the week's meals from Mela's calendar, written by 🔄 Sync with Mela in the [🥘 hub](51-meal-prep.md)).
 - **😊 Moods** reads the month average with its vs-last-month arrow in the bullet, and one line per week underneath.
 - **⏳ Dates** - every birthday and countdown landing in that month, by date. Days already past count: a birthday on the 3rd is still what the month held.
 - **⏪ Last month** - the five headline numbers and the same two rankings, read off last month's weeks. It stays `_(pending)_` rather than showing zeros when none of those weeks can be read.

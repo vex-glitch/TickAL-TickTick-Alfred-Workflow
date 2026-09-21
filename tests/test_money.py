@@ -164,6 +164,10 @@ class _FakeDate(date):
 
 
 prows.date = _FakeDate
+# pm.past_day (the *mon road) reads ITS OWN date.today(): unpinned, a typed
+# day word resolved against the real calendar and the week of 14 Sep
+# answered '💰 Not this week' on any later Monday (2026-09-21)
+pm.date = _FakeDate
 
 r = prows.income_rows("")
 check("idle strip prompts then lists the week",

@@ -1,42 +1,52 @@
 #!/usr/bin/env python3
 """meal_write.py - every TickTick write the 🥘 Meal Prep hub makes
-(HANDOFF_MEAL.md). meal.py plans, meal_scale.py scales, mela.py reads the
-recipe app; this module writes, and it is the ONLY module that does.
+(HANDOFF_MEAL.md). meal.py folds the plan into weeks, meal_scale.py scales,
+mela.py reads the recipe app, mela_cal.py reads the plan out of Apple
+Calendar; this module writes, and it is the ONLY module that does.
 
-Why src/ and not Scripts/xact.py: the hourly agent (src/sync.py) imports
-recipes and fills descriptions too, and it cannot import Scripts/. The xact
-verbs (meal_commit, meal_import, meal_fill, meal_groceries) are thin
-wrappers over the functions here; sync.py calls hourly().
+ONE VERB. Vex 2026-09-21: "this python script that runs in the background
+is unacceptable. We should only have a row that says sync TickTick with
+Mela, that would do that manually." So sync() is the whole write side and
+runs only when the 🔄 row is pressed: new Mela recipes into the library
+(cap CAP_IMPORT), empty descriptions filled (cap CAP_FILL), then the COOK
+WEEK mirrored: the routine's live cook Sunday picks the week, the calendar
+says what is planned on it, the routine's old meal POINTERS are deleted and
+one is minted per planned meal, a 🛒 CHECKLIST per meal is made in the
+library list (seven portions), the weekly note's 🥘 bullet is written. No
+hourly hitchhiker, nothing wakes Mela, nothing schedules: "I will be
+scheduling in Mela, it is nicer".
 
-THE WEEK. commit() takes the three picks (library task ids) and makes the
-week real: the routine's old meal POINTERS are deleted, three new ones are
-minted under it dated the cook Sunday, one 🛒 CHECKLIST per meal is made in
-the library list with the ingredients scaled to seven portions, the weekly
-note's 🥘 bullet is filled, and the ledger remembers the week. Pointers are
-deleted rather than reopened or moved: HANDOFF_ROUTINES §8 says API
-completion leaves a repeating task's children completed while the app
-reopens them - delete-then-create is the one shape that is right on both
-roads, and the library entries never move, so nothing is lost.
+Pointers are deleted rather than reopened or moved: HANDOFF_ROUTINES §8
+says API completion leaves a repeating task's children completed while the
+app reopens them - delete-then-create is the one shape that is right on
+both roads, and the library entries never move, so nothing is lost.
 
-LIVE READS. Every commit reads the routine, its list and the library list
-live: the routine tree is mutated by routine resets (which invalidate
-all_tasks) and by the app, and a cached child list would hand us an id
-that is already gone. A grocery list is re-dated from its live object, never
-from the cache (full-object writes clobber whatever changed since the read).
+THE READ SIDE, plan_view(), is what the screens render from: the calendar
+plan folded into HORIZON_WEEKS weeks with the library entries joined in.
+It never raises; a calendar it cannot read becomes `error`, the toast line
+the hub's status row shows.
 
-THE LOCK (~/.ticktick_alfred/meal.lock), the okr_write shape: user verbs
-wait LOCK_WAIT then refuse "busy"; hourly() takes it non-blocking and
-leaves when it is held.
+LIVE READS. sync reads the routine, its list and the library list live:
+the routine tree is mutated by routine resets (which invalidate all_tasks)
+and by the app, and a cached child list would hand us an id that is
+already gone. A grocery list is re-dated from its live object, never from
+the cache (full-object writes clobber whatever changed since the read).
 
-BUDGET. TickTick allows 300 requests per 5 minutes and the hourly sync
-already spends ~100 unpaced. A commit is ~20 calls. The hourly hitchhiker
-caps itself at BUDGET_HOURLY requests at 1 s pacing; the foreground backfill
-paces 1.5 s. api.RateLimitError ends any run at once - retrying inside the
-window deepens the lockout.
+THE LOCK (~/.ticktick_alfred/meal.lock), the okr_write shape: sync waits
+LOCK_WAIT then refuses "busy".
+
+BUDGET. TickTick enforces 100 requests a MINUTE (hit 2026-09-19). A sync is
+~20 calls plus the imports and backfills, all at PACE. api.RateLimitError
+ends any run at once - retrying inside the window deepens the lockout - and
+the toast says how far it got.
 
 CACHE. Writes are mirrored into all_tasks / all_notes / project_data_<pid>
 (dispatch's own helpers) so the hub shows the new week before the next
 sync. Never invalidate all_tasks (map trap 10).
+
+THE IMPORT LEDGER (~/.ticktick_alfred/meal_import.json) stays: it is the
+dedupe memory of what was imported, not a plan. The cooked-history ledger
+of the picker era is gone; "cooked N weeks ago" reads off the calendar.
 
 NO SYNC CLICK HERE: every road a verb runs on ends at ET End, which clicks
 File > Sync already (the 2026-09-12 wedge).
@@ -47,7 +57,7 @@ import os
 import time
 from collections import namedtuple
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import cache as cache_store
 import config as cfg
@@ -55,16 +65,13 @@ import mdtext
 import meal
 
 LOCK_FILE = os.path.join(cfg.CONFIG_DIR, "meal.lock")
-LEDGER = os.path.join(cfg.CONFIG_DIR, "meal_ledger.json")
 IMPORT_LEDGER = os.path.join(cfg.CONFIG_DIR, "meal_import.json")
 LOCK_WAIT = 60.0
 POST_GAP = 0.35            # seconds between our own POSTs (periodic_engine's rule)
-BUDGET_HOURLY = 30         # requests the hourly hitchhiker may spend
-CAP_IMPORT_HOURLY = 10     # of which, at most this many imports
-PACE_BG = 1.0              # seconds between requests inside the hourly agent
-PACE_FG = 1.5              # in a foreground verb
-CAP_FG = 150               # entries per foreground backfill
-STALE_WAKE_S = 6 * 3600    # meal_wake_mela: Mela's DB older than this → open -gj
+CAP_IMPORT = 40            # recipes imported per sync
+CAP_FILL = 60              # descriptions filled per sync
+PACE = 1.0                 # seconds between requests (100 a minute is the wall)
+HORIZON_WEEKS = 13         # "all the next meals for a quarter, by week"
 
 
 class Refusal(Exception):
@@ -140,8 +147,37 @@ def _pace():
     _LAST_POST[0] = time.time()
 
 
-def _dry(spec):
-    return bool((spec or {}).get("dry")) or os.environ.get("TICKAL_MEAL_DRY") == "1"
+def _dry_env():
+    return os.environ.get("TICKAL_MEAL_DRY") == "1"
+
+
+# ── the import ledger (dedupe memory) ────────────────────────────────────────
+def _load_import_ledger(path):
+    """{"weeks": [{uuid, tid, pid, when}]} - the key is historical; missing
+    or corrupt reads as empty."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get("weeks"), list):
+            return data
+    except (OSError, ValueError):
+        pass
+    return {"weeks": []}
+
+
+def _save_import_ledger(path, data):
+    """Atomic, 0600, like config.save - never a half-written memory."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)
+
+
+def _imported_uuids(path):
+    led = _load_import_ledger(path)
+    return {w.get("uuid", "").upper() for w in led.get("weeks", []) if w.get("uuid")}
 
 
 # ── the caches, mirrored ─────────────────────────────────────────────────────
@@ -210,6 +246,10 @@ def _mela():
         return [], {}, str(e) or type(e).__name__
 
 
+def _by_id(recipes):
+    return {(r.id or "").upper(): r for r in recipes or [] if getattr(r, "id", None)}
+
+
 def _render(recipe):
     import mela
     return mela.render_markdown(recipe)
@@ -218,6 +258,64 @@ def _render(recipe):
 def _tag_for(recipe, tag_map=None):
     import mela
     return mela.meal_tag_for(recipe, tag_map or cfg.get_meal_tag_map())
+
+
+# ── the calendar (the plan) ──────────────────────────────────────────────────
+def _calendar(since=None, until=None):
+    """(planned rows, error line) - the Mela plan out of Apple Calendar.
+    Never raises: a MelaCalError (Full Disk Access, a busy store) or a
+    missing module becomes the one toast line."""
+    try:
+        import mela_cal
+    except Exception as e:
+        return [], f"Calendar reader missing · {type(e).__name__}: {e}"
+    try:
+        return list(mela_cal.plan(since=since, until=until)), ""
+    except mela_cal.MelaCalError as e:
+        return [], str(e)
+    except Exception as e:
+        return [], f"Calendar store unreadable ({type(e).__name__}: {e}) · try again"
+
+
+# ── the read side: the screens' plan ─────────────────────────────────────────
+def plan_view(today=None, n_weeks=HORIZON_WEEKS, planned=None, recipes=None,
+              tasks=None, first_sunday=None):
+    """The plan the 🥘 screens render: {weeks: [meal.Week] (every week
+    present), first_sunday, planned_count, error, mela_error, planned,
+    by_id, entries, today}. Never raises. `error` is the calendar's toast
+    line ("" when it read fine) - the hub wears a "cache" chip on it;
+    `mela_error` is Mela's own (its meals then read slot 🍽️ off the event
+    title). first_sunday defaults to the coming Sunday (today itself on a
+    Sunday), the routine's cook Sunday when it is on schedule; the browse
+    side passes meal.cook_sunday(routine, today) when it has the live
+    routine. planned / recipes / tasks are injectable (tests, and a caller
+    that already holds them); read otherwise from the calendar snapshot, the
+    Mela snapshot and the cached library pool."""
+    today = today or date.today()
+    n_weeks = max(1, int(n_weeks or HORIZON_WEEKS))
+    first_sunday = (meal.cook_week_of(first_sunday) if first_sunday
+                    else meal.next_sunday(today))
+    since = first_sunday - timedelta(days=7)
+    until = first_sunday + timedelta(days=7 * n_weeks)
+    error = ""
+    if planned is None:
+        planned, error = _calendar(since=since, until=until)
+    planned = list(planned or [])
+    mela_error = ""
+    if recipes is None:
+        recipes, by_id, err = _mela()
+        mela_error = err or ""
+    else:
+        by_id = _by_id(recipes)
+    list_id = cfg.get_meal_list_id()
+    if tasks is None:
+        tasks = _pool_tasks(list_id) if list_id else []
+    entries = meal.library_entries(tasks, list_id)
+    tag_map = cfg.get_meal_tag_map()
+    weeks = meal.weeks_plan(planned, by_id, tag_map, entries, first_sunday, n_weeks)
+    return {"weeks": weeks, "first_sunday": first_sunday, "planned_count": len(planned),
+            "error": error, "mela_error": mela_error, "planned": planned,
+            "by_id": by_id, "entries": entries, "today": today}
 
 
 # ── groceries ────────────────────────────────────────────────────────────────
@@ -233,11 +331,23 @@ def grocery_body(recipe):
     return lines, desc.strip()
 
 
+def _picks_of(meals):
+    """{UUID: {name, uuid, slot, tid}} in meal order - the pick shape the
+    grocery writer and the note take (one list per recipe, however many
+    meals the week has; slot "x" rides like any other)."""
+    picks = {}
+    for m in meals or []:
+        u = (m.uuid or "").upper()
+        if u and u not in picks:
+            picks[u] = {"name": m.name, "uuid": u, "slot": m.slot, "tid": m.tid}
+    return picks
+
+
 def _write_groceries(api, list_id, picks, sunday, today, by_id, existing):
-    """One 🛒 CHECKLIST per pick in the library list. `existing` = {UUID:
-    live open grocery task}. Kept when its meal is still planned (re-dated
-    when the Saturday moved), deleted when its meal is not, created when
-    missing. -> (made, kept, deleted_ids)."""
+    """One 🛒 CHECKLIST per pick in the library list, in pick order.
+    `existing` = {UUID: live open grocery task}. Kept when its meal is still
+    planned (re-dated when the Saturday moved), deleted when its meal is
+    not, created when missing. -> (made, kept, deleted_ids)."""
     day = meal.api_day(meal.grocery_day(sunday, today))
     want = {p["uuid"]: p for p in picks.values() if p.get("uuid")}
     made, kept, gone = [], [], []
@@ -251,10 +361,7 @@ def _write_groceries(api, list_id, picks, sunday, today, by_id, existing):
             if _rate_limited(e):
                 raise
         gone.append(t["id"])
-    for key, _tag, _glyph, _label in meal.SLOTS:
-        p = picks.get(key)
-        if not p or not p.get("uuid"):
-            continue
+    for p in want.values():
         cur = existing.get(p["uuid"])
         if cur is not None:
             if (cur.get("dueDate") or "")[:10] != day:
@@ -292,135 +399,7 @@ def _write_groceries(api, list_id, picks, sunday, today, by_id, existing):
     return made, kept, gone
 
 
-# ── the week ─────────────────────────────────────────────────────────────────
-def _resolve_picks(spec, lib_tasks):
-    """{key: {tid, name, uuid, task}} for the three ids in spec; Refusal on
-    a miss or a slot/tag mismatch. lib_tasks = the library list's tasks."""
-    entries = {e["tid"]: e for e in meal.library_entries(lib_tasks, None)}
-    picks = {}
-    for key, tag, _g, label in meal.SLOTS:
-        tid = (spec.get(key) or "").strip()
-        if not tid:
-            raise Refusal(f"🥘 No {label.lower()} picked · nothing written")
-        e = entries.get(tid)
-        if e is None:
-            raise Refusal("🥘 Not in the library · sync and pick again")
-        if e.get("slot") != key:
-            raise Refusal(f"🥘 {e['name'][:30]} is not tagged {tag} · pick again")
-        picks[key] = {"tid": tid, "name": e["name"], "uuid": e["uuid"]}
-    return picks
-
-
-def preview(spec, today=None, api=None):
-    """The dry run's text: what commit would do, from LIVE reads, no write."""
-    return commit(dict(spec or {}, dry=True), today=today, api=api)
-
-
-def commit(spec, today=None, api=None):
-    """Make the week real (module docstring). spec: {"b","l","s": library
-    task ids, "sunday": iso|None, "back": ctx, "dry": bool}. Returns an
-    Outcome (or, dry, the plan as text); raises Refusal when nothing was
-    written."""
-    today = today or date.today()
-    spec = dict(spec or {})
-    list_id = cfg.get_meal_list_id()
-    rid = cfg.get_meal_routine_id()
-    if not list_id or not rid:
-        raise Refusal("🥘 Meal prep is off · ⚙️ Settings → Meal Prep List")
-    with _lock() as held:
-        if not held:
-            raise Refusal("🥘 Busy · another meal-prep write is running")
-        api = _api(api)
-        try:
-            rpid = _routine_pid(rid)
-            routine = api.get_task(rpid, rid)
-            rpid = routine.get("projectId") or rpid
-            lib = api.get_project_data(list_id)
-            rlist = api.get_project_data(rpid) if rpid != list_id else lib
-        except Exception as e:
-            if _rate_limited(e):
-                raise Refusal("🥘 Not written · TickTick rate limit · try again in a minute")
-            raise Refusal(f"🥘 Not written · {type(e).__name__}: {e}")
-        lib_tasks = list((lib or {}).get("tasks") or [])
-        r_tasks = list((rlist or {}).get("tasks") or [])
-        picks = _resolve_picks(spec, lib_tasks)
-        sunday = None
-        if spec.get("sunday"):
-            try:
-                sunday = date.fromisoformat(spec["sunday"])
-            except (ValueError, TypeError):
-                sunday = None
-        sunday = sunday or meal.cook_sunday(routine, today)
-        old = meal.pointers_of(r_tasks, rid)
-        old_ids = [t["id"] for t in old.values()]
-        existing = meal.groceries_of(lib_tasks, list_id)
-        recipes, by_id, mela_err = _mela()
-        if _dry(spec):
-            lines = [f"🥘 DRY RUN · {meal.week_label(sunday)} (cook {sunday:%a %d %b})",
-                     f"routine {rid} in {rpid}: delete {len(old_ids)} pointer(s) {old_ids}"]
-            for key, _t, glyph, label in meal.SLOTS:
-                p = picks[key]
-                lines.append(f"  create {glyph} {p['name']} ({p['uuid']}) due {meal.api_day(sunday)}")
-            keep = [u for u in existing if u in {p['uuid'] for p in picks.values()}]
-            drop = [existing[u]['id'] for u in existing if u not in keep]
-            lines.append(f"groceries in {list_id}: keep {len(keep)}, delete {drop}, "
-                         f"create {3 - len(keep)} due {meal.api_day(meal.grocery_day(sunday, today))}")
-            if mela_err:
-                lines.append(f"Mela: {mela_err}")
-            else:
-                for p in picks.values():
-                    r = by_id.get(p['uuid'])
-                    n = len(grocery_body(r)[0]) if r else 0
-                    lines.append(f"  {p['name'][:30]}: {n} grocery lines" if r else f"  {p['name'][:30]}: NOT in Mela")
-            lines.append(f"weekly note: {meal.note_day(sunday)} (block filled)")
-            return "\n".join(lines)
-        # ── write ──
-        made = []
-        try:
-            for tid in old_ids:
-                try:
-                    _pace()
-                    api.delete_task(rpid, tid)
-                except Exception as e:
-                    if _rate_limited(e):
-                        raise
-            for key, _t, _g, _l in meal.SLOTS:
-                p = picks[key]
-                _pace()
-                t = api.create_task(meal.pointer_title(key, p["name"], p["uuid"]),
-                                    project_id=rpid, parent_id=rid,
-                                    due_date=meal.api_day(sunday), kind="TEXT")
-                t["parentId"] = rid                # the response lies (map trap 12)
-                t["projectId"] = t.get("projectId") or rpid
-                made.append(t)
-            try:
-                from dispatch import _order_children
-                _order_children(api, made, rpid, rid)
-            except Exception:
-                pass
-            g_made, g_kept, g_gone = _write_groceries(api, list_id, picks, sunday,
-                                                      today, by_id, existing)
-        except Exception as e:
-            if _rate_limited(e):
-                _uncache(old_ids, [rpid])
-                _cache_add(made)
-                raise Refusal("🥘 Partly written · TickTick rate limit · re-run the plan in a minute")
-            raise
-        note_ok = _write_note(picks, sunday)
-        try:
-            led = meal.load_ledger(LEDGER)
-            meal.ledger_add(led, sunday, picks, pointers=[t["id"] for t in made],
-                            groceries=[t["id"] for t in g_made] + g_kept)
-            meal.save_ledger(LEDGER, led)
-        except Exception:
-            pass
-        _uncache(old_ids + g_gone, [rpid, list_id])
-        _cache_add(made + g_made)
-        ids = [t["id"] for t in made] + [t["id"] for t in g_made]
-        return Outcome(meal.outcome_text(sunday, len(made), len(g_made) + len(g_kept), note_ok),
-                       spec.get("back") or "ctx:meal", ids)
-
-
+# ── the routine and the note ─────────────────────────────────────────────────
 def _routine_pid(rid):
     """The routine's list: the cache's copy, else the registry's hint."""
     try:
@@ -440,7 +419,28 @@ def _routine_pid(rid):
     return meal.ROUTINES_LIST if hasattr(meal, "ROUTINES_LIST") else "6a268ea18f081f1de80eaeb5"
 
 
-def _write_note(picks, sunday):
+NOTHING_PLANNED = "nothing planned in Mela"
+
+
+def note_lines(meals):
+    """The 🥘 bullet's body for a week: meal_notes.block_lines' three slot
+    lines (a missing slot reads "_(not planned)_") plus one line per extra
+    meal (a second breakfast, a 🍽️ recipe outside the three slots); an empty
+    week reads "_(nothing planned in Mela)_" - the toast's words."""
+    meals = list(meals or [])
+    if not meals:
+        return [f"- _({NOTHING_PLANNED})_"]
+    import meal_notes
+    picks, extra = {}, []
+    for m in meals:
+        if m.slot in meal.SLOT_KEYS and m.slot not in picks:
+            picks[m.slot] = {"name": m.name, "uuid": m.uuid}
+        else:
+            extra.append(f"- {m.glyph} {meal.md_link(m.name, m.uuid)}")
+    return meal_notes.block_lines(picks) + extra
+
+
+def _write_note(meals, sunday):
     """The weekly note's 🥘 bullet for the week being cooked for. Never
     raises; False when the note could not be written (kill switch, no
     periodic list, network)."""
@@ -454,7 +454,7 @@ def _write_note(picks, sunday):
         p = pm.period_for("weekly", meal.note_day(sunday))
         task, _ = pe.ensure_note(p)
         pid = task.get("projectId") or areas.PERIODIC_LIST_ID
-        lines = meal_notes.block_lines(picks)
+        lines = note_lines(meals)
 
         def mutate(doc, live):
             return meal_notes.write_block(doc, lines, live=live)
@@ -464,7 +464,7 @@ def _write_note(picks, sunday):
         return False
 
 
-# ── import + backfill (the verb AND the hourly sync) ─────────────────────────
+# ── import + backfill ────────────────────────────────────────────────────────
 def _existing_uuids(list_id, tasks=None):
     out = set()
     for t in (tasks if tasks is not None else _pool_tasks(list_id)):
@@ -474,9 +474,26 @@ def _existing_uuids(list_id, tasks=None):
     return out
 
 
+def _import_candidates(recipes, existing, done, tag_map=None):
+    """[(recipe, tag)] newest first for the categorised recipes in neither
+    the list nor the ledger, and the count of uncategorised ones."""
+    cands, no_cat = [], 0
+    for r in recipes or []:
+        tag = _tag_for(r, tag_map)
+        if not tag:
+            no_cat += 1
+            continue
+        u = (r.id or "").upper()
+        if not u or u in existing or u in done:
+            continue
+        cands.append((r, tag))
+    cands.sort(key=lambda rt: (rt[0].date or datetime.min.replace(tzinfo=timezone.utc)),
+               reverse=True)
+    return cands, no_cat
+
+
 def import_new(api, recipes=None, existing=None, list_id=None, tag_map=None,
-               cap=CAP_IMPORT_HOURLY, pace=PACE_BG, ledger_path=None,
-               now=None, column_id=None):
+               cap=CAP_IMPORT, pace=PACE, ledger_path=None, now=None, column_id=None):
     """Create a library task for every Mela recipe that carries a meal
     category and is in neither the list nor the import ledger. Newest
     first, `cap` per run, ledger saved after EACH ack (a crash between the
@@ -494,21 +511,10 @@ def import_new(api, recipes=None, existing=None, list_id=None, tag_map=None,
             out["error"] = err
             return out
     existing = set(existing) if existing is not None else _existing_uuids(list_id)
-    led = meal.load_ledger(ledger_path)
+    led = _load_import_ledger(ledger_path)
     done = {w.get("uuid", "").upper() for w in led.get("weeks", []) if w.get("uuid")}
-    cands = []
-    for r in recipes:
-        tag = _tag_for(r, tag_map)
-        if not tag:
-            out["no_category"] += 1
-            continue
-        u = (r.id or "").upper()
-        if not u or u in existing or u in done:
-            out["skipped"] += 1
-            continue
-        cands.append((r, tag))
-    cands.sort(key=lambda rt: (rt[0].date or datetime.min.replace(tzinfo=timezone.utc)),
-               reverse=True)
+    cands, out["no_category"] = _import_candidates(recipes, existing, done, tag_map)
+    out["skipped"] = len(recipes) - out["no_category"] - len(cands)
     made = []
     for r, tag in cands[:max(0, int(cap))]:
         title = mdtext.md_link(r.title, r.url)
@@ -527,7 +533,7 @@ def import_new(api, recipes=None, existing=None, list_id=None, tag_map=None,
         led.setdefault("weeks", []).append({"uuid": r.id.upper(), "tid": t.get("id"),
                                             "pid": list_id, "when": _stamp()})
         try:
-            meal.save_ledger(ledger_path, led)
+            _save_import_ledger(ledger_path, led)
         except Exception:
             pass
         if pace:
@@ -561,7 +567,7 @@ def missing_descriptions(list_id=None, tasks=None):
     return out
 
 
-def backfill_descriptions(api, entries=None, by_id=None, cap=10, pace=PACE_BG,
+def backfill_descriptions(api, entries=None, by_id=None, cap=CAP_FILL, pace=PACE,
                           progress=None):
     """Fill empty descriptions from Mela: a LIVE get_task per entry (project
     data omits NOTE bodies; a stale full-object POST would wipe a hand
@@ -609,65 +615,171 @@ def backfill_descriptions(api, entries=None, by_id=None, cap=10, pace=PACE_BG,
     return out
 
 
-def _wake_mela():
-    """meal_wake_mela: launch Mela hidden in the background when its
-    database is stale, so iCloud brings the phone's recipes over for the
-    NEXT run. Never raises."""
-    try:
-        if not cfg.get_meal_wake_mela():
-            return False
-        import mela
-        import subprocess
-        fr = mela.freshness()
-        if not fr.get("present") or (fr.get("age_s") or 0) < STALE_WAKE_S:
-            return False
-        ps = subprocess.run(["/bin/ps", "-xco", "comm"], capture_output=True, text=True)
-        if "Mela" in (ps.stdout or "").split():
-            return False
-        subprocess.run(["open", "-gj", "-a", "Mela"], check=False)
-        return True
-    except Exception:
-        return False
+# ── THE sync ─────────────────────────────────────────────────────────────────
+def _refuse_partial(what, imported, filled):
+    bits = ["🥘 Partly synced"]
+    if imported:
+        bits.append(f"+{imported} recipe{'s' if imported != 1 else ''}")
+    if filled:
+        bits.append(f"{filled} filled")
+    bits.append(f"{what} · TickTick rate limit · press 🔄 again in a minute")
+    raise Refusal(" · ".join(bits), reopen="ctx:meal")
 
 
-def hourly(api=None):
-    """The sync's hitchhiker: imports first, then descriptions, within one
-    request budget, paced. Returns the summary chip ('' = nothing done).
-    Never raises."""
-    try:
-        list_id = cfg.get_meal_list_id()
-        if not list_id:
-            return ""
-        import mela
-        if not mela.db_present():
-            return ""
-        with _lock(wait=0) as held:
-            if not held:
-                return ""
-            api = _api(api)
+def sync(today=None, api=None, dry=False, planned=None, recipes=None):
+    """🔄 Sync with Mela, the one meal verb (module docstring). Under the
+    lock: Mela library → import_new (CAP_IMPORT) → backfill_descriptions
+    (CAP_FILL) → the calendar plan → the LIVE routine → cook Sunday =
+    meal.cook_sunday(routine, today) → meal.week_meals → that week mirrored:
+    old pointers deleted, one pointer per meal created (🍽️ for slot "x"),
+    groceries made / kept / dropped, the note bullet written, caches
+    mirrored. A week with nothing planned clears the pointers and the OPEN
+    stale groceries; bullet and toast say "nothing planned in Mela".
+
+    dry=True or TICKAL_MEAL_DRY=1: live READS only, returns the plan as
+    text, nothing written. planned / recipes are injectable (tests). Raises
+    Refusal when the list or routine id is blank, Mela's DB is missing, the
+    calendar store is unreadable, another sync holds the lock, or TickTick
+    rate-limits mid-way (the toast says how far it got)."""
+    today = today or date.today()
+    dry = bool(dry) or _dry_env()
+    list_id = cfg.get_meal_list_id()
+    rid = cfg.get_meal_routine_id()
+    if not list_id or not rid:
+        raise Refusal("🥘 Meal prep is off · ⚙️ Settings → Meal Prep List")
+    with _lock() as held:
+        if not held:
+            raise Refusal("🥘 Busy · another meal-prep sync is running")
+        # the recipe library
+        if recipes is None:
+            try:
+                import mela
+                if not mela.db_present():
+                    raise Refusal("🥘 Not synced · Mela's database is not on this Mac "
+                                  "· open Mela once")
+            except ImportError:
+                raise Refusal("🥘 Not synced · the Mela reader is missing")
             recipes, by_id, err = _mela()
             if err:
-                return ""
-            budget = BUDGET_HOURLY
-            imp = import_new(api, recipes=recipes, list_id=list_id,
-                             cap=min(CAP_IMPORT_HOURLY, budget), pace=PACE_BG)
-            budget -= imp["created"] + imp["failed"]
-            chips = [imp["chip"]] if imp.get("chip") else []
-            if not imp.get("rate_limited") and budget >= 2:
-                bf = backfill_descriptions(api, by_id=by_id, cap=budget // 2, pace=PACE_BG)
-                if bf["filled"]:
-                    chips.append(f"{bf['filled']} filled")
-            _wake_mela()
-            return "🥘 " + " · ".join(c.replace("🥘 ", "") for c in chips) if chips else ""
-    except Exception:
-        return ""
+                raise Refusal(f"🥘 Not synced · Mela: {err}")
+        else:
+            by_id = _by_id(recipes)
+        # the plan - read before a single write, so a store we cannot read
+        # costs nothing (the Full Disk Access caveat, HANDOFF_MEAL §6)
+        if planned is None:
+            planned, cal_err = _calendar()
+            if cal_err:
+                raise Refusal(f"🥘 Not synced · {cal_err}")
+        planned = list(planned or [])
+        tag_map = cfg.get_meal_tag_map()
+        api = _api(api)
+        # ── recipes in, descriptions filled ──
+        imported = filled = 0
+        if dry:
+            cands, _nc = _import_candidates(recipes, _existing_uuids(list_id),
+                                            _imported_uuids(IMPORT_LEDGER), tag_map)
+            n_import = min(len(cands), CAP_IMPORT)
+            n_fill = min(len(missing_descriptions(list_id)), CAP_FILL)
+        else:
+            imp = import_new(api, recipes=recipes, list_id=list_id, tag_map=tag_map,
+                             cap=CAP_IMPORT, pace=PACE)
+            imported = imp["created"]
+            if imp.get("rate_limited"):
+                _refuse_partial("week not mirrored", imported, 0)
+            bf = backfill_descriptions(api, by_id=by_id, cap=CAP_FILL, pace=PACE)
+            filled = bf["filled"]
+            if bf.get("rate_limited"):
+                _refuse_partial("week not mirrored", imported, filled)
+        # ── live reads ──
+        try:
+            rpid = _routine_pid(rid)
+            routine = api.get_task(rpid, rid)
+            rpid = routine.get("projectId") or rpid
+            lib = api.get_project_data(list_id)
+            rlist = api.get_project_data(rpid) if rpid != list_id else lib
+        except Exception as e:
+            if _rate_limited(e):
+                _refuse_partial("week not mirrored", imported, filled)
+            raise Refusal(f"🥘 Not synced · {type(e).__name__}: {e}")
+        lib_tasks = list((lib or {}).get("tasks") or [])
+        r_tasks = list((rlist or {}).get("tasks") or [])
+        sunday = meal.cook_sunday(routine, today)
+        entries = meal.library_entries(lib_tasks, list_id)
+        week = meal.week_meals(planned, by_id, tag_map, entries, sunday)
+        picks = _picks_of(week.meals)
+        old = meal.pointers_of(r_tasks, rid)
+        old_ids = [t["id"] for t in old.values()]
+        existing = meal.groceries_of(lib_tasks, list_id)
+        if dry:
+            lines = [f"🥘 DRY RUN · {meal.week_label(sunday)} (cook {sunday:%a %d %b})",
+                     f"Mela: {len(recipes)} recipes · import +{n_import} (cap {CAP_IMPORT})"
+                     f" · fill {n_fill} (cap {CAP_FILL})",
+                     f"calendar: {len(planned)} planned row(s) · on {sunday:%a %d %b}: "
+                     f"{len(week.meals)} meal(s)",
+                     f"routine {rid} in {rpid}: delete {len(old_ids)} pointer(s) {old_ids}"]
+            for m in week.meals:
+                src = "in the library" if m.tid else "NOT in the library"
+                lines.append(f"  create {m.glyph} {m.name} ({m.uuid}) due {meal.api_day(sunday)} · {src}")
+            if not week.meals:
+                lines.append(f"  ({NOTHING_PLANNED})")
+            keep = [u for u in existing if u in picks]
+            drop = [existing[u]["id"] for u in existing if u not in picks]
+            lines.append(f"groceries in {list_id}: keep {len(keep)}, delete {drop}, "
+                         f"create {len(picks) - len(keep)} due "
+                         f"{meal.api_day(meal.grocery_day(sunday, today))}")
+            for p in picks.values():
+                r = by_id.get(p["uuid"])
+                lines.append(f"  {p['name'][:30]}: {len(grocery_body(r)[0])} grocery lines"
+                             if r else f"  {p['name'][:30]}: NOT in Mela")
+            lines.append(f"weekly note: {meal.note_day(sunday)} (block: "
+                         f"{len(note_lines(week.meals))} line(s))")
+            return "\n".join(lines)
+        # ── write the week ──
+        made = []
+        try:
+            for tid in old_ids:
+                try:
+                    _pace()
+                    api.delete_task(rpid, tid)
+                except Exception as e:
+                    if _rate_limited(e):
+                        raise
+            for m in week.meals:
+                _pace()
+                t = api.create_task(meal.pointer_title(m.slot, m.name, m.uuid),
+                                    project_id=rpid, parent_id=rid,
+                                    due_date=meal.api_day(sunday), kind="TEXT")
+                t["parentId"] = rid                # the response lies (map trap 12)
+                t["projectId"] = t.get("projectId") or rpid
+                made.append(t)
+            if made:
+                try:
+                    from dispatch import _order_children
+                    _order_children(api, made, rpid, rid)
+                except Exception:
+                    pass
+            g_made, g_kept, g_gone = _write_groceries(api, list_id, picks, sunday,
+                                                      today, by_id, existing)
+        except Exception as e:
+            if _rate_limited(e):
+                _uncache(old_ids, [rpid])
+                _cache_add(made)
+                _refuse_partial("week partly mirrored", imported, filled)
+            raise
+        note_ok = _write_note(week.meals, sunday)
+        _uncache(old_ids + g_gone, [rpid, list_id])
+        _cache_add(made + g_made)
+        ids = [t["id"] for t in made] + [t["id"] for t in g_made]
+        return Outcome(meal.sync_text(sunday, week.meals, len(g_made) + len(g_kept),
+                                      imported, filled, note_ok),
+                       "ctx:meal", ids)
 
 
 # ── the hub's numbers (cache only, no network) ───────────────────────────────
 def hub_counts():
     """{new, missing, uncategorised, mela_ok, mela_age_s, mela_error,
-    entries} for the hub's status and action rows, from the caches and the
-    Mela snapshot only."""
+    list_id} for the hub's status and 🔄 rows, from the caches and the Mela
+    snapshot only."""
     list_id = cfg.get_meal_list_id()
     out = {"new": 0, "missing": 0, "uncategorised": 0, "mela_ok": False,
            "mela_age_s": None, "mela_error": None, "list_id": list_id}
@@ -683,77 +795,7 @@ def hub_counts():
         out["mela_age_s"] = mela.freshness().get("age_s")
     except Exception:
         pass
-    existing = _existing_uuids(list_id, tasks)
-    led = meal.load_ledger(IMPORT_LEDGER)
-    done = {w.get("uuid", "").upper() for w in led.get("weeks", []) if w.get("uuid")}
-    for r in recipes:
-        if not _tag_for(r):
-            out["uncategorised"] += 1
-        elif (r.id or "").upper() not in existing and (r.id or "").upper() not in done:
-            out["new"] += 1
+    cands, out["uncategorised"] = _import_candidates(
+        recipes, _existing_uuids(list_id, tasks), _imported_uuids(IMPORT_LEDGER))
+    out["new"] = len(cands)
     return out
-
-
-# ── groceries, rebuilt on demand ─────────────────────────────────────────────
-def rebuild_groceries(spec=None, today=None, api=None):
-    """Remake this week's three 🛒 lists from the routine's live pointers
-    (the ⌥⇧ road on the hub's Groceries row): open lists for the planned
-    meals are deleted and created again, so a recipe fixed in Mela lands
-    in the shopping list. Ticked (completed) lists are never touched."""
-    today = today or date.today()
-    spec = dict(spec or {})
-    list_id = cfg.get_meal_list_id()
-    rid = cfg.get_meal_routine_id()
-    if not list_id or not rid:
-        raise Refusal("🥘 Meal prep is off · ⚙️ Settings → Meal Prep List")
-    with _lock() as held:
-        if not held:
-            raise Refusal("🥘 Busy · another meal-prep write is running")
-        api = _api(api)
-        try:
-            rpid = _routine_pid(rid)
-            routine = api.get_task(rpid, rid)
-            rpid = routine.get("projectId") or rpid
-            r_tasks = list((api.get_project_data(rpid) or {}).get("tasks") or [])
-            lib_tasks = list((api.get_project_data(list_id) or {}).get("tasks") or [])
-        except Exception as e:
-            if _rate_limited(e):
-                raise Refusal("🥘 Not written · TickTick rate limit · try again in a minute")
-            raise Refusal(f"🥘 Not written · {type(e).__name__}: {e}")
-        pointers = meal.pointers_of(r_tasks, rid)
-        if not pointers:
-            raise Refusal("🥘 No meals planned yet · 🎲 Plan next week first")
-        picks = {}
-        for key, t in pointers.items():
-            parsed = meal.parse_title(t.get("title") or "")
-            if parsed:
-                picks[key] = {"tid": t["id"], "name": parsed[0], "uuid": parsed[1]}
-        sunday = meal.cook_sunday(routine, today)
-        existing = meal.groceries_of(lib_tasks, list_id)
-        recipes, by_id, mela_err = _mela()
-        if mela_err:
-            raise Refusal(f"🥘 Not rebuilt · {mela_err}")
-        planned = {p["uuid"] for p in picks.values()}
-        gone = []
-        for uuid, t in list(existing.items()):
-            if uuid in planned:
-                try:
-                    _pace()
-                    api.delete_task(t.get("projectId") or list_id, t["id"])
-                    gone.append(t["id"])
-                    existing.pop(uuid, None)
-                except Exception as e:
-                    if _rate_limited(e):
-                        raise Refusal("🥘 Partly rebuilt · TickTick rate limit · try again in a minute")
-        try:
-            made, kept, gone2 = _write_groceries(api, list_id, picks, sunday, today,
-                                                 by_id, existing)
-        except Exception as e:
-            if _rate_limited(e):
-                raise Refusal("🥘 Partly rebuilt · TickTick rate limit · try again in a minute")
-            raise
-        _uncache(gone + gone2, [list_id])
-        _cache_add(made)
-        return Outcome(f"🥘 {len(made)} grocery list" + ("s" if len(made) != 1 else "")
-                       + f" rebuilt · {meal.week_label(sunday)}",
-                       spec.get("back") or "ctx:meal", [t["id"] for t in made])

@@ -272,6 +272,15 @@ write through BrowseCtx - clean bar):
                                     status -1, someday = undated
     xact:okr_setlist                ⚙️ Settings → OKR List dialog (blank = off,
                                     no kanban flip: a timeline list)
+    xact:meal_sync:<b64 {back}>     🔄 Sync with Mela: new recipes in,
+                                    descriptions filled, the cook week's
+                                    meals from the Mela calendar mirrored
+                                    onto the routine + groceries + note
+                                    (Vex 2026-09-21: "only a row that says
+                                    sync TickTick with Mela"; nothing runs
+                                    in the background). {"dry": true} or
+                                    TICKAL_MEAL_DRY=1 prints the plan only
+    xact:meal_setlist               ⚙️ Settings → Meal Prep List dialog
 
 stdout → the End notification. task_title rides the env.
 """
@@ -12149,67 +12158,15 @@ def _dry_meal(spec):
     return bool((spec or {}).get("dry")) or os.environ.get("TICKAL_MEAL_DRY") == "1"
 
 
-def meal_commit(rest):
-    """✅ Commit the week: three pointers under the Sunday routine, three 🛒
-    checklists, the weekly note's 🥘 bullet, the ledger (meal_write.commit).
-    {"dry": true} or TICKAL_MEAL_DRY=1 prints the plan and writes nothing."""
+def meal_sync(rest):
+    """🔄 Sync with Mela (meal_write.sync): recipes in, descriptions filled,
+    the cook week's meals read from the Mela calendar and mirrored onto the
+    routine's pointers + 🛒 groceries + the weekly note. The ONE meal verb -
+    Vex 2026-09-21: "a row that says sync TickTick with Mela, that would do
+    that manually". {"dry": true} or TICKAL_MEAL_DRY=1 prints the plan and
+    writes nothing."""
     import meal_write as mw
-    _meal_run(rest, mw.commit)
-
-
-def meal_import(rest):
-    """📥 Import from Mela now: every recipe carrying a meal category that
-    is not in the library yet (the hourly sync does 10 per run; this does
-    up to 40, half-second paced)."""
-    import meal_write as mw
-
-    def fn(spec):
-        r = mw.import_new(_api(), cap=40, pace=0.5)
-        if r.get("error"):
-            return f"🥘 Mela unreadable · {r['error']}"
-        if r.get("rate_limited"):
-            return f"🥘 Imported {r['created']} · TickTick rate limit · the rest later"
-        left = f" · {r['remaining']} more next time" if r["remaining"] else ""
-        return f"🥘 Imported {r['created']} recipe" + ("s" if r["created"] != 1 else "") + left
-    _meal_run(rest, fn)
-
-
-def meal_fill(rest):
-    """📝 Fill empty library descriptions from Mela in the foreground
-    (1.5 s paced, a banner every 25). The hourly sync fills ~10 per run
-    on its own; this is the fast road for the backlog."""
-    import meal_write as mw
-
-    def fn(spec):
-        entries = mw.missing_descriptions()
-        if not entries:
-            return "🥘 Every description is filled"
-        n = min(len(entries), mw.CAP_FG)
-        _crm_say(f"🥘 Filling {n} description" + ("s" if n != 1 else "")
-                 + f" · about {max(1, round(n * mw.PACE_FG / 60))} min")
-
-        def progress(i, total):
-            if i % 25 == 0 and i < total:
-                _crm_say(f"🥘 {i}/{total} filled…")
-        r = mw.backfill_descriptions(_api(), entries=entries, cap=mw.CAP_FG,
-                                     pace=mw.PACE_FG, progress=progress)
-        if r.get("error"):
-            return f"🥘 Mela unreadable · {r['error']}"
-        bits = [f"🥘 {r['filled']} filled"]
-        if r["not_in_mela"]:
-            bits.append(f"{r['not_in_mela']} not in Mela")
-        if r["rate_limited"]:
-            bits.append("rate limit · the rest later")
-        elif r["remaining"]:
-            bits.append(f"{r['remaining']} left")
-        return " · ".join(bits)
-    _meal_run(rest, fn)
-
-
-def meal_groceries(rest):
-    """🛒 Rebuild this week's grocery lists from Mela (meal_write)."""
-    import meal_write as mw
-    _meal_run(rest, mw.rebuild_groceries)
+    _meal_run(rest, lambda spec: mw.sync(dry=_dry_meal(spec)))
 
 
 def meal_setlist():
@@ -12554,14 +12511,8 @@ def main():
             okr_carry(rest)
         elif verb == "okr_setlist":
             okr_setlist()
-        elif verb == "meal_commit":
-            meal_commit(rest)
-        elif verb == "meal_import":
-            meal_import(rest)
-        elif verb == "meal_fill":
-            meal_fill(rest)
-        elif verb == "meal_groceries":
-            meal_groceries(rest)
+        elif verb == "meal_sync":
+            meal_sync(rest)
         elif verb == "meal_setlist":
             meal_setlist()
         elif verb == "add_pre":

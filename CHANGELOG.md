@@ -7,14 +7,19 @@ All notable user-visible changes to TickAL. Format follows
 
 ### Added
 
-- **🥘 Meal prep hub** (`tml`, main menu, or the Routines screen) - plan the
-  week's breakfast, lunch and snack from the recipe library (least recently
-  cooked first, 🎲 Surprise), commit it as three subtasks on the Sunday
-  routine plus one 🛒 grocery checklist per meal scaled to seven portions,
-  and a 🥘 bullet in the weekly note. Change one meal with ⌥ on it.
-- **Recipes flow in from Mela** - a recipe tagged Breakfast / Meal / Snack in
-  Mela becomes a library task with the tag and the recipe text, ten per
-  hourly sync or forty from the 📥 row; empty descriptions fill themselves.
+- **🥘 Meal prep hub** (`tml`, main menu, or the Routines screen) - plan
+  your meals in Mela (⌘⌥A Add to Calendar, on the Sunday you cook) and the
+  hub shows this week's breakfast, lunch and snack plus **📆 Next 13
+  weeks**, one row per week, an empty week saying so. On a meal: ⏎ opens
+  it in Mela, ⇧ its web page, ⌥⌘ copies the Mela link, ⌘ Actions when it
+  is a library task.
+- **🔄 Sync with Mela** - the one row that writes, only when pressed:
+  recipes tagged Breakfast / Meal / Snack in Mela become library tasks
+  with the tag and the recipe text, empty descriptions fill, and the cook
+  week's meals from the calendar land on the Sunday routine as subtasks,
+  one 🛒 grocery checklist per meal scaled to seven portions, and a 🥘
+  bullet in the weekly note. Nothing runs in the background any more.
+  Needs Full Disk Access for Alfred (the status row says when).
 - **Weekly note: 🥘 Meal prep** bullet under 💿 Data.
 - **✏️ Rename tag** in the tag's ⌘ menu - a dialog asks the new name and
   every task that carries the tag follows. A name already in use is refused

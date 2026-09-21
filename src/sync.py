@@ -249,16 +249,9 @@ def do_sync():
             summary += f" · {_okr.chip}"
     except Exception:
         pass
-    # 🥘 Meal Prep: import Mela's newly categorised recipes, then fill empty
-    # library descriptions, within one paced request budget (HANDOFF_MEAL).
-    # Same placement rule as the OKR heal: after _people_nudge. Never raises.
-    try:
-        import meal_write
-        _meal = meal_write.hourly(api=api)
-        if _meal:
-            summary += f" · {_meal}"
-    except Exception:
-        pass
+    # 🥘 Meal Prep rides NO sync: Vex 2026-09-21, "this python script that
+    # runs in the background is unacceptable" - the 🔄 Sync with Mela row
+    # in the hub is the only meal writer (meal_write.sync).
     print(summary)
     return summary
 

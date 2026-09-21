@@ -31,7 +31,7 @@ TickAL is a keyboard-driven TickTick front end for Alfred 5. It covers search, b
 | | [Periodic notes](48-periodic.md) | Daily → yearly notes: auto-mint, journals, money roll-ups, reviews - set up + read first |
 | | [Projects](49-projects.md) | 💼 project lists with one scheduled call-to-action task each - set up + read first |
 | | [OKRs](50-okrs.md) | A guiding-star plan: year objectives, objectives and key results on a timeline, with pace and moves that ripple - set up + read first |
-| | [Meal prep](51-meal-prep.md) | The week's three meals from a Mela-fed recipe library, grocery checklists scaled to seven portions, the weekly note's 🥘 bullet |
+| | [Meal prep](51-meal-prep.md) | This week and the next 13 weeks as Mela planned them; one 🔄 Sync with Mela row puts the cook week onto the Sunday routine with grocery checklists scaled to seven portions and the weekly note's 🥘 bullet |
 | **Reference** | [Setup](30-setup.md) | TickTick app credentials, OAuth login, first sync, optional extras |
 | | [Settings & sync](90-settings-sync.md) | Configure Workflow options, cache, optional hourly background sync |
 | | [Cheatsheet](95-cheatsheet.md) | Every keyword and keystroke on one page |

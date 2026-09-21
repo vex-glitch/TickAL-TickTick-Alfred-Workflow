@@ -46,7 +46,7 @@ PAGES = [
     ("📈", "CRM", "docs/47-crm.md", "Bookings, 🔥 tags, Prepare follow-ups"),
     ("💫", "Periodic notes", "docs/48-periodic.md", "Daily to yearly, journals, roll-ups"),
     ("💼", "Projects", "docs/49-projects.md", "P flow, CTAs, keycap areas"),
-    ("🥘", "Meal prep", "docs/51-meal-prep.md", "Plan the week, groceries, the Mela library"),
+    ("🥘", "Meal prep", "docs/51-meal-prep.md", "This week, the next 13 weeks, groceries, the Mela library"),
     ("⚙️", "Settings & sync", "docs/90-settings-sync.md", "The tup menu, cache, agents"),
     ("⌨️", "Cheatsheet", "docs/95-cheatsheet.md", "Every keyword and keystroke"),
     ("🚑", "Troubleshooting", "docs/99-troubleshooting.md", "Symptom, cause, fix"),
