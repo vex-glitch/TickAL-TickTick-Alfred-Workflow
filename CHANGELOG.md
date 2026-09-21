@@ -18,8 +18,11 @@ All notable user-visible changes to TickAL. Format follows
   with the tag and the recipe text, empty descriptions fill, and the cook
   week's meals from the calendar land on the Sunday routine as subtasks,
   one 🛒 grocery checklist per meal scaled to seven portions, and a 🥘
-  bullet in the weekly note. Nothing runs in the background any more.
-  Needs Full Disk Access for Alfred (the status row says when).
+  bullet in the weekly note. Every recipe task then takes the date Mela
+  has it planned on next, so the recipe itself shows when you eat it, in
+  search and in TickTick's calendar; a recipe with no upcoming plan loses
+  its date. Nothing runs in the background any more. Needs Full Disk
+  Access for Alfred (the status row says when).
 - **Weekly note: 🥘 Meal prep** bullet under 💿 Data.
 - **✏️ Rename tag** in the tag's ⌘ menu - a dialog asks the new name and
   every task that carries the tag follows. A name already in use is refused

@@ -221,7 +221,7 @@ res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES + [NEW_LUNC
 kinds = [c[0] for c in api.calls]
 check("outcome is the sync toast", isinstance(res, mw.Outcome) and res.reopen == "ctx:meal" and res.msg ==
       "🔄 Mela · +1 recipe · 3 filled · Week of 28 Sep: 🍳 Oats · 🍛 Beef Bulgogi · 🌮 Pockets · 🍽️ Mystery Bake"
-      " · 4 grocery lists", res)
+      " · 4 grocery lists · 3 recipes dated", res)
 check("import ran inside the sync: the new recipe is in the library",
       any(t["title"].startswith("[New Lunch](mela://recipe/1111") for t in api.lists[LIST].values()))
 check("backfill ran inside the sync: the three library bodies are filled, the stray untouched",
@@ -406,6 +406,61 @@ with open(os.path.join(ROOT, "src", "sync.py"), encoding="utf-8") as f:
     _src = f.read()
     check("sync.py imports no meal writer and calls no hourly hitchhiker",
           "import meal_write" not in _src and ".hourly(" not in _src)
+
+
+# ── the library's dates follow Mela (Vex 2026-09-21) ─────────────────────────
+print("-- library dates")
+api = fresh()
+lib_now = list(api.lists[LIST].values())
+d_set, d_clear = mw.date_plan(lib_now, PLANNED, TODAY)
+check("date_plan: every planned entry takes its NEAREST upcoming day, the past 20 Sep ignored",
+      sorted((t["id"], d.isoformat()) for t, d in d_set) == [("t1", "2026-09-27"), ("t2", "2026-09-27"), ("t3", "2026-09-27")],
+      sorted((t["id"], d.isoformat()) for t, d in d_set))
+check("date_plan: an unplanned undated entry is left alone", d_clear == [])
+dated_t2 = dict(api.lists[LIST]["t2"], startDate="2026-09-27T00:00:00.000+0000", dueDate="2026-09-27T00:00:00.000+0000", isAllDay=True)
+d_set2, _ = mw.date_plan([dated_t2], PLANNED, TODAY)
+check("date_plan: an entry already on its day is skipped", d_set2 == [])
+stale = dict(api.lists[LIST]["t4"], startDate="2026-09-10T00:00:00.000+0000", dueDate="2026-09-10T00:00:00.000+0000", isAllDay=True)
+_, d_clear2 = mw.date_plan([stale], PLANNED, TODAY)
+check("date_plan: a dated entry with no upcoming plan is cleared", [t["id"] for t in d_clear2] == ["t4"])
+g = dict(api.lists[LIST]["g_keep"])
+check("date_plan: a grocery list is never touched", mw.date_plan([g], PLANNED, TODAY) == ([], []))
+
+res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES)
+ups = [c for c in api.calls if c[0] == "update" and "startDate" in c[3] and c[2].startswith("t")]   # not the backfill (content), not g_keep
+check("sync: one paced update per entry, dates set on the day Mela has them",
+      [c[2] for c in ups] == ["t1", "t2", "t3"]
+      and all(api.lists[LIST][t]["startDate"] == "2026-09-27" and api.lists[LIST][t]["dueDate"] == "2026-09-27"
+              and api.lists[LIST][t]["isAllDay"] is True for t in ("t1", "t2", "t3")),
+      (ups, {t: api.lists[LIST][t].get("startDate") for t in ("t1", "t2", "t3", "t4")}))
+check("sync: the stray stays undated, untouched", "startDate" not in api.lists[LIST]["t4"] or not api.lists[LIST]["t4"]["startDate"])
+check("sync: the toast counts them", res.msg.endswith(" · 3 recipes dated"), res.msg)
+check("sync: the cache mirrors the dates",
+      next(t for t in cache_store.get("all_tasks") if t["id"] == "t2")["startDate"] == "2026-09-27")
+res = mw.sync(today=TODAY, api=api, planned=[P(date(2026, 10, 4), U1, "Beef Bulgogi")], recipes=RECIPES)
+check("sync again with one plan left: Bulgogi moves to 4 Oct, the others lose their date",
+      api.lists[LIST]["t2"]["startDate"] == "2026-10-04"
+      and api.lists[LIST]["t1"]["startDate"] is None and api.lists[LIST]["t3"]["dueDate"] is None
+      and api.lists[LIST]["t1"]["isAllDay"] is False, {t: api.lists[LIST][t].get("startDate") for t in ("t1", "t2", "t3")})
+check("… toast: 3 recipes dated (one moved, two cleared)", " · 3 recipes dated" in res.msg, res.msg)
+n_before = len(api.calls)
+res = mw.sync(today=TODAY, api=api, planned=[P(date(2026, 10, 4), U1, "Beef Bulgogi")], recipes=RECIPES)
+check("a third pass with nothing to change writes no dates and says nothing about them",
+      "dated" not in res.msg and not [c for c in api.calls[n_before:] if c[0] == "update" and "startDate" in c[3]],
+      (res.msg, api.calls[n_before:]))
+probe = fresh()
+mw.sync(today=TODAY, api=probe, planned=PLANNED, recipes=RECIPES)
+api = fresh()
+api.fail_after = len(probe.calls) - 2      # the rate limit lands on the LAST date updates
+try:
+    res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES)
+    check("a rate limit inside the dating pass keeps the mirrored week and says how many dates are left",
+          isinstance(res, mw.Outcome) and "left · run again" in res.msg and " dated" in res.msg, res.msg)
+except mw.Refusal as e:
+    check("a rate limit inside the dating pass keeps the mirrored week and says how many dates are left", False, str(e))
+api.fail_after = None
+out = mw.sync(today=TODAY, api=fresh(), dry=True, planned=PLANNED, recipes=RECIPES)
+check("dry run lists the date plan", "library dates: set 3, clear 0" in out and "Oats → 2026-09-27" in out, out.splitlines()[-4:])
 
 print(f"\nmeal_write: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

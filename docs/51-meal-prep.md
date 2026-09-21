@@ -34,7 +34,7 @@ The cook day is Sunday. A meal on a Sunday is cooked that evening and eaten the 
 | 🥘 head | - | the week, the cook Sunday, how many meals ("nothing planned in Mela" when empty) |
 | 🍳 🍛 🌮 this week's meals | opens the recipe in **Mela** | the [meal row](#a-meal-row) chords |
 | 📆 Next 13 weeks | the quarter, one row per week | ⌥ same |
-| 🔄 Sync with Mela · n new · n to fill | recipes in, descriptions filled, this week's meals onto the routine + groceries + note | ⌥⇧ same |
+| 🔄 Sync with Mela · n new · n to fill | recipes in, descriptions filled, next Sunday's meals onto the routine + groceries + note + every recipe dated as Mela has it | ⌥⇧ same |
 | 🛒 Groceries · n open lists | this week's checklists | ⌥ same |
 | 📚 Breakfasts / Lunches / Snacks | that tag's library | ⌥ same |
 | ℹ️ status | - | Mela's data age and how many meals the calendar holds, or why it can't be read |
@@ -64,10 +64,11 @@ Plan rows carry the date (`· Sun 27 Sep`); library rows carry the cooked chip i
 1. Every recipe categorised in Mela that the library does not have yet becomes a library task with its tag and the recipe text (up to forty a run).
 2. Library tasks with an empty description get the recipe text (up to sixty a run).
 3. The calendar is read, and the routine's cook week is mirrored into TickTick: last week's pointers under the routine go (your own steps on it are never touched), one new pointer per planned meal is minted dated the cook Sunday, one 🛒 checklist per meal is made or kept (a list for a meal that stays stays, ticked items are never touched, lists for dropped meals go), and the weekly note's 🥘 bullet is filled.
+4. Every recipe task takes the date Mela has it planned on next: the nearest day on or after today, all-day, the day itself rather than the cook Sunday. A recipe with no upcoming plan loses its date. So the recipe task itself shows when you eat it, in search rows and in TickTick's calendar, for the whole quarter. Groceries, pointers and anything you made by hand are never touched.
 
-The toast says what happened: `🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Hot Pockets · 2 grocery lists`. A week with nothing in the calendar clears the pointers and the open grocery lists, and the note bullet says "nothing planned in Mela".
+The toast says what happened: `🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Hot Pockets · 2 grocery lists · 41 recipes dated`. A week with nothing in the calendar clears the pointers and the open grocery lists, and the note bullet says "nothing planned in Mela". If TickTick's hundred-requests-a-minute limit stops the dating pass, the toast says how many dates are left; press the row again a minute later.
 
-Only the cook week is mirrored. The weeks after it live in the calendar until their Sunday comes round; open the hub and sync again then.
+Only the cook week is mirrored onto the routine. The weeks after it live on the recipe tasks' dates and in the hub's 📆 view until their Sunday comes round.
 
 ## Portions
 

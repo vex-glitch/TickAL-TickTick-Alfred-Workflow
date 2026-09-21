@@ -467,7 +467,8 @@ def sync_payload(back="ctx:meal"):
     return {"back": back}
 
 
-def sync_text(sunday, n_meals, n_groceries, imported, filled, note_ok=True):
+def sync_text(sunday, n_meals, n_groceries, imported, filled, note_ok=True,
+              dated=0, dates_left=0):
     """The toast: '🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Hot
     Pockets · 2 grocery lists'. `n_meals` is a count OR the week's meals
     (Meal objects, (slot, name) pairs or plain names) - names read better
@@ -494,5 +495,9 @@ def sync_text(sunday, n_meals, n_groceries, imported, filled, note_ok=True):
         what = " · ".join(names) if names else "nothing planned in Mela"
     parts.append(f"{week_label(sunday)}: {what}")
     parts.append(f"{n_groceries} grocery list{'s' if n_groceries != 1 else ''}")
+    if dated:                      # library tasks re-dated off the calendar
+        parts.append(f"{dated} recipe{'s' if dated != 1 else ''} dated")
+    if dates_left:                 # the 100-a-minute limit stopped the pass
+        parts.append(f"{dates_left} date{'s' if dates_left != 1 else ''} left · run again")
     txt = " · ".join(parts)
     return txt if note_ok else txt + " · note not written"

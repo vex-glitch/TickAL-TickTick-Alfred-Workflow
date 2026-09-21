@@ -7001,7 +7001,7 @@ def render_meal(ids, query):
     rows.append(alfred.item(
         uid="meal-sync",
         title=f"🔄 Sync with Mela · {n_new} new · {n_missing} to fill",
-        subtitle=f"Recipes in, descriptions filled, Sun {next_cook:%-d %b}'s meals onto the routine + groceries + note",
+        subtitle=f"Recipes in, descriptions filled, Sun {next_cook:%-d %b}'s meals onto the routine + groceries + note + recipe dates",
         arg=sync_arg, valid=True, mods=sm))
     groc = meal.groceries_of(pool, list_id)
     rows.append(alfred.item(

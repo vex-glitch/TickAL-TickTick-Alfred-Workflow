@@ -57,6 +57,19 @@ web".
   from the event's time. A recipe in none of the three maps to slot "x",
   glyph 🍽️, shown and mirrored, never dropped. A planned uuid with no recipe
   in Mela's DB still yields a meal named after the event's summary, slot "x".
+- **D17 · Library tasks carry Mela's date** (2026-09-21, later the same
+  day; Vex: "as long as the correct recipe in TickTick (task) reflects the
+  date it is scheduled for in Mela, I am happy"). The sync's LAST step
+  (`meal_write.date_plan` / `_date_library`): every library entry takes the
+  nearest planned day on or after today, all-day, the day Mela has it on
+  (not the cook Sunday); no upcoming plan = the date is cleared; an entry
+  already on its day is skipped; groceries, pointers and hand-made rows are
+  never touched. One paced full-object update each; a rate limit stops the
+  pass and the toast says "N dates left · run again" (the week is already
+  mirrored by then). This reverses the 2026-09-19 migration's "undated
+  library" on purpose: the sync owns those dates now. So the quarter reaches
+  TickTick through the recipe tasks themselves (search rows, TickTick's
+  calendar), while the routine still carries only the cook week (D13).
 
 ## 1. What it is (Vex's model)
 

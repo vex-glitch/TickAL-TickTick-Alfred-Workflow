@@ -733,6 +733,12 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
                              if r else f"  {p['name'][:30]}: NOT in Mela")
             lines.append(f"weekly note: {meal.note_day(sunday)} (block: "
                          f"{len(note_lines(week.meals))} line(s))")
+            d_set, d_clear = date_plan(lib_tasks, planned, today)
+            lines.append(f"library dates: set {len(d_set)}, clear {len(d_clear)}")
+            for t, d in d_set[:8]:
+                lines.append(f"  {_name_of(t)[:30]} → {d}")
+            for t in d_clear[:8]:
+                lines.append(f"  {_name_of(t)[:30]} → undated")
             return "\n".join(lines)
         # ── write the week ──
         made = []
@@ -769,10 +775,90 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
         note_ok = _write_note(week.meals, sunday)
         _uncache(old_ids + g_gone, [rpid, list_id])
         _cache_add(made + g_made)
+        # last, so a rate limit here leaves the week already mirrored
+        dated, dates_left = _date_library(api, lib_tasks, planned, today)
         ids = [t["id"] for t in made] + [t["id"] for t in g_made]
         return Outcome(meal.sync_text(sunday, week.meals, len(g_made) + len(g_kept),
-                                      imported, filled, note_ok),
+                                      imported, filled, note_ok,
+                                      dated=dated, dates_left=dates_left),
                        "ctx:meal", ids)
+
+
+
+# ── the library's dates (Vex 2026-09-21: "as long as the correct recipe in
+# TickTick reflects the date it is scheduled for in Mela, I am happy") ──────
+def _name_of(t):
+    parsed = meal.parse_title(t.get("title", ""))
+    return parsed[0] if parsed else (t.get("title") or "")
+
+
+def _task_day(t):
+    """The local day a task's date sits on, or None."""
+    raw = t.get("startDate") or t.get("dueDate")
+    if not raw:
+        return None
+    try:
+        return meal._local_date(raw)
+    except Exception:
+        return None
+
+
+def date_plan(lib_tasks, planned, today):
+    """Pure: what every library entry's date should become -> (set, clear).
+    A recipe takes its NEAREST planned day on or after today (all-day, the
+    day Mela has it on, not the cook Sunday); a recipe with no upcoming plan
+    loses its date. Entries already right are left out. `set` =
+    [(task, day)], `clear` = [task]. Only library entries (meal.library_entries):
+    groceries, pointers and hand-made rows are never touched."""
+    upcoming = {}
+    for p in planned or []:
+        d = getattr(p, "date", None)
+        u = (getattr(p, "uuid", "") or "").upper()
+        if d and u and d >= today and (u not in upcoming or d < upcoming[u]):
+            upcoming[u] = d
+    by_id = {t.get("id"): t for t in lib_tasks or []}
+    to_set, to_clear = [], []
+    for e in meal.library_entries(lib_tasks, ""):
+        t = by_id.get(e.get("tid"))
+        if not t:
+            continue
+        want = upcoming.get((e.get("uuid") or "").upper())
+        have = _task_day(t)
+        if want and have != want:
+            to_set.append((t, want))
+        elif not want and have:
+            to_clear.append(t)
+    return to_set, to_clear
+
+
+def _date_library(api, lib_tasks, planned, today):
+    """Write date_plan: (dated, left). One paced full-object update per
+    entry; the 100-a-minute limit stops the pass and `left` says how many
+    wait for the next press (the toast: "N dates left · run again")."""
+    to_set, to_clear = date_plan(lib_tasks, planned, today)
+    todo = [(t, d) for t, d in to_set] + [(t, None) for t in to_clear]
+    dated = 0
+    for t, d in todo:
+        try:
+            _pace()
+            if d is None:
+                resp = api.update_task(t["id"], t.get("projectId"), current=t,
+                                       startDate=None, dueDate=None, isAllDay=False)
+            else:
+                day = meal.api_day(d)
+                resp = api.update_task(t["id"], t.get("projectId"), current=t,
+                                       startDate=day, dueDate=day, isAllDay=True)
+        except Exception as e:
+            if _rate_limited(e):
+                return dated, len(todo) - dated
+            raise
+        dated += 1
+        fields = (dict(startDate=None, dueDate=None, isAllDay=False) if d is None
+                  else dict(startDate=(resp or {}).get("startDate") or meal.api_day(d),
+                            dueDate=(resp or {}).get("dueDate") or meal.api_day(d),
+                            isAllDay=True))
+        _cache_patch(t["id"], **fields)
+    return dated, 0
 
 
 # ── the hub's numbers (cache only, no network) ───────────────────────────────
