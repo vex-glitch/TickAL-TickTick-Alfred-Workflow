@@ -135,7 +135,9 @@ check("cook_sunday: a non-Sunday date is not trusted",
 check("grocery_day: the Saturday before, or today", meal.grocery_day(sun, sat) == sat and meal.grocery_day(sun, sun) == sun
       and meal.grocery_day(date(2026, 9, 27), sat) == date(2026, 9, 26))
 check("note_day + week_label", meal.note_day(sun) == mon and meal.week_label(sun) == "Week of 21 Sep")
-check("api_day", meal.api_day(sun) == "2026-09-20")
+check("api_day: local midnight written in UTC, round-trips to the same day",
+      meal.api_day(sun).endswith("+0000") and "T" in meal.api_day(sun) and meal._local_date(meal.api_day(sun)) == sun,
+      meal.api_day(sun))
 
 
 # ── slot_for_recipe (duck-typed mela.Recipe) ─────────────────────────────────

@@ -348,7 +348,8 @@ def _write_groceries(api, list_id, picks, sunday, today, by_id, existing):
     `existing` = {UUID: live open grocery task}. Kept when its meal is still
     planned (re-dated when the Saturday moved), deleted when its meal is
     not, created when missing. -> (made, kept, deleted_ids)."""
-    day = meal.api_day(meal.grocery_day(sunday, today))
+    gday = meal.grocery_day(sunday, today)
+    day = meal.api_day(gday)
     want = {p["uuid"]: p for p in picks.values() if p.get("uuid")}
     made, kept, gone = [], [], []
     for uuid, t in list(existing.items()):
@@ -364,7 +365,7 @@ def _write_groceries(api, list_id, picks, sunday, today, by_id, existing):
     for p in want.values():
         cur = existing.get(p["uuid"])
         if cur is not None:
-            if (cur.get("dueDate") or "")[:10] != day:
+            if _task_day(cur) != gday:            # local day, not the UTC string
                 try:
                     _pace()
                     api.update_task(cur["id"], cur.get("projectId") or list_id,
@@ -719,14 +720,14 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
                      f"routine {rid} in {rpid}: delete {len(old_ids)} pointer(s) {old_ids}"]
             for m in week.meals:
                 src = "in the library" if m.tid else "NOT in the library"
-                lines.append(f"  create {m.glyph} {m.name} ({m.uuid}) due {meal.api_day(sunday)} · {src}")
+                lines.append(f"  create {m.glyph} {m.name} ({m.uuid}) due {sunday} · {src}")
             if not week.meals:
                 lines.append(f"  ({NOTHING_PLANNED})")
             keep = [u for u in existing if u in picks]
             drop = [existing[u]["id"] for u in existing if u not in picks]
             lines.append(f"groceries in {list_id}: keep {len(keep)}, delete {drop}, "
                          f"create {len(picks) - len(keep)} due "
-                         f"{meal.api_day(meal.grocery_day(sunday, today))}")
+                         f"{meal.grocery_day(sunday, today)}")
             for p in picks.values():
                 r = by_id.get(p["uuid"])
                 lines.append(f"  {p['name'][:30]}: {len(grocery_body(r)[0])} grocery lines"

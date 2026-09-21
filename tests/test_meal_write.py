@@ -238,15 +238,15 @@ check("pointer deletes come before pointer creates",
 ptrs = sorted(pointers(api), key=lambda t: t["id"])
 check("four pointers under the routine, dated the cook Sunday, b/l/s/x order",
       [meal.pointer_slot(t["title"]) for t in ptrs] == ["b", "l", "s", "x"]
-      and all(t["parentId"] == RID and t["dueDate"] == "2026-09-27" and t["kind"] == "TEXT" for t in ptrs), ptrs)
+      and all(t["parentId"] == RID and t["dueDate"] == meal.api_day(date(2026, 9, 27)) and t["kind"] == "TEXT" for t in ptrs), ptrs)
 check("pointer titles: glyph + Mela link, 🍽️ named after the event",
       ptrs[0]["title"] == f"🍳 [Oats](mela://recipe/{U2})"
       and ptrs[3]["title"] == f"🍽️ [Mystery Bake](mela://recipe/{U8})", [t["title"] for t in ptrs])
 check("next week's meal is NOT mirrored", not any("2026-10-04" in (t.get("dueDate") or "") for t in ptrs))
 grocs = groceries(api)
 check("groceries: kept one re-dated, three created, stale gone",
-      set(grocs) == {U1, U2, U3, U8} and grocs[U2]["id"] == "g_keep" and grocs[U2]["dueDate"] == "2026-09-26"
-      and grocs[U1]["kind"] == "CHECKLIST" and grocs[U1]["dueDate"] == "2026-09-26", grocs)
+      set(grocs) == {U1, U2, U3, U8} and grocs[U2]["id"] == "g_keep" and grocs[U2]["dueDate"] == meal.api_day(date(2026, 9, 26))
+      and grocs[U1]["kind"] == "CHECKLIST" and grocs[U1]["dueDate"] == meal.api_day(date(2026, 9, 26)), grocs)
 check("grocery checklist items scaled ×1.75 (4 → 7), header dropped",
       [it["title"] for it in grocs[U1]["items"]] == ["875 g chicken", "1 3/4 tbsp oil", "3 1/2 tsp soy"],
       grocs[U1].get("items"))
@@ -430,16 +430,16 @@ res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES)
 ups = [c for c in api.calls if c[0] == "update" and "startDate" in c[3] and c[2].startswith("t")]   # not the backfill (content), not g_keep
 check("sync: one paced update per entry, dates set on the day Mela has them",
       [c[2] for c in ups] == ["t1", "t2", "t3"]
-      and all(api.lists[LIST][t]["startDate"] == "2026-09-27" and api.lists[LIST][t]["dueDate"] == "2026-09-27"
+      and all(api.lists[LIST][t]["startDate"] == meal.api_day(date(2026, 9, 27)) and api.lists[LIST][t]["dueDate"] == meal.api_day(date(2026, 9, 27))
               and api.lists[LIST][t]["isAllDay"] is True for t in ("t1", "t2", "t3")),
       (ups, {t: api.lists[LIST][t].get("startDate") for t in ("t1", "t2", "t3", "t4")}))
 check("sync: the stray stays undated, untouched", "startDate" not in api.lists[LIST]["t4"] or not api.lists[LIST]["t4"]["startDate"])
 check("sync: the toast counts them", res.msg.endswith(" · 3 recipes dated"), res.msg)
 check("sync: the cache mirrors the dates",
-      next(t for t in cache_store.get("all_tasks") if t["id"] == "t2")["startDate"] == "2026-09-27")
+      next(t for t in cache_store.get("all_tasks") if t["id"] == "t2")["startDate"] == meal.api_day(date(2026, 9, 27)))
 res = mw.sync(today=TODAY, api=api, planned=[P(date(2026, 10, 4), U1, "Beef Bulgogi")], recipes=RECIPES)
 check("sync again with one plan left: Bulgogi moves to 4 Oct, the others lose their date",
-      api.lists[LIST]["t2"]["startDate"] == "2026-10-04"
+      api.lists[LIST]["t2"]["startDate"] == meal.api_day(date(2026, 10, 4))
       and api.lists[LIST]["t1"]["startDate"] is None and api.lists[LIST]["t3"]["dueDate"] is None
       and api.lists[LIST]["t1"]["isAllDay"] is False, {t: api.lists[LIST][t].get("startDate") for t in ("t1", "t2", "t3")})
 check("… toast: 3 recipes dated (one moved, two cleared)", " · 3 recipes dated" in res.msg, res.msg)

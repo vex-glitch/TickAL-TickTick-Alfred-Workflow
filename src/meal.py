@@ -30,7 +30,7 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time, timezone
 
 try:
     import periodic_model as _pm
@@ -284,8 +284,13 @@ def week_label(sunday):
 
 
 def api_day(d):
-    """A bare ISO date - api.create_task reads it as all-day."""
-    return d.isoformat()
+    """The all-day form TickTick STORES: local midnight of `d` written in
+    UTC ("2026-09-26T22:00:00+0000" for a CEST Sunday 27 Sep), the shape
+    day_move writes. A bare "2026-09-27" is accepted by v1 and silently
+    dropped: the pointers and grocery lists of the first 🔄 press
+    (2026-09-21 20:00) came back undated."""
+    local_midnight = datetime.combine(d, time(0, 0)).astimezone()   # naive = local
+    return local_midnight.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
 
 
 # ── the plan, folded into weeks ──────────────────────────────────────────────
