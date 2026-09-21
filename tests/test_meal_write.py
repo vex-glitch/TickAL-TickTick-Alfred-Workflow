@@ -462,5 +462,38 @@ api.fail_after = None
 out = mw.sync(today=TODAY, api=fresh(), dry=True, planned=PLANNED, recipes=RECIPES)
 check("dry run lists the date plan", "library dates: set 3, clear 0" in out and "Oats → 2026-09-27" in out, out.splitlines()[-4:])
 
+
+# ── a pointer the listing lost (v1 left the first press's undated ones out) ──
+print("-- childIds fallback")
+api = fresh()
+ghost = T("p_ghost", meal.pointer_title("b", "Ghost", U2), pid=RLIST, parent=RID)
+api.lists[RLIST][RID]["childIds"] = ["p_old", "step", "p_arch", "p_ghost", "p_gone"]
+api.ghost = ghost
+_orig_get = api.get_task
+def _get(pid, tid):
+    if tid == "p_ghost":
+        api._bump("get_task", pid, tid)
+        return dict(ghost)
+    if tid == "p_gone":
+        api._bump("get_task", pid, tid)
+        raise KeyError("404")
+    return _orig_get(pid, tid)
+api.get_task = _get
+_orig_pd = api.get_project_data
+api.get_project_data = lambda pid: (lambda d: d)(_orig_pd(pid))      # p_ghost is NOT in the listing
+_orig_del = api.delete_task
+deleted = []
+def _del(pid, tid):
+    deleted.append(tid)
+    if tid in ("p_ghost",):
+        api._bump("delete", pid, tid); return True
+    return _orig_del(pid, tid)
+api.delete_task = _del
+res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES)
+check("a pointer named in childIds but missing from the listing is read alone and deleted",
+      "p_ghost" in deleted and "p_old" in deleted, deleted)
+check("a childId that answers 404 is skipped, the sync still lands", "p_gone" not in deleted and isinstance(res, mw.Outcome), res)
+check("the routine's own step is never touched", "step" not in deleted)
+
 print(f"\nmeal_write: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

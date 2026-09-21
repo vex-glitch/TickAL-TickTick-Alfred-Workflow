@@ -710,6 +710,25 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
         picks = _picks_of(week.meals)
         old = meal.pointers_of(r_tasks, rid)
         old_ids = [t["id"] for t in old.values()]
+        # v1's project data left out the first press's pointers (2026-09-21:
+        # created with a bare date, isAllDay true and NO date - the listing
+        # skipped them, the routine's childIds still named them), so every
+        # childId the listing lacks is read on its own; an open pointer among
+        # them is deleted too. A deleted child keeps its id in childIds (the
+        # OKR trap) and answers 404 or a trashed status-0 copy, so cap it.
+        seen = {t.get("id") for t in r_tasks}
+        for cid in [c for c in (routine.get("childIds") or []) if c not in seen][:12]:
+            try:
+                _pace()
+                stray = api.get_task(rpid, cid)
+            except Exception as e:
+                if _rate_limited(e):
+                    _refuse_partial("week not mirrored", imported, filled)
+                continue
+            if (isinstance(stray, dict) and stray.get("status", 0) == 0
+                    and not stray.get("deleted") and not stray.get("repeatTaskId")
+                    and meal.is_pointer(stray.get("title") or "")):
+                old_ids.append(cid)
         existing = meal.groceries_of(lib_tasks, list_id)
         if dry:
             lines = [f"🥘 DRY RUN · {meal.week_label(sunday)} (cook {sunday:%a %d %b})",
