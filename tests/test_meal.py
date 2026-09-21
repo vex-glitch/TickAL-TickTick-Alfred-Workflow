@@ -242,10 +242,10 @@ check("sort_for_lib: never first (by name), then least recently cooked", order =
 # ── the sync verb ────────────────────────────────────────────────────────────
 check("sync_payload", meal.sync_payload() == {"back": "ctx:meal"} and meal.sync_payload("ctx:mealq") == {"back": "ctx:mealq"})
 txt = meal.sync_text(S27, [w0[0]], 2, 2, 3)
-check("sync_text: the contract line", txt == "🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Oats · 2 grocery lists", txt)
-check("sync_text: a count, singular", meal.sync_text(S27, 1, 1, 1, 0) == "🔄 Mela · +1 recipe · Week of 28 Sep: 1 meal · 1 grocery list")
+check("sync_text: the contract line", txt == "🔄 Mela · +2 recipes · 3 filled · cook Sun 27 Sep: 🍳 Oats · 2 grocery lists", txt)
+check("sync_text: a count, singular", meal.sync_text(S27, 1, 1, 1, 0) == "🔄 Mela · +1 recipe · cook Sun 27 Sep: 1 meal · 1 grocery list")
 check("sync_text: nothing new, nothing planned", meal.sync_text(S27, 0, 0, 0, 0)
-      == "🔄 Mela · nothing new · Week of 28 Sep: nothing planned in Mela · 0 grocery lists")
+      == "🔄 Mela · nothing new · cook Sun 27 Sep: nothing planned in Mela · 0 grocery lists")
 check("sync_text: (slot, name) pairs", "🍳 Oats · 🍽️ Cake" in meal.sync_text(S27, [("b", "Oats"), ("x", "Cake")], 2, 0, 0))
 check("sync_text: note not written", meal.sync_text(S27, 3, 3, 0, 0, note_ok=False).endswith(" · note not written"))
 
@@ -284,6 +284,53 @@ check("seed lands at the end of 💿 Data, before the divider",
 check("seed is idempotent", meal_notes.write_block(d3, lines, live={"createdTime": "2026-09-14T10:00:00.000+0000"}) is False)
 old_layout = ps.parse_sections("### A\n- x\n")
 check("no 💿 Data group = never written", meal_notes.write_block(old_layout, lines, live={"createdTime": "2026-01-01T00:00:00+0000"}) is False)
+
+
+# ── zones, the upcoming occurrence, the batch (Vex 2026-09-21) ───────────────
+print("-- zones / upcoming / batch")
+from zoneinfo import ZoneInfo
+lon = {"timeZone": "Europe/London", "startDate": "2026-09-21T22:00:00.000+0000"}
+ber = {"timeZone": "Europe/Berlin", "startDate": "2026-09-21T22:00:00.000+0000"}
+check("task_date reads a stamp in the task's OWN zone: 21T22Z is Mon 21 in London, Tue 22 in Berlin",
+      meal.task_date(lon) == date(2026, 9, 21) and meal.task_date(ber) == date(2026, 9, 22))
+check("task_date: no date, bad date", meal.task_date({}) is None and meal.task_date({"dueDate": "soon"}) is None)
+check("api_day in a zone: London midnight of 22 Sep is 21T23Z, Berlin's is 21T22Z",
+      meal.api_day(date(2026, 9, 22), ZoneInfo("Europe/London")) == "2026-09-21T23:00:00+0000"
+      and meal.api_day(date(2026, 9, 22), ZoneInfo("Europe/Berlin")) == "2026-09-21T22:00:00+0000")
+check("api_day round-trips through task_date in the same zone",
+      meal.task_date({"timeZone": "Europe/London", "startDate": meal.api_day(date(2026, 12, 25), ZoneInfo("Europe/London"))}) == date(2026, 12, 25))
+check("zone_name", meal.zone_name(ZoneInfo("Europe/Berlin")) == "Europe/Berlin")
+check("routine_key folds case and spaces", meal.routine_key("  🥘  meal   PREP ") == meal.routine_key("🥘 Meal Prep"))
+RID = "r" * 24
+POOL = [
+    {"id": RID, "title": "🥘 Meal Prep", "status": 0, "repeatFlag": "RRULE:FREQ=WEEKLY", "timeZone": "Europe/Berlin",
+     "startDate": "2026-09-27T17:00:00.000+0000"},
+    {"id": "c" * 24, "title": "🥘 Meal Prep", "status": 0, "timeZone": "Europe/Berlin",
+     "startDate": "2026-09-22T07:00:00.000+0000"},                        # the copy Vex moved to Tuesday
+    {"id": "d" * 24, "title": "🥘 Meal Prep", "status": 2, "startDate": "2026-09-20T17:00:00.000+0000"},   # done
+    {"id": "e" * 24, "title": "🥘 Meal Prep", "status": 0, "startDate": "2026-09-13T17:00:00.000+0000"},   # stale, past
+    {"id": "f" * 24, "title": "🥘 Meal Prep", "status": 0},                                                 # undated
+    {"id": "g" * 24, "title": "Something else", "status": 0, "repeatTaskId": RID, "startDate": "2026-09-24T07:00:00.000+0000"},
+    {"id": "h" * 24, "title": "🛒 Groceries", "status": 0, "startDate": "2026-09-22T06:00:00.000+0000"},
+]
+today = date(2026, 9, 21)
+check("open_matching: title twins, the series and a split-off occurrence, never the done one",
+      sorted(t["id"][0] for t in meal.open_matching(POOL, meal.PREP_TITLE, (RID,))) == ["c", "e", "f", "g", "r"])
+up = meal.upcoming(POOL, meal.PREP_TITLE, today, ids=(RID,))
+check("upcoming: the moved Tuesday copy beats the Sunday series", up and up["id"] == "c" * 24, up and up["id"])
+check("upcoming: the past and the undated never count", meal.upcoming(POOL[3:5], meal.PREP_TITLE, today) is None)
+check("upcoming on the cook day itself still counts", meal.upcoming(POOL, meal.PREP_TITLE, date(2026, 9, 22), ids=(RID,))["id"] == "c" * 24)
+check("upcoming: after Tuesday the series is next", meal.upcoming(POOL, meal.PREP_TITLE, date(2026, 9, 23), ids=(RID,))["id"] == "g" * 24
+      or meal.upcoming(POOL, meal.PREP_TITLE, date(2026, 9, 25), ids=(RID,))["id"] == RID)
+tie = [dict(POOL[0], startDate="2026-09-22T17:00:00.000+0000"), POOL[1]]
+check("upcoming: a same-day tie goes to the copy, not the series", meal.upcoming(tie, meal.PREP_TITLE, today, ids=(RID,))["id"] == "c" * 24)
+check("upcoming: groceries by title", meal.upcoming(POOL, meal.GROCERIES_TITLE, today)["id"] == "h" * 24)
+pl = [P(date(2026, 9, 22), U2, "Oats"), P(date(2026, 9, 22), U1, "Bulgogi"), P(date(2026, 9, 22), U2, "Oats again"),
+      P(date(2026, 9, 27), U3, "Pockets")]
+ms = meal.meals_on(pl, RECIPES, None, ents, date(2026, 9, 22))
+check("meals_on: the day's meals only, one per recipe, slot order",
+      [(m.slot, m.name) for m in ms] == [("b", "Oats"), ("l", "Beef Bulgogi")], [(m.slot, m.name) for m in ms])
+check("meals_on: an empty day", meal.meals_on(pl, {}, None, [], date(2026, 9, 23)) == [])
 
 print(f"\nmeal: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

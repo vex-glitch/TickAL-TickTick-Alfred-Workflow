@@ -111,8 +111,8 @@ def P(day, uuid, title):
 # the calendar: this cook week has a breakfast, a lunch and a recipe Mela
 # does not know (dropped on the Monday, still this week); Pockets in two
 # weeks; Bulgogi cooked two cook-weeks before today's
-PLANNED = [P(WK, U2, "Oats"), P(WK, U1, "Beef Bulgogi"), P(WK + timedelta(days=1), U5, "Mystery Pie"),
-           P(WK + timedelta(days=14), U3, "Pockets"),
+PLANNED = [P(SUN, U2, "Oats"), P(SUN, U1, "Beef Bulgogi"), P(SUN, U5, "Mystery Pie"),
+           P(SUN + timedelta(days=14), U3, "Pockets"),
            P(meal.cook_week_of(TODAY) - timedelta(days=14), U1, "Beef Bulgogi")]
 CALLS = []
 ERROR = [""]
@@ -125,7 +125,8 @@ def fake_plan_view(today=None, n_weeks=HORIZON, planned=None, recipes=None, task
         return {"weeks": [], "first_sunday": first, "planned_count": 0, "error": ERROR[0]}
     entries = meal.library_entries(LIB, LIST)
     return {"weeks": meal.weeks_plan(PLANNED, RECIPES, None, entries, first, n_weeks),
-            "first_sunday": first, "planned_count": len(PLANNED), "error": ""}
+            "first_sunday": first, "planned_count": len(PLANNED), "error": "",
+            "planned": list(PLANNED), "by_id": RECIPES, "entries": entries, "tag_map": None}
 
 
 mw.plan_view = fake_plan_view
@@ -220,9 +221,9 @@ uids = [x["uid"] for x in rows]
 check("hub: sealed", sealed(rows, "hub"))
 check("hub: plan_view anchored on THIS week's cook Sunday (first_sunday), the full horizon",
       CALLS and CALLS[-1] == (TODAY, HORIZON, WK), CALLS)
-check("hub: head = week label · cook Sunday · 3 meals, dead",
-      r["meal-head"]["title"] == f"🥘 {meal.week_label(WK)} · {COOK(WK)} · 3 meals"
-      and not r["meal-head"]["valid"], r["meal-head"]["title"])
+check("hub: head = the BATCH: the upcoming prep task's day · 3 meals, dead",
+      r["meal-head"]["title"] == f"🥘 {COOK(SUN)} · 3 meals" and f"{meal.week_label(WK)} · groceries" in r["meal-head"]["subtitle"]
+      and not r["meal-head"]["valid"], (r["meal-head"]["title"], r["meal-head"]["subtitle"]))
 check("hub: rows in order (b, l, x), then 📆 🔄 🛒 📚×3 ℹ️",
       uids == ["meal-head", f"meal-b-{U2[:8]}", f"meal-l-{U1[:8]}", f"meal-x-{U5[:8]}", "meal-next", "meal-sync",
                "meal-groc", "meal-lib-b", "meal-lib-l", "meal-lib-s", "meal-status"], uids)
@@ -230,7 +231,7 @@ check("hub: the retired rows are gone",
       not any(u in r for u in ("meal-plan", "meal-import", "meal-fill", "meal-b", "meal-l", "meal-s")))
 b = r[f"meal-b-{U2[:8]}"]
 check("hub: breakfast title carries the glyph and the planned day",
-      b["title"] == f"🍳 Oats · {WK:%a %-d %b}", b["title"])
+      b["title"] == f"🍳 Oats · {SUN:%a %-d %b}", b["title"])
 meal_row_ok(b, U2, "https://oats.example/recipe", "hub breakfast")
 check("hub: ⌘ live on a meal with a library task, the task variables ride",
       b["mods"]["cmd"]["valid"] and b["variables"]["task_id"] == "t1" and b["variables"]["task_list_id"] == LIST
@@ -249,19 +250,19 @@ s = r["meal-sync"]
 check("hub: 🔄 row = xact:meal_sync with the back payload, ⌥⇧ the same verb, counts new + to fill",
       s["arg"].startswith("xact:meal_sync:") and payload(s) == {"back": "ctx:meal"} and s["valid"]
       and s["mods"]["alt+shift"]["arg"] == s["arg"] and s["title"] == "🔄 Sync with Mela · 2 new · 14 to fill"
-      and "onto the routine + groceries + note" in s["subtitle"], s)
+      and "onto the prep task + groceries + note" in s["subtitle"], s)
 check("hub: 🔄 never on ⌘ or ⌥", not s["mods"]["cmd"]["valid"] and not s["mods"]["alt"]["valid"])
 check("hub: groceries row counts, no rebuild verb any more",
       "1 open list" in r["meal-groc"]["title"] and r["meal-groc"]["arg"] == "xact:crmbrowse:ctx:mealgroc"
       and not r["meal-groc"]["mods"]["alt+shift"]["valid"], r["meal-groc"])
 check("hub: library rows", r["meal-lib-l"]["arg"] == "xact:crmbrowse:ctx:meallib:lunch" and "Lunches · 2" in r["meal-lib-l"]["title"])
-check("hub: status row = Mela age · calendar count", r["meal-status"]["title"] == "ℹ️ Mela data 4 min old · calendar 5 planned meals"
+check("hub: status row = Mela age · calendar count", r["meal-status"]["title"] == "ℹ️ Mela data 4 min old · calendar: 5 planned meals"
       and "4 recipes" in r["meal-status"]["subtitle"] and not r["meal-status"]["valid"], r["meal-status"]["title"])
 check("hub: ⌃ backs to the folders", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:folders" for x in rows))
 ERROR[0] = "Calendar store unreadable · give Alfred Full Disk Access (System Settings › Privacy › Full Disk Access)"
 r2 = by_uid(rows_for("ctx:meal"))
 check("hub: plan_view error → head wears the cache chip, says nothing planned, status shows the line",
-      r2["meal-head"]["title"].endswith("nothing planned in Mela · cache") and r2["meal-status"]["title"] == f"ℹ️ {ERROR[0]}"
+      "nothing planned in Mela" in r2["meal-head"]["title"] and r2["meal-head"]["title"].endswith("· cache") and r2["meal-status"]["title"] == f"ℹ️ {ERROR[0]}"
       and not any(u.startswith("meal-b-") for u in r2), r2["meal-head"]["title"])
 ERROR[0] = ""
 saved = PLANNED[:]
@@ -293,40 +294,44 @@ r = by_uid(rows)
 check("quarter: sealed", sealed(rows, "quarter"))
 check("quarter: 13 rows, one per cook Sunday from this week's",
       [x["uid"] for x in rows] == [f"mq-{(WK + timedelta(days=7 * i)).isoformat()}" for i in range(HORIZON)], [x["uid"] for x in rows])
+BW = meal.cook_week_of(SUN)                    # the batch's week
 w0 = r[f"mq-{WK.isoformat()}"]
-check("quarter: this week starred, meals joined, ⏎ trampoline to the week, ⌥ by variable, ⌘ dead",
-      w0["title"] == f"⭐️ {meal.week_label(WK)} · 🍳 Oats · 🍛 Beef Bulgogi · 🍽️ Mystery Pie" and w0["valid"]
-      and w0["arg"] == f"xact:crmbrowse:ctx:mealw:{WK.isoformat()}"
-      and w0["mods"]["alt"]["variables"]["browse_ctx"] == f"ctx:mealw:{WK.isoformat()}"
-      and not w0["mods"]["cmd"]["valid"], w0)
-w1 = r[f"mq-{(WK + timedelta(days=7)).isoformat()}"]
+check("quarter: this week starred", w0["title"].startswith("⭐️ ") and not w0["mods"]["cmd"]["valid"], w0["title"])
+wb = r[f"mq-{BW.isoformat()}"]
+check("quarter: the batch week lists its meals, ⏎ trampoline to the week, ⌥ by variable, ⌘ dead",
+      wb["title"].endswith(f"{meal.week_label(BW)} · 🍳 Oats · 🍛 Beef Bulgogi · 🍽️ Mystery Pie") and wb["valid"]
+      and wb["arg"] == f"xact:crmbrowse:ctx:mealw:{BW.isoformat()}"
+      and wb["mods"]["alt"]["variables"]["browse_ctx"] == f"ctx:mealw:{BW.isoformat()}"
+      and not wb["mods"]["cmd"]["valid"], wb)
+EW = WK + timedelta(days=35)                   # a week with nothing in it
+w1 = r[f"mq-{EW.isoformat()}"]
 check("quarter: an empty week is dead and says where to plan it",
-      w1["title"] == f"{meal.week_label(WK + timedelta(days=7))} · nothing planned" and not w1["valid"]
+      w1["title"] == f"{meal.week_label(EW)} · nothing planned" and not w1["valid"]
       and "Plan it in Mela: ⌘⌥A Add to Calendar" in w1["subtitle"] and not w1["title"].startswith("⭐️"), w1)
-w2 = r[f"mq-{(WK + timedelta(days=14)).isoformat()}"]
+w2 = r[f"mq-{(SUN + timedelta(days=14)).isoformat()}"]
 check("quarter: a later planned week is live", w2["valid"] and "🌮 Pockets" in w2["title"] and "1 meal " in w2["subtitle"], w2)
 check("quarter: ⌃ backs to the hub", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows))
-check("quarter: the bar filters on meal names", [x["uid"] for x in rows_for("ctx:mealq", "pockets")] == [f"mq-{(WK + timedelta(days=14)).isoformat()}"])
+check("quarter: the bar filters on meal names", [x["uid"] for x in rows_for("ctx:mealq", "pockets")] == [f"mq-{(SUN + timedelta(days=14)).isoformat()}"])
 check("quarter: the bar filters on the week label",
-      [x["uid"] for x in rows_for("ctx:mealq", meal.week_label(WK + timedelta(days=7)))][:1] == [f"mq-{(WK + timedelta(days=7)).isoformat()}"])
+      [x["uid"] for x in rows_for("ctx:mealq", meal.week_label(EW))][:1] == [f"mq-{EW.isoformat()}"])
 
 # ── one week ──────────────────────────────────────────────────────────────────
-wk = (WK + timedelta(days=14)).isoformat()
+wk = (SUN + timedelta(days=14)).isoformat()
 rows = rows_for(f"ctx:mealw:{wk}")
 r = by_uid(rows)
 check("week: sealed", sealed(rows, "week"))
 check("week: head + the meal row", [x["uid"] for x in rows] == ["mw-head", f"mw-s-{U3[:8]}"]
-      and r["mw-head"]["title"] == f"🥘 {meal.week_label(WK + timedelta(days=14))} · {COOK(WK + timedelta(days=14))} · 1 meal", [x["uid"] for x in rows])
+      and r["mw-head"]["title"] == f"🥘 {meal.week_label(SUN + timedelta(days=14))} · {COOK(SUN + timedelta(days=14))} · 1 meal", [x["uid"] for x in rows])
 meal_row_ok(r[f"mw-s-{U3[:8]}"], U3, "https://pockets.example", "week snack")
 check("week: ⌘ live (Pockets is t3)", r[f"mw-s-{U3[:8]}"]["variables"]["task_id"] == "t3" and r[f"mw-s-{U3[:8]}"]["mods"]["cmd"]["valid"])
 check("week: ⌃ backs to the quarter", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:mealq" for x in rows))
-rows = rows_for(f"ctx:mealw:{(WK + timedelta(days=21)).isoformat()}")
+rows = rows_for(f"ctx:mealw:{EW.isoformat()}")
 check("week: an empty one = the head alone, nothing planned", len(rows) == 1 and "nothing planned in Mela" in rows[0]["title"]
       and "⌘⌥A" in rows[0]["subtitle"], rows)
 check("week: a weekday resolves to its cook Sunday",
-      by_uid(rows_for(f"ctx:mealw:{(WK + timedelta(days=3)).isoformat()}"))["mw-head"]["title"].startswith(f"🥘 {meal.week_label(WK)}"))
+      by_uid(rows_for(f"ctx:mealw:{(SUN + timedelta(days=3)).isoformat()}"))["mw-head"]["title"].startswith(f"🥘 {meal.week_label(SUN)}"))
 check("week: a bad date", "needs" in browse.render_mealw(["yesterday"], "")[0]["title"])
-check("week: the bar filters", [x["uid"] for x in rows_for(f"ctx:mealw:{WK.isoformat()}", "bulg")] == ["mw-head", f"mw-l-{U1[:8]}"])
+check("week: the bar filters", [x["uid"] for x in rows_for(f"ctx:mealw:{SUN.isoformat()}", "bulg")] == ["mw-head", f"mw-l-{U1[:8]}"])
 
 # ── the library + groceries ───────────────────────────────────────────────────
 rows = rows_for("ctx:meallib:lunch")
@@ -344,7 +349,7 @@ check("library: ⌘ live with the task variables", r["ml-t2"]["mods"]["cmd"]["va
 check("library: ⌥ dead without subtasks, still the drill hop", not r["ml-t2"]["mods"]["alt"]["valid"]
       and r["ml-t2"]["mods"]["alt"]["variables"]["browse_ctx"] == f"ctx:subtasks:{LIST}:t2")
 rs = by_uid(rows_for("ctx:meallib:snack"))
-check("library: the next planned Sunday shows", f"next {WK + timedelta(days=14):%a %-d %b}" in rs["ml-t3"]["subtitle"], rs["ml-t3"]["subtitle"])
+check("library: the next planned Sunday shows", f"next {SUN + timedelta(days=14):%a %-d %b}" in rs["ml-t3"]["subtitle"], rs["ml-t3"]["subtitle"])
 check("library: filter", [x["uid"] for x in rows_for("ctx:meallib:lunch", "second")] == ["ml-head", "ml-t4"])
 check("library: a bad tag", "needs" in browse.render_meallib(["dinner"], "")[0]["title"])
 check("library: ⌃ backs to the hub", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows))
@@ -352,7 +357,7 @@ rows = rows_for("ctx:mealgroc")
 r = by_uid(rows)
 check("groceries: sealed", sealed(rows, "groc"))
 check("groceries: one list, ticked count, due, ⇧ completes",
-      "1/2 ticked" in r["mg-g1"]["subtitle"] and "due 2026-09-26" in r["mg-g1"]["subtitle"]
+      "1/2 ticked" in r["mg-g1"]["subtitle"] and f"due {meal.task_date(LIB[4]):%a %-d %b}" in r["mg-g1"]["subtitle"]
       and r["mg-g1"]["mods"]["shift"]["arg"].startswith(f"complete:{LIST}:g1:") and r["mg-g1"]["variables"]["task_id"] == "g1", r["mg-g1"])
 
 # ── the Routines hub's door ───────────────────────────────────────────────────

@@ -6829,6 +6829,40 @@ def _meal_pool(list_id):
     return mw._pool_tasks(list_id)
 
 
+def _meal_list(rid, live=False):
+    """(the routines list's rows, its list id, the routine task) - the pool
+    the batch is found in (meal.upcoming). The cache first; on an empty bar
+    one live read, kept as meal_kids for _MEAL_FRESH_S."""
+    import routines as rt
+    t = cache_store.find_task(rid) or {}
+    pid = (t.get("projectId") or t.get("_projectId")
+           or (rt.by_tid(rid) or {}).get("pid") or rt.ROUTINES_LIST)
+    tasks = None
+    kept = cache_store.get("meal_kids")
+    if (isinstance(kept, dict) and kept.get("rid") == rid
+            and time.time() - (kept.get("ts") or 0) < _MEAL_FRESH_S):
+        tasks = kept.get("tasks") or []
+        t = kept.get("routine") or t
+    elif live:
+        try:
+            pd = TickTickAPI(cfg.get_token()).get_project_data(pid) or {}
+            tasks = list(pd.get("tasks") or [])
+            t = next((x for x in tasks if x.get("id") == rid), None) or t
+            try:
+                cache_store.set("meal_kids", {"rid": rid, "ts": time.time(),
+                                              "routine": t, "tasks": tasks})
+            except Exception:
+                pass
+        except Exception:
+            tasks = None
+    if tasks is None:
+        tasks = [x for x in (cache_store.get("all_tasks") or [])
+                 if (x.get("projectId") or x.get("_projectId")) == pid]
+        if not tasks:
+            tasks = list((cache_store.get(f"project_data_{pid}") or {}).get("tasks") or [])
+    return tasks, pid, t
+
+
 def _meal_routine(rid, live=False):
     """(routine task, {slot: pointer task}, its list id). The cache first;
     on an empty bar one live read of the routine's list, kept as meal_kids
@@ -6970,22 +7004,35 @@ def render_meal(ids, query):
     if not list_id or not rid:
         return _meal_off()
     today = _date.today()
-    routine, _kids, _rpid = _meal_routine(rid, live=not query)
-    sunday = meal.cook_week_of(today)     # THIS week, the one being eaten (Vex
-                                          # 2026-09-21: "this week's breakfast,
-                                          # lunch, snack"), never next Sunday's
-    next_cook = meal.cook_sunday(routine, today)   # the routine's: what 🔄 mirrors
+    r_tasks, _rpid, routine = _meal_list(rid, live=not query)
+    # THE BATCH (Vex 2026-09-21): the next 🥘 Meal Prep task - the series or
+    # the copy he moved to a weekday - and the meals Mela has on ITS day.
+    prep = meal.upcoming(r_tasks, meal.PREP_TITLE, today, ids=(rid,))
+    groc_task = meal.upcoming(r_tasks, meal.GROCERIES_TITLE, today,
+                              ids=(cfg.get_meal_groceries_id(),))
+    cook = meal.task_date(prep) if prep else meal.next_sunday(today)
+    sunday = meal.cook_week_of(today)     # 📆 starts on THIS week, starred
     pool = _meal_pool(list_id)
     entries = meal.library_entries(pool, list_id)
     by_slot = meal.entries_by_slot(entries)
     pv = _meal_plan(sunday, mw.HORIZON_WEEKS, today)
-    week = _meal_week(pv, sunday)
+    meals = meal.meals_on(pv.get("planned") or [], pv.get("by_id") or {},
+                          pv.get("tag_map"), pv.get("entries") or entries, cook)
     try:
         counts = mw.hub_counts()
     except Exception as e:
         counts = {"new": 0, "missing": 0, "uncategorised": 0, "mela_error": str(e)}
-    rows = [_meal_head("meal-head", week, sunday, today, routine=routine, cache=bool(pv["error"]))]
-    for m in week.meals:
+    n = len(meals)
+    what = (f"{n} meal" + ("" if n == 1 else "s")) if n else f"nothing planned in Mela on {cook:%a %-d %b}"
+    head = f"🥘 {_meal_cook(cook, today)} · {what}" + (" · cache" if pv["error"] else "")
+    gday = meal.task_date(groc_task) if groc_task else max(cook - timedelta(days=1), today)
+    sub = f"{meal.week_label(sunday)} · groceries {gday:%a %-d %b}"
+    if prep is None:
+        sub += " · no upcoming 🥘 Meal Prep task"
+    elif not n:
+        sub += " · Plan it in Mela: ⌘⌥A Add to Calendar"
+    rows = [alfred.item(uid="meal-head", title=head, subtitle=sub + "  |  ⌃🔙", valid=False)]
+    for m in meals:
         rows.append(_meal_row(f"meal-{m.slot}-{m.uuid[:8]}", m,
                               (meal.slot(m.slot) or meal.SLOT_X)[3], when=m.date))
     n_plan = pv["planned_count"]
@@ -7001,13 +7048,14 @@ def render_meal(ids, query):
     rows.append(alfred.item(
         uid="meal-sync",
         title=f"🔄 Sync with Mela · {n_new} new · {n_missing} to fill",
-        subtitle=f"Recipes in, descriptions filled, Sun {next_cook:%-d %b}'s meals onto the routine + groceries + note + recipe dates",
+        subtitle=f"Recipes in, descriptions filled, {cook:%a %-d %b}'s meals onto the prep task + groceries + note + recipe dates",
         arg=sync_arg, valid=True, mods=sm))
-    groc = meal.groceries_of(pool, list_id)
+    groc = mw._grocery_lists(pool + r_tasks)
     rows.append(alfred.item(
         uid="meal-groc",
-        title=f"🛒 Groceries · {len(groc)} open list" + ("" if len(groc) == 1 else "s"),
-        subtitle="this week's shopping checklists  |  ⏎⤵️  ⌥⤵️",
+        title=f"🛒 Groceries · {len(groc)} open list" + ("" if len(groc) == 1 else "s") + f" · {gday:%a %-d %b}",
+        subtitle=("under " + md_links_display(groc_task.get("title") or "🛒 Groceries") if groc_task
+                  else "loose in the library list") + "  |  ⏎⤵️  ⌥⤵️",
         arg="xact:crmbrowse:ctx:mealgroc", valid=True, mods=_okr_nav_mods("ctx:mealgroc")))
     for key, tag, glyph, label in meal.SLOTS:
         ctx = f"ctx:meallib:{_MEAL_SLUG[key]}"
@@ -7020,7 +7068,8 @@ def render_meal(ids, query):
     elif counts.get("mela_error"):
         st = f"Mela: {counts['mela_error']}"
     else:
-        st = (f"Mela data {_meal_age(counts.get('mela_age_s'))} old · calendar {n_plan} planned meal"
+        cal = ", ".join(pv.get("calendars") or []) or "calendar"
+        st = (f"Mela data {_meal_age(counts.get('mela_age_s'))} old · {cal}: {n_plan} planned meal"
               + ("" if n_plan == 1 else "s"))
     rows.append(alfred.item(uid="meal-status", title=f"ℹ️ {st}",
                             subtitle=f"{len(entries)} recipes in the library  |  ⌃🔙",
@@ -7147,11 +7196,15 @@ def render_mealgroc(query):
     """This week's 🛒 checklists in the library list: ⏎ opens the task,
     ⇧ ticks it done, ⌥⌘ copies its link, ⌘ Actions."""
     import meal
-    list_id = cfg.get_meal_list_id()
+    import meal_write as mw
+    list_id, rid = cfg.get_meal_list_id(), cfg.get_meal_routine_id()
     if not list_id:
         return _meal_off("ctx:meal")
     pool = _meal_pool(list_id)
-    groc = list(meal.groceries_of(pool, list_id).values())
+    r_tasks = _meal_list(rid, live=False)[0] if rid else []
+    # the lists sit under the upcoming 🛒 Groceries task now (loose in the
+    # library list only when there is none)
+    groc = list(mw._grocery_lists(pool + r_tasks).values())
     groc.sort(key=lambda t: (t.get("dueDate") or "", t.get("title") or ""))
     if query:
         groc = fuzz.filter_and_score(query, groc, key_fn=lambda t: t.get("title") or "")
@@ -7164,7 +7217,8 @@ def render_mealgroc(query):
         link = _meal_link(pid, t["id"])
         items = t.get("items") or []
         done = sum(1 for it in items if it.get("status") == 2)
-        due = (t.get("dueDate") or "")[:10]
+        dd = meal.task_date(t)
+        due = f"{dd:%a %-d %b}" if dd else ""
         parsed = meal.parse_title(t.get("title") or "")
         name = parsed[0] if parsed else (t.get("title") or "")
         mods = _okr_dead_mods()

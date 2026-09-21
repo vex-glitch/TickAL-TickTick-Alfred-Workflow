@@ -283,14 +283,97 @@ def week_label(sunday):
     return f"Week of {note_day(sunday):%-d %b}"
 
 
-def api_day(d):
-    """The all-day form TickTick STORES: local midnight of `d` written in
-    UTC ("2026-09-26T22:00:00+0000" for a CEST Sunday 27 Sep), the shape
-    day_move writes. A bare "2026-09-27" is accepted by v1 and silently
-    dropped: the pointers and grocery lists of the first 🔄 press
-    (2026-09-21 20:00) came back undated."""
-    local_midnight = datetime.combine(d, time(0, 0)).astimezone()   # naive = local
-    return local_midnight.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
+PREP_TITLE = "🥘 Meal Prep"          # the routine, and any copy Vex moves
+GROCERIES_TITLE = "🛒 Groceries"     # the Saturday routine, moved the same way
+
+
+def local_zone():
+    """The Mac's zone (via /etc/localtime), DST-aware."""
+    try:
+        from zoneinfo import ZoneInfo
+        name = os.path.realpath("/etc/localtime").split("zoneinfo/")[-1]
+        return ZoneInfo(name)
+    except Exception:
+        return datetime.now().astimezone().tzinfo
+
+
+def zone_of(task):
+    """The zone a task's dates are READ in: its own timeZone field, else
+    the Mac's. TickTick shows an all-day task on the date its stamp has in
+    THAT zone - Vex's account writes Europe/London on API-made tasks while
+    the Mac sits on Europe/Berlin, so a Berlin-midnight stamp on a London
+    task showed the day before (2026-09-21)."""
+    name = ((task or {}).get("timeZone") or "").strip()
+    if name:
+        try:
+            from zoneinfo import ZoneInfo
+            return ZoneInfo(name)
+        except Exception:
+            pass
+    return local_zone()
+
+
+def zone_name(zone):
+    return getattr(zone, "key", None) or str(zone)
+
+
+def task_date(task):
+    """The calendar day a task sits on, in its own zone (see zone_of)."""
+    raw = (task or {}).get("startDate") or (task or {}).get("dueDate")
+    if not raw:
+        return None
+    try:
+        txt = str(raw).replace("Z", "+00:00")
+        if re.search(r"[+-]\d{4}$", txt):
+            txt = txt[:-2] + ":" + txt[-2:]
+        return datetime.fromisoformat(txt).astimezone(zone_of(task)).date()
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def api_day(d, zone=None):
+    """The all-day form TickTick STORES: midnight of `d` in `zone` (the
+    task's own, else the Mac's) written in UTC - "2026-09-26T22:00:00+0000"
+    for a CEST 27 Sep, "…T23:00:00+0000" for a BST one. A bare "2026-09-27"
+    is accepted by v1 and silently dropped: the first 🔄 press (2026-09-21
+    20:00) came back undated."""
+    zone = zone or local_zone()
+    return (datetime.combine(d, time(0, 0), tzinfo=zone).astimezone(timezone.utc)
+            .strftime("%Y-%m-%dT%H:%M:%S+0000"))
+
+
+def routine_key(title):
+    return " ".join((title or "").split()).casefold()
+
+
+def open_matching(tasks, title, ids=()):
+    """Every OPEN task that is this routine: the series (its id), an
+    occurrence TickTick split off (repeatTaskId), or a copy with the same
+    title (what "move this one to Tuesday" leaves behind, 2026-09-21)."""
+    want, ids = routine_key(title), set(i for i in (ids or ()) if i)
+    out = []
+    for t in tasks or []:
+        if not isinstance(t, dict) or t.get("status", 0) != 0 or t.get("deleted"):
+            continue
+        if (routine_key(t.get("title")) == want or t.get("id") in ids
+                or (t.get("repeatTaskId") or "") in ids):
+            out.append(t)
+    return out
+
+
+def upcoming(tasks, title, today, ids=()):
+    """The NEXT occurrence of a routine: the earliest open matching task on
+    or after today (its own zone); a same-day tie goes to the moved copy
+    over the series. None when nothing is ahead."""
+    best, best_key = None, None
+    for t in open_matching(tasks, title, ids):
+        d = task_date(t)
+        if not d or d < today:
+            continue
+        key = (d, 1 if t.get("repeatFlag") else 0, str(t.get("startDate") or t.get("dueDate") or ""))
+        if best is None or key < best_key:
+            best, best_key = t, key
+    return best
 
 
 # ── the plan, folded into weeks ──────────────────────────────────────────────
@@ -411,6 +494,25 @@ def week_meals(planned, by_id, tag_map, entries, sunday):
     return weeks_plan(planned, by_id, tag_map, entries, sunday, 1)[0]
 
 
+def meals_on(planned, by_id, tag_map, entries, day):
+    """The meals Mela has ON one calendar day - the batch a cook day makes
+    (Vex 2026-09-21: the prep task moves, the meals sit on its day in Mela).
+    One per recipe, slot order."""
+    by_uuid = {}
+    for e in entries or []:
+        u = (e.get("uuid") or "").upper()
+        if u and u not in by_uuid:
+            by_uuid[u] = e
+    seen = {}
+    for p in sorted(planned or [], key=lambda p: (p.date, getattr(p, "title", "") or "")):
+        if p.date != day:
+            continue
+        u = _uuid_of(p)
+        if u and u not in seen:
+            seen[u] = _meal_from(p, by_id, tag_map, by_uuid)
+    return sorted(seen.values(), key=_meal_sort_key)
+
+
 def last_cooked(planned, uuid, today):
     """Whole cook-weeks since this recipe was last planned on or before
     today (0 = this week's cooking, i.e. the same cook Sunday as today),
@@ -472,12 +574,12 @@ def sync_payload(back="ctx:meal"):
     return {"back": back}
 
 
-def sync_text(sunday, n_meals, n_groceries, imported, filled, note_ok=True,
+def sync_text(day, n_meals, n_groceries, imported, filled, note_ok=True,
               dated=0, dates_left=0):
-    """The toast: '🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Hot
-    Pockets · 2 grocery lists'. `n_meals` is a count OR the week's meals
-    (Meal objects, (slot, name) pairs or plain names) - names read better
-    than a number when the writer has them."""
+    """The toast: '🔄 Mela · +2 recipes · 3 filled · cook Tue 22 Sep: 🍳 Hot
+    Pockets · 2 grocery lists'. `day` is the cook day (the prep task's);
+    `n_meals` is a count OR that day's meals (Meal objects, (slot, name)
+    pairs or plain names) - names read better than a number."""
     parts = ["🔄 Mela"]
     if imported:
         parts.append(f"+{imported} recipe{'s' if imported != 1 else ''}")
@@ -498,7 +600,7 @@ def sync_text(sunday, n_meals, n_groceries, imported, filled, note_ok=True,
             else:
                 names.append(str(m))
         what = " · ".join(names) if names else "nothing planned in Mela"
-    parts.append(f"{week_label(sunday)}: {what}")
+    parts.append(f"cook {day:%a %-d %b}: {what}")
     parts.append(f"{n_groceries} grocery list{'s' if n_groceries != 1 else ''}")
     if dated:                      # library tasks re-dated off the calendar
         parts.append(f"{dated} recipe{'s' if dated != 1 else ''} dated")

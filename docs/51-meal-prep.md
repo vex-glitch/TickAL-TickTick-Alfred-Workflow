@@ -16,32 +16,34 @@ One cooking session a week, three meals, seven portions each. The recipes live i
 |---|---|---|
 | **The plan** | Calendar events made by Mela (**⌘⌥A Add to Calendar**), one per meal, on the Sunday it is cooked. Any calendar works: the hub reads them all and keeps only Mela's | You, in Mela |
 | **The library** | One TickTick list (🍳Meal Prep) with one task per recipe: title `[Name](mela://recipe/…)`, tagged 🍳breakfast / 🍛lunch / 🌮snack, the recipe in the description | Mela + 🔄 Sync |
-| **The routine** | The repeating Sunday 🥘 Meal Prep task in 🌅 Routines | You, once |
-| **This week** | One pointer subtask per planned meal under the routine, dated the cook Sunday | 🔄 Sync |
-| **Groceries** | One 🛒 checklist per meal in the library list, tagged 🛒groceries, due the Saturday before, ingredients scaled to 7 portions | 🔄 Sync |
+| **The routine** | The repeating Sunday 🥘 Meal Prep task in 🌅 Routines, or the copy you moved to another day | You |
+| **The next cook** | One pointer subtask per meal Mela has on that day, under that 🥘 Meal Prep task, dated the day | 🔄 Sync |
+| **Groceries** | One 🛒 checklist per meal as a subtask of your next 🛒 Groceries task, tagged 🛒groceries, dated its day, ingredients scaled to 7 portions | 🔄 Sync |
 | **The weekly note** | A `🥘 Meal prep` bullet under 💿 Data with the week's meals | 🔄 Sync |
 
 The slot of a meal (🍳 breakfast, 🍛 lunch, 🌮 snack) comes from the recipe's Mela category (**02 • Breakfast**, **01 • Meal**, **03 • Snack**), never from the time of the event. A recipe in none of those shows as 🍽️ and is kept, not dropped.
 
 ## Weeks
 
-The cook day is Sunday. A meal on a Sunday is cooked that evening and eaten the week after, so the hub calls it **Week of** the Monday that follows: a meal on Sun 27 Sep belongs to Week of 28 Sep, cook Sun 27 Sep. Put the event on the Sunday you cook; the time does not matter.
+The cook day is whatever day your next **🥘 Meal Prep** task sits on in the Routines list. Usually that is Sunday, but when you move it to a Tuesday because of work, the hub and the sync follow the moved task, and they take the meals Mela has on that day. So plan the meals in Mela on the day you cook, then move the TickTick task to match if you need to; the time does not matter. For the week rows the hub still folds a cook day into the week it feeds: a meal cooked on Sun 27 Sep belongs to Week of 28 Sep, one cooked on Tue 22 Sep to Week of 21 Sep.
+
+Groceries are not planned in Mela at all. The sync hangs one checklist per meal under your next **🛒 Groceries** task, dated its day, wherever you moved that one.
 
 ## The hub
 
 | Row | ⏎ | Chords |
 |---|---|---|
-| 🥘 head | - | the week, the cook Sunday, how many meals ("nothing planned in Mela" when empty) |
-| 🍳 🍛 🌮 this week's meals | opens the recipe in **Mela** | the [meal row](#a-meal-row) chords |
+| 🥘 head | - | the next cook day (your 🥘 Meal Prep task, wherever you moved it), how many meals Mela has on it, the groceries day ("nothing planned in Mela on …" when empty) |
+| 🍳 🍛 🌮 that day's meals | opens the recipe in **Mela** | the [meal row](#a-meal-row) chords |
 | 📆 Next 13 weeks | the quarter, one row per week | ⌥ same |
-| 🔄 Sync with Mela · n new · n to fill | recipes in, descriptions filled, next Sunday's meals onto the routine + groceries + note + every recipe dated as Mela has it | ⌥⇧ same |
-| 🛒 Groceries · n open lists | this week's checklists | ⌥ same |
+| 🔄 Sync with Mela · n new · n to fill | recipes in, descriptions filled, the next cook's meals onto its prep task + groceries + note + every recipe dated as Mela has it | ⌥⇧ same |
+| 🛒 Groceries · n open lists · day | the checklists under your next 🛒 Groceries task | ⌥ same |
 | 📚 Breakfasts / Lunches / Snacks | that tag's library | ⌥ same |
 | ℹ️ status | - | Mela's data age and how many meals the calendar holds, or why it can't be read |
 
 ### The quarter
 
-**📆 Next 13 weeks** lists one row per week from the routine's cook Sunday: `⭐️ Week of 28 Sep · 🍳 Hot Pockets`, this week starred, several meals joined with a dot. A week with nothing in the calendar reads `Week of 5 Oct · nothing planned` and cannot be entered; its subtitle reminds you: plan it in Mela, ⌘⌥A. Type to filter on the week or a meal name. ⏎ (or ⌥) opens that week: its head row and its meal rows, the same shape as the hub. ⌃ steps back.
+**📆 Next 13 weeks** lists one row per week from this week on: `⭐️ Week of 21 Sep · 🍳 Breakfast Bagels · 🌮 Chicken subs`, this week starred, several meals joined with a dot. A week with nothing in the calendar reads `Week of 5 Oct · nothing planned` and cannot be entered; its subtitle reminds you: plan it in Mela, ⌘⌥A. Type to filter on the week or a meal name. ⏎ (or ⌥) opens that week: its head row and its meal rows, the same shape as the hub. ⌃ steps back.
 
 ### A meal row
 
@@ -63,12 +65,12 @@ Plan rows carry the date (`· Sun 27 Sep`); library rows carry the cooked chip i
 
 1. Every recipe categorised in Mela that the library does not have yet becomes a library task with its tag and the recipe text (up to forty a run).
 2. Library tasks with an empty description get the recipe text (up to sixty a run).
-3. The calendar is read, and the routine's cook week is mirrored into TickTick: last week's pointers under the routine go (your own steps on it are never touched), one new pointer per planned meal is minted dated the cook Sunday, one 🛒 checklist per meal is made or kept (a list for a meal that stays stays, ticked items are never touched, lists for dropped meals go), and the weekly note's 🥘 bullet is filled.
+3. The calendar is read, and the next cook is mirrored into TickTick: your next 🥘 Meal Prep task is found (the Sunday routine or the copy you moved to a weekday), every old pointer under any Meal Prep task goes (your own steps on it are never touched), one new pointer per meal Mela has on that day is minted under it dated that day, one 🛒 checklist per meal is made or kept under your next 🛒 Groceries task dated its day (a list already there stays, ticked items are never touched, lists for dropped meals go, a list sitting loose from an older press is remade under the task), and the 🥘 bullet is filled in the note of the week that cook feeds.
 4. Every recipe task takes the date Mela has it planned on next: the nearest day on or after today, all-day, the day itself rather than the cook Sunday. A recipe with no upcoming plan loses its date. So the recipe task itself shows when you eat it, in search rows and in TickTick's calendar, for the whole quarter. Groceries, pointers and anything you made by hand are never touched.
 
-The toast says what happened: `🔄 Mela · +2 recipes · 3 filled · Week of 28 Sep: 🍳 Hot Pockets · 2 grocery lists · 41 recipes dated`. A week with nothing in the calendar clears the pointers and the open grocery lists, and the note bullet says "nothing planned in Mela". If TickTick's hundred-requests-a-minute limit stops the dating pass, the toast says how many dates are left; press the row again a minute later.
+The toast says what happened: `🔄 Mela · +2 recipes · 3 filled · cook Tue 22 Sep: 🍳 Breakfast Bagels · 🌮 Chicken subs · 2 grocery lists · 41 recipes dated`. A cook day with nothing in the calendar clears the pointers and the open grocery lists, and the note bullet says "nothing planned in Mela". If TickTick's hundred-requests-a-minute limit stops the dating pass, the toast says how many dates are left; press the row again a minute later.
 
-Only the cook week is mirrored onto the routine. The weeks after it live on the recipe tasks' dates and in the hub's 📆 view until their Sunday comes round.
+Only the next cook is mirrored onto its prep task. The cooks after it live on the recipe tasks' dates and in the hub's 📆 view until their day comes round; press the row again once a cook is done.
 
 ## Portions
 
@@ -79,6 +81,12 @@ Every grocery line is scaled to seven portions from the recipe's yield. The yiel
 The plan is read from the Mac's own calendar store, which macOS protects. If the hub's status row says the calendar store is unreadable, give Alfred **Full Disk Access** (System Settings › Privacy & Security › Full Disk Access) and open the hub again. Nothing is written to the calendar, ever.
 
 Mela's database only reflects the phone once the Mac app has synced, so open Mela now and then; the status row shows the data age.
+
+## Which calendar
+
+Mela's "Add to Calendar" writes to whichever calendar you picked last, and the plan is read from exactly that one: the calendar Mela wrote to most recently. The status row names it. Two stale local calendars both called "Mela", left from the first experiments, are ignored that way; delete them in Calendar.app whenever you like. To pin the choice, put the calendar's name in `config.json` under `meal_calendars` (several names separated by commas).
+
+Dates are written in each task's own time zone. TickTick shows an all-day task on the date its stamp has in that zone, and a task made through the API gets the account's zone (Europe/London) while the Mac runs on Europe/Berlin, which is how a Tuesday plan once showed up on Monday.
 
 ## What went away
 

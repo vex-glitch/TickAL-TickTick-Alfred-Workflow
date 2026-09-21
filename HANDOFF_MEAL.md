@@ -70,6 +70,35 @@ web".
   library" on purpose: the sync owns those dates now. So the quarter reaches
   TickTick through the recipe tasks themselves (search rows, TickTick's
   calendar), while the routine still carries only the cook week (D13).
+- **D18 · The batch, not the Sunday** (2026-09-21 evening, after the first
+  real press). The sync and the hub anchor on the NEXT 🥘 Meal Prep task in
+  the routines list, whatever day it sits on: the series, an occurrence
+  TickTick split off (repeatTaskId), or the copy it leaves when Vex moves an
+  occurrence to a weekday (Vex: "I will often move it because of work"). Found
+  by title (`meal.PREP_TITLE`, `routine_key`) or id (`meal.upcoming`; a
+  same-day tie goes to the copy). The meals are Mela's events ON that day
+  (`meal.meals_on`); he adjusts Mela first. Pointers under every other open
+  prep occurrence go with the press: one batch at a time. The week the batch
+  feeds = `cook_week_of(day)`, which is where the note bullet lands.
+- **D19 · Groceries hang off the 🛒 Groceries task.** The upcoming one (title,
+  or config `meal_groceries_id`, default the Saturday series
+  `6a9ed12a3d3fd103a69fec48`): one CHECKLIST per meal as its SUBTASKS in the
+  routines list, dated its day in its zone. Without one: loose in the library
+  list, due the day before the cook. A list sitting elsewhere (a loose one
+  from an earlier press) is deleted and re-made under the task, its ticks
+  lost once; ticked lists are never touched. Vex: "I do not schedule
+  groceries in Mela, but I do in TickTick."
+- **D20 · Zones and calendars.** Every all-day stamp is written in the TASK's
+  zone (`meal.zone_of`, `api_day(d, zone)`; creates carry `timeZone`):
+  TickTick reads an all-day date in the task's timeZone, and Vex's account
+  stamps Europe/London on API-made tasks while the Mac sits on Europe/Berlin,
+  so a Berlin-midnight stamp showed a Tuesday plan on Monday. The plan is read
+  from the calendar Mela wrote to most recently (`mela_cal.choose_calendars`;
+  config `meal_calendars` overrides): two stale local "Mela" calendars full
+  of test events had dated Breakfast Bagels on the wrong day. Trashed pointer
+  ids are remembered in `~/.ticktick_alfred/meal_gone.json` so the childIds
+  fallback never re-reads them (v1 get_task answers a trashed task as status
+  0, the OKR trap).
 
 ## 1. What it is (Vex's model)
 

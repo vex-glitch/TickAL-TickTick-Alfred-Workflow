@@ -40,7 +40,8 @@ CREATE TABLE CalendarItem (ROWID INTEGER PRIMARY KEY, summary TEXT, description 
   start_date REAL, start_tz TEXT, end_date REAL, end_tz TEXT, all_day INTEGER,
   calendar_id INTEGER, orig_item_id INTEGER, orig_date REAL, status INTEGER,
   url TEXT, hidden INTEGER, has_recurrences INTEGER, unique_identifier TEXT,
-  UUID TEXT, entity_type INTEGER, phantom_master INTEGER, last_modified REAL);
+  UUID TEXT, entity_type INTEGER, phantom_master INTEGER, last_modified REAL,
+  creation_date REAL);
 """
 CALENDARS = [(28, 5, "Inbox"), (48, 8, "Mela"), (49, 8, "Mela")]
 E = mela_cal.APPLE_EPOCH
@@ -114,6 +115,7 @@ def build_store(path):
     con.executemany("INSERT INTO CalendarItem (ROWID, summary, start_date, start_tz, all_day, "
                     "calendar_id, status, url, hidden, phantom_master, entity_type) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?,2)", ITEMS)
+    con.execute("UPDATE CalendarItem SET creation_date = start_date")   # newest plan = latest day
     con.commit()
     con.close()
 
@@ -309,6 +311,24 @@ try:
 finally:
     mela_cal.STORE_PATH, mela_cal.SNAP_DIR, mela_cal._RETRY_S = SAVED
     shutil.rmtree(TMP, ignore_errors=True)
+
+
+# ── which calendar (Vex 2026-09-21: two stale local "Mela" calendars) ─────────
+print("-- calendars")
+store2 = os.path.join(tempfile.mkdtemp(prefix="test_mela_cal2-"), "cal2.sqlitedb")   # TMP is locked by the FDA check above
+build_store(store2)
+rec = mela_cal.calendars_by_recency(path=store2)
+check("calendars_by_recency: the calendar Mela wrote to last comes first, names deduped",
+      rec[:1] == ["Inbox"] and rec.count("Mela") == 1, rec)
+check("choose_calendars: a preference wins", mela_cal.choose_calendars(["Mela"], path=store2) == ["Mela"])
+check("choose_calendars: blank preference = the most recent one only", mela_cal.choose_calendars([], path=store2) == ["Inbox"])
+check("choose_calendars: '  ' entries are ignored", mela_cal.choose_calendars(["  "], path=store2) == ["Inbox"])
+all_rows = mela_cal.plan(path=store2)
+inbox = mela_cal.plan(path=store2, calendars=["Inbox"])
+check("plan(calendars=) keeps only those calendars",
+      inbox and all(p.calendar == "Inbox" for p in inbox) and len(inbox) < len(all_rows), (len(inbox), len(all_rows)))
+check("plan(calendars=[]) is empty, plan(calendars=None) is everything",
+      mela_cal.plan(path=store2, calendars=[]) == [] and len(mela_cal.plan(path=store2, calendars=None)) == len(all_rows))
 
 print(f"\nmela_cal: {COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":

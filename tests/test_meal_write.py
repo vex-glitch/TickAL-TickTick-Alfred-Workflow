@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 from datetime import date
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
@@ -30,6 +31,7 @@ import mela                                    # noqa: E402
 import mela_cal                                # noqa: E402
 
 mw.IMPORT_LEDGER = os.path.join(TMP, "meal_import.json")
+mw.GONE_LEDGER = os.path.join(TMP, "meal_gone.json")          # never the real memory of trashed ids
 mw.LOCK_FILE = os.path.join(TMP, "meal.lock")
 mw.POST_GAP = 0.0
 mw.PACE = 0.0                                   # the sync's own imports + backfills
@@ -78,12 +80,13 @@ class FakeAPI:
 
     def create_task(self, title, project_id=None, due_date=None, content=None, priority=0,
                     tags=None, column_id=None, parent_id=None, kind=None, start_date=None,
-                    repeat_flag=None, reminders=None):
+                    repeat_flag=None, reminders=None, time_zone=None):
         self._bump("create", project_id, title)
         self.n += 1
         t = {"id": f"new{self.n}", "projectId": project_id, "title": title, "status": 0,
              "dueDate": due_date, "content": content or "", "tags": tags or [],
-             "parentId": None, "kind": kind or "TEXT", "sortOrder": -self.n}
+             "parentId": None, "kind": kind or "TEXT", "sortOrder": -self.n,
+             "timeZone": time_zone}
         self.lists.setdefault(project_id, {})[t["id"]] = dict(t, parentId=parent_id)
         return dict(t)
 
@@ -177,7 +180,7 @@ check("dry run returns text", isinstance(out, str) and "DRY RUN" in out and "Wee
       and "cook Sun 27 Sep" in out, out[:120])
 check("dry run reads only", all(c[0] in ("get", "pd") for c in api.calls), api.calls)
 check("dry run names the stale pointer + grocery and the four meals",
-      "p_old" in out and "g_old" in out and "keep 1" in out and "create 3 due 2026-09-26" in out
+      "p_old" in out and "g_old" in out and "due 2026-09-26: keep 1" in out and "create 3" in out
       and "🍽️ Mystery Bake" in out and "NOT in the library" in out, out)
 check("dry run: no import ledger, no note", not os.path.exists(mw.IMPORT_LEDGER) and not NOTE_CALLS)
 os.environ["TICKAL_MEAL_DRY"] = "1"
@@ -195,8 +198,8 @@ try:
 except mw.Refusal as e:
     check("blank list id refused", "Meal prep is off" in str(e), str(e))
 os.environ["meal_list_id"] = LIST
-_cal = mw._calendar
-mw._calendar = lambda since=None, until=None: ([], "Calendar store unreadable · give Alfred Full Disk Access (System Settings › Privacy › Full Disk Access)")
+_cal = mw._calendar_plan
+mw._calendar_plan = lambda since=None, until=None: ([], [], "Calendar store unreadable · give Alfred Full Disk Access (System Settings › Privacy › Full Disk Access)")
 try:
     api = fresh()
     mw.sync(today=TODAY, api=api, recipes=RECIPES)
@@ -204,7 +207,7 @@ try:
 except mw.Refusal as e:
     check("unreadable calendar refused with the FDA line", "Full Disk Access" in str(e), str(e))
     check("unreadable calendar: nothing written, nothing read", api.calls == [], api.calls)
-mw._calendar = _cal
+mw._calendar_plan = _cal
 _m = mw._mela
 mw._mela = lambda: ([], {}, "Mela database not found")
 try:
@@ -220,7 +223,7 @@ NEW_LUNCH = R("11111111-1111-1111-1111-111111111111", "New Lunch")
 res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES + [NEW_LUNCH])
 kinds = [c[0] for c in api.calls]
 check("outcome is the sync toast", isinstance(res, mw.Outcome) and res.reopen == "ctx:meal" and res.msg ==
-      "🔄 Mela · +1 recipe · 3 filled · Week of 28 Sep: 🍳 Oats · 🍛 Beef Bulgogi · 🌮 Pockets · 🍽️ Mystery Bake"
+      "🔄 Mela · +1 recipe · 3 filled · cook Sun 27 Sep: 🍳 Oats · 🍛 Beef Bulgogi · 🌮 Pockets · 🍽️ Mystery Bake"
       " · 4 grocery lists · 3 recipes dated", res)
 check("import ran inside the sync: the new recipe is in the library",
       any(t["title"].startswith("[New Lunch](mela://recipe/1111") for t in api.lists[LIST].values()))
@@ -279,7 +282,7 @@ res2 = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES + [NEW_LUN
 after = {t["id"] for t in pointers(api)}
 check("re-sync: pointers re-minted, still four", not (before & after) and len(after) == 4)
 check("re-sync: groceries kept, none created, nothing new",
-      res2.msg.startswith("🔄 Mela · nothing new · Week of 28 Sep") and "4 grocery lists" in res2.msg
+      res2.msg.startswith("🔄 Mela · nothing new · cook Sun 27 Sep") and "4 grocery lists" in res2.msg
       and len([c for c in api.calls[n_calls:] if c[0] == "create" and c[1] == LIST]) == 0, res2.msg)
 
 # ── note lines ────────────────────────────────────────────────────────────────
@@ -300,7 +303,7 @@ check("empty week: pointers cleared, none minted", pointers(api) == [] and "step
 check("empty week: open groceries cleared, the ticked one kept",
       groceries(api) == {} and "g_done" in api.lists[LIST], groceries(api))
 check("empty week: toast says nothing planned in Mela",
-      "Week of 28 Sep: nothing planned in Mela · 0 grocery lists" in res.msg, res.msg)
+      "cook Sun 27 Sep: nothing planned in Mela · 0 grocery lists" in res.msg, res.msg)
 check("empty week: the note gets the empty block", NOTE_CALLS and NOTE_CALLS[-1][0] == [])
 
 # ── rate limit mid-way ────────────────────────────────────────────────────────
@@ -329,11 +332,11 @@ pv = mw.plan_view(today=date(2026, 9, 27), planned=PLANNED, recipes=RECIPES)
 check("plan_view on a Sunday: that Sunday is the first week", pv["first_sunday"] == SUN)
 pv = mw.plan_view(today=TODAY, planned=PLANNED, recipes=RECIPES, first_sunday=date(2026, 10, 6))
 check("plan_view: first_sunday snaps to the cook Sunday", pv["first_sunday"] == date(2026, 10, 4))
-mw._calendar = lambda since=None, until=None: ([], "Calendar store unreadable · give Alfred Full Disk Access (System Settings › Privacy › Full Disk Access)")
+mw._calendar_plan = lambda since=None, until=None: ([], [], "Calendar store unreadable · give Alfred Full Disk Access (System Settings › Privacy › Full Disk Access)")
 pv = mw.plan_view(today=TODAY, recipes=RECIPES)
 check("plan_view never raises: the FDA line as error, 13 empty weeks",
       "Full Disk Access" in pv["error"] and len(pv["weeks"]) == 13 and all(w.meals == [] for w in pv["weeks"]))
-mw._calendar = _cal
+mw._calendar_plan = _cal
 mw._mela = lambda: ([], {}, "no Mela")
 pv = mw.plan_view(today=TODAY, planned=PLANNED)
 check("plan_view without Mela: meals still shown, slot 🍽️ off the event title, mela_error set",
@@ -494,6 +497,49 @@ check("a pointer named in childIds but missing from the listing is read alone an
       "p_ghost" in deleted and "p_old" in deleted, deleted)
 check("a childId that answers 404 is skipped, the sync still lands", "p_gone" not in deleted and isinstance(res, mw.Outcome), res)
 check("the routine's own step is never touched", "step" not in deleted)
+
+
+# ── the batch follows the MOVED prep task; lists hang off the 🛒 task (Vex 2026-09-21) ──
+print("-- moved prep + groceries task")
+BER = ZoneInfo("Europe/Berlin")
+api = fresh()
+api.lists[RLIST]["prep_tue"] = T("prep_tue", "🥘 Meal Prep", pid=RLIST, startDate="2026-09-22T07:00:00.000+0000", timeZone="Europe/Berlin")
+api.lists[RLIST]["groc_tue"] = T("groc_tue", "🛒 Groceries", pid=RLIST, startDate="2026-09-22T06:00:00.000+0000", timeZone="Europe/Berlin")
+TUE = [P(date(2026, 9, 22), U2, "Oats"), P(date(2026, 9, 22), U1, "Beef Bulgogi")] + PLANNED
+out = mw.sync(today=TODAY, api=api, dry=True, planned=TUE, recipes=RECIPES)
+check("dry run: the batch is the moved Tuesday task, groceries under the 🛒 task",
+      "cook Tue 22 Sep" in out and "prep_tue" in out and "under groc_tue" in out and "due 2026-09-22" in out, out.splitlines()[:6])
+res = mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
+ptrs = pointers(api)
+check("pointers under the moved copy only, dated its day in its zone",
+      sorted(t["parentId"] for t in ptrs) == ["prep_tue", "prep_tue"]
+      and all(t["dueDate"] == meal.api_day(date(2026, 9, 22), BER) for t in ptrs), ptrs)
+check("… created in the prep task's zone", all(t.get("timeZone") == "Europe/Berlin" for t in ptrs), ptrs)
+check("… the series' old pointer went", "p_old" not in api.lists[RLIST])
+glists = [t for t in api.lists[RLIST].values() if meal.is_grocery(t["title"]) and meal.parse_title(t["title"]) and t["status"] == 0]
+check("one list per meal as SUBTASKS of the 🛒 Groceries task, due its day",
+      sorted(t["parentId"] for t in glists) == ["groc_tue", "groc_tue"]
+      and all(t["dueDate"] == meal.api_day(date(2026, 9, 22), BER) and t.get("timeZone") == "Europe/Berlin" for t in glists), glists)
+check("… the loose library-list lists are gone, the ticked one survives",
+      groceries(api) == {} and "g_keep" not in api.lists[LIST] and "g_done" in api.lists[LIST])
+check("… the toast names the cook day", "cook Tue 22 Sep: 🍳 Oats · 🍛 Beef Bulgogi · 2 grocery lists" in res.msg, res.msg)
+check("… the note went to the week the batch feeds (Mon 21 Sep)", NOTE_CALLS and NOTE_CALLS[-1][1] == date(2026, 9, 20), NOTE_CALLS[-1:])
+check("the trashed pointer id is remembered", "p_old" in mw._gone_ids(), mw._gone_ids())
+res2 = mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
+check("a second press keeps the lists (in place), re-mints the pointers",
+      "2 grocery lists" in res2.msg and len(pointers(api)) == 2 and len([t for t in api.lists[RLIST].values() if meal.is_grocery(t["title"]) and meal.parse_title(t["title"]) and t["status"] == 0]) == 2, res2.msg)
+api.lists[RLIST][RID]["childIds"] = ["p_old", "step"]
+n_before = len(api.calls)
+mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
+check("a remembered childId is never read again",
+      not [c for c in api.calls[n_before:] if c[0] == "get" and c[2] == "p_old"], [c for c in api.calls[n_before:] if c[0] == "get"])
+api = fresh()
+api.lists[LIST]["t1"]["timeZone"] = "Europe/London"
+mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES)
+check("a London-zone recipe gets London midnight; a zoneless one the Mac's",
+      api.lists[LIST]["t1"]["startDate"] == meal.api_day(date(2026, 9, 27), ZoneInfo("Europe/London"))
+      and api.lists[LIST]["t2"]["startDate"] == meal.api_day(date(2026, 9, 27)),
+      (api.lists[LIST]["t1"]["startDate"], api.lists[LIST]["t2"]["startDate"]))
 
 print(f"\nmeal_write: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

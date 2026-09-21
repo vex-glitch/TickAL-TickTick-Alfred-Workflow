@@ -133,8 +133,13 @@ class TickTickAPI:
 
     def create_task(self, title, project_id=None, due_date=None, content=None,
                     priority=0, tags=None, column_id=None, parent_id=None, kind=None,
-                    start_date=None, repeat_flag=None, reminders=None):
+                    start_date=None, repeat_flag=None, reminders=None, time_zone=None):
         payload = {"title": title}
+        if time_zone:
+            # an all-day date is READ in the task's zone: a create without one
+            # gets the account's (Europe/London on Vex's), so a Berlin-midnight
+            # stamp showed the day before (meal prep, 2026-09-21)
+            payload["timeZone"] = time_zone
         if project_id:
             payload["projectId"] = project_id
         if start_date:

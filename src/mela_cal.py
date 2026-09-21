@@ -281,13 +281,15 @@ _SQL = ("SELECT ci.summary, ci.start_date, ci.start_tz, ci.all_day, ci.status, "
         "WHERE ci.url LIKE ? ORDER BY ci.ROWID")
 
 
-def plan(since=None, until=None, path=None, now=None) -> List[Planned]:
+def plan(since=None, until=None, path=None, now=None, calendars=None) -> List[Planned]:
     """Every planned meal in every calendar: rows whose url starts with
     mela://calendar/, minus hidden, cancelled (status 3) and phantom
     masters, as Planned sorted by (date, start, title). `since` / `until`
-    are inclusive LOCAL date bounds. `path` reads that copy (tests);
+    are inclusive LOCAL date bounds. `calendars` (names) keeps only those
+    calendars; None = every calendar. `path` reads that copy (tests);
     otherwise a fresh snapshot(now=now)."""
     path = path or snapshot(now=now)
+    keep = None if calendars is None else {str(c) for c in calendars}
     out = []
     try:
         con = sqlite3.connect(path)
@@ -311,12 +313,51 @@ def plan(since=None, until=None, path=None, now=None) -> List[Planned]:
             continue
         if until and day > until:
             continue
+        if keep is not None and (cal or "") not in keep:
+            continue
         _cal_id, event_id, uuid = parsed
         out.append(Planned(date=day, start=start, all_day=bool(all_day), uuid=uuid,
                            title=(summary or "").strip(), calendar=cal or "",
                            event_id=event_id, url=url))
     out.sort(key=_sort_key)
     return out
+
+
+_SQL_RECENT = ("SELECT c.title, MAX(ci.creation_date) FROM CalendarItem ci "
+               "LEFT JOIN Calendar c ON c.ROWID = ci.calendar_id "
+               "WHERE ci.url LIKE ? AND (ci.hidden IS NULL OR ci.hidden = 0) "
+               "GROUP BY ci.calendar_id ORDER BY 2 DESC")
+
+
+def calendars_by_recency(path=None, now=None):
+    """Calendar names holding Mela events, the one Mela wrote to most
+    recently first (its current "Add to Calendar" target). Names deduped
+    (two local calendars can share a name)."""
+    path = path or snapshot(now=now)
+    try:
+        con = sqlite3.connect(path)
+        try:
+            rows = con.execute(_SQL_RECENT, (URL_PREFIX + "%",)).fetchall()
+        finally:
+            con.close()
+    except sqlite3.Error as e:
+        raise MelaCalError(f"Calendar store unreadable ({e}) · schema changed?") from e
+    out = []
+    for title, _newest in rows:
+        name = (title or "").strip()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def choose_calendars(pref=None, path=None, now=None):
+    """The calendars the plan is read from: `pref` (names from config) when
+    given, else the single most recently written one, else [] (no plan)."""
+    pref = [str(x).strip() for x in (pref or []) if str(x).strip()]
+    if pref:
+        return pref
+    recent = calendars_by_recency(path=path, now=now)
+    return recent[:1]
 
 
 def _age_s(now=None):
