@@ -72,7 +72,7 @@ Per row type (⌘⏎ = Actions and ⌃⏎ = back everywhere; - = nothing bound):
 | Note | Open | - | - | - | Copy link |
 | Completed task | Open | - | Uncomplete | - | - |
 | Won't Do task | Open | - | Reopen | - | - |
-| 🥘 Meal (hub, week, library) | Open in Mela | - / subtasks (library) | Open web page | - | Copy Mela link |
+| 🥘 Meal (hub, week, library) | Open in Mela | - / subtasks (library) | Open web page | Cooked (👨‍🍳 tag + a note) | Copy Mela link |
 | 🥘 Week (📆 Next 13 weeks) | That week's meals | Same hop | - | - | - |
 
 \* App-only smart lists (no in-Alfred view) open in TickTick instead. Inside the ⌘⏎ Actions menu, ⌃⏎ returns to the screen you came from.

@@ -27,6 +27,16 @@ All notable user-visible changes to TickAL. Format follows
   task's own time zone. Nothing runs in the background any more. Needs Full
   Disk Access for Alfred (the status row says when).
 - **Weekly note: 🥘 Meal prep** bullet under 💿 Data.
+- **👨‍🍳 Cooked, ⭐️ rating and 💬 notes on a recipe** - ⌥⇧ on any meal
+  row (or **👨‍🍳 Cooked** in the recipe task's ⌘ menu) tags the recipe
+  👨‍🍳cooked and asks for a note; **⭐️ Rate…** picks one to five stars and
+  **💬 Comment…** adds a line, both in the recipe task's ⌘ menu, any time
+  after. The stars sit as a quote line right under the links at the top of
+  the recipe's description, the notes as quote lines under the stars.
+  Library rows say "cooked before" and show the stars. A rating typed into
+  a recipe's description field in Mela (`Rating: ⭐️⭐️⭐️`) reaches TickTick
+  on the next 🔄 Sync when the task has none; Mela itself cannot be
+  written.
 - **✏️ Rename tag** in the tag's ⌘ menu - a dialog asks the new name and
   every task that carries the tag follows. A name already in use is refused
   rather than merged.

@@ -133,18 +133,64 @@ def numbered(text):
     return out
 
 
+# Mela has no rating column: a recipe Vex rated in the app carries a plain
+# "Rating: ⭐️⭐️⭐️⭐️⭐️" line in its description (ZTEXT) or its notes
+# (ZNOTES), verified on Burbon Asian Chicken 2026-09-21. Mela is never
+# written (Core Data under CloudKit, no write intent, no URL verb): the
+# rating is only READ, and meal.py's stars line in TickTick is the record.
+STAR = "⭐️"                  # ⭐️ as Mela writes it: U+2B50 + VS16
+RATING_RE = re.compile(r"^[ \t]*Rating:[ \t]*((?:⭐️?|★)+)[ \t]*$",
+                       re.MULTILINE)
+
+
+def rating_of(recipe):
+    """The stars Mela shows for a recipe (1..5, more is capped), read off
+    its first "Rating:" line, description first, then notes; None when
+    unrated. VS16 blind: the count is the same with or without it."""
+    for txt in (getattr(recipe, "text", "") or "", getattr(recipe, "notes", "") or ""):
+        m = RATING_RE.search(txt)
+        if m:
+            return min(len(m.group(1).replace("️", "")), 5)
+    return None
+
+
+def strip_rating(text):
+    """`text` without its "Rating:" line(s); a blank line the removal left
+    doubled (or leading) goes with it. Byte-identical when there is none."""
+    text = text or ""
+    if not RATING_RE.search(text):
+        return text
+    out, gap = [], False
+    for l in text.split("\n"):
+        if RATING_RE.match(l):
+            gap = True
+            continue
+        if gap and not l.strip() and (not out or not out[-1].strip()):
+            continue
+        gap = False
+        out.append(l)
+    return "\n".join(out)
+
+
 def render_markdown(recipe):
-    """The TickTick description of a recipe: link header, source site,
-    blurb, one meta line, then Ingredients / Steps / Nutrition / Notes.
-    Ends with exactly one newline."""
+    """The TickTick description of a recipe: link header, source site, the
+    stars when Mela has a rating (right under the links, where meal.py
+    keeps them), blurb, one meta line, then Ingredients / Steps / Nutrition
+    / Notes - Mela's own "Rating:" line dropped from blurb and notes, a
+    Notes section that leaves empty omitted. Ends with exactly one newline;
+    an unrated recipe renders byte-identical to the pre-rating form."""
     r = recipe
     md = [f"> 🔗 [{r.title}]({r.url})"]
     if r.link:
         host = urllib.parse.urlparse(r.link).netloc.replace("www.", "") or r.link
         md.append(f"> 🌐 [{host}]({r.link})")
+    rating = rating_of(r)
+    if rating:
+        md.append("> " + STAR * rating)
     md.append("")
-    if r.text:
-        md += [r.text.strip(), ""]
+    text = strip_rating(r.text)
+    if text and (text == r.text or text.strip()):       # emptied by the strip = omitted
+        md += [text.strip(), ""]
     meta = []
     if r.yield_text:
         meta.append(f"Serves: {r.yield_text}")
@@ -162,8 +208,9 @@ def render_markdown(recipe):
         md += ["## Steps:"] + numbered(r.instructions) + [""]
     if r.nutrition:
         md += ["## Nutrition:"] + [f"- {l}" for l in _lines(r.nutrition)] + [""]
-    if r.notes:
-        md += ["## Notes:"] + _lines(r.notes) + [""]
+    notes = strip_rating(r.notes)
+    if notes and (notes == r.notes or _lines(notes)):   # emptied by the strip = omitted
+        md += ["## Notes:"] + _lines(notes) + [""]
     return "\n".join(md).rstrip() + "\n"
 
 

@@ -7,7 +7,14 @@ order with 🍽️ for a recipe outside the three slots, the grocery rules, an
 empty week clearing pointers + open groceries, the dry run writing nothing,
 refusals (ids blank, calendar unreadable, Mela missing, rate limit),
 plan_view's shape, import dedupe + cap + rate limit, the backfill's
-live-read rule. Caches live in a temp dir. Run: python3 tests/test_meal_write.py
+live-read rule, and (2026-09-21) the verdict verbs: mark_cooked's tag +
+note (live read, ONE update, no write when nothing changes, dry = no
+call), rate (set / replace / clear / unchanged / refused), comment
+(appended, blank refused), mirror_ratings (unrated entries only, Mela's
+"Rating:" copy stripped, cap, rate limit) and the sync's rating pass (the
+toast's "N ratings from Mela", a rate limit that never aborts the week,
+the dry run's "would mirror"). Caches live in a temp dir.
+Run: python3 tests/test_meal_write.py
 """
 import os
 import sys
@@ -540,6 +547,228 @@ check("a London-zone recipe gets London midnight; a zoneless one the Mac's",
       api.lists[LIST]["t1"]["startDate"] == meal.api_day(date(2026, 9, 27), ZoneInfo("Europe/London"))
       and api.lists[LIST]["t2"]["startDate"] == meal.api_day(date(2026, 9, 27)),
       (api.lists[LIST]["t1"]["startDate"], api.lists[LIST]["t2"]["startDate"]))
+
+
+
+# ── the verdict verbs: cooked, rate, comment (Vex 2026-09-21) ────────────────
+print("-- cooked / rate / comment")
+TAG_CALLS = []
+mw._ensure_cooked_tag = lambda: TAG_CALLS.append(1)     # never api_v2 (the Keychain) here
+STAR = meal.STAR
+api = fresh()
+res = mw.mark_cooked(api, LIST, "t1")
+check("cooked: the tag joins the others, in their order",
+      api.lists[LIST]["t1"]["tags"] == ["🍳breakfast", "👨‍🍳cooked"], api.lists[LIST]["t1"]["tags"])
+check("cooked: a LIVE read then ONE update",
+      api.calls == [("get", LIST, "t1"), ("update", LIST, "t1", ("tags",))], api.calls)
+check("cooked: the toast, no reopen of its own", isinstance(res, mw.Outcome) and res.msg == "👨‍🍳 Cooked · Oats"
+      and res.reopen is None, res)
+check("cooked: the tag entity was ensured once", TAG_CALLS == [1], TAG_CALLS)
+check("cooked: the cache mirrors the tag",
+      "👨‍🍳cooked" in next(t for t in cache_store.get("all_tasks") if t["id"] == "t1")["tags"])
+n = len(api.calls)
+res = mw.mark_cooked(api, LIST, "t1")
+check("cooked again, no note: read only, nothing written, tag not doubled",
+      api.calls[n:] == [("get", LIST, "t1")] and res.msg == "👨‍🍳 Already cooked · Oats"
+      and api.lists[LIST]["t1"]["tags"] == ["🍳breakfast", "👨‍🍳cooked"], (api.calls[n:], res.msg))
+res = mw.mark_cooked(api, LIST, "t2", comment="  less salt next time \n")
+check("cooked with a note on an empty body: header minted (🔗 + 🌐 from Mela), the note under it, the tag",
+      api.lists[LIST]["t2"]["content"] == f"> 🔗 [Beef Bulgogi](mela://recipe/{U1})\n"
+      f"> 🌐 [example.org](https://example.org/bulgogi)\n> less salt next time"
+      and api.lists[LIST]["t2"]["tags"] == ["🍛lunch", "👨‍🍳cooked"], api.lists[LIST]["t2"]["content"])
+check("cooked with a note: ONE update carrying content + tags, the toast says note saved",
+      api.calls[-1] == ("update", LIST, "t2", ("content", "tags")) and api.calls[-2] == ("get", LIST, "t2")
+      and res.msg == "👨‍🍳 Cooked · Beef Bulgogi · note saved", (api.calls[-2:], res.msg))
+res = mw.mark_cooked(api, LIST, "t2", comment="more garlic")
+check("cooked again with a note: the note appended below the first, the tag kept single",
+      meal.read_comments(api.lists[LIST]["t2"]["content"]) == ["less salt next time", "more garlic"]
+      and api.lists[LIST]["t2"]["tags"] == ["🍛lunch", "👨‍🍳cooked"]
+      and res.msg == "👨‍🍳 Already cooked · Beef Bulgogi · note saved", (api.lists[LIST]["t2"]["content"], res.msg))
+check("cooked: the cache carries the note", meal.read_comments(next(t for t in cache_store.get("all_tasks") if t["id"] == "t2")["content"])
+      == ["less salt next time", "more garlic"])
+api.lists[LIST]["t3"]["tags"] = ["🌮snack", "👨‍🍳COOKED"]
+n = len(api.calls)
+res = mw.mark_cooked(api, LIST, "t3")
+check("cooked: a hand-typed twin of the tag counts, case blind",
+      api.calls[n:] == [("get", LIST, "t3")] and res.msg.startswith("👨‍🍳 Already cooked"), (api.calls[n:], res.msg))
+api = fresh()
+res = mw.mark_cooked(api, LIST, "t1", comment="x", dry=True)
+check("cooked dry run: no api call at all, the line names the recipe and the note",
+      api.calls == [] and res.msg == "🥘 Dry run · would tag Oats 👨‍🍳cooked · note", (api.calls, res.msg))
+check("cooked dry run without a note", mw.mark_cooked(api, LIST, "t1", dry=True).msg == "🥘 Dry run · would tag Oats 👨‍🍳cooked"
+      and api.calls == [])
+
+# rate
+api = fresh()
+body = mela.render_markdown(BY[U2])             # Oats: a 🔗 line, then the body
+api.lists[LIST]["t1"]["content"] = body
+line0 = body.split("\n")[0]
+res = mw.rate(api, LIST, "t1", 3)
+c = api.lists[LIST]["t1"]["content"]
+check("rate: the stars line right under the 🔗 line, the body byte-identical",
+      c == body.replace(line0 + "\n", line0 + "\n> " + STAR * 3 + "\n", 1) and meal.read_rating(c) == 3, c[:160])
+check("rate: live read, one update, the toast is the stars and the name",
+      api.calls == [("get", LIST, "t1"), ("update", LIST, "t1", ("content",))] and res.msg == STAR * 3 + " Oats", (api.calls, res.msg))
+n = len(api.calls)
+res = mw.rate(api, LIST, "t1", "3")
+check("rate: the same rating again (as a string, even) is no write",
+      api.calls[n:] == [("get", LIST, "t1")] and res.msg == STAR * 3 + " Oats · unchanged", (api.calls[n:], res.msg))
+res = mw.rate(api, LIST, "t1", 5)
+c = api.lists[LIST]["t1"]["content"]
+check("rate: replaced in place, one stars line", meal.read_rating(c) == 5 and c.count("> " + STAR) == 1
+      and c.split("\n")[1] == "> " + STAR * 5 and res.msg == STAR * 5 + " Oats", c[:160])
+res = mw.rate(api, LIST, "t1", 0)
+check("rate 0: cleared, the description back to the render byte for byte",
+      api.lists[LIST]["t1"]["content"] == body and res.msg == "Rating cleared · Oats", (api.lists[LIST]["t1"]["content"][:120], res.msg))
+n = len(api.calls)
+res = mw.rate(api, LIST, "t1", 0)
+check("rate 0 on an unrated task: no write", api.calls[n:] == [("get", LIST, "t1")] and res.msg == "No rating · Oats · unchanged", res.msg)
+check("rate: the cache mirrors the description", next(t for t in cache_store.get("all_tasks") if t["id"] == "t1")["content"] == body)
+n = len(api.calls)
+bad = []
+for v in (None, 6, "abc", -1, "3/5"):
+    try:
+        mw.rate(api, LIST, "t1", v)
+        bad.append((v, "accepted"))
+    except mw.Refusal as e:
+        if str(e) != "⭐️ Pick 1 to 5":
+            bad.append((v, str(e)))
+check("rate: None / 6 / a word / a negative / '3/5' refuse with the one line, nothing read", bad == [] and api.calls[n:] == [], (bad, api.calls[n:]))
+res = mw.rate(api, LIST, "t3", 4)
+check("rate on an empty body: the header minted from the title, the stars under it",
+      api.lists[LIST]["t3"]["content"] == f"> 🔗 [Pockets](mela://recipe/{U3})\n> " + STAR * 4, api.lists[LIST]["t3"]["content"])
+n = len(api.calls)
+res = mw.rate(api, LIST, "t2", 2, dry=True)
+check("rate dry run: no api call", api.calls[n:] == [] and res.msg == "🥘 Dry run · would rate Beef Bulgogi " + STAR * 2, res.msg)
+
+# comment
+n = len(api.calls)
+res = mw.comment(api, LIST, "t3", "add less salt next time")
+check("comment: appended under the stars, one update, the toast",
+      api.lists[LIST]["t3"]["content"] == f"> 🔗 [Pockets](mela://recipe/{U3})\n> " + STAR * 4 + "\n> add less salt next time"
+      and res.msg == "💬 Pockets · note saved"
+      and api.calls[n:] == [("get", LIST, "t3"), ("update", LIST, "t3", ("content",))], (api.lists[LIST]["t3"]["content"], api.calls[n:]))
+mw.comment(api, LIST, "t3", "more garlic\n\nand chilli")
+check("comment: a second one goes below the first, one quote line per line",
+      meal.read_comments(api.lists[LIST]["t3"]["content"]) == ["add less salt next time", "more garlic", "and chilli"],
+      api.lists[LIST]["t3"]["content"])
+mw.rate(api, LIST, "t3", 2)
+check("rate after comments: the stars line replaced where it sits, the comments stay below it",
+      api.lists[LIST]["t3"]["content"] == f"> 🔗 [Pockets](mela://recipe/{U3})\n> " + STAR * 2
+      + "\n> add less salt next time\n> more garlic\n> and chilli", api.lists[LIST]["t3"]["content"])
+n = len(api.calls)
+bad = []
+for v in ("", "  \n ", None, ">"):
+    try:
+        mw.comment(api, LIST, "t3", v)
+        bad.append((v, "accepted"))
+    except mw.Refusal as e:
+        if str(e) != "💬 Nothing written":
+            bad.append((v, str(e)))
+check("comment: blank text refuses before any call (quote marks alone after the read)",
+      bad == [] and all(c[0] == "get" for c in api.calls[n:]), (bad, api.calls[n:]))
+n = len(api.calls)
+res = mw.comment(api, LIST, "t1", "x", dry=True)
+check("comment dry run: no api call", api.calls[n:] == [] and res.msg == "🥘 Dry run · would note on Oats: x", res.msg)
+
+# ── Mela's ratings mirrored into the tasks that have none ────────────────────
+print("-- Mela ratings mirrored")
+RATED = [R(U2, "Oats", ("02 • Breakfast",)), R(U1, "Beef Bulgogi", link="https://example.org/bulgogi"),
+         R(U3, "Pockets", ("03 • Snack",))]
+RATED[0].text = "Rating: " + STAR * 4 + "\n\nSunday oats."     # description
+RATED[1].notes = "Rating: " + STAR * 2                        # notes
+RBY = {r.id: r for r in RATED}
+OLD_OATS = (f"> 🔗 [Oats](mela://recipe/{U2})\n\nRating: " + STAR * 4
+            + "\n\nSunday oats.\n\nServes: 4\n## Ingredients:\n- 500 g chicken\n")   # an older render: Mela's line in the blurb
+RATED_BULGOGI = f"> 🔗 [Beef Bulgogi](mela://recipe/{U1})\n> " + STAR * 5 + "\n\nServes: 4\n"
+
+
+def seed(api, **contents):
+    for tid, content in contents.items():
+        api.lists[LIST][tid]["content"] = content
+        mw._cache_patch(tid, content=content)
+
+
+api = fresh()
+seed(api, t1=OLD_OATS, t2=RATED_BULGOGI)
+entries = meal.library_entries(list(api.lists[LIST].values()), LIST)
+check("library_entries reads the rating off the head block", {e["tid"]: e["rating"] for e in entries} == {"t1": None, "t2": 5, "t3": None, "t4": None})
+r = mw.mirror_ratings(api, entries=entries, by_id=RBY, cap=10, pace=0)
+check("mirror: only the unrated entry whose Mela recipe is rated", r == {"rated": 1, "skipped": 0, "remaining": 0, "failed": 0, "rate_limited": False}, r)
+check("mirror: the stars under the 🔗 line, Mela's Rating: line gone from the body, the rest byte-identical",
+      api.lists[LIST]["t1"]["content"] == f"> 🔗 [Oats](mela://recipe/{U2})\n> " + STAR * 4
+      + "\n\nSunday oats.\n\nServes: 4\n## Ingredients:\n- 500 g chicken\n", api.lists[LIST]["t1"]["content"])
+check("mirror: a TickTick-rated entry is left alone even though Mela rates it lower",
+      api.lists[LIST]["t2"]["content"] == RATED_BULGOGI and not [c for c in api.calls if c[2] == "t2"])
+check("mirror: live read then one update, nothing else", api.calls == [("get", LIST, "t1"), ("update", LIST, "t1", ("content",))], api.calls)
+check("mirror: the cache mirrors it", meal.read_rating(next(t for t in cache_store.get("all_tasks") if t["id"] == "t1")["content"]) == 4)
+stale = [dict(e, rating=None) for e in entries if e["tid"] == "t2"]
+n = len(api.calls)
+r = mw.mirror_ratings(api, entries=stale, by_id=RBY, cap=10, pace=0)
+check("mirror: stars that appeared since the cache = skipped after the live read, no write",
+      r["skipped"] == 1 and r["rated"] == 0 and api.calls[n:] == [("get", LIST, "t2")], (r, api.calls[n:]))
+RATED[2].text = "Rating: " + STAR * 3
+api = fresh()
+seed(api, t1=OLD_OATS, t3=f"> 🔗 [Pockets](mela://recipe/{U3})\n\nServes: 2\n")
+entries = meal.library_entries(list(api.lists[LIST].values()), LIST)
+check("mirror: an EMPTY description is never a candidate (the backfill's, its render carries the stars)",
+      [e["tid"] for e, _n, _r in mw._rating_candidates(entries, RBY)] == ["t1", "t3"], mw._rating_candidates(entries, RBY))
+r = mw.mirror_ratings(api, entries=entries, by_id=RBY, cap=1, pace=0)
+check("mirror: cap + remaining (t2's empty body is not counted)", r["rated"] == 1 and r["remaining"] == 1 and len(api.calls) == 2, r)
+api = fresh()
+seed(api, t1=OLD_OATS)
+entries = meal.library_entries(list(api.lists[LIST].values()), LIST)
+api.lists[LIST]["t1"]["content"] = ""                 # emptied between the cache and the live read
+n = len(api.calls)
+r = mw.mirror_ratings(api, entries=entries, by_id=RBY, cap=10, pace=0)
+check("mirror: a body emptied since the cache = skipped after the live read, never a head block alone",
+      r["skipped"] == 1 and r["rated"] == 0 and api.calls[n:] == [("get", LIST, "t1")]
+      and api.lists[LIST]["t1"]["content"] == "", (r, api.calls[n:], api.lists[LIST]["t1"]["content"]))
+api = fresh()
+seed(api, t1=OLD_OATS, t3=f"> 🔗 [Pockets](mela://recipe/{U3})\n\nServes: 2\n")
+entries = meal.library_entries(list(api.lists[LIST].values()), LIST)
+api.fail_after = 0
+r = mw.mirror_ratings(api, entries=entries, by_id=RBY, cap=10, pace=0)
+check("mirror: the rate limit stops the pass, the rest counted", r["rate_limited"] and r["rated"] == 0 and r["remaining"] == 2, r)
+check("mirror: the sync's cap", mw.CAP_RATE == 20 and mw.mirror_ratings.__defaults__[2] == 20)
+
+# the sync's rating pass
+api = fresh()
+seed(api, t1=OLD_OATS, t3="Hand-written pockets.\n")
+res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RATED)
+check("sync: the toast counts the ratings from Mela", " · 2 ratings from Mela" in res.msg and "1 filled" in res.msg, res.msg)
+check("sync: Oats adopted Mela's four stars, the Rating: copy gone",
+      meal.read_rating(api.lists[LIST]["t1"]["content"]) == 4 and "Rating:" not in api.lists[LIST]["t1"]["content"])
+check("sync: the hand-written body got a minted header and the stars on top, the body kept",
+      api.lists[LIST]["t3"]["content"] == f"> 🔗 [Pockets](mela://recipe/{U3})\n> " + STAR * 3 + "\n\nHand-written pockets.\n",
+      api.lists[LIST]["t3"]["content"])
+check("sync: the backfilled body carries Mela's stars from the render, so it was never a candidate",
+      meal.read_rating(api.lists[LIST]["t2"]["content"]) == 2 and len([c for c in api.calls if c[0] == "get" and c[2] == "t2"]) == 1)
+check("sync: the week still landed", len(pointers(api)) == 4 and "4 grocery lists" in res.msg, res.msg)
+n = len(api.calls)
+res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RATED)
+check("sync again: nothing to rate, the toast says nothing about ratings", "rating" not in res.msg, res.msg)
+api = fresh()
+seed(api, t1=OLD_OATS, t3="Hand-written pockets.\n")
+_g, hits = api.get_task, []
+def _limited_get(pid, tid):
+    if tid == "t1" and not hits:
+        hits.append(tid)
+        api._bump("get", pid, tid)
+        raise RateLimitError("exceed_query_limit")
+    return _g(pid, tid)
+api.get_task = _limited_get
+res = mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RATED)
+check("a rate limit inside the rating pass never aborts the sync: the week lands, the toast counts the ratings left",
+      isinstance(res, mw.Outcome) and " · 2 ratings left · run again" in res.msg and "ratings from Mela" not in res.msg
+      and len(pointers(api)) == 4, res.msg)
+api = fresh()
+seed(api, t1=OLD_OATS, t3="Hand-written pockets.\n")
+out = mw.sync(today=TODAY, api=api, dry=True, planned=PLANNED, recipes=RATED)
+check("dry run: says what it would rate (the empty body is fill's, not the mirror's) and writes nothing",
+      "would mirror 2 Mela ratings" in out and "Oats " + STAR * 4 in out and "Bulgogi" not in out.splitlines()[2]
+      and all(c[0] in ("get", "pd") for c in api.calls)
+      and api.lists[LIST]["t1"]["content"] == OLD_OATS, out.splitlines()[:4])
 
 print(f"\nmeal_write: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

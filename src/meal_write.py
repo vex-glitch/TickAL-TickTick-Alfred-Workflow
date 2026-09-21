@@ -16,6 +16,18 @@ library list (seven portions), the weekly note's 🥘 bullet is written. No
 hourly hitchhiker, nothing wakes Mela, nothing schedules: "I will be
 scheduling in Mela, it is nicer".
 
+THE VERDICT VERBS (2026-09-21) are the only other writes, and each is on
+a LIBRARY task: mark_cooked (the 👨‍🍳cooked tag, plus one note), rate (the
+stars line) and comment (a quote line) - Vex: "mark meal cooked via
+modifier", "know which meals I have cooked before, so I am thinking a
+tag", "rate a meal and give a comment". Each is a live read, ONE update
+and a cache patch; none opens a dialog (xact asks, this module writes,
+and a blank note is a refusal, not a write). Mela is read only, so sync()
+also copies Mela's own "Rating:" stars into a task that has none
+(mirror_ratings, cap CAP_RATE) right after the backfill: a rate limit in
+that pass is counted in the toast, never a refusal - the week is the
+point, the stars are polish.
+
 Pointers are deleted rather than reopened or moved: HANDOFF_ROUTINES §8
 says API completion leaves a repeating task's children completed while the
 app reopens them - delete-then-create is the one shape that is right on
@@ -72,6 +84,7 @@ LOCK_WAIT = 60.0
 POST_GAP = 0.35            # seconds between our own POSTs (periodic_engine's rule)
 CAP_IMPORT = 40            # recipes imported per sync
 CAP_FILL = 60              # descriptions filled per sync
+CAP_RATE = 20              # Mela ratings mirrored into unrated tasks per sync
 PACE = 1.0                 # seconds between requests (100 a minute is the wall)
 HORIZON_WEEKS = 13         # "all the next meals for a quarter, by week"
 
@@ -694,6 +707,223 @@ def backfill_descriptions(api, entries=None, by_id=None, cap=CAP_FILL, pace=PACE
     return out
 
 
+# ── the verdict: cooked, rating, comment (Vex 2026-09-21) ────────────────────
+# "I would like to be able to mark meal cooked via modifier", "know which
+# meals I have cooked before, so I am thinking a tag", "rate a meal and give
+# a comment". Three verbs on the LIBRARY task, each the backfill's shape: a
+# LIVE get_task (project data omits NOTE bodies, and a stale full-object
+# write wipes a hand edit), ONE update_task, the caches patched. No dialog
+# opens here: xact asks for the note and hands the text over.
+def _library_header(task, recipe=None):
+    """The head block a description without one gets before a verdict can
+    sit in it: meal.mint_header off the task title, with the 🌐 line when
+    the Mela recipe (and so its web page) is known. [] for a title that
+    carries no Mela link - the verdict then tops the body on its own."""
+    parsed = meal.parse_title((task or {}).get("title") or "")
+    if not parsed:
+        return []
+    name, uuid = parsed
+    web = (getattr(recipe, "link", "") or "") if recipe is not None else ""
+    return meal.mint_header(name, uuid, web)
+
+
+def _recipe_for(uuid):
+    """The Mela recipe behind a library task, for the header's 🌐 line;
+    None when Mela is unreadable on this Mac or no longer knows the id.
+    Never raises - the verdict lands either way."""
+    if not uuid:
+        return None
+    _r, by_id, _err = _mela()
+    return by_id.get(str(uuid).upper())
+
+
+def _cached_name(tid):
+    """The recipe's name off the cached task, for a dry run's line (a dry
+    run makes no call, so there is no live object to name it from)."""
+    try:
+        t = cache_store.find_task(tid) or {}
+    except Exception:
+        t = {}
+    return _name_of(t) or "this recipe"
+
+
+def _ensure_cooked_tag():
+    """The 👨‍🍳cooked tag as a real entity under 🍱mealprep (Vex made it by
+    hand on 2026-09-21; a fresh Mac would not have it). Best-effort, the
+    dispatch helper's own rule: a v1 task write attaches the label either
+    way, the entity just waits for the app."""
+    try:
+        from dispatch import _ensure_tags_exist
+        _ensure_tags_exist([meal.COOKED_TAG], {meal.COOKED_TAG: meal.COOKED_PARENT})
+    except Exception:
+        pass
+
+
+def _verdict_header(live):
+    """The head block a verdict (stars, a note) needs when the live
+    description has none: minted off the live title, with Mela's web link
+    when Mela still knows the recipe. [] when the title carries no link."""
+    parsed = meal.parse_title(live.get("title") or "")
+    return _library_header(live, _recipe_for(parsed[1]) if parsed else None)
+
+
+def _header_if_needed(live, content):
+    """_verdict_header only when the description has no head block yet:
+    the mint reads Mela's DB (a snapshot copy), which the common case, a
+    description that already opens with its > 🔗 line, never needs."""
+    return None if meal.header_block(content)[0] else _verdict_header(live)
+
+
+def mark_cooked(api=None, pid=None, tid=None, comment=None, dry=False):
+    """👨‍🍳 Cooked: the 👨‍🍳cooked tag on the library task (the other tags
+    kept, in their order; case blind, so a hand-typed twin is not doubled)
+    and, when xact's one dialog brought a note, that note as a quote line
+    at the end of the head block ("retrospectively I also should be able
+    to add a comment, like add less salt next time"). Already tagged and
+    no note = nothing written. dry: the line, no call at all."""
+    comment = (comment or "").strip()
+    if dry:
+        return Outcome(f"🥘 Dry run · would tag {_cached_name(tid)} {meal.COOKED_TAG}"
+                       + (" · note" if comment else ""), None, [])
+    api = _api(api)
+    live = api.get_task(pid, tid)
+    name = _name_of(live) or "this recipe"
+    tags = [str(t) for t in (live.get("tags") or [])]
+    had = meal.COOKED_TAG.lower() in {t.lower() for t in tags}
+    merged = tags if had else tags + [meal.COOKED_TAG]
+    fields = {}
+    if comment:
+        content = live.get("content") or ""
+        new = meal.add_comment(content, comment, header=_header_if_needed(live, content))
+        if new != content:
+            fields["content"] = new
+    msg = f"👨‍🍳 {'Already cooked' if had else 'Cooked'} · {name}"
+    if had and not fields:
+        return Outcome(msg, None, [tid])
+    if not had:
+        _ensure_cooked_tag()
+    api.update_task(tid, live.get("projectId") or pid, current=live, tags=merged, **fields)
+    _cache_patch(tid, tags=merged, **fields)
+    return Outcome(msg + (" · note saved" if fields else ""), None, [tid])
+
+
+def rate(api=None, pid=None, tid=None, stars=None, dry=False):
+    """⭐️ Rate: n stars (1..5) as the quote line right under the link header
+    ("a rating should be quote first liner below links in recipe, stars"),
+    0 clears it. The same rating again is no write ("· unchanged"); None, a
+    non-number, a negative or more than MAX_STARS refuses - the verb never
+    guesses."""
+    try:
+        n = int(stars)
+    except (TypeError, ValueError):
+        raise Refusal("⭐️ Pick 1 to 5")
+    if n < 0 or n > meal.MAX_STARS:
+        raise Refusal("⭐️ Pick 1 to 5")
+    if dry:
+        what = (f"would rate {_cached_name(tid)} {meal.stars(n)}" if n
+                else f"would clear the rating of {_cached_name(tid)}")
+        return Outcome(f"🥘 Dry run · {what}", None, [])
+    api = _api(api)
+    live = api.get_task(pid, tid)
+    name = _name_of(live) or "this recipe"
+    content = live.get("content") or ""
+    head = f"{meal.stars(n)} {name}" if n else f"Rating cleared · {name}"
+    if (meal.read_rating(content) or 0) == n:
+        return Outcome((head if n else f"No rating · {name}") + " · unchanged", None, [tid])
+    new = meal.set_rating(content, n, header=_header_if_needed(live, content))
+    api.update_task(tid, live.get("projectId") or pid, current=live, content=new)
+    _cache_patch(tid, content=new)
+    return Outcome(head, None, [tid])
+
+
+def comment(api=None, pid=None, tid=None, text=None, dry=False):
+    """💬 Comment: one quote line per line of `text` at the END of the head
+    block, after the stars and the earlier notes ("comment should go below
+    that also as quote"; appended, never replaced). Blank text refuses
+    before any call."""
+    text = (text or "").strip()
+    if not text:
+        raise Refusal("💬 Nothing written")
+    if dry:
+        return Outcome(f"🥘 Dry run · would note on {_cached_name(tid)}: "
+                       f"{text.splitlines()[0]}", None, [])
+    api = _api(api)
+    live = api.get_task(pid, tid)
+    name = _name_of(live) or "this recipe"
+    content = live.get("content") or ""
+    new = meal.add_comment(content, text, header=_header_if_needed(live, content))
+    if new == content:                     # nothing but quote marks
+        raise Refusal("💬 Nothing written")
+    api.update_task(tid, live.get("projectId") or pid, current=live, content=new)
+    _cache_patch(tid, content=new)
+    return Outcome(f"💬 {name} · note saved", None, [tid])
+
+
+def _rating_candidates(entries, by_id):
+    """[(entry, stars, recipe)] - the library entries with a description
+    but no rating in TickTick whose Mela recipe carries a "Rating:" line:
+    what the mirror would write, in library order. Pure."""
+    import mela
+    out = []
+    for e in entries or []:
+        if e.get("rating") is not None:
+            continue
+        # an EMPTY description is the backfill's: its render carries Mela's
+        # stars already, and a head block written here would hide the task
+        # from missing_descriptions for good (the body never arriving)
+        if not (e.get("content") or "").strip():
+            continue
+        r = (by_id or {}).get((e.get("uuid") or "").upper())
+        n = mela.rating_of(r) if r is not None else None
+        if n:
+            out.append((e, n, r))
+    return out
+
+
+def mirror_ratings(api, entries=None, by_id=None, cap=CAP_RATE, pace=PACE):
+    """Mela's stars into the tasks that have none. TickTick is the record
+    and Mela cannot be written, so the copy runs ONE way and never over a
+    rating given in TickTick: a task with a stars line is not a candidate,
+    however Mela rates it. The backfill's shape: a LIVE get_task per entry,
+    skipped when stars appeared meanwhile, meal.adopt_mela_rating (Mela's
+    own "Rating:" line leaves the body, the stars land in the head), the
+    cache patched, paced. A rate limit ends the pass and counts the rest
+    in `remaining`. Returns a summary dict."""
+    out = {"rated": 0, "skipped": 0, "remaining": 0, "failed": 0, "rate_limited": False}
+    if entries is None:
+        list_id = cfg.get_meal_list_id()
+        entries = meal.library_entries(_pool_tasks(list_id), list_id) if list_id else []
+    if by_id is None:
+        _r, by_id, err = _mela()
+        if err:
+            out["error"] = err
+            return out
+    cands = _rating_candidates(entries, by_id)
+    todo = cands[:max(0, int(cap))]
+    out["remaining"] = max(0, len(cands) - len(todo))
+    for i, (e, n, r) in enumerate(todo, 1):
+        try:
+            live = api.get_task(e["pid"], e["tid"])
+            content = live.get("content") or ""
+            if meal.read_rating(content) is not None or not content.strip():
+                out["skipped"] += 1          # rated meanwhile, or emptied: the backfill's
+            else:
+                body = meal.adopt_mela_rating(content, n, header=_library_header(live, r))
+                api.update_task(e["tid"], live.get("projectId") or e["pid"],
+                                current=live, content=body)
+                _cache_patch(e["tid"], content=body)
+                out["rated"] += 1
+        except Exception as ex:
+            if _rate_limited(ex):
+                out["rate_limited"] = True
+                out["remaining"] += len(todo) - i + 1
+                break
+            out["failed"] += 1
+        if pace:
+            time.sleep(pace)
+    return out
+
+
 # ── THE sync ─────────────────────────────────────────────────────────────────
 def _refuse_partial(what, imported, filled):
     bits = ["🥘 Partly synced"]
@@ -708,7 +938,9 @@ def _refuse_partial(what, imported, filled):
 def sync(today=None, api=None, dry=False, planned=None, recipes=None):
     """🔄 Sync with Mela, the one meal verb (module docstring). Under the
     lock: Mela library → import_new (CAP_IMPORT) → backfill_descriptions
-    (CAP_FILL) → the calendar plan → the LIVE routine → cook Sunday =
+    (CAP_FILL) → mirror_ratings (CAP_RATE, Mela's stars into unrated tasks;
+    a rate limit here is counted, never a refusal) → the calendar plan →
+    the LIVE routine → cook Sunday =
     meal.cook_sunday(routine, today) → meal.week_meals → that week mirrored:
     old pointers deleted, one pointer per meal created (🍽️ for slot "x"),
     groceries made / kept / dropped, the note bullet written, caches
@@ -754,12 +986,18 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
         tag_map = cfg.get_meal_tag_map()
         api = _api(api)
         # ── recipes in, descriptions filled ──
-        imported = filled = 0
+        imported = filled = rated = ratings_left = 0
         if dry:
             cands, _nc = _import_candidates(recipes, _existing_uuids(list_id),
                                             _imported_uuids(IMPORT_LEDGER), tag_map)
             n_import = min(len(cands), CAP_IMPORT)
             n_fill = min(len(missing_descriptions(list_id)), CAP_FILL)
+            # an EMPTY description is the backfill's (its render carries
+            # Mela's stars already), so it never reaches the mirror: the
+            # count says what this press would mirror, not what fill does
+            rate_cands = _rating_candidates(
+                meal.library_entries(_pool_tasks(list_id), list_id), by_id)
+            n_rate = min(len(rate_cands), CAP_RATE)
         else:
             imp = import_new(api, recipes=recipes, list_id=list_id, tag_map=tag_map,
                              cap=CAP_IMPORT, pace=PACE)
@@ -770,6 +1008,11 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
             filled = bf["filled"]
             if bf.get("rate_limited"):
                 _refuse_partial("week not mirrored", imported, filled)
+            # Mela's stars into the tasks that have none: optional polish,
+            # the week is the point - a rate limit here is counted in the
+            # toast and the mirror below still runs
+            rt = mirror_ratings(api, by_id=by_id, cap=CAP_RATE, pace=PACE)
+            rated, ratings_left = rt["rated"], rt["remaining"]
         # ── live reads ──
         try:
             rpid = _routine_pid(rid)
@@ -832,6 +1075,8 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
                      f"{prep['id']} ({prep.get('title')})",
                      f"Mela: {len(recipes)} recipes · import +{n_import} (cap {CAP_IMPORT})"
                      f" · fill {n_fill} (cap {CAP_FILL})",
+                     f"ratings: would mirror {n_rate} Mela ratings (cap {CAP_RATE})"
+                     + "".join(f" · {e['name'][:30]} {meal.stars(n)}" for e, n, _r in rate_cands[:8]),
                      f"calendar {', '.join(cal_names) or '(as given)'}: {len(planned)} planned row(s)"
                      f" · on {day:%a %d %b}: {len(meals)} meal(s)",
                      f"pointers: delete {len(old_ids)} {old_ids}"]
@@ -901,7 +1146,8 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
         ids = [t["id"] for t in made] + [t["id"] for t in g_made]
         return Outcome(meal.sync_text(day, meals, len(g_made) + len(g_kept),
                                       imported, filled, note_ok,
-                                      dated=dated, dates_left=dates_left),
+                                      dated=dated, dates_left=dates_left,
+                                      rated=rated, ratings_left=ratings_left),
                        "ctx:meal", ids)
 
 

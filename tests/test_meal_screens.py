@@ -1,16 +1,29 @@
 #!/usr/bin/env python3
 """The 🥘 screens (Scripts/browse.py ctx:meal / mealq / mealw / meallib /
-mealgroc) rendered against a FAKE cache in a temp dir, no network, no
-Mela, no Calendar store: meal_write.plan_view, meal_write.hub_counts,
-mela_cal.plan and mela.library are stubbed, and the routine's list is
-planted as the meal_kids snapshot so the live read never fires.
+mealgroc / mealrate) rendered against a FAKE cache in a temp dir, no
+network, no Mela, no Calendar store: meal_write.plan_view,
+meal_write.hub_counts, mela_cal.plan and mela.library are stubbed, and the
+routine's list is planted as the meal_kids snapshot so the live read never
+fires.
 
 What it pins (the traps that burned the other hubs):
   * every row spells out all six chords as fresh dicts, no xact: on ⌘ or ⌥,
     ⌘ dead on anything that is not a library task, task rows carry the full
     variable set
   * THE MEAL ROW: ⏎ open:mela://recipe, ⇧ open:<web> (dead "No web page"
-    without a link), ⌥⌘ copy:mela://recipe, ⌥ and ⌥⇧ dead on plan rows
+    without a link), ⌥⌘ copy:mela://recipe, ⌥ dead on plan rows, ⌥⇧ =
+    xact:meal_cooked {pid, tid, back = the screen's own ctx} on a row with
+    a library task and dead ("No library task") without one; the legend
+    says ⌥⇧👨‍🍳
+  * the chips: a plan row of a 👨‍🍳cooked-tagged, rated entry says
+    "👨‍🍳 cooked · ⭐️⭐️⭐️"; the library chip says "cooked before · ⭐️⭐️⭐️"
+    for a tag-only entry with no calendar past, and never-cooked rows
+    sort before it (tag-only after never, before the dated ones)
+  * ctx:mealrate:<pid>:<tid>[:<back…>] = the ⭐️ picker: dead head + the
+    comments already there, five star rows (⏎ and ⌥⇧ the same
+    xact:meal_rate payload, the current one marked), 🚫 No rating (dead
+    when unrated, stars 0 when rated), back = the trailing ids re-joined
+    or ctx:meal; an unknown task = one dead row; sealed like every screen
   * the hub reads the cook week off the calendar plan anchored on the
     ROUTINE's cook Sunday; 🎲 Plan / 📥 Import / 📝 Fill are gone, 🔄 Sync is
     the one verb (⏎ and ⌥⇧ the same xact:meal_sync payload)
@@ -64,6 +77,7 @@ U2 = "62946285-B1C4-4A50-BB17-6CA9B1417EA3"
 U3 = "7EB6A2B6-0C98-4B8A-B10F-86E0C3CCA3D3"
 U4 = "44444444-4444-4444-4444-444444444444"
 U5 = "55555555-5555-5555-5555-555555555555"      # planned, unknown to Mela
+U6 = "66666666-6666-6666-6666-666666666666"      # cooked by the TAG alone, rated
 TODAY = date.today()
 SUN = meal.next_sunday(TODAY)                  # the routine's cook Sunday (what 🔄 mirrors)
 WK = meal.cook_week_of(TODAY)                  # THIS week's cook Sunday: the hub's anchor
@@ -84,10 +98,18 @@ def T(tid, title, pid=LIST, tags=(), status=0, parent=None, **kw):
     return t
 
 
-LIB = [T("t1", f"[Oats](mela://recipe/{U2})", tags=["🍳breakfast"]),
+# Oats: planned this week AND tagged 👨‍🍳cooked, rated ⭐️⭐️⭐️ under its links
+# (the hub chip); Kimchi Stew: cooked by the tag ALONE, no calendar past,
+# rated with two comments (the library chip, the ⭐️ picker)
+OATS_DESC = (f"> 🔗 [Oats](mela://recipe/{U2})\n> 🌐 [oats.example](https://oats.example/recipe)\n"
+             "> ⭐️⭐️⭐️\n\nServes: 4\n## Ingredients:\n- oats\n")
+KIMCHI_DESC = (f"> 🔗 [Kimchi Stew](mela://recipe/{U6})\n> ⭐️⭐️⭐️\n> less salt next time\n"
+               "> more chili\n\nServes: 4\n")
+LIB = [T("t1", f"[Oats](mela://recipe/{U2})", tags=["🍳breakfast", "👨‍🍳cooked"], content=OATS_DESC),
        T("t2", f"[Beef Bulgogi](mela://recipe/{U1})", tags=["🍛lunch"], content="body"),
        T("t3", f"[Pockets](mela://recipe/{U3})", tags=["🌮snack"]),
        T("t4", f"[Second Lunch](mela://recipe/{U4})", tags=["🍛lunch"]),
+       T("t5", f"[Kimchi Stew](mela://recipe/{U6})", tags=["🍛lunch", "👨‍🍳Cooked"], content=KIMCHI_DESC),
        T("g1", meal.grocery_title("Oats", U2), tags=["🛒groceries"], kind="CHECKLIST",
          dueDate="2026-09-26T00:00:00+0000", items=[{"title": "a", "status": 2}, {"title": "b", "status": 0}])]
 ROUTINE = T(RID, "🥘 Meal Prep", pid=RLIST, startDate=f"{SUN.isoformat()}T17:00:00.000+0000")
@@ -159,7 +181,8 @@ def rows_for(ctx, query=""):
           "mealq": lambda: browse.render_mealq(ids, q),
           "mealw": lambda: browse.render_mealw(ids, q),
           "meallib": lambda: browse.render_meallib(ids, q),
-          "mealgroc": lambda: browse.render_mealgroc(q)}[level]
+          "mealgroc": lambda: browse.render_mealgroc(q),
+          "mealrate": lambda: browse.render_mealrate(ids, q)}[level]
     return fn()
 
 
@@ -199,8 +222,14 @@ def payload(row):
     return json.loads(base64.b64decode(arg.split(":", 2)[2]))
 
 
-def meal_row_ok(r, uuid, web, where):
-    """THE MEAL ROW's chords."""
+def mod_payload(mod):
+    return json.loads(base64.b64decode((mod.get("arg") or "").split(":", 2)[2]))
+
+
+def meal_row_ok(r, uuid, web, where, tid=None, back="ctx:meal"):
+    """THE MEAL ROW's chords. `tid` = the library task behind the meal (⌥⇧
+    then fires xact:meal_cooked on it, `back` in the payload), None = no
+    library task, ⌥⇧ dead."""
     m = r["mods"]
     check(f"{where}: ⏎ opens the recipe in Mela", r["arg"] == f"open:mela://recipe/{uuid}" and r["valid"], r["arg"])
     if web:
@@ -209,7 +238,15 @@ def meal_row_ok(r, uuid, web, where):
         check(f"{where}: ⇧ dead without a web page", m["shift"]["arg"] == "" and not m["shift"]["valid"]
               and m["shift"]["subtitle"] == "No web page", m["shift"])
     check(f"{where}: ⌥⌘ copies the Mela link", m["alt+cmd"]["arg"] == f"copy:mela://recipe/{uuid}" and m["alt+cmd"]["valid"])
-    check(f"{where}: ⌥⇧ dead", not m["alt+shift"]["valid"] and m["alt+shift"]["arg"] == "")
+    if tid:
+        check(f"{where}: ⌥⇧ = xact:meal_cooked on the library task, back = the screen",
+              m["alt+shift"]["arg"].startswith("xact:meal_cooked:") and m["alt+shift"]["valid"]
+              and mod_payload(m["alt+shift"]) == {"pid": LIST, "tid": tid, "back": back}
+              and "Cooked" in m["alt+shift"]["subtitle"], m["alt+shift"])
+    else:
+        check(f"{where}: ⌥⇧ dead without a library task", not m["alt+shift"]["valid"] and m["alt+shift"]["arg"] == ""
+              and m["alt+shift"]["subtitle"] == "No library task", m["alt+shift"])
+    check(f"{where}: the legend says ⌥⇧👨‍🍳", "⌥⇧👨‍🍳" in r["subtitle"], r["subtitle"])
 
 
 # ── the hub root ──────────────────────────────────────────────────────────────
@@ -232,17 +269,23 @@ check("hub: the retired rows are gone",
 b = r[f"meal-b-{U2[:8]}"]
 check("hub: breakfast title carries the glyph and the planned day",
       b["title"] == f"🍳 Oats · {SUN:%a %-d %b}", b["title"])
-meal_row_ok(b, U2, "https://oats.example/recipe", "hub breakfast")
+meal_row_ok(b, U2, "https://oats.example/recipe", "hub breakfast", tid="t1", back="ctx:meal")
+check("hub: the chip of a 👨‍🍳cooked-tagged, rated entry says the word and the stars",
+      b["subtitle"].startswith("Breakfast · 👨‍🍳 cooked · ⭐️⭐️⭐️  |  "), b["subtitle"])
+check("hub: the chip is stamped once (no second 'cooked', no second stars run)",
+      b["subtitle"].count("cooked") == 2 and b["subtitle"].count("⭐️⭐️⭐️") == 1, b["subtitle"])
 check("hub: ⌘ live on a meal with a library task, the task variables ride",
       b["mods"]["cmd"]["valid"] and b["variables"]["task_id"] == "t1" and b["variables"]["task_list_id"] == LIST
       and b["variables"]["item_type"] == "task" and "Oats" in b["variables"]["task_title"], b["variables"])
 check("hub: ⌥ dead on a plan row", not b["mods"]["alt"]["valid"] and b["mods"]["alt"]["arg"] == "")
 l = r[f"meal-l-{U1[:8]}"]
-meal_row_ok(l, U1, "", "hub lunch")
+meal_row_ok(l, U1, "", "hub lunch", tid="t2", back="ctx:meal")
+check("hub: an untagged, unrated entry's chip is the bare slot", l["subtitle"].startswith("Lunch  |  "), l["subtitle"])
 x = r[f"meal-x-{U5[:8]}"]
 check("hub: a recipe Mela does not know is a 🍽️ row named after the event, ⌘ dead, no task id",
       x["title"].startswith("🍽️ Mystery Pie") and x["arg"] == f"open:mela://recipe/{U5}"
       and not x["mods"]["cmd"]["valid"] and not x["variables"].get("task_id"), x)
+meal_row_ok(x, U5, "", "hub mystery pie", tid=None)
 check("hub: 📆 row → ctx:mealq by trampoline, ⌥ by variable, counts the calendar",
       r["meal-next"]["arg"] == "xact:crmbrowse:ctx:mealq" and r["meal-next"]["mods"]["alt"]["variables"]["browse_ctx"] == "ctx:mealq"
       and r["meal-next"]["title"] == f"📆 Next {HORIZON} weeks" and "5 planned meals" in r["meal-next"]["subtitle"], r["meal-next"])
@@ -255,9 +298,9 @@ check("hub: 🔄 never on ⌘ or ⌥", not s["mods"]["cmd"]["valid"] and not s["
 check("hub: groceries row counts, no rebuild verb any more",
       "1 open list" in r["meal-groc"]["title"] and r["meal-groc"]["arg"] == "xact:crmbrowse:ctx:mealgroc"
       and not r["meal-groc"]["mods"]["alt+shift"]["valid"], r["meal-groc"])
-check("hub: library rows", r["meal-lib-l"]["arg"] == "xact:crmbrowse:ctx:meallib:lunch" and "Lunches · 2" in r["meal-lib-l"]["title"])
+check("hub: library rows", r["meal-lib-l"]["arg"] == "xact:crmbrowse:ctx:meallib:lunch" and "Lunches · 3" in r["meal-lib-l"]["title"])
 check("hub: status row = Mela age · calendar count", r["meal-status"]["title"] == "ℹ️ Mela data 4 min old · calendar: 5 planned meals"
-      and "4 recipes" in r["meal-status"]["subtitle"] and not r["meal-status"]["valid"], r["meal-status"]["title"])
+      and "5 recipes" in r["meal-status"]["subtitle"] and not r["meal-status"]["valid"], r["meal-status"]["title"])
 check("hub: ⌃ backs to the folders", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:folders" for x in rows))
 ERROR[0] = "Calendar store unreadable · give Alfred Full Disk Access (System Settings › Privacy › Full Disk Access)"
 r2 = by_uid(rows_for("ctx:meal"))
@@ -322,7 +365,7 @@ r = by_uid(rows)
 check("week: sealed", sealed(rows, "week"))
 check("week: head + the meal row", [x["uid"] for x in rows] == ["mw-head", f"mw-s-{U3[:8]}"]
       and r["mw-head"]["title"] == f"🥘 {meal.week_label(SUN + timedelta(days=14))} · {COOK(SUN + timedelta(days=14))} · 1 meal", [x["uid"] for x in rows])
-meal_row_ok(r[f"mw-s-{U3[:8]}"], U3, "https://pockets.example", "week snack")
+meal_row_ok(r[f"mw-s-{U3[:8]}"], U3, "https://pockets.example", "week snack", tid="t3", back=f"ctx:mealw:{wk}")
 check("week: ⌘ live (Pockets is t3)", r[f"mw-s-{U3[:8]}"]["variables"]["task_id"] == "t3" and r[f"mw-s-{U3[:8]}"]["mods"]["cmd"]["valid"])
 check("week: ⌃ backs to the quarter", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:mealq" for x in rows))
 rows = rows_for(f"ctx:mealw:{EW.isoformat()}")
@@ -337,13 +380,18 @@ check("week: the bar filters", [x["uid"] for x in rows_for(f"ctx:mealw:{SUN.isof
 rows = rows_for("ctx:meallib:lunch")
 r = by_uid(rows)
 check("library: sealed", sealed(rows, "lib"))
-check("library: never cooked first, then least recently cooked", [x["uid"] for x in rows] == ["ml-head", "ml-t4", "ml-t2"], [x["uid"] for x in rows])
+check("library: never cooked first, then the tag-only cooked, then least recently cooked",
+      [x["uid"] for x in rows] == ["ml-head", "ml-t4", "ml-t5", "ml-t2"], [x["uid"] for x in rows])
 check("library: chips read off the calendar",
       r["ml-t4"]["subtitle"].startswith("never cooked · no description yet")
       and r["ml-t2"]["subtitle"].startswith(f"{meal.lib_chip(PLANNED, U1, TODAY)} · recipe in the description"),
       (r["ml-t4"]["subtitle"], r["ml-t2"]["subtitle"]))
-meal_row_ok(r["ml-t4"], U4, "https://second.example", "library lunch")
-meal_row_ok(r["ml-t2"], U1, "", "library bulgogi")
+check("library: a tag-only entry with no calendar past says 'cooked before · ⭐️⭐️⭐️', stamped once",
+      r["ml-t5"]["subtitle"].startswith("cooked before · ⭐️⭐️⭐️ · recipe in the description  |  ")
+      and r["ml-t5"]["subtitle"].count("⭐️⭐️⭐️") == 1 and r["ml-t5"]["subtitle"].count("cooked") == 2, r["ml-t5"]["subtitle"])
+meal_row_ok(r["ml-t4"], U4, "https://second.example", "library lunch", tid="t4", back="ctx:meallib:lunch")
+meal_row_ok(r["ml-t2"], U1, "", "library bulgogi", tid="t2", back="ctx:meallib:lunch")
+meal_row_ok(r["ml-t5"], U6, "", "library kimchi", tid="t5", back="ctx:meallib:lunch")
 check("library: ⌘ live with the task variables", r["ml-t2"]["mods"]["cmd"]["valid"] and r["ml-t2"]["variables"]["task_id"] == "t2"
       and r["ml-t2"]["variables"]["task_title"] == LIB[1]["title"])
 check("library: ⌥ dead without subtasks, still the drill hop", not r["ml-t2"]["mods"]["alt"]["valid"]
@@ -357,8 +405,55 @@ rows = rows_for("ctx:mealgroc")
 r = by_uid(rows)
 check("groceries: sealed", sealed(rows, "groc"))
 check("groceries: one list, ticked count, due, ⇧ completes",
-      "1/2 ticked" in r["mg-g1"]["subtitle"] and f"due {meal.task_date(LIB[4]):%a %-d %b}" in r["mg-g1"]["subtitle"]
+      "1/2 ticked" in r["mg-g1"]["subtitle"] and f"due {meal.task_date(next(t for t in LIB if t['id'] == 'g1')):%a %-d %b}" in r["mg-g1"]["subtitle"]
       and r["mg-g1"]["mods"]["shift"]["arg"].startswith(f"complete:{LIST}:g1:") and r["mg-g1"]["variables"]["task_id"] == "g1", r["mg-g1"])
+
+# ── the ⭐️ picker ─────────────────────────────────────────────────────────────
+rows = rows_for(f"ctx:mealrate:{LIST}:t5")
+r = by_uid(rows)
+check("rate: sealed (no xact on ⌘ or ⌥, ⌘ dead: not task rows)", sealed(rows, "rate"))
+check("rate: head + the two comments + five star rows + 🚫, in that order",
+      [x["uid"] for x in rows] == ["mr-head", "mr-c0", "mr-c1", "mr-1", "mr-2", "mr-3", "mr-4", "mr-5", "mr-0"],
+      [x["uid"] for x in rows])
+check("rate: the head names the recipe and its rating now, dead",
+      r["mr-head"]["title"] == "⭐️ Rate · Kimchi Stew · now ⭐️⭐️⭐️" and not r["mr-head"]["valid"], r["mr-head"]["title"])
+check("rate: the comments already under the rating, oldest first, dead",
+      r["mr-c0"]["title"] == "💬 less salt next time" and r["mr-c1"]["title"] == "💬 more chili"
+      and not r["mr-c0"]["valid"] and not r["mr-c1"]["valid"], (r["mr-c0"], r["mr-c1"]))
+for n in range(1, 6):
+    s = r[f"mr-{n}"]
+    check(f"rate: {n} stars = xact:meal_rate with rate_payload(LIST, t5, {n}, ctx:meal), ⏎ and ⌥⇧ the same",
+          s["title"] == meal.stars(n) and s["valid"] and s["arg"].startswith("xact:meal_rate:")
+          and payload(s) == meal.rate_payload(LIST, "t5", n, "ctx:meal") == {"pid": LIST, "tid": "t5", "stars": n, "back": "ctx:meal"}
+          and s["mods"]["alt+shift"]["arg"] == s["arg"] and s["mods"]["alt+shift"]["valid"], s)
+check("rate: the current rating is marked, the others plain",
+      r["mr-3"]["subtitle"] == "⏎ rate · current" and all(r[f"mr-{n}"]["subtitle"] == "⏎ rate" for n in (1, 2, 4, 5)),
+      [r[f"mr-{n}"]["subtitle"] for n in range(1, 6)])
+check("rate: 🚫 No rating is live on a rated recipe, stars 0, ⌥⇧ the same",
+      r["mr-0"]["title"] == "🚫 No rating" and r["mr-0"]["valid"] and payload(r["mr-0"]) == {"pid": LIST, "tid": "t5", "stars": 0, "back": "ctx:meal"}
+      and r["mr-0"]["mods"]["alt+shift"]["arg"] == r["mr-0"]["arg"], r["mr-0"])
+check("rate: ⌃ backs to the hub when the ctx names no screen",
+      all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows))
+check("rate: the bar filters ('3' keeps the 3-star row)",
+      [x["uid"] for x in rows_for(f"ctx:mealrate:{LIST}:t5", "3")] == ["mr-3"],
+      [x["uid"] for x in rows_for(f"ctx:mealrate:{LIST}:t5", "3")])
+ru = by_uid(rows_for(f"ctx:mealrate:{LIST}:t4"))
+check("rate: an unrated recipe: head says so, no comment rows, 🚫 dead, no 'current'",
+      ru["mr-head"]["title"] == "⭐️ Rate · Second Lunch · not rated" and not any(u.startswith("mr-c") for u in ru)
+      and not ru["mr-0"]["valid"] and ru["mr-0"]["arg"] == "" and not ru["mr-0"]["mods"]["alt+shift"]["valid"]
+      and all(ru[f"mr-{n}"]["subtitle"] == "⏎ rate" for n in range(1, 6)), (ru["mr-head"]["title"], ru["mr-0"]))
+rb = rows_for(f"ctx:mealrate:{LIST}:t5:meallib:lunch")
+check("rate: a back level in the ctx = the ⌃ target AND the payloads' back",
+      all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meallib:lunch" for x in rb)
+      and payload(by_uid(rb)["mr-4"]) == meal.rate_payload(LIST, "t5", 4, "ctx:meallib:lunch")
+      and payload(by_uid(rb)["mr-0"])["back"] == "ctx:meallib:lunch", [x["mods"]["ctrl"]["variables"] for x in rb][:1])
+check("rate: the ctx carries the trailing ids", render(f"ctx:mealrate:{LIST}:t5:meallib:lunch") == ("mealrate", [LIST, "t5", "meallib", "lunch"], ""))
+check("rate: the pid in the ctx wins for the payload",
+      payload(by_uid(rows_for("ctx:mealrate:otherlist:t5"))["mr-2"])["pid"] == "otherlist")
+rn = rows_for(f"ctx:mealrate:{LIST}:nope")
+check("rate: an unknown task = one dead row, ⌃ still backs",
+      len(rn) == 1 and rn[0]["uid"] == "mr-none" and not rn[0]["valid"] and "not in the cache" in rn[0]["title"]
+      and rn[0]["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" and sealed(rn, "rate none"), rn)
 
 # ── the Routines hub's door ───────────────────────────────────────────────────
 rr = by_uid(browse.render_routines(""))
@@ -384,6 +479,20 @@ with contextlib.redirect_stdout(buf):
     browse.main()
 out = json.loads(buf.getvalue())
 check("main(): the quarter renders by explicit ctx", sum(1 for i in out.get("items", []) if i.get("uid", "").startswith("mq-")) == HORIZON)
+sys.argv = ["browse.py", f"ctx:mealrate:{LIST}:t5"]
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    browse.main()
+out = json.loads(buf.getvalue())
+check("main(): the ⭐️ picker renders by explicit ctx", [i.get("uid") for i in out.get("items", [])][:2] == ["mr-head", "mr-c0"]
+      and sum(1 for i in out.get("items", []) if i.get("uid", "") in ("mr-1", "mr-2", "mr-3", "mr-4", "mr-5")) == 5)
+sys.argv = ["browse.py", f"ctx:mealrate:{LIST}"]
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    browse.main()
+out = json.loads(buf.getvalue())
+check("main(): ctx:mealrate with one id = the grammar row", len(out.get("items", [])) == 1
+      and "needs <listId>:<taskId>" in out["items"][0]["title"], out.get("items"))
 
 print(f"\nmeal screens: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

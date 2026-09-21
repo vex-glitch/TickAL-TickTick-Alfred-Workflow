@@ -12189,6 +12189,68 @@ def meal_setlist():
     print(f"🥘 Meal Prep list set · {_list_name_of(a) or a}")
 
 
+def _meal_name(tid):
+    """The recipe's name off the cached library task (meal.parse_title), for
+    a dialog's first line; 'this recipe' when the cache does not hold it."""
+    import meal
+    try:
+        parsed = meal.parse_title((cache_store.find_task(tid) or {}).get("title") or "")
+    except Exception:
+        parsed = None
+    return parsed[0] if parsed else "this recipe"
+
+
+def meal_cooked(rest):
+    """👨‍🍳 Cooked (meal_write.mark_cooked): the 👨‍🍳cooked tag on the
+    library recipe and ONE note for next time, asked in one dialog (Esc or
+    an empty box = no note) - Vex 2026-09-21: "I would like to be able to
+    mark meal cooked via modifier", "know which meals I have cooked before,
+    so I am thinking a tag", "retrospectively I also should be able to add
+    a comment, like add less salt next time". Payload {"pid","tid"[,"back"]}:
+    ⌥⇧ on any meal row that resolves to a library task (the one chord
+    besides ⏎ that runs a row's xact arg) and the ⌘ Actions row, which
+    carries no back (toast only). The dialog is asked INSIDE the writer
+    call so a dry run and a Refusal still ride _meal_run."""
+    import meal_write as mw
+
+    def run(spec):
+        name = _meal_name(spec.get("tid"))
+        note = _ask(f"👨‍🍳 {name} cooked · a note for next time? (Esc = none)",
+                    multiline=True)
+        return mw.mark_cooked(pid=spec.get("pid"), tid=spec.get("tid"),
+                              comment=note or None, dry=_dry_meal(spec))
+    _meal_run(rest, run)
+
+
+def meal_rate(rest):
+    """⭐️ Rate (meal_write.rate): the stars line right under the link header
+    of the recipe's description ("a rating should be quote first liner
+    below links in recipe, stars"), 1 to 5, 0 clears. Payload
+    {"pid","tid","stars"[,"back"]} - the count is picked on the row, so no
+    dialog; a bad count is the writer's refusal."""
+    import meal_write as mw
+    _meal_run(rest, lambda spec: mw.rate(pid=spec.get("pid"), tid=spec.get("tid"),
+                                         stars=spec.get("stars"), dry=_dry_meal(spec)))
+
+
+def meal_comment(rest):
+    """💬 Comment (meal_write.comment): one quote line under the stars
+    ("comment should go below that also as quote"), appended after the
+    earlier ones - "add less salt next time", written after eating. Payload
+    {"pid","tid"[,"back"]}; the text is asked here, Esc cancels with
+    nothing written (an empty box is the writer's refusal)."""
+    import meal_write as mw
+
+    def run(spec):
+        name = _meal_name(spec.get("tid"))
+        text = _ask(f"💬 {name} · note (Esc cancels)", multiline=True)
+        if text is None:
+            return "💬 Cancelled"
+        return mw.comment(pid=spec.get("pid"), tid=spec.get("tid"), text=text,
+                          dry=_dry_meal(spec))
+    _meal_run(rest, run)
+
+
 def okr_sched(rest):
     """📅 extend +N / 🌙 tomorrow / pick a date on one OKR item, with the
     ripple through its Y lane and the parent heals (okr.schedule_plan) -
@@ -12515,6 +12577,12 @@ def main():
             meal_sync(rest)
         elif verb == "meal_setlist":
             meal_setlist()
+        elif verb == "meal_cooked":
+            meal_cooked(rest)
+        elif verb == "meal_rate":
+            meal_rate(rest)
+        elif verb == "meal_comment":
+            meal_comment(rest)
         elif verb == "add_pre":
             add_pre(rest)
         elif verb == "crmtrash":

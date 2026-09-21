@@ -53,11 +53,38 @@ The one row shape, on the hub, on a week and in the library:
 |---|---|
 | ⏎ | Open the recipe in **Mela** |
 | ⇧⏎ | Open the recipe's web page (dead, "No web page", when the recipe has none) |
+| ⌥⇧⏎ | Cooked: the 👨‍🍳cooked tag goes on the recipe task and a box asks for a note ("less salt next time", Esc for none) |
 | ⌥⌘⏎ | Copy the Mela link |
 | ⌘⏎ | Actions - only when the meal is a task in your library; otherwise dead |
 | ⌃⏎ | Back |
 
-Plan rows carry the date (`· Sun 27 Sep`); library rows carry the cooked chip instead: **never cooked**, **cooked 2 weeks ago** or **next Sun 4 Oct**, read from the calendar. On library rows ⌥ still drills into subtasks when there are any.
+Plan rows carry the date (`· Sun 27 Sep`); library rows carry the cooked chip instead: **never cooked**, **cooked 2 weeks ago** or **next Sun 4 Oct**, read from the calendar, or **cooked before** when only the 👨‍🍳cooked tag says so. A rated recipe shows its stars in the chip (`· ⭐️⭐️⭐️`), a tagged one the word cooked. On library rows ⌥ still drills into subtasks when there are any.
+
+## Cooked, rated, noted
+
+Three things live on the recipe task itself, so they follow the recipe wherever it shows up:
+
+| What | Where it lands | How |
+|---|---|---|
+| **Cooked** | the 👨‍🍳cooked tag on the recipe task | ⌥⇧⏎ on any meal row, or **👨‍🍳 Cooked** in the recipe task's ⌘ menu. A box asks for a note first; Esc skips it, the tag goes on either way |
+| **Rating** | a quote line of stars right under the links at the top of the description | **⭐️ Rate…** in the ⌘ menu opens a picker: ⭐️ to ⭐️⭐️⭐️⭐️⭐️, and 🚫 No rating to clear. Rate whenever you like, a week after eating it is fine |
+| **Notes** | quote lines right under the stars, one per note, newest last | the box after Cooked, or **💬 Comment…** in the ⌘ menu any time later |
+
+The description then reads:
+
+```
+> 🔗 [Burbon Asian Chicken](mela://recipe/…)
+> 🌐 [instagram.com](https://…)
+> ⭐️⭐️⭐️⭐️⭐️
+> add less salt next time
+
+Serves: 4
+## Ingredients:
+```
+
+Notes are added, never replaced; edit or delete a line in TickTick when it has served its purpose. A recipe whose description is empty gets the link header minted on top.
+
+**Mela can't be written.** The app has no way in: no Shortcuts action for editing, no URL that changes a recipe, and its database is a synced Core Data store that must not be touched from outside. So the rating lives in TickTick. What does work the other way: a rating you type into a recipe's description field in Mela as `Rating: ⭐️⭐️⭐️` is read by 🔄 Sync and put into the TickTick quote when the task has no stars yet (a rating set in TickAL is never overwritten by Mela's).
 
 ## Syncing
 
@@ -65,8 +92,9 @@ Plan rows carry the date (`· Sun 27 Sep`); library rows carry the cooked chip i
 
 1. Every recipe categorised in Mela that the library does not have yet becomes a library task with its tag and the recipe text (up to forty a run).
 2. Library tasks with an empty description get the recipe text (up to sixty a run).
-3. The calendar is read, and the next cook is mirrored into TickTick: your next 🥘 Meal Prep task is found (the Sunday routine or the copy you moved to a weekday), every old pointer under any Meal Prep task goes (your own steps on it are never touched), one new pointer per meal Mela has on that day is minted under it dated that day, one 🛒 checklist per meal is made or kept under your next 🛒 Groceries task dated its day (a list already there stays, ticked items are never touched, lists for dropped meals go, a list sitting loose from an older press is remade under the task), and the 🥘 bullet is filled in the note of the week that cook feeds.
-4. Every recipe task takes the date Mela has it planned on next: the nearest day on or after today, all-day, the day itself rather than the cook Sunday. A recipe with no upcoming plan loses its date. So the recipe task itself shows when you eat it, in search rows and in TickTick's calendar, for the whole quarter. Groceries, pointers and anything you made by hand are never touched.
+3. Recipes rated in Mela (a `Rating: ⭐️⭐️⭐️` line in the description field there) get the stars into TickTick when the task has none yet (up to twenty a run).
+4. The calendar is read, and the next cook is mirrored into TickTick: your next 🥘 Meal Prep task is found (the Sunday routine or the copy you moved to a weekday), every old pointer under any Meal Prep task goes (your own steps on it are never touched), one new pointer per meal Mela has on that day is minted under it dated that day, one 🛒 checklist per meal is made or kept under your next 🛒 Groceries task dated its day (a list already there stays, ticked items are never touched, lists for dropped meals go, a list sitting loose from an older press is remade under the task), and the 🥘 bullet is filled in the note of the week that cook feeds.
+5. Every recipe task takes the date Mela has it planned on next: the nearest day on or after today, all-day, the day itself rather than the cook Sunday. A recipe with no upcoming plan loses its date. So the recipe task itself shows when you eat it, in search rows and in TickTick's calendar, for the whole quarter. Groceries, pointers and anything you made by hand are never touched.
 
 The toast says what happened: `🔄 Mela · +2 recipes · 3 filled · cook Tue 22 Sep: 🍳 Breakfast Bagels · 🌮 Chicken subs · 2 grocery lists · 41 recipes dated`. A cook day with nothing in the calendar clears the pointers and the open grocery lists, and the note bullet says "nothing planned in Mela". If TickTick's hundred-requests-a-minute limit stops the dating pass, the toast says how many dates are left; press the row again a minute later.
 
@@ -94,7 +122,7 @@ The earlier version planned the week inside TickAL. Gone: the 🎲 Plan the week
 
 ## Limitations
 
-- Sync is one way: Mela's calendar → TickTick. A meal moved or removed in TickTick does not move in Mela; change it in the calendar and sync again.
+- Sync is one way: Mela's calendar → TickTick. A meal moved or removed in TickTick does not move in Mela; change it in the calendar and sync again. The same for cooked, stars and notes: they stay on the TickTick task, Mela never learns them.
 - The hub shows the calendar as it is on this Mac. An event added on the phone appears once iCloud has delivered it.
 - A recipe you rename in TickTick keeps working (the link is the key); a recipe deleted in Mela gets a grocery list with no items and a note saying so.
 - Groceries are TickTick checklists: tick items in the app; they carry no tags or dates of their own.

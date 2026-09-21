@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Unit suite for src/mela.py (the Mela recipe library) - NO real database:
 an in-memory sqlite with Mela's schema subset, and a throwaway file for the
-snapshot machinery. Run: python3 tests/test_mela.py
+snapshot machinery. Pins: the loader on an injected connection, the meal
+tags, the golden render (byte-for-byte mela2ticktick), Mela's "Rating:"
+line (rating_of / strip_rating, the stars line under the links, the
+blurb and notes without Mela's copy, 2026-09-21), links, the renumbered
+join table and the snapshot. Run: python3 tests/test_mela.py
 """
 import importlib.util
 import os
@@ -9,6 +13,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+from dataclasses import replace
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
@@ -190,6 +195,48 @@ if os.path.isfile(REF):
         print(f"  --  reference script not importable ({e}); hand golden stands")
 else:
     print("  --  reference script not on this Mac; hand golden stands")
+
+# ── Mela's "Rating:" line (Vex 2026-09-21: read only, TickTick is the record) ─
+ST = "⭐️"                            # ⭐️ = U+2B50 + VS16, as Mela writes it
+NOTES = "I did not have ranch seasoning nor el paso thing. Was still tasty\nRating: " + ST * 3
+check("STAR is Mela's glyph, RATING_RE is a module constant", mela.STAR == ST and hasattr(mela, "RATING_RE")
+      and mela.RATING_RE.search("Rating: " + ST) is not None)
+check("rating_of: the description shape (Burbon Asian Chicken)",
+      mela.rating_of(mela.Recipe("X", 9, "x", text="Rating: " + ST * 5)) == 5)
+check("rating_of: the notes shape, under a note line", mela.rating_of(mela.Recipe("X", 9, "x", notes=NOTES)) == 3)
+check("rating_of: description first, then notes",
+      mela.rating_of(mela.Recipe("X", 9, "x", text="Rating: " + ST * 2, notes="Rating: " + ST * 4)) == 2)
+check("rating_of: VS16 blind, ★ too, capped at 5, padding",
+      mela.rating_of(mela.Recipe("X", 9, "x", text="Rating: ⭐⭐")) == 2
+      and mela.rating_of(mela.Recipe("X", 9, "x", text="Rating: ★★★★")) == 4
+      and mela.rating_of(mela.Recipe("X", 9, "x", text="Rating: " + ST * 7)) == 5
+      and mela.rating_of(mela.Recipe("X", 9, "x", notes="  Rating:  " + ST + "  ")) == 1)
+check("rating_of: in the middle of the text", mela.rating_of(mela.Recipe("X", 9, "x", text="Nice.\nRating: " + ST * 3 + "\nMore.")) == 3)
+check("rating_of: None when unrated", mela.rating_of(A) is None and mela.rating_of(B) is None
+      and mela.rating_of(mela.Recipe("X", 9, "x", text="Rating: great")) is None
+      and mela.rating_of(mela.Recipe("X", 9, "x", text="My Rating: " + ST)) is None)
+check("strip_rating: the line goes, the text stays", mela.strip_rating("Rating: " + ST * 5) == ""
+      and mela.strip_rating(NOTES) == "I did not have ranch seasoning nor el paso thing. Was still tasty"
+      and mela.strip_rating("Nice.\n\nRating: " + ST + "\n\nMore.") == "Nice.\n\nMore."
+      and mela.strip_rating("Rating: " + ST + "\nNice.") == "Nice.")
+check("strip_rating: byte-identical without one", mela.strip_rating("Nice.") == "Nice." and mela.strip_rating("") == ""
+      and mela.strip_rating(None) == "" and mela.strip_rating("a\n\n\nb") == "a\n\n\nb")
+rated_a = replace(A, text="Rating: " + ST * 5)
+GOLDEN_A_RATED = GOLDEN_A.replace("Nice.\n\n", "").replace(
+    "(https://www.example.com/x)\n", "(https://www.example.com/x)\n> " + ST * 5 + "\n")
+md_ar = mela.render_markdown(rated_a)
+check("render: the stars line right after 🌐, the blurb copy gone", md_ar == GOLDEN_A_RATED, repr(md_ar))
+check("render: the blurb around the Rating line stays", mela.render_markdown(replace(A, text="Nice.\nRating: " + ST * 3))
+      == GOLDEN_A.replace("(https://www.example.com/x)\n", "(https://www.example.com/x)\n> " + ST * 3 + "\n"))
+check("render: the ## Notes copy gone, the note kept", mela.render_markdown(replace(A, notes="Best fresh.\nRating: " + ST * 3))
+      == GOLDEN_A.replace("(https://www.example.com/x)\n", "(https://www.example.com/x)\n> " + ST * 3 + "\n"))
+md_nn = mela.render_markdown(replace(A, notes="Rating: " + ST * 2))
+check("render: a Notes section the strip empties is omitted, one trailing newline",
+      md_nn == GOLDEN_A.replace("(https://www.example.com/x)\n", "(https://www.example.com/x)\n> " + ST * 2 + "\n")
+      .replace("\n## Notes:\nBest fresh.\n", "") and md_nn.endswith("- Protein: 20 g\n"), repr(md_nn))
+check("render: no 🌐 = the stars right after 🔗", mela.render_markdown(replace(B, notes=NOTES))
+      == GOLDEN_B.replace(")\n\n", ")\n> " + ST * 3 + "\n\n", 1) + "\n## Notes:\nI did not have ranch seasoning nor el paso thing. Was still tasty\n")
+check("render: unrated recipes still equal the golden", mela.render_markdown(A) == GOLDEN_A and mela.render_markdown(B) == GOLDEN_B)
 
 # ── links ───────────────────────────────────────────────────────────────────
 ESCAPED = rf"\[Pad Thai\]\(mela://recipe/{A_ID.lower()}\)"

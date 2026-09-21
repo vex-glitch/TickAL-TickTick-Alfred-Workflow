@@ -6785,12 +6785,18 @@ def render_filter(index, query):
 # (Vex: "open the link to Mela"), ⇧ open:<web> ("and a link to the web" -
 # the Browse SF's ⇧ edge is junction 581BB8A1 → Call-ET modComplete →
 # dispatch.py, whose first branch executes open: args; traced 2026-09-21),
-# ⌥⌘ copy:mela://recipe, ⌘ live only when the meal maps to a library task.
+# ⌥⌘ copy:mela://recipe, ⌘ live only when the meal maps to a library task,
+# and ⌥⇧ = xact:meal_cooked on that library task (Vex 2026-09-21: "mark
+# meal cooked via modifier" - ⌥⇧ is the ONE chord besides ⏎ that executes
+# a row's xact arg, the 892DFDB7 router; the verb tags 👨‍🍳cooked and asks
+# for one note). The rating and the comments have no chord of their own:
+# ⌘ Actions on the row carries ⭐️ Rate… (ctx:mealrate, the picker below)
+# and 💬 Comment…, "cause I cannot rate a meal until I ate it".
 _MEAL_FRESH_S = 45
 _MEAL_SLUG = {"b": "breakfast", "l": "lunch", "s": "snack"}
 _MEAL_KEY = {v: k for k, v in _MEAL_SLUG.items()}
 _MEAL_PLURAL = {"Breakfast": "Breakfasts", "Lunch": "Lunches", "Snack": "Snacks"}
-_MEAL_LEGEND = "⏎🍴 Mela  ⇧🌐 web  ⌥⌘🔗  ⌘⚡"
+_MEAL_LEGEND = "⏎🍴 Mela  ⇧🌐 web  ⌥⇧👨‍🍳 cooked  ⌥⌘🔗  ⌘⚡"
 
 
 def _meal_b64(d):
@@ -6944,14 +6950,25 @@ def _meal_recipes():
         return {}
 
 
-def _meal_row(uid, m, chip, when=None, lib_kids=None, lib_title=""):
+def _meal_row(uid, m, chip, when=None, lib_kids=None, lib_title="", back="ctx:meal",
+              cooked=False, rating=None):
     """THE MEAL ROW. `m` = meal.Meal (slot, name, uuid, web, tid, pid).
     `when` (a date) stamps ' · Sun 27 Sep' on a plan row; `lib_kids`
     (a count, or None on plan rows) makes ⌥ the subtask drill of a library
     row. ⌘ Actions is live ONLY with a library task behind the meal - the
-    row then carries the task variables; else _okr_seal blanks them."""
+    row then carries the task variables; else _okr_seal blanks them.
+    ⌥⇧ = xact:meal_cooked on that same library task (the tag + one note),
+    `back` the screen the verb reopens after its toast; dead without a
+    task, the tag has nowhere to go. `cooked` (the 👨‍🍳cooked tag is on
+    the task) and `rating` (its ⭐️ count) finish the chip: a plan row
+    gets the word and the stars here, a library chip already carries
+    them (meal.lib_chip), so neither is stamped twice."""
     import meal
     title = f"{m.glyph} {m.name}" + (f" · {when:%a %-d %b}" if when else "")
+    if cooked and "cooked" not in (chip or ""):
+        chip = f"{chip} · 👨‍🍳 cooked" if chip else "👨‍🍳 cooked"
+    if meal.stars(rating) and meal.stars(rating) not in (chip or ""):
+        chip = f"{chip} · {meal.stars(rating)}" if chip else meal.stars(rating)
     mods = _okr_dead_mods()
     mods["alt+cmd"] = {"arg": f"copy:{m.url}", "valid": True, "subtitle": "Copy Mela link"}
     if m.web:
@@ -6961,8 +6978,13 @@ def _meal_row(uid, m, chip, when=None, lib_kids=None, lib_title=""):
     variables = None
     if m.tid:
         mods["cmd"] = {"arg": "", "valid": True, "subtitle": "⌘ Actions"}
+        mods["alt+shift"] = {
+            "arg": f"xact:meal_cooked:{_meal_b64(meal.cooked_payload(m.pid, m.tid, back))}",
+            "valid": True, "subtitle": "👨‍🍳 Cooked · a note asked"}
         variables = _meal_task_vars({"id": m.tid, "title": lib_title or meal.md_link(m.name, m.uuid)},
                                     m.pid)
+    else:
+        mods["alt+shift"] = {"arg": "", "valid": False, "subtitle": "No library task"}
     if lib_kids is not None:
         mods["alt"] = {"arg": "", "valid": bool(lib_kids), "subtitle": "⤵️ Subtasks",
                        "variables": {"browse_ctx": f"ctx:subtasks:{m.pid}:{m.tid}"}}
@@ -7032,9 +7054,13 @@ def render_meal(ids, query):
     elif not n:
         sub += " · Plan it in Mela: ⌘⌥A Add to Calendar"
     rows = [alfred.item(uid="meal-head", title=head, subtitle=sub + "  |  ⌃🔙", valid=False)]
+    by_tid = {e["tid"]: e for e in entries}
     for m in meals:
+        e = by_tid.get(m.tid) or {}
         rows.append(_meal_row(f"meal-{m.slot}-{m.uuid[:8]}", m,
-                              (meal.slot(m.slot) or meal.SLOT_X)[3], when=m.date))
+                              (meal.slot(m.slot) or meal.SLOT_X)[3], when=m.date,
+                              back="ctx:meal", cooked=e.get("cooked", False),
+                              rating=e.get("rating")))
     n_plan = pv["planned_count"]
     rows.append(alfred.item(
         uid="meal-next", title=f"📆 Next {mw.HORIZON_WEEKS} weeks",
@@ -7143,9 +7169,16 @@ def render_mealw(ids, query):
     meals = week.meals
     if query:
         meals = fuzz.filter_and_score(query, meals, key_fn=lambda m: m.name)
+    # the library as plan_view read it (a broken read side hands back none:
+    # the cache pool then, so the cooked / ⭐️ chips never depend on the calendar)
+    entries = pv.get("entries") or meal.library_entries(_meal_pool(list_id), list_id)
+    by_tid = {e["tid"]: e for e in entries}
+    back = f"ctx:mealw:{sunday.isoformat()}"
     for m in meals:
+        e = by_tid.get(m.tid) or {}
         rows.append(_meal_row(f"mw-{m.slot}-{m.uuid[:8]}", m,
-                              (meal.slot(m.slot) or meal.SLOT_X)[3], when=m.date))
+                              (meal.slot(m.slot) or meal.SLOT_X)[3], when=m.date,
+                              back=back, cooked=e.get("cooked", False), rating=e.get("rating")))
     if query and not meals:
         rows.append(alfred.item(uid="mw-none", title="No meal matches", valid=False))
     return add_back(_okr_seal(rows), "ctx:mealq")
@@ -7154,7 +7187,9 @@ def render_mealw(ids, query):
 def render_meallib(ids, query):
     """One tag's library, never-cooked first: MEAL ROWS with the cooked chip
     read off the calendar plan ('never cooked' / 'cooked 2 weeks ago' /
-    'next Sun 4 Oct'); ⌥ drills open subtasks."""
+    'next Sun 4 Oct'), 'cooked before' when only the 👨‍🍳cooked tag says
+    so, then the ⭐️ rating (meal.lib_chip; the tag-only rows sort after
+    the never-cooked ones); ⌥ drills open subtasks."""
     import meal
     from datetime import date as _date
     list_id = cfg.get_meal_list_id()
@@ -7178,14 +7213,16 @@ def render_meallib(ids, query):
         entries = fuzz.filter_and_score(query, entries, key_fn=lambda e: e["name"])
     rows = [alfred.item(uid="ml-head", title=f"📚 {glyph} {_MEAL_PLURAL.get(label, label + 's')} · {len(entries)}",
                         subtitle=f"{tag} · never cooked first · ⏎ opens the recipe in Mela  |  ⌃🔙", valid=False)]
+    back = f"ctx:meallib:{_MEAL_SLUG[key]}"
     for e in entries:
         r = recipes.get(e["uuid"])
         m = meal.Meal(slot=key, name=e["name"], uuid=e["uuid"], date=today,
                       web=(getattr(r, "link", "") or "").strip(), tid=e["tid"], pid=e["pid"])
-        chip = meal.lib_chip(planned, e["uuid"], today)
+        chip = meal.lib_chip(planned, e["uuid"], today, tagged=e["cooked"], rating=e["rating"])
         chip += " · " + ("recipe in the description" if e.get("content") else "no description yet")
         rows.append(_meal_row(f"ml-{e['tid']}", m, chip, lib_kids=kids.get(e["tid"], 0),
-                              lib_title=e["title"]))
+                              lib_title=e["title"], back=back, cooked=e["cooked"],
+                              rating=e["rating"]))
     if not entries:
         rows.append(alfred.item(uid="ml-none", title="No recipe matches" if query
                                 else f"No {tag} recipes yet", valid=False))
@@ -7235,6 +7272,64 @@ def render_mealgroc(query):
         rows.append(alfred.item(uid="mg-none", title="No grocery lists open",
                                 subtitle="🔄 Sync with Mela to make them  |  ⌃🔙", valid=False))
     return add_back(_okr_seal(rows), "ctx:meal")
+
+
+def render_mealrate(ids, query):
+    """ctx:mealrate:<pid>:<tid>[:<back level>[:<more>]] - the ⭐️ picker a
+    recipe's ⌘ Actions opens (Vex 2026-09-21: "rate a meal and give a
+    comment", "it should use stars"). The head says the recipe and its
+    rating now, the comments already under it follow (dead, oldest first,
+    the retrospective "add less salt next time" lines), then ⭐️ .. ⭐️⭐️⭐️⭐️⭐️
+    and 🚫 No rating: each fires xact:meal_rate on ⏎ and ⌥⇧ alike (the 🔄
+    row's pair - both chords execute an xact arg, nothing else does), and
+    the verb reopens `back` after its toast: the trailing ids re-joined
+    ("meallib:lunch" -> ctx:meallib:lunch), the hub when none. The pid in
+    the ctx wins for the payload (a row can come off a view alias); the
+    task itself is read from the cache, a recipe not in it is a dead row.
+    Not task rows: the seal keeps ⌘ dead and blanks the variables."""
+    import meal
+    pid, tid = (ids[0] or "").strip(), (ids[1] or "").strip()
+    back = "ctx:" + ":".join(ids[2:]) if len(ids) > 2 else "ctx:meal"
+    list_id = cfg.get_meal_list_id()
+    t = cache_store.find_task(tid) if tid else None
+    if not t and list_id:
+        t = next((x for x in _meal_pool(list_id) if x.get("id") == tid), None)
+    if not t:
+        return add_back(_okr_seal([alfred.item(
+            uid="mr-none", title="Recipe not in the cache · open the library first",
+            subtitle="🥘 Meal Prep › 📚 library  |  ⌃🔙", valid=False)]), back)
+    parsed = meal.parse_title(t.get("title") or "")
+    name = parsed[0] if parsed else meal.unescape(t.get("title") or "")
+    content = t.get("content") or ""
+    now = meal.read_rating(content)
+    rows = [alfred.item(
+        uid="mr-head",
+        title=f"⭐️ Rate · {name} · " + (f"now {meal.stars(now)}" if now else "not rated"),
+        subtitle="⏎ on a row below · the stars land under the recipe's links  |  ⌃🔙",
+        valid=False)]
+    for i, c in enumerate(meal.read_comments(content)[:5]):
+        rows.append(alfred.item(uid=f"mr-c{i}", title=f"💬 {c}",
+                                subtitle="a comment already under the rating", valid=False))
+    for n in range(1, meal.MAX_STARS + 1):
+        arg = f"xact:meal_rate:{_meal_b64(meal.rate_payload(pid, tid, n, back))}"
+        mods = _okr_dead_mods()
+        mods["alt+shift"] = {"arg": arg, "valid": True, "subtitle": "⭐️ Rate"}
+        rows.append(alfred.item(
+            uid=f"mr-{n}", title=meal.stars(n),
+            subtitle="⏎ rate" + (" · current" if n == now else ""),
+            arg=arg, valid=True, mods=mods, match=f"{n} {meal.stars(n)} {n} stars"))
+    clear = f"xact:meal_rate:{_meal_b64(meal.rate_payload(pid, tid, 0, back))}"
+    mods = _okr_dead_mods()
+    if now:
+        mods["alt+shift"] = {"arg": clear, "valid": True, "subtitle": "🚫 Clear the rating"}
+    rows.append(alfred.item(
+        uid="mr-0", title="🚫 No rating",
+        subtitle="⏎ clears the stars line" if now else "not rated yet",
+        arg=clear if now else "", valid=bool(now), mods=mods, match="0 none clear no rating"))
+    if query:
+        rows = [r for r in rows if fuzz.score(query, r.get("match") or r["title"]) > 0] or \
+               [alfred.item(uid="mr-nomatch", title="No row matches", valid=False)]
+    return add_back(_okr_seal(rows), back)
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -7324,6 +7419,9 @@ def main():
 
         elif level == "mealgroc":
             items = render_mealgroc(query)
+
+        elif level == "mealrate":
+            items = render_mealrate(ids, query) if len(ids) >= 2 else _missing(level, "<listId>:<taskId>")
 
         elif level == "okrpace":
             items = render_okrpace(ids, query)

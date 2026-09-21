@@ -3,7 +3,15 @@
 weekly note's bullet). Pure: no network, no cache, no Calendar store and
 no Mela DB - the plan rows are tiny duck-typed objects (date/uuid/title,
 the mela_cal.Planned shape) and the recipes duck-type mela.Recipe
-(id/title/link/categories). Run: python3 tests/test_meal.py
+(id/title/link/categories). Pins, in order: the picker era stays gone,
+the title grammar, the library as the screens see it, week arithmetic,
+slot_for_recipe, the plan folded into weeks, cooked history off the
+calendar, the sync verb (its toast's rated / ratings_left too), meal_notes
+over the weekly template, zones /
+upcoming / batch, and (2026-09-21) rating, comments and cooked: the
+star grammar, the head block, set_rating / add_comment on the sample
+layout, Mela's "Rating:" line adopted, the payloads, the chips and the
+library order with the 👨‍🍳cooked tag. Run: python3 tests/test_meal.py
 """
 import os
 import sys
@@ -248,6 +256,12 @@ check("sync_text: nothing new, nothing planned", meal.sync_text(S27, 0, 0, 0, 0)
       == "🔄 Mela · nothing new · cook Sun 27 Sep: nothing planned in Mela · 0 grocery lists")
 check("sync_text: (slot, name) pairs", "🍳 Oats · 🍽️ Cake" in meal.sync_text(S27, [("b", "Oats"), ("x", "Cake")], 2, 0, 0))
 check("sync_text: note not written", meal.sync_text(S27, 3, 3, 0, 0, note_ok=False).endswith(" · note not written"))
+check("sync_text: ratings from Mela, worded like the dates",
+      meal.sync_text(S27, 1, 1, 0, 0, dated=2, rated=2).endswith(" · 2 recipes dated · 2 ratings from Mela")
+      and meal.sync_text(S27, 1, 1, 0, 0, rated=1).endswith(" · 1 grocery list · 1 rating from Mela"))
+check("sync_text: ratings left · run again, and nothing said when both are 0",
+      meal.sync_text(S27, 1, 1, 0, 0, rated=1, ratings_left=3).endswith(" · 1 rating from Mela · 3 ratings left · run again")
+      and "rating" not in meal.sync_text(S27, 1, 1, 0, 0, rated=0, ratings_left=0))
 
 # ── meal_notes over the shipped weekly template ───────────────────────────────
 picks = {"b": {"tid": "t1", "uuid": U2, "name": "Oats"}, "l": {"tid": "t2", "uuid": U1, "name": "Bulgogi"}}
@@ -331,6 +345,162 @@ ms = meal.meals_on(pl, RECIPES, None, ents, date(2026, 9, 22))
 check("meals_on: the day's meals only, one per recipe, slot order",
       [(m.slot, m.name) for m in ms] == [("b", "Oats"), ("l", "Beef Bulgogi")], [(m.slot, m.name) for m in ms])
 check("meals_on: an empty day", meal.meals_on(pl, {}, None, [], date(2026, 9, 23)) == [])
+
+
+# ── rating, comments, cooked (Vex 2026-09-21) ────────────────────────────────
+print("-- rating / comments / cooked")
+import mela                                   # noqa: E402  (pure: render only, no DB)
+ST = "⭐️"                           # ⭐️ = U+2B50 + VS16, Mela's own
+BARE = "⭐"                               # ⭐ without the selector
+UR = "F052E26F-E879-44E9-8633-E6BA39676E87"
+WEB = "https://www.instagram.com/reel/x"
+L1 = f"> 🔗 [Burbon Asian Chicken](mela://recipe/{UR})"
+L2 = f"> 🌐 [instagram.com]({WEB})"
+BODY = "Serves: 4\n## Ingredients:\n- a\n"
+SAMPLE = f"{L1}\n{L2}\n> {ST * 5}\n> add less salt next time\n\n{BODY}"
+check("constants: the tag under its parent, ⭐️ with VS16, five at most",
+      meal.COOKED_TAG == "\U0001F468‍\U0001F373cooked" and meal.COOKED_PARENT == "\U0001F371mealprep"
+      and meal.STAR == ST and meal.MAX_STARS == 5)
+# stars / parse_stars
+check("stars: n copies, capped, '' for none", meal.stars(3) == ST * 3 and meal.stars(9) == ST * 5
+      and meal.stars(0) == "" and meal.stars(None) == "" and meal.stars(-2) == "" and meal.stars("x") == "")
+check("parse_stars: digits, n/5, capped", meal.parse_stars("3") == 3 and meal.parse_stars("3/5") == 3
+      and meal.parse_stars(" 4 / 5 ") == 4 and meal.parse_stars("7") == 5 and meal.parse_stars("5") == 5)
+check("parse_stars: ⭐️ with VS16, ⭐ without, ★, *", meal.parse_stars(ST * 3) == 3 and meal.parse_stars(BARE * 2) == 2
+      and meal.parse_stars("★★★") == 3 and meal.parse_stars("***") == 3 and meal.parse_stars(ST * 6) == 5
+      and meal.parse_stars(ST + " " + ST) == 2)
+check("parse_stars: 0 / none / clear / - / empty -> 0", [meal.parse_stars(x) for x in ("0", "none", "Clear", "-", "", "  ", None)] == [0] * 7)
+check("parse_stars: garbage -> None", meal.parse_stars("great") is None and meal.parse_stars("3/4") is None
+      and meal.parse_stars(ST + " great") is None and meal.parse_stars("3 stars") is None)
+# header_block
+check("header_block: the sample", meal.header_block(SAMPLE) == ([L1, L2, f"> {ST * 5}", "> add less salt next time"], BODY))
+check("header_block: no head", meal.header_block(BODY) == ([], BODY) and meal.header_block("x > y") == ([], "x > y"))
+check("header_block: a bare > counts", meal.header_block("> a\n>\n> b\n\nx") == (["> a", ">", "> b"], "x"))
+check("header_block: no trailing newline, no body", meal.header_block("> a\n\nx") == (["> a"], "x")
+      and meal.header_block("> a") == (["> a"], "") and meal.header_block("> a\n") == (["> a"], ""))
+check("header_block: only ONE blank line removed, none needed", meal.header_block("> a\n\n\nx") == (["> a"], "\nx")
+      and meal.header_block("> a\nx") == (["> a"], "x"))
+check("header_block: None / empty never raise", meal.header_block(None) == ([], "") and meal.header_block("") == ([], ""))
+# the line classifiers
+check("is_link_line: 🔗 and 🌐 quote lines only", meal.is_link_line(L1) and meal.is_link_line(L2)
+      and not meal.is_link_line(f"> {ST * 3}") and not meal.is_link_line("> add salt") and not meal.is_link_line("🔗 x")
+      and not meal.is_link_line(None))
+check("is_link_line: a note that mentions the web is a note (the glyph must lead the line)",
+      not meal.is_link_line("> see 🌐 for the web version") and not meal.is_link_line("> the 🔗 was dead")
+      and meal.is_link_line(">🌐 [x](https://x)") and meal.is_link_line(">  🔗 [x](mela://recipe/1)"))
+check("set_rating: a note mentioning the web keeps the stars right under the links, and stays a note",
+      meal.set_rating(f"{L1}\n> see 🌐 for the web version", 2) == f"{L1}\n> {ST * 2}\n> see 🌐 for the web version"
+      and meal.read_comments(f"{L1}\n> see 🌐 for the web version") == ["see 🌐 for the web version"])
+check("is_stars_line: ⭐️, ⭐, ★, spaced, 1..5", meal.is_stars_line(f"> {ST * 5}") and meal.is_stars_line(f"> {BARE}")
+      and meal.is_stars_line("> ★★★") and meal.is_stars_line(f"> {ST} {ST}") and meal.is_stars_line(f">{ST}"))
+check("is_stars_line: not 6, not text, not without >", not meal.is_stars_line(f"> {ST * 6}")
+      and not meal.is_stars_line(f"> {ST * 3} nice") and not meal.is_stars_line(ST * 3) and not meal.is_stars_line(">")
+      and not meal.is_stars_line(None))
+# read_rating / read_comments
+check("read_rating: the sample, VS16 blind, none", meal.read_rating(SAMPLE) == 5
+      and meal.read_rating(f"{L1}\n> {BARE * 3}\n\n{BODY}") == 3 and meal.read_rating(f"{L1}\n\n{BODY}") is None
+      and meal.read_rating(None) is None and meal.read_rating(f"body {ST * 2}") is None)
+check("read_comments: the sample", meal.read_comments(SAMPLE) == ["add less salt next time"])
+check("read_comments: order kept, bare > and > empty skipped, links and stars never",
+      meal.read_comments(f"{L1}\n> {ST}\n> first\n>\n> \n> second\n\nx") == ["first", "second"]
+      and meal.read_comments(BODY) == [] and meal.read_comments(None) == [])
+# mint_header
+check("mint_header: 🔗 from the title, 🌐 host without www", meal.mint_header("Burbon Asian Chicken", UR, WEB) == [L1, L2]
+      and meal.mint_header("Burbon Asian Chicken", UR) == [L1] and meal.mint_header("X", UR, "  ") == [f"> 🔗 [X](mela://recipe/{UR})"])
+check("mint_header: exactly mela.render_markdown's header",
+      mela.render_markdown(mela.Recipe(UR, 1, "Burbon Asian Chicken", link=WEB)).split("\n")[:2]
+      == meal.mint_header("Burbon Asian Chicken", UR, WEB))
+# set_rating
+check("set_rating: after 🌐", meal.set_rating(f"{L1}\n{L2}\n\n{BODY}", 4) == f"{L1}\n{L2}\n> {ST * 4}\n\n{BODY}")
+check("set_rating: after 🔗 when there is no 🌐", meal.set_rating(f"{L1}\n\n{BODY}", 2) == f"{L1}\n> {ST * 2}\n\n{BODY}")
+check("set_rating: replace in place, comments kept after", meal.set_rating(SAMPLE, 3) == SAMPLE.replace(ST * 5, ST * 3)
+      and meal.read_comments(meal.set_rating(SAMPLE, 3)) == ["add less salt next time"])
+check("set_rating: a stars line that sat after a comment moves up under the links",
+      meal.set_rating(f"{L1}\n> salty\n> {ST * 2}\n\nx", 4) == f"{L1}\n> {ST * 4}\n> salty\n\nx")
+check("set_rating: remove with 0 and None", meal.set_rating(SAMPLE, 0) == SAMPLE.replace(f"> {ST * 5}\n", "")
+      and meal.set_rating(SAMPLE, None) == meal.set_rating(SAMPLE, 0))
+check("set_rating: nothing to remove = byte-identical", meal.set_rating(f"{L1}\nx", 0) == f"{L1}\nx"
+      and meal.set_rating("", 0) == "" and meal.set_rating(None, 0) == "")
+hdr = meal.mint_header("Burbon Asian Chicken", UR, WEB)
+check("set_rating: minted header on empty content, no newline added", meal.set_rating("", 5, header=hdr) == f"{L1}\n{L2}\n> {ST * 5}")
+check("set_rating: minted header on a hand-written body, blank line between",
+      meal.set_rating("Serves: 4\n- a\n", 3, header=hdr) == f"{L1}\n{L2}\n> {ST * 3}\n\nServes: 4\n- a\n")
+check("set_rating: no head and no header still lands the stars on top", meal.set_rating("body", 3) == f"> {ST * 3}\n\nbody")
+odd = "Serves: 4\n\n\n- a   \n\n"
+check("set_rating: the rest is byte-identical", meal.set_rating(f"{L1}\n\n{odd}", 1) == f"{L1}\n> {ST}\n\n{odd}")
+check("set_rating: a trailing newline is kept", meal.set_rating(f"{L1}\n", 1) == f"{L1}\n> {ST}\n"
+      and meal.set_rating(L1, 1) == f"{L1}\n> {ST}")
+check("set_rating: the exact trailing newline run comes back (two, three) when there is no body",
+      meal.set_rating(f"{L1}\n\n", 1) == f"{L1}\n> {ST}\n\n" and meal.set_rating(f"{L1}\n\n\n", 1) == f"{L1}\n> {ST}\n\n\n"
+      and meal.add_comment(f"{L1}\n\n", "x") == f"{L1}\n> x\n\n")
+check("set_rating: capped at 5, round-trips through read_rating", meal.read_rating(meal.set_rating(SAMPLE, 9)) == 5
+      and meal.read_rating(meal.set_rating(SAMPLE, 3)) == 3 and meal.read_rating(meal.set_rating(SAMPLE, 0)) is None)
+# add_comment
+check("add_comment: after the stars", meal.add_comment(f"{L1}\n{L2}\n> {ST * 3}\n\n{BODY}", "less salt")
+      == f"{L1}\n{L2}\n> {ST * 3}\n> less salt\n\n{BODY}")
+check("add_comment: after earlier comments, never replacing", meal.add_comment(SAMPLE, "more chili")
+      == SAMPLE.replace("> add less salt next time\n", "> add less salt next time\n> more chili\n")
+      and meal.read_comments(meal.add_comment(SAMPLE, "more chili")) == ["add less salt next time", "more chili"])
+check("add_comment: multi-line text, one quote line each, blanks dropped",
+      meal.add_comment(SAMPLE, "a\n\n  b  \n") == SAMPLE.replace("next time\n", "next time\n> a\n> b\n"))
+check("add_comment: blank / None text = untouched", meal.add_comment(SAMPLE, "   ") == SAMPLE
+      and meal.add_comment(SAMPLE, None) == SAMPLE and meal.add_comment("", "") == "" and meal.add_comment(None, "") == "")
+check("add_comment: minted header on empty and on a hand-written body", meal.add_comment("", "note", header=hdr) == f"{L1}\n{L2}\n> note"
+      and meal.add_comment("Serves: 4\n", "note", header=hdr) == f"{L1}\n{L2}\n> note\n\nServes: 4\n")
+check("add_comment: no head, no header", meal.add_comment("body", "note") == "> note\n\nbody")
+check("add_comment: a pasted quote is not quoted twice", meal.add_comment(SAMPLE, "> quoted").count("> quoted") == 1
+      and ">  >" not in meal.add_comment(SAMPLE, "> quoted"))
+# strip_mela_rating / adopt_mela_rating
+blurb = f"{L1}\n{L2}\n\nRating: {ST * 5}\n\n{BODY}"
+check("strip_mela_rating: the blurb copy, one blank line kept", meal.strip_mela_rating(blurb) == f"{L1}\n{L2}\n\n{BODY}")
+check("strip_mela_rating: a blurb with text keeps the text", meal.strip_mela_rating(f"{L1}\n\nNice.\nRating: {ST * 2}\n\n{BODY}")
+      == f"{L1}\n\nNice.\n\n{BODY}")
+notes = f"{L1}\n\n{BODY}\n## Notes:\nI did not have ranch\nRating: {ST * 3}\n"
+check("strip_mela_rating: the ## Notes copy", meal.strip_mela_rating(notes) == f"{L1}\n\n{BODY}\n## Notes:\nI did not have ranch\n")
+check("strip_mela_rating: a ## Notes left empty goes too, one trailing newline",
+      meal.strip_mela_rating(f"{L1}\n\n{BODY}\n## Notes:\nRating: {ST * 3}\n") == f"{L1}\n\n{BODY}")
+check("strip_mela_rating: a stars line INSIDE the head is never touched", meal.strip_mela_rating(SAMPLE) == SAMPLE
+      and meal.strip_mela_rating(f"{L1}\n> Rating: {ST}\n\nx") == f"{L1}\n> Rating: {ST}\n\nx")
+check("strip_mela_rating: nothing to strip = byte-identical", meal.strip_mela_rating(f"{L1}\nx") == f"{L1}\nx"
+      and meal.strip_mela_rating(BODY) == BODY and meal.strip_mela_rating(None) == "" and meal.strip_mela_rating("") == "")
+check("strip_mela_rating: ⭐ without VS16, ★, padding; 'Rating: great' stays",
+      meal.strip_mela_rating(f"a\n  Rating: {BARE * 2}  \nb") == "a\nb" and meal.strip_mela_rating("a\nRating: ★★\nb") == "a\nb"
+      and meal.strip_mela_rating("a\nRating: great\nb") == "a\nRating: great\nb")
+check("strip_mela_rating: a rating line on top of a hand-written body", meal.strip_mela_rating(f"Rating: {ST}\n\nbody") == "body")
+check("adopt_mela_rating: Mela's line leaves the body, the stars land under the links",
+      meal.adopt_mela_rating(blurb, 5) == f"{L1}\n{L2}\n> {ST * 5}\n\n{BODY}"
+      and meal.adopt_mela_rating(notes, 3) == f"{L1}\n> {ST * 3}\n\n{BODY}\n## Notes:\nI did not have ranch\n")
+check("adopt_mela_rating: mints the header on a hand-written body",
+      meal.adopt_mela_rating(f"Rating: {ST * 2}\nServes: 4\n", 2, header=hdr) == f"{L1}\n{L2}\n> {ST * 2}\n\nServes: 4\n")
+# payloads
+check("cooked_payload", meal.cooked_payload("p", "t") == {"pid": "p", "tid": "t"}
+      and meal.cooked_payload("p", "t", "ctx:meal") == {"pid": "p", "tid": "t", "back": "ctx:meal"})
+check("rate_payload", meal.rate_payload("p", "t", 4) == {"pid": "p", "tid": "t", "stars": 4}
+      and meal.rate_payload("p", "t", 0, "ctx:meal") == {"pid": "p", "tid": "t", "stars": 0, "back": "ctx:meal"})
+check("comment_payload", meal.comment_payload("p", "t") == {"pid": "p", "tid": "t"}
+      and meal.comment_payload("p", "t", back="ctx:meallib:b") == {"pid": "p", "tid": "t", "back": "ctx:meallib:b"})
+# chips and order with the tag and a rating
+today = date(2026, 9, 28)
+check("cooked_chip: the tag alone says 'cooked before', the calendar wins when it knows",
+      meal.cooked_chip(None, tagged=True) == "cooked before" and meal.cooked_chip(None) == "never cooked"
+      and meal.cooked_chip(0, True) == "cooked this week" and meal.cooked_chip(2, tagged=True) == "cooked 2 weeks ago")
+check("lib_chip: old calls unchanged", meal.lib_chip(PLANNED, U2, today) == "cooked this week · next Sun 11 Oct"
+      and meal.lib_chip(PLANNED, "zz", today) == "never cooked")
+check("lib_chip: tagged, rated", meal.lib_chip(PLANNED, "zz", today, tagged=True) == "cooked before"
+      and meal.lib_chip(PLANNED, U2, today, rating=3) == f"cooked this week · next Sun 11 Oct · {ST * 3}"
+      and meal.lib_chip(PLANNED, "zz", today, tagged=True, rating=5) == f"cooked before · {ST * 5}"
+      and meal.lib_chip(PLANNED, "zz", today, rating=0) == "never cooked" and meal.lib_chip(PLANNED, U3, today, rating=None) == "cooked this week")
+pool2 = [{"tid": "a", "uuid": U2, "name": "Oats"}, {"tid": "b", "uuid": "N1", "name": "Zebra", "cooked": True},
+         {"tid": "c", "uuid": U1, "name": "Bulgogi", "cooked": True}, {"tid": "d", "uuid": "N2", "name": "Apple"},
+         {"tid": "e", "uuid": "N3", "name": "Mango", "cooked": True}, {"tid": "f", "uuid": "N4", "name": "Kiwi", "cooked": False}]
+order = [e["tid"] for e in meal.sort_for_lib(pool2, PLANNED, date(2026, 9, 21))]
+check("sort_for_lib: never (by name), then tag-only (by name), then least recently cooked", order == ["d", "f", "e", "b", "a", "c"], order)
+check("sort_for_lib: entries without the key sort as before", [e["tid"] for e in meal.sort_for_lib(pool, PLANNED, date(2026, 9, 21))] == ["d", "b", "a", "c"])
+ents2 = meal.library_entries(TASKS + [T("t7", f"[Rated](mela://recipe/{U5})", tags=["🍛lunch", "👨‍🍳COOKED"], content=SAMPLE),
+                                     T("t8", f"[Plain](mela://recipe/{U4})", tags=["🍛lunch"], content=f"{L1}\n\n{BODY}")], LIST)
+check("library_entries: cooked (case blind) and rating carried", [(e["tid"], e["cooked"], e["rating"]) for e in ents2[-2:]]
+      == [("t7", True, 5), ("t8", False, None)] and ents2[0]["cooked"] is False and ents2[0]["rating"] is None,
+      [(e["tid"], e["cooked"], e["rating"]) for e in ents2])
 
 print(f"\nmeal: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

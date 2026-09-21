@@ -99,6 +99,47 @@ web".
   ids are remembered in `~/.ticktick_alfred/meal_gone.json` so the childIds
   fallback never re-reads them (v1 get_task answers a trashed task as status
   0, the OKR trap).
+- **D21 · Cooked is a tag** (2026-09-21 night; Vex: "mark meal cooked via
+  modifier", "know which meals I have cooked before, so I am thinking a
+  tag"; he made `👨‍🍳cooked` under 🍱mealprep himself). The tag sits on the
+  LIBRARY task, never on a pointer or a 🛒 list. ⌥⇧ on any meal row that
+  resolves to a library task (hub, ctx:mealw, ctx:meallib) and the
+  "👨‍🍳 Cooked" row in the recipe task's ⌘ Actions fire
+  `xact:meal_cooked:<b64 {pid, tid[, back]}>`: ONE dialog asks a note
+  ("less salt next time"; Esc = none), then ONE live-read update writes tag
+  + note (`meal_write.mark_cooked`). The calendar history (`last_cooked`)
+  stays the primary chip; the tag says "cooked before" where the calendar
+  has no past, and tag-only entries sort after the never-cooked ones.
+- **D22 · Rating and notes are quote lines under the link header** (Vex:
+  "a rating should be a quote first liner below links in recipe, stars
+  ⭐️⭐️⭐️; comment should go below that also as quote"; "retrospectively I
+  also should be able to add a comment"). The grammar lives in `meal.py`:
+  the head block = the leading `>` lines of the description; the stars line
+  sits right after the last 🔗/🌐 link line; notes are appended after it,
+  never replaced; a body without a header gets one minted from the title
+  (`mint_header`). Read back by `read_rating` / `read_comments`. Rated any
+  time: "⭐️ Rate…" (the ctx:mealrate picker, five star rows + 🚫) and
+  "💬 Comment…" (a dialog) in the recipe task's ⌘ Actions;
+  `xact:meal_rate` / `xact:meal_comment`; `meal_write.rate` / `comment`.
+- **D23 · Mela is read, never written.** Vex asked for the mirror ("rating
+  tags and a line rating in the comment of a recipe"). Mela 2.6.1 has no
+  write surface: the only Shortcuts intent is Download Recipe, the URL
+  scheme only opens (recipe, myrecipes, groceries, calendar), and
+  Curcuma.sqlite is a Core Data + CloudKit store (ANSCK* / ATRANSACTION
+  tables): a direct row write bypasses persistent history and the CloudKit
+  export, so the phone never sees it and the app's next save of that object
+  conflicts. Never write it. What Mela CAN give: Vex's own rating there is a
+  plain `Rating: ⭐️⭐️⭐️⭐️⭐️` line in the recipe's description field
+  (ZTEXT, Burbon Asian Chicken; one older one in ZNOTES). So the sync READS
+  it: `mela.rating_of` → the stars land in the TickTick head block when the
+  task has none (`meal_write.mirror_ratings`, cap 20, right after the
+  fills), and `render_markdown` writes a new import with the stars line and
+  without the Rating line in blurb/notes. TickTick's rating is the record: a
+  Mela rating never overwrites one.
+- **D24 · One dialog, one write.** The cooked verb asks its note BEFORE the
+  write so tag + note are a single update; a cancelled dialog still tags.
+  `meal_write` never opens a dialog (the verbs in `xact.py` do). Dry run
+  (`TICKAL_MEAL_DRY=1` / `{"dry": true}`) prints and writes nothing.
 
 ## 1. What it is (Vex's model)
 
@@ -114,7 +155,7 @@ doing lives in TickTick, mirrored by one row (D12).
 | 🍳Meal Prep, the library list (kind TASK, list view) | `6a8abb444e699108a4693fa5` = `config.MEAL_LIST_DEFAULT` |
 | 🥘 Meal Prep, the Sunday routine (🌅 Routines, RRULE weekly SU 19:00) | `6a9ed0dc0eecd103a69febee` = `config.MEAL_ROUTINE_DEFAULT`, registry key `meal` |
 | its habit | `6aa27acd557832cfc9ea5d77` |
-| tags | 🍱mealprep › 🍳breakfast · 🍛lunch · 🌮snack · 🛒groceries |
+| tags | 🍱mealprep › 🍳breakfast · 🍛lunch · 🌮snack · 🛒groceries · 👨‍🍳cooked (`meal.COOKED_TAG`, Vex's, 2026-09-21) |
 | Mela categories → tags | `02 • Breakfast`→🍳breakfast · `01 • Meal`→🍛lunch · `03 • Snack`→🌮snack (`mela.DEFAULT_TAG_MAP`, overridable by config `meal_tag_map`) |
 | Mela's database (Mac) | `~/Library/Group Containers/66JC38RDUD.recipes.mela/Data/Curcuma.sqlite` (+ -wal/-shm; ALWAYS read a copy: `mela.snapshot()`) |
 | the plan = Apple Calendar's store | `~/Library/Group Containers/group.com.apple.calendar/Calendar.sqlitedb` (+ -wal/-shm; ALWAYS a copy: `mela_cal.snapshot()` into `~/.ticktick_alfred/run/melacal/`, reused while the source mtimes hold, 600 s) |
@@ -135,6 +176,10 @@ be backslash-escaped: every reader goes through `meal.parse_title` /
   mela2ticktick format: `> 🔗`, `> 🌐`, Serves, ## Ingredients, ## Steps,
   ## Nutrition). Migrated from NOTE-kind + week-long dates by
   `Scripts/meal_migrate.py` (snapshot in `~/.ticktick_alfred/run/`).
+  Since D22 the HEAD BLOCK (the leading `>` lines) also carries the rating
+  and the notes: `> 🔗 …` / `> 🌐 …` / `> ⭐️⭐️⭐️` / `> less salt next
+  time`, then a blank line, then the recipe. The 👨‍🍳cooked tag (D21) rides
+  beside the meal tag.
 - **Planned meal** (the calendar side, `mela_cal.Planned`): one calendar
   event per meal, url `mela://calendar/<cal>:<event>/<UUID>`, on the SUNDAY
   it is cooked (Vex's convention; the event's time is ignored, all-day rows
@@ -177,13 +222,14 @@ for `meal` must never contain `{"do": "reset"}`.
 | File | Role |
 |---|---|
 | `src/mela_cal.py` | IMPURE, stdlib: the calendar reader. `STORE_PATH`, `MelaCalError` (one toast line), `Planned` (date · start · all_day · uuid UPPER · title · calendar · event_id · url), `store_present`, `snapshot` (the mela.py shape, PermissionError → the FDA toast), `parse_url`, `plan(since, until)` (every calendar, url LIKE `mela://calendar/%`, skips hidden / cancelled / phantom_master, local date from start_tz), `freshness` |
-| `src/meal.py` | PURE: title grammar, slots (b/l/s/x), week arithmetic (`cook_week_of`, `cook_sunday`, `week_label`), `Meal` / `Week`, `slot_for_recipe`, `weeks_plan` (every week present, meals b,l,s,x → date → name), `week_meals`, `last_cooked` / `next_planned` (over the calendar plan), `sort_for_lib`, `sync_payload`, `sync_text` |
+| `src/meal.py` | PURE: title grammar, slots (b/l/s/x), week arithmetic (`cook_week_of`, `cook_sunday`, `week_label`), `Meal` / `Week`, `slot_for_recipe`, `weeks_plan` (every week present, meals b,l,s,x → date → name), `week_meals`, `last_cooked` / `next_planned` (over the calendar plan), `sort_for_lib`, `sync_payload`, `sync_text`; since D21/D22 `COOKED_TAG`, the rating/notes grammar (`header_block`, `read_rating`, `read_comments`, `set_rating`, `add_comment`, `strip_mela_rating`, `adopt_mela_rating`, `stars`, `parse_stars`, `mint_header`) and the `cooked_payload` / `rate_payload` / `comment_payload` helpers |
 | `src/meal_scale.py` | PURE: yield ladder (field → text → protein estimate → none), quantity parser, half-up scaling, grocery filter |
-| `src/mela.py` | Mela DB snapshot + loader, `render_markdown` (byte-identical to the mela2ticktick script), `meal_tag_for`, `freshness` |
+| `src/mela.py` | Mela DB snapshot + loader, `render_markdown` (byte-identical to the mela2ticktick script for a recipe without a Rating line; with one, the stars go into the head block), `rating_of` / `strip_rating` (D23), `meal_tag_for`, `freshness` |
 | `src/meal_notes.py` | the weekly bullet (`write_block`, seed rule) |
-| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13 |
-| `Scripts/browse.py` | `render_meal` (ctx:meal), `render_mealq` (ctx:mealq, the 13 weeks), `render_mealw` (ctx:mealw:<YYYY-MM-DD sunday>), `render_meallib` (ctx:meallib:<slot>), `render_mealgroc`; the 🥘 door row in `render_routines`; parse_ctx's alias guard covers `ctx:meal*` |
-| `Scripts/xact.py` | `_meal_run` (copy of `_okr_run`), `meal_sync`, `meal_setlist`, `_dry_meal` |
+| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13; since D21/D22 `mark_cooked` / `rate` / `comment` (live read, ONE update each, never a dialog) and `mirror_ratings` (cap 20, inside `sync` right after the fills, a rate limit there never aborts the week) |
+| `Scripts/browse.py` | `render_meal` (ctx:meal), `render_mealq` (ctx:mealq, the 13 weeks), `render_mealw` (ctx:mealw:<YYYY-MM-DD sunday>), `render_meallib` (ctx:meallib:<slot>), `render_mealgroc`, `render_mealrate` (ctx:mealrate:<pid>:<tid>[:<back level>], the star picker); the 🥘 door row in `render_routines`; parse_ctx's alias guard covers `ctx:meal*` |
+| `Scripts/xact.py` | `_meal_run` (copy of `_okr_run`), `meal_sync`, `meal_setlist`, `_dry_meal`, `meal_cooked` (the one dialog), `meal_rate`, `meal_comment` |
+| `Scripts/actions.py` | the recipe gate (`meal.is_library_title`): 👨‍🍳 Cooked · ⭐️ Rate… · 💬 Comment… lead the recipe task's ⌘ menu; generic verbs kept |
 | `src/routines.py` · `routine_runner.py` · `routine_link.py` (`view:meal`) · `link.py` (`VIEW_CTX["meal"]`) | the registry entry and its gates |
 | `Scripts/meal_migrate.py` | one-shot NOTE→TEXT + dates cleared: dry-run / `--probe TID` / `--apply` / `--rollback FILE` |
 | `tools/plist_surgery/phase_meal.py` | the canvas phase (§7) |
@@ -211,8 +257,13 @@ Makefile `test:` list. No network, never the real calendar.
   the recipe has no ZLINK; the Browse SF's ⇧ road is dispatch.py, which
   executes open: args), ⌥⌘ `copy:mela://recipe/<UUID>`, ⌘ live ONLY when
   the meal resolves to a library task (the row then carries task_id /
-  task_list_id / task_title / item_type=task), ⌥ and ⌥⇧ dead on plan rows
-  (library rows keep ⌥ = drill subtasks), ⌃ back.
+  task_list_id / task_title / item_type=task), ⌥⇧ `xact:meal_cooked:<b64>`
+  on every meal row that resolves to a library task (dead, "No library
+  task", otherwise; D21), ⌥ dead on plan rows (library rows keep ⌥ = drill
+  subtasks), ⌃ back. The ctx:mealrate picker's star rows carry
+  `xact:meal_rate:<b64>` on ⏎ and ⌥⇧ (the 🔄 row's pair). ⌘ Actions on a
+  recipe task leads with 👨‍🍳 Cooked · ⭐️ Rate… · 💬 Comment…; their
+  payloads carry no `back`, so they toast and stay where Vex was.
 - **Full Disk Access (the FDA caveat).** The calendar store is TCC
   protected. The CLI reads it; ALFRED must be granted Full Disk Access
   (System Settings › Privacy & Security › Full Disk Access) or every read
@@ -292,6 +343,25 @@ Makefile `test:` list. No network, never the real calendar.
    Vex smoke-gates: the hub on an empty calendar week, ⇧ on a meal with
    and without a web page, one dry sync (`TICKAL_MEAL_DRY=1`), then a real
    one, then the status row inside ALFRED (the FDA caveat, §6).
+10. **Cooked · rating · notes, 2026-09-21 night (D21 to D24) - zero
+    canvas.** `meal.py`: `COOKED_TAG`, the head-block grammar, the payload
+    helpers, `cooked_chip` / `lib_chip` / `sort_for_lib` with the tag and a
+    rating, `library_entries` rows carrying `cooked` / `rating`,
+    `sync_text(rated=, ratings_left=)`. `mela.py`: `rating_of`,
+    `strip_rating`, the stars line in `render_markdown`. `meal_write.py`:
+    `mark_cooked`, `rate`, `comment`, `mirror_ratings` (in `sync` after the
+    fills). `xact.py`: `meal_cooked` (the one dialog), `meal_rate`,
+    `meal_comment`. `browse.py`: ⌥⇧ on THE MEAL ROW, `render_mealrate`
+    (ctx:mealrate), chips with stars / cooked. `actions.py`: the recipe
+    gate and its three rows. Built by a three-phase workflow (model → writer
+    + screens in parallel → suite run + two adversarial reviews). Tests
+    extended in place (`test_meal`, `test_mela`, `test_meal_write`,
+    `test_meal_screens`). Vex smoke-gates: ⌥⇧ on a hub meal (the dialog,
+    then the tag + the note under the links in TickTick), ⌘ on a recipe row
+    → ⭐️ Rate… → three stars → the quote line lands under the links, 💬
+    Comment… appends under it, a library row's chip reads "cooked before ·
+    ⭐️⭐️⭐️", and one 🔄 press pulls his two Mela ratings (Burbon Asian
+    Chicken, Cheesy Buffalo Chicken Ranch Taquitos) into TickTick.
 
 ## 8. Open / next
 
@@ -306,3 +376,10 @@ Makefile `test:` list. No network, never the real calendar.
 - `docs/00-index.md` (vault `X • 00-index.md`) still describes the hub as
   "the week's three meals from a Mela-fed recipe library" - one line to
   re-word to the calendar model on the next docs pass.
+- **Writing back to Mela** (D23) is closed unless Mela ships a write intent
+  or a URL verb; the `.melarecipe` import road (open a file carrying the
+  same `id`) is UNPROBED - it may duplicate the recipe and it pops Mela's
+  import sheet, so only with Vex's go and on a throwaway recipe first.
+- The 👨‍🍳cooked tag is Vex's own entity; `mark_cooked` calls
+  `dispatch._ensure_tags_exist` best-effort so a fresh machine still gets
+  a real tag under 🍱mealprep.

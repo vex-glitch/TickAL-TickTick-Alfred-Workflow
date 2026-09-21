@@ -25,10 +25,27 @@ goes through `parse_title`.
 "Cooked" history is READ OFF THE CALENDAR PLAN (a past planned Sunday =
 cooked): the cooked-history ledger of the picker era is gone with the
 picker ("get rid of Plan the week / Schedule a meal").
+
+Since 2026-09-21 the library also remembers Vex's verdict on a recipe (Vex:
+"I would like to be able to mark meal cooked via modifier", "know which
+meals I have cooked before, so I am thinking a tag", "rate a meal and give
+a comment"). COOKED is the 👨‍🍳cooked tag on the library task: a tag,
+because the calendar only knows what was PLANNED (a week can be skipped)
+and TickTick groups by tag. The RATING is one quote line of ⭐️ right under
+the link header of the description, each COMMENT one quote line below it
+("a rating should be quote first liner below links in recipe, stars",
+"comment should go below that also as quote", "retrospectively I also
+should be able to add a comment, like add less salt next time"): quote
+lines because that head block reads first in the app and survives a
+re-render of the body. Mela is READ ONLY (a Core Data + CloudKit store, no
+write intent, no URL verb), so TickTick is the record; Mela's own
+"Rating: ⭐️⭐️⭐️" line (a plain line in the recipe's description or notes)
+is only adopted into a task that has no rating yet.
 """
 import json
 import os
 import re
+import urllib.parse
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, time, timezone
 
@@ -55,6 +72,10 @@ except Exception:                       # standalone: the mapping is small
 PORTIONS = 7
 GROCERY_TAG = "🛒groceries"
 GROCERY_GLYPH = "🛒"
+COOKED_TAG = "👨‍🍳cooked"             # on the LIBRARY task; Vex made it under
+COOKED_PARENT = "🍱mealprep"          # this parent tag (2026-09-21)
+STAR = "⭐️"                 # ⭐️ as Mela writes it: U+2B50 + VS16
+MAX_STARS = 5
 # key, TickTick tag, glyph, label - in the order a week is planned
 SLOTS = (("b", "🍳breakfast", "🍳", "Breakfast"),
          ("l", "🍛lunch", "🍛", "Lunch"),
@@ -152,12 +173,260 @@ def is_library_title(title):
     return t.startswith("[") and bool(_TITLE_RE.match(t))
 
 
+# ── rating, comments, cooked ─────────────────────────────────────────────────
+# The HEAD BLOCK of a recipe description is the leading run of quote lines
+# mela.render_markdown (and mela2ticktick before it) puts on top: the 🔗
+# link line, the 🌐 site line. Vex's verdicts live in that block, so they
+# read first and outlive a re-render of the body: the stars line right
+# after the last link line, then one quote line per comment, oldest first.
+_STAR_GLYPHS = "⭐★"           # ⭐ (with or without VS16) and ★
+# Mela's own line, as an older render copied it into the blurb or ## Notes
+_MELA_RATING_RE = re.compile(r"^\s*Rating:\s*(?:⭐️?|★)+\s*$")
+
+
+def stars(n):
+    """n copies of ⭐️, at most MAX_STARS; '' for None, 0 or less."""
+    try:
+        n = int(n or 0)
+    except (TypeError, ValueError):
+        return ""
+    return STAR * min(max(n, 0), MAX_STARS)
+
+
+def parse_stars(text):
+    """What Vex typed into the rating dialog, as a count: '3', '3/5' or a
+    row of ⭐️ / ⭐ / ★ / * glyphs -> 1..5 (more is capped); '0', 'none',
+    'clear', '-' or nothing -> 0 (clear the rating); anything else ->
+    None, so the verb can refuse instead of guessing."""
+    t = (text or "").strip()
+    if t.casefold() in ("", "0", "none", "clear", "-"):
+        return 0
+    m = re.fullmatch(r"(\d+)\s*(?:/\s*5)?", t)
+    if m:
+        return min(int(m.group(1)), MAX_STARS)
+    bare = t.replace("️", "").replace(" ", "")
+    if bare and all(c in _STAR_GLYPHS + "*" for c in bare):
+        return min(len(bare), MAX_STARS)
+    return None
+
+
+def header_block(content):
+    """(head, rest): the leading run of quote lines (every line starting
+    with '>', a bare '>' included) and the text after them with the ONE
+    blank line separating the two removed; ([], content) when the
+    description does not start with a quote. Never raises on None."""
+    content = content or ""
+    if not content.startswith(">"):
+        return [], content
+    lines = content.split("\n")
+    n = 0
+    while n < len(lines) and lines[n].startswith(">"):
+        n += 1
+    tail = lines[n:]
+    if tail and not tail[0].strip():
+        tail = tail[1:]
+    return lines[:n], "\n".join(tail)
+
+
+def _rebuild(content, head, rest):
+    """header_block's inverse: head, one blank line, the body untouched.
+    With no body the result ends the way `content` ended: whatever
+    trailing whitespace followed the original head lines comes back as it
+    was (one newline, two, none), and an empty input gains nothing beyond
+    the block."""
+    if not head:
+        return rest
+    block = "\n".join(head)
+    if (rest or "").strip():
+        return block + "\n\n" + rest
+    content = content or ""
+    lines = content.split("\n")
+    n = 0
+    while n < len(lines) and lines[n].startswith(">"):
+        n += 1
+    if n:
+        return block + content[len("\n".join(lines[:n])):]
+    return block + ("\n" if content.endswith("\n") else "")
+
+
+def _quote_text(line):
+    """A quote line's text: the leading '>' (and the space after it) gone,
+    both ends trimmed."""
+    return re.sub(r"^>\s?", "", line or "").strip()
+
+
+_LINK_LINE_RE = re.compile(r"^>\s*(?:🔗|🌐)\s")
+
+
+def is_link_line(line):
+    """A head line carrying the recipe link (🔗) or its web source (🌐) in
+    the header shape mela.render_markdown / mint_header write: the glyph
+    is the FIRST thing after the quote mark. A note that merely mentions
+    the web ("> 🌐 the web version is better" is still a note when the
+    glyph is not followed by a link, but "> see 🌐 for it" surely is) must
+    not push the stars line below itself or vanish from the picker."""
+    return bool(_LINK_LINE_RE.match(line or ""))
+
+
+def is_stars_line(line):
+    """A quote line whose text is nothing but 1..5 star glyphs (⭐️, ⭐
+    or ★)."""
+    line = line or ""
+    if not line.startswith(">"):
+        return False
+    txt = _quote_text(line).replace("️", "").replace(" ", "")
+    return bool(txt) and len(txt) <= MAX_STARS and all(c in _STAR_GLYPHS for c in txt)
+
+
+def read_rating(content):
+    """The count on the first stars line of the head block, else None
+    (VS16 blind: the app has been seen dropping variation selectors)."""
+    for l in header_block(content)[0]:
+        if is_stars_line(l):
+            return len(_quote_text(l).replace("️", "").replace(" ", ""))
+    return None
+
+
+def read_comments(content):
+    """The head block's comment lines with the '> ' stripped: every line
+    that is not a link line, not the stars line and not empty, in the
+    order they were added."""
+    out = []
+    for l in header_block(content)[0]:
+        if is_link_line(l) or is_stars_line(l):
+            continue
+        txt = _quote_text(l)
+        if txt:
+            out.append(txt)
+    return out
+
+
+def mint_header(name, uuid, web=""):
+    """The head block a hand-written (or empty) description gets before a
+    rating or comment can sit in it: the 🔗 line from the task title and,
+    when the recipe's web page is known, the 🌐 line, both in the exact
+    form mela.render_markdown writes (host = netloc without 'www.')."""
+    head = [f"> 🔗 {md_link(name, uuid)}"]
+    web = (web or "").strip()
+    if web:
+        host = urllib.parse.urlparse(web).netloc.replace("www.", "") or web
+        head.append(f"> 🌐 [{host}]({web})")
+    return head
+
+
+def set_rating(content, n, header=None):
+    """`content` with its rating set to n stars (1..5): the stars line
+    goes right after the LAST link line, an existing one is replaced
+    wherever it sat in the head. 0/None removes it. `header` (from
+    mint_header) tops a description with no head block; without one the
+    stars still land, as a head block of their own. The body below stays
+    byte-identical, and a description that needs no change comes back as
+    it was."""
+    content = content or ""
+    n = min(int(n or 0), MAX_STARS)
+    head, rest = header_block(content)
+    had = any(is_stars_line(l) for l in head)
+    if n <= 0 and not had:
+        return content                       # nothing to remove
+    if not head:
+        head = list(header or [])
+    head = [l for l in head if not is_stars_line(l)]
+    if n > 0:
+        at = 0
+        for i, l in enumerate(head):
+            if is_link_line(l):
+                at = i + 1
+        head.insert(at, "> " + stars(n))
+    return _rebuild(content, head, rest)
+
+
+def add_comment(content, text, header=None):
+    """`content` with one quote line per non-empty line of `text` appended
+    at the END of the head block, after the stars and the earlier comments
+    (Vex adds "less salt next time" after eating; the older verdicts stay,
+    never replaced). Blank text leaves the description untouched; `header`
+    as in set_rating."""
+    content = content or ""
+    lines = [re.sub(r"^>+\s*", "", l).strip() for l in (text or "").splitlines()]
+    lines = [l for l in lines if l]
+    if not lines:
+        return content
+    head, rest = header_block(content)
+    if not head:
+        head = list(header or [])
+    head += ["> " + l for l in lines]
+    return _rebuild(content, head, rest)
+
+
+def strip_mela_rating(content):
+    """Mela's own "Rating: ⭐️⭐️⭐️" line removed from the BODY (an older
+    render copied it into the blurb or the ## Notes section); the head
+    block is never touched, our stars line is not Mela's. A blank line the
+    removal left doubled goes with it, and a ## Notes header left with
+    nothing under it."""
+    content = content or ""
+    head, rest = header_block(content)
+    lines = rest.split("\n")
+    if not any(_MELA_RATING_RE.match(l) for l in lines):
+        return content
+    out, gap = [], False
+    for l in lines:
+        if _MELA_RATING_RE.match(l):
+            gap = True
+            continue
+        if gap and not l.strip() and (not out or not out[-1].strip()):
+            continue                         # the blank the line left doubled
+        gap = False
+        out.append(l)
+    j = next((i for i, l in enumerate(out) if l.strip() == "## Notes:"), None)
+    if j is not None and not any(l.strip() for l in out[j + 1:]):
+        ends_nl = rest.endswith("\n")
+        out = out[:j]
+        while out and not out[-1].strip():
+            out.pop()
+        if out and ends_nl:
+            out.append("")
+    return _rebuild(content, head, "\n".join(out))
+
+
+def adopt_mela_rating(content, n, header=None):
+    """Mela's rating taken over by a task that has none: Mela's line leaves
+    the body, the stars land in the head."""
+    return set_rating(strip_mela_rating(content), n, header)
+
+
+def cooked_payload(pid, tid, back=None):
+    """The b64-able spec behind xact:meal_cooked (the tag + one note)."""
+    p = {"pid": pid, "tid": tid}
+    if back:
+        p["back"] = back
+    return p
+
+
+def rate_payload(pid, tid, stars, back=None):
+    """The spec behind xact:meal_rate: stars is the count (0 clears)."""
+    p = {"pid": pid, "tid": tid, "stars": stars}
+    if back:
+        p["back"] = back
+    return p
+
+
+def comment_payload(pid, tid, back=None):
+    """The spec behind xact:meal_comment (the text is asked for at run time)."""
+    p = {"pid": pid, "tid": tid}
+    if back:
+        p["back"] = back
+    return p
+
+
 # ── the library as the screens see it ────────────────────────────────────────
 def library_entries(tasks, list_id):
-    """[{tid, pid, title, name, uuid, slot, tags, content, kind}] for the
-    open library entries of list_id among `tasks` (a cache pool or a
-    project_data task list). Pointers, grocery lists and untagged strays
-    are left out; `slot` is None for an entry without a meal tag."""
+    """[{tid, pid, title, name, uuid, slot, tags, content, kind, cooked,
+    rating}] for the open library entries of list_id among `tasks` (a
+    cache pool or a project_data task list). Pointers, grocery lists and
+    untagged strays are left out; `slot` is None for an entry without a
+    meal tag; `cooked` = the 👨‍🍳cooked tag is on it (case blind), `rating`
+    = the stars in the description's head block, else None."""
     out = []
     for t in tasks or []:
         if not isinstance(t, dict) or t.get("status", 0) != 0:
@@ -175,9 +444,11 @@ def library_entries(tasks, list_id):
         if not parsed:
             continue
         name, uuid = parsed
+        content = t.get("content") or ""
         out.append({"tid": t.get("id"), "pid": pid, "title": title, "name": name,
                     "uuid": uuid, "slot": slot_of_tags(tags), "tags": tags,
-                    "content": t.get("content") or "", "kind": t.get("kind") or ""})
+                    "content": content, "kind": t.get("kind") or "",
+                    "cooked": COOKED_TAG.lower() in tags, "rating": read_rating(content)})
     return out
 
 
@@ -541,9 +812,12 @@ def next_planned(planned, uuid, today):
     return min(days) if days else None
 
 
-def cooked_chip(weeks):
+def cooked_chip(weeks, tagged=False):
+    """'never cooked' / 'cooked this week' / 'cooked 2 weeks ago' off the
+    calendar; 'cooked before' when only the 👨‍🍳cooked tag says so (a
+    recipe cooked before the calendar era, or one tagged by hand)."""
     if weeks is None:
-        return "never cooked"
+        return "cooked before" if tagged else "never cooked"
     if weeks == 0:
         return "cooked this week"
     if weeks == 1:
@@ -551,20 +825,23 @@ def cooked_chip(weeks):
     return f"cooked {weeks} weeks ago"
 
 
-def lib_chip(planned, uuid, today):
-    """The library row's chip: 'never cooked' / 'cooked 2 weeks ago', with
-    ' · next Sun 4 Oct' when the calendar has it coming."""
-    chip = cooked_chip(last_cooked(planned, uuid, today))
+def lib_chip(planned, uuid, today, tagged=False, rating=None):
+    """The library row's chip: 'never cooked' / 'cooked 2 weeks ago' (or
+    'cooked before' on the tag alone), ' · next Sun 4 Oct' when the
+    calendar has it coming, ' · ⭐️⭐️⭐️' when Vex rated it."""
+    chip = cooked_chip(last_cooked(planned, uuid, today), tagged)
     nxt = next_planned(planned, uuid, today)
-    return chip + (f" · next {nxt:%a %-d %b}" if nxt else "")
+    chip += f" · next {nxt:%a %-d %b}" if nxt else ""
+    return chip + (" · " + stars(rating) if stars(rating) else "")
 
 
 def sort_for_lib(entries, planned, today):
-    """Library order: never cooked first, then least recently cooked, then
-    by name."""
+    """Library order: never cooked first (no calendar past, no tag), then
+    the tag-only ones, then least recently cooked, then by name."""
     def key(e):
         w = last_cooked(planned, e.get("uuid"), today)
-        return (0 if w is None else 1, -(w or 0), (e.get("name") or "").lower())
+        rank = (0 if not e.get("cooked") else 1) if w is None else 2
+        return (rank, -(w or 0), (e.get("name") or "").lower())
     return sorted(entries, key=key)
 
 
@@ -575,11 +852,13 @@ def sync_payload(back="ctx:meal"):
 
 
 def sync_text(day, n_meals, n_groceries, imported, filled, note_ok=True,
-              dated=0, dates_left=0):
+              dated=0, dates_left=0, rated=0, ratings_left=0):
     """The toast: '🔄 Mela · +2 recipes · 3 filled · cook Tue 22 Sep: 🍳 Hot
     Pockets · 2 grocery lists'. `day` is the cook day (the prep task's);
     `n_meals` is a count OR that day's meals (Meal objects, (slot, name)
-    pairs or plain names) - names read better than a number."""
+    pairs or plain names) - names read better than a number. `rated` /
+    `ratings_left` count Mela's own stars copied into unrated tasks (the
+    sync's rating pass, 2026-09-21), worded like dated / dates_left."""
     parts = ["🔄 Mela"]
     if imported:
         parts.append(f"+{imported} recipe{'s' if imported != 1 else ''}")
@@ -606,5 +885,9 @@ def sync_text(day, n_meals, n_groceries, imported, filled, note_ok=True,
         parts.append(f"{dated} recipe{'s' if dated != 1 else ''} dated")
     if dates_left:                 # the 100-a-minute limit stopped the pass
         parts.append(f"{dates_left} date{'s' if dates_left != 1 else ''} left · run again")
+    if rated:                      # Mela's stars adopted by tasks that had none
+        parts.append(f"{rated} rating{'s' if rated != 1 else ''} from Mela")
+    if ratings_left:               # the same limit stopped that pass
+        parts.append(f"{ratings_left} rating{'s' if ratings_left != 1 else ''} left · run again")
     txt = " · ".join(parts)
     return txt if note_ok else txt + " · note not written"

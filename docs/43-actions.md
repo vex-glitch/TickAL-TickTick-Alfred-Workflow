@@ -56,6 +56,8 @@ Task / subtask / note share one row set; lists and sections get the container su
 | 🗑️ Delete | Delete (lists: typed confirm, see below) | ✓ | ✓ | ✓ | ✓ | |
 | 🔙 Go back | Back to search | ✓ | ✓ | ✓ | ✓ | ✓ |
 
+**Recipe tasks** (a 🍳Meal Prep library entry, title `[Name](mela://recipe/…)`) lead with three rows of their own before the generic ones: **👨‍🍳 Cooked** (the 👨‍🍳cooked tag, a note asked), **⭐️ Rate…** (a picker, one to five stars or none) and **💬 Comment…** (a line under the stars) - see [Meal prep](51-meal-prep.md#cooked-rated-noted).
+
 Notes never show Priority or Complete. Deleting a list is guarded: the `🗑️ Delete list` row autocompletes the query to `delete list yes`, and only then does the valid confirm row appear - the list and its tasks move to TickTick's Trash, and so do the list's open 📌CTA tasks (a completed CTA stays as history).
 
 **Typed shortcuts** inside the menu: `pomo 45` starts a 45-minute pomodoro on the task; `log 25` writes a 25-minute focus record ending now.
