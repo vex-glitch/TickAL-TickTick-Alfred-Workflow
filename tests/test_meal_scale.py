@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Unit suite for src/meal_scale.py (yield inference + ingredient scaling,
-and carry_ticks: a re-cut list's ticks following the ingredient name, the
-portions verb's helper, 2026-09-22).
+carry_ticks: a re-cut list's ticks following the ingredient name, the
+portions verb's helper, 2026-09-22, and tick_key dropping the price suffix
+" · ≈ 4.52 €" so a tick survives a re-price, D26 the same day).
 Run: python3 tests/test_meal_scale.py
 """
 import os
@@ -295,6 +296,28 @@ same("carry_ticks: two old ticks carry to two new lines, a third stays open",
                                             ["2 tsp salt", "4 tsp salt", "6 tsp salt"])], [2, 2, 0])
 same("tick_key", (ms.tick_key("875 g chicken"), ms.tick_key("  Avocado  Oil "), ms.tick_key("")),
      ("chicken", "avocado oil", ""))
+
+# ── tick_key drops the price suffix, so a tick survives a re-price (D26) ──
+same("tick_key: the price suffix is not part of the key",
+     (ms.tick_key("875 g chicken · ≈ 4.52 €"), ms.tick_key("625 g Chicken  ·  ≈ 3.20 €"), ms.tick_key("875 g chicken")),
+     ("chicken", "chicken", "chicken"))
+same("tick_key: a suffix on a line with no amount", ms.tick_key("Avocado oil · ≈ 1.10 €"), "avocado oil")
+same("tick_key: a comma decimal and a zero price strip too",
+     (ms.tick_key("1 tsp salt · ≈ 0,01 €"), ms.tick_key("1 cup water · ≈ 0.00 €")), ("salt", "water"))
+same("tick_key: a euro figure in the MIDDLE of a line is the ingredient, not a suffix",
+     ms.tick_key("1 pot · ≈ 2.00 € pesto"), "pot · ≈ 2.00 € pesto")
+same("tick_key: a middle dot without the ≈ € shape stays",
+     ms.tick_key("350 g bacon · smoked"), "bacon · smoked")
+same("carry_ticks: a tick made on a priced title carries to the re-priced one",
+     [it["status"] for it in ms.carry_ticks([{"status": 2, "title": "875 g chicken · ≈ 4.52 €"},
+                                             {"status": 0, "title": "1 tsp salt · ≈ 0.01 €"}],
+                                            ["625 g chicken · ≈ 3.20 €", "3/4 tsp salt · ≈ 0.01 €"])], [2, 0])
+same("carry_ticks: a tick on a bare title carries to a priced one and back",
+     ([it["status"] for it in ms.carry_ticks([{"status": 2, "title": "875 g chicken"}], ["625 g chicken · ≈ 3.20 €"])],
+      [it["status"] for it in ms.carry_ticks([{"status": 2, "title": "875 g chicken · ≈ 4.52 €"}], ["625 g chicken"])]),
+     ([2], [2]))
+same("carry_ticks: the new titles are handed back verbatim, suffix and all",
+     [it["title"] for it in ms.carry_ticks([], ["625 g chicken · ≈ 3.20 €"])], ["625 g chicken · ≈ 3.20 €"])
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":

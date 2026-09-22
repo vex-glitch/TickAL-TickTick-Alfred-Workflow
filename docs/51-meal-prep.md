@@ -38,6 +38,7 @@ Groceries are not planned in Mela at all. The sync hangs one checklist per meal 
 | 📆 Next 13 weeks | the quarter, one row per week | ⌥ same |
 | 🔄 Sync with Mela · n new · n to fill | recipes in, descriptions filled, the next cook's meals onto its prep task + groceries + note + every recipe dated as Mela has it | ⌥⇧ same |
 | 🛒 Groceries · n open lists · day | the checklists under your next 🛒 Groceries task | ⌥ same · ⌥⇧ portions per meal (a box per list, see [Portions](#portions)) |
+| 🏷 Prices · ≈ 42.10 € this week · n unpriced | the price book, this week's ingredients first (see [Prices](#prices)) | ⌥ same · ⌥⇧ refresh the prices from knuspr.de |
 | 📚 Breakfasts / Lunches / Snacks | that tag's library | ⌥ same |
 | ℹ️ status | - | Mela's data age and how many meals the calendar holds, or why it can't be read |
 
@@ -105,6 +106,28 @@ Only the next cook is mirrored onto its prep task. The cooks after it live on th
 Every grocery line is scaled to seven portions from the recipe's yield. The yield comes from Mela's field when set, else from the text ("Makes 7", "6 Total", "Serves 4"), else estimated from the weight of the main protein (170 g a portion) and marked ≈, else the list is left unscaled with a ⚠️ note. The checklist's description says which. Amounts round the way a shopper would: 875 g, 2 3/4 tsp, 4 scallions. Section headers, "1. Heat the oil" steps and macro lines are dropped from the shopping list.
 
 **Cooking a different number this week?** ⌥⇧⏎ on the hub's **🛒 Groceries** row asks, one box per list, how many portions of each meal you want ("Bagels · portions? (now 7)", the current count prefilled; Esc skips that list). Each list is then cut again to your number: the amounts change, the description says the new count, and anything you had already ticked stays ticked when the ingredient is still there. For one list only, open the groceries screen (⏎ on that row) and press ⌥⇧⏎ on the list; its row shows the count it was cut for (`· 5 portions`). The next 🔄 Sync leaves a re-cut list alone, and seven stays the default for new lists.
+
+## Prices
+
+Speculation, by design: what a week of groceries roughly costs, per ingredient, per list and per portion, so a meal can be compared with another. The numbers come from **knuspr.de** (the online supermarket Amazon hands its German grocery customers to), read through the shop's own product search, and land in a **price book** on this Mac (`~/.ticktick_alfred/meal_prices.json`): one entry per ingredient, a price per gram, millilitre or piece, the product it came from and the date. Nothing is fetched in the background; the book only changes when you press the row.
+
+**Where it shows**
+
+- Every checklist item carries its guess: `14 Eggs · ≈ 4.47 €`. The list's description starts with the total: `≈ 18.40 € · 2.60 €/portion · 3 unpriced`. Both follow a re-cut to another portion count.
+- The groceries screen shows each list's total in its chip; the hub's **🏷 Prices** row sums the week.
+- **🏷 Prices ⏎** opens the book: this week's ingredients first, the unpriced ones on top (❓ salt · no price yet), then the priced ones (🧾 bacon · 12.90 €/kg · Dacello Bacon 100 g 1.29 € · knuspr 22 Sep), then the rest of the book (📖). A price you typed yourself shows as ✍️ and is never overwritten.
+
+**Filling and fixing the book**
+
+- **⌥⇧⏎ on 🏷 Prices** looks every ingredient of this week's lists up on knuspr.de (about half a second each), writes the cheapest sensible match into the book and rewrites the lists' guesses. The toast says how many were priced, kept and left unpriced.
+- **⏎ on a book row** asks for a price the way a shelf label reads it: `2.99 / 10 pc`, `1.49 / 100 g`, `7.97 / 1 l`. That entry is yours and wins over the shop.
+- **⌥⇧⏎ on a book row** asks for a different search term (the English ingredient is translated with a built-in list, `egg → Eier`; a miss is usually a term the shop spells differently) and looks that one up again.
+
+**What it cannot do**
+
+- It is Knuspr's price, not your store's, unless you shop there; treat the totals as relative truth.
+- It prices what a recipe consumes (350 g of bacon at the per-kilo price), not the packs you carry home.
+- A line with no amount ("a handful of parsley"), a piece against a per-kilo entry ("2 chicken breasts") or an ingredient the shop cannot find stays unpriced and is counted as such. Water and ice are free.
 
 ## Alfred needs Full Disk Access
 

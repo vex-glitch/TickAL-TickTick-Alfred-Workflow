@@ -12315,6 +12315,86 @@ def meal_portions(rest):
     _meal_run(rest, run)
 
 
+def meal_prices(rest):
+    """🏷 Prices (meal_write.refresh_prices): the week's ingredient keys
+    priced from knuspr.de into the book and every 🛒 list re-priced in
+    place, suffixes and cost line - Vex 2026-09-22: "how feasible is the
+    idea of price speculations? Like how much will each ingredient cost
+    and total per meal?", "Could we not scrape prices of that site, write
+    them in the pricebook and use that?", "Speculation is all I need."
+    One of the two roads to the network (the other: a book row's ⌥⇧ search term), and only when this row is pressed (⌥⇧
+    on the hub's 🏷 row): never a hitchhiker, never a LaunchAgent. Payload
+    {"back"}; {"dry": true} or TICKAL_MEAL_DRY=1 names the keys and
+    fetches nothing."""
+    import meal_write as mw
+    _meal_run(rest, lambda spec: mw.refresh_prices(dry=_dry_meal(spec)))
+
+
+def _price_default(entry):
+    """The dialog's default for a key the book already prices: the entry's
+    own "<price> / <pack amount> <pack unit>" ("3.19 / 10 pc"), so Return
+    keeps what it had; "" when the entry lacks one of the three."""
+    e = entry or {}
+    try:
+        if e.get("price") is None or e.get("pack_amount") is None or not e.get("pack_unit"):
+            return ""
+        return f"{float(e['price']):g} / {float(e['pack_amount']):g} {e['pack_unit']}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def meal_price_set(rest):
+    """✍️ A price by hand (meal_write.set_price): ⏎ on a ctx:mealprice
+    row asks "price / amount unit" in ONE dialog ("2.99 / 10 pc", "1.49 /
+    100 g", "7.97 / 1 l"), the entry's own pack as the default when the
+    book has one; Esc or an empty box cancels with nothing written, and
+    a text the writer cannot read is its refusal. A manual price wins
+    over knuspr's for good (the refresh never touches it). Payload
+    {"key","back"}. Asked INSIDE the writer call so a Refusal still
+    rides _meal_run; a dry run never opens the dialog."""
+    import meal_price as mp
+    import meal_write as mw
+
+    def run(spec):
+        key = (spec.get("key") or "").strip()
+        if not key:
+            return "🏷 No ingredient"
+        if _dry_meal(spec):
+            return f"🥘 Dry run · would ask a price for {key}"
+        entry = ((mp.load_book().get("entries") or {}).get(key))
+        ans = _ask(f"🏷 {key} · price? (e.g. 2.99 / 10 pc, 1.49 / 100 g, 7.97 / 1 l)",
+                   default=_price_default(entry if isinstance(entry, dict) else None))
+        if ans is None or not ans.strip():
+            return "🏷 Cancelled"
+        return mw.set_price(key, ans.strip())
+    _meal_run(rest, run)
+
+
+def meal_price_search(rest):
+    """🔍 A search term by hand (meal_write.set_search): ⌥⇧ on a
+    ctx:mealprice row asks what to type into knuspr.de, the term the
+    refresh would use as the default (meal_price.search_term: the entry's
+    own, else the English-to-German table, else the key), then that ONE
+    key is looked up at once - the second and last road to the network,
+    one call. Esc or an empty box cancels with nothing written. Payload
+    {"key","back"}; a dry run never asks and never fetches."""
+    import meal_price as mp
+    import meal_write as mw
+
+    def run(spec):
+        key = (spec.get("key") or "").strip()
+        if not key:
+            return "🏷 No ingredient"
+        if _dry_meal(spec):
+            return f"🥘 Dry run · would ask a search term for {key}"
+        ans = _ask(f"🏷 {key} · search term on knuspr.de",
+                   default=mp.search_term(key, mp.load_book()))
+        if ans is None or not ans.strip():
+            return "🏷 Cancelled"
+        return mw.set_search(key, ans.strip())
+    _meal_run(rest, run)
+
+
 def okr_sched(rest):
     """📅 extend +N / 🌙 tomorrow / pick a date on one OKR item, with the
     ripple through its Y lane and the parent heals (okr.schedule_plan) -
@@ -12649,6 +12729,12 @@ def main():
             meal_comment(rest)
         elif verb == "meal_portions":
             meal_portions(rest)
+        elif verb == "meal_prices":
+            meal_prices(rest)
+        elif verb == "meal_price_set":
+            meal_price_set(rest)
+        elif verb == "meal_price_search":
+            meal_price_search(rest)
         elif verb == "add_pre":
             add_pre(rest)
         elif verb == "crmtrash":

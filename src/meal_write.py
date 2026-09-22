@@ -41,6 +41,22 @@ week's lists for the hub's "every meal" road. The yield note in the list's
 content is the only memory of the count (meal.portions_of reads it back),
 which is why a loose list the sync re-makes is cut to the old one's count.
 
+THE PRICES (2026-09-22, D26) ride the same two writes and add three of
+their own. Vex: "how feasible is the idea of price speculations? Like how
+much will each ingredient cost and total per meal?", "Could we not scrape
+prices of that site, write them in the pricebook and use that?",
+"Speculation is all I need." - so grocery_body, given the price book
+(meal_price.load_book, loaded ONCE per sync or per verb and handed down),
+hangs " · ≈ 4.52 €" on every line the book can price and puts the list's
+cost line ("≈ 18.40 € · 2.60 €/portion · 3 unpriced") FIRST in the
+description, above the yield note; without a book its output is byte for
+byte what it was. reprice_lists rewrites the suffixes and the cost line of
+the week's lists in place (ids and ticks kept: the amounts do not move),
+refresh_prices and set_search are the two roads to knuspr.de (the 🏷 row, never a
+background job - "this python script that runs in the background is
+unacceptable"), set_price and set_search are the book screen's two
+dialogs, week_cost is the hub's number off the cached cost lines.
+
 Pointers are deleted rather than reopened or moved: HANDOFF_ROUTINES §8
 says API completion leaves a repeating task's children completed while the
 app reopens them - delete-then-create is the one shape that is right on
@@ -88,6 +104,7 @@ import cache as cache_store
 import config as cfg
 import mdtext
 import meal
+import meal_price as mp
 
 LOCK_FILE = os.path.join(cfg.CONFIG_DIR, "meal.lock")
 IMPORT_LEDGER = os.path.join(cfg.CONFIG_DIR, "meal_import.json")
@@ -99,6 +116,7 @@ CAP_IMPORT = 40            # recipes imported per sync
 CAP_FILL = 60              # descriptions filled per sync
 CAP_RATE = 20              # Mela ratings mirrored into unrated tasks per sync
 PACE = 1.0                 # seconds between requests (100 a minute is the wall)
+PRICE_PACE = 0.5           # seconds between knuspr.de searches (a shop we are not paying)
 HORIZON_WEEKS = 13         # "all the next meals for a quarter, by week"
 
 
@@ -358,11 +376,47 @@ def plan_view(today=None, n_weeks=HORIZON_WEEKS, planned=None, recipes=None,
 
 
 # ── groceries ────────────────────────────────────────────────────────────────
-def grocery_body(recipe, portions=meal.PORTIONS):
+def _book(book=None):
+    """The price book to cost a list from: the one handed down, else
+    meal_price.load_book (a file read, never the network; an unreadable
+    or missing book reads as empty, and an empty book prices nothing)."""
+    if book is not None:
+        return book
+    try:
+        return mp.load_book()
+    except Exception:
+        return mp.empty_book()
+
+
+def _has_prices(book):
+    return bool(book) and bool((book or {}).get("entries"))
+
+
+def _suffix_for(cost):
+    """The title suffix for one meal_price.Cost: " · ≈ 4.52 €" when the
+    book priced the line, nothing otherwise - a free line (water) stays
+    bare, because "≈ 0.00 €" on tap water is noise, not a speculation, and
+    an unpriced line shows its hole in the cost line's count instead."""
+    return mp.price_suffix(cost.cost) if cost.reason == "priced" else ""
+
+
+def _price_lines(lines, book, portions):
+    """(suffixed lines, meal_price.Total) - the bare lines costed at
+    `portions`, the priced ones with their suffix."""
+    total = mp.list_cost(lines, book, portions)
+    return [ln + _suffix_for(c) for ln, c in zip(lines, total.costs)], total
+
+
+def grocery_body(recipe, portions=meal.PORTIONS, book=None):
     """(checklist lines, description) for one recipe at `portions` - the
     sync's PORTIONS unless the portions verb asks for another count (the
     note then says "4 → 5 portions", and that note is how the count is
-    read back: meal.portions_of)."""
+    read back: meal.portions_of). With a `book` that holds entries (D26)
+    every line the book can price carries " · ≈ 4.52 €" and the cost line
+    ("≈ 18.40 € · 2.60 €/portion · 3 unpriced") is the FIRST line of the
+    description, the yield note under it - meal.portions_of still finds
+    its note, meal_price.read_cost_line its line. None or an empty book:
+    exactly the unpriced output, byte for byte."""
     import meal_scale
     lines, info = meal_scale.scaled_ingredients(recipe, portions)
     desc = info.get("note") or ""
@@ -370,7 +424,11 @@ def grocery_body(recipe, portions=meal.PORTIONS):
         desc += f"\n_(yield: {info['detail']})_"
     if info.get("unscaled"):
         desc += f"\n_({len(info['unscaled'])} line(s) had no quantity, left as written)_"
-    return lines, desc.strip()
+    desc = desc.strip()
+    if _has_prices(book):
+        lines, total = _price_lines(lines, book, portions)
+        desc = mp.cost_line(total) + (f"\n{desc}" if desc else "")
+    return lines, desc
 
 
 def _picks_of(meals):
@@ -437,7 +495,7 @@ def _grocery_in_place(t, groc, list_id):
     return not t.get("parentId") and (t.get("projectId") or t.get("_projectId")) == list_id
 
 
-def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None):
+def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None, book=None):
     """One 🛒 CHECKLIST per pick, as SUBTASKS of `groc` (the upcoming 🛒
     Groceries task - Vex 2026-09-21: "put those tasks as subtasks in the
     groceries task", "I do not schedule groceries in Mela, but I do in
@@ -445,8 +503,9 @@ def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None
     `existing` = {UUID: open 🛒 list anywhere}. Kept when in place (re-dated
     when the day moved, in its own zone), deleted when its meal is not
     planned OR it sits elsewhere (a loose list from an earlier press: its
-    ticks go with it, once), created when missing. -> (made, kept,
-    deleted_ids)."""
+    ticks go with it, once), created when missing. `book` is the price
+    book the sync loaded once (D26): a new list is priced on the way in.
+    -> (made, kept, deleted_ids)."""
     zone = meal.zone_of(groc) if groc else meal.local_zone()
     day = meal.api_day(gday, zone)
     pid = ((groc.get("projectId") or rpid or list_id) if groc else list_id)
@@ -485,7 +544,7 @@ def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None
             # a loose list from an earlier press is deleted above and
             # re-made here: it keeps the count it was re-cut to (the
             # portions verb, D25), so a re-cut week survives the move
-            lines, desc = grocery_body(recipe, _portions_of(cur) or meal.PORTIONS)
+            lines, desc = grocery_body(recipe, _portions_of(cur) or meal.PORTIONS, book)
         else:
             lines, desc = [], "⚠️ recipe not in Mela on this Mac · no list (open Mela to sync)"
         _pace()
@@ -960,8 +1019,10 @@ def set_portions(api=None, pid=None, tid=None, portions=None, dry=False):
     repaired at its own count); a list with no note (the first ones) is
     written even at PORTIONS, which gives it its note. A recipe whose yield
     is unknown refuses: the scaler cannot cut it, so a write would change
-    nothing and a toast would claim a count the list is not cut to. dry:
-    the line, no call at all."""
+    nothing and a toast would claim a count the list is not cut to. The
+    re-cut is priced from the book it loads itself (D26; tick_key drops
+    the suffix, so a tick on "875 g chicken · ≈ 4.52 €" lands on "625 g
+    chicken · ≈ 3.23 €"). dry: the line, no call at all."""
     import meal_scale
     try:
         n = int(str(portions).strip())
@@ -984,7 +1045,7 @@ def set_portions(api=None, pid=None, tid=None, portions=None, dry=False):
         raise Refusal(f"🛒 {name} · recipe not in Mela on this Mac")
     if _portions_of(live) == n and live.get("items"):
         return Outcome(f"🛒 {name} · {n} portions · unchanged", None, [tid])
-    lines, desc = grocery_body(recipe, n)
+    lines, desc = grocery_body(recipe, n, _book())
     if meal.portions_of(desc) is None:
         raise Refusal(f"🛒 {name} · yield unknown · cannot re-cut")
     items = meal_scale.carry_ticks(live.get("items") or [], lines)
@@ -995,6 +1056,247 @@ def set_portions(api=None, pid=None, tid=None, portions=None, dry=False):
     if kept:
         msg += f" · {kept} tick{'s' if kept != 1 else ''} kept"
     return Outcome(msg, None, [tid])
+
+
+# ── prices: the book on the week's 🛒 lists (Vex 2026-09-22, D26) ────────────
+# "how feasible is the idea of price speculations? Like how much will each
+# ingredient cost and total per meal?", "Could we not scrape prices of that
+# site, write them in the pricebook and use that?", "Speculation is all I
+# need." The book is meal_price's; this is where it meets TickTick. No
+# dialog opens here: xact asks, these write. Only refresh_prices and
+# set_search touch knuspr.de, and only when their row is pressed.
+def _bare_items(task):
+    """The checklist items of a cached or live list, dicts only."""
+    return [it for it in ((task or {}).get("items") or []) if isinstance(it, dict)]
+
+
+def _bare_titles(task):
+    """The item titles of a list with their price suffixes off: what the
+    book keys on and what a re-price costs."""
+    return [mp.strip_price(it.get("title") or "") for it in _bare_items(task)]
+
+
+def _week_keys(lists):
+    """meal_price.keys_of over the stripped item titles of `lists`, in
+    list order: the keys a refresh prices."""
+    lines = []
+    for t in lists or []:
+        lines += _bare_titles(t)
+    return mp.keys_of(lines)
+
+
+def _cost_of(content):
+    """(total, unpriced count) off a list's cost line, None when it carries
+    none: meal_price.read_cost_line's (total, per portion, unpriced) with
+    the per-portion figure dropped. A "nothing priced yet" line is NO cost
+    (None), not a 0.00 total: the hub must say nothing is priced rather
+    than "≈ 0.00 € this week" when knuspr answered nothing."""
+    got = mp.read_cost_line(content or "")
+    if got is None:
+        return None
+    total, _per, holes = got
+    if holes is None and not total:          # "nothing priced yet": no total to sum
+        return None
+    return float(total), int(holes or 0)
+
+
+def _repriced(live, book):
+    """(items, content, changed) for one list under `book`: every item
+    keeps its id and status (the amounts do not move, so no tick moves)
+    and gets the suffix its cost earns now; the content is the cost line
+    at the list's own count (meal.portions_of, else PORTIONS) over the old
+    content with its old cost line stripped. Pure."""
+    old_items = _bare_items(live)
+    bare = [mp.strip_price(it.get("title") or "") for it in old_items]
+    portions = _portions_of(live) or meal.PORTIONS
+    total = mp.list_cost(bare, book, portions)
+    items = [dict(it, title=ln + _suffix_for(c)) for it, ln, c in zip(old_items, bare, total.costs)]
+    old_content = live.get("content") or ""
+    rest = mp.strip_cost_line(old_content).strip()
+    content = mp.cost_line(total) + (f"\n{rest}" if rest else "")
+    return items, content, (items != old_items or content != old_content)
+
+
+def reprice_lists(api=None, lists=None, book=None, dry=False):
+    """The week's 🛒 lists re-priced in place from `book` (loaded when
+    None) -> {"updated", "unchanged", "failed"}. Per list a LIVE get_task
+    (the ticks made in the shop since the cache are the point of keeping
+    ids), _repriced, and ONE update_task with items + content when either
+    moved, the cache patched; identical = no write. A list with no items
+    (the "not in Mela" warning) and an empty book are left alone, the
+    same rule as grocery_body's. Paced; a rate limit stops the pass and
+    the rest counts as failed. dry: the cached rows costed, no call."""
+    out = {"updated": 0, "unchanged": 0, "failed": 0}
+    lists = week_lists() if lists is None else [t for t in (lists or []) if isinstance(t, dict)]
+    if not lists:
+        return out
+    book = _book(book)
+    if not _has_prices(book):
+        out["unchanged"] = len(lists)
+        return out
+    if not dry:
+        api = _api(api)
+    for i, t in enumerate(lists):
+        tid = t.get("id")
+        pid = t.get("projectId") or t.get("_projectId")
+        if not tid:
+            out["failed"] += 1
+            continue
+        try:
+            if dry:
+                live = t
+            else:
+                _pace()
+                live = api.get_task(pid, tid)
+            if not _bare_items(live):
+                out["unchanged"] += 1
+                continue
+            items, content, changed = _repriced(live, book)
+            if not changed:
+                out["unchanged"] += 1
+                continue
+            if not dry:
+                _pace()
+                api.update_task(tid, live.get("projectId") or pid, current=live,
+                                items=items, content=content)
+                _cache_patch(tid, items=items, content=content)
+            out["updated"] += 1
+        except Exception as e:
+            if _rate_limited(e):
+                out["failed"] += len(lists) - i
+                break
+            out["failed"] += 1
+    return out
+
+
+def _head(names, n=3):
+    """The first `n` of `names`, "a, b, c…" past that."""
+    names = list(names or [])
+    return ", ".join(names[:n]) + ("…" if len(names) > n else "")
+
+
+def refresh_prices(api=None, book=None, today=None, fetch=None, dry=False):
+    """🏷 Prices: one of the two roads to knuspr.de (the other is a book row's ⌥⇧, set_search). The keys of the week's lists
+    (meal_price.keys_of over their stripped item titles, in list order)
+    are re-priced into the book (meal_price.refresh, 0.5 s apart, manual
+    entries kept), the book saved, then the lists re-priced in place
+    (reprice_lists). No week list = a refusal that points at 🔄 Sync: the
+    batch's recipes are NOT read from Mela here, because a price on a
+    list that does not exist is nothing Vex can see. dry: the keys named,
+    nothing fetched, nothing written. Runs only when the row is pressed -
+    never a hitchhiker, never a LaunchAgent."""
+    today = today or date.today()
+    lists = week_lists()
+    if not lists:
+        raise Refusal("🏷 No grocery lists this week · 🔄 Sync with Mela first")
+    keys = _week_keys(lists)
+    if dry:
+        return Outcome(f"🥘 Dry run · would price {len(keys)} keys from knuspr.de: {_head(keys)}",
+                       None, [])
+    book = _book(book)
+    res = mp.refresh(keys, book, today, fetch=fetch, pace=PRICE_PACE)
+    mp.save_book(book)
+    rp = reprice_lists(api, lists=lists, book=book)
+    updated = res.get("updated") or []
+    kept = res.get("kept") or []
+    unpriced = res.get("unpriced") or []
+    stale = res.get("stale") or []
+    msg = f"🏷 Prices · {len(updated)} priced · {len(kept)} kept · {len(unpriced)} unpriced"
+    if unpriced:
+        msg += f" ({_head(unpriced)})"
+    if stale:
+        msg += f" · {len(stale)} stale"
+    msg += f" · {rp['updated']} lists updated"
+    if rp["failed"]:
+        msg += f" · {rp['failed']} not written"
+    return Outcome(msg, None, [t.get("id") for t in lists if t.get("id")])
+
+
+def set_price(key, answer, today=None, search=None):
+    """✍️ A price by hand for one ingredient key, the book screen's ⏎:
+    the dialog's text ("2.99 / 10 pc", "1.49 / 100 g", "7.97 / 1 l")
+    through meal_price.parse_price_answer and manual_entry, the entry
+    written over whatever knuspr had (manual always wins, and a refresh
+    never touches it again), its search term and piece_g carried over,
+    the book saved. A text that is not a price, or a unit nobody knows,
+    refuses with the module's own words; nothing is written. `search`
+    sets the entry's term too."""
+    key = (key or "").strip()
+    if not key:
+        raise Refusal("🏷 No ingredient")
+    today = today or date.today()
+    book = _book()
+    entries = book.setdefault("entries", {})
+    old = entries.get(key)
+    old = old if isinstance(old, dict) else {}
+    try:
+        price, amount, unit = mp.parse_price_answer(answer)
+        entry = mp.manual_entry(key, price, amount, unit, today,
+                                search=(search or old.get("search") or None))
+    except ValueError as e:
+        raise Refusal("🏷 " + (str(e) or "not a price"))
+    if old.get("piece_g"):
+        entry["piece_g"] = old["piece_g"]
+    entries[key] = entry
+    mp.save_book(book)
+    return Outcome(f"🏷 {key} · {entry['price']:.2f} € / {amount:g} {unit} · manual", None, [])
+
+
+def set_search(key, term, today=None, fetch=None):
+    """🔍 A search term by hand for one ingredient key (the book screen's
+    ⌥⇧), then that ONE key re-read from knuspr.de at once (no pace: one
+    call). The entry itself is kept as it is: a manual price stays manual
+    (the term is stored on it for the day it is cleared), a pinned product
+    is re-read by its own name, a knuspr entry is re-picked under the new
+    term. A key with no entry keeps the term in book["terms"] (search_term
+    reads it), so a miss today is not retyped tomorrow, and never mints a
+    bare entry the costing could trip on. The toast says what happened."""
+    key = (key or "").strip()
+    term = (term or "").strip()
+    if not key:
+        raise Refusal("🏷 No ingredient")
+    if not term:
+        raise Refusal("🏷 No search term")
+    today = today or date.today()
+    book = _book()
+    entries = book.setdefault("entries", {})
+    old = entries.get(key)
+    if isinstance(old, dict):
+        old["search"] = term
+    else:
+        book.setdefault("terms", {})[key] = term
+    res = mp.refresh([key], book, today, fetch=fetch, pace=0)
+    mp.save_book(book)
+    e = entries.get(key) if isinstance(entries.get(key), dict) else {}
+    if key in (res.get("updated") or []):
+        price = e.get("price")
+        shown = f"{price:.2f} €" if isinstance(price, (int, float)) else "priced"
+        return Outcome(f"🏷 {key} · {term} · {e.get('product') or 'product'} {shown}", None, [])
+    if e.get("source") == "manual":
+        return Outcome(f"🏷 {key} · {term} · manual price kept", None, [])
+    if e.get("pinned"):
+        return Outcome(f"🏷 {key} · {term} · pinned product kept", None, [])
+    if key in (res.get("stale") or []):
+        return Outcome(f"🏷 {key} · {term} · nothing found on knuspr.de · old price kept", None, [])
+    return Outcome(f"🏷 {key} · {term} · nothing found on knuspr.de", None, [])
+
+
+def week_cost(lists=None):
+    """(total, unpriced, n_lists) for the hub's 🏷 row, summed off the
+    cost lines in the CACHED week lists' content (no live read, no
+    network): total None when no list carries a cost line, unpriced the
+    holes across them, n_lists the lists that were summed."""
+    lists = week_lists() if lists is None else [t for t in (lists or []) if isinstance(t, dict)]
+    total, holes, n = None, 0, 0
+    for t in lists:
+        got = _cost_of(t.get("content") or t.get("desc") or "")
+        if got is None:
+            continue
+        amount, unpriced = got
+        total = (total or 0.0) + amount
+        holes += unpriced
+        n += 1
+    return (mp._round2(total) if total is not None else None), holes, n
 
 
 def _rating_candidates(entries, by_id):
@@ -1267,8 +1569,10 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
                     _order_children(api, made, rpid, prep["id"])
                 except Exception:
                     pass
+            # the price book, read ONCE for the whole press and handed down
+            # (a file, never the network: the sync does not fetch, D26)
             g_made, g_kept, g_gone = _write_groceries(api, list_id, picks, groc, gday,
-                                                      by_id, existing, rpid)
+                                                      by_id, existing, rpid, _book())
         except Exception as e:
             if _rate_limited(e):
                 _uncache(old_ids, [rpid])

@@ -44,6 +44,14 @@ All notable user-visible changes to TickAL. Format follows
   on a single list in the groceries screen does the same for that list,
   whose row now says the count it was cut for. Seven stays the default and
   the next sync leaves a re-cut list alone.
+- **🏷 Prices, as speculation** - every grocery item carries a guessed
+  price (`14 Eggs · ≈ 4.47 €`), each list its total and per-portion cost,
+  and the hub's new **🏷 Prices** row sums the week. Prices come from
+  knuspr.de through a price book on this Mac: ⌥⇧ on the row looks this
+  week's ingredients up (only when pressed, never in the background), ⏎
+  opens the book with the unpriced ones first, where ⏎ takes a price you
+  type (`2.99 / 10 pc`) and ⌥⇧ a different search term. Your own prices
+  always win over the shop's.
 - **✏️ Rename tag** in the tag's ⌘ menu - a dialog asks the new name and
   every task that carries the tag follows. A name already in use is refused
   rather than merged.

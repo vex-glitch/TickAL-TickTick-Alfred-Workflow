@@ -443,12 +443,21 @@ def scaled_ingredients(recipe, portions=7, headers="drop"):
 # re-cut replaces every checklist item (the amounts change, so the titles
 # do), and a tick made in the shop would go with the old item; the tick
 # follows the INGREDIENT instead, the part of the line that does not move.
+# the price suffix meal_price.price_suffix hangs on an item title (" · ≈
+# 4.52 €", D26): spelled out here rather than imported, because this module
+# is pure and meal_price imports IT. A re-price rewrites every title's tail,
+# and a tick made in the shop must not go with the old cent figure.
+_PRICE_TAIL = re.compile(r"\s*·\s*≈\s*\d+(?:[.,]\d+)?\s*€\s*$")
+
+
 def tick_key(line):
     """The ingredient without its amount, the name a tick follows across a
     re-cut: parse_quantity's rest (the whole line when it has no leading
-    number - a bold header, "Avocado oil"), casefolded, whitespace
-    collapsed. "875 g chicken" and "625 g Chicken" are one key."""
-    return " ".join((parse_quantity(line).rest or "").split()).casefold()
+    number - a bold header, "Avocado oil"), its price suffix dropped,
+    casefolded, whitespace collapsed. "875 g chicken", "625 g Chicken" and
+    "625 g chicken · ≈ 3.20 €" are one key."""
+    rest = _PRICE_TAIL.sub("", parse_quantity(line).rest or "")
+    return " ".join(rest.split()).casefold()
 
 
 def _ticked(item):

@@ -61,6 +61,7 @@ test:
 	@$(PYTHON) tests/test_journal_goal.py
 	@$(PYTHON) tests/test_meal.py
 	@$(PYTHON) tests/test_meal_scale.py
+	@$(PYTHON) tests/test_meal_price.py
 	@$(PYTHON) tests/test_mela.py
 	@$(PYTHON) tests/test_meal_write.py
 	@$(PYTHON) tests/test_meal_screens.py

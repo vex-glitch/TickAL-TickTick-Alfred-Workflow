@@ -21,7 +21,19 @@ ONE update with items + content, the items re-cut with the ×1.25 note, a
 tick carried by name, the same count = no write and "unchanged", 0 / 41 /
 a word refused, a library task and a recipe Mela does not know refused,
 dry = no call, the cache patched) and the sync re-making a loose list at
-the count it was re-cut to. Caches live in a temp dir.
+the count it was re-cut to, and (2026-09-22, D26) the prices: grocery_body
+with a book (the suffix on every priced line, the cost line FIRST in the
+description, portions_of still reading the note, no book or an empty book
+= byte-identical), _write_groceries and the sync pricing new lists from
+the book they load once, set_portions re-pricing a re-cut with the ticks
+kept across the suffix, reprice_lists (ids and statuses kept, suffixes
+and the cost line replaced, unchanged = no write, an empty book or an
+itemless list = no write, a rate limit counted for the rest, dry = no
+call), refresh_prices (keys off the cached week lists, a FAKE fetch,
+the book saved to a temp path, the lists re-priced, the toast, dry = no
+fetch, no week = refused), set_price / set_search on a temp book,
+week_cost off the cached cost lines, and the real ~/.ticktick_alfred
+book never written. Caches and the book live in a temp dir.
 Run: python3 tests/test_meal_write.py
 """
 import os
@@ -41,10 +53,18 @@ import cache as cache_store                    # noqa: E402
 cache_store.CACHE_DIR = os.path.join(TMP, "cache")
 os.makedirs(cache_store.CACHE_DIR)
 import meal                                    # noqa: E402
+import meal_price as mp                        # noqa: E402
 import meal_write as mw                        # noqa: E402
 import mela                                    # noqa: E402
 import mela_cal                                # noqa: E402
 
+# the price book (D26) lives in the temp dir for the whole run: _book_path
+# hands back BOOK_PATH the moment it differs from its birth value, so this
+# one line beats config.CONFIG_DIR, and the real book on this Mac is never
+# read (it would price every list below) nor written (asserted at the end)
+REAL_BOOK = mp._BOOK_PATH_BORN
+HAD_REAL_BOOK = os.path.exists(REAL_BOOK)
+mp.BOOK_PATH = os.path.join(TMP, "meal_prices.json")
 mw.IMPORT_LEDGER = os.path.join(TMP, "meal_import.json")
 mw.GONE_LEDGER = os.path.join(TMP, "meal_gone.json")          # never the real memory of trashed ids
 mw.LOCK_FILE = os.path.join(TMP, "meal.lock")
@@ -928,5 +948,293 @@ wl = mw.week_lists(today=TODAY)
 check("week_lists off the caches after the sync: the two lists under the upcoming 🛒 task",
       sorted(t["parentId"] for t in wl) == ["groc_tue", "groc_tue"] and {meal.link_uuid(t["title"]) for t in wl} == {U1, U2}, wl)
 
+
+# ── prices: the book on the 🛒 lists (Vex 2026-09-22, D26) ───────────────────
+print("-- prices")
+BOOK = {"version": 1, "updated": "2026-09-22", "entries": {
+    "chicken": {"key": "chicken", "search": "Hähnchen", "product": "Hähnchenbrust", "product_id": 1,
+                "pack": "500 g", "pack_amount": 500, "pack_unit": "g", "price": 4.99, "per": 0.00998,
+                "per_unit": "g", "source": "knuspr", "date": "2026-09-22", "pinned": False,
+                "url": "https://www.knuspr.de/1-haehnchenbrust"},
+    "oil": {"key": "oil", "search": "Öl", "product": "Rapsöl", "product_id": 2, "pack": "1 l",
+            "pack_amount": 1000, "pack_unit": "ml", "price": 2.49, "per": 0.00249, "per_unit": "ml",
+            "source": "knuspr", "date": "2026-09-22", "pinned": False, "url": ""}}}
+COST7 = "≈ 8.80 € · 1.26 €/portion · 1 unpriced"        # 875 g chicken 8.73 + 26.25 ml oil 0.07, soy unpriced
+COST5 = "≈ 6.29 € · 1.26 €/portion · 1 unpriced"
+LINES7 = ["875 g chicken · ≈ 8.73 €", "1 3/4 tbsp oil · ≈ 0.07 €", "3 1/2 tsp soy"]
+LINES5 = ["625 g chicken · ≈ 6.24 €", "1 1/4 tbsp oil · ≈ 0.05 €", "2 1/2 tsp soy"]
+BARE7 = ["875 g chicken", "1 3/4 tbsp oil", "3 1/2 tsp soy"]
+
+lines, desc = mw.grocery_body(BY[U1], book=BOOK)
+check("grocery_body with a book: the suffix on every priced line, the unpriced one bare",
+      lines == LINES7, lines)
+check("grocery_body with a book: the cost line FIRST, the yield note under it",
+      desc == COST7 + "\n" + NOTE7, desc)
+check("grocery_body with a book: meal.portions_of still reads the note, the cost line reads its own",
+      meal.portions_of(desc) == 7 and mw._cost_of(desc) == (8.80, 1), (meal.portions_of(desc), mw._cost_of(desc)))
+check("grocery_body at 5 with a book", mw.grocery_body(BY[U1], 5, BOOK) == (LINES5, COST5 + "\n" + NOTE5),
+      mw.grocery_body(BY[U1], 5, BOOK))
+check("grocery_body without a book, with None, with an empty book, with a bookless dict: byte-identical to before",
+      all(mw.grocery_body(BY[U1], 7, b) == (BARE7, NOTE7) for b in (None, {}, mp.empty_book(), {"entries": {}}))
+      and mw.grocery_body(BY[U1]) == (BARE7, NOTE7))
+check("grocery_body: a book that prices nothing on this recipe still writes an honest cost line",
+      mw.grocery_body(BY[U1], 7, {"entries": {"unicorn": BOOK["entries"]["oil"]}})
+      == (BARE7, "≈ 0.00 € · nothing priced yet\n" + NOTE7), mw.grocery_body(BY[U1], 7, {"entries": {"unicorn": {}}}))
+check("_cost_of: the module's reader or the regex fallback, None without a line",
+      mw._cost_of(COST7 + "\nx") == (8.80, 1) and mw._cost_of("≈ 4.47 €") == (4.47, 0)
+      and mw._cost_of(NOTE7) is None and mw._cost_of("") is None and mw._cost_of(None) is None
+      and mw._cost_of("≈ 0.00 € · nothing priced yet") is None,
+      (mw._cost_of(COST7 + "\nx"), mw._cost_of("≈ 4.47 €"), mw._cost_of(NOTE7)))
+
+# _write_groceries prices a new list from the book it is handed
+api = fresh()
+picks = {U1: {"name": "Beef Bulgogi", "uuid": U1, "slot": "l", "tid": "t2"}}
+made, kept, gone = mw._write_groceries(api, LIST, picks, None, date(2026, 9, 26), BY, {}, None, BOOK)
+check("_write_groceries with a book: the new list's items carry the suffixes, its content the cost line first",
+      len(made) == 1 and [it["title"] for it in made[0]["items"]] == LINES7 and made[0]["content"] == COST7 + "\n" + NOTE7,
+      made and (made[0].get("items"), made[0].get("content")))
+api = fresh()
+made, kept, gone = mw._write_groceries(api, LIST, picks, None, date(2026, 9, 26), BY, {})
+check("_write_groceries without a book: bare, as before",
+      [it["title"] for it in made[0]["items"]] == BARE7 and made[0]["content"] == NOTE7)
+
+# the sync loads the book ONCE off the temp path and prices every new list
+mp.save_book(BOOK)
+check("the test book landed in the temp dir, never the real one", os.path.exists(mp.BOOK_PATH) and mp.BOOK_PATH.startswith(TMP))
+api = fresh()
+mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES)
+grocs = groceries(api)
+check("sync with a book on disk: the created lists are priced, the cost line above the note",
+      [it["title"] for it in grocs[U1]["items"]] == LINES7 and grocs[U1]["content"] == COST7 + "\n" + NOTE7
+      and grocs[U3]["content"].startswith("≈ ") and meal.portions_of(grocs[U3]["content"]) == 7,
+      (grocs[U1].get("items"), grocs[U1].get("content")))
+check("sync with a book: the not-in-Mela warning list is untouched by prices",
+      grocs[U8]["content"].startswith("⚠️ recipe not in Mela") and not grocs[U8].get("items"))
+check("sync never fetches: a book on disk is a file read, the calls are TickTick's only",
+      all(c[0] in ("get", "pd", "create", "update", "delete") for c in api.calls))
+
+# set_portions re-prices the re-cut, the ticks carried across the suffix
+api = fresh()
+GLP = T("glp", meal.grocery_title("Beef Bulgogi", U1), kind="CHECKLIST", tags=["🛒groceries"],
+        content=COST7 + "\n" + NOTE7,
+        items=[{"id": "i1", "status": 2, "title": LINES7[0], "sortOrder": 0},
+               {"id": "i2", "status": 0, "title": LINES7[1], "sortOrder": 1},
+               {"id": "i3", "status": 2, "title": LINES7[2], "sortOrder": 2}])
+api.lists[LIST]["glp"] = dict(GLP)
+mw._cache_add([GLP])
+res = mw.set_portions(api, LIST, "glp", 5)
+live = api.lists[LIST]["glp"]
+check("set_portions with the book: the re-cut is re-priced at 5, the cost line first, the note under it",
+      [it["title"] for it in live["items"]] == LINES5 and live["content"] == COST5 + "\n" + NOTE5
+      and mw._portions_of(live) == 5, (live["items"], live["content"]))
+check("set_portions with the book: the ticks carried by the ingredient, the suffix ignored, the toast unchanged",
+      [it["status"] for it in live["items"]] == [2, 0, 2] and res.msg == "🛒 Beef Bulgogi · 5 portions · 2 ticks kept", res)
+api.lists[LIST]["gl"] = dict(GL)                                   # bare items, NOTE7, ticks on chicken + soy
+mw.set_portions(api, LIST, "gl", 6)
+check("set_portions: a bare (pre-price) list re-cut gets priced too, its ticks kept",
+      [it["title"] for it in api.lists[LIST]["gl"]["items"]] == ["750 g chicken · ≈ 7.49 €", "1 1/2 tbsp oil · ≈ 0.06 €", "3 tsp soy"]
+      and [it["status"] for it in api.lists[LIST]["gl"]["items"]] == [2, 0, 2], api.lists[LIST]["gl"]["items"])
+
+# reprice_lists: the same lists under a NEW book, ids and ticks kept
+api = fresh()
+STALE = T("gls", meal.grocery_title("Beef Bulgogi", U1), kind="CHECKLIST", tags=["🛒groceries"],
+          content="≈ 99.00 € · 14.14 €/portion\n" + NOTE7,
+          items=[{"id": "i1", "status": 2, "title": "875 g chicken · ≈ 90.00 €", "sortOrder": 0},
+                 {"id": "i2", "status": 0, "title": "1 3/4 tbsp oil · ≈ 9.00 €", "sortOrder": 1},
+                 {"id": "i3", "status": 2, "title": "3 1/2 tsp soy", "sortOrder": 2}])
+BARE = T("glb", meal.grocery_title("Oats", U2), kind="CHECKLIST", tags=["🛒groceries"], content=NOTE7,
+         items=[{"id": "j1", "status": 0, "title": "875 g chicken", "sortOrder": 0},
+                {"id": "j2", "status": 2, "title": "1 3/4 tbsp oil", "sortOrder": 1},
+                {"id": "j3", "status": 0, "title": "3 1/2 tsp soy", "sortOrder": 2}])
+EMPTY = T("gle", meal.grocery_title("Nope", U8), kind="CHECKLIST", tags=["🛒groceries"],
+          content="⚠️ recipe not in Mela on this Mac · no list (open Mela to sync)", items=[])
+for t in (STALE, BARE, EMPTY):
+    api.lists[LIST][t["id"]] = dict(t)
+mw._cache_add([STALE, BARE, EMPTY])
+r = mw.reprice_lists(api, lists=[STALE, BARE, EMPTY], book=BOOK)
+check("reprice_lists: two updated, the itemless one unchanged",
+      r == {"updated": 2, "unchanged": 1, "failed": 0}, r)
+s = api.lists[LIST]["gls"]
+check("reprice_lists: a LIVE read then ONE update per changed list, items + content",
+      api.calls == [("get", LIST, "gls"), ("update", LIST, "gls", ("content", "items")),
+                    ("get", LIST, "glb"), ("update", LIST, "glb", ("content", "items")),
+                    ("get", LIST, "gle")], api.calls)
+check("reprice_lists: the stale suffixes replaced, ids and statuses and sortOrder KEPT",
+      s["items"] == [{"id": "i1", "status": 2, "title": LINES7[0], "sortOrder": 0},
+                     {"id": "i2", "status": 0, "title": LINES7[1], "sortOrder": 1},
+                     {"id": "i3", "status": 2, "title": LINES7[2], "sortOrder": 2}], s["items"])
+check("reprice_lists: the old cost line replaced, the yield note kept",
+      s["content"] == COST7 + "\n" + NOTE7, s["content"])
+b = api.lists[LIST]["glb"]
+check("reprice_lists: a bare list gains suffixes and a cost line, its tick kept",
+      [it["title"] for it in b["items"]] == LINES7 and [it["status"] for it in b["items"]] == [0, 2, 0]
+      and [it["id"] for it in b["items"]] == ["j1", "j2", "j3"] and b["content"] == COST7 + "\n" + NOTE7, b)
+check("reprice_lists: the cache mirrors it",
+      next(t for t in cache_store.get("all_tasks") if t["id"] == "gls")["content"] == COST7 + "\n" + NOTE7)
+n = len(api.calls)
+r = mw.reprice_lists(api, lists=[STALE, BARE], book=BOOK)
+check("reprice_lists again under the same book: reads only, nothing written, all unchanged",
+      r == {"updated": 0, "unchanged": 2, "failed": 0} and all(c[0] == "get" for c in api.calls[n:]), (r, api.calls[n:]))
+n = len(api.calls)
+r = mw.reprice_lists(api, lists=[STALE, BARE], book={"entries": {}})
+check("reprice_lists under an empty book: no call at all, all unchanged (grocery_body's rule)",
+      r == {"updated": 0, "unchanged": 2, "failed": 0} and api.calls[n:] == [], (r, api.calls[n:]))
+r = mw.reprice_lists(api, lists=[], book=BOOK)
+check("reprice_lists: no lists, nothing", r == {"updated": 0, "unchanged": 0, "failed": 0})
+api2 = fresh()
+for t in (STALE, BARE):
+    api2.lists[LIST][t["id"]] = dict(t)
+api2.fail_after = 1                         # the first update trips the limit
+r = mw.reprice_lists(api2, lists=[STALE, BARE], book=BOOK)
+check("reprice_lists: a rate limit stops the pass, this list and the rest counted as failed",
+      r == {"updated": 0, "unchanged": 0, "failed": 2} and len(api2.calls) == 2, (r, api2.calls))
+api2 = fresh()
+api2.lists[LIST]["gls"] = dict(STALE)
+r = mw.reprice_lists(api2, lists=[STALE, BARE], book=BOOK, dry=True)
+check("reprice_lists dry: the cached rows costed, no call", r == {"updated": 2, "unchanged": 0, "failed": 0} and api2.calls == [], (r, api2.calls))
+same_book = mw._repriced(dict(STALE, items=[dict(it, title=ln) for it, ln in zip(STALE["items"], LINES7)],
+                              content=COST7 + "\n" + NOTE7), BOOK)
+check("_repriced: a list already right under the book reads unchanged (the cost line at its own count)",
+      same_book[2] is False and same_book[1] == COST7 + "\n" + NOTE7, same_book)
+at5 = mw._repriced(dict(STALE, items=[dict(it, title=ln) for it, ln in zip(STALE["items"], LINES5)],
+                        content=COST7 + "\n" + NOTE5), BOOK)
+check("_repriced: the cost line is cut at the list's OWN count (the note's 5, not the sync's 7)",
+      at5[1] == COST5 + "\n" + NOTE5 and [it["title"] for it in at5[0]] == LINES5, at5)
+
+# refresh_prices: the keys off the cached week lists, a FAKE fetch, the book saved, the lists re-priced
+def prod(pid, name, pack, price, ppu):
+    return {"productId": pid, "productName": name, "baseLink": f"{pid}-{name.lower()}", "textualAmount": pack,
+            "price": {"full": price}, "pricePerUnit": {"full": ppu}, "inStock": True}
+
+
+SHOP = {"Hähnchen": [prod(1, "Hähnchenbrust", "500 g", 4.99, 9.98)], "Öl": [prod(2, "Rapsöl", "1 l", 2.49, 2.49)]}
+FETCHED = []
+
+
+def fake_fetch(term):
+    FETCHED.append(term)
+    return {"status": 200, "data": {"productList": SHOP.get(term, [])}}
+
+
+check("refresh_prices paces knuspr at half a second by default", mw.PRICE_PACE == 0.5
+      and mw.refresh_prices.__code__.co_varnames[:5] == ("api", "book", "today", "fetch", "dry"))
+mw.PRICE_PACE = 0.0                          # no sleeping in the suite
+mp.save_book(mp.empty_book())                # a fresh book
+api = fresh()
+for t in (dict(BARE, id="g_keep", title=api.lists[LIST]["g_keep"]["title"]),
+          dict(STALE, id="g_old", title=api.lists[LIST]["g_old"]["title"])):
+    api.lists[LIST][t["id"]] = dict(t)
+    mw._cache_patch(t["id"], items=t["items"], content=t["content"])
+wl = mw.week_lists(today=TODAY)
+check("the week's cached lists carry their items (what the refresh keys on)",
+      [t["id"] for t in wl] == ["g_old", "g_keep"] and all(t.get("items") for t in wl), [(t["id"], bool(t.get("items"))) for t in wl])
+check("_week_keys: distinct keys off the stripped titles, in list order",
+      mw._week_keys(wl) == ["chicken", "oil", "soy"], mw._week_keys(wl))
+res = mw.refresh_prices(api, dry=True, fetch=lambda t: 1 / 0)
+check("refresh_prices dry: the keys named, nothing fetched, nothing called, nothing saved",
+      res.msg == "🥘 Dry run · would price 3 keys from knuspr.de: chicken, oil, soy" and api.calls == []
+      and mp.load_book()["entries"] == {}, (res, api.calls))
+check("_head: three, then an ellipsis", (mw._head(["a", "b", "c", "d"]), mw._head(["a"]), mw._head([])), ("a, b, c…", "a", ""))
+res = mw.refresh_prices(api, today=date(2026, 9, 22), fetch=fake_fetch)
+check("refresh_prices: the fake shop was asked by the default German terms, soy by itself",
+      FETCHED == ["Hähnchen", "Öl", "soy"], FETCHED)
+saved = mp.load_book()
+check("refresh_prices: the book saved to the temp path with the two entries, stamped",
+      set(saved["entries"]) == {"chicken", "oil"} and saved["entries"]["chicken"]["per"] == 0.00998
+      and saved["entries"]["oil"]["per_unit"] == "ml" and saved["updated"] == "2026-09-22", saved)
+check("refresh_prices: the toast", res.msg == "🏷 Prices · 2 priced · 0 kept · 1 unpriced (soy) · 2 lists updated"
+      and res.reopen is None and res.ids == ["g_old", "g_keep"], res)
+check("refresh_prices: both lists re-priced live (ids kept), the cache with them",
+      [it["title"] for it in api.lists[LIST]["g_keep"]["items"]] == LINES7 and api.lists[LIST]["g_keep"]["content"] == COST7 + "\n" + NOTE7
+      and [it["id"] for it in api.lists[LIST]["g_old"]["items"]] == ["i1", "i2", "i3"]
+      and next(t for t in cache_store.get("all_tasks") if t["id"] == "g_old")["content"] == COST7 + "\n" + NOTE7,
+      (api.lists[LIST]["g_keep"].get("items"), api.lists[LIST]["g_keep"].get("content")))
+check("refresh_prices: TickTick calls are a get + an update per list, nothing else",
+      [c[0] for c in api.calls] == ["get", "update", "get", "update"], api.calls)
+del FETCHED[:]
+n = len(api.calls)
+res = mw.refresh_prices(api, today=date(2026, 9, 23), fetch=fake_fetch)
+check("refresh_prices again: re-fetched, the lists unchanged under the same prices, no write",
+      FETCHED == ["Hähnchen", "Öl", "soy"] and res.msg.endswith(" · 0 lists updated")
+      and all(c[0] == "get" for c in api.calls[n:]), (res.msg, api.calls[n:]))
+_wl = mw.week_lists
+mw.week_lists = lambda *a, **k: []
+try:
+    mw.refresh_prices(api, fetch=fake_fetch)
+    check("refresh_prices: no week lists refuses", False)
+except mw.Refusal as e:
+    check("refresh_prices: no week lists refuses, pointing at the sync",
+          str(e) == "🏷 No grocery lists this week · 🔄 Sync with Mela first", str(e))
+mw.week_lists = _wl
+
+# week_cost off the cached cost lines (the hub's number: no live read, no network)
+check("week_cost: the two re-priced lists summed off the cache, the holes counted",
+      mw.week_cost() == (17.60, 2, 2), mw.week_cost())
+check("week_cost over given lists: only the ones with a cost line count, None when none has one",
+      mw.week_cost([dict(STALE, content=COST7), dict(BARE, content=NOTE7), {"content": "≈ 1.20 €"}]) == (10.0, 1, 2)
+      and mw.week_cost([dict(BARE, content=NOTE7)]) == (None, 0, 0) and mw.week_cost([]) == (None, 0, 0),
+      mw.week_cost([dict(STALE, content=COST7), dict(BARE, content=NOTE7), {"content": "≈ 1.20 €"}]))
+
+# set_price / set_search on the temp book
+if hasattr(mp, "parse_price_answer") and hasattr(mp, "manual_entry"):
+    res = mw.set_price("soy", "1.49 / 100 ml", today=date(2026, 9, 22))
+    e = mp.load_book()["entries"].get("soy") or {}
+    check("set_price: a manual entry in the book, per ml, saved",
+          e.get("source") == "manual" and e.get("per_unit") == "ml" and abs(float(e.get("per") or 0) - 0.0149) < 1e-9
+          and e.get("date") == "2026-09-22", e)
+    check("set_price: the toast", res.msg == "🏷 soy · 1.49 € / 100 ml · manual", res.msg)
+    e_soy_after = dict(e)
+    e_before = dict(mp.load_book()["entries"]["chicken"])
+    res = mw.set_price("chicken", "9.99 / 1 kg", today=date(2026, 9, 22))
+    e = mp.load_book()["entries"]["chicken"]
+    check("set_price over a knuspr entry: manual wins, the search term carried over",
+          e.get("source") == "manual" and e.get("search") == e_before.get("search") and abs(float(e["per"]) - 0.00999) < 1e-9, e)
+    bad = []
+    for v in ("", "abc", "1.49 / 100 elephants", None):
+        try:
+            mw.set_price("soy", v)
+            bad.append((v, "accepted"))
+        except mw.Refusal as e:
+            if not str(e).startswith("🏷 "):
+                bad.append((v, str(e)))
+    check("set_price: a text that is not a price refuses with a 🏷 line", bad == [], bad)
+    check("set_price: a refused text leaves the entry as it was", mp.load_book()["entries"]["soy"] == e_soy_after)
+    try:
+        mw.set_price("", "1 / 1 pc")
+        check("set_price: a blank key refuses", False)
+    except mw.Refusal as e:
+        check("set_price: a blank key refuses", str(e) == "🏷 No ingredient", str(e))
+    del FETCHED[:]
+    res = mw.set_search("chicken", "Hähnchen", today=date(2026, 9, 22), fetch=fake_fetch)
+    e = mp.load_book()["entries"]["chicken"]
+    check("set_search on a manual entry: the term is stored, the manual price kept, nothing fetched",
+          FETCHED == [] and e.get("source") == "manual" and e.get("search") == "Hähnchen"
+          and res.msg == "🏷 chicken · Hähnchen · manual price kept", (e, res.msg))
+    res = mw.set_search("chicken", "Einhorn", today=date(2026, 9, 22), fetch=fake_fetch)
+    e = mp.load_book()["entries"]["chicken"]
+    check("set_search: a second term on the manual entry replaces the stored one, the price still kept",
+          e.get("source") == "manual" and e.get("search") == "Einhorn"
+          and res.msg == "🏷 chicken · Einhorn · manual price kept", (e, res.msg))
+    res = mw.set_search("egg", "Eier", today=date(2026, 9, 22), fetch=fake_fetch)
+    e = mp.load_book()["entries"].get("egg")
+    bk = mp.load_book()
+    check("set_search on a key the book lacks: no bare entry minted, the term kept in book['terms'], nothing found",
+          e is None and (bk.get("terms") or {}).get("egg") == "Eier" and mp.search_term("egg", bk) == "Eier"
+          and res.msg.endswith("nothing found on knuspr.de"), (e, bk.get("terms"), res.msg))
+    for key, term in (("", "x"), ("egg", ""), ("egg", "  ")):
+        try:
+            mw.set_search(key, term, fetch=fake_fetch)
+            check(f"set_search refuses {key!r}/{term!r}", False)
+        except mw.Refusal as e:
+            check(f"set_search refuses {key!r}/{term!r}", str(e).startswith("🏷 "), str(e))
+else:
+    check("meal_price.parse_price_answer + manual_entry present (the module fixer's names, set_price rides them)",
+          False, "absent: set_price / set_search checks skipped")
+
+check("the real ~/.ticktick_alfred book was never written by this run",
+      os.path.exists(REAL_BOOK) == HAD_REAL_BOOK and not os.path.exists(REAL_BOOK + ".tmp"), REAL_BOOK)
+
+import shutil
+shutil.rmtree(TMP, ignore_errors=True)
 print(f"\nmeal_write: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

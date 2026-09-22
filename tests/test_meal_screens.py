@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """The 🥘 screens (Scripts/browse.py ctx:meal / mealq / mealw / meallib /
-mealgroc / mealrate) rendered against a FAKE cache in a temp dir, no
-network, no Mela, no Calendar store: meal_write.plan_view,
-meal_write.hub_counts, mela_cal.plan and mela.library are stubbed, and the
-routine's list is planted as the meal_kids snapshot so the live read never
-fires.
+mealgroc / mealrate / mealprice) rendered against a FAKE cache in a temp
+dir, no network, no Mela, no Calendar store, no price book on disk:
+meal_write.plan_view, meal_write.hub_counts, mela_cal.plan, mela.library
+and meal_price.load_book are stubbed, the routine's list is planted as the
+meal_kids snapshot so the live read never fires, and meal_write.week_lists
+is the REAL one over the planted pool.
 
 What it pins (the traps that burned the other hubs):
   * every row spells out all six chords as fresh dicts, no xact: on ⌘ or ⌥,
@@ -35,17 +36,37 @@ What it pins (the traps that burned the other hubs):
     "now 7" read off the yield note in the content, both missing (never
     wrong) on a list saved without one; the legends say ⌥⇧🔢, the head
     says "cut to 7 portions · ⌥⇧ re-cuts one"; still no xact on ⌘ or ⌥
+  * THE 🏷 ROW: the hub's 🏷 Prices row sits right after 🛒, sums the
+    week's lists off their cost lines ("nothing priced yet" without one,
+    "≈ 1.75 € this week · 1 unpriced" with a planted one), ⏎ the
+    trampoline to ctx:mealprice, ⌥ by variable, ⌥⇧ = xact:meal_prices
+    {back: ctx:meal} (the one road to knuspr.de), the subtitle counts the
+    book; a ctx:mealgroc chip gains " · ≈ 1.75 €" after the portions
+    chip and a list without a cost line keeps its chip as it was
+  * ctx:mealprice[:<back…>] = the price book: a dead head (entries, the
+    week's holes, the book date or never), the week's keys unpriced FIRST
+    (❓, searched as the default term), then priced (🧾 knuspr / ✍️ manual
+    with the €/kg and the product), then the rest of the book (📖); a
+    suffixed item title keys clean (rice, never "rice 1 75"); every key
+    row ⏎ = xact:meal_price_set and ⌥⇧ = xact:meal_price_search {key,
+    back: THIS ctx}, ⌥⌘ copies the knuspr page when there is one and is
+    dead without, ⌘ ⌥ ⇧ ⌘⇧ dead; back = the trailing ids or ctx:meal; the
+    bar filters on key + product; the book is read once a render; no
+    lists + an empty book = the head and one dead row
   * typing "today" on a meal screen never jumps away (parse_ctx guard)
   * the Routines hub carries the zero-canvas door
+  * the real ~/.ticktick_alfred/meal_prices.json is never written
 
     python3 tests/test_meal_screens.py
 """
 import base64
 import json
 import os
+import re
 import sys
 import tempfile
 import time
+from collections import namedtuple
 from datetime import date, timedelta
 from types import SimpleNamespace
 
@@ -65,7 +86,12 @@ import meal                                    # noqa: E402
 import meal_write as mw                        # noqa: E402
 import mela                                    # noqa: E402
 import mela_cal                                # noqa: E402
+import meal_price as mp                        # noqa: E402
 import browse                                  # noqa: E402
+
+REAL_BOOK = os.path.expanduser("~/.ticktick_alfred/meal_prices.json")
+HAD_BOOK = os.path.exists(REAL_BOOK)
+mp.BOOK_PATH = os.path.join(TMP, "meal_prices.json")   # the temp path wins even unstubbed
 
 FAILS, COUNT = [], [0]
 
@@ -118,11 +144,50 @@ LIB = [T("t1", f"[Oats](mela://recipe/{U2})", tags=["🍳breakfast", "👨‍�
        T("t4", f"[Second Lunch](mela://recipe/{U4})", tags=["🍛lunch"]),
        T("t5", f"[Kimchi Stew](mela://recipe/{U6})", tags=["🍛lunch", "👨‍🍳Cooked"], content=KIMCHI_DESC),
        T("g1", meal.grocery_title("Oats", U2), tags=["🛒groceries"], kind="CHECKLIST",
-         dueDate="2026-09-26T00:00:00+0000", items=[{"title": "a", "status": 2}, {"title": "b", "status": 0}],
+         dueDate="2026-09-26T00:00:00+0000",
+         items=[{"title": "350 g bacon", "status": 2}, {"title": "2 eggs", "status": 0}],
          content="Scaled ×1.75: 4 → 7 portions\n_(yield: '4' in yield)_")]
 # a second list as the very first sync saved them: EMPTY content, no yield note
 G2 = T("g2", meal.grocery_title("Pockets", U3), tags=["🛒groceries"], kind="CHECKLIST",
        items=[{"title": "x", "status": 0}])
+# a third list as a PRICED sync saves them: the cost line first in the
+# content, a priced line suffixed, a manual salt, a hole (thighs by the
+# piece against nothing in the book); sortOrder puts it first in the week
+G3 = T("g3", meal.grocery_title("Beef Bulgogi", U1), tags=["🛒groceries"], kind="CHECKLIST",
+       sortOrder=-10,
+       items=[{"title": "500 g rice · ≈ 1.75 €", "status": 0}, {"title": "1 tsp salt", "status": 0},
+              {"title": "3 chicken thighs", "status": 0}],
+       content="≈ 1.75 € · 0.25 €/portion · 1 unpriced\nScaled ×1.75: 4 → 7 portions\n_(yield: '4' in yield)_")
+
+
+def E(key, product, pack, price, per, url="", search=None, source="knuspr", date="2026-09-22"):
+    return {"key": key, "search": search or product, "product": product, "product_id": hash(key) & 0xffff,
+            "pack": pack, "pack_amount": 1000, "pack_unit": "g", "price": price, "per": per,
+            "per_unit": "g", "source": source, "date": date, "pinned": False, "url": url}
+
+
+# the fake book: two knuspr entries on this week's lists, a manual salt,
+# and flour that no list wants (the 📖 row); load_book hands out a COPY
+BOOK = {"version": 1, "updated": "2026-09-22", "entries": {
+    "bacon": E("bacon", "Tulip Bacon", "150 g", 1.99, 0.01327, "https://www.knuspr.de/tulip-bacon", search="Bacon"),
+    "rice": E("rice", "Basmati Reis", "1 kg", 3.49, 0.00349, "https://www.knuspr.de/basmati-reis"),
+    "salt": {"key": "salt", "product": "", "pack": "1 kg", "pack_amount": 1000, "pack_unit": "g",
+             "price": 0.49, "per": 0.00049, "per_unit": "g", "source": "manual", "date": "2026-09-20", "url": ""},
+    "flour": E("flour", "Mehl Type 405", "1 kg", 0.89, 0.00089, "https://www.knuspr.de/mehl-405", search="Mehl")}}
+LOADS = [0]
+
+
+def fake_load_book(path=None):
+    LOADS[0] += 1
+    return json.loads(json.dumps(BOOK))
+
+
+mp.load_book = fake_load_book
+
+# stand-ins for what the price groups add beside this one (installed only
+# while missing, the HORIZON_WEEKS pattern): the cost-line reader and the
+# week's sum off the cached lists. The fake week_cost parses the line
+# itself so its answer never rides the reader's shape.
 ROUTINE = T(RID, "🥘 Meal Prep", pid=RLIST, startDate=f"{SUN.isoformat()}T17:00:00.000+0000")
 PTR = T("p1", meal.pointer_title("b", "Oats", U2), pid=RLIST, parent=RID)
 
@@ -194,7 +259,8 @@ def rows_for(ctx, query=""):
           "mealw": lambda: browse.render_mealw(ids, q),
           "meallib": lambda: browse.render_meallib(ids, q),
           "mealgroc": lambda: browse.render_mealgroc(q),
-          "mealrate": lambda: browse.render_mealrate(ids, q)}[level]
+          "mealrate": lambda: browse.render_mealrate(ids, q),
+          "mealprice": lambda: browse.render_mealprice(ids, q)}[level]
     return fn()
 
 
@@ -273,9 +339,9 @@ check("hub: plan_view anchored on THIS week's cook Sunday (first_sunday), the fu
 check("hub: head = the BATCH: the upcoming prep task's day · 3 meals, dead",
       r["meal-head"]["title"] == f"🥘 {COOK(SUN)} · 3 meals" and f"{meal.week_label(WK)} · groceries" in r["meal-head"]["subtitle"]
       and not r["meal-head"]["valid"], (r["meal-head"]["title"], r["meal-head"]["subtitle"]))
-check("hub: rows in order (b, l, x), then 📆 🔄 🛒 📚×3 ℹ️",
+check("hub: rows in order (b, l, x), then 📆 🔄 🛒 🏷 📚×3 ℹ️",
       uids == ["meal-head", f"meal-b-{U2[:8]}", f"meal-l-{U1[:8]}", f"meal-x-{U5[:8]}", "meal-next", "meal-sync",
-               "meal-groc", "meal-lib-b", "meal-lib-l", "meal-lib-s", "meal-status"], uids)
+               "meal-groc", "meal-price", "meal-lib-b", "meal-lib-l", "meal-lib-s", "meal-status"], uids)
 check("hub: the retired rows are gone",
       not any(u in r for u in ("meal-plan", "meal-import", "meal-fill", "meal-b", "meal-l", "meal-s")))
 b = r[f"meal-b-{U2[:8]}"]
@@ -317,6 +383,28 @@ check("hub: 🛒 ⌥⇧ = xact:meal_portions {all, back: ctx:meal}, live with an
       and g["mods"]["alt+shift"]["subtitle"] == "🔢 Portions… (asks per list)", g["mods"]["alt+shift"])
 check("hub: 🛒 legend says ⏎⤵️  ⌥⤵️  ⌥⇧🔢", g["subtitle"].endswith("  |  ⏎⤵️  ⌥⤵️  ⌥⇧🔢"), g["subtitle"])
 check("hub: 🛒 never an xact on ⌘ or ⌥", not g["mods"]["cmd"]["valid"] and not g["mods"]["alt"]["arg"])
+p = r["meal-price"]
+check("hub: 🏷 sits right after 🛒", uids[uids.index("meal-groc") + 1] == "meal-price", uids)
+check("hub: 🏷 with no cost line on any list says nothing priced yet, no unpriced count",
+      p["title"] == "🏷 Prices · nothing priced yet", p["title"])
+check("hub: 🏷 subtitle = knuspr.de speculation · the book's size · ⌥⇧ refresh · the legend",
+      p["subtitle"] == "knuspr.de speculation · book 4 entries · ⌥⇧ refresh (≈ 0.5 s a key)  |  ⏎⤵️  ⌥⤵️  ⌥⇧🏷",
+      p["subtitle"])
+check("hub: 🏷 ⏎ the trampoline to ctx:mealprice, ⌥ by variable",
+      p["arg"] == "xact:crmbrowse:ctx:mealprice" and p["valid"]
+      and p["mods"]["alt"]["variables"]["browse_ctx"] == "ctx:mealprice" and p["mods"]["alt"]["valid"], p)
+check("hub: 🏷 ⌥⇧ = xact:meal_prices {back: ctx:meal}, the one road to knuspr.de",
+      p["mods"]["alt+shift"]["arg"].startswith("xact:meal_prices:") and p["mods"]["alt+shift"]["valid"]
+      and mod_payload(p["mods"]["alt+shift"]) == {"back": "ctx:meal"}
+      and "knuspr" in p["mods"]["alt+shift"]["subtitle"], p["mods"]["alt+shift"])
+check("hub: 🏷 never an xact on ⌘ or ⌥, ⇧ and ⌥⌘ dead",
+      not p["mods"]["cmd"]["valid"] and not p["mods"]["alt"]["arg"]
+      and not p["mods"]["shift"]["valid"] and not p["mods"]["alt+cmd"]["valid"], p["mods"])
+plant(lib=LIB + [G3])
+pp = by_uid(rows_for("ctx:meal"))["meal-price"]
+check("hub: 🏷 sums the planted cost line: ≈ 1.75 € this week · 1 unpriced (the noteless list adds nothing)",
+      pp["title"] == "🏷 Prices · ≈ 1.75 € this week · 1 unpriced", pp["title"])
+plant()
 plant(lib=[t for t in LIB if t["id"] != "g1"])
 g0 = by_uid(rows_for("ctx:meal"))["meal-groc"]
 check("hub: 🛒 ⌥⇧ dead with no open list, the row itself still opens the screen",
@@ -459,6 +547,16 @@ check("groceries: a list saved without a yield note: no portions chip, the chord
 check("groceries: the noted list keeps its chip beside the plain one",
       "1/2 ticked · 7 portions" in r2["mg-g1"]["subtitle"] and r2["mg-g1"]["mods"]["alt+shift"]["subtitle"] == "🔢 Portions… (now 7)")
 check("groceries: ⌃ backs to the hub", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows2))
+plant(lib=LIB + [G3])
+r3 = by_uid(rows_for("ctx:mealgroc"))
+g3 = r3["mg-g3"]
+check("groceries: the chip gains ' · ≈ 1.75 €' off the list's cost line, after the portions chip",
+      "0/3 ticked · 7 portions · ≈ 1.75 €  |  " in g3["subtitle"], g3["subtitle"])
+check("groceries: a list without a cost line keeps its chip as it was",
+      "1/2 ticked · 7 portions  |  " in r3["mg-g1"]["subtitle"], r3["mg-g1"]["subtitle"])
+check("groceries: the priced list is sealed, ⌥⇧ still the portions verb on it, ⏎ still opens it",
+      sealed([g3], "groc3") and mod_payload(g3["mods"]["alt+shift"]) == {"pid": LIST, "tid": "g3", "back": "ctx:mealgroc"}
+      and g3["arg"] == f"open:{browse._meal_link(LIST, 'g3')}", g3)
 plant()
 
 # ── the ⭐️ picker ─────────────────────────────────────────────────────────────
@@ -508,6 +606,82 @@ check("rate: an unknown task = one dead row, ⌃ still backs",
       len(rn) == 1 and rn[0]["uid"] == "mr-none" and not rn[0]["valid"] and "not in the cache" in rn[0]["title"]
       and rn[0]["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" and sealed(rn, "rate none"), rn)
 
+# ── the 🏷 price book ─────────────────────────────────────────────────────────
+plant(lib=LIB + [G3])
+LOADS[0] = 0
+rows = rows_for("ctx:mealprice")
+r = by_uid(rows)
+uids = [x["uid"] for x in rows]
+check("prices: sealed (no xact on ⌘ or ⌥, ⌘ dead: not task rows)", sealed(rows, "prices"))
+check("prices: the book is read once a render", LOADS[0] == 1, LOADS[0])
+check("prices: head, the week's holes first (list order: g3 then g1), then the priced week keys, then the rest of the book",
+      uids == ["mp-head", "mp-chicken thigh", "mp-egg", "mp-rice", "mp-salt", "mp-bacon", "mp-flour"], uids)
+check("prices: the head counts the book, the week's holes and the book date, dead",
+      r["mp-head"]["title"] == "🏷 Price book · 4 entries · 2 unpriced this week · updated 2026-09-22"
+      and r["mp-head"]["subtitle"] == "knuspr.de prices as speculation · ⏎ type a price · ⌥⇧ change the search term  |  ⌃🔙"
+      and not r["mp-head"]["valid"], r["mp-head"])
+h = r["mp-chicken thigh"]
+check("prices: a hole = ❓ key · no price yet, searched as its default term",
+      h["title"] == "❓ chicken thigh · no price yet"
+      and h["subtitle"] == "searched as Hähnchenschenkel · ⏎ type a price · ⌥⇧ search term", h)
+check("prices: a suffixed item title keys clean (rice, never 'rice 1 75')",
+      "mp-rice" in r and not any(u.startswith("mp-rice ") for u in uids), uids)
+k = r["mp-rice"]
+check("prices: a knuspr entry = 🧾 key · €/kg · product pack price · knuspr date",
+      k["title"] == "🧾 rice · 3.49 €/kg · Basmati Reis 1 kg 3.49 € · knuspr 22 Sep", k["title"])
+check("prices: the entry's own search term shows",
+      k["subtitle"].startswith("searched as Basmati Reis · ⏎ type a price · ⌥⇧ search term"), k["subtitle"])
+check("prices: the manual glyph: ✍️ key · €/kg · manual date",
+      r["mp-salt"]["title"] == "✍️ salt · 0.49 €/kg · manual 20 Sep", r["mp-salt"]["title"])
+check("prices: an entry not on this week's lists wears 📖, same shape",
+      r["mp-flour"]["title"] == "📖 flour · 0.89 €/kg · Mehl Type 405 1 kg 0.89 € · knuspr 22 Sep", r["mp-flour"]["title"])
+for uid in uids[1:]:
+    row, key = r[uid], uid[3:]
+    check(f"prices: {key}: ⏎ = xact:meal_price_set {{key, back: ctx:mealprice}}",
+          row["arg"].startswith("xact:meal_price_set:") and row["valid"]
+          and payload(row) == {"key": key, "back": "ctx:mealprice"}, row["arg"])
+    check(f"prices: {key}: ⌥⇧ = xact:meal_price_search, the same payload, 🔍",
+          row["mods"]["alt+shift"]["arg"].startswith("xact:meal_price_search:") and row["mods"]["alt+shift"]["valid"]
+          and mod_payload(row["mods"]["alt+shift"]) == {"key": key, "back": "ctx:mealprice"}
+          and row["mods"]["alt+shift"]["subtitle"] == "🔍 Search term…", row["mods"]["alt+shift"])
+    check(f"prices: {key}: ⌘ ⌥ ⇧ ⌘⇧ dead",
+          all(not row["mods"][c]["valid"] and not row["mods"][c]["arg"] for c in ("cmd", "alt", "shift", "cmd+shift")),
+          row["mods"])
+check("prices: ⌥⌘ copies the knuspr page when the entry has one, the legend says so",
+      k["mods"]["alt+cmd"]["arg"] == "copy:https://www.knuspr.de/basmati-reis" and k["mods"]["alt+cmd"]["valid"]
+      and k["subtitle"].endswith("  |  ⌥⌘🔗"), k["mods"]["alt+cmd"])
+check("prices: ⌥⌘ dead without a url (a hole, a manual entry)",
+      not h["mods"]["alt+cmd"]["valid"] and not h["mods"]["alt+cmd"]["arg"]
+      and not r["mp-salt"]["mods"]["alt+cmd"]["valid"] and "⌥⌘" not in r["mp-salt"]["subtitle"], (h["mods"]["alt+cmd"], r["mp-salt"]["subtitle"]))
+check("prices: ⌃ backs to the hub when the ctx names no screen",
+      all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows))
+rb = rows_for("ctx:mealprice:mealgroc")
+check("prices: a back level in the ctx = the ⌃ target, the payloads' back = THIS ctx (the verb reopens the book)",
+      all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:mealgroc" for x in rb)
+      and payload(by_uid(rb)["mp-rice"]) == {"key": "rice", "back": "ctx:mealprice:mealgroc"}
+      and mod_payload(by_uid(rb)["mp-rice"]["mods"]["alt+shift"])["back"] == "ctx:mealprice:mealgroc",
+      [x["mods"]["ctrl"]["variables"] for x in rb][:1])
+check("prices: the ctx carries the trailing ids", render("ctx:mealprice:mealgroc") == ("mealprice", ["mealgroc"], ""))
+check("prices: the bar filters on the key", [x["uid"] for x in rows_for("ctx:mealprice", "chick")] == ["mp-head", "mp-chicken thigh"],
+      [x["uid"] for x in rows_for("ctx:mealprice", "chick")])
+check("prices: the bar filters on the product too", [x["uid"] for x in rows_for("ctx:mealprice", "basm")] == ["mp-head", "mp-rice"],
+      [x["uid"] for x in rows_for("ctx:mealprice", "basm")])
+rz = rows_for("ctx:mealprice", "zzzz")
+check("prices: nothing matches = the head and one dead row",
+      [x["uid"] for x in rz] == ["mp-head", "mp-none"] and not rz[1]["valid"] and sealed(rz, "prices none"), [x["uid"] for x in rz])
+check("prices: 'today' typed on the book stays put", render("ctx:mealprice", "today") == ("mealprice", [], "today"))
+plant(lib=[t for t in LIB if t["id"] != "g1"])
+saved_entries, BOOK["entries"], BOOK["updated"] = BOOK["entries"], {}, ""
+re_ = by_uid(rows_for("ctx:mealprice"))
+check("prices: no lists + an empty book = head says 0 entries · 0 unpriced · updated never, one dead row",
+      re_["mp-head"]["title"] == "🏷 Price book · 0 entries · 0 unpriced this week · updated never"
+      and list(re_) == ["mp-head", "mp-none"] and "Sync with Mela" in re_["mp-none"]["subtitle"], list(re_))
+hp = by_uid(rows_for("ctx:meal"))["meal-price"]
+check("hub: 🏷 with an empty book and no list: nothing priced yet · book 0 entries",
+      hp["title"] == "🏷 Prices · nothing priced yet" and "book 0 entries" in hp["subtitle"], hp)
+BOOK["entries"], BOOK["updated"] = saved_entries, "2026-09-22"
+plant()
+
 # ── the Routines hub's door ───────────────────────────────────────────────────
 rr = by_uid(browse.render_routines(""))
 door = rr.get("rt-meal-hub")
@@ -546,6 +720,17 @@ with contextlib.redirect_stdout(buf):
 out = json.loads(buf.getvalue())
 check("main(): ctx:mealrate with one id = the grammar row", len(out.get("items", [])) == 1
       and "needs <listId>:<taskId>" in out["items"][0]["title"], out.get("items"))
+sys.argv = ["browse.py", "ctx:mealprice"]
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    browse.main()
+out = json.loads(buf.getvalue())
+check("main(): the 🏷 book renders by explicit ctx (the week's hole first, then bacon, then the 📖 rest)",
+      [i.get("uid") for i in out.get("items", [])] == ["mp-head", "mp-egg", "mp-bacon", "mp-flour", "mp-rice", "mp-salt"],
+      [i.get("uid") for i in out.get("items", [])])
+check("the real price book is never written by this file", os.path.exists(REAL_BOOK) == HAD_BOOK, REAL_BOOK)
 
+import shutil
+shutil.rmtree(TMP, ignore_errors=True)
 print(f"\nmeal screens: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
