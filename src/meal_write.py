@@ -28,6 +28,19 @@ also copies Mela's own "Rating:" stars into a task that has none
 that pass is counted in the toast, never a refusal - the week is the
 point, the stars are polish.
 
+THE PORTIONS VERB (2026-09-22, D25) is the one write on a 🛒 LIST. Vex:
+"can we have a row that would ask me how many portions of each meal I
+would like to cook this week and then adjust groceries accordingly? Like
+separate action. Maybe on groceries row for that list under some
+modifier?" and "We can keep those calculations as are in general" - so
+the sync still cuts every list to PORTIONS, and set_portions re-cuts ONE
+list to the count xact asked for: a live read, grocery_body at that
+count, the ticks carried over by ingredient name (meal_scale.carry_ticks),
+ONE update with items + content, the cache patched. week_lists names the
+week's lists for the hub's "every meal" road. The yield note in the list's
+content is the only memory of the count (meal.portions_of reads it back),
+which is why a loose list the sync re-makes is cut to the old one's count.
+
 Pointers are deleted rather than reopened or moved: HANDOFF_ROUTINES §8
 says API completion leaves a repeating task's children completed while the
 app reopens them - delete-then-create is the one shape that is right on
@@ -345,10 +358,13 @@ def plan_view(today=None, n_weeks=HORIZON_WEEKS, planned=None, recipes=None,
 
 
 # ── groceries ────────────────────────────────────────────────────────────────
-def grocery_body(recipe):
-    """(checklist lines, description) for one recipe at PORTIONS."""
+def grocery_body(recipe, portions=meal.PORTIONS):
+    """(checklist lines, description) for one recipe at `portions` - the
+    sync's PORTIONS unless the portions verb asks for another count (the
+    note then says "4 → 5 portions", and that note is how the count is
+    read back: meal.portions_of)."""
     import meal_scale
-    lines, info = meal_scale.scaled_ingredients(recipe, meal.PORTIONS)
+    lines, info = meal_scale.scaled_ingredients(recipe, portions)
     desc = info.get("note") or ""
     if info.get("detail"):
         desc += f"\n_(yield: {info['detail']})_"
@@ -466,7 +482,10 @@ def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None
             continue
         recipe = by_id.get(p["uuid"].upper())
         if recipe is not None:
-            lines, desc = grocery_body(recipe)
+            # a loose list from an earlier press is deleted above and
+            # re-made here: it keeps the count it was re-cut to (the
+            # portions verb, D25), so a re-cut week survives the move
+            lines, desc = grocery_body(recipe, _portions_of(cur) or meal.PORTIONS)
         else:
             lines, desc = [], "⚠️ recipe not in Mela on this Mac · no list (open Mela to sync)"
         _pace()
@@ -857,6 +876,125 @@ def comment(api=None, pid=None, tid=None, text=None, dry=False):
     api.update_task(tid, live.get("projectId") or pid, current=live, content=new)
     _cache_patch(tid, content=new)
     return Outcome(f"💬 {name} · note saved", None, [tid])
+
+
+# ── portions: a week's 🛒 lists re-cut (Vex 2026-09-22, D25) ─────────────────
+# "can we have a row that would ask me how many portions of each meal I
+# would like to cook this week and then adjust groceries accordingly? Like
+# separate action. Maybe on groceries row for that list under some
+# modifier?" - and "We can keep those calculations as are in general", so
+# the sync's cut stays PORTIONS and this verb re-cuts a list on request.
+# No dialog here: xact asks one count per list and hands it over.
+def _portions_of(task):
+    """The count a 🛒 list was cut for, off the yield note in its content
+    (the sync writes it there; a cached row may carry it as desc). None
+    when the note is missing - the very first lists were saved with an
+    empty content - or the yield was unknown."""
+    t = task or {}
+    return meal.portions_of(t.get("content") or t.get("desc") or "")
+
+
+def _open_list(t):
+    return (isinstance(t, dict) and t.get("status", 0) == 0 and not t.get("deleted")
+            and meal.is_grocery(t.get("title") or ""))
+
+
+def week_lists(today=None, tasks=None):
+    """The week's open 🛒 lists, for the hub's "every meal" road: the lists
+    whose parent is the upcoming 🛒 Groceries task (meal.upcoming over the
+    routines list's cached rows plus the hub's own fresh read of that list,
+    cache key meal_kids, so the row that fired the verb and the verb see
+    the same lists), else EVERY open 🛒 list in the two pools (the loose
+    ones in the library when no 🛒 task is ahead, or lists an older press
+    left elsewhere - the hub's 🛒 row counts those too, so the chord must
+    reach them). Sorted by (sortOrder, title). `tasks` injects the whole
+    pool (tests). Never raises: any read problem is an empty week, and the
+    verb then says so."""
+    try:
+        today = today or date.today()
+        list_id = cfg.get_meal_list_id()
+        if tasks is None:
+            rpid = _routine_pid(cfg.get_meal_routine_id())
+            pool = _pool_tasks(rpid)
+            if list_id and list_id != rpid:
+                pool += _pool_tasks(list_id)
+            kept = cache_store.get("meal_kids")
+            if isinstance(kept, dict) and isinstance(kept.get("tasks"), list):
+                pool += [t for t in kept["tasks"] if isinstance(t, dict)]
+        else:
+            pool = [t for t in tasks if isinstance(t, dict)]
+        groc = meal.upcoming(pool, meal.GROCERIES_TITLE, today,
+                             ids=(cfg.get_meal_groceries_id(),))
+        seen, out = set(), []
+        for t in pool:
+            if not _open_list(t) or not t.get("id") or t["id"] in seen:
+                continue
+            if not _grocery_in_place(t, groc, list_id):
+                continue
+            seen.add(t["id"])
+            out.append(t)
+        if not out:                            # nothing in place: whatever is open
+            out = [t for t in _grocery_lists(pool).values() if t.get("id")]
+
+        def key(t):
+            try:
+                order = int(t.get("sortOrder") or 0)
+            except (TypeError, ValueError):
+                order = 0
+            return (order, t.get("title") or "")
+        out.sort(key=key)
+        return out
+    except Exception:
+        return []
+
+
+def set_portions(api=None, pid=None, tid=None, portions=None, dry=False):
+    """🔢 Portions: ONE 🛒 list re-cut to `portions` (1..SANE[1]; anything
+    else refuses before a call). The verdict shape: a LIVE get_task (the
+    items and the note are read off the live object, never the cache), the
+    recipe from Mela, grocery_body at the count, the ticks carried over by
+    ingredient name (meal_scale.carry_ticks - a tick made in the shop is
+    not lost to a re-cut), ONE update_task with items + content, the cache
+    patched. The same count as the note already says is no write ("·
+    unchanged") unless the list has no items (a failed items update is
+    repaired at its own count); a list with no note (the first ones) is
+    written even at PORTIONS, which gives it its note. A recipe whose yield
+    is unknown refuses: the scaler cannot cut it, so a write would change
+    nothing and a toast would claim a count the list is not cut to. dry:
+    the line, no call at all."""
+    import meal_scale
+    try:
+        n = int(str(portions).strip())
+    except (TypeError, ValueError, AttributeError):
+        raise Refusal(f"🔢 Portions: {meal_scale.SANE[0]} to {meal_scale.SANE[1]}")
+    if not meal_scale.SANE[0] <= n <= meal_scale.SANE[1]:
+        raise Refusal(f"🔢 Portions: {meal_scale.SANE[0]} to {meal_scale.SANE[1]}")
+    if dry:
+        return Outcome(f"🥘 Dry run · would cut {_cached_name(tid)} to {n} portions", None, [])
+    api = _api(api)
+    live = api.get_task(pid, tid)
+    title = live.get("title") or ""
+    parsed = meal.parse_title(title) if meal.is_grocery(title) else None
+    if not parsed:
+        raise Refusal("🛒 Not a grocery list")
+    name, uuid = parsed
+    name = name or "this list"
+    recipe = _recipe_for(uuid)
+    if recipe is None:
+        raise Refusal(f"🛒 {name} · recipe not in Mela on this Mac")
+    if _portions_of(live) == n and live.get("items"):
+        return Outcome(f"🛒 {name} · {n} portions · unchanged", None, [tid])
+    lines, desc = grocery_body(recipe, n)
+    if meal.portions_of(desc) is None:
+        raise Refusal(f"🛒 {name} · yield unknown · cannot re-cut")
+    items = meal_scale.carry_ticks(live.get("items") or [], lines)
+    api.update_task(tid, live.get("projectId") or pid, current=live, items=items, content=desc)
+    _cache_patch(tid, items=items, content=desc)
+    kept = sum(1 for it in items if it["status"] == 2)
+    msg = f"🛒 {name} · {n} portions"
+    if kept:
+        msg += f" · {kept} tick{'s' if kept != 1 else ''} kept"
+    return Outcome(msg, None, [tid])
 
 
 def _rating_candidates(entries, by_id):

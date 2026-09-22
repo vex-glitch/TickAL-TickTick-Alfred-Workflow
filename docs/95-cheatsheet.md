@@ -74,6 +74,7 @@ Per row type (⌘⏎ = Actions and ⌃⏎ = back everywhere; - = nothing bound):
 | Won't Do task | Open | - | Reopen | - | - |
 | 🥘 Meal (hub, week, library) | Open in Mela | - / subtasks (library) | Open web page | Cooked (👨‍🍳 tag + a note) | Copy Mela link |
 | 🥘 Week (📆 Next 13 weeks) | That week's meals | Same hop | - | - | - |
+| 🛒 Grocery list (hub › Groceries) | Open in TickTick | - | Complete | Portions… (re-cut this list) | Copy link |
 
 \* App-only smart lists (no in-Alfred view) open in TickTick instead. Inside the ⌘⏎ Actions menu, ⌃⏎ returns to the screen you came from.
 

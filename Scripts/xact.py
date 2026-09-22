@@ -12251,6 +12251,70 @@ def meal_comment(rest):
     _meal_run(rest, run)
 
 
+def meal_portions(rest):
+    """🔢 Portions (meal_write.set_portions): how many portions of each meal
+    this week, ONE dialog per 🛒 list with the count it is cut for now as
+    the default, then that checklist re-cut with its ticks kept - Vex
+    2026-09-22: "can we have a row that would ask me how many portions of
+    each meal I would like to cook this week and then adjust groceries
+    accordingly? Like separate action. Maybe on groceries row for that
+    list under some modifier?" ("We can keep those calculations as are in
+    general", so the sync's own cut stays 7). Payload (meal.portions_payload)
+    {"pid","tid"[,"back"]} = one list (⌥⇧ on a ctx:mealgroc row) or
+    {"all": true[, "back"]} = every open list of the upcoming 🛒 Groceries
+    task (⌥⇧ on the hub's 🛒 Groceries row, meal_write.week_lists). Esc or
+    an empty box skips that list, never the rest; the answers land in ONE
+    toast. The dialogs are asked INSIDE the writer call so a dry run and a
+    Refusal still ride _meal_run."""
+    import meal
+    import meal_scale
+    import meal_write as mw
+    lo, hi = meal_scale.SANE
+
+    def run(spec):
+        if spec.get("tid"):
+            rows = [cache_store.find_task(spec["tid"])
+                    or {"id": spec["tid"], "projectId": spec.get("pid"), "title": ""}]
+        else:
+            rows = mw.week_lists()
+        if not rows:
+            return "🛒 No grocery lists this week · 🔄 Sync with Mela first"
+        results = []
+        for row in rows:
+            parsed = meal.parse_title(row.get("title") or "")
+            name = (parsed[0] if parsed else "") or "this list"
+            cur = mw._portions_of(row)
+            # the first lists were saved without their note: the count is
+            # unknown, not "unscaled" (the sync cut them to 7 all the same)
+            now = f"now {cur}" if cur else f"count unknown · default {meal.PORTIONS}"
+            ans = _ask(f"🛒 {name} · portions? ({now})", default=str(cur or meal.PORTIONS))
+            if ans is None or not ans.strip():
+                results.append(f"{name} skipped")
+                continue
+            try:
+                n = int(ans.strip())
+            except ValueError:
+                results.append(f"{name} skipped (not a number)")
+                continue
+            if n < lo or n > hi:
+                results.append(f"{name} skipped ({lo} to {hi})")
+                continue
+            try:
+                msg = mw.set_portions(pid=row.get("projectId") or row.get("_projectId")
+                                      or spec.get("pid"),
+                                      tid=row.get("id"), portions=n, dry=_dry_meal(spec)).msg
+            except mw.Refusal as e:
+                msg = str(e)
+            except Exception as e:
+                if mw._rate_limited(e):      # retrying inside the window deepens the lockout
+                    results.append(f"{name} · TickTick rate limit · the rest skipped")
+                    break
+                msg = f"{name} · not written · {type(e).__name__}: {e}"
+            results.append(msg[2:] if msg.startswith("🛒 ") else msg)
+        return "🔢 Portions · " + " · ".join(results)
+    _meal_run(rest, run)
+
+
 def okr_sched(rest):
     """📅 extend +N / 🌙 tomorrow / pick a date on one OKR item, with the
     ripple through its Y lane and the parent heals (okr.schedule_plan) -
@@ -12583,6 +12647,8 @@ def main():
             meal_rate(rest)
         elif verb == "meal_comment":
             meal_comment(rest)
+        elif verb == "meal_portions":
+            meal_portions(rest)
         elif verb == "add_pre":
             add_pre(rest)
         elif verb == "crmtrash":

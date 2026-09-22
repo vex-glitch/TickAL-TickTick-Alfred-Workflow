@@ -6792,6 +6792,19 @@ def render_filter(index, query):
 # for one note). The rating and the comments have no chord of their own:
 # ⌘ Actions on the row carries ⭐️ Rate… (ctx:mealrate, the picker below)
 # and 💬 Comment…, "cause I cannot rate a meal until I ate it".
+#
+# THE 🛒 ROW (the hub's 🛒 Groceries row, the ctx:mealgroc list rows): ⏎
+# opens (the hub row the screen, a list row its task), ⇧ ticks a list done,
+# ⌥⌘ copies its link, and ⌥⇧ = xact:meal_portions (Vex 2026-09-22: "can we
+# have a row that would ask me how many portions of each meal I would like
+# to cook this week and then adjust groceries accordingly? Like separate
+# action. Maybe on groceries row for that list under some modifier?"). The
+# payload is meal.portions_payload: ONE list {pid, tid} on a ctx:mealgroc
+# row, {all: true} on the hub's row (the verb then asks per open list of
+# the upcoming 🛒 Groceries task); `back` the screen it reopens. The sync's
+# own cut stays PORTIONS = 7 ("We can keep those calculations as are in
+# general"); a list row's chip says the count it was cut for now
+# (meal.portions_of, off the yield note), so a re-cut is visible.
 _MEAL_FRESH_S = 45
 _MEAL_SLUG = {"b": "breakfast", "l": "lunch", "s": "snack"}
 _MEAL_KEY = {v: k for k, v in _MEAL_SLUG.items()}
@@ -7077,12 +7090,19 @@ def render_meal(ids, query):
         subtitle=f"Recipes in, descriptions filled, {cook:%a %-d %b}'s meals onto the prep task + groceries + note + recipe dates",
         arg=sync_arg, valid=True, mods=sm))
     groc = mw._grocery_lists(pool + r_tasks)
+    # ⌥⇧ asks a count for every open list and re-cuts them (Vex 2026-09-22:
+    # "how many portions of each meal I would like to cook this week");
+    # dead with nothing to re-cut
+    gm = _okr_nav_mods("ctx:mealgroc")
+    gm["alt+shift"] = {
+        "arg": "xact:meal_portions:" + _meal_b64(meal.portions_payload(back="ctx:meal")),
+        "valid": len(groc) > 0, "subtitle": "🔢 Portions… (asks per list)"}
     rows.append(alfred.item(
         uid="meal-groc",
         title=f"🛒 Groceries · {len(groc)} open list" + ("" if len(groc) == 1 else "s") + f" · {gday:%a %-d %b}",
         subtitle=("under " + md_links_display(groc_task.get("title") or "🛒 Groceries") if groc_task
-                  else "loose in the library list") + "  |  ⏎⤵️  ⌥⤵️",
-        arg="xact:crmbrowse:ctx:mealgroc", valid=True, mods=_okr_nav_mods("ctx:mealgroc")))
+                  else "loose in the library list") + "  |  ⏎⤵️  ⌥⤵️  ⌥⇧🔢",
+        arg="xact:crmbrowse:ctx:mealgroc", valid=True, mods=gm))
     for key, tag, glyph, label in meal.SLOTS:
         ctx = f"ctx:meallib:{_MEAL_SLUG[key]}"
         rows.append(alfred.item(
@@ -7230,8 +7250,19 @@ def render_meallib(ids, query):
 
 
 def render_mealgroc(query):
-    """This week's 🛒 checklists in the library list: ⏎ opens the task,
-    ⇧ ticks it done, ⌥⌘ copies its link, ⌘ Actions."""
+    """This week's 🛒 checklists, wherever the sync put them (under the
+    upcoming 🛒 Groceries task, loose in the library list without one): ⏎
+    opens the task, ⇧ ticks it done, ⌥⌘ copies its link, ⌘ Actions, and
+    ⌥⇧ = xact:meal_portions on THAT list (Vex 2026-09-22: "a row that would
+    ask me how many portions of each meal I would like to cook this week
+    and then adjust groceries accordingly ... Maybe on groceries row for
+    that list under some modifier?"): the verb asks one count and re-cuts
+    the checklist. The chip says the count a list was cut for now
+    (meal.portions_of, read off the yield note the sync wrote into the
+    task's content); the very first lists were saved with an empty content,
+    so the chip and the chord's "now N" go missing on those, never wrong.
+    The sync's own cut stays PORTIONS = 7 ("We can keep those calculations
+    as are in general")."""
     import meal
     import meal_write as mw
     list_id, rid = cfg.get_meal_list_id(), cfg.get_meal_routine_id()
@@ -7247,7 +7278,8 @@ def render_mealgroc(query):
         groc = fuzz.filter_and_score(query, groc, key_fn=lambda t: t.get("title") or "")
     rows = [alfred.item(uid="mg-head", title=f"🛒 Groceries · {len(groc)} open list"
                         + ("" if len(groc) == 1 else "s"),
-                        subtitle="one checklist per planned meal, scaled to 7 portions  |  ⌃🔙",
+                        subtitle=f"one checklist per planned meal, cut to {meal.PORTIONS} portions"
+                                 " · ⌥⇧ re-cuts one  |  ⌃🔙",
                         valid=False)]
     for t in groc:
         pid = t.get("projectId") or t.get("_projectId") or list_id
@@ -7263,10 +7295,19 @@ def render_mealgroc(query):
         mods["shift"] = {"arg": f"complete:{pid}:{t['id']}:{t.get('title', '')}",
                          "valid": True, "subtitle": "✅ Done"}
         mods["alt+cmd"] = {"arg": f"copy:{link}", "valid": True, "subtitle": "Copy link"}
+        # the count this list was cut for, off its yield note (None on the
+        # first lists, saved without one): the chord's default, the chip
+        portions = meal.portions_of(t.get("content") or t.get("desc") or "")
+        mods["alt+shift"] = {
+            "arg": "xact:meal_portions:" + _meal_b64(meal.portions_payload(pid, t["id"], "ctx:mealgroc")),
+            "valid": True,
+            "subtitle": "🔢 Portions…" + (f" (now {portions})" if portions is not None else "")}
         chip = f"{done}/{len(items)} ticked" if items else "no items (recipe not in Mela?)"
+        if portions is not None:
+            chip += f" · {portions} portions"
         rows.append(alfred.item(
             uid=f"mg-{t['id']}", title=f"🛒 {name}",
-            subtitle=f"{('due ' + due + ' · ') if due else ''}{chip}  |  ⏎↗️  ⇧✅  ⌥⌘🔗  ⌘⚡",
+            subtitle=f"{('due ' + due + ' · ') if due else ''}{chip}  |  ⏎↗️  ⇧✅  ⌥⇧🔢  ⌥⌘🔗  ⌘⚡",
             arg=f"open:{link}", valid=True, variables=_meal_task_vars(t, pid), mods=mods))
     if not groc:
         rows.append(alfred.item(uid="mg-none", title="No grocery lists open",

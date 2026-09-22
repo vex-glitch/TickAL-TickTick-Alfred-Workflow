@@ -28,6 +28,13 @@ What it pins (the traps that burned the other hubs):
     ROUTINE's cook Sunday; 🎲 Plan / 📥 Import / 📝 Fill are gone, 🔄 Sync is
     the one verb (⏎ and ⌥⇧ the same xact:meal_sync payload)
   * ctx:mealq = 13 weeks, this week starred, empty weeks dead
+  * THE 🛒 ROW: the hub's 🛒 Groceries row ⌥⇧ = xact:meal_portions
+    {all: true, back: ctx:meal} ("asks per list"), live with an open list,
+    dead with none; a ctx:mealgroc row's ⌥⇧ = the same verb on THAT list
+    {pid, tid, back: ctx:mealgroc}, its chip "· 7 portions" and the chord's
+    "now 7" read off the yield note in the content, both missing (never
+    wrong) on a list saved without one; the legends say ⌥⇧🔢, the head
+    says "cut to 7 portions · ⌥⇧ re-cuts one"; still no xact on ⌘ or ⌥
   * typing "today" on a meal screen never jumps away (parse_ctx guard)
   * the Routines hub carries the zero-canvas door
 
@@ -111,7 +118,11 @@ LIB = [T("t1", f"[Oats](mela://recipe/{U2})", tags=["🍳breakfast", "👨‍�
        T("t4", f"[Second Lunch](mela://recipe/{U4})", tags=["🍛lunch"]),
        T("t5", f"[Kimchi Stew](mela://recipe/{U6})", tags=["🍛lunch", "👨‍🍳Cooked"], content=KIMCHI_DESC),
        T("g1", meal.grocery_title("Oats", U2), tags=["🛒groceries"], kind="CHECKLIST",
-         dueDate="2026-09-26T00:00:00+0000", items=[{"title": "a", "status": 2}, {"title": "b", "status": 0}])]
+         dueDate="2026-09-26T00:00:00+0000", items=[{"title": "a", "status": 2}, {"title": "b", "status": 0}],
+         content="Scaled ×1.75: 4 → 7 portions\n_(yield: '4' in yield)_")]
+# a second list as the very first sync saved them: EMPTY content, no yield note
+G2 = T("g2", meal.grocery_title("Pockets", U3), tags=["🛒groceries"], kind="CHECKLIST",
+       items=[{"title": "x", "status": 0}])
 ROUTINE = T(RID, "🥘 Meal Prep", pid=RLIST, startDate=f"{SUN.isoformat()}T17:00:00.000+0000")
 PTR = T("p1", meal.pointer_title("b", "Oats", U2), pid=RLIST, parent=RID)
 
@@ -159,11 +170,12 @@ mela_cal.plan = lambda since=None, until=None, path=None, now=None: [
 mela.library = lambda path=None: list(RECIPES.values())
 
 
-def plant(kids=(PTR,)):
+def plant(kids=(PTR,), lib=None):
+    lib = LIB if lib is None else list(lib)
     rl = [ROUTINE] + list(kids)
-    cache_store.set("all_tasks", LIB + rl)
+    cache_store.set("all_tasks", lib + rl)
     cache_store.set("projects", [{"id": LIST, "name": "🍳Meal Prep"}, {"id": RLIST, "name": "🌅 Routines"}])
-    cache_store.set(f"project_data_{LIST}", {"project": {"id": LIST}, "tasks": LIB})
+    cache_store.set(f"project_data_{LIST}", {"project": {"id": LIST}, "tasks": lib})
     cache_store.set(f"project_data_{RLIST}", {"project": {"id": RLIST}, "tasks": rl})
     cache_store.set("meal_kids", {"rid": RID, "ts": time.time(), "routine": ROUTINE, "tasks": rl})
 
@@ -295,9 +307,22 @@ check("hub: 🔄 row = xact:meal_sync with the back payload, ⌥⇧ the same ver
       and s["mods"]["alt+shift"]["arg"] == s["arg"] and s["title"] == "🔄 Sync with Mela · 2 new · 14 to fill"
       and "onto the prep task + groceries + note" in s["subtitle"], s)
 check("hub: 🔄 never on ⌘ or ⌥", not s["mods"]["cmd"]["valid"] and not s["mods"]["alt"]["valid"])
-check("hub: groceries row counts, no rebuild verb any more",
-      "1 open list" in r["meal-groc"]["title"] and r["meal-groc"]["arg"] == "xact:crmbrowse:ctx:mealgroc"
-      and not r["meal-groc"]["mods"]["alt+shift"]["valid"], r["meal-groc"])
+g = r["meal-groc"]
+check("hub: groceries row counts, ⏎ the trampoline, ⌥ by variable",
+      "1 open list" in g["title"] and g["arg"] == "xact:crmbrowse:ctx:mealgroc"
+      and g["mods"]["alt"]["variables"]["browse_ctx"] == "ctx:mealgroc", g)
+check("hub: 🛒 ⌥⇧ = xact:meal_portions {all, back: ctx:meal}, live with an open list, asks per list",
+      g["mods"]["alt+shift"]["arg"].startswith("xact:meal_portions:") and g["mods"]["alt+shift"]["valid"]
+      and mod_payload(g["mods"]["alt+shift"]) == meal.portions_payload(back="ctx:meal") == {"all": True, "back": "ctx:meal"}
+      and g["mods"]["alt+shift"]["subtitle"] == "🔢 Portions… (asks per list)", g["mods"]["alt+shift"])
+check("hub: 🛒 legend says ⏎⤵️  ⌥⤵️  ⌥⇧🔢", g["subtitle"].endswith("  |  ⏎⤵️  ⌥⤵️  ⌥⇧🔢"), g["subtitle"])
+check("hub: 🛒 never an xact on ⌘ or ⌥", not g["mods"]["cmd"]["valid"] and not g["mods"]["alt"]["arg"])
+plant(lib=[t for t in LIB if t["id"] != "g1"])
+g0 = by_uid(rows_for("ctx:meal"))["meal-groc"]
+check("hub: 🛒 ⌥⇧ dead with no open list, the row itself still opens the screen",
+      "0 open lists" in g0["title"] and not g0["mods"]["alt+shift"]["valid"] and g0["valid"]
+      and g0["arg"] == "xact:crmbrowse:ctx:mealgroc", g0)
+plant()
 check("hub: library rows", r["meal-lib-l"]["arg"] == "xact:crmbrowse:ctx:meallib:lunch" and "Lunches · 3" in r["meal-lib-l"]["title"])
 check("hub: status row = Mela age · calendar count", r["meal-status"]["title"] == "ℹ️ Mela data 4 min old · calendar: 5 planned meals"
       and "5 recipes" in r["meal-status"]["subtitle"] and not r["meal-status"]["valid"], r["meal-status"]["title"])
@@ -407,6 +432,34 @@ check("groceries: sealed", sealed(rows, "groc"))
 check("groceries: one list, ticked count, due, ⇧ completes",
       "1/2 ticked" in r["mg-g1"]["subtitle"] and f"due {meal.task_date(next(t for t in LIB if t['id'] == 'g1')):%a %-d %b}" in r["mg-g1"]["subtitle"]
       and r["mg-g1"]["mods"]["shift"]["arg"].startswith(f"complete:{LIST}:g1:") and r["mg-g1"]["variables"]["task_id"] == "g1", r["mg-g1"])
+check("groceries: head says cut to 7 portions · ⌥⇧ re-cuts one, dead",
+      r["mg-head"]["subtitle"] == "one checklist per planned meal, cut to 7 portions · ⌥⇧ re-cuts one  |  ⌃🔙"
+      and not r["mg-head"]["valid"] and "1 open list" in r["mg-head"]["title"], r["mg-head"])
+g1 = r["mg-g1"]
+check("groceries: ⌥⇧ = xact:meal_portions on THAT list {pid, tid, back: ctx:mealgroc}, live",
+      g1["mods"]["alt+shift"]["arg"].startswith("xact:meal_portions:") and g1["mods"]["alt+shift"]["valid"]
+      and mod_payload(g1["mods"]["alt+shift"]) == meal.portions_payload(LIST, "g1", "ctx:mealgroc")
+      == {"pid": LIST, "tid": "g1", "back": "ctx:mealgroc"}, g1["mods"]["alt+shift"])
+check("groceries: the chord says the count the list was cut for (off the yield note)",
+      g1["mods"]["alt+shift"]["subtitle"] == "🔢 Portions… (now 7)", g1["mods"]["alt+shift"])
+check("groceries: the chip says 1/2 ticked · 7 portions", "1/2 ticked · 7 portions  |  " in g1["subtitle"], g1["subtitle"])
+check("groceries: the legend ⏎↗️  ⇧✅  ⌥⇧🔢  ⌥⌘🔗  ⌘⚡", g1["subtitle"].endswith("  |  ⏎↗️  ⇧✅  ⌥⇧🔢  ⌥⌘🔗  ⌘⚡"), g1["subtitle"])
+check("groceries: ⏎ still opens the task, ⌥⌘ still copies its link",
+      g1["arg"] == f"open:{browse._meal_link(LIST, 'g1')}" and g1["mods"]["alt+cmd"]["arg"] == f"copy:{browse._meal_link(LIST, 'g1')}", g1)
+plant(lib=LIB + [G2])
+rows2 = rows_for("ctx:mealgroc")
+r2 = by_uid(rows2)
+check("groceries: two lists: sealed (no xact on ⌘ or ⌥)", sealed(rows2, "groc2"))
+check("groceries: two lists counted in the head", "2 open lists" in r2["mg-head"]["title"] and "mg-g2" in r2, list(r2))
+g2 = r2["mg-g2"]
+check("groceries: a list saved without a yield note: no portions chip, the chord plain",
+      "portions" not in g2["subtitle"] and "0/1 ticked  |  " in g2["subtitle"]
+      and g2["mods"]["alt+shift"]["subtitle"] == "🔢 Portions…" and g2["mods"]["alt+shift"]["valid"]
+      and mod_payload(g2["mods"]["alt+shift"]) == {"pid": LIST, "tid": "g2", "back": "ctx:mealgroc"}, g2)
+check("groceries: the noted list keeps its chip beside the plain one",
+      "1/2 ticked · 7 portions" in r2["mg-g1"]["subtitle"] and r2["mg-g1"]["mods"]["alt+shift"]["subtitle"] == "🔢 Portions… (now 7)")
+check("groceries: ⌃ backs to the hub", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows2))
+plant()
 
 # ── the ⭐️ picker ─────────────────────────────────────────────────────────────
 rows = rows_for(f"ctx:mealrate:{LIST}:t5")

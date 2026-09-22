@@ -845,6 +845,39 @@ def sort_for_lib(entries, planned, today):
     return sorted(entries, key=key)
 
 
+# ── portions (a week's 🛒 lists re-cut) ─────────────────────────────────────
+# Vex 2026-09-22: "a row that would ask me how many portions of each meal I
+# would like to cook this week and then adjust groceries accordingly". The
+# scaler (meal_scale) already cuts a recipe to any count; the number a list
+# was cut for is read back off the yield note the sync wrote into it, so
+# the dialog can offer it as the default and the toast can say "unchanged".
+_PORTIONS_RES = (re.compile(r"→\s*(\d+)\s*portions?\b"),          # "4 → 7 portions"
+                 re.compile(r"\bAlready\s+(\d+)\s+portions?\b"),   # "Already 7 portions, unscaled"
+                 re.compile(r"→\s*(\d+)\s*$", re.M))               # "… from 850 g protein → 7"
+
+
+def portions_of(text):
+    """The portion count a 🛒 list was cut for, read off its yield note
+    (meal_scale.yield_note's shapes); None when the note is missing (the
+    first lists were saved without one) or the yield was unknown (nothing
+    was scaled, so no number was ever written)."""
+    for rx in _PORTIONS_RES:
+        m = rx.search(text or "")
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def portions_payload(pid=None, tid=None, back=None):
+    """The b64-able spec behind xact:meal_portions: ONE list ({pid, tid},
+    the ⌥⇧ of a row in ctx:mealgroc) or, without one, every open list of
+    the upcoming 🛒 Groceries task ({all: true}, the hub's 🛒 row)."""
+    d = {"pid": pid, "tid": tid} if tid else {"all": True}
+    if back:
+        d["back"] = back
+    return d
+
+
 # ── the sync verb ────────────────────────────────────────────────────────────
 def sync_payload(back="ctx:meal"):
     """The b64-able spec behind xact:meal_sync."""

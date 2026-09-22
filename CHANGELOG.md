@@ -37,6 +37,13 @@ All notable user-visible changes to TickAL. Format follows
   a recipe's description field in Mela (`Rating: ⭐️⭐️⭐️`) reaches TickTick
   on the next 🔄 Sync when the task has none; Mela itself cannot be
   written.
+- **🔢 Portions per meal** - ⌥⇧ on the hub's 🛒 Groceries row asks, one
+  box per list, how many portions of each meal to cook this week (the
+  current count prefilled, Esc skips) and cuts the checklists again to your
+  numbers; ticked items stay ticked when the ingredient is still there. ⌥⇧
+  on a single list in the groceries screen does the same for that list,
+  whose row now says the count it was cut for. Seven stays the default and
+  the next sync leaves a re-cut list alone.
 - **✏️ Rename tag** in the tag's ⌘ menu - a dialog asks the new name and
   every task that carries the tag follows. A name already in use is refused
   rather than merged.

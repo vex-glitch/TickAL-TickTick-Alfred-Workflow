@@ -140,6 +140,50 @@ web".
   write so tag + note are a single update; a cancelled dialog still tags.
   `meal_write` never opens a dialog (the verbs in `xact.py` do). Dry run
   (`TICKAL_MEAL_DRY=1` / `{"dry": true}`) prints and writes nothing.
+- **D25 · Portions per meal, on the 🛒 rows** (2026-09-22; Vex: "a row that
+  would ask me how many portions of each meal I would like to cook this
+  week and then adjust groceries accordingly. Like separate action. Maybe
+  on groceries row for that list under some modifier?"; "we can keep those
+  calculations as are in general"). The scaler stays; a verb re-cuts a
+  week's checklists: `xact:meal_portions:<b64 meal.portions_payload(...)>`
+  on ⌥⇧ of the hub's 🛒 Groceries row (`{"all": true}`, every open list
+  under the upcoming 🛒 Groceries task, `meal_write.week_lists`) and on
+  ⌥⇧ of a list row in ctx:mealgroc (`{pid, tid}`, that one). One dialog
+  per list, the current count as the default (read off the yield note,
+  `meal.portions_of`; Esc skips that list), then `meal_write.set_portions`:
+  live read, `grocery_body(recipe, n)`, ticks carried over by ingredient
+  name (`meal_scale.carry_ticks`), ONE update with items + content. The
+  sync never rewrites a kept list, and a loose list it re-makes keeps the
+  old count. The default stays 7 (`meal.PORTIONS`); nothing is remembered
+  beyond the list itself (the note IS the memory).
+- **D26 · Price speculation** (2026-09-22; Vex: "how feasible is the idea
+  of price speculations? Like how much will each ingredient cost and total
+  per meal?", "Could we not scrape prices of that site, write them in the
+  pricebook and use that?", "Speculation is all I need."). SOURCE:
+  knuspr.de's own search endpoint
+  (`/services/frontend-service/search-metadata?search=<term>&referer=whisperer`,
+  no login, JSON: productName, textualAmount "10 Stk" / "100 g" /
+  "ca. 0,53 kg" / "1 l", price.full, pricePerUnit.full per kg / l / piece,
+  inStock; probed 2026-09-22). Amazon Fresh Germany ended 14 Dec 2024,
+  REWE sits behind bot protection with per-market prices, so Knuspr is the
+  proxy for whatever store Vex shops at: relative truth, never a receipt.
+  BOOK: `~/.ticktick_alfred/meal_prices.json` (`meal_price.load_book` /
+  `save_book`), one entry per ingredient KEY (`meal_price.ingredient_key`:
+  the line's name canonicalised: parentheses dropped, cut at the comma,
+  prep words removed, last word singularised), a euro price per g / ml / pc,
+  source `knuspr` or `manual` (manual always wins, `pinned` keeps the
+  product), a German search term (`DEFAULT_SEARCH`, overridable per entry).
+  COST: `line_cost` per checklist line, `list_cost` per 🛒 list,
+  `cost_line` in the list's description ("≈ 18.40 € · 2.60 €/portion · 3
+  unpriced"), `price_suffix` on each item title (" · ≈ 1.10 €"; the
+  portions re-cut strips it before keying ticks). The sync's create and
+  the portions re-cut both price a list; the hub's 🛒 row sums the week.
+  REFRESH: one manual hub row 🏷 Prices (`xact:meal_prices`, keys from the
+  current lists, Knuspr queried 0.5 s apart; never a background job) and
+  `ctx:mealprice`, the book as a screen (unpriced first): ⏎ = a price by
+  dialog (manual), ⌥⇧ = re-search with a typed German term. Water and ice
+  are free; a pc line against a per-gram entry is "unit mismatch" until
+  the entry carries `piece_g`.
 
 ## 1. What it is (Vex's model)
 
@@ -223,12 +267,12 @@ for `meal` must never contain `{"do": "reset"}`.
 |---|---|
 | `src/mela_cal.py` | IMPURE, stdlib: the calendar reader. `STORE_PATH`, `MelaCalError` (one toast line), `Planned` (date · start · all_day · uuid UPPER · title · calendar · event_id · url), `store_present`, `snapshot` (the mela.py shape, PermissionError → the FDA toast), `parse_url`, `plan(since, until)` (every calendar, url LIKE `mela://calendar/%`, skips hidden / cancelled / phantom_master, local date from start_tz), `freshness` |
 | `src/meal.py` | PURE: title grammar, slots (b/l/s/x), week arithmetic (`cook_week_of`, `cook_sunday`, `week_label`), `Meal` / `Week`, `slot_for_recipe`, `weeks_plan` (every week present, meals b,l,s,x → date → name), `week_meals`, `last_cooked` / `next_planned` (over the calendar plan), `sort_for_lib`, `sync_payload`, `sync_text`; since D21/D22 `COOKED_TAG`, the rating/notes grammar (`header_block`, `read_rating`, `read_comments`, `set_rating`, `add_comment`, `strip_mela_rating`, `adopt_mela_rating`, `stars`, `parse_stars`, `mint_header`) and the `cooked_payload` / `rate_payload` / `comment_payload` helpers |
-| `src/meal_scale.py` | PURE: yield ladder (field → text → protein estimate → none), quantity parser, half-up scaling, grocery filter |
+| `src/meal_scale.py` | PURE: yield ladder (field → text → protein estimate → none), quantity parser, half-up scaling, grocery filter; `carry_ticks` (D25: ticked state carried by ingredient name when a list is re-cut) |
 | `src/mela.py` | Mela DB snapshot + loader, `render_markdown` (byte-identical to the mela2ticktick script for a recipe without a Rating line; with one, the stars go into the head block), `rating_of` / `strip_rating` (D23), `meal_tag_for`, `freshness` |
 | `src/meal_notes.py` | the weekly bullet (`write_block`, seed rule) |
-| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13; since D21/D22 `mark_cooked` / `rate` / `comment` (live read, ONE update each, never a dialog) and `mirror_ratings` (cap 20, inside `sync` right after the fills, a rate limit there never aborts the week) |
+| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13; since D21/D22 `mark_cooked` / `rate` / `comment` (live read, ONE update each, never a dialog) and `mirror_ratings` (cap 20, inside `sync` right after the fills, a rate limit there never aborts the week); D25 `set_portions` (one list re-cut, live read, one update), `week_lists`, `grocery_body(recipe, portions)`, `_portions_of` |
 | `Scripts/browse.py` | `render_meal` (ctx:meal), `render_mealq` (ctx:mealq, the 13 weeks), `render_mealw` (ctx:mealw:<YYYY-MM-DD sunday>), `render_meallib` (ctx:meallib:<slot>), `render_mealgroc`, `render_mealrate` (ctx:mealrate:<pid>:<tid>[:<back level>], the star picker); the 🥘 door row in `render_routines`; parse_ctx's alias guard covers `ctx:meal*` |
-| `Scripts/xact.py` | `_meal_run` (copy of `_okr_run`), `meal_sync`, `meal_setlist`, `_dry_meal`, `meal_cooked` (the one dialog), `meal_rate`, `meal_comment` |
+| `Scripts/xact.py` | `_meal_run` (copy of `_okr_run`), `meal_sync`, `meal_setlist`, `_dry_meal`, `meal_cooked` (the one dialog), `meal_rate`, `meal_comment`, `meal_portions` (one dialog per list, D25) |
 | `Scripts/actions.py` | the recipe gate (`meal.is_library_title`): 👨‍🍳 Cooked · ⭐️ Rate… · 💬 Comment… lead the recipe task's ⌘ menu; generic verbs kept |
 | `src/routines.py` · `routine_runner.py` · `routine_link.py` (`view:meal`) · `link.py` (`VIEW_CTX["meal"]`) | the registry entry and its gates |
 | `Scripts/meal_migrate.py` | one-shot NOTE→TEXT + dates cleared: dry-run / `--probe TID` / `--apply` / `--rollback FILE` |
@@ -263,7 +307,10 @@ Makefile `test:` list. No network, never the real calendar.
   subtasks), ⌃ back. The ctx:mealrate picker's star rows carry
   `xact:meal_rate:<b64>` on ⏎ and ⌥⇧ (the 🔄 row's pair). ⌘ Actions on a
   recipe task leads with 👨‍🍳 Cooked · ⭐️ Rate… · 💬 Comment…; their
-  payloads carry no `back`, so they toast and stay where Vex was.
+  payloads carry no `back`, so they toast and stay where Vex was. The 🛒
+  rows carry `xact:meal_portions:<b64>` on ⌥⇧ (the hub's Groceries row =
+  the week, a ctx:mealgroc row = that list; D25) and the list rows' chip
+  says "· 7 portions" when the yield note is there.
 - **Full Disk Access (the FDA caveat).** The calendar store is TCC
   protected. The CLI reads it; ALFRED must be granted Full Disk Access
   (System Settings › Privacy & Security › Full Disk Access) or every read
@@ -362,6 +409,17 @@ Makefile `test:` list. No network, never the real calendar.
     Comment… appends under it, a library row's chip reads "cooked before ·
     ⭐️⭐️⭐️", and one 🔄 press pulls his two Mela ratings (Burbon Asian
     Chicken, Cheesy Buffalo Chicken Ranch Taquitos) into TickTick.
+11. **Portions per meal, 2026-09-22 (D25) - zero canvas.** `meal.py`:
+    `portions_of`, `portions_payload`. `meal_scale.py`: `carry_ticks`.
+    `meal_write.py`: `grocery_body(recipe, portions)`, `_portions_of`,
+    `week_lists`, `set_portions`, the re-made loose list keeping its count.
+    `xact.py`: `meal_portions` (one dialog per list). `browse.py`: ⌥⇧ on
+    the hub's 🛒 row and on every ctx:mealgroc row, the "· N portions"
+    chip. Built by a two-phase workflow (writer + screens in parallel →
+    suite run + two adversarial reviews). Vex smoke-gates: hub › 🛒
+    Groceries ⌥⇧ (a dialog per list, the current count prefilled, Esc
+    skips), then the checklist items re-cut in TickTick with the ticked
+    ones still ticked; hub › 🛒 Groceries ⏎ › a list row ⌥⇧ for one list.
 
 ## 8. Open / next
 

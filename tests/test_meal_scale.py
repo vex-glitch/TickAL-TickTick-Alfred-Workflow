@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Unit suite for src/meal_scale.py (yield inference + ingredient scaling).
+"""Unit suite for src/meal_scale.py (yield inference + ingredient scaling,
+and carry_ticks: a re-cut list's ticks following the ingredient name, the
+portions verb's helper, 2026-09-22).
 Run: python3 tests/test_meal_scale.py
 """
 import os
@@ -254,6 +256,45 @@ same("header_text", ms.header_text("## Sauce "), "Sauce")
 same("_get on a missing key", ms._get({}, "title"), "")
 same("_get on an object", ms._get(SimpleNamespace(title="x"), "title"), "x")
 same("_get joins a list", ms._get({"ingredients": ["a", "b"]}, "ingredients"), "a\nb")
+
+# ── carry_ticks: a re-cut list keeps its ticks by ingredient name ──────────
+OLD_ITEMS = [{"id": "i1", "status": 2, "title": "875 g chicken", "sortOrder": 0},
+             {"id": "i2", "status": 0, "title": "1 3/4 tbsp oil", "sortOrder": 1},
+             {"id": "i3", "status": 2, "title": "**Sauce**", "sortOrder": 2},
+             {"id": "i4", "status": 2, "title": "1 tsp salt", "sortOrder": 3},
+             {"id": "i5", "status": 0, "title": "Avocado oil", "sortOrder": 4}]
+NEW_LINES = ["625 g chicken", "1 1/4 tbsp oil", "**Sauce**", "3/4 tsp salt", "3/4 tsp salt",
+             "Avocado oil", "2 eggs"]
+out = ms.carry_ticks(OLD_ITEMS, NEW_LINES)
+same("carry_ticks: the lines, in order", [it["title"] for it in out], NEW_LINES)
+same("carry_ticks: ticked carried by name past a new amount, a header keyed whole, an open item"
+     " stays open, a duplicate name consumed once, a new line open",
+     [it["status"] for it in out], [2, 0, 2, 2, 0, 0, 0])
+same("carry_ticks: sortOrder sequential, the sync's own keys, no ids",
+     ([it["sortOrder"] for it in out], sorted(out[0])), (list(range(7)), ["sortOrder", "status", "title"]))
+same("carry_ticks: None old items = every line open",
+     ms.carry_ticks(None, ["1 egg", "2 tsp salt"]), [{"title": "1 egg", "status": 0, "sortOrder": 0},
+                                                     {"title": "2 tsp salt", "status": 0, "sortOrder": 1}])
+same("carry_ticks: empty old items, empty lines", (ms.carry_ticks([], ["1 egg"])[0]["status"], ms.carry_ticks(OLD_ITEMS, [])),
+     (0, []))
+same("carry_ticks: case and spacing do not break a match",
+     ms.carry_ticks([{"status": 2, "title": "500 g  Chicken"}], ["875 g chicken"])[0]["status"], 2)
+same("carry_ticks: the unit's plural is not part of the key",
+     ms.carry_ticks([{"status": 2, "title": "1 cup oats"}], ["1 3/4 cups oats"])[0]["status"], 2)
+same("carry_ticks: a status given as text counts, a stray non-dict is skipped",
+     ms.carry_ticks([{"status": "2", "title": "1 egg"}, None, "x"], ["2 egg"])[0]["status"], 2)
+same("carry_ticks: a tick follows its ORDINAL, the sauce's salt does not jump to the marinade's",
+     [it["status"] for it in ms.carry_ticks([{"title": "1 tsp salt", "status": 0}, {"title": "875 g chicken", "status": 0},
+                                              {"title": "2 tbsp salt", "status": 2}],
+                                             ["3/4 tsp salt", "625 g chicken", "1 1/2 tbsp salt"])], [0, 0, 2])
+same("carry_ticks: an ordinal that is gone falls back to the first open line of that key",
+     [it["status"] for it in ms.carry_ticks([{"title": "1 tsp salt", "status": 0}, {"title": "2 tbsp salt", "status": 2}],
+                                             ["3/4 tsp salt"])], [2])
+same("carry_ticks: two old ticks carry to two new lines, a third stays open",
+     [it["status"] for it in ms.carry_ticks([{"status": 2, "title": "1 tsp salt"}, {"status": 2, "title": "2 tsp salt"}],
+                                            ["2 tsp salt", "4 tsp salt", "6 tsp salt"])], [2, 2, 0])
+same("tick_key", (ms.tick_key("875 g chicken"), ms.tick_key("  Avocado  Oil "), ms.tick_key("")),
+     ("chicken", "avocado oil", ""))
 
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":

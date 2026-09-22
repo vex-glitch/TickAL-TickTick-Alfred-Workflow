@@ -437,6 +437,63 @@ def scaled_ingredients(recipe, portions=7, headers="drop"):
     return out, info
 
 
+# ── a re-cut list keeps its ticks ──────────────────────────────────────────
+# Vex 2026-09-22: "a row that would ask me how many portions of each meal I
+# would like to cook this week and then adjust groceries accordingly". A
+# re-cut replaces every checklist item (the amounts change, so the titles
+# do), and a tick made in the shop would go with the old item; the tick
+# follows the INGREDIENT instead, the part of the line that does not move.
+def tick_key(line):
+    """The ingredient without its amount, the name a tick follows across a
+    re-cut: parse_quantity's rest (the whole line when it has no leading
+    number - a bold header, "Avocado oil"), casefolded, whitespace
+    collapsed. "875 g chicken" and "625 g Chicken" are one key."""
+    return " ".join((parse_quantity(line).rest or "").split()).casefold()
+
+
+def _ticked(item):
+    return isinstance(item, dict) and str(item.get("status", 0)) == "2"
+
+
+def carry_ticks(old_items, lines):
+    """The sync's own item shape for `lines` in order - {title, status,
+    sortOrder = index}, no ids (the update posts a fresh list) - with
+    status 2 wherever the SAME ingredient was ticked before, else 0. The
+    new lines come from the same recipe in the same order as the old
+    items, so a tick follows (tick_key, ordinal among same-key items): the
+    salt of the sauce section stays ticked, the salt of the marinade does
+    not swap places with it. A tick whose ordinal no longer exists (the
+    recipe lost a line) falls back to the first still-open line of that
+    key, so a tick is never dropped while its ingredient is on the list.
+    Pure; None or empty old_items = every line open."""
+    ticked, seen = {}, {}
+    for it in old_items or []:
+        if not isinstance(it, dict):
+            continue
+        k = tick_key(it.get("title") or "")
+        o = seen.get(k, 0)
+        seen[k] = o + 1
+        if _ticked(it):
+            ticked.setdefault(k, set()).add(o)
+    out, seen = [], {}
+    for i, ln in enumerate(lines or []):
+        k = tick_key(ln)
+        o = seen.get(k, 0)
+        seen[k] = o + 1
+        status = 2 if o in ticked.get(k, ()) else 0
+        if status:
+            ticked[k].discard(o)
+        out.append({"title": ln, "status": status, "sortOrder": i})
+    for k, left in ticked.items():             # the fallback: ordinals gone
+        for it in out:
+            if not left:
+                break
+            if it["status"] == 0 and tick_key(it["title"]) == k:
+                it["status"] = 2
+                left.pop()
+    return out
+
+
 if __name__ == "__main__":                 # python3 src/meal_scale.py 1.75 "1 1/2 tsp salt" ...
     import sys
     if len(sys.argv) < 3:

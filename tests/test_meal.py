@@ -12,6 +12,8 @@ upcoming / batch, and (2026-09-21) rating, comments and cooked: the
 star grammar, the head block, set_rating / add_comment on the sample
 layout, Mela's "Rating:" line adopted, the payloads, the chips and the
 library order with the 👨‍🍳cooked tag. Run: python3 tests/test_meal.py
+Since 2026-09-22 also portions_of (the three yield-note shapes; None when the
+note is missing or the yield unknown) and portions_payload (one list / the week).
 """
 import os
 import sys
@@ -246,6 +248,19 @@ pool = [{"tid": "a", "uuid": U2, "name": "Oats"}, {"tid": "b", "uuid": "N1", "na
         {"tid": "c", "uuid": U1, "name": "Bulgogi"}, {"tid": "d", "uuid": "N2", "name": "Apple"}]
 order = [e["tid"] for e in meal.sort_for_lib(pool, PLANNED, date(2026, 9, 21))]
 check("sort_for_lib: never first (by name), then least recently cooked", order == ["d", "b", "a", "c"], order)
+
+# ── portions ──────────────────────────────────────────────────────────────────
+check("portions_of: the three yield-note shapes", meal.portions_of("Scaled ×1.75: 4 → 7 portions\n_(yield: '4' in yield)_") == 7
+      and meal.portions_of("≈ Scaled ×1.4: est. 5 portions from 850 g protein → 7\n_(x)_") == 7
+      and meal.portions_of("Already 5 portions, unscaled") == 5
+      and meal.portions_of("≈ Already 7 portions (est. from 1.2 kg beef), unscaled") == 7
+      and meal.portions_of("⚠️ check yield · Scaled ×7: 1 → 7 portions") == 7)
+check("portions_of: none when the note is missing or the yield unknown",
+      meal.portions_of("") is None and meal.portions_of(None) is None
+      and meal.portions_of("⚠️ Yield unknown, quantities unscaled") is None
+      and meal.portions_of("⚠️ recipe not in Mela on this Mac · no list") is None)
+check("portions_payload: one list or the week", meal.portions_payload("p", "t", "ctx:mealgroc") == {"pid": "p", "tid": "t", "back": "ctx:mealgroc"}
+      and meal.portions_payload(back="ctx:meal") == {"all": True, "back": "ctx:meal"} and meal.portions_payload() == {"all": True})
 
 # ── the sync verb ────────────────────────────────────────────────────────────
 check("sync_payload", meal.sync_payload() == {"back": "ctx:meal"} and meal.sync_payload("ctx:mealq") == {"back": "ctx:mealq"})

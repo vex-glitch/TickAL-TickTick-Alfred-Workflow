@@ -37,7 +37,7 @@ Groceries are not planned in Mela at all. The sync hangs one checklist per meal 
 | 🍳 🍛 🌮 that day's meals | opens the recipe in **Mela** | the [meal row](#a-meal-row) chords |
 | 📆 Next 13 weeks | the quarter, one row per week | ⌥ same |
 | 🔄 Sync with Mela · n new · n to fill | recipes in, descriptions filled, the next cook's meals onto its prep task + groceries + note + every recipe dated as Mela has it | ⌥⇧ same |
-| 🛒 Groceries · n open lists · day | the checklists under your next 🛒 Groceries task | ⌥ same |
+| 🛒 Groceries · n open lists · day | the checklists under your next 🛒 Groceries task | ⌥ same · ⌥⇧ portions per meal (a box per list, see [Portions](#portions)) |
 | 📚 Breakfasts / Lunches / Snacks | that tag's library | ⌥ same |
 | ℹ️ status | - | Mela's data age and how many meals the calendar holds, or why it can't be read |
 
@@ -103,6 +103,8 @@ Only the next cook is mirrored onto its prep task. The cooks after it live on th
 ## Portions
 
 Every grocery line is scaled to seven portions from the recipe's yield. The yield comes from Mela's field when set, else from the text ("Makes 7", "6 Total", "Serves 4"), else estimated from the weight of the main protein (170 g a portion) and marked ≈, else the list is left unscaled with a ⚠️ note. The checklist's description says which. Amounts round the way a shopper would: 875 g, 2 3/4 tsp, 4 scallions. Section headers, "1. Heat the oil" steps and macro lines are dropped from the shopping list.
+
+**Cooking a different number this week?** ⌥⇧⏎ on the hub's **🛒 Groceries** row asks, one box per list, how many portions of each meal you want ("Bagels · portions? (now 7)", the current count prefilled; Esc skips that list). Each list is then cut again to your number: the amounts change, the description says the new count, and anything you had already ticked stays ticked when the ingredient is still there. For one list only, open the groceries screen (⏎ on that row) and press ⌥⇧⏎ on the list; its row shows the count it was cut for (`· 5 portions`). The next 🔄 Sync leaves a re-cut list alone, and seven stays the default for new lists.
 
 ## Alfred needs Full Disk Access
 

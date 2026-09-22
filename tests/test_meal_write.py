@@ -13,7 +13,15 @@ call), rate (set / replace / clear / unchanged / refused), comment
 (appended, blank refused), mirror_ratings (unrated entries only, Mela's
 "Rating:" copy stripped, cap, rate limit) and the sync's rating pass (the
 toast's "N ratings from Mela", a rate limit that never aborts the week,
-the dry run's "would mirror"). Caches live in a temp dir.
+the dry run's "would mirror"), and (2026-09-22, D25) the portions verb:
+grocery_body at a count, _portions_of off content / desc, week_lists
+(under the upcoming 🛒 task, loose in the library without one, sorted,
+never raising, off the caches after a sync), set_portions (live read then
+ONE update with items + content, the items re-cut with the ×1.25 note, a
+tick carried by name, the same count = no write and "unchanged", 0 / 41 /
+a word refused, a library task and a recipe Mela does not know refused,
+dry = no call, the cache patched) and the sync re-making a loose list at
+the count it was re-cut to. Caches live in a temp dir.
 Run: python3 tests/test_meal_write.py
 """
 import os
@@ -128,6 +136,7 @@ RECIPES = [R(U1, "Beef Bulgogi", link="https://example.org/bulgogi"),
            R(U2, "Oats", ("02 • Breakfast",)), R(U3, "Pockets", ("03 • Snack",))]
 BY = {r.id: r for r in RECIPES}
 mw._mela = lambda: (RECIPES, BY, None)          # no real Mela here
+mela.freshness = lambda: {"age_s": 0, "newest_recipe_date": None, "db_path": "", "present": True}   # nor its store: hub_counts would snapshot it
 NOTE_CALLS = []
 mw._write_note = lambda meals, sunday: (NOTE_CALLS.append((list(meals), sunday)) or True)
 import api as _api_mod                          # noqa: E402
@@ -769,6 +778,155 @@ check("dry run: says what it would rate (the empty body is fill's, not the mirro
       "would mirror 2 Mela ratings" in out and "Oats " + STAR * 4 in out and "Bulgogi" not in out.splitlines()[2]
       and all(c[0] in ("get", "pd") for c in api.calls)
       and api.lists[LIST]["t1"]["content"] == OLD_OATS, out.splitlines()[:4])
+
+
+# ── portions: a week's 🛒 lists re-cut (Vex 2026-09-22, D25) ─────────────────
+print("-- portions")
+NOTE7 = "Scaled ×1.75: 4 → 7 portions\n_(yield: '4' in yield)_"
+NOTE5 = "Scaled ×1.25: 4 → 5 portions\n_(yield: '4' in yield)_"
+lines5, desc5 = mw.grocery_body(BY[U1], 5)
+check("grocery_body at 5 portions: the lines ×1.25, the note says 4 → 5",
+      lines5 == ["625 g chicken", "1 1/4 tbsp oil", "2 1/2 tsp soy"] and desc5 == NOTE5, (lines5, desc5))
+check("grocery_body's default is still the sync's 7",
+      mw.grocery_body(BY[U1]) == (["875 g chicken", "1 3/4 tbsp oil", "3 1/2 tsp soy"], NOTE7), mw.grocery_body(BY[U1]))
+check("_portions_of: content, then desc, else None",
+      mw._portions_of({"content": NOTE7}) == 7 and mw._portions_of({"content": "", "desc": "Already 5 portions, unscaled"}) == 5
+      and mw._portions_of({"content": ""}) is None and mw._portions_of({}) is None and mw._portions_of(None) is None
+      and mw._portions_of({"content": "⚠️ Yield unknown, quantities unscaled"}) is None)
+
+# week_lists over an injected pool
+GT = T("groc_sat", "🛒 Groceries", pid=RLIST, startDate="2026-09-26T06:00:00.000+0000", timeZone="Europe/Berlin")
+GT_OLD = T("groc_old", "🛒 Groceries", pid=RLIST, startDate="2026-09-12T06:00:00.000+0000", timeZone="Europe/Berlin")
+POOL = [GT, GT_OLD,
+        T("gl_b", meal.grocery_title("Beef Bulgogi", U1), pid=RLIST, parent="groc_sat", kind="CHECKLIST", sortOrder=20),
+        T("gl_a", meal.grocery_title("Oats", U2), pid=RLIST, parent="groc_sat", kind="CHECKLIST", sortOrder=10),
+        T("gl_done", meal.grocery_title("Pockets", U3), pid=RLIST, parent="groc_sat", kind="CHECKLIST", status=2),
+        T("gl_last", meal.grocery_title("Last week", U9), pid=RLIST, parent="groc_old", kind="CHECKLIST"),
+        T("gl_loose", meal.grocery_title("Loose", U9), kind="CHECKLIST"),
+        T("gl_alpha", meal.grocery_title("Alpha", U8), kind="CHECKLIST"),
+        T("step", "Wipe the counter", pid=RLIST, parent="groc_sat")]
+wl = mw.week_lists(today=TODAY, tasks=POOL)
+check("week_lists: the open lists under the upcoming 🛒 task by sortOrder; the ticked one, last week's, the loose ones and the step left out",
+      [t["id"] for t in wl] == ["gl_a", "gl_b"], [t["id"] for t in wl])
+wl = mw.week_lists(today=TODAY, tasks=[t for t in POOL if t["id"] != "groc_sat"])
+check("week_lists: no upcoming 🛒 task (last week's does not count) = the loose library lists, by title",
+      [t["id"] for t in wl] == ["gl_alpha", "gl_loose"], [t["id"] for t in wl])
+check("week_lists never raises: garbage in, an empty week out",
+      mw.week_lists(today=TODAY, tasks=[None, 3, {"title": None}, {"id": None, "title": meal.grocery_title("x", U1)}]) == [])
+wl = mw.week_lists(today=TODAY, tasks=[t for t in POOL if t["id"] not in ("gl_a", "gl_b", "gl_done")])
+check("week_lists: a 🛒 task ahead but nothing under it = every open list anywhere (what the hub row counts; "
+      "gl_loose shares U9 with gl_last, first seen wins)",
+      sorted(t["id"] for t in wl) == ["gl_alpha", "gl_last"], [t["id"] for t in wl])
+fresh()
+wl = mw.week_lists(today=TODAY)
+check("week_lists off the caches: no 🛒 task in the routines list = the loose open lists of the library, the ticked one out",
+      [t["id"] for t in wl] == ["g_old", "g_keep"], [t["id"] for t in wl])
+
+# set_portions
+api = fresh()
+GL = T("gl", meal.grocery_title("Beef Bulgogi", U1), kind="CHECKLIST", tags=["🛒groceries"], content=NOTE7,
+       items=[{"id": "i1", "status": 2, "title": "875 g chicken", "sortOrder": 0},
+              {"id": "i2", "status": 0, "title": "1 3/4 tbsp oil", "sortOrder": 1},
+              {"id": "i3", "status": 2, "title": "3 1/2 tsp soy", "sortOrder": 2}])
+api.lists[LIST]["gl"] = dict(GL)
+mw._cache_add([GL])
+res = mw.set_portions(api, LIST, "gl", 5)
+live = api.lists[LIST]["gl"]
+check("set_portions: a live read then ONE update carrying items + content",
+      api.calls == [("get", LIST, "gl"), ("update", LIST, "gl", ("content", "items"))], api.calls)
+check("set_portions: the items re-cut ×1.25 (4 → 5), the note says so",
+      [it["title"] for it in live["items"]] == ["625 g chicken", "1 1/4 tbsp oil", "2 1/2 tsp soy"]
+      and live["content"] == NOTE5, (live["items"], live["content"]))
+check("set_portions: the ticks carried by ingredient name, sortOrder fresh, no ids",
+      [it["status"] for it in live["items"]] == [2, 0, 2] and [it["sortOrder"] for it in live["items"]] == [0, 1, 2]
+      and not any("id" in it for it in live["items"]), live["items"])
+check("set_portions: the toast counts the ticks kept, no reopen of its own",
+      isinstance(res, mw.Outcome) and res.msg == "🛒 Beef Bulgogi · 5 portions · 2 ticks kept" and res.reopen is None
+      and res.ids == ["gl"], res)
+cached = next(t for t in cache_store.get("all_tasks") if t["id"] == "gl")
+pd_gl = next(t for t in cache_store.get(f"project_data_{LIST}")["tasks"] if t["id"] == "gl")
+check("set_portions: the cache mirrors items + content in both pools",
+      [it["title"] for it in cached["items"]] == ["625 g chicken", "1 1/4 tbsp oil", "2 1/2 tsp soy"] and cached["content"] == NOTE5
+      and pd_gl["content"] == NOTE5 and mw._portions_of(cached) == 5, (cached.get("items"), cached.get("content")))
+n = len(api.calls)
+res = mw.set_portions(api, LIST, "gl", "5")
+check("set_portions: the same count (as a string, even) = the read, no write, 'unchanged'",
+      api.calls[n:] == [("get", LIST, "gl")] and res.msg == "🛒 Beef Bulgogi · 5 portions · unchanged", (api.calls[n:], res.msg))
+# an unknown yield: the scaler cannot cut it, so nothing is written and the toast tells the truth
+BY[U8] = R(U8, "Salad", yield_text="", ings="2 tomatoes\n1 cucumber\n3 tbsp oil")
+GS = T("gs", meal.grocery_title("Salad", U8), kind="CHECKLIST", tags=["🛒groceries"],
+       content="⚠️ Yield unknown, quantities unscaled",
+       items=[{"id": "s1", "status": 2, "title": "2 tomatoes", "sortOrder": 0}])
+api.lists[LIST]["gs"] = dict(GS)
+n = len(api.calls)
+try:
+    mw.set_portions(api, LIST, "gs", 5)
+    bad = "accepted"
+except mw.Refusal as e:
+    bad = str(e)
+check("set_portions: a recipe whose yield is unknown refuses after the read, nothing written",
+      bad == "🛒 Salad · yield unknown · cannot re-cut" and api.calls[n:] == [("get", LIST, "gs")]
+      and api.lists[LIST]["gs"]["items"][0]["status"] == 2, (bad, api.calls[n:]))
+# the noted count but NO items (a failed items update): written, not "unchanged"
+GE = T("ge", meal.grocery_title("Oats", U2), kind="CHECKLIST", tags=["🛒groceries"], content=NOTE7, items=[])
+api.lists[LIST]["ge"] = dict(GE)
+n = len(api.calls)
+res = mw.set_portions(api, LIST, "ge", 7)
+check("set_portions: the noted count with an empty checklist is repaired, not 'unchanged'",
+      [c[0] for c in api.calls[n:]] == ["get", "update"] and res.msg == "🛒 Oats · 7 portions"
+      and len(api.lists[LIST]["ge"]["items"]) > 0, (api.calls[n:], res.msg))
+n = len(api.calls)
+bad = []
+for v in (0, 41, "x", None, "", 5.5, "7.0", True):
+    try:
+        mw.set_portions(api, LIST, "gl", v)
+        bad.append((v, "accepted"))
+    except mw.Refusal as e:
+        if str(e) != "🔢 Portions: 1 to 40":
+            bad.append((v, str(e)))
+check("set_portions: 0 / 41 / a word / None / blank / a fraction / a bool refuse with the one line, nothing read",
+      bad == [] and api.calls[n:] == [], (bad, api.calls[n:]))
+n = len(api.calls)
+try:
+    mw.set_portions(api, LIST, "t1", 5)
+    check("set_portions: a library task refuses", False)
+except mw.Refusal as e:
+    check("set_portions: a library task refuses after the read, nothing written",
+          str(e) == "🛒 Not a grocery list" and api.calls[n:] == [("get", LIST, "t1")], (str(e), api.calls[n:]))
+n = len(api.calls)
+try:
+    mw.set_portions(api, LIST, "g_old", 5)                      # "Gone", U9: not in Mela
+    check("set_portions: a recipe Mela does not know refuses", False)
+except mw.Refusal as e:
+    check("set_portions: a recipe Mela does not know refuses by name, nothing written",
+          str(e) == "🛒 Gone · recipe not in Mela on this Mac" and api.calls[n:] == [("get", LIST, "g_old")], (str(e), api.calls[n:]))
+n = len(api.calls)
+res = mw.set_portions(api, LIST, "gl", 6, dry=True)
+check("set_portions dry run: no api call, the line names the list off the cache",
+      api.calls[n:] == [] and res.msg == "🥘 Dry run · would cut Beef Bulgogi to 6 portions", res.msg)
+api.lists[LIST]["gl"]["content"] = ""                          # one of the first lists: saved without a note
+n = len(api.calls)
+res = mw.set_portions(api, LIST, "gl", 7)
+check("set_portions: a list without a note is written even at 7, and gets its note (the note is the memory)",
+      api.calls[n:] == [("get", LIST, "gl"), ("update", LIST, "gl", ("content", "items"))]
+      and api.lists[LIST]["gl"]["content"] == NOTE7 and [it["title"] for it in api.lists[LIST]["gl"]["items"]] == ["875 g chicken", "1 3/4 tbsp oil", "3 1/2 tsp soy"]
+      and res.msg == "🛒 Beef Bulgogi · 7 portions · 2 ticks kept", (api.calls[n:], api.lists[LIST]["gl"]["content"], res.msg))
+
+# the sync re-making a loose list under the 🛒 task keeps the count it was re-cut to
+api = fresh()
+api.lists[LIST]["g_keep"]["content"] = NOTE5                   # Oats, re-cut to 5 last press, loose in the library
+api.lists[RLIST]["prep_tue"] = T("prep_tue", "🥘 Meal Prep", pid=RLIST, startDate="2026-09-22T07:00:00.000+0000", timeZone="Europe/Berlin")
+api.lists[RLIST]["groc_tue"] = T("groc_tue", "🛒 Groceries", pid=RLIST, startDate="2026-09-22T06:00:00.000+0000", timeZone="Europe/Berlin")
+mw._cache_add([api.lists[RLIST]["groc_tue"]])                # the hourly sync would have it
+mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
+glists = {meal.link_uuid(t["title"]): t for t in api.lists[RLIST].values() if meal.is_grocery(t["title"]) and t["status"] == 0}
+check("sync: the loose Oats list re-made under the 🛒 task at ITS 5 portions, the new Bulgogi one at 7",
+      "g_keep" not in api.lists[LIST] and glists[U2]["parentId"] == "groc_tue" and glists[U2]["content"] == NOTE5
+      and [it["title"] for it in glists[U2]["items"]] == ["625 g chicken", "1 1/4 tbsp oil", "2 1/2 tsp soy"]
+      and glists[U1]["content"] == NOTE7, {u: (t.get("parentId"), t.get("content")) for u, t in glists.items()})
+wl = mw.week_lists(today=TODAY)
+check("week_lists off the caches after the sync: the two lists under the upcoming 🛒 task",
+      sorted(t["parentId"] for t in wl) == ["groc_tue", "groc_tue"] and {meal.link_uuid(t["title"]) for t in wl} == {U1, U2}, wl)
 
 print(f"\nmeal_write: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
