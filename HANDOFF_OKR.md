@@ -88,6 +88,18 @@ than daily work plan. Cause as we all know reality drifts from plans."
 
 ## 4. Behaviours (decided)
 
+**2026-09-23: SCHEDULING AND THE RIPPLE ARE OUT.** Vex: "just remove any
+scheduling and ripple from workflow, I will handle it myself until I
+understand how what I want could actually be automated." TickAL moves no
+OKR date on its own: no 📅 Schedule screen or ⌘ Actions row, no
+`xact:okr_sched`, no `okr.ripple_plan` / `schedule_plan` / `lane_of`, no
+carry move in the carry-over (its row now opens the copy to drag). The
+heal is the only date writer left. The **Ripple** and **Schedule actions**
+bullets below are history, kept for the reasoning. The one thing he named
+wanting later: "move all other tasks equally according to that one task"
+(push the rest from where a late one now ends) - not built, not understood
+well enough by either of us yet.
+
 - **Parent span**: an O runs from its first dated KR's start to its last
   dated KR's end; a Y the same over its O's. Healed after every TickAL write,
   on hub open, and on the hourly sync. A drag in TickTick does NOT ripple
@@ -474,3 +486,17 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
   - Checklist links fixed: Shutdown "[D Note]" had an empty slot ->
     notesticky:daily; Monthly and Quarterly "[Journal]" under TickTick
     opened the WEEKLY journal -> journal:monthly / journal:quarterly.
+- 2026-09-23: SCHEDULING + RIPPLE REMOVED (Vex: "I think we might have over
+  engineered it ... I would like to handle scheduling of OKRs only in
+  TickTick"). Gone: `ctx:okrsched` + render_okrsched, the ⌥⇧ 📅 Schedule mod
+  on every hub row (⌥⇧ is dead on OKR rows now), ⌘ Actions "📅 Schedule…",
+  `xact:okr_sched`, `okr_write.schedule` / `_sched_arg` / MAX_EXTEND,
+  `okr.ripple_plan` / `schedule_plan` / `SCHEDULE_ACTIONS` / `lane_of` /
+  `_span_leaves` / `carry_start`, and the carry-over's ↪️ Carry (its place
+  taken by "📆 Move it in TickTick", which opens the copy). `okr_write.carry`
+  takes wontdo | someday only. `okr.healed` stays (what screens show for a
+  parent), `apply_spans` stays (the heal's writer), countdowns follow the
+  heal. Docs: 50-okrs.md "Scheduling" is one paragraph. What Vex may want
+  later, in his words: "I reschedule what I am late on (couple of tasks) and
+  then can say move all other tasks from when this task ends" - a manual
+  "push the rest" verb; parked until he can picture it.

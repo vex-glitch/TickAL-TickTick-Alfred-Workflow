@@ -18,10 +18,14 @@ told apart by the title prefix alone:
 
 This module reads that list and answers: the tree, the dates, the parent
 spans a timeline drag has left stale (heal), progress (ticked KRs over all
-KRs), pace, the plan for a period, the ripple a schedule action would cause,
-the KRs whose linked original is already done (auto-tick) and the objective
-codes. Nothing here writes: the planners RETURN what a writer should do, and
-phase 1 only prints it.
+KRs), pace, the plan for a period, the KRs whose linked original is already
+done (auto-tick) and the objective codes. Nothing here writes: the planners
+RETURN what a writer should do, and phase 1 only prints it.
+
+SCHEDULING IS TICKTICK'S (Vex 2026-09-23: "just remove any scheduling and
+ripple from workflow, I will handle it myself"). TickAL never moves a date
+by itself: no schedule action, no ripple, no carry move. It heals parents
+onto their children and that is all the date writing there is.
 
 Pure part: no I/O. The one impure piece is load() at the bottom (v1 open
 tasks + v2 completed ones, cache fallback that SAYS it fell back) and the
@@ -30,11 +34,11 @@ __main__ report:
     python3 src/okr.py          # the live tree, read-only
 
 THE WRITER RULE (phase 2 and on). Every writer this model feeds - the span
-heal, the auto-tick, the ripple of a schedule action - must REFUSE unless
+heal, the auto-tick, the countdowns - must REFUSE unless
 the Snapshot it planned from says source == "live" AND done_complete
 (Snapshot.writable). A cache read is minutes to hours old, and a plan
 without every completed KR reads a ticked deliverable as deleted: it counts
-nowhere, shapes no span, and a heal or ripple built on that would write a
+nowhere, shapes no span, and a heal built on that would write a
 wrong plan over the right one. Reading (the report, the notes' forecast
 lines) may use any Snapshot; writing may not.
 """
@@ -386,8 +390,8 @@ class Item:
 
     @property
     def history(self):
-        """Done or won't do: HISTORY. It never moves - no ripple shifts it,
-        no parent's move drags it, no heal rewrites a done Y/O's span."""
+        """Done or won't do: HISTORY. It never moves - no heal rewrites a
+        done Y/O's span."""
         return self.done or self.abandoned
 
     @property
@@ -618,9 +622,8 @@ def heal_diff(items):
 
 def healed(items):
     """The items with heal_diff applied to replace()d copies: every open Y/O
-    on its WANTED span, everything else as it is. The input is untouched.
-    ripple_plan plans on this, so a stale stored span never becomes a
-    delta."""
+    on its WANTED span, everything else as it is. The input is untouched -
+    what every screen and note SHOWS for a parent."""
     fix = {iid: (s, e) for iid, s, e in heal_diff(items)}
     return [replace(it, start=fix[it.id][0], end=fix[it.id][1])
             if it.id in fix else it for it in items]
@@ -760,189 +763,6 @@ def overlapping(items, start, end, kinds=KINDS):
     return [it for _s, it in out]
 
 
-# ── Ripple ───────────────────────────────────────────────────────────────────
-def lane_of(item, items):
-    """The lane a schedule action ripples in (decided 2026-09-18: SAME Y
-    OBJECTIVE): the item's topmost Y ancestor (itself when it is a Y); no Y
-    = its topmost O; neither = the root of its own tree."""
-    chain = [item] + _ancestors(item, index(items))
-    ys = [x for x in chain if x.kind == "Y"]
-    if ys:
-        return ys[-1]
-    os_ = [x for x in chain if x.kind == "O"]
-    return os_[-1] if os_ else chain[-1]
-
-
-def _span_leaves(item, kids, want):
-    """The items that SHAPE a Y/O's wanted span: its children, recursing
-    through child Y/O's down to the KRs (and any unprefixed step) - never
-    into a KR's own subtasks, which do not move it. Abandoned ones shape
-    nothing and are left out, as wanted_spans leaves them out.
-
-    A child Y/O with NO wanted span of its own (an O dated by hand before it
-    has a dated KR) is a leaf itself: wanted_spans counts its stored dates
-    (contrib), so it shapes its parent exactly like a KR does, and an extend
-    that ends on it has to move IT (review 2026-09-18: without this, a Y
-    whose end came from such an O moved some KR and never lengthened)."""
-    out, todo, seen = [], [item.id], {item.id}
-    while todo:
-        for c in kids.get(todo.pop(), []):
-            if c.id in seen or c.abandoned:
-                continue
-            seen.add(c.id)
-            if c.kind in PARENT_KINDS and c.id in want:
-                todo.append(c.id)
-            else:
-                out.append(c)
-    return out
-
-
-def _shift(x, days):
-    return x.start + timedelta(days=days), x.end + timedelta(days=days)
-
-
-def ripple_plan(items, moved_id, new_start, new_end):
-    """What a schedule action on one item does to the plan -> (moves, heals).
-
-    moves  [(id, new_start, new_end)], the item that actually moves first
-    heals  heal_diff of the plan AFTER the moves (an id may be in both - a
-           writer applies moves, then heals, and the heal wins)
-
-    HEAL FIRST. The plan is made on healed(items): every open Y/O on its
-    WANTED span. A timeline drag leaves a parent's stored span stale until
-    the next heal (live 2026-09-18: 🥅 O • TickAL stored 29 Sep - 14 Oct
-    while its Goals wf starts 19 Sep), and reading the stale one would turn
-    "put TickAL on 19 Sep - 14 Oct" - the span it already has - into a
-    ten-day pull-in of every KR under it. So the deltas and the successor
-    threshold below all read healed spans.
-
-    The rule (HANDOFF section 4, decided 2026-09-18): the move changes the
-    item's END by D days. Every DATED item in the same lane (lane_of) whose
-    start is AFTER the item's inclusive end (as it was) shifts by the same
-    D. The item's own descendants move WITH it, by the change of its START
-    (a move / pick-a-date on a Y or O shifts its whole subtree). Its
-    ancestors never shift - they heal. Items that overlap it (start on or
-    before its old end) stay put, and so does anything undated, and anything
-    in another lane. Negative D (pulling in) is the same rule mirrored - to
-    be flagged to Vex when phase 2 ships.
-
-    EXTEND ON A PARENT goes to its last deliverable. A Y/O's span is its
-    KRs', so a Y/O with dated deliverables whose START stays and END moves
-    (extend +N, or pulling its end in) hands the change down: to its
-    last-ending OPEN dated deliverable, recursively (a Y through its O's)
-    down to a KR (or to a child O dated by hand that has no dated KR yet -
-    _span_leaves). That deliverable is given the PARENT's requested end, so
-    the parent lands on it even when a done KR is what ended it (review
-    2026-09-18: handing the KR only "+D" left the O short and opened a
-    D-day hole in front of the next one). The lane then ripples by the
-    parent's D, from the PARENT's old end - an item overlapping the
-    parent's tail is inside it, not after it. If the parent still cannot
-    land on the requested end (another open KR ends after a pulled-in end,
-    or a done one does), the plan is REFUSED: ValueError naming the KR to
-    move instead, never a plan whose heal quietly undoes the request.
-    Every deliverable done = nothing open to extend: ValueError too.
-
-    HISTORY NEVER MOVES. A done or won't-do item is skipped by the
-    successor shift and by the descendant shift alike - it stays where it
-    was when it closed - and a schedule action on one is refused: its
-    stored span is never healed, so a delta read off it is stale by design.
-
-    An UNDATED item getting dates has no old end, so it ripples nothing.
-    Absolute dates must be read off healed(items), never off a Snapshot's
-    stored items (schedule_plan does that for the three actions).
-    Pure: returns the plan, writes nothing."""
-    if new_start is None or new_end is None or new_end < new_start:
-        raise ValueError(f"bad span {new_start}..{new_end}")
-    plan = healed(items)
-    by = index(plan)
-    m = by[moved_id]
-    if m.history:
-        raise ValueError(f"{m.name} is closed · reopen it first")
-    kids = _kids(plan)
-    anchor = None               # the parent an extend was handed down from
-    if m.kind in PARENT_KINDS and m.dated and new_start == m.start and new_end != m.end:
-        want = wanted_spans(plan)
-        leaves = [x for x in _span_leaves(m, kids, want) if x.dated]
-        if leaves:
-            live = [x for x in leaves if not x.history]
-            if not live:
-                raise ValueError(f"{m.name}: every KR is done · nothing to extend")
-            t = max(live, key=lambda x: (x.end, x.start, x.id))
-            if new_end < t.start:
-                raise ValueError(f"bad span {t.start}..{new_end} for {t.name!r}")
-            anchor = m
-            m, new_start = t, t.start
-    moves = {m.id: (new_start, new_end)}
-    if m.dated:
-        mine = _descendants(m.id, kids)
-        s_delta = (new_start - m.start).days
-        # the lane follows the PARENT when the change was handed down to a KR
-        edge = anchor or m
-        d = (new_end - edge.end).days
-        if s_delta:
-            for did in mine:
-                x = by[did]
-                if x.dated and not x.history:
-                    moves[did] = _shift(x, s_delta)
-        if d:
-            lane = lane_of(m, plan)
-            members = {lane.id} | _descendants(lane.id, kids)
-            skip = {m.id} | mine | {a.id for a in _ancestors(m, by)}
-            for xid in members - skip:
-                x = by[xid]
-                if x.dated and not x.history and x.start > edge.end:
-                    moves[xid] = _shift(x, d)
-    # The heal is judged against what is STORED: every item not moved keeps
-    # its stored dates here, so a stale span anywhere still shows up.
-    after = [replace(it, start=moves[it.id][0], end=moves[it.id][1])
-             if it.id in moves else it for it in items]
-    if anchor is not None:
-        got = wanted_spans(after).get(anchor.id)
-        if got != (anchor.start, new_end):
-            longer = [x for x in _span_leaves(anchor, _kids(after), wanted_spans(after))
-                      if x.dated and x.end > new_end]
-            x = longer[0] if longer else None
-            who = ("" if x is None else
-                   f" · {x.name} is done, ends {span_txt(x.end, x.end)}" if x.history else
-                   f" · {x.name} ends {span_txt(x.end, x.end)} · move that one first")
-            raise ValueError(f"{anchor.name} cannot end on "
-                             f"{span_txt(new_end, new_end)}{who}")
-    first = [(m.id,) + moves[m.id]]
-    rest = sorted(((i,) + se for i, se in moves.items() if i != m.id),
-                  key=lambda r: (r[1], r[0]))
-    return first + rest, heal_diff(after)
-
-
-SCHEDULE_ACTIONS = ("extend", "tomorrow", "date")
-
-
-def schedule_plan(items, item_id, action, arg=None, today=None):
-    """The three schedule actions (HANDOFF section 4: "extend duration. Move
-    to tomorrow or pick a date" - no time entry) -> ripple_plan's (moves,
-    heals). The absolute dates are read off healed(items), so a caller
-    holding a Snapshot's STORED items cannot hand ripple_plan a stale span
-    (review 2026-09-18: "extend TickAL +2" computed off the stored span
-    became a subtree move that put Goals wf on the wrong week).
-
-      extend    arg = N days (negative pulls the end in); start stays
-      tomorrow  start = today + 1, the length kept (an undated item = 1 day)
-      date      arg = the new start date, the length kept"""
-    today = today or date.today()
-    it = index(healed(items))[item_id]
-    length = (it.end - it.start).days if it.dated else 0
-    if action == "extend":
-        if not it.dated:
-            raise ValueError(f"{it.name} has no dates to extend · pick a date first")
-        return ripple_plan(items, item_id, it.start,
-                           it.end + timedelta(days=int(arg or 0)))
-    if action in ("tomorrow", "date"):
-        start = today + timedelta(days=1) if action == "tomorrow" else arg
-        if not isinstance(start, date):
-            raise ValueError(f"no date to move {it.name} to")
-        return ripple_plan(items, item_id, start, start + timedelta(days=length))
-    raise ValueError(f"unknown schedule action {action!r}")
-
-
 # ── Auto-tick ────────────────────────────────────────────────────────────────
 def autotick_candidates(items, is_done):
     """Open KRs whose link points at a SINGLE task that is completed (decided
@@ -1035,13 +855,6 @@ def carry_candidates(items, q_end):
            and carry_leaf(it, want, by) and it.end <= q_end]
     out.sort(key=lambda it: (it.end, it.start, it.name))
     return out
-
-
-def carry_start(q_end, today=None):
-    """Where a carried item starts: the next quarter's first day, or today
-    when the review runs late and that day is gone (a schedule action never
-    starts in the past - the plan is a forecast)."""
-    return max(q_end + timedelta(days=1), today or date.today())
 
 
 Capacity = namedtuple("Capacity", "planned done weeks")

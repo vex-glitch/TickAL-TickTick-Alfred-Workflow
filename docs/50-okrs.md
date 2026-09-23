@@ -2,7 +2,7 @@
 
 _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-cheatsheet.md)_
 
-> A guiding-star plan of your goals inside TickTick: year objectives, objectives and key results on a timeline, with pace, progress and moves that keep the whole line intact.
+> A guiding-star plan of your goals inside TickTick: year objectives, objectives and key results on a timeline, with pace and progress.
 
 **Keyword:** `tok` · **Hotkey:** (set in canvas) - or the **🥅 OKRs** row in the main menu (`tal`).
 
@@ -10,7 +10,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 A plan is a forecast, and reality drifts from it. OKRs here are not a daily to-do list: they are the plan you set once a year (or whenever), review every quarter and month, and keep in view while the real work happens in your normal lists. Every OKR item is an all-day entry with no time, so it sits on top of your calendar, outside your time blocks: you see what the ideal plan says for today, and you adjust.
 
-The plan lives in ONE TickTick list you schedule by hand in the **timeline view** - drag an item, stretch it, slide it. TickAL never replaces that. It reads the plan and keeps its arithmetic right: parents that cover their children, progress, pace, and moves that push the rest of the line along.
+The plan lives in ONE TickTick list you schedule by hand in the **timeline view** - drag an item, stretch it, slide it. TickAL never replaces that. It reads the plan and keeps its arithmetic right: parents that cover their children, progress and pace. It never moves a date on its own.
 
 > [!IMPORTANT]
 > OKRs are a workflow, not a single action - a list, three levels, a naming convention and a few automations. Give this page a full read before first use.
@@ -26,7 +26,7 @@ The plan lives in ONE TickTick list you schedule by hand in the **timeline view*
 | **The code** | A short suffix per objective (TickAL → `TA`), stamped on every KR under it | The automation - proposed, you can override |
 | **Area tags** | The lanes of the timeline: the subtags of your `0️⃣Area` tag (plus the tags your Y/O items carry) | You, once |
 | **Heal + auto-tick** | Parents re-cover their children; a KR whose linked task is done gets ticked | The automation - on hub open and on the hourly sync |
-| **Countdowns** | One TickTick countdown per started objective, to its end | The automation - the same passes, and every schedule action |
+| **Countdowns** | One TickTick countdown per started objective, to its end | The automation - the same passes |
 
 ## Planning copies
 
@@ -57,7 +57,6 @@ Open it from the main menu or its keyword. The root shows your year objectives, 
 | ⏎ | Inside (its children) | Open the copy in TickTick |
 | ⌥ | Inside | The real task in Alfred (its subtasks, or its list) |
 | ⇧ | - | ✅ Done / ↩️ Reopen |
-| ⌥⇧ | 📅 Schedule | 📅 Schedule |
 | ⌘ | Actions | Actions |
 | ⌃ | Back | Back |
 
@@ -69,20 +68,9 @@ The last row is **⚖️ Capacity**: the key results your plan puts due in the n
 
 **Typing** in the hub searches every item. With no match (or below the matches), ➕ rows add what you typed: **➕ New objective / year objective** on the root, **➕ New objective** on a year objective, **➕ New KR** on an objective. A pipe adds several: `Draft spec | Review | Publish`. `=XY` sets a new objective's code.
 
-## Scheduling and the ripple
+## Scheduling
 
-**📅 Schedule** (⌥⇧, or ⌘⏎ → 📅 Schedule…) moves one item without breaking the line:
-
-| Type | Does |
-|---|---|
-| `+3`, `+3d`, `+2w` | Extend by that much |
-| `-1`, `-1d` | Pull the end in |
-| 🌙 Tomorrow | Start tomorrow, same length |
-| `12.10`, `next mon` | Start on that date, same length |
-
-Every later item in the same year objective moves by the same amount, so the plan's total length stays true. Parents stretch to cover their children. Extending an objective extends its last open key result. Done items never move. Dates in the past, times of day, and pull-ins longer than the item are refused - the row tells you why before you press ⏎.
-
-A drag in the TickTick timeline does not ripple (nothing can see a drag happen), but the parent re-covers its children on the next heal.
+All of it happens in TickTick's timeline: drag an item, stretch it, slide it. TickAL moves no dates on its own, and nothing you drag moves anything else. The one thing that follows a drag is the parent: an objective re-covers its key results, a year objective its objectives, on the next hub open or hourly sync (the heal below).
 
 ## Adding to the plan
 
@@ -96,7 +84,7 @@ The copy is made undated (drag it into place), named with the prefix and code, a
 
 ## Actions on an OKR item
 
-⌘⏎ on any item in the plan shows its own rows first - **📅 Schedule…**, **🔗 Link…**, **🏷 Tag…**, **🔑 Add KRs** (objectives), **✔️ Done** (key results) - and drops the generic ones that would drag a planning copy into a time block (add to today, day goal, timed schedule, reminders, focus).
+⌘⏎ on any item in the plan shows its own rows first - **🔗 Link…**, **🏷 Tag…**, **🔑 Add KRs** (objectives), **✔️ Done** (key results) - and drops the generic ones that would drag a planning copy into a time block (add to today, day goal, timed schedule, reminders, focus).
 
 **🏷 Tag…** offers only plan tags (the area subtags and the tags your year objectives and objectives carry). It replaces the plan tag and keeps any other tag; on an objective, its open key results follow.
 
@@ -129,15 +117,15 @@ Of the tasks you finished this week (routine lists, the plan's own copies and wo
 
 ## The quarter carry-over
 
-When a quarter ends, every key result it leaves open gets one decision, so nothing leaks silently into the next one. During a quarter's last two weeks (and after it ends, while its leftovers are still open) the hub shows **↪️ Carry-over · Q3 · 5 open**. It lists every open, dated key result that ends by the quarter's last day, earlier quarters' leftovers included. ⏎ on one opens its three choices:
+When a quarter ends, every key result it leaves open gets one decision, so nothing leaks silently into the next one. During a quarter's last two weeks (and after it ends, while its leftovers are still open) the hub shows **↪️ Carry-over · Q3 · 5 open**. It lists every open, dated key result that ends by the quarter's last day, earlier quarters' leftovers included. ⏎ on one opens its choices:
 
 | Choice | Does |
 |---|---|
-| ↪️ Carry into Q4 | Starts it on the next quarter's first day (today, when that day is already past), same length. The rest of its line moves along, like any schedule action. |
+| 📆 Move it in TickTick | Opens the copy so you drag it into the next quarter. Nothing else moves. |
 | 🚫 Won't do | TickTick's won't do: out of progress and pace. Undo it from 🚫 Won't Do. |
 | 💤 Someday | Takes its dates away: off the timeline, still in the plan and in its objective's count. |
 
-On the list, ⇧ still ticks a key result done and ⌥⇧ still schedules it to any date. After each decision the list reopens with the next leftover on top. The 🌓 Quarterly Review's checklist opens this screen (see below).
+On the list, ⇧ still ticks a key result done. After each decision the list reopens with the next leftover on top. The 🌓 Quarterly Review's checklist opens this screen (see below).
 
 ## Countdowns
 
@@ -166,8 +154,7 @@ All three run when you open the hub (at most every five minutes) and with the op
 ## Limitations
 
 - Key results are deliverables. There are no numeric key results; the only number is progress (ticked key results over all of them).
-- A drag in the timeline does not ripple.
-- Pulling the line in mirrors pushing it out: later items move earlier by the same amount.
+- TickAL moves no dates: scheduling, and pushing later items along when one slips, is done by hand in the timeline.
 
 ## Related
 

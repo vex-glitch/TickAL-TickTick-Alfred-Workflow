@@ -11,6 +11,7 @@ dir, and okr_list_id rides the env the way config.get_okr_list_id reads it.
 """
 import base64
 import contextlib
+import fcntl
 import io
 import json
 import os
@@ -30,6 +31,7 @@ os.environ["okr_list_id"] = PID
 import cache  # noqa: E402
 import okr  # noqa: E402
 import okr_write as ow  # noqa: E402
+from api import RateLimitError  # noqa: E402
 
 FAILS = []
 COUNT = [0]
@@ -435,188 +437,6 @@ try:
     res = ow.apply_spans(snap, [(f"X{i}", d(11, 3), d(11, 4)) for i in range(120)], api, v2)
     check("batches of 50: 120 items = 3 requests", [len(b) for b in v2.batches] == [50, 50, 20],
           [len(b) for b in v2.batches])
-
-    # ── 2. schedule ──────────────────────────────────────────────────────────
-    print("schedule")
-    api, v2 = world()
-    msg = ow.schedule({"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    wrote = {b["id"]: b for b in v2.batches[0]}
-    check("extend a KR +3: the KR and its stale O are written, nothing else",
-          set(wrote) == {"K2", "O1"}, set(wrote))
-    check("the KR lands on Oct 5 - Oct 17", okr.span(wrote["K2"]) == (d(10, 5), d(10, 17)))
-    check("its O heals onto Sep 19 - Oct 17", okr.span(wrote["O1"]) == (d(9, 19), d(10, 17)),
-          okr.span(wrote["O1"]))
-    check("another lane (O2, no shared Y) stays put", "O2" not in wrote and "K6" not in wrote)
-    check("toast: name, new span, the heal", msg == "📅 Hub → Oct 5 - Oct 17 · 1 healed", msg)
-
-    api, v2 = world()
-    msg = ow.schedule({"id": "O1", "action": "extend", "arg": "+2"}, api, v2, today=TODAY)
-    wrote = {b["id"]: b for b in v2.batches[0]}
-    check("extend an O: handed to its LAST open KR", okr.span(wrote["K2"]) == (d(10, 5), d(10, 16)))
-    check("extend an O: the O ends on the asked day", okr.span(wrote["O1"]) == (d(9, 19), d(10, 16)))
-    check("toast names the KR it went through", msg == "📅 TickAL → Sep 19 - Oct 16 · via Hub", msg)
-
-    api, v2 = world()
-    snap0 = snapshot(api, v2)
-    plan = okr.schedule_plan(snap0.items, "O1", "date", d(10, 1), TODAY)
-    msg = ow.schedule({"id": "O1", "action": "date", "arg": "2026-10-01"}, api, v2, today=TODAY)
-    wrote = {b["id"]: okr.span(b) for b in v2.batches[0]}
-    want = {}
-    for i, s, e in plan[0] + plan[1]:
-        want[i] = (s, e)
-    by0 = okr.index(snap0.items)
-    want = {i: se for i, se in want.items()
-            if not ((by0[i].start, by0[i].end) == se and by0[i].raw.get("isAllDay") is True)}
-    check("pick a date on an O: exactly okr.schedule_plan's moves + heals are written",
-          wrote == want, (wrote, want))
-    check("pick a date: the toast counts what moved along", "moved along" in msg, msg)
-
-    api, v2 = world()
-    msg = ow.schedule({"id": "K3", "action": "tomorrow", "arg": None}, api, v2, today=TODAY)
-    wrote = {b["id"]: b for b in v2.batches[0]}
-    check("tomorrow on an undated KR: one day, all-day exclusive form",
-          okr.span(wrote["K3"]) == (d(9, 19), d(9, 19)) and wrote["K3"]["isAllDay"] is True,
-          okr.span(wrote["K3"]))
-
-    api, v2 = world()
-    r = refused(ow.schedule, {"id": "K4", "action": "extend", "arg": 2}, api, v2, today=TODAY)
-    check("a done KR: okr's own refusal, toasted as is", r and "closed" in r, r)
-    check("... and nothing written", not v2.batches and not api.of("update_task"))
-    r = refused(ow.schedule, {"id": "K3", "action": "extend", "arg": 2}, api, v2, today=TODAY)
-    check("extend on an undated KR is refused", r and "no dates" in r, r)
-    r = refused(ow.schedule, {"id": "nope", "action": "extend", "arg": 2}, api, v2, today=TODAY)
-    check("an id gone from the list is refused", r and "Not in the OKR list" in r, r)
-    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": "abc"}, api, v2, today=TODAY)
-    check("extend by a non-number is refused", r and "how many days" in r, r)
-    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": True}, api, v2, today=TODAY)
-    check("extend by a bool is refused", r is not None, r)
-    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 99999}, api, v2, today=TODAY)
-    check("extend by 99999 days is refused", r is not None, r)
-    r = refused(ow.schedule, {"id": "K2", "action": "date", "arg": "2026-13-40"}, api, v2, today=TODAY)
-    check("a bad date is refused", r and "Not a date" in r, r)
-    r = refused(ow.schedule, {"id": "K2", "action": "later"}, api, v2, today=TODAY)
-    check("an unknown action is refused", r == "📅 Nothing to schedule", r)
-    check("refusals wrote nothing", not v2.batches and not api.of("update_task"))
-
-    api, v2 = world(completed=False)
-    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    check("WRITER RULE: completed KRs unreadable = refused", r and "Not written" in r, r)
-    check("... nothing written", not v2.batches and not api.of("update_task"))
-    api, v2 = world(token="")
-    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    check("no v2 token: the toast names the Attachment Login", r and "Attachment Login" in r, r)
-
-    # B2 the rate limit (300 / 5 min) says to WAIT. It reaches a toast by v1
-    # only: api.RateLimitError is the v1 client's, and api_v2.
-    # project_completed never raises - a v2 limit answers None, which reads
-    # "completed KRs unreadable" like any other v2 blip.
-    from api import RateLimitError
-    RATE = "🥅 Not written · TickTick rate limit · try again in a minute"
-
-    class RateAPI(FakeAPI):
-        def get_project_data(self, pid):
-            self.calls.append(("get_project_data", pid))
-            raise RateLimitError("exceed_query_limit")
-
-    o, dn = fixture()
-    seed_cache(o, dn)
-    api = RateAPI(o, dn)
-    v2 = FakeV2(api)
-    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    check("B2 v1 rate-limited (only the cache answered): 'rate limit · try again in a "
-          "minute'", r == RATE and ow.RATE_LIMITED == RATE and wrote_nothing(api, v2), r)
-    r = refused(ow.add_items, {"kind": "O", "names": ["x"],
-                               "link": {"to": "list", "pid": "3" * 24}}, api, v2)
-    check("B2 ... a linked add says the same", r == RATE and wrote_nothing(api, v2), r)
-    r = refused(ow.add_items, {"kind": "O", "names": ["x"]}, api, v2)
-    check("B2 ... and a typed one, never 'unreachable'", r == RATE and wrote_nothing(api, v2), r)
-    MEM.clear()
-    r = refused(ow.retag, {"id": "K1", "tag": "1️⃣work"}, api, FakeV2(api))
-    check("B2 v1 rate-limited with no cache to fall back on (OkrLoadError): the same",
-          r == RATE, r)
-
-    class LimitedV2(FakeV2):
-        """What a v2 rate limit really looks like: project_completed None."""
-        def project_completed(self, pid, days=120, limit=500):
-            return None
-
-    api, _v = world()
-    v2 = LimitedV2(api)
-    r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    check("B2 v2 limited (project_completed None, it never raises): 'completed KRs "
-          "unreadable', not the rate-limit wording",
-          r == "🥅 Not written · completed KRs unreadable right now · try again"
-          and wrote_nothing(api, v2), r)
-
-    api, v2 = world()
-    import fcntl
-    with open(ow.LOCK_FILE, "a") as held:
-        fcntl.flock(held, fcntl.LOCK_EX)
-        r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-        fcntl.flock(held, fcntl.LOCK_UN)
-    check("the lock held elsewhere: waits LOCK_WAIT, then refuses busy", r and "Busy" in r, r)
-    check("... and read nothing", not api.of("get_project_data"))
-
-    api, v2 = world()
-    os.environ["okr_list_id"] = ""
-    try:
-        r = refused(ow.schedule, {"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    finally:
-        os.environ["okr_list_id"] = PID
-    check("OKRs off (blank list id): refused, pointing at Settings", r and "Settings" in r, r)
-
-    api, v2 = world()
-    r = refused(ow.schedule, {"id": "K3", "action": "date", "arg": "2026-09-17"}, api, v2,
-                today=TODAY)
-    check("W2 a picked day before today is refused, before any read",
-          r == "📅 That day is gone · today or later" and not api.calls, r)
-    msg = ow.schedule({"id": "K3", "action": "date", "arg": "2026-09-18"}, api, v2, today=TODAY)
-    check("... today itself is fine", msg.startswith("📅 Eagle → Sep 18"), msg)
-
-    api, v2 = world()
-    r = refused(ow.schedule, {"id": "K5", "action": "extend", "arg": 2}, api, v2,
-                today=d(9, 25))
-    check("W2 an extend whose new end is before today is refused",
-          r == "📅 That end is gone · today or later" and wrote_nothing(api, v2), r)
-    msg = ow.schedule({"id": "K5", "action": "extend", "arg": 2}, api, v2, today=d(9, 23))
-    check("... ending ON today is fine", msg.startswith("📅 Side quest → Sep 20 - Sep 23"), msg)
-
-    api, v2 = world()
-    r = refused(ow.schedule, {"id": "K5", "action": "extend", "arg": -5}, api, v2, today=TODAY)
-    check("W2 a pull-in longer than the item: 'bad span' in words",
-          r == "📅 Longer than the item · pick a date" and wrote_nothing(api, v2), r)
-    r = refused(ow.schedule, {"id": "O1", "action": "extend", "arg": -40}, api, v2, today=TODAY)
-    check("... handed down from an O too", r == "📅 Longer than the item · pick a date", r)
-
-    api, v2 = world(ok=False)
-    api.fail_update = True
-    msg = ow.schedule({"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    check("W10 nothing written: the toast says where it STAYS",
-          msg == "📅 Not written · Hub stays on Oct 5 - Oct 14", msg)
-
-    api, v2 = world(ok=False)
-    api.fail_ids = {"K2"}
-    msg = ow.schedule({"id": "K2", "action": "extend", "arg": 3}, api, v2, today=TODAY)
-    check("the item itself not written (its heal was): never '→ <new span>'",
-          msg == "📅 Not written · Hub stays on Oct 5 - Oct 14 · ⚠️ 1 not written, 1 were", msg)
-
-    # the "stays on" span is the HEALED one - the span every screen shows -
-    # never the stale stored one (O1: stored Sep 29 - Oct 24, healed Sep 19 - Oct 14)
-    api, v2 = world(ok=False)
-    api.fail_update = True
-    msg = ow.schedule({"id": "O1", "action": "extend", "arg": 2}, api, v2, today=TODAY)
-    check("a stale-stored O not written: it stays on its HEALED span",
-          msg == "📅 Not written · TickAL stays on Sep 19 - Oct 14", msg)
-    api, v2 = world(ok=False)
-    api.fail_ids = {"K2"}
-    msg = ow.schedule({"id": "O1", "action": "extend", "arg": 2}, api, v2, today=TODAY)
-    check("an O extend whose carrier KR failed: never '→ <new span>'",
-          msg.startswith("📅 Not written · TickAL stays on Sep 19 - Oct 14"), msg)
-    api, v2 = world()
-    r = refused(ow.schedule, {"id": "O1", "action": "extend", "arg": 2}, api, v2,
-                today=d(10, 20))
-    check("W2 the end-before-today test reads the O's HEALED end (Oct 14 + 2 < Oct 20)",
-          r == "📅 That end is gone · today or later" and wrote_nothing(api, v2), r)
 
     # ── 3. add_krs ───────────────────────────────────────────────────────────
     print("add_krs")
@@ -2248,7 +2068,10 @@ try:
         _real_set("okr_rows", stale)
         time.sleep(0.01)
         api = FakeAPI(o, dn)
-        ow.schedule({"id": "K2", "action": "extend", "arg": 3}, api, FakeV2(api), today=TODAY)
+        # the heal is the span writer now (2026-09-23): O1's stored span is
+        # stale in the fixture, so this pass writes one span through
+        # apply_spans + patch_cache, the road the check is about
+        ow.heal_and_tick(api, FakeV2(api), is_done=lambda p_, t: None, today=TODAY)
 
         def mt(k):
             return os.stat(os.path.join(cache.CACHE_DIR, f"{k}.json")).st_mtime_ns
@@ -2258,10 +2081,10 @@ try:
               all(mt("okr_rows") >= mt(k) for k in ("all_tasks", f"project_data_{PID}",
                                                     "completed_tasks")))
         rc = cache.get("okr_rows")
-        k2 = next((t for t in rc["rows"] if t["id"] == "K2"), {})
+        o1 = next((t for t in rc["rows"] if t["id"] == "O1"), {})
         check("file cache: rebuilt fresh - the stale row gone, the write in, the shape",
               all(t["id"] != "GONE" for t in rc["rows"]) and rc["done_complete"] is True
-              and okr.span(k2) == (d(10, 5), d(10, 17)), (rc.get("done_complete"), okr.span(k2)))
+              and okr.span(o1) == (d(9, 19), d(10, 14)), (rc.get("done_complete"), okr.span(o1)))
     finally:
         cache.get, cache.set, cache.invalidate, cache.age_seconds = mem_fns
         cache.CACHE_DIR = real_dir
@@ -2305,18 +2128,7 @@ try:
         out = run(xact._okr_run, "not-b64!", crashing)
         check("a bad payload", out == "🥅 Bad payload · nothing written\n", out)
 
-        real_sched = ow.schedule
-        ow.schedule = lambda spec: f"📅 got {spec['id']}"
         old_argv = sys.argv
-        try:
-            sys.argv = ["xact.py", "xact:okr_sched:" + b64({"id": "K2", "action": "extend",
-                                                             "arg": 1})]
-            out = run(xact.main)
-        finally:
-            sys.argv = old_argv
-            ow.schedule = real_sched
-        check("main routes xact:okr_sched", out == "📅 got K2\n", out)
-
         # phase 3: xact:okr_add, and where a write may land instead of back
         real_add = ow.add_items
         trig.clear()
@@ -2625,14 +2437,6 @@ try:
           r.chip == "🥅 1 span healed · ⏳ 1 countdown added"
           and v2.cds[0]["date"] == 20261014 and "countdowns: " in r.note, (r, v2.cds))
     os.remove(ow.CD_REGISTRY)
-    api, v2 = world()
-    v2.cds = [ours("O1", "🥅 TickAL", 20261014)]
-    out = attempt(ow.schedule, {"id": "K2", "action": "extend", "arg": 2}, api, v2, SEP20)
-    check("schedule: an extend that moves the O's end moves its countdown, said in the toast",
-          isinstance(out, str) and out.endswith("· ⏳ 1 countdown updated")
-          and v2.cds[0]["date"] == 20261016, (out, v2.cds))
-    if os.path.exists(ow.CD_REGISTRY):
-        os.remove(ow.CD_REGISTRY)
 
     # ── 11. phase 5: ↪️ the quarter carry-over ────────────────────────────────
     print("carry")
@@ -2642,9 +2446,6 @@ try:
           okr.closing_quarter(d(10, 3)).start == d(7, 1)
           and okr.closing_quarter(d(9, 16)).start == d(4, 1))
     check("closing quarter: a pin wins", okr.closing_quarter(d(9, 17), d(2, 3)).start == d(1, 1))
-    check("carry start: the next quarter's first day, or today when that is gone",
-          okr.carry_start(d(9, 30), d(9, 20)) == d(10, 1)
-          and okr.carry_start(d(9, 30), d(10, 3)) == d(10, 3))
     left = okr.carry_candidates(items, d(9, 30))
     check("candidates: open dated LEAVES ending by the quarter's end, end order "
           "(no parent with dated KRs, no done, no undated)",
@@ -2654,14 +2455,9 @@ try:
           [x.id for x in okr.carry_candidates(solo, d(9, 30))] == ["OX"])
 
     api, v2 = world()
-    out = attempt(ow.carry, {"id": "K5", "action": "carry", "arg": "2026-10-01"},
-                  api, v2, SEP20)
-    check("carry: rides schedule's date move (ripple, heals, its toast)",
-          out == "📅 Side quest → Oct 1 - Oct 2 · 2 moved along · 1 healed"
-          and okr.span(api.store["K5"]) == (d(10, 1), d(10, 2))
-          and okr.span(api.store["K7"]) == (d(10, 3), d(10, 4))
-          and okr.span(api.store["O1"]) == (d(9, 19), d(10, 25)),
-          (out, {k: okr.span(api.store[k]) for k in ("K5", "K7", "K2", "O1")}))
+    check("carry: a date move is no longer a decision here (TickTick's, 2026-09-23)",
+          refused(ow.carry, {"id": "K5", "action": "carry", "arg": "2026-10-01"},
+                  api, v2, SEP20) == "↪️ Nothing to decide" and wrote_nothing(api, v2))
     api, v2 = world()
     out = attempt(ow.carry, {"id": "K7", "action": "wontdo"}, api, v2, SEP20)
     ab = v2.abandoned[0] if v2.abandoned else {}

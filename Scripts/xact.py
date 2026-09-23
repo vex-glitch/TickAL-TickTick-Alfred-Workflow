@@ -242,10 +242,6 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
 🥅 OKRs (HANDOFF_OKR phase 2; writes in src/okr_write.py, screens browse.py
 ctx:okr*; b64 JSON payloads, each may carry "back": a ctx reopened after the
 write through BrowseCtx - clean bar):
-    xact:okr_sched:<b64>            📅 {"id","action":extend|tomorrow|date,
-                                    "arg":N|"YYYY-MM-DD"|null} - ripple in
-                                    the Y lane + parent heals, only from a
-                                    writable live read (okr.Snapshot)
     xact:okr_add:<b64>              ➕ {"kind":Y|O|KR,"parent":id|null,
                                     "names":[...],"code":str|null,"link":
                                     {"to":task|list,"pid","tid"}|null,
@@ -265,11 +261,11 @@ write through BrowseCtx - clean bar):
     xact:okr_heal                   detached heal + auto-tick + the ⏳
                                     countdowns (the hub spawns it on open,
                                     debounced; hourly sync too)
-    xact:okr_carry:<b64>            ↪️ {"id","action":carry|wontdo|someday,
-                                    "arg":"YYYY-MM-DD"|null} one quarter
-                                    carry-over decision (phase 5): carry =
-                                    okr_sched's date move, wontdo = v2
-                                    status -1, someday = undated
+    xact:okr_carry:<b64>            ↪️ {"id","action":wontdo|someday} one
+                                    quarter carry-over decision (phase 5):
+                                    wontdo = v2 status -1, someday = undated;
+                                    carrying it forward is a DRAG in TickTick
+                                    (2026-09-23: TickAL moves no OKR dates)
     xact:okr_setlist                ⚙️ Settings → OKR List dialog (blank = off,
                                     no kanban flip: a timeline list)
     xact:meal_sync:<b64 {back}>     🔄 Sync with Mela: new recipes in,
@@ -12403,14 +12399,6 @@ def meal_price_search(rest):
     _meal_run(rest, run)
 
 
-def okr_sched(rest):
-    """📅 extend +N / 🌙 tomorrow / pick a date on one OKR item, with the
-    ripple through its Y lane and the parent heals (okr.schedule_plan) -
-    only from a writable live read."""
-    import okr_write as ow
-    _okr_run(rest, ow.schedule)
-
-
 def okr_add(rest):
     """🥅 new 🏔️ Y / 🥅 O / 🔑 KR planning copies (HANDOFF_OKR phase 3):
     typed text (the pipe = siblings) or ONE imported task, note or list
@@ -12441,10 +12429,10 @@ def okr_tag(rest):
 
 
 def okr_carry(rest):
-    """↪️ one quarter carry-over decision (HANDOFF_OKR phase 5): carry into
-    the next quarter (the ripple of a schedule action), won't do, or
-    someday (undated) - from a writable live read, parents healed, the
-    countdowns in step. Lands back on the carry-over list."""
+    """↪️ one quarter carry-over decision (HANDOFF_OKR phase 5): won't do,
+    or someday (undated) - from a writable live read, parents healed, the
+    countdowns in step. Lands back on the carry-over list. Carrying an item
+    INTO the next quarter is a drag in TickTick (2026-09-23)."""
     import okr_write as ow
     _okr_run(rest, ow.carry)
 
@@ -12709,8 +12697,6 @@ def main():
             person_setup()
         elif verb == "people_setlist":
             people_setlist()
-        elif verb == "okr_sched":
-            okr_sched(rest)
         elif verb == "okr_add":
             okr_add(rest)
         elif verb == "okr_addkr":

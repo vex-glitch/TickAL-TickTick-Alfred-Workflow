@@ -780,13 +780,11 @@ def main():
                  f"xact:cretire:{tid}", "retire remove content", True),
             ]
         elif _is_okr:
-            # every drill lands on the hub's own screens (browse ctx:okr*),
-            # the ONE schedule / link / tag family the hub's ⌥⇧ also opens;
-            # their ⌃ and the verb's landing is the screen that lists it
+            # every drill lands on the hub's own screens (browse ctx:okr*);
+            # their ⌃ and the verb's landing is the screen that lists it. No
+            # 📅 Schedule: OKR dates are TickTick's (Vex 2026-09-23), a drag
+            # in the timeline
             entity_rows = [
-                ("📅 Schedule…", "Extend · tomorrow · a date",
-                 f"xact:crmbrowse:ctx:okrsched:{tid}",
-                 "schedule extend tomorrow date move ripple", not _okr_hist),
                 ("🔗 Link…", "Task · note · list",
                  f"xact:crmbrowse:ctx:okrlink:{tid}",
                  "link task note list original real", True),

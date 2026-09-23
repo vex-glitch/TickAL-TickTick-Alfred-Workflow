@@ -6,7 +6,7 @@ ctx riding env browse_ctx) against a FAKE cache in a temp dir.
 No network and no write anywhere real: okr.load is a stub that counts its
 calls, okr_write is a stub module that counts heal spawns, cache.CACHE_DIR
 points at a temp dir, and okr_list_id rides env. The dates are built around
-today, so "late", "behind" and the ripple preview are stable on any day.
+today, so "late" and "behind" are stable on any day.
 
 What it pins down (map_rows.md, the traps that burned the other hubs):
   * every row spells out all six chords, fresh dicts, ⌃ and ⌥ args empty,
@@ -249,10 +249,10 @@ try:
           browse.parse_ctx("okr")[0] == "folders")
 
     # ── parse_ctx: an OKR screen's bar is text ───────────────────────────
-    os.environ["browse_ctx"] = f"ctx:okrsched:{KR2}"
+    os.environ["browse_ctx"] = f"ctx:okrlink:{KR2}"
     os.environ["browse_back"] = ""
-    check("parse_ctx: 'tomorrow' typed on the schedule screen stays there",
-          browse.parse_ctx("tomorrow") == ("okrsched", [KR2], "tomorrow"),
+    check("parse_ctx: 'tomorrow' typed on the link screen stays there",
+          browse.parse_ctx("tomorrow") == ("okrlink", [KR2], "tomorrow"),
           browse.parse_ctx("tomorrow"))
     os.environ["browse_ctx"] = "ctx:okr"
     check("parse_ctx: 'today | review' typed on the hub stays a search",
@@ -292,16 +292,16 @@ try:
                                    "variables": {"browse_ctx": f"ctx:okr:y:{Y1}"}}, y)
     check("root: a Y aggregates its O's KRs - the completed one counts (live read)",
           "1/4 KRs" in y["subtitle"] and "behind 1d" in y["subtitle"], y["subtitle"])
-    check("root: ⇧ and ⌘⇧ dead on a Y/O, ⌥⇧ opens the schedule screen",
+    check("root: ⇧, ⌘⇧ and ⌥⇧ dead on a Y/O (scheduling is TickTick's, 2026-09-23)",
           y["mods"]["shift"]["valid"] is False and y["mods"]["cmd+shift"]["valid"] is False
-          and y["mods"]["alt+shift"]["arg"] == f"xact:crmbrowse:ctx:okrsched:{Y1}")
+          and y["mods"]["alt+shift"] == {"arg": "", "valid": False}, y["mods"])
     check("root: item rows are task rows (⌘ Actions on THE item, raw title)",
           y["variables"]["task_id"] == Y1 and y["variables"]["task_list_id"] == PID
           and y["variables"]["task_title"] == "🏔️ Y • Productivity System"
           and y["variables"]["item_type"] == "task" and y["mods"]["cmd"]["valid"] is True)
     closed = rows[-1]
-    check("root: a closed O never schedules (⌥⇧ dead)",
-          closed["mods"]["alt+shift"]["valid"] is False)
+    check("root: no row schedules - ⌥⇧ dead on every item",
+          all(r["mods"]["alt+shift"]["valid"] is False for r in rows), closed["mods"])
     check("root: ⌃ goes back to the folders root",
           all(r["variables"]["browse_back"] == "ctx:folders" for r in rows))
     check("root: the live read is kept as okr_rows (the cache every other read uses)",
@@ -478,10 +478,10 @@ try:
           titles == [f"↪️ Carry-over · {browse._okr_q(far)} · 5 open", "🔑 Goals wf 🔗",
                      "🔑 Review", "🔑 Plan 🔗", "🔑 Publish", "🔑 Orphan deliverable"], titles)
     kr = rows[2]
-    check("carry: ⏎ on a leftover opens its three choices, the other chords as on the hub",
+    check("carry: ⏎ on a leftover opens its choices, the other chords as on the hub",
           kr["arg"] == f"xact:crmbrowse:ctx:okrcarry:{fk}:{KR2}" and "⏎↪️" in kr["subtitle"]
           and kr["mods"]["shift"]["arg"] == f"complete:{PID}:{KR2}:Review"
-          and kr["mods"]["alt+shift"]["arg"] == f"xact:crmbrowse:ctx:okrsched:{KR2}"
+          and kr["mods"]["alt+shift"]["valid"] is False
           and kr["variables"]["task_id"] == KR2, kr)
     check("carry: ⌃ back to the hub", all(r["variables"]["browse_back"] == "ctx:okr" for r in rows))
     rows = render(f"ctx:okrcarry:{fk}", "orphan")
@@ -490,22 +490,20 @@ try:
     rows = render(f"ctx:okrcarry:{fk}:{KR2}")
     check_rows("carry decision", rows)
     nq = _pm.next_period(far)
-    check("carry decision: head, then carry · won't do · someday",
+    check("carry decision: head, then open in TickTick · won't do · someday",
           rows[0]["title"].startswith("🔑 Review · ") and rows[0]["valid"] is False
           and "🥅 TickAL" in rows[0]["subtitle"]
-          and [r["title"] for r in rows[1:]] == [f"↪️ Carry into {browse._okr_q(nq)}",
+          and [r["title"] for r in rows[1:]] == ["📆 Move it in TickTick",
                                                  "🚫 Won't do", "💤 Someday"],
           [r["title"] for r in rows])
-    start = okr.carry_start(far.end, TODAY)
-    pays = {r["uid"]: b64(r["arg"], "xact:okr_carry:") for r in rows[1:]}
+    check("carry decision: carrying forward is a DRAG - the row opens the copy, moves nothing",
+          rows[1]["arg"] == f"open:ticktick:///webapp/#p/{PID}/tasks/{KR2}"
+          and browse._okr_q(nq) in rows[1]["subtitle"], rows[1])
+    pays = {r["uid"]: b64(r["arg"], "xact:okr_carry:") for r in rows[2:]}
     back = f"ctx:okrcarry:{fk}"
     check("carry decision: one okr_carry payload each, landing back on the pinned list",
-          pays == {"okrc-carry": {"id": KR2, "action": "carry", "arg": start.isoformat(), "back": back},
-                   "okrc-wontdo": {"id": KR2, "action": "wontdo", "arg": None, "back": back},
-                   "okrc-someday": {"id": KR2, "action": "someday", "arg": None, "back": back}}, pays)
-    check("carry decision: the carry previews the new span and the ripple (Publish moves along)",
-          rows[1]["subtitle"].startswith(okr.span_txt(start, start + timedelta(days=2), TODAY)
-                                         + " · moves 1 along"), rows[1]["subtitle"])
+          pays == {"okrc-wontdo": {"id": KR2, "action": "wontdo", "back": back},
+                   "okrc-someday": {"id": KR2, "action": "someday", "back": back}}, pays)
     check("carry decision: ⌃ back to the list it came from",
           all(r["variables"]["browse_back"] == back for r in rows))
     rows = render(f"ctx:okrcarry:{fk}:{KR4}")
@@ -520,167 +518,6 @@ try:
     rows = render("ctx:okrcarry:nonsense")
     check("carry: an unreadable pin falls back to the closing quarter",
           rows[0]["title"].startswith(f"↪️ Carry-over · {browse._okr_q(cq)} · "), rows[0]["title"])
-
-    # ── schedule ─────────────────────────────────────────────────────────
-    n_loads = len(LOADS)
-    rows = render(f"ctx:okrsched:{KR2}")
-    check_rows("schedule", rows)
-    check("schedule: reads the cache only (a preview, never a plan to write)",
-          len(LOADS) == n_loads)
-    titles = [r["title"] for r in rows]
-    check("schedule: head, +1 / +3 / +7, tomorrow, pick-a-date hint",
-          titles == [f"📅 Review · {okr.span_txt(day(0), day(2), TODAY)}", "⏩ +1 day",
-                     "⏩ +3 days", "⏩ +7 days", "🌙 Tomorrow", "📆 Pick a date · type it"], titles)
-    p1 = b64(rows[1]["arg"], "xact:okr_sched:")
-    check("schedule: +1 day = the extend payload, back = the screen that lists it",
-          p1 == {"id": KR2, "action": "extend", "arg": 1, "back": f"ctx:okr:o:{O1}"}, p1)
-    check("schedule: the preview names the new span and the ripple",
-          rows[1]["subtitle"].startswith(f"{okr.span_txt(day(0), day(3), TODAY)} · moves 1"),
-          rows[1]["subtitle"])
-    pt = b64(rows[4]["arg"], "xact:okr_sched:")
-    check("schedule: tomorrow carries no arg", pt["action"] == "tomorrow" and pt["arg"] is None, pt)
-    check("schedule: ⌃ goes to the item's O screen",
-          all(r["variables"]["browse_back"] == f"ctx:okr:o:{O1}" for r in rows))
-    rows = render(f"ctx:okrsched:{KR2}", "+5")
-    check("schedule: typed +5 = one extend row, arg 5",
-          len(rows) == 1 and b64(rows[0]["arg"], "xact:okr_sched:")["arg"] == 5, rows)
-    rows = render(f"ctx:okrsched:{KR2}", "-1")
-    check("schedule: typed -1 pulls in",
-          rows[0]["title"] == "⏪ Pull in 1 day"
-          and b64(rows[0]["arg"], "xact:okr_sched:")["arg"] == -1, rows[0])
-    rows = render(f"ctx:okrsched:{KR2}", "+0")
-    check("schedule: +0 moves nothing", rows[0]["valid"] is False)
-    rows = render(f"ctx:okrsched:{KR1}", "-1")
-    check("schedule: a pull-in that would end before today is a dead row",
-          rows[0]["valid"] is False and "That end is gone" in rows[0]["subtitle"], rows[0])
-    rows = render(f"ctx:okrsched:{KR1}", "+1")
-    check("schedule: an extend that ends TODAY is still offered",
-          rows[0]["valid"] is True, rows[0])
-    rows = render(f"ctx:okrsched:{KR2}", "+523w")
-    check("schedule: a length the verb refuses (> 3660 days) is never a ⏎",
-          rows[0]["valid"] is False and "Too long" in rows[0]["subtitle"], rows[0])
-    rows = render(f"ctx:okrsched:{KR2}", "+522w")
-    check("schedule: +522w is still a plan", rows[0]["valid"] is True, rows[0])
-    for dash in ("\u2212", "\u2013", "\u2014"):
-        rows = render(f"ctx:okrsched:{KR2}", dash + "1d")
-        check(f"schedule: a leading {dash!r} is a minus, never a date",
-              rows[0]["title"] == "⏪ Pull in 1 day"
-              and b64(rows[0]["arg"], "xact:okr_sched:")["arg"] == -1, rows[0])
-    target = day(30)
-    typed = f"{target.day}.{target.month}.{target.year}"
-    want_iso = dateutil.parse_date(typed)
-    rows = render(f"ctx:okrsched:{KR2}", typed)
-    got = b64(rows[0]["arg"], "xact:okr_sched:") if rows[0]["valid"] else rows[0]
-    check("schedule: a typed date = the date action, ISO arg",
-          want_iso and got.get("action") == "date" and got.get("arg") == want_iso[:10], (typed, got))
-    rows = render(f"ctx:okrsched:{KR2}", "tomorrow 14:00")
-    check("schedule: a time is refused (all-day only)",
-          rows[0]["title"] == "Dates only · no time" and rows[0]["valid"] is False)
-    rows = render(f"ctx:okrsched:{KR2}", "tomorrow")
-    check("schedule: 'tomorrow' typed is a date here, not the smart list",
-          rows[0]["valid"] is True and b64(rows[0]["arg"], "xact:okr_sched:")["arg"]
-          == (TODAY + timedelta(days=1)).isoformat(), rows[0])
-    rows = render(f"ctx:okrsched:{KR2}", "tom")
-    check("schedule: a word that is no date falls back to the rows it names",
-          [r["title"] for r in rows] == ["🌙 Tomorrow"], [r["title"] for r in rows])
-    rows = render(f"ctx:okrsched:{KR2}", "xyzzy")
-    check("schedule: nonsense says so", rows[0]["valid"] is False and "No date" in rows[0]["title"])
-    rows = render(f"ctx:okrsched:{KR6}")
-    ext = rows[1]
-    check("schedule: an undated KR cannot extend - the refusal is the subtitle",
-          ext["valid"] is False and "no dates to extend" in ext["subtitle"], ext)
-    check("schedule: an undated KR can still move to tomorrow", rows[4]["valid"] is True)
-    rows = render(f"ctx:okrsched:{KR4}")
-    check("schedule: a done KR never moves",
-          [r["title"] for r in rows][1] == "Closed · never moves" and len(rows) == 2)
-    rows = render(f"ctx:okrsched:{O1}")
-    check("schedule: +1 on an O goes to its last KR (the O ends a day later)",
-          rows[1]["valid"] is True
-          and rows[1]["subtitle"].startswith(okr.span_txt(day(-12), day(13), TODAY)),
-          rows[1]["subtitle"])
-
-    # S1: a bar led by + or - is a LENGTH, every spelling, and it never
-    # reaches dateutil (a bare "-2" or "+3 months" read as a date would be
-    # a silent wrong move)
-    SEEN = []
-    _pd, _pds = dateutil.parse_date, dateutil.parse_date_status
-    dateutil.parse_date = lambda x, _f=_pd: SEEN.append(x) or _f(x)
-    dateutil.parse_date_status = lambda x, _f=_pds: SEEN.append(x) or _f(x)
-    try:
-        bad = []
-        for typed, n in (("+3", 3), ("+3d", 3), ("+3 D", 3), ("+ 3 days", 3),
-                         ("+1 day", 1), ("+1DAY", 1), ("+1w", 7), ("+2W", 14),
-                         ("+ 2 weeks", 14), ("+1 Week", 7), ("-2", -2), ("-2d", -2),
-                         ("- 1 w", -7)):
-            rows = render(f"ctx:okrsched:{KR3}", typed)
-            got = b64(rows[0]["arg"], "xact:okr_sched:") if rows[0]["valid"] else {}
-            if len(rows) != 1 or got.get("action") != "extend" or got.get("arg") != n:
-                bad.append((typed, rows[0]["title"], rows[0]["subtitle"], got.get("arg")))
-        check("schedule: +N · +Nd · +N day(s) · +Nw · +N week(s), any case, any spacing",
-              not bad, bad)
-        rows = render(f"ctx:okrsched:{KR3}", "+2w")
-        check("schedule: weeks say weeks, the payload counts days",
-              rows[0]["title"] == "⏩ Extend +2 weeks", rows[0]["title"])
-        rows = render(f"ctx:okrsched:{KR3}", "-2")
-        check("schedule: a minus pulls in", rows[0]["title"] == "⏪ Pull in 2 days", rows[0]["title"])
-        bad = []
-        for typed in ("+", "-", "+x", "+3 months", "+2 wks", "-tomorrow", "+1.5", "+ 3 days later"):
-            rows = render(f"ctx:okrsched:{KR3}", typed)
-            if not (len(rows) == 1 and rows[0]["title"] == "+N longer · -N shorter"
-                    and rows[0]["valid"] is False):
-                bad.append((typed, [r["title"] for r in rows]))
-        check("schedule: a signed bar that is no length = one dead hint row", not bad, bad)
-        check("schedule: no signed bar ever reached dateutil", not SEEN, SEEN)
-    finally:
-        dateutil.parse_date, dateutil.parse_date_status = _pd, _pds
-
-    # S3: ANY typed time is refused, by parsedatetime's own status. Pinned
-    # to UTC+2 (Vex's summer offset): there "2am" is UTC midnight, and an
-    # ISO check alone read it as a plain date
-    _tz = os.environ.get("TZ")
-    os.environ["TZ"] = "Etc/GMT-2"                          # POSIX sign: UTC+2
-    time.tzset()
-    try:
-        check("dateutil: parse_date unchanged - '2am' at UTC+2 is UTC midnight",
-              (dateutil.parse_date("2am") or "")[11:19] == "00:00:00",
-              dateutil.parse_date("2am"))
-        st = {x: dateutil.parse_date_status(x) for x in ("tomorrow", "2am", "12.10 2am", "xyzzy")}
-        check("dateutil: parse_date_status = 1 date · 2 time · 3 both · 0 nothing",
-              st["tomorrow"][1] == 1 and st["2am"][1] == 2 and st["12.10 2am"][1] == 3
-              and st["xyzzy"] == (None, 0), st)
-        check("dateutil: parse_date_status's ISO is parse_date's",
-              dateutil.parse_date_status("12.10")[0] == dateutil.parse_date("12.10"))
-        bad = []
-        for typed in ("3pm", "2am", "12.10 2am", "tomorrow 14:00", "noon", "9 at 14"):
-            rows = render(f"ctx:okrsched:{KR2}", typed)
-            if not (len(rows) == 1 and rows[0]["title"] == "Dates only · no time"
-                    and rows[0]["valid"] is False):
-                bad.append((typed, rows[0]["title"]))
-        check("schedule: every typed time is refused - '2am', '12.10 2am' like '3pm'",
-              not bad, bad)
-    finally:
-        if _tz is None:
-            os.environ.pop("TZ", None)
-        else:
-            os.environ["TZ"] = _tz
-        time.tzset()
-
-    # S4: the past is refused, and a pull-in past the start says so in words
-    rows = render(f"ctx:okrsched:{KR2}", "yesterday")
-    check("schedule: a day before today is a dead row",
-          len(rows) == 1 and rows[0]["title"] == "That day is gone · today or later"
-          and rows[0]["valid"] is False, rows)
-    rows = render(f"ctx:okrsched:{KR2}", "today")
-    check("schedule: today itself is a date",
-          rows[0]["valid"] is True
-          and b64(rows[0]["arg"], "xact:okr_sched:")["arg"] == TODAY.isoformat(), rows[0])
-    iso_re = re.compile(r"\d{4}-\d{2}-\d{2}")
-    for who, iid, typed in (("a KR", KR2, "-5"), ("an O (its last KR's start)", O1, "-12")):
-        rows = render(f"ctx:okrsched:{iid}", typed)
-        check(f"schedule: {who} pulled in past its start = words, never raw ISO dates",
-              rows[0]["valid"] is False
-              and rows[0]["subtitle"].startswith("Longer than the item · pick a date")
-              and not iso_re.search(rows[0]["subtitle"]), rows[0])
 
     # ── add KRs ──────────────────────────────────────────────────────────
     rows = render(f"ctx:okraddkr:{O1}")
@@ -1153,7 +990,7 @@ try:
             ("root", browse.render_okr, [], ""), ("root search", browse.render_okr, [], "o"),
             ("O screen", browse.render_okr, ["o", O1], ""),
             ("pace", browse.render_okrpace, [], ""), ("pace plan", browse.render_okrpace, ["monthly"], ""),
-            ("schedule", browse.render_okrsched, [KR2], ""), ("add KRs", browse.render_okraddkr, [O1], "a | b"),
+            ("add KRs", browse.render_okraddkr, [O1], "a | b"),
             ("link", browse.render_okrlink, [KR2], ""), ("tag", browse.render_okrtag, [O1], ""),
             ("import", browse.render_okrimport, ["task", OTHERP, OTHERT], ""),
             ("import planned", browse.render_okrimport, ["task", REALP, REALT], ""),
@@ -1200,11 +1037,11 @@ try:
     items = menu(KR2, PID, "🔑 KR • Review - TA")
     titles = [i["title"] for i in items]
     op = titles.index("↗️ Open")
-    check("Actions KR: entity rows first, right after Open",
-          titles[op + 1:op + 5] == ["📅 Schedule…", "🔗 Link…", "🏷 Tag…", "✔️ Done"], titles)
+    check("Actions KR: entity rows first, right after Open (no 📅 Schedule - TickTick's)",
+          titles[op + 1:op + 4] == ["🔗 Link…", "🏷 Tag…", "✔️ Done"], titles)
     args = {i["title"]: i["arg"] for i in items}
     check("Actions KR: the drills ride xact:crmbrowse to the hub's own screens",
-          args["📅 Schedule…"] == f"xact:crmbrowse:ctx:okrsched:{KR2}"
+          "📅 Schedule…" not in args
           and args["🔗 Link…"] == f"xact:crmbrowse:ctx:okrlink:{KR2}"
           and args["🏷 Tag…"] == f"xact:crmbrowse:ctx:okrtag:{KR2}"
           and args["✔️ Done"].startswith(f"complete:{PID}:{KR2}:"), args)

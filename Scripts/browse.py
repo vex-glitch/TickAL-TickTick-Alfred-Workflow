@@ -35,8 +35,6 @@ Levels:
                                         with its children (HANDOFF_OKR.md)
     ctx:okrpace[:<tier>]                📈 Pace: quarter · month · week · day,
                                         or that period's plan
-    ctx:okrsched:<id>                   📅 schedule an OKR item (extend,
-                                        tomorrow, a date - ripple previewed)
     ctx:okraddkr:<oid>                  🔑 KRs under an O, "a | b | c =XY"
     ctx:okrlink:<id>                    🔗 link an OKR item to a task / list
     ctx:okrtag:<id>                     🏷 an OKR item's area / project tag
@@ -4871,18 +4869,19 @@ def render_rtrack(ids, query):
 # plan" (Vex 2026-09-18). The plan is ONE list of all-day planning copies
 # (src/okr.py reads it); these screens show it and hand every change to an
 # xact:okr_* verb, which re-reads LIVE before it writes (the writer rule in
-# okr.py's docstring). Nothing here writes TickTick, and a schedule preview
-# computed here is display only - the verb re-plans from a writable read.
+# okr.py's docstring). Nothing here writes TickTick. SCHEDULING IS
+# TICKTICK'S (Vex 2026-09-23): no screen here moves a date - he drags the
+# timeline, the parents heal.
 #
 # Chords, ALL SIX spelled out on EVERY row (a missing mod fires the row's
 # default arg down that chord's edge: ⌥ dumps it in the bar, ⇧ runs an
 # xact:crmbrowse through dispatch, ⌘⇧ with a ctx: arg navigates):
 #   Y / O row   ⏎⤵️ inside (xact:crmbrowse) · ⌥⤵️ the same hop, faster
-#               (a variable hop skips End's Sync click) · ⌥⇧📅 schedule ·
-#               ⌘⚡ Actions · ⌥⌘ copy link · ⇧ and ⌘⇧ dead
+#               (a variable hop skips End's Sync click) · ⌘⚡ Actions ·
+#               ⌥⌘ copy link · ⇧, ⌥⇧ and ⌘⇧ dead
 #   KR row      ⏎↗️ opens the COPY · ⇧✅ ticks it (⇧↩️ reopens a done or
 #               won't-do one) · ⌥⤵️ the
-#               REAL thing it links, in Alfred · ⌥⇧📅 · ⌘⚡ · ⌥⌘ copy link
+#               REAL thing it links, in Alfred · ⌘⚡ · ⌥⌘ copy link
 #   any other   ⌘ pinned dead: a row that is not a task would otherwise
 #               open ⌘ Actions on the LAST task acted on (actions.py
 #               recovers /tmp/ticktick_reattribute.txt when vars are blank)
@@ -5169,12 +5168,6 @@ def _okr_row(it, items, today, pid, want, real, head=False, where=None):
             mods["alt"] = {"arg": "", "valid": True, "subtitle": "⤵️ The real one",
                            "variables": {"browse_ctx": ctx}}
             chips.append("⌥⤵️")
-    if not it.history:
-        # actions_loop blanked: this road is the hub's, not ⌘ Actions' act-again
-        mods["alt+shift"] = {"arg": f"xact:crmbrowse:ctx:okrsched:{it.id}",
-                             "valid": True, "subtitle": "📅 Schedule",
-                             "variables": {"actions_loop": ""}}
-        chips.append("⌥⇧📅")
     chips += ["⌘⚡", "⌃🔙"]
     glyph = _OKR_GLYPH.get(it.kind, "▫️")
     state = "✅ " if it.done else ("🚫 " if it.abandoned else "")
@@ -5273,7 +5266,7 @@ def render_okr(ids, query):
     if left:
         extra.append(alfred.item(
             uid="okr-carry", title=f"↪️ Carry-over · {_okr_q(cq)} · {len(left)} open",
-            subtitle="Carry · won't do · someday  |  ⏎⤵️  ⌃🔙",
+            subtitle="Open · won't do · someday  |  ⏎⤵️  ⌃🔙",
             arg="xact:crmbrowse:ctx:okrcarry", valid=True,
             match="carry over quarter leftovers",
             variables=dict(_OKR_NO_TASK), mods=_okr_nav_mods("ctx:okrcarry")))
@@ -5419,11 +5412,12 @@ def render_okrcarry(ids, query):
     won't do / someday. Nothing leaks silently from one quarter into the
     next"): okr.carry_candidates for okr.closing_quarter - the quarter now
     ending in its last two weeks, else the one just gone - each a full hub
-    row (⇧✅ ⌥⇧📅 ⌘⚡ as everywhere) whose ⏎ opens its three choices.
-    ctx:okrcarry:<quarter start>:<id> - those three, each an xact:okr_carry
-    that lands back on the list, pinned to the same quarter, so the next
-    leftover is on top. A carry ripples like any schedule action: the rest
-    of the lane moves along, often out of the quarter with it."""
+    row (⇧✅ ⌘⚡ as everywhere) whose ⏎ opens its choices.
+    ctx:okrcarry:<quarter start>:<id> - 📆 open the copy in TickTick (carrying
+    it into the next quarter is a DRAG there: TickAL moves no dates, Vex
+    2026-09-23), 🚫 won't do and 💤 someday, the two an xact:okr_carry that
+    lands back on the list, pinned to the same quarter, so the next leftover
+    is on top."""
     import okr
     import periodic_model as pm
     from datetime import date as _date
@@ -5458,26 +5452,14 @@ def render_okrcarry(ids, query):
             return add_back(_okr_seal([head, alfred.item(
                 uid="okrc-closed", title="Closed already · nothing to decide",
                 subtitle="⌃🔙", valid=False)]), home)
-        start = okr.carry_start(q.end, today)
+        def pay(action):
+            return _b64({"id": it.id, "action": action, "back": home})
 
-        def pay(action, arg=None):
-            return _b64({"id": it.id, "action": action, "arg": arg, "back": home})
-
-        try:
-            moves, heals = okr.schedule_plan(items, it.id, "date", start, today)
-            new = {i: (a, b) for i, a, b in list(moves) + list(heals)}
-            ns, ne = new.get(it.id, (s, e))
-            n = len({m[0] for m in moves} - {it.id})
-            carry = alfred.item(
-                uid="okrc-carry", title=f"↪️ Carry into {_okr_q(nq)}",
-                subtitle=(f"{okr.span_txt(ns, ne, today)}"
-                          + (f" · moves {n} along" if n else "") + "  |  ⏎↪️  ⌃🔙"),
-                arg=f"xact:okr_carry:{pay('carry', start.isoformat())}",
-                valid=True, match="carry next quarter")
-        except ValueError as ex:
-            carry = alfred.item(uid="okrc-carry", title=f"↪️ Carry into {_okr_q(nq)}",
-                                subtitle=f"{ex}  |  ⌃🔙", valid=False,
-                                match="carry next quarter")
+        link = f"ticktick:///webapp/#p/{snap.list_id}/tasks/{it.id}"
+        carry = alfred.item(
+            uid="okrc-open", title="📆 Move it in TickTick",
+            subtitle=f"Drag it into {_okr_q(nq)} · nothing else moves  |  ⏎↗️  ⌃🔙",
+            arg=f"open:{link}", valid=True, match="open move drag carry next quarter")
         # the verb refuses a won't do with open work under it (it would
         # strand it): never offer that ⏎
         kids = okr._kids(items)
@@ -5525,7 +5507,7 @@ def render_okrcarry(ids, query):
         uid="okrc-list-head",
         title=f"↪️ Carry-over · {_okr_q(q)} · {len(left)} open",
         subtitle=(f"{_okr_q(q)} ends {okr.span_txt(q.end, q.end, today)} · "
-                  f"carry into {_okr_q(nq)} · won't do · someday  |  ⌃🔙"),
+                  f"open · won't do · someday  |  ⌃🔙"),
         valid=False)
     if not left:
         rows = [alfred.item(uid="okrc-clean", title=f"Nothing left open · {_okr_q(q)} is clean",
@@ -5546,131 +5528,6 @@ def _okr_item_for(ids):
     if it is None:
         return snap, None, by, _okr_gone()
     return snap, it, by, None
-
-
-# "+3" · "+3d" · "- 2 days" · "+1w" · "+2 Weeks": a length, never a date
-# okr_write.MAX_EXTEND: a length the verb refuses is never offered as a ⏎
-_OKR_MAX_EXTEND = 3660
-_OKR_EXTEND_RE = re.compile(r"([+-])\s*(\d{1,3})\s*(d|days?|w|weeks?)?", re.I)
-
-
-def render_okrsched(ids, query):
-    """ctx:okrsched:<id> - the ONE schedule screen (⌥⇧ on a hub row, 📅
-    Schedule… in ⌘ Actions): ⏩ +1 / +3 / +7 days, 🌙 Tomorrow, or typed:
-    a bar led by + or - is ALWAYS a length ("+N", "+Nd", "+N days", "+Nw",
-    "+N weeks"; a bare number is a DAY of the month to dateutil, so
-    extending needs its sign) and never reaches dateutil; anything else is
-    a date, today or later. No time entry ("we can remove add time",
-    HANDOFF_OKR section 4): parsedatetime's own status refuses one, since
-    "2am" at UTC+2 is UTC midnight and reads as a date by its ISO alone.
-    Each row previews "<new span> · moves N" from okr.schedule_plan over
-    the cache; a refusal (closed item, undated extend, a parent that
-    cannot land) is the row's subtitle and the row is dead. Rows fire
-    xact:okr_sched:<b64>."""
-    import okr
-    import dateutil
-    import periodic_model as pm
-    from datetime import date as _date
-    from periodic_rows import _b64
-    snap, it, by, problem = _okr_item_for(ids)
-    if problem:
-        return problem
-    items, today = snap.items, _date.today()
-    home = _okr_home(it, by)
-    want = okr.wanted_spans(items)
-    cur = _okr_span(it, want)
-    head = alfred.item(uid="okrs-head",
-                       title=f"📅 {it.name} · {okr.span_txt(cur[0], cur[1], today)}",
-                       subtitle="Type +N · -N · a date  |  ⌃🔙", valid=False)
-    if it.history:
-        return add_back(_okr_seal([head, alfred.item(
-            uid="okrs-closed", title="Closed · never moves",
-            subtitle="Reopen it first  |  ⌃🔙", valid=False)]), home)
-
-    def plan(uid, title, action, arg, match):
-        pay = {"id": it.id, "action": action,
-               "arg": arg.isoformat() if isinstance(arg, _date) else arg,
-               "back": home}
-        if action == "extend" and abs(arg) > _OKR_MAX_EXTEND:
-            return alfred.item(uid=uid, title=title,
-                               subtitle="Too long · pick a date  |  ⌃🔙",
-                               valid=False, match=match)
-        try:
-            moves, heals = okr.schedule_plan(items, it.id, action, arg, today)
-        except ValueError as e:
-            # "bad span 2026-09-18..2026-09-16" = pulled in past its start:
-            # said in words, never as raw ISO dates
-            why = ("Longer than the item · pick a date"
-                   if str(e).startswith("bad span") else str(e))
-            return alfred.item(uid=uid, title=title, subtitle=f"{why}  |  ⌃🔙",
-                               valid=False, match=match)
-        new = {i: (s, e) for i, s, e in moves}
-        new.update({i: (s, e) for i, s, e in heals})
-        s, e = new.get(it.id, cur)
-        if action == "extend" and e is not None and e < today:
-            # the verb refuses it too (okr_write.schedule): never offer a ⏎
-            # that can only answer "no"
-            return alfred.item(uid=uid, title=title,
-                               subtitle="That end is gone · today or later  |  ⌃🔙",
-                               valid=False, match=match)
-        n = len({m[0] for m in moves} - {it.id})
-        return alfred.item(uid=uid, title=title,
-                           subtitle=f"{okr.span_txt(s, e, today)} · moves {n}  |  ⏎📅  ⌃🔙",
-                           arg=f"xact:okr_sched:{_b64(pay)}", valid=True, match=match)
-
-    fixed = [plan(f"okrs-x{n}", f"⏩ +{n} day{'s' if n > 1 else ''}", "extend", n,
-                  f"+{n} extend longer")
-             for n in (1, 3, 7)]
-    fixed.append(plan("okrs-tmrw", "🌙 Tomorrow", "tomorrow", None,
-                      "tomorrow move next day"))
-    q = query.strip()
-    if q[:1] in ("\u2212", "\u2013", "\u2014"):
-        # text substitution turns a typed "-" into these; read as a date,
-        # "-3 days" would become a FORWARD move (review 2026-09-18)
-        q = "-" + q[1:]
-    if not q:
-        return add_back(_okr_seal([head] + fixed + [alfred.item(
-            uid="okrs-date", title="📆 Pick a date · type it",
-            subtitle="12.10 · next mon · 12 oct  |  ⌃🔙", valid=False)]), home)
-    # ONE answer per bar: what was typed wins; a word that is no date
-    # ("tom") falls back to the fixed rows it names before saying so
-    if q[0] in "+-":
-        # a sign = a length, ALWAYS: "-2" must never reach dateutil
-        m = _OKR_EXTEND_RE.fullmatch(q)
-        if not m:
-            return add_back(_okr_seal([alfred.item(
-                uid="okrs-typed", title="+N longer · -N shorter",
-                subtitle="+3 · +3d · +2w · -1d  |  ⌃🔙", valid=False)]), home)
-        k = int(m.group(2))
-        weeks = (m.group(3) or "d")[:1].lower() == "w"
-        n = k * (7 if weeks else 1) * (-1 if m.group(1) == "-" else 1)
-        word = f"{k} {'week' if weeks else 'day'}{'s' if k > 1 else ''}"
-        rows = [plan("okrs-typed",
-                     f"⏩ Extend +{word}" if n > 0 else f"⏪ Pull in {word}",
-                     "extend", n, q) if n else
-                alfred.item(uid="okrs-typed", title="Nothing to move",
-                            subtitle="+N longer · -N shorter  |  ⌃🔙", valid=False)]
-        return add_back(_okr_seal(rows), home)
-    iso, status = dateutil.parse_date_status(q)
-    d = _date.fromisoformat(iso[:10]) if iso else None
-    if iso and status != 1:
-        rows = [alfred.item(uid="okrs-typed", title="Dates only · no time",
-                            subtitle="OKR items are all-day  |  ⌃🔙", valid=False)]
-    elif d is not None and d < today:
-        rows = [alfred.item(uid="okrs-typed", title="That day is gone · today or later",
-                            subtitle=f"{pm.DAY_ABBR[d.weekday()]} · "
-                                     f"{okr.span_txt(d, d, today)}  |  ⌃🔙",
-                            valid=False)]
-    elif d is not None:
-        rows = [plan("okrs-typed",
-                     f"📆 {pm.DAY_ABBR[d.weekday()]} · {okr.span_txt(d, d, today)}",
-                     "date", d, q)]
-    else:
-        rows = (fuzz.filter_and_score(q, fixed, key_fn=lambda x: x.get("match") or x["title"])
-                or [alfred.item(uid="okrs-typed", title=f'No date in "{q}"',
-                                subtitle="12.10 · next mon · 12 oct · +N  |  ⌃🔙",
-                                valid=False)])
-    return add_back(_okr_seal(rows), home)
 
 
 _OKR_CODE_TOKEN = re.compile(r"(?:^|(?<=\s))=(\w{1,16})(?=\s|$)")
@@ -7701,8 +7558,8 @@ def main():
         elif level == "okrpace":
             items = render_okrpace(ids, query)
 
-        elif level in ("okrsched", "okraddkr", "okrlink", "okrtag"):
-            items = ({"okrsched": render_okrsched, "okraddkr": render_okraddkr,
+        elif level in ("okraddkr", "okrlink", "okrtag"):
+            items = ({"okraddkr": render_okraddkr,
                       "okrlink": render_okrlink, "okrtag": render_okrtag}[level](ids, query)
                      if ids else _missing(level, "<itemId>"))
 

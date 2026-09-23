@@ -4,7 +4,7 @@ phase 2). okr.py plans, this module writes; okr.py stays pure.
 
 Why src/ and not Scripts/xact.py: the hourly agent (src/sync.py) heals and
 auto-ticks too, and it cannot import Scripts/. So the xact verbs
-(okr_sched, okr_add, okr_addkr, okr_link, okr_tag, okr_heal) are thin
+(okr_add, okr_addkr, okr_link, okr_tag, okr_carry, okr_heal) are thin
 wrappers over the functions here, and sync.py calls heal_and_tick()
 directly. Phase 3 (import) adds add_items (every new Y / O / KR, typed or
 linked; add_krs is its KR alias), import_source (what the import screen
@@ -14,8 +14,8 @@ ask and nothing else. It asks plan_of / _verdict / planned exactly as
 add_items asks them of its live read, so the row, the screen and the verb
 never disagree, and a screen never offers a ⏎ the verb can only refuse.
 
-THE WRITER RULE (okr.py module docstring). A span write - a schedule
-action's ripple, the heal - and the auto-tick write only from a Snapshot
+THE WRITER RULE (okr.py module docstring). A span write (the heal), the
+auto-tick and the countdowns write only from a Snapshot
 that is .writable: a live read with every completed KR. A cache read, or one
 missing completed KRs, reads a ticked deliverable as deleted, and a plan
 built on that writes a wrong plan over the right one. Title, tag and new-KR
@@ -87,7 +87,6 @@ BATCH = 50                # v2 batch/task bodies per request
 ROWS_KEY = "okr_rows"     # the hub's cached snapshot (browse ctx:okr)
 COMPLETE_KEY = "okr_complete"   # the last COMPLETE read (remember_complete)
 AREA_ROOT = "0️⃣area"
-MAX_EXTEND = 3660         # days; a typo like +99999 is not a plan
 
 
 class Refusal(Exception):
@@ -426,10 +425,10 @@ SpanResult = namedtuple("SpanResult", "written failed")
 
 
 def apply_spans(snap, pairs, api=None, v2=None):
-    """Put items on new all-day spans: pairs = [(id, start, end_inclusive)],
-    a plan's MOVES then its HEALS - the later entry for an id wins, which is
-    how okr.ripple_plan means them. Planned from snap.items as STORED (the
-    module docstring: never a healed() copy). History never moves; an item
+    """Put items on new all-day spans: pairs = [(id, start, end_inclusive)]
+    - the later entry for an id wins. Since 2026-09-23 the ONLY caller is
+    the heal (scheduling is TickTick's). Planned from snap.items as STORED
+    (the module docstring: never a healed() copy). History never moves; an item
     already all-day on that exact span is not written (a TIMED one on it is:
     OKR items are all-day by rule). The cache follows only what TickTick
     took. THE WRITER RULE is checked here, whoever calls: a snap that is not
@@ -456,101 +455,6 @@ def apply_spans(snap, pairs, api=None, v2=None):
     ok = set(written)
     patch_cache(snap, patches={it.id: f for it, f in todo if it.id in ok})
     return SpanResult(written, failed)
-
-
-# ── 📅 schedule: extend / tomorrow / pick a date, with the ripple ────────────
-def _sched_arg(action, arg):
-    if action == "extend":
-        try:
-            if isinstance(arg, bool):
-                raise ValueError
-            n = int(str(arg).strip())
-        except (TypeError, ValueError):
-            raise Refusal(f"📅 Extend by how many days? Got {arg!r}")
-        if abs(n) > MAX_EXTEND:
-            raise Refusal(f"📅 {n:+d} days is not a plan")
-        return n
-    if action == "date":
-        try:
-            return date.fromisoformat(str(arg or "").strip())
-        except ValueError:
-            raise Refusal(f"📅 Not a date: {arg!r}")
-    return None
-
-
-def schedule(spec, api=None, v2=None, today=None):
-    """xact:okr_sched {"id", "action": extend|tomorrow|date, "arg"}. The
-    plan is okr.schedule_plan's (the ONLY way dates are computed - it reads
-    them off healed items), written moves-then-heals from the STORED items.
-    Its ValueErrors are refusals, toasted as they are (closed item, undated
-    extend, a parent that cannot land on the asked end) - "bad span" (a
-    pull-in longer than the item) in words. The past is refused: a picked
-    start before today, and an extend whose new end is before today (the
-    plan is a forecast; yesterday is not one). -> toast text."""
-    iid = str(spec.get("id") or "")
-    action = spec.get("action")
-    if not iid or action not in okr.SCHEDULE_ACTIONS:
-        raise Refusal("📅 Nothing to schedule")
-    arg = _sched_arg(action, spec.get("arg"))
-    today = today or date.today()
-    if action == "date" and arg < today:
-        raise Refusal("📅 That day is gone · today or later")
-    api, v2 = _clients(api, v2)
-    with _lock() as got:
-        if not got:
-            raise Refusal("🥅 Busy · another OKR write is running · try again")
-        snap = _load(api, v2, writable=True)
-        by = okr.index(snap.items)
-        it = by.get(iid)
-        if it is None:
-            raise Refusal("🥅 Not in the OKR list any more")
-        try:
-            moves, heals = okr.schedule_plan(snap.items, iid, action, arg, today)
-        except ValueError as e:
-            if str(e).startswith("bad span"):
-                raise Refusal("📅 Longer than the item · pick a date")
-            raise Refusal(f"📅 {e}")
-        # the span every screen shows for it: the HEALED one (a stale-stored
-        # O reads Sep 29 while all its screens say Sep 19). Taken BEFORE
-        # apply_spans folds the writes into snap.items.
-        h = okr.index(okr.healed(snap.items))[iid]
-        if action == "extend":
-            # the end schedule_plan asked for: the HEALED end + N
-            if h.end + timedelta(days=arg) < today:
-                raise Refusal("📅 That end is gone · today or later")
-        res = apply_spans(snap, list(moves) + list(heals), api, v2)
-        cd_chip = sync_countdowns(snap, v2, today)[0] if res.written else ""
-    final = {}
-    for i, s, e in list(moves) + list(heals):
-        final[i] = (s, e)
-    s, e = final.get(iid, (it.start, it.end))
-    span = okr.span_txt(s, e, today)
-    done = set(res.written)
-    if not done and not res.failed:
-        return f"📅 {it.name} already on {span}"
-    first = moves[0][0] if moves else None
-    stays = f"📅 Not written · {it.name} stays on {okr.span_txt(h.start, h.end, today)}"
-    if not done:
-        return stays
-    moved = {m[0] for m in moves}
-    along = sum(1 for m in moves if m[0] in done and m[0] not in (iid, first))
-    healed = sum(1 for h in heals if h[0] in done and h[0] != iid and h[0] not in moved)
-    if (first or iid) in res.failed:
-        # the item that carries the change did not take it: saying
-        # "→ <new span>" would be a lie, whatever else went through
-        return stays + f" · ⚠️ {len(res.failed)} not written, {len(done)} were"
-    msg = f"📅 {it.name} → {span}"
-    if first and first != iid and first in by:
-        msg += f" · via {by[first].name}"
-    if along:
-        msg += f" · {along} moved along"
-    if healed:
-        msg += f" · {healed} healed"
-    if res.failed:
-        msg += f" · ⚠️ {len(res.failed)} not written"
-    if cd_chip:
-        msg += f" · {cd_chip}"
-    return msg
 
 
 # ── 🔑 KRs under an O from one piped line ────────────────────────────────────
@@ -1950,7 +1854,7 @@ def sync_countdowns(snap, v2, today=None):
 
 
 # ── ↪️ the quarter carry-over: carry / won't do / someday (phase 5) ──────────
-CARRY_ACTIONS = ("carry", "wontdo", "someday")
+CARRY_ACTIONS = ("wontdo", "someday")
 
 
 def _carry_item(snap, iid):
@@ -2020,13 +1924,11 @@ def _after_close(snap, api, v2, today):
 
 
 def carry(spec, api=None, v2=None, today=None):
-    """xact:okr_carry {"id", "action", "arg", "back"} - ONE decision on an
-    item a quarter leaves open (okr.carry_candidates), the three HANDOFF_OKR
-    phase 5 names ("carry / won't do / someday per open KR"):
+    """xact:okr_carry {"id", "action", "back"} - ONE decision on an item a
+    quarter leaves open (okr.carry_candidates). Carrying it INTO the next
+    quarter is a drag in TickTick (2026-09-23: TickAL moves no dates); the
+    two decisions that are not a date are here:
 
-      carry    start on `arg` (okr.carry_start: the next quarter's first
-               day), same length, the lane rippling - schedule()'s "date",
-               refusals and toast included
       wontdo   TickTick's won't do (v2 status -1 + a stamped completedTime,
                the write xact.wontdo makes): out of progress, pace and
                spans; the parents heal in the same hold
@@ -2040,9 +1942,6 @@ def carry(spec, api=None, v2=None, today=None):
     if not iid or action not in CARRY_ACTIONS:
         raise Refusal("↪️ Nothing to decide")
     today = today or date.today()
-    if action == "carry":
-        return schedule({"id": iid, "action": "date", "arg": spec.get("arg")},
-                        api, v2, today)
     api, v2 = _clients(api, v2)
     if action == "wontdo" and not _has_token(v2):
         raise Refusal("🚫 Won't do needs the Attachment Login token (⚙️ Settings)")
