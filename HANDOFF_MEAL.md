@@ -184,6 +184,22 @@ web".
   dialog (manual), ⌥⇧ = re-search with a typed German term. Water and ice
   are free; a pc line against a per-gram entry is "unit mismatch" until
   the entry carries `piece_g`.
+- **D27 · The till** (2026-09-23; Vex: "Let's do what you pay at the till
+  please."). Beside the consumption cost, the packs one has to buy:
+  `meal_price.pack_need` converts a priced line's need into the entry's
+  pack base the way `line_cost` does, `list_till` pools needs per ENTRY key
+  within one list before rounding up (two salt lines = one pack),
+  `week_till` pools across the week (eggs in two recipes = 2 packs of 10,
+  not 2 + 1). An entry with no usable pack counts its consumption cost.
+  PANTRY: `DEFAULT_PANTRY` (salt, oils, vinegars, sauces, spices, sugar,
+  flour, stock, rice, pasta…) and an entry's `pantry` flag (typed as
+  "pantry" / "not pantry" into the price box) split the till so the hub can
+  say "till ≈ 58.40 € · 12.10 € of it pantry" instead of charging a jar of
+  paprika to every week. The cost line grows a chip: "≈ 8.24 € · 1.18
+  €/portion · till ≈ 12.90 € · 2 unpriced"; `read_cost_line` is a 4-tuple
+  now. The hub's 🏷 row reads "≈ 36.73 € used · till ≈ 58.40 €", the
+  ctx:mealgroc chip "≈ 8.24 € · till 12.90 €". The per-list till is that
+  list alone (an upper bound); only the hub's figure shares packs.
 
 ## 1. What it is (Vex's model)
 
@@ -268,10 +284,10 @@ for `meal` must never contain `{"do": "reset"}`.
 | `src/mela_cal.py` | IMPURE, stdlib: the calendar reader. `STORE_PATH`, `MelaCalError` (one toast line), `Planned` (date · start · all_day · uuid UPPER · title · calendar · event_id · url), `store_present`, `snapshot` (the mela.py shape, PermissionError → the FDA toast), `parse_url`, `plan(since, until)` (every calendar, url LIKE `mela://calendar/%`, skips hidden / cancelled / phantom_master, local date from start_tz), `freshness` |
 | `src/meal.py` | PURE: title grammar, slots (b/l/s/x), week arithmetic (`cook_week_of`, `cook_sunday`, `week_label`), `Meal` / `Week`, `slot_for_recipe`, `weeks_plan` (every week present, meals b,l,s,x → date → name), `week_meals`, `last_cooked` / `next_planned` (over the calendar plan), `sort_for_lib`, `sync_payload`, `sync_text`; since D21/D22 `COOKED_TAG`, the rating/notes grammar (`header_block`, `read_rating`, `read_comments`, `set_rating`, `add_comment`, `strip_mela_rating`, `adopt_mela_rating`, `stars`, `parse_stars`, `mint_header`) and the `cooked_payload` / `rate_payload` / `comment_payload` helpers |
 | `src/meal_scale.py` | PURE: yield ladder (field → text → protein estimate → none), quantity parser, half-up scaling, grocery filter; `tick_key` / `carry_ticks` (D25: ticked state carried by ingredient name + ordinal when a list is re-cut; the key strips a price suffix) |
-| `src/meal_price.py` | D26, PURE except `load_book` / `save_book` (the book, `~/.ticktick_alfred/meal_prices.json`) and `knuspr_fetch` (the ONE network call): `ingredient_key`, `DEFAULT_SEARCH` / `search_term`, `lookup`, `line_cost` / `list_cost` / `cost_line` / `read_cost_line`, `price_suffix` / `strip_price`, `knuspr_search` / `pick` / `entry_from` / `refresh`, `manual_entry` / `parse_price_answer`, `keys_of`, `FREE`; CLI `python3 src/meal_price.py <term>` (the live probe) and `--cost <line>…` |
+| `src/meal_price.py` | D26, PURE except `load_book` / `save_book` (the book, `~/.ticktick_alfred/meal_prices.json`) and `knuspr_fetch` (the ONE network call): `ingredient_key`, `DEFAULT_SEARCH` / `search_term`, `lookup`, `line_cost` / `list_cost` / `cost_line` / `read_cost_line`, `price_suffix` / `strip_price`, `knuspr_search` / `pick` / `entry_from` / `refresh`, `manual_entry` / `parse_price_answer`, `keys_of`, `FREE`; D27 `DEFAULT_PANTRY` / `is_pantry`, `pack_need` / `list_till` / `week_till`, `cost_line(total, till=)`; CLI `python3 src/meal_price.py <term>` (the live probe) and `--cost <line>…` |
 | `src/mela.py` | Mela DB snapshot + loader, `render_markdown` (byte-identical to the mela2ticktick script for a recipe without a Rating line; with one, the stars go into the head block), `rating_of` / `strip_rating` (D23), `meal_tag_for`, `freshness` |
 | `src/meal_notes.py` | the weekly bullet (`write_block`, seed rule) |
-| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13; since D21/D22 `mark_cooked` / `rate` / `comment` (live read, ONE update each, never a dialog) and `mirror_ratings` (cap 20, inside `sync` right after the fills, a rate limit there never aborts the week); D25 `set_portions` (one list re-cut, live read, one update), `week_lists`, `grocery_body(recipe, portions, book=None)`, `_portions_of`; D26 `reprice_lists` (ids and ticks kept, suffixes + cost line rewritten), `refresh_prices` (the 🏷 verb: keys of the week's lists → `meal_price.refresh` → `save_book` → `reprice_lists`), `set_price` / `set_search` (the book screen's two dialogs), `week_cost` (the hub's sum off the cached cost lines) |
+| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13; since D21/D22 `mark_cooked` / `rate` / `comment` (live read, ONE update each, never a dialog) and `mirror_ratings` (cap 20, inside `sync` right after the fills, a rate limit there never aborts the week); D25 `set_portions` (one list re-cut, live read, one update), `week_lists`, `grocery_body(recipe, portions, book=None)`, `_portions_of`; D26 `reprice_lists` (ids and ticks kept, suffixes + cost line rewritten), `refresh_prices` (the 🏷 verb: keys of the week's lists → `meal_price.refresh` → `save_book` → `reprice_lists`), `set_price` / `set_search` (the book screen's two dialogs; `set_price` also takes "pantry" / "not pantry"), `week_cost` (the hub's sum off the cached cost lines), `week_till` (D27, pooled packs across the cached week lists) |
 | `Scripts/browse.py` | `render_meal` (ctx:meal), `render_mealq` (ctx:mealq, the 13 weeks), `render_mealw` (ctx:mealw:<YYYY-MM-DD sunday>), `render_meallib` (ctx:meallib:<slot>), `render_mealgroc`, `render_mealrate` (ctx:mealrate:<pid>:<tid>[:<back level>], the star picker), `render_mealprice` (ctx:mealprice, the book: this week's keys first, ❓ unpriced on top, 🧾 knuspr / ✍️ manual / 📖 the rest; D26); the 🏷 Prices hub row; the 🥘 door row in `render_routines`; parse_ctx's alias guard covers `ctx:meal*` |
 | `Scripts/xact.py` | `_meal_run` (copy of `_okr_run`), `meal_sync`, `meal_setlist`, `_dry_meal`, `meal_cooked` (the one dialog), `meal_rate`, `meal_comment`, `meal_portions` (one dialog per list, D25), `meal_prices` (the refresh), `meal_price_set` / `meal_price_search` (one dialog each, D26) |
 | `Scripts/actions.py` | the recipe gate (`meal.is_library_title`): 👨‍🍳 Cooked · ⭐️ Rate… · 💬 Comment… lead the recipe task's ⌘ menu; generic verbs kept |
@@ -449,6 +465,19 @@ Makefile `test:` list. No network, never the real calendar.
     ⏎ into the book, ⏎ on a ❓ row (type "2.99 / 10 pc"), ⌥⇧ on a row (a
     search term), then a checklist in TickTick showing " · ≈ … €" items and
     the "≈ … €" first line.
+13. **The till, 2026-09-23 (D27) - zero canvas.** `meal_price.py`:
+    `DEFAULT_PANTRY`, `is_pantry`, `pack_need`, `list_till`, `week_till`,
+    `cost_line(total, till=)`, `read_cost_line` → 4-tuple. `meal_write.py`:
+    the till in `grocery_body` / `reprice_lists`, `week_till`, "pantry" /
+    "not pantry" in `set_price`. `browse.py`: the hub 🏷 row (used · till ·
+    pantry), the ctx:mealgroc chip, the book rows' pantry marker.
+    `xact.py`: the price box prompt. Built by a two-phase workflow (price
+    model + wiring in parallel → runner + one adversarial review). The
+    week's lists re-priced live once (the till chip appears on the next
+    reprice; `reprice_lists` after deploy). Vex smoke-gates: hub › 🏷 Prices
+    reads "≈ … € used · till ≈ … €" with the pantry share in the subtitle;
+    a 🛒 list's first line carries "till ≈ … €"; ⏎ on a book row, type
+    "pantry" → the row wears "· pantry" and the hub's pantry share moves.
 
 ## 8. Open / next
 

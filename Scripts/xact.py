@@ -12353,9 +12353,13 @@ def meal_price_set(rest):
     100 g", "7.97 / 1 l"), the entry's own pack as the default when the
     book has one; Esc or an empty box cancels with nothing written, and
     a text the writer cannot read is its refusal. A manual price wins
-    over knuspr's for good (the refresh never touches it). Payload
-    {"key","back"}. Asked INSIDE the writer call so a Refusal still
-    rides _meal_run; a dry run never opens the dialog."""
+    over knuspr's for good (the refresh never touches it). The same box
+    takes "pantry" / "not pantry" (D27, Vex 2026-09-23: "Let's do what
+    you pay at the till please."): the writer flips the entry's pantry
+    flag instead of parsing a price, so a staple the till should report
+    apart needs no second dialog. Payload {"key","back"}. Asked INSIDE
+    the writer call so a Refusal still rides _meal_run; a dry run never
+    opens the dialog."""
     import meal_price as mp
     import meal_write as mw
 
@@ -12366,7 +12370,7 @@ def meal_price_set(rest):
         if _dry_meal(spec):
             return f"🥘 Dry run · would ask a price for {key}"
         entry = ((mp.load_book().get("entries") or {}).get(key))
-        ans = _ask(f"🏷 {key} · price? (e.g. 2.99 / 10 pc, 1.49 / 100 g, 7.97 / 1 l)",
+        ans = _ask(f"🏷 {key} · price? (e.g. 2.99 / 10 pc, 1.49 / 100 g · or: pantry / not pantry)",
                    default=_price_default(entry if isinstance(entry, dict) else None))
         if ans is None or not ans.strip():
             return "🏷 Cancelled"

@@ -168,6 +168,10 @@ prows.date = _FakeDate
 # day word resolved against the real calendar and the week of 14 Sep
 # answered '💰 Not this week' on any later Monday (2026-09-21)
 pm.date = _FakeDate
+# ...and past_day's clock is _dayroll_today (the 04:00 day roll), not
+# pm.date: unpinned, '*mon' resolved against the real week again on
+# 2026-09-23 and the check read '💰 Not this week' once more
+pm._dayroll_today = lambda: TODAY
 
 r = prows.income_rows("")
 check("idle strip prompts then lists the week",

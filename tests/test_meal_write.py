@@ -33,7 +33,17 @@ call), refresh_prices (keys off the cached week lists, a FAKE fetch,
 the book saved to a temp path, the lists re-priced, the toast, dry = no
 fetch, no week = refused), set_price / set_search on a temp book,
 week_cost off the cached cost lines, and the real ~/.ticktick_alfred
-book never written. Caches and the book live in a temp dir.
+book never written, and (2026-09-23, D27, "Let's do what you pay at the
+till please.") the till: grocery_body's cost line carrying "till ≈ N €"
+(the packs pooled per entry: 875 g chicken = 2 packs of 500 g), _cost_of's
+3-tuple with till None on a pre-D27 line, week_cost's shape unchanged,
+week_till pooled ONCE across the week's lists off the cache (chicken in
+two lists = 4 packs, the oil ONE pack not two, its pantry share, (None,
+0.0, 0) with no list / no book / nothing priced), _repriced re-cutting the
+till when only the pack size moved, set_price's "pantry" / "not pantry"
+flipping the flag (a bare entry on a key without one, the flag kept under
+a later manual price, the bare entry pricing nothing). Caches and the
+book live in a temp dir.
 Run: python3 tests/test_meal_write.py
 """
 import os
@@ -959,8 +969,12 @@ BOOK = {"version": 1, "updated": "2026-09-22", "entries": {
     "oil": {"key": "oil", "search": "Öl", "product": "Rapsöl", "product_id": 2, "pack": "1 l",
             "pack_amount": 1000, "pack_unit": "ml", "price": 2.49, "per": 0.00249, "per_unit": "ml",
             "source": "knuspr", "date": "2026-09-22", "pinned": False, "url": ""}}}
-COST7 = "≈ 8.80 € · 1.26 €/portion · 1 unpriced"        # 875 g chicken 8.73 + 26.25 ml oil 0.07, soy unpriced
-COST5 = "≈ 6.29 € · 1.26 €/portion · 1 unpriced"
+# the till chip (D27) sits between the per-portion chip and the holes:
+# 875 g chicken = 2 packs of 500 g (9.98) + 26.25 ml oil = 1 pack of 1 l
+# (2.49) = 12.47; at 5 portions 625 g is still 2 packs, so the same till
+COST7 = "≈ 8.80 € · 1.26 €/portion · till ≈ 12.47 € · 1 unpriced"        # 875 g chicken 8.73 + 26.25 ml oil 0.07, soy unpriced
+COST5 = "≈ 6.29 € · 1.26 €/portion · till ≈ 12.47 € · 1 unpriced"
+COST7_OLD = "≈ 8.80 € · 1.26 €/portion · 1 unpriced"    # a line written before D27: no till chip
 LINES7 = ["875 g chicken · ≈ 8.73 €", "1 3/4 tbsp oil · ≈ 0.07 €", "3 1/2 tsp soy"]
 LINES5 = ["625 g chicken · ≈ 6.24 €", "1 1/4 tbsp oil · ≈ 0.05 €", "2 1/2 tsp soy"]
 BARE7 = ["875 g chicken", "1 3/4 tbsp oil", "3 1/2 tsp soy"]
@@ -970,8 +984,12 @@ check("grocery_body with a book: the suffix on every priced line, the unpriced o
       lines == LINES7, lines)
 check("grocery_body with a book: the cost line FIRST, the yield note under it",
       desc == COST7 + "\n" + NOTE7, desc)
-check("grocery_body with a book: meal.portions_of still reads the note, the cost line reads its own",
-      meal.portions_of(desc) == 7 and mw._cost_of(desc) == (8.80, 1), (meal.portions_of(desc), mw._cost_of(desc)))
+check("grocery_body with a book: meal.portions_of still reads the note, the cost line reads its own (with the till)",
+      meal.portions_of(desc) == 7 and mw._cost_of(desc) == (8.80, 1, 12.47), (meal.portions_of(desc), mw._cost_of(desc)))
+check("grocery_body: the till is the packs pooled per entry (2 x 500 g chicken + 1 l oil), the line says so",
+      desc.split("\n")[0] == COST7 and mp.list_till(BARE7, BOOK).total == 12.47
+      and mp.list_till(BARE7, BOOK).packs.get("chicken", (None,))[0] == 2
+      and mp.list_till(BARE7, BOOK).packs.get("oil", (None,))[0] == 1, (desc, mp.list_till(BARE7, BOOK)))
 check("grocery_body at 5 with a book", mw.grocery_body(BY[U1], 5, BOOK) == (LINES5, COST5 + "\n" + NOTE5),
       mw.grocery_body(BY[U1], 5, BOOK))
 check("grocery_body without a book, with None, with an empty book, with a bookless dict: byte-identical to before",
@@ -980,11 +998,14 @@ check("grocery_body without a book, with None, with an empty book, with a bookle
 check("grocery_body: a book that prices nothing on this recipe still writes an honest cost line",
       mw.grocery_body(BY[U1], 7, {"entries": {"unicorn": BOOK["entries"]["oil"]}})
       == (BARE7, "≈ 0.00 € · nothing priced yet\n" + NOTE7), mw.grocery_body(BY[U1], 7, {"entries": {"unicorn": {}}}))
-check("_cost_of: the module's reader or the regex fallback, None without a line",
-      mw._cost_of(COST7 + "\nx") == (8.80, 1) and mw._cost_of("≈ 4.47 €") == (4.47, 0)
+check("_cost_of: a 3-tuple (total, holes, till), None without a line",
+      mw._cost_of(COST7 + "\nx") == (8.80, 1, 12.47) and mw._cost_of("≈ 4.47 €") == (4.47, 0, None)
       and mw._cost_of(NOTE7) is None and mw._cost_of("") is None and mw._cost_of(None) is None
       and mw._cost_of("≈ 0.00 € · nothing priced yet") is None,
       (mw._cost_of(COST7 + "\nx"), mw._cost_of("≈ 4.47 €"), mw._cost_of(NOTE7)))
+check("_cost_of: a line written before D27 reads till None (never 0.00), a till without holes reads its till",
+      mw._cost_of(COST7_OLD + "\n" + NOTE7) == (8.80, 1, None) and mw._cost_of("≈ 4.47 € · till ≈ 6.38 €") == (4.47, 0, 6.38),
+      (mw._cost_of(COST7_OLD + "\n" + NOTE7), mw._cost_of("≈ 4.47 € · till ≈ 6.38 €")))
 
 # _write_groceries prices a new list from the book it is handed
 api = fresh()
@@ -1100,6 +1121,19 @@ at5 = mw._repriced(dict(STALE, items=[dict(it, title=ln) for it, ln in zip(STALE
                         content=COST7 + "\n" + NOTE5), BOOK)
 check("_repriced: the cost line is cut at the list's OWN count (the note's 5, not the sync's 7)",
       at5[1] == COST5 + "\n" + NOTE5 and [it["title"] for it in at5[0]] == LINES5, at5)
+# the till follows the PACK, not the per-gram price: chicken sold in 300 g
+# packs at the same €/kg keeps every suffix (8.73) but needs 3 packs (8.98)
+BOOK300 = {"entries": dict(BOOK["entries"], chicken=dict(BOOK["entries"]["chicken"], pack="300 g",
+                                                           pack_amount=300, price=2.994))}
+COST7_300 = "≈ 8.80 € · 1.26 €/portion · till ≈ 11.47 € · 1 unpriced"
+moved = mw._repriced(dict(STALE, items=[dict(it, title=ln) for it, ln in zip(STALE["items"], LINES7)],
+                          content=COST7 + "\n" + NOTE7), BOOK300)
+check("_repriced: a pack size that moved re-cuts the till (3 x 300 g = 8.98 + 2.49) with no suffix moving, and that IS a change",
+      moved[1] == COST7_300 + "\n" + NOTE7 and [it["title"] for it in moved[0]] == LINES7 and moved[2] is True, moved)
+old_line = mw._repriced(dict(STALE, items=[dict(it, title=ln) for it, ln in zip(STALE["items"], LINES7)],
+                             content=COST7_OLD + "\n" + NOTE7), BOOK)
+check("_repriced: a list priced before D27 gains the till chip on its cost line, the suffixes as they were",
+      old_line[1] == COST7 + "\n" + NOTE7 and old_line[2] is True and [it["title"] for it in old_line[0]] == LINES7, old_line)
 
 # refresh_prices: the keys off the cached week lists, a FAKE fetch, the book saved, the lists re-priced
 def prod(pid, name, pack, price, ppu):
@@ -1174,6 +1208,30 @@ check("week_cost over given lists: only the ones with a cost line count, None wh
       mw.week_cost([dict(STALE, content=COST7), dict(BARE, content=NOTE7), {"content": "≈ 1.20 €"}]) == (10.0, 1, 2)
       and mw.week_cost([dict(BARE, content=NOTE7)]) == (None, 0, 0) and mw.week_cost([]) == (None, 0, 0),
       mw.week_cost([dict(STALE, content=COST7), dict(BARE, content=NOTE7), {"content": "≈ 1.20 €"}]))
+check("week_cost's shape is untouched by the till chip: a pre-D27 line and a D27 line sum alike",
+      mw.week_cost([dict(STALE, content=COST7_OLD), dict(BARE, content=COST7)]) == (17.60, 2, 2),
+      mw.week_cost([dict(STALE, content=COST7_OLD), dict(BARE, content=COST7)]))
+
+# week_till: the packs pooled ONCE across the week (Vex 2026-09-23: "Let's
+# do what you pay at the till please."): two lists of 875 g chicken are
+# 1750 g = 4 packs of 500 g (19.96), the oil 52.5 ml = ONE pack (2.49),
+# not the two the per-list tills would add up to (2 x 12.47 = 24.94)
+check("week_till over given lists: pooled per entry across the lists, the oil's pantry share, 4 lines took part",
+      mw.week_till([STALE, BARE], BOOK) == (22.45, 2.49, 4), mw.week_till([STALE, BARE], BOOK))
+check("week_till pools across lists (one pack of oil), the per-list tills summed would not",
+      mw.week_till([STALE, BARE], BOOK)[0] < mp.list_till(BARE7, BOOK).total * 2
+      and mp.list_till(BARE7, BOOK).total * 2 == 24.94, mw.week_till([STALE, BARE], BOOK))
+n_wt = len(api.calls)
+check("week_till off the cached week lists (g_old + g_keep under the refreshed book), no live read",
+      mw.week_till() == (22.45, 2.49, 4) and api.calls[n_wt:] == [], (mw.week_till(), api.calls[n_wt:]))
+check("week_till: no list, an empty book, a book that prices nothing on these lines = (None, 0.0, 0)",
+      mw.week_till([], BOOK) == (None, 0.0, 0) and mw.week_till([STALE, BARE], {"entries": {}}) == (None, 0.0, 0)
+      and mw.week_till([dict(BARE, items=[{"title": "3 tsp soy"}])], BOOK) == (None, 0.0, 0)
+      and mw.week_till([None, 3], BOOK) == (None, 0.0, 0),
+      (mw.week_till([], BOOK), mw.week_till([STALE, BARE], {"entries": {}}), mw.week_till([dict(BARE, items=[{"title": "3 tsp soy"}])], BOOK)))
+check("week_till keys on the STRIPPED item titles: a suffixed list pools with a bare one",
+      mw.week_till([dict(STALE, items=[dict(it, title=ln) for it, ln in zip(STALE["items"], LINES7)]), BARE], BOOK) == (22.45, 2.49, 4),
+      mw.week_till([dict(STALE, items=[dict(it, title=ln) for it, ln in zip(STALE["items"], LINES7)]), BARE], BOOK))
 
 # set_price / set_search on the temp book
 if hasattr(mp, "parse_price_answer") and hasattr(mp, "manual_entry"):
@@ -1204,6 +1262,38 @@ if hasattr(mp, "parse_price_answer") and hasattr(mp, "manual_entry"):
         check("set_price: a blank key refuses", False)
     except mw.Refusal as e:
         check("set_price: a blank key refuses", str(e) == "🏷 No ingredient", str(e))
+    # "pantry" / "not pantry" in the price box (D27): the flag, never a price
+    res = mw.set_price("salt", "pantry")
+    e = mp.load_book()["entries"].get("salt")
+    check("set_price 'pantry' on a key without an entry: a bare {key, pantry} entry, saved, the toast",
+          e == {"key": "salt", "pantry": True} and res.msg == "🏷 salt · pantry" and res.reopen is None, (e, res))
+    check("set_price: the bare entry prices nothing (line_cost reads it as no entry) and is_pantry reads it",
+          mp.line_cost("500 g salt", mp.load_book()).reason == "no entry" and mp.is_pantry("salt", e) is True,
+          mp.line_cost("500 g salt", mp.load_book()))
+    res = mw.set_price("salt", "  Not   PANTRY ")
+    e = mp.load_book()["entries"].get("salt")
+    check("set_price 'not pantry' (case blind, spaces trimmed) flips the bare entry to False, is_pantry says so over the default",
+          e == {"key": "salt", "pantry": False} and res.msg == "🏷 salt · not pantry" and mp.is_pantry("salt", e) is False
+          and mp.is_pantry("salt") is True, (e, res.msg))
+    before = dict(mp.load_book()["entries"]["chicken"])
+    res = mw.set_price("chicken", "pantry")
+    e = mp.load_book()["entries"]["chicken"]
+    check("set_price 'pantry' on a priced entry: the flag added, the price and everything else kept",
+          e == dict(before, pantry=True) and res.msg == "🏷 chicken · pantry" and mp.is_pantry("chicken", e) is True, e)
+    res = mw.set_price("chicken", "8.99 / 1 kg", today=date(2026, 9, 22))
+    e = mp.load_book()["entries"]["chicken"]
+    check("set_price: a later manual price keeps the pantry flag (the piece_g rule)",
+          e.get("pantry") is True and e.get("source") == "manual" and abs(float(e["per"]) - 0.00899) < 1e-9
+          and res.msg == "🏷 chicken · 8.99 € / 1 kg · manual", e)
+    res = mw.set_price("chicken", "not pantry")
+    check("set_price 'not pantry' on a manual entry: False, the manual price still there",
+          mp.load_book()["entries"]["chicken"].get("pantry") is False and mp.load_book()["entries"]["chicken"]["source"] == "manual"
+          and res.msg == "🏷 chicken · not pantry", mp.load_book()["entries"]["chicken"])
+    try:
+        mw.set_price("chicken", "pantry please")
+        check("set_price: 'pantry please' is not the word, refused as a non-price", False)
+    except mw.Refusal as e:
+        check("set_price: 'pantry please' is not the word, refused as a non-price", str(e).startswith("🏷 "), str(e))
     del FETCHED[:]
     res = mw.set_search("chicken", "Hähnchen", today=date(2026, 9, 22), fetch=fake_fetch)
     e = mp.load_book()["entries"]["chicken"]

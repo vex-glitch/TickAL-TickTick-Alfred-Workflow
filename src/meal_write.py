@@ -57,6 +57,18 @@ background job - "this python script that runs in the background is
 unacceptable"), set_price and set_search are the book screen's two
 dialogs, week_cost is the hub's number off the cached cost lines.
 
+THE TILL (2026-09-23, D27). Vex: "Let's do what you pay at the till
+please." (the day after "Speculation is all I need."): beside what a list
+USES (350 g of bacon at the per-kilo price) the cost line now carries what
+the shop charges for the PACKS one has to buy (meal_price.list_till: needs
+pooled per book entry and rounded up once, two salt lines = one pack), and
+the hub's 🏷 row sums that till over the whole week pooled once more
+(week_till: eggs in two recipes are 20 eggs = 2 packs of 10, never 2 + 1),
+with the staples a kitchen already holds (meal_price.is_pantry) reported
+apart. The book screen's price box takes "pantry" / "not pantry" too
+(set_price), so a staple the default list does not know can be flagged
+without a price.
+
 Pointers are deleted rather than reopened or moved: HANDOFF_ROUTINES §8
 says API completion leaves a repeating task's children completed while the
 app reopens them - delete-then-create is the one shape that is right on
@@ -407,16 +419,29 @@ def _price_lines(lines, book, portions):
     return [ln + _suffix_for(c) for ln, c in zip(lines, total.costs)], total
 
 
+def _till_of(lines, book, total):
+    """The till figure the cost line carries for ONE list (D27, Vex
+    2026-09-23: "Let's do what you pay at the till please."): the packs
+    one has to buy, pooled per book entry over the BARE lines and rounded
+    up once (meal_price.list_till), or None when the book priced nothing
+    on this list - then the cost line keeps its "nothing priced yet" form
+    and a till of 0.00 € would only claim a shop visit that costs nothing."""
+    if not total.priced:
+        return None
+    return mp.list_till(lines, book).total
+
+
 def grocery_body(recipe, portions=meal.PORTIONS, book=None):
     """(checklist lines, description) for one recipe at `portions` - the
     sync's PORTIONS unless the portions verb asks for another count (the
     note then says "4 → 5 portions", and that note is how the count is
     read back: meal.portions_of). With a `book` that holds entries (D26)
     every line the book can price carries " · ≈ 4.52 €" and the cost line
-    ("≈ 18.40 € · 2.60 €/portion · 3 unpriced") is the FIRST line of the
-    description, the yield note under it - meal.portions_of still finds
-    its note, meal_price.read_cost_line its line. None or an empty book:
-    exactly the unpriced output, byte for byte."""
+    ("≈ 18.40 € · 2.60 €/portion · till ≈ 25.90 € · 3 unpriced", the till
+    chip since D27) is the FIRST line of the description, the yield note
+    under it - meal.portions_of still finds its note,
+    meal_price.read_cost_line its line. None or an empty book: exactly the
+    unpriced output, byte for byte."""
     import meal_scale
     lines, info = meal_scale.scaled_ingredients(recipe, portions)
     desc = info.get("note") or ""
@@ -426,8 +451,9 @@ def grocery_body(recipe, portions=meal.PORTIONS, book=None):
         desc += f"\n_({len(info['unscaled'])} line(s) had no quantity, left as written)_"
     desc = desc.strip()
     if _has_prices(book):
-        lines, total = _price_lines(lines, book, portions)
-        desc = mp.cost_line(total) + (f"\n{desc}" if desc else "")
+        bare = lines
+        lines, total = _price_lines(bare, book, portions)
+        desc = mp.cost_line(total, till=_till_of(bare, book, total)) + (f"\n{desc}" if desc else "")
     return lines, desc
 
 
@@ -1086,18 +1112,21 @@ def _week_keys(lists):
 
 
 def _cost_of(content):
-    """(total, unpriced count) off a list's cost line, None when it carries
-    none: meal_price.read_cost_line's (total, per portion, unpriced) with
-    the per-portion figure dropped. A "nothing priced yet" line is NO cost
-    (None), not a 0.00 total: the hub must say nothing is priced rather
-    than "≈ 0.00 € this week" when knuspr answered nothing."""
+    """(total, unpriced count, till) off a list's cost line, None when it
+    carries none: meal_price.read_cost_line's (total, per portion,
+    unpriced, till) with the per-portion figure dropped; till is None on a
+    line written before D27 (no till chip), never 0.00, so a screen can
+    leave the chip off instead of claiming a free shop. A "nothing priced
+    yet" line is NO cost (None), not a 0.00 total: the hub must say
+    nothing is priced rather than "≈ 0.00 € this week" when knuspr
+    answered nothing."""
     got = mp.read_cost_line(content or "")
     if got is None:
         return None
-    total, _per, holes = got
+    total, _per, holes, till = got
     if holes is None and not total:          # "nothing priced yet": no total to sum
         return None
-    return float(total), int(holes or 0)
+    return float(total), int(holes or 0), (float(till) if till is not None else None)
 
 
 def _repriced(live, book):
@@ -1113,7 +1142,10 @@ def _repriced(live, book):
     items = [dict(it, title=ln + _suffix_for(c)) for it, ln, c in zip(old_items, bare, total.costs)]
     old_content = live.get("content") or ""
     rest = mp.strip_cost_line(old_content).strip()
-    content = mp.cost_line(total) + (f"\n{rest}" if rest else "")
+    # the till rides the cost line and is re-cut here too (D27): a pack
+    # size that moved in the book changes what the shop charges even when
+    # no per-gram price, and so no suffix, moved with it
+    content = mp.cost_line(total, till=_till_of(bare, book, total)) + (f"\n{rest}" if rest else "")
     return items, content, (items != old_items or content != old_content)
 
 
@@ -1212,15 +1244,26 @@ def refresh_prices(api=None, book=None, today=None, fetch=None, dry=False):
     return Outcome(msg, None, [t.get("id") for t in lists if t.get("id")])
 
 
+PANTRY_WORDS = {"pantry": True, "not pantry": False}
+
+
 def set_price(key, answer, today=None, search=None):
     """✍️ A price by hand for one ingredient key, the book screen's ⏎:
     the dialog's text ("2.99 / 10 pc", "1.49 / 100 g", "7.97 / 1 l")
     through meal_price.parse_price_answer and manual_entry, the entry
     written over whatever knuspr had (manual always wins, and a refresh
-    never touches it again), its search term and piece_g carried over,
-    the book saved. A text that is not a price, or a unit nobody knows,
-    refuses with the module's own words; nothing is written. `search`
-    sets the entry's term too."""
+    never touches it again), its search term, piece_g and pantry flag
+    carried over, the book saved. A text that is not a price, or a unit
+    nobody knows, refuses with the module's own words; nothing is
+    written. `search` sets the entry's term too.
+
+    "pantry" / "not pantry" in the same box (case blind, spaces trimmed)
+    is not a price: it flips the entry's pantry flag (D27, the staples a
+    kitchen already holds, counted in the till but reported apart), on a
+    key the book has no entry for as a bare {"key", "pantry"} entry - it
+    prices nothing (meal_price.line_cost reads an entry without a per as
+    "no entry"), it only remembers the word. One box for both because the
+    row's ⏎ is the one door Vex has into an entry."""
     key = (key or "").strip()
     if not key:
         raise Refusal("🏷 No ingredient")
@@ -1229,6 +1272,13 @@ def set_price(key, answer, today=None, search=None):
     entries = book.setdefault("entries", {})
     old = entries.get(key)
     old = old if isinstance(old, dict) else {}
+    word = " ".join((answer or "").lower().split())
+    if word in PANTRY_WORDS:
+        entry = old if old else {"key": key}
+        entry["pantry"] = PANTRY_WORDS[word]
+        entries[key] = entry
+        mp.save_book(book)
+        return Outcome(f"🏷 {key} · {word}", None, [])
     try:
         price, amount, unit = mp.parse_price_answer(answer)
         entry = mp.manual_entry(key, price, amount, unit, today,
@@ -1237,6 +1287,8 @@ def set_price(key, answer, today=None, search=None):
         raise Refusal("🏷 " + (str(e) or "not a price"))
     if old.get("piece_g"):
         entry["piece_g"] = old["piece_g"]
+    if isinstance(old.get("pantry"), bool):
+        entry["pantry"] = old["pantry"]
     entries[key] = entry
     mp.save_book(book)
     return Outcome(f"🏷 {key} · {entry['price']:.2f} € / {amount:g} {unit} · manual", None, [])
@@ -1292,11 +1344,32 @@ def week_cost(lists=None):
         got = _cost_of(t.get("content") or t.get("desc") or "")
         if got is None:
             continue
-        amount, unpriced = got
+        amount, unpriced, _till = got
         total = (total or 0.0) + amount
         holes += unpriced
         n += 1
     return (mp._round2(total) if total is not None else None), holes, n
+
+
+def week_till(lists=None, book=None):
+    """(till, pantry, n_lines) for the hub's 🏷 row (D27, Vex 2026-09-23:
+    "Let's do what you pay at the till please."): the packs the WEEK
+    needs, pooled ONCE across every cached week list's stripped item
+    titles (meal_price.week_till), not the per-list tills summed - eggs
+    in two recipes are 20 eggs = 2 packs of 10, never 2 + 1. `pantry` is
+    the part of the till on staples a kitchen already holds
+    (meal_price.is_pantry), `n_lines` the lines that took part. Off the
+    caches and the book file only: no live read, no network. (None, 0.0,
+    0) when there is no list, no book or nothing the book can price - the
+    row then says nothing priced rather than a till of 0.00 €."""
+    lists = week_lists() if lists is None else [t for t in (lists or []) if isinstance(t, dict)]
+    book = _book(book)
+    if not lists or not _has_prices(book):
+        return None, 0.0, 0
+    till = mp.week_till([_bare_titles(t) for t in lists], book)
+    if not till.lines:
+        return None, 0.0, 0
+    return till.total, till.pantry, till.lines
 
 
 def _rating_candidates(entries, by_id):

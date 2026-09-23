@@ -56,6 +56,19 @@ What it pins (the traps that burned the other hubs):
   * typing "today" on a meal screen never jumps away (parse_ctx guard)
   * the Routines hub carries the zero-canvas door
   * the real ~/.ticktick_alfred/meal_prices.json is never written
+  * THE TILL (2026-09-23, D27, "Let's do what you pay at the till
+    please."): the hub's 🏷 row says "≈ 1.75 € used · till ≈ 5.97 €" (the
+    used figure off the cost lines, the till pooled once across the
+    week's lists off the book: 500 g + 200 g of rice = ONE 1 kg pack),
+    "· N unpriced" after, "pantry 3.98 € of the till · " in front of the
+    subtitle when a staple is in it, "till ≈ 1.99 €" alone on a list cut
+    before the book existed (the book prices its bacon, no cost line says
+    what it uses), "nothing priced yet" with neither; a ctx:mealgroc chip
+    reads " · ≈ 0.70 € · till 3.49 €" off a D27 cost line and keeps its
+    old shape on a pre-D27 one; a pantry entry's book row wears " · pantry"
+    (rice, salt, flour by the default list; a ❓ soy sauce hole too; a
+    bare {key, pantry: false} entry and an entry's own flag win over the
+    list), the head says the price box takes pantry / not pantry
 
     python3 tests/test_meal_screens.py
 """
@@ -158,6 +171,13 @@ G3 = T("g3", meal.grocery_title("Beef Bulgogi", U1), tags=["🛒groceries"], kin
        items=[{"title": "500 g rice · ≈ 1.75 €", "status": 0}, {"title": "1 tsp salt", "status": 0},
               {"title": "3 chicken thighs", "status": 0}],
        content="≈ 1.75 € · 0.25 €/portion · 1 unpriced\nScaled ×1.75: 4 → 7 portions\n_(yield: '4' in yield)_")
+# a fourth list as a D27 sync saves them: the till chip on the cost line;
+# more rice (pooled with G3's into the same 1 kg pack at the hub) and a
+# pantry hole (soy sauce: no entry, but the default list knows it)
+G4 = T("g4", meal.grocery_title("Second Lunch", U4), tags=["🛒groceries"], kind="CHECKLIST",
+       sortOrder=-5,
+       items=[{"title": "200 g rice · ≈ 0.70 €", "status": 0}, {"title": "1 tbsp soy sauce", "status": 0}],
+       content="≈ 0.70 € · 0.10 €/portion · till ≈ 3.49 € · 1 unpriced\nScaled ×1.75: 4 → 7 portions\n_(yield: '4' in yield)_")
 
 
 def E(key, product, pack, price, per, url="", search=None, source="knuspr", date="2026-09-22"):
@@ -385,9 +405,13 @@ check("hub: 🛒 legend says ⏎⤵️  ⌥⤵️  ⌥⇧🔢", g["subtitle"].en
 check("hub: 🛒 never an xact on ⌘ or ⌥", not g["mods"]["cmd"]["valid"] and not g["mods"]["alt"]["arg"])
 p = r["meal-price"]
 check("hub: 🏷 sits right after 🛒", uids[uids.index("meal-groc") + 1] == "meal-price", uids)
-check("hub: 🏷 with no cost line on any list says nothing priced yet, no unpriced count",
-      p["title"] == "🏷 Prices · nothing priced yet", p["title"])
-check("hub: 🏷 subtitle = knuspr.de speculation · the book's size · ⌥⇧ refresh · the legend",
+# D27 changed this pin on purpose: g1 was cut before the book existed (no
+# cost line, so no used figure) but the book prices its 350 g of bacon at
+# the till (one 1 kg pack, 1.99), and the till is read off the book, not
+# off the cost line; no unpriced count because no line was ever costed
+check("hub: 🏷 with no cost line on any list says the till alone (the book prices the bacon), no used figure, no unpriced count",
+      p["title"] == "🏷 Prices · till ≈ 1.99 €", p["title"])
+check("hub: 🏷 subtitle = knuspr.de speculation · the book's size · ⌥⇧ refresh · the legend (no pantry chip: bacon is not a staple)",
       p["subtitle"] == "knuspr.de speculation · book 4 entries · ⌥⇧ refresh (≈ 0.5 s a key)  |  ⏎⤵️  ⌥⤵️  ⌥⇧🏷",
       p["subtitle"])
 check("hub: 🏷 ⏎ the trampoline to ctx:mealprice, ⌥ by variable",
@@ -402,8 +426,19 @@ check("hub: 🏷 never an xact on ⌘ or ⌥, ⇧ and ⌥⌘ dead",
       and not p["mods"]["shift"]["valid"] and not p["mods"]["alt+cmd"]["valid"], p["mods"])
 plant(lib=LIB + [G3])
 pp = by_uid(rows_for("ctx:meal"))["meal-price"]
-check("hub: 🏷 sums the planted cost line: ≈ 1.75 € this week · 1 unpriced (the noteless list adds nothing)",
-      pp["title"] == "🏷 Prices · ≈ 1.75 € this week · 1 unpriced", pp["title"])
+# used = the planted cost line (1.75, the noteless g1 adds nothing); till =
+# rice 1 pack 3.49 + salt 1 pack 0.49 + bacon 1 pack 1.99 = 5.97, of which
+# rice and salt are pantry staples (3.98)
+check("hub: 🏷 says used off the cost line and the till off the book: ≈ 1.75 € used · till ≈ 5.97 € · 1 unpriced",
+      pp["title"] == "🏷 Prices · ≈ 1.75 € used · till ≈ 5.97 € · 1 unpriced", pp["title"])
+check("hub: 🏷 subtitle leads with the pantry share of the till",
+      pp["subtitle"] == "pantry 3.98 € of the till · knuspr.de speculation · book 4 entries · ⌥⇧ refresh (≈ 0.5 s a key)  |  ⏎⤵️  ⌥⤵️  ⌥⇧🏷",
+      pp["subtitle"])
+plant(lib=LIB + [G3, G4])
+pp = by_uid(rows_for("ctx:meal"))["meal-price"]
+check("hub: 🏷 pools the till ONCE across the week: G3's 500 g + G4's 200 g of rice = one 1 kg pack, used summed, holes summed",
+      pp["title"] == "🏷 Prices · ≈ 2.45 € used · till ≈ 5.97 € · 2 unpriced"
+      and pp["subtitle"].startswith("pantry 3.98 € of the till · "), (pp["title"], pp["subtitle"]))
 plant()
 plant(lib=[t for t in LIB if t["id"] != "g1"])
 g0 = by_uid(rows_for("ctx:meal"))["meal-groc"]
@@ -557,6 +592,17 @@ check("groceries: a list without a cost line keeps its chip as it was",
 check("groceries: the priced list is sealed, ⌥⇧ still the portions verb on it, ⏎ still opens it",
       sealed([g3], "groc3") and mod_payload(g3["mods"]["alt+shift"]) == {"pid": LIST, "tid": "g3", "back": "ctx:mealgroc"}
       and g3["arg"] == f"open:{browse._meal_link(LIST, 'g3')}", g3)
+plant(lib=LIB + [G3, G4])
+r4 = by_uid(rows_for("ctx:mealgroc"))
+check("groceries: a D27 cost line gives the chip ' · ≈ 0.70 € · till 3.49 €' (used, then the till)",
+      "0/2 ticked · 7 portions · ≈ 0.70 € · till 3.49 €  |  " in r4["mg-g4"]["subtitle"], r4["mg-g4"]["subtitle"])
+check("groceries: a pre-D27 cost line keeps its chip without a till, never 'till 0.00 €'",
+      "0/3 ticked · 7 portions · ≈ 1.75 €  |  " in r4["mg-g3"]["subtitle"] and "till" not in r4["mg-g3"]["subtitle"],
+      r4["mg-g3"]["subtitle"])
+check("groceries: _meal_cost_total = (used, till), till None on a pre-D27 line, None without a line",
+      browse._meal_cost_total(G4["content"]) == (0.70, 3.49) and browse._meal_cost_total(G3["content"]) == (1.75, None)
+      and browse._meal_cost_total(G2["content"]) is None and browse._meal_cost_total(None) is None,
+      (browse._meal_cost_total(G4["content"]), browse._meal_cost_total(G3["content"])))
 plant()
 
 # ── the ⭐️ picker ─────────────────────────────────────────────────────────────
@@ -616,9 +662,10 @@ check("prices: sealed (no xact on ⌘ or ⌥, ⌘ dead: not task rows)", sealed(
 check("prices: the book is read once a render", LOADS[0] == 1, LOADS[0])
 check("prices: head, the week's holes first (list order: g3 then g1), then the priced week keys, then the rest of the book",
       uids == ["mp-head", "mp-chicken thigh", "mp-egg", "mp-rice", "mp-salt", "mp-bacon", "mp-flour"], uids)
-check("prices: the head counts the book, the week's holes and the book date, dead",
+check("prices: the head counts the book, the week's holes and the book date, says the box takes pantry / not pantry, dead",
       r["mp-head"]["title"] == "🏷 Price book · 4 entries · 2 unpriced this week · updated 2026-09-22"
-      and r["mp-head"]["subtitle"] == "knuspr.de prices as speculation · ⏎ type a price · ⌥⇧ change the search term  |  ⌃🔙"
+      and r["mp-head"]["subtitle"] == "knuspr.de prices as speculation · ⏎ type a price (or pantry / not pantry in the price box)"
+                                      " · ⌥⇧ change the search term  |  ⌃🔙"
       and not r["mp-head"]["valid"], r["mp-head"])
 h = r["mp-chicken thigh"]
 check("prices: a hole = ❓ key · no price yet, searched as its default term",
@@ -627,14 +674,19 @@ check("prices: a hole = ❓ key · no price yet, searched as its default term",
 check("prices: a suffixed item title keys clean (rice, never 'rice 1 75')",
       "mp-rice" in r and not any(u.startswith("mp-rice ") for u in uids), uids)
 k = r["mp-rice"]
-check("prices: a knuspr entry = 🧾 key · €/kg · product pack price · knuspr date",
-      k["title"] == "🧾 rice · 3.49 €/kg · Basmati Reis 1 kg 3.49 € · knuspr 22 Sep", k["title"])
+# D27: rice, salt and flour are pantry staples by the default list, so
+# their rows end in " · pantry" (the pins below changed on purpose)
+check("prices: a knuspr entry = 🧾 key · €/kg · product pack price · knuspr date (· pantry: rice is a staple)",
+      k["title"] == "🧾 rice · 3.49 €/kg · Basmati Reis 1 kg 3.49 € · knuspr 22 Sep · pantry", k["title"])
 check("prices: the entry's own search term shows",
       k["subtitle"].startswith("searched as Basmati Reis · ⏎ type a price · ⌥⇧ search term"), k["subtitle"])
-check("prices: the manual glyph: ✍️ key · €/kg · manual date",
-      r["mp-salt"]["title"] == "✍️ salt · 0.49 €/kg · manual 20 Sep", r["mp-salt"]["title"])
-check("prices: an entry not on this week's lists wears 📖, same shape",
-      r["mp-flour"]["title"] == "📖 flour · 0.89 €/kg · Mehl Type 405 1 kg 0.89 € · knuspr 22 Sep", r["mp-flour"]["title"])
+check("prices: the manual glyph: ✍️ key · €/kg · manual date (· pantry)",
+      r["mp-salt"]["title"] == "✍️ salt · 0.49 €/kg · manual 20 Sep · pantry", r["mp-salt"]["title"])
+check("prices: an entry not on this week's lists wears 📖, same shape (· pantry: flour)",
+      r["mp-flour"]["title"] == "📖 flour · 0.89 €/kg · Mehl Type 405 1 kg 0.89 € · knuspr 22 Sep · pantry", r["mp-flour"]["title"])
+check("prices: bacon and the holes are not staples: no pantry marker",
+      not any(x["title"].endswith("· pantry") for x in (r["mp-bacon"], h, r["mp-egg"])),
+      [x["title"] for x in (r["mp-bacon"], h, r["mp-egg"])])
 for uid in uids[1:]:
     row, key = r[uid], uid[3:]
     check(f"prices: {key}: ⏎ = xact:meal_price_set {{key, back: ctx:mealprice}}",
@@ -670,6 +722,33 @@ rz = rows_for("ctx:mealprice", "zzzz")
 check("prices: nothing matches = the head and one dead row",
       [x["uid"] for x in rz] == ["mp-head", "mp-none"] and not rz[1]["valid"] and sealed(rz, "prices none"), [x["uid"] for x in rz])
 check("prices: 'today' typed on the book stays put", render("ctx:mealprice", "today") == ("mealprice", [], "today"))
+# the pantry marker on a hole, and the two overrides that beat the default
+# list: an entry's own flag, and the bare {key, pantry} entry a "not
+# pantry" answer mints under a key the book cannot price
+plant(lib=LIB + [G3, G4])
+rp = by_uid(rows_for("ctx:mealprice"))
+check("prices: G4's soy sauce is a hole AND a staple: ❓ soy sauce · no price yet · pantry, the egg hole plain",
+      list(rp)[:4] == ["mp-head", "mp-chicken thigh", "mp-soy sauce", "mp-egg"]
+      and rp["mp-soy sauce"]["title"] == "❓ soy sauce · no price yet · pantry"
+      and rp["mp-egg"]["title"] == "❓ egg · no price yet", (list(rp), rp["mp-soy sauce"]["title"]))
+check("prices: a pantry hole still fires the price verb with its own key",
+      payload(rp["mp-soy sauce"]) == {"key": "soy sauce", "back": "ctx:mealprice"} and rp["mp-soy sauce"]["valid"])
+BOOK["entries"]["soy sauce"] = {"key": "soy sauce", "pantry": False}
+BOOK["entries"]["bacon"]["pantry"] = True
+BOOK["entries"]["rice"]["pantry"] = False
+rp = by_uid(rows_for("ctx:mealprice"))
+check("prices: a bare {key, pantry: false} entry keeps the key a hole (it prices nothing) and drops the marker",
+      rp["mp-soy sauce"]["title"] == "❓ soy sauce · no price yet" and "mp-soy sauce" in list(rp)[:4], rp["mp-soy sauce"]["title"])
+check("prices: an entry's own flag wins over the default list both ways (bacon pantry, rice not)",
+      rp["mp-bacon"]["title"].endswith("· knuspr 22 Sep · pantry") and not rp["mp-rice"]["title"].endswith("· pantry"),
+      (rp["mp-bacon"]["title"], rp["mp-rice"]["title"]))
+hp = by_uid(rows_for("ctx:meal"))["meal-price"]
+check("hub: the flags move the pantry share (bacon 1.99 + salt 0.49 in, rice out), the till itself unchanged",
+      hp["title"] == "🏷 Prices · ≈ 2.45 € used · till ≈ 5.97 € · 2 unpriced"
+      and hp["subtitle"].startswith("pantry 2.48 € of the till · "), (hp["title"], hp["subtitle"]))
+del BOOK["entries"]["soy sauce"]
+del BOOK["entries"]["bacon"]["pantry"]
+del BOOK["entries"]["rice"]["pantry"]
 plant(lib=[t for t in LIB if t["id"] != "g1"])
 saved_entries, BOOK["entries"], BOOK["updated"] = BOOK["entries"], {}, ""
 re_ = by_uid(rows_for("ctx:mealprice"))

@@ -52,6 +52,10 @@ All notable user-visible changes to TickAL. Format follows
   opens the book with the unpriced ones first, where ⏎ takes a price you
   type (`2.99 / 10 pc`) and ⌥⇧ a different search term. Your own prices
   always win over the shop's.
+- **At the till** - beside what a meal consumes, what you pay: the packs
+  to buy, rounded up, shared within a list and across the week on the hub
+  (`≈ 36.73 € used · till ≈ 58.40 €`), with staples split out as pantry
+  (type `pantry` / `not pantry` into a book row's price box).
 - **✏️ Rename tag** in the tag's ⌘ menu - a dialog asks the new name and
   every task that carries the tag follows. A name already in use is refused
   rather than merged.

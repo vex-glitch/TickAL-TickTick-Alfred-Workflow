@@ -8,14 +8,25 @@ comma-decimal pack, the 5 percent price / pack rule, junk answers), rank
 and pick never comparing per across bases, refresh (pinned without a
 product, stale entries, a fetch that throws), the cost lines (strip by
 shape, read_cost_line), the hand-typed price (parse_price_answer,
-manual_entry)). Never touches the network or the real ~/.ticktick_alfred:
-the real book's existence and mtime are recorded first and asserted
-unchanged last.
+manual_entry), and since 2026-09-23 the till (Vex: "Let's do what you pay
+at the till please."): is_pantry (the default set, whole-word
+containment, the entry's own flag), pack_need per conversion (pc / pc,
+g / g, a kg pack already in g, ml against g 1:1, pieces through piece_g
+both ways, an unusable pack falling back on the consumption cost, a
+range line), list_till pooling per entry (two salt lines one pack, eggs
+14 + 6 two packs of ten) and week_till pooling across lists, the pantry
+split, a bare pantry-flag entry never shadowing a priced cousin,
+cost_line's till chip, read_cost_line's 4-tuple (the 3-tuple pins of
+2026-09-22 moved on purpose: every reader unpacks four now) and the CLI
+over a HOME-redirected book). Never touches the network or the real
+~/.ticktick_alfred: the real book's existence and mtime are recorded
+first and asserted unchanged last.
 Run: python3 tests/test_meal_price.py
 """
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import date
@@ -312,22 +323,24 @@ D2 = "≈ 18.40 € · 2.60 €/portion\n\nbody"
 same("strip_cost_line: idempotent on the blank-line shape", mp.strip_cost_line(mp.strip_cost_line(D2)), "body")
 same("strip_cost_line: round trip with cost_line",
      mp.strip_cost_line(mp.cost_line(t) + "\n" + "≈ Scaled ×1.75: 4 → 7 portions"), "≈ Scaled ×1.75: 4 → 7 portions")
-# read_cost_line (fix 12)
-same("read_cost_line: the spec's line", mp.read_cost_line("≈ 18.40 € · 2.60 €/portion · 3 unpriced"), (18.4, 2.6, 3))
-same("read_cost_line: nothing priced yet", mp.read_cost_line("≈ 0.00 € · nothing priced yet"), (0.0, None, None))
+# read_cost_line (fix 12); a 4-tuple since the till of 2026-09-23, the
+# fourth value None on a line without a till chip (these pins MOVED from
+# 3-tuples on purpose: every reader unpacks four now)
+same("read_cost_line: the spec's line", mp.read_cost_line("≈ 18.40 € · 2.60 €/portion · 3 unpriced"), (18.4, 2.6, 3, None))
+same("read_cost_line: nothing priced yet", mp.read_cost_line("≈ 0.00 € · nothing priced yet"), (0.0, None, None, None))
 same("read_cost_line: missing", mp.read_cost_line("Scaled ×1.75: 4 → 7 portions\n[R](mela://recipe/X)"), None)
 same("read_cost_line: None / empty", (mp.read_cost_line(None), mp.read_cost_line("")), (None, None))
-same("read_cost_line: a clean line reports 0 unpriced", mp.read_cost_line("≈ 8.99 € · 1.28 €/portion"), (8.99, 1.28, 0))
-same("read_cost_line: no portions", mp.read_cost_line("≈ 4.47 €"), (4.47, None, 0))
-same("read_cost_line: unpriced without portions", mp.read_cost_line("≈ 4.47 € · 2 unpriced"), (4.47, None, 2))
+same("read_cost_line: a clean line reports 0 unpriced", mp.read_cost_line("≈ 8.99 € · 1.28 €/portion"), (8.99, 1.28, 0, None))
+same("read_cost_line: no portions", mp.read_cost_line("≈ 4.47 €"), (4.47, None, 0, None))
+same("read_cost_line: unpriced without portions", mp.read_cost_line("≈ 4.47 € · 2 unpriced"), (4.47, None, 2, None))
 same("read_cost_line: reads it from inside a description",
-     mp.read_cost_line("≈ 18.40 € · 2.60 €/portion · 3 unpriced\n\nScaled ×1.75: 4 → 7 portions"), (18.4, 2.6, 3))
+     mp.read_cost_line("≈ 18.40 € · 2.60 €/portion · 3 unpriced\n\nScaled ×1.75: 4 → 7 portions"), (18.4, 2.6, 3, None))
 same("read_cost_line: a recipe's own euro line is not the shape", mp.read_cost_line("≈ 3.00 € worth of saffron"), None)
 same("read_cost_line: the yield note is not the shape", mp.read_cost_line("≈ Scaled ×1.75: 4 → 7 portions"), None)
 for tot in (t, t2, mp.list_cost([], BOOK), mp.list_cost(["14 Eggs"], BOOK, portions=None),
             mp.list_cost(["2 unicorns"], BOOK)):
     got = mp.read_cost_line(mp.cost_line(tot))
-    want = (tot.total, tot.per_portion, len(tot.unpriced)) if tot.priced or not tot.unpriced else (0.0, None, None)
+    want = (tot.total, tot.per_portion, len(tot.unpriced), None) if tot.priced or not tot.unpriced else (0.0, None, None, None)
     same(f"read_cost_line: round trip of {mp.cost_line(tot)!r}", got, want)
 same("price_suffix", mp.price_suffix(1.1), " · ≈ 1.10 €")
 same("price_suffix: None is nothing", mp.price_suffix(None), "")
@@ -336,6 +349,219 @@ same("strip_price: round trip", mp.strip_price("350 g bacon" + mp.price_suffix(4
 same("strip_price: untouched without a suffix", mp.strip_price("350 g bacon · smoked"), "350 g bacon · smoked")
 same("strip_price: None", mp.strip_price(None), "")
 same("strip_price: only a trailing suffix", mp.strip_price("≈ 1.10 € of bacon"), "≈ 1.10 € of bacon")
+
+# ── the till (2026-09-23: "Let's do what you pay at the till please.") ─────
+# is_pantry: the default set, whole words, the entry's own flag
+check("DEFAULT_PANTRY is a frozenset", isinstance(mp.DEFAULT_PANTRY, frozenset))
+SPEC_PANTRY = ("salt", "kosher salt", "sea salt", "seasoning salt", "pepper", "black pepper", "white pepper", "oil",
+               "olive oil", "vegetable oil", "sunflower oil", "canola oil", "sesame oil", "cooking spray", "vinegar",
+               "apple cider vinegar", "rice vinegar", "balsamic vinegar", "white wine vinegar", "soy sauce", "fish sauce",
+               "worcestershire sauce", "hot sauce", "sriracha", "sriracha hot sauce", "ketchup", "mustard", "mayonnaise",
+               "honey", "maple syrup", "sugar", "brown sugar", "flour", "cornstarch", "baking powder", "baking soda",
+               "vanilla extract", "paprika", "smoked paprika", "cumin", "oregano", "thyme", "rosemary", "chili flake",
+               "chili powder", "cayenne", "curry powder", "garlic powder", "onion powder", "italian seasoning", "bay leaf",
+               "cinnamon", "nutmeg", "stock cube", "bouillon", "stock", "broth", "chicken stock", "beef stock",
+               "vegetable stock", "rice", "pasta", "oat", "peanut butter", "hoisin sauce", "hoisin", "oyster sauce",
+               "sesame seed", "coconut milk")
+check("DEFAULT_PANTRY carries every key the spec names", set(SPEC_PANTRY) <= mp.DEFAULT_PANTRY,
+      str(sorted(set(SPEC_PANTRY) - mp.DEFAULT_PANTRY)))
+for k, want in (("salt", True), ("kosher salt", True), ("sea salt flake", True), ("toasted sesame oil", True),
+                ("chicken stock", True), ("garlic powder", True), ("garlic", False), ("bacon", False), ("egg", False),
+                ("chicken thigh", False), ("eggplant", False), ("", False), (None, False), ("Salt", True),
+                ("olive  oil", True)):
+    same(f"is_pantry({k!r}) by the default set", mp.is_pantry(k), want)
+same("is_pantry: the entry's True wins over the set", mp.is_pantry("bacon", {"pantry": True}), True)
+same("is_pantry: the entry's False wins over the set", mp.is_pantry("salt", {"pantry": False}), False)
+same("is_pantry: a non-bool flag is ignored (a string)", mp.is_pantry("salt", {"pantry": "no"}), True)
+same("is_pantry: a non-bool flag is ignored (an int)", mp.is_pantry("bacon", {"pantry": 1}), False)
+same("is_pantry: entry None / empty fall on the set", (mp.is_pantry("salt", None), mp.is_pantry("salt", {})), (True, True))
+same("is_pantry: a bare flag entry with no price is judged by its flag", mp.is_pantry("bacon", {"key": "bacon", "pantry": True}), True)
+
+# the till book: packs beside the per-unit prices, the shapes entry_from and manual_entry write
+BOOK_T = {"version": 1, "updated": "2026-09-23", "entries": {
+    "egg": {"key": "egg", "pack": "10 Stk", "pack_amount": 10, "pack_unit": "pc", "price": 3.19, "per": 0.319,
+            "per_unit": "pc", "source": "knuspr"},
+    "bacon": {"key": "bacon", "pack": "300 g", "pack_amount": 300, "pack_unit": "g", "price": 2.59, "per": 0.008633,
+              "per_unit": "g", "source": "knuspr"},
+    "flour": {"key": "flour", "pack": "1 kg", "pack_amount": 1000, "pack_unit": "g", "price": 0.99, "per": 0.00099,
+              "per_unit": "g", "source": "knuspr"},
+    "salt": {"key": "salt", "pack": "500 g", "pack_amount": 500, "pack_unit": "g", "price": 0.29, "per": 0.00058,
+             "per_unit": "g", "source": "manual"},
+    "chicken breast": {"key": "chicken breast", "pack": "500 g", "pack_amount": 500, "pack_unit": "g", "price": 6.0,
+                       "per": 0.012, "per_unit": "g", "piece_g": 150, "source": "knuspr"},
+    "scallion": {"key": "scallion", "pack": "1 Bund", "pack_amount": 1, "pack_unit": "pc", "price": 0.89, "per": 0.89,
+                 "per_unit": "pc", "piece_g": 60, "source": "knuspr"},
+    "olive oil": {"key": "olive oil", "pack": "500 ml", "pack_amount": 500, "pack_unit": "ml", "price": 7.99,
+                  "per": 0.01598, "per_unit": "ml", "source": "knuspr"},
+    "cheddar": {"key": "cheddar", "per": 0.015, "per_unit": "g", "source": "knuspr"},
+    "milk": {"key": "milk", "pack": "1 l", "pack_amount": 0, "pack_unit": "ml", "price": 1.09, "per": 0.00109,
+             "per_unit": "ml", "source": "knuspr"},
+    "butter": {"key": "butter", "pack": "250 g", "pack_amount": 250, "pack_unit": "g", "price": None, "per": 0.01,
+               "per_unit": "g", "source": "knuspr"},
+    "garlic": {"key": "garlic", "pack": "1 Knolle", "pack_amount": 1, "pack_unit": "pc", "price": 0.49, "per": 0.49,
+               "per_unit": "pc", "source": "knuspr", "pantry": True},
+    "sriracha": {"key": "sriracha", "pack": "200 ml", "pack_amount": 200, "pack_unit": "ml", "price": 2.49,
+                 "per": 0.01245, "per_unit": "ml", "source": "knuspr", "pantry": False},
+}}
+check("Need has the ten fields",
+      mp.Need._fields == ("key", "entry_key", "need", "base", "packs", "pack_amount", "pack_unit", "price", "till", "pantry"))
+check("Till has the four fields", mp.Till._fields == ("total", "pantry", "packs", "lines"))
+# pack_need per conversion
+same("pack_need: pc line + pc pack (14 eggs / 10 Stk -> 2 packs, 6.38)", mp.pack_need("14 Eggs", BOOK_T),
+     mp.Need("egg", "egg", 14.0, "pc", 2, 10.0, "pc", 3.19, 6.38, False))
+same("pack_need: exactly one pack is one pack (10 / 10, no float noise)", mp.pack_need("10 eggs", BOOK_T).packs, 1)
+n = mp.pack_need("350 g bacon", BOOK_T)
+same("pack_need: g line + g pack (350 g / 300 g -> 2 packs, 5.18)", (n.need, n.packs, n.pack_amount, n.pack_unit, n.till),
+     (350.0, 2, 300.0, "g", 5.18))
+same("pack_need: the consumption cost is what line_cost says, the till is more", (mp.line_cost("350 g bacon", BOOK_T).cost, n.till),
+     (3.02, 5.18))
+n = mp.pack_need("350 g flour", BOOK_T)
+same("pack_need: g line + a kg pack already stored in g (1 kg = 1000 g -> 1 pack)", (n.need, n.packs, n.pack_amount, n.till, n.pantry),
+     (350.0, 1, 1000.0, 0.99, True))
+n = mp.pack_need("1 tsp salt", BOOK_T)
+same("pack_need: ml line against a g pack, 1:1 (5 ml -> 5 g -> 1 pack of 500 g)",
+     (n.need, n.base, n.pack_unit, n.packs, n.till, n.pantry), (5.0, "ml", "g", 1, 0.29, True))
+n = mp.pack_need("200 g olive oil", BOOK_T)
+same("pack_need: g line against an ml pack, 1:1", (n.need, n.base, n.pack_unit, n.packs, n.till, n.pantry),
+     (200.0, "g", "ml", 1, 7.99, True))
+n = mp.pack_need("3 chicken breasts", BOOK_T)
+same("pack_need: pieces through piece_g (3 x 150 g = 450 g -> 1 pack of 500 g)",
+     (n.need, n.base, n.pack_unit, n.packs, n.till), (450.0, "pc", "g", 1, 6.0))
+same("pack_need: 4 pieces tip over into the second pack", mp.pack_need("4 chicken breasts", BOOK_T)[4:9],
+     (2, 500.0, "g", 6.0, 12.0))
+n = mp.pack_need("120 g scallions", BOOK_T)
+same("pack_need: grams against a piece pack through piece_g (120 / 60 = 2 pc -> 2 Bund)",
+     (n.need, n.base, n.pack_unit, n.packs, n.pack_amount, n.till), (2.0, "g", "pc", 2, 1.0, 1.78))
+n = mp.pack_need("11-14 chicken breasts", BOOK_T)
+same("pack_need: a range line at its midpoint (12.5 x 150 = 1875 g -> 4 packs)", (n.need, n.packs, n.till), (1875.0, 4, 24.0))
+n = mp.pack_need("200 g cheddar", BOOK_T)
+same("pack_need: no pack at all -> packs None, the consumption cost as till",
+     (n.packs, n.pack_amount, n.pack_unit, n.price, n.till), (None, None, "g", None, 3.0))
+n = mp.pack_need("500 ml milk", BOOK_T)
+same("pack_need: pack_amount 0 is unusable, the price still rides along", (n.packs, n.pack_amount, n.price, n.till),
+     (None, None, 1.09, 0.55))
+same("pack_need: ... and that till is line_cost's cent", n.till, mp.line_cost("500 ml milk", BOOK_T).cost)
+n = mp.pack_need("100 g butter", BOOK_T)
+same("pack_need: price None is unusable", (n.packs, n.pack_amount, n.price, n.till), (None, None, None, 1.0))
+n = mp.pack_need("2 garlic", BOOK_T)
+same("pack_need: the entry's pantry True rides along (garlic is not pantry by the set)", (n.packs, n.till, n.pantry), (2, 0.98, True))
+n = mp.pack_need("1 tbsp sriracha", BOOK_T)
+same("pack_need: the entry's pantry False rides along (sriracha is pantry by the set)", (n.packs, n.till, n.pantry), (1, 2.49, False))
+n = mp.pack_need("1 tsp kosher salt", BOOK_T)
+same("pack_need: the line's key and the entry's key are both carried (kosher salt priced by salt)",
+     (n.key, n.entry_key, n.pantry), ("kosher salt", "salt", True))
+same("pack_need: the module's own suffix is ignored", mp.pack_need("14 Eggs · ≈ 4.47 €", BOOK_T), mp.pack_need("14 Eggs", BOOK_T))
+for ln in ("1 cup water", "**Meat**", "Avocado oil", "2 unicorns", "", None):
+    same(f"pack_need: {ln!r} is None (free, header, no amount, no entry, blank)", mp.pack_need(ln, BOOK_T), None)
+same("pack_need: a unit mismatch is None", mp.pack_need("3 chicken thighs", BOOK), None)
+same("pack_need: no book", mp.pack_need("14 Eggs", None), None)
+# the bare pantry-flag entry: prices nothing, shadows nothing
+BOOK_BARE = {"entries": {"salt": {"key": "salt", "pantry": True}}}
+same("line_cost: an entry without a per is 'no entry'", mp.line_cost("1 tsp salt", BOOK_BARE).reason, "no entry")
+same("pack_need: an entry without a per is None", mp.pack_need("1 tsp salt", BOOK_BARE), None)
+same("lookup: the bare entry comes back when it is all there is", mp.lookup("salt", BOOK_BARE), BOOK_BARE["entries"]["salt"])
+BOOK_BARE2 = {"entries": {"salt": {"key": "salt", "pantry": True},
+                          "sea salt": {"key": "sea salt", "pack_amount": 500, "pack_unit": "g", "price": 0.5, "per": 0.001,
+                                       "per_unit": "g"}}}
+same("lookup: a bare exact entry is passed over for a priced cousin", mp.lookup("salt", BOOK_BARE2), BOOK_BARE2["entries"]["sea salt"])
+c = mp.line_cost("1 tsp salt", BOOK_BARE2)
+same("line_cost: ... so the line is priced by the cousin", (c.cost, c.reason), (0.01, "priced"))
+n = mp.pack_need("1 tsp salt", BOOK_BARE2)
+same("pack_need: ... and pooled under the cousin's key", (n.key, n.entry_key, n.packs, n.till), ("salt", "sea salt", 1, 0.5))
+same("lookup: a broken exact entry no longer shadows a priced cousin",
+     mp.line_cost("500 g chicken breast", {"entries": {"chicken breast": {"per": "lots", "per_unit": "g"},
+                                                       "chicken": {"per": 0.01, "per_unit": "g"}}}).cost, 5.0)
+BOOK_T2 = {"entries": dict(BOOK_T["entries"], **{"kosher salt": {"key": "kosher salt", "pantry": False}})}
+n = mp.pack_need("1 tsp kosher salt", BOOK_T2)
+same("pack_need: a bare flag on the line's own key does not stop the cousin pricing it (the flag read is the cousin's)",
+     (n.entry_key, n.till, n.pantry), ("salt", 0.29, True))
+# list_till: pooled per entry BEFORE the ceiling
+tl = mp.list_till(["1 tsp salt", "1 tsp salt"], BOOK_T)
+same("list_till: two salt lines are one pack", tl, mp.Till(0.29, 0.29, {"salt": (1, 500.0, "g", 0.29)}, 2))
+tl = mp.list_till(["14 Eggs", "6 eggs"], BOOK_T)
+same("list_till: eggs 14 + 6 = 20 = 2 packs of 10, not 2 + 1", (tl.total, tl.packs, tl.lines), (6.38, {"egg": (2, 10.0, "pc", 3.19)}, 2))
+same("list_till: ... where the lines on their own would say 3 packs",
+     mp.pack_need("14 Eggs", BOOK_T).till + mp.pack_need("6 eggs", BOOK_T).till, 9.57)
+tl = mp.list_till(["**Meat**", "14 Eggs", "1 cup water", "2 unicorns", "Avocado oil", "6 eggs"], BOOK_T)
+same("list_till: headers, water, holes and nameless amounts take no part", (tl.total, tl.lines), (6.38, 2))
+tl = mp.list_till(["14 Eggs", "1 tsp salt", "350 g bacon", "2 tbsp olive oil"], BOOK_T)
+same("list_till: the pantry split (salt + oil of the till)", (tl.total, tl.pantry, tl.lines), (19.84, 8.28, 4))
+same("list_till: the packs, first seen first", list(tl.packs),  ["egg", "salt", "bacon", "olive oil"])
+tl = mp.list_till(["200 g cheddar", "100 g cheddar"], BOOK_T)
+same("list_till: an unusable pack sums its consumption cost, packs None", tl, mp.Till(4.5, 0.0, {"cheddar": (None, None, "g", None)}, 2))
+same("list_till: usable and unusable side by side", mp.list_till(["200 g cheddar", "14 Eggs"], BOOK_T).total, 9.38)
+tl = mp.list_till(["350 g bacon", "14 Eggs", "200 g bacon"], BOOK_T)
+same("list_till: bacon 350 + 200 = 550 g = 2 packs of 300", (tl.packs["bacon"], tl.total), ((2, 300.0, "g", 2.59), 11.56))
+same("list_till: suffixed lines pool the same as bare ones", mp.list_till(["14 Eggs · ≈ 4.47 €", "6 eggs · ≈ 1.91 €"], BOOK_T).total, 6.38)
+same("list_till: kosher salt and salt pool under one entry", mp.list_till(["1 tsp kosher salt", "1 tsp salt"], BOOK_T).packs,
+     {"salt": (1, 500.0, "g", 0.29)})
+same("list_till: the entry's own pantry flag decides the split",
+     mp.list_till(["2 garlic", "1 tbsp sriracha"], BOOK_T)[:2], (3.47, 0.98))
+same("list_till: empty", mp.list_till([], BOOK_T), mp.Till(0.0, 0.0, {}, 0))
+same("list_till: None lines", mp.list_till(None, BOOK_T), mp.Till(0.0, 0.0, {}, 0))
+same("list_till: no book", mp.list_till(["14 Eggs"], None), mp.Till(0.0, 0.0, {}, 0))
+same("list_till: the till is never below the consumption total",
+     mp.list_till(LINES, BOOK).total >= mp.list_cost(LINES, BOOK).total, True)
+# week_till: pooled across the lists
+wk = mp.week_till([["14 Eggs"], ["6 eggs"]], BOOK_T)
+same("week_till: eggs in two recipes are bought once (2 packs, not 2 + 1)", wk, mp.Till(6.38, 0.0, {"egg": (2, 10.0, "pc", 3.19)}, 2))
+same("week_till: ... where the lists on their own sum to 9.57",
+     mp.list_till(["14 Eggs"], BOOK_T).total + mp.list_till(["6 eggs"], BOOK_T).total, 9.57)
+wk = mp.week_till([["14 Eggs", "1 tsp salt"], ["6 eggs", "1 tsp salt", "350 g bacon"]], BOOK_T)
+same("week_till: three entries pooled over two lists", (wk.total, wk.pantry, wk.lines, list(wk.packs)),
+     (11.85, 0.29, 5, ["egg", "salt", "bacon"]))
+same("week_till: empty, None and blank lists", (mp.week_till([], BOOK_T), mp.week_till(None, BOOK_T), mp.week_till([None, []], BOOK_T)),
+     (mp.Till(0.0, 0.0, {}, 0),) * 3)
+same("week_till: one list is list_till", mp.week_till([LINES], BOOK), mp.list_till(LINES, BOOK))
+# cost_line with the till chip, read_cost_line's fourth value
+same("cost_line: the till chip between per-portion and unpriced", mp.cost_line(t, till=12.9),
+     "≈ 8.99 € · 1.28 €/portion · till ≈ 12.90 € · 3 unpriced")
+same("cost_line: the till chip on a clean line", mp.cost_line(t2, till=12.9), "≈ 8.99 € · 1.28 €/portion · till ≈ 12.90 €")
+same("cost_line: the spec's example", mp.cost_line(mp.Total(8.24, 5, ["a", "b"], 1.18, True, []), till=12.9),
+     "≈ 8.24 € · 1.18 €/portion · till ≈ 12.90 € · 2 unpriced")
+same("cost_line: till None is the old line, byte for byte", (mp.cost_line(t), mp.cost_line(t, till=None)),
+     ("≈ 8.99 € · 1.28 €/portion · 3 unpriced",) * 2)
+same("cost_line: nothing priced yet stays, till or not", mp.cost_line(mp.list_cost(["2 unicorns"], BOOK), till=5.0),
+     "≈ 0.00 € · nothing priced yet")
+same("cost_line: a Till is taken by its total", mp.cost_line(t2, till=mp.Till(12.9, 1.0, {}, 3)), mp.cost_line(t2, till=12.9))
+same("cost_line: no portions, a till", mp.cost_line(mp.list_cost(["14 Eggs"], BOOK, portions=None), till=6.38), "≈ 4.47 € · till ≈ 6.38 €")
+same("cost_line: a till of zero is written (it was asked for)", mp.cost_line(t2, till=0.0), "≈ 8.99 € · 1.28 €/portion · till ≈ 0.00 €")
+same("read_cost_line: the spec's till line", mp.read_cost_line("≈ 8.24 € · 1.18 €/portion · till ≈ 12.90 € · 2 unpriced"),
+     (8.24, 1.18, 2, 12.9))
+same("read_cost_line: a till without holes", mp.read_cost_line("≈ 8.24 € · 1.18 €/portion · till ≈ 12.90 €"), (8.24, 1.18, 0, 12.9))
+same("read_cost_line: a till without portions", mp.read_cost_line("≈ 4.47 € · till ≈ 6.38 €"), (4.47, None, 0, 6.38))
+same("read_cost_line: a till without portions, with holes", mp.read_cost_line("≈ 4.47 € · till ≈ 6.38 € · 2 unpriced"), (4.47, None, 2, 6.38))
+same("read_cost_line: the chips in the wrong order are not the shape", mp.read_cost_line("≈ 4.47 € · 2 unpriced · till ≈ 6.38 €"), None)
+same("read_cost_line: a till line inside a description",
+     mp.read_cost_line("≈ 8.24 € · 1.18 €/portion · till ≈ 12.90 € · 2 unpriced\n\nScaled ×1.75: 4 → 7 portions\n[R](mela://recipe/X)"),
+     (8.24, 1.18, 2, 12.9))
+same("strip_cost_line: a till line goes with its blank line, the body stays",
+     mp.strip_cost_line("≈ 8.24 € · 1.18 €/portion · till ≈ 12.90 € · 2 unpriced\n\nbody"), "body")
+LINES_T = ["**Meat**", "14 Eggs", "6 eggs", "1 tsp salt", "2 unicorns", "1 cup water"]
+tot_t, till_t = mp.list_cost(LINES_T, BOOK_T), mp.list_till(LINES_T, BOOK_T)
+same("the chain: list_cost + list_till -> cost_line -> read_cost_line round trips",
+     mp.read_cost_line(mp.cost_line(tot_t, till=till_t.total)), (tot_t.total, tot_t.per_portion, 1, till_t.total))
+same("the chain: the figures (eaten 6.38, bought 6.67)", (tot_t.total, till_t.total, till_t.pantry), (6.38, 6.67, 0.29))
+for tot in (t, t2, mp.list_cost([], BOOK), mp.list_cost(["14 Eggs"], BOOK, portions=None)):
+    got = mp.read_cost_line(mp.cost_line(tot, till=12.9))
+    same(f"read_cost_line: round trip with a till of {mp.cost_line(tot, till=12.9)!r}", got, (tot.total, tot.per_portion, len(tot.unpriced), 12.9))
+# the CLI: --cost prints the till per line and the pooled cost line, the book read from $HOME (never the real one)
+TMP_CLI = tempfile.mkdtemp(prefix="tickal_meal_price_cli_")
+mp.save_book(BOOK_T, os.path.join(TMP_CLI, ".ticktick_alfred", "meal_prices.json"))
+_SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src", "meal_price.py")
+cli = subprocess.run([sys.executable, _SRC, "--cost", "14 Eggs", "6 eggs", "1 tsp salt", "2 unicorns"],
+                     env={**os.environ, "HOME": TMP_CLI}, capture_output=True, text=True, timeout=60)
+same("CLI --cost: exits 0", cli.returncode, 0)
+CLI_LINES = cli.stdout.splitlines()
+check("CLI --cost: one row per line plus the cost line and the pantry line", len(CLI_LINES) == 6, cli.stdout)
+check("CLI --cost: the eggs row says the till per line, unpooled (2 x 10 pc)", "6.38 € (2 x 10 pc)" in CLI_LINES[0], CLI_LINES[0] if CLI_LINES else "")
+check("CLI --cost: the second eggs row is one pack on its own", "3.19 € (1 x 10 pc)" in CLI_LINES[1], CLI_LINES[1] if len(CLI_LINES) > 1 else "")
+check("CLI --cost: the salt row", "0.29 € (1 x 500 g)" in CLI_LINES[2], CLI_LINES[2] if len(CLI_LINES) > 2 else "")
+check("CLI --cost: a hole has no till", "no entry" in CLI_LINES[3] and "€ (" not in CLI_LINES[3], CLI_LINES[3] if len(CLI_LINES) > 3 else "")
+same("CLI --cost: the pooled cost line (eggs bought once)", CLI_LINES[4] if len(CLI_LINES) > 4 else "",
+     "≈ 6.38 € · 0.91 €/portion · till ≈ 6.67 € · 1 unpriced")
+same("CLI --cost: the pantry line", CLI_LINES[5] if len(CLI_LINES) > 5 else "", "pantry 0.29 € of the till")
+shutil.rmtree(TMP_CLI, ignore_errors=True)
 
 # ── pack_parse ─────────────────────────────────────────────────────────────
 for text, want in (("10 Stk", (10, "pc")), ("100 g", (100, "g")), ("ca. 0,53 kg", (530, "g")),
@@ -730,6 +956,33 @@ same("the real book's existence and mtime are what they were at the start",
      (os.path.exists(REAL_BOOK), os.path.getmtime(REAL_BOOK) if os.path.exists(REAL_BOOK) else None), REAL_BOOK_BEFORE)
 shutil.rmtree(TMP, ignore_errors=True)
 check("the temp dir is gone", not os.path.exists(TMP))
+
+# ── the till review's catches ────────────────────────────────────────────────
+_bk = {"entries": {"salt": {"key": "salt", "source": "knuspr", "product": "Tafelsalz", "product_id": 1, "per": 0.001, "per_unit": "g",
+                            "pack_amount": 500.0, "pack_unit": "g", "price": 0.5, "pantry": False, "piece_g": 7},
+                   "bacon": {"key": "bacon", "source": "knuspr", "product": "Dacello Bacon", "product_id": 2, "per": 0.0129,
+                             "per_unit": "g", "pack_amount": 100.0, "pack_unit": "g", "price": 1.29, "pinned": True, "pantry": True},
+                   "unicorn dust": {"key": "unicorn dust", "pantry": True}}}
+def _ffetch(term):
+    if "Tafelsalz" in term or "Salz" in term:
+        return {"data": {"productList": [{"productId": 9, "productName": "Meersalz fein", "textualAmount": "500 g",
+                                          "price": {"full": 0.99}, "pricePerUnit": {"full": 1.98}, "inStock": True, "baseLink": "x"}]}}
+    if "Dacello" in term:
+        return {"data": {"productList": [{"productId": 2, "productName": "Dacello Bacon", "textualAmount": "100 g",
+                                          "price": {"full": 1.39}, "pricePerUnit": {"full": 13.9}, "inStock": True, "baseLink": "y"}]}}
+    return {"data": {"productList": []}}
+_r = mp.refresh(["salt", "bacon", "unicorn dust"], _bk, "2026-09-23", fetch=_ffetch, pace=0)
+same("refresh keeps Vex's pantry flag and piece_g on a re-picked entry",
+     (_bk["entries"]["salt"].get("pantry"), _bk["entries"]["salt"].get("piece_g"), _bk["entries"]["salt"]["product"]),
+     (False, 7, "Meersalz fein"))
+same("refresh keeps the pantry flag on a pinned re-read", (_bk["entries"]["bacon"].get("pantry"), _bk["entries"]["bacon"]["price"]), (True, 1.39))
+same("refresh: a bare flag entry the shop cannot price is unpriced, never stale",
+     ("unicorn dust" in _r["unpriced"], "unicorn dust" in _r["stale"], _bk["entries"]["unicorn dust"].get("pantry")), (True, False, True))
+same("is_pantry: produce with a staple's word is not pantry",
+     [mp.is_pantry(k) for k in ("bell pepper", "red pepper", "sugar snap pea", "oat milk", "mustard green", "flour tortilla", "tortilla")],
+     [False] * 7)
+same("is_pantry: dried herbs are, the flag beats everything",
+     (mp.is_pantry("dried parsley"), mp.is_pantry("bell pepper", {"pantry": True}), mp.is_pantry("salt", {"pantry": False})), (True, True, False))
 
 print(f"\ntest_meal_price: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
 if __name__ == "__main__":

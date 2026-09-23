@@ -6819,7 +6819,11 @@ def render_filter(index, query):
 # way. On the book screen every key row is ⏎ xact:meal_price_set (type a
 # price by hand) and ⌥⇧ xact:meal_price_search (change the term, re-read
 # that one key), both with back = the screen itself; ⌥⌘ copies the product's
-# knuspr page.
+# knuspr page. Since D27 (Vex 2026-09-23: "Let's do what you pay at the
+# till please.") the hub row says the week's TILL beside what it uses (the
+# packs, pooled once across the week, meal_write.week_till) with the pantry
+# staples' share apart, a ctx:mealgroc chip carries its list's till, and a
+# pantry entry's book row says so.
 _MEAL_FRESH_S = 45
 _MEAL_SLUG = {"b": "breakfast", "l": "lunch", "s": "snack"}
 _MEAL_KEY = {v: k for k, v in _MEAL_SLUG.items()}
@@ -7120,24 +7124,34 @@ def render_meal(ids, query):
         arg="xact:crmbrowse:ctx:mealgroc", valid=True, mods=gm))
     # 🏷 the week's speculation (Vex 2026-09-22: "how much will each
     # ingredient cost and total per meal?", "Speculation is all I need"):
-    # the total read off the lists' cost lines, no network here; ⌥⇧ is the
-    # ONE road to knuspr.de (never a background job, Vex 2026-09-21)
+    # what the week USES read off the lists' cost lines, and what the
+    # TILL charges for the packs (Vex 2026-09-23: "Let's do what you pay
+    # at the till please.") pooled once across the week off the book, the
+    # pantry staples' share said apart; no network here, ⌥⇧ is the ONE
+    # road to knuspr.de (never a background job, Vex 2026-09-21)
     import meal_price as mp
+    book = mp.load_book()
     try:
         wtotal, wholes, _wn = mw.week_cost()
     except Exception:
         wtotal, wholes = None, 0
-    n_book = len(mp.load_book().get("entries") or {})
+    try:
+        wtill, wpantry, _wl = mw.week_till(book=book)
+    except Exception:
+        wtill, wpantry = None, 0.0
+    n_book = len(book.get("entries") or {})
     pm = _okr_nav_mods("ctx:mealprice")
     pm["alt+shift"] = {"arg": "xact:meal_prices:" + _meal_b64({"back": "ctx:meal"}),
                        "valid": True, "subtitle": "🏷 Refresh prices from knuspr.de"}
-    ptitle = "🏷 Prices · " + (f"≈ {wtotal:.2f} € this week" if wtotal is not None
-                               else "nothing priced yet")
+    chips = ([f"≈ {wtotal:.2f} € used"] if wtotal is not None else []) \
+        + ([f"till ≈ {wtill:.2f} €"] if wtill is not None else [])
+    ptitle = "🏷 Prices · " + (" · ".join(chips) if chips else "nothing priced yet")
     if wholes:
         ptitle += f" · {wholes} unpriced"
     rows.append(alfred.item(
         uid="meal-price", title=ptitle,
-        subtitle=f"knuspr.de speculation · book {n_book} entr{'y' if n_book == 1 else 'ies'}"
+        subtitle=(f"pantry {wpantry:.2f} € of the till · " if wpantry else "")
+                 + f"knuspr.de speculation · book {n_book} entr{'y' if n_book == 1 else 'ies'}"
                  " · ⌥⇧ refresh (≈ 0.5 s a key)  |  ⏎⤵️  ⌥⤵️  ⌥⇧🏷",
         arg="xact:crmbrowse:ctx:mealprice", valid=True, mods=pm))
     for key, tag, glyph, label in meal.SLOTS:
@@ -7347,7 +7361,10 @@ def render_mealgroc(query):
             chip += f" · {portions} portions"
         cost = _meal_cost_total(t.get("content") or t.get("desc") or "")
         if cost is not None:
-            chip += f" · ≈ {cost:.2f} €"
+            used, till = cost
+            chip += f" · ≈ {used:.2f} €"
+            if till is not None:            # a line written before D27 has no till
+                chip += f" · till {till:.2f} €"
         rows.append(alfred.item(
             uid=f"mg-{t['id']}", title=f"🛒 {name}",
             subtitle=f"{('due ' + due + ' · ') if due else ''}{chip}  |  ⏎↗️  ⇧✅  ⌥⇧🔢  ⌥⌘🔗  ⌘⚡",
@@ -7417,15 +7434,22 @@ def render_mealrate(ids, query):
 
 
 def _meal_cost_total(content):
-    """The euro total off a 🛒 list's cost line (the first line the sync
+    """(used, till) off a 🛒 list's cost line (the first line the sync
     writes above the yield note; meal_price.read_cost_line reads it as
-    (total, per_portion, unpriced)), None on a list without one - the
-    lists cut before the book existed. A reader that trips is a missing
-    chip, never a broken screen."""
+    (total, per_portion, unpriced, till)), None on a list without one -
+    the lists cut before the book existed. `till` is None on a line
+    written before D27 (Vex 2026-09-23: "Let's do what you pay at the
+    till please."), so the chip says only what it knows. A reader that
+    trips is a missing chip, never a broken screen."""
     import meal_price as mp
     try:
         got = mp.read_cost_line(content or "")
-        return None if got is None else float(got[0])
+        if got is None:
+            return None
+        total, _per, holes, till = got
+        if holes is None and not total:      # "nothing priced yet": no chip, like the hub
+            return None
+        return float(total), (float(till) if till is not None else None)
     except Exception:
         return None
 
@@ -7466,9 +7490,15 @@ def render_mealprice(ids, query):
     (xact:meal_price_search) - both reopen THIS ctx after the toast, the
     ⭐️ picker's shape; ⌥⌘ copies the product's knuspr page. The book is
     read once a render and no network is ever touched here (the refresh
-    is the hub row's ⌥⇧). Not task rows: the seal keeps ⌘ dead and blanks
-    the variables. back = the trailing ids re-joined, the hub when none.
-    The bar filters on the key and the product name."""
+    is the hub row's ⌥⇧). A row whose key or entry is a pantry staple
+    (meal_price.is_pantry: the entry's own flag, else the default list)
+    wears " · pantry" at the end of its title, because the till counts
+    those packs but the hub says their share apart (D27, Vex 2026-09-23:
+    "Let's do what you pay at the till please."), and the price box takes
+    "pantry" / "not pantry" to flip the flag. Not task rows: the seal
+    keeps ⌘ dead and blanks the variables. back = the trailing ids
+    re-joined, the hub when none. The bar filters on the key and the
+    product name."""
     import meal_price as mp
     import meal_write as mw
     ctx = "ctx:mealprice" + (":" + ":".join(ids) if ids else "")
@@ -7507,7 +7537,8 @@ def render_mealprice(ids, query):
         uid="mp-head",
         title=f"🏷 Price book · {len(entries)} entr{'y' if len(entries) == 1 else 'ies'}"
               f" · {len(holes)} unpriced this week · updated {book.get('updated') or 'never'}",
-        subtitle="knuspr.de prices as speculation · ⏎ type a price · ⌥⇧ change the search term  |  ⌃🔙",
+        subtitle="knuspr.de prices as speculation · ⏎ type a price (or pantry / not pantry in the price box)"
+                 " · ⌥⇧ change the search term  |  ⌃🔙",
         valid=False)]
 
     def key_row(glyph, key, e):
@@ -7516,6 +7547,10 @@ def render_mealprice(ids, query):
         pay = _meal_b64({"key": (e or {}).get("key") or key, "back": ctx})
         term = mp.search_term(key, book)
         url = (e or {}).get("url") or ""
+        # the pantry verdict: the entry that prices the row, else the bare
+        # entry a "pantry" answer minted under the exact key (it prices
+        # nothing, so `e` is None for it), else the default list by key
+        pantry = mp.is_pantry(key, e if e is not None else entries.get(key))
         mods = _okr_dead_mods()
         mods["alt+shift"] = {"arg": f"xact:meal_price_search:{pay}", "valid": True,
                              "subtitle": "🔍 Search term…"}
@@ -7546,6 +7581,8 @@ def render_mealprice(ids, query):
                 what = " ".join(s for s in (e.get("product") or "?", e.get("pack") or "", price) if s)
                 title = f"{glyph} {key} · {mp._per_text(per, unit)} · {what} · knuspr {when}"
                 sub = f"searched as {term} · ⏎ type a price · ⌥⇧ search term"
+        if pantry:
+            title += " · pantry"
         if url:
             sub += "  |  ⌥⌘🔗"
         return alfred.item(uid=f"mp-{key}", title=title, subtitle=sub,

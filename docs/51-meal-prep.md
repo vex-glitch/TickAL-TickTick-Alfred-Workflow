@@ -123,10 +123,14 @@ Speculation, by design: what a week of groceries roughly costs, per ingredient, 
 - **⏎ on a book row** asks for a price the way a shelf label reads it: `2.99 / 10 pc`, `1.49 / 100 g`, `7.97 / 1 l`. That entry is yours and wins over the shop.
 - **⌥⇧⏎ on a book row** asks for a different search term (the English ingredient is translated with a built-in list, `egg → Eier`; a miss is usually a term the shop spells differently) and looks that one up again.
 
+**Two figures: used and at the till**
+
+The first figure is what the meals consume (350 g of bacon at the per-kilo price). The second is what you pay at the till: the packs you have to buy, each rounded up, at the pack price. Within a list one ingredient shares its packs (salt in two sections is one pack), and the hub's figure shares them across the whole week (eggs in two recipes are two packs of ten, not two and one). Staples you already keep, salt, oils, vinegars, sauces, spices, sugar, flour, stock, rice and pasta, are counted but shown apart as **pantry**, so the till does not charge a jar of paprika to every week. Type `pantry` or `not pantry` into a book row's price box to move an ingredient across. A list's description reads `≈ 8.24 € · 1.18 €/portion · till ≈ 12.90 € · 2 unpriced`; the hub's 🏷 row reads `≈ 36.73 € used · till ≈ 58.40 €` with the pantry share underneath.
+
 **What it cannot do**
 
 - It is Knuspr's price, not your store's, unless you shop there; treat the totals as relative truth.
-- It prices what a recipe consumes (350 g of bacon at the per-kilo price), not the packs you carry home.
+- The till figure assumes you buy every pack fresh (minus the pantry); what is left in the fridge from last week is not known.
 - A line with no amount ("a handful of parsley"), a piece against a per-kilo entry ("2 chicken breasts") or an ingredient the shop cannot find stays unpriced and is counted as such. Water and ice are free.
 
 ## Alfred needs Full Disk Access

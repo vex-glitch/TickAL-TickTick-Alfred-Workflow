@@ -33,6 +33,31 @@ the kilo) is a "unit mismatch" until the entry says how many grams a piece
 is (`piece_g`), because guessing that silently would be a lie, not a
 speculation.
 
+THE TILL: Vex 2026-09-23: "Let's do what you pay at the till please." The
+consumption figure (350 g of bacon at the per-kilo price) is what a recipe
+EATS; the till figure is what the shop CHARGES, because bacon comes in
+300 g packs and eggs in tens. pack_need brings a line's need into the
+entry's pack base exactly the way line_cost converts (same base as it is,
+g and ml 1:1, pieces through piece_g either way), list_till pools the
+needs per ENTRY before rounding up (two salt lines are one pack) and
+week_till pools them across the whole week (20 eggs over two recipes are
+two packs of ten, not two and one), then packs = ceil(need / pack) and
+till = packs x price. An entry with no usable pack (no pack_amount, or no
+price) counts its consumption cost instead, so the till never reads lower
+than what is eaten. cost_line carries the till as its own chip and
+read_cost_line hands it back as a fourth value.
+
+PANTRY: the staples a kitchen holds anyway (salt, oil, flour, soy sauce:
+DEFAULT_PANTRY, or entry["pantry"] flipped by typing "pantry" / "not
+pantry" into a book row's price box) are counted IN the till but reported
+apart, so the hub can say "till ≈ 58.40 € · 12.10 € of it pantry" and Vex
+knows how much of the figure is jars already on the shelf. is_pantry judges
+by the entry's own flag when it is a bool, else by DEFAULT_PANTRY as whole
+words ("kosher salt" is salt; "garlic" alone is not pantry, "garlic
+powder" is). A bare {"key", "pantry"} entry (the flip on a key the shop
+never priced) prices nothing: lookup passes it over for a priced cousin
+and line_cost reads it as "no entry".
+
 The ingredient KEY is the line's name canonicalised (`ingredient_key`):
 parentheses dropped, cut at the comma, prep words removed, the last word
 singularised - so "350 g Sliced Bacon (short cut …)" and "200 g bacon" are
@@ -58,6 +83,17 @@ import meal_scale as ms
 Qty = ms.Qty
 Cost = namedtuple("Cost", "line key cost per_line_note approx reason")
 Total = namedtuple("Total", "total priced unpriced per_portion approx costs")
+# one line's share of the till: key = the line's own key, entry_key = the
+# book key that priced it (the pooling key), need = the amount in the
+# entry's pack base, base = the LINE's own base (what the cook wrote),
+# packs / pack_amount None when the entry has no usable pack (till is then
+# the consumption cost), pantry = is_pantry of the entry
+Need = namedtuple("Need", "key entry_key need base packs pack_amount pack_unit price till pantry")
+# a list's (or the week's) till: total to the cent, pantry = the part of
+# total from pantry entries, packs = {entry_key: (packs, pack_amount,
+# pack_unit, price)} with packs None for an unusable pack, lines = how
+# many lines took part
+Till = namedtuple("Till", "total pantry packs lines")
 Product = namedtuple("Product", "id name pack price per per_unit in_stock url")
 
 BOOK_NAME = "meal_prices.json"
@@ -407,6 +443,68 @@ def search_term(key, book=None):
     return DEFAULT_SEARCH[hit] if hit else key
 
 
+# ── pantry ─────────────────────────────────────────────────────────────────
+# Ingredient keys a kitchen holds anyway: the till counts them (a recipe
+# that needs salt needs salt) but reports them apart, so a week's figure
+# is not read as sixty euros of shopping when twelve of it sits on the
+# shelf. A key IN the set or CONTAINING one of its keys as whole words is
+# pantry ("kosher salt", "chicken stock", "toasted sesame oil"); the
+# reverse is not ("garlic" is produce, "garlic powder" is a jar). Vex
+# corrects a single entry with "pantry" / "not pantry" in its price box.
+DEFAULT_PANTRY = frozenset((
+    "salt", "kosher salt", "sea salt", "seasoning salt", "pepper", "black pepper",
+    "white pepper", "oil", "olive oil", "vegetable oil", "sunflower oil", "canola oil",
+    "rapeseed oil", "coconut oil", "avocado oil", "sesame oil", "cooking spray",
+    "vinegar", "apple cider vinegar", "rice vinegar", "balsamic vinegar",
+    "white wine vinegar", "red wine vinegar", "soy sauce", "fish sauce",
+    "worcestershire sauce", "hot sauce", "sriracha", "sriracha hot sauce", "ketchup",
+    "mustard", "dijon mustard", "mayonnaise", "mayo", "honey", "maple syrup", "sugar",
+    "brown sugar", "powdered sugar", "icing sugar", "flour", "cornstarch", "corn starch",
+    "baking powder", "baking soda", "vanilla extract", "vanilla", "cocoa powder",
+    "paprika", "smoked paprika", "cumin", "oregano", "thyme", "rosemary", "chili flake",
+    "red pepper flake", "chili powder", "cayenne", "curry powder", "garlic powder",
+    "onion powder", "italian seasoning", "bay leaf", "cinnamon", "nutmeg", "turmeric",
+    "stock cube", "bouillon", "stock", "broth", "chicken stock", "chicken broth",
+    "beef stock", "beef broth", "vegetable stock", "vegetable broth", "rice", "pasta",
+    "oat", "breadcrumb", "panko", "peanut butter", "hoisin sauce", "hoisin",
+    "oyster sauce", "sesame seed", "coconut milk",
+))
+
+
+# Produce, dairy and fresh things whose NAME carries a staple's word: a bell
+# pepper is not the pepper mill, a tortilla is not the flour, oat milk is not
+# the oats. Checked before the containment rule; Vex's own flag beats both.
+DEFAULT_NOT_PANTRY = frozenset((
+    "bell pepper", "red pepper", "green pepper", "yellow pepper", "orange pepper",
+    "chili pepper", "jalapeno pepper", "jalapeno", "roasted red pepper", "sweet pepper",
+    "peppercorn", "sugar snap pea", "snap pea", "oat milk", "rice milk", "mustard green",
+    "pasta sauce", "rice noodle", "rice paper", "rice cake", "tortilla", "flour tortilla",
+    "wrap", "tortilla wrap", "honey mustard chicken", "sugar cane", "rice vinegar chicken",
+    "cooked rice", "fried rice", "salted butter", "pepper jack", "pepperoni", "salt cod",
+    "vanilla ice cream", "vanilla yogurt", "stock cube chicken", "pasta salad",
+))
+
+
+def is_pantry(key, entry=None):
+    """Is `key` (a book key or a line's ingredient_key) a pantry staple:
+    entry["pantry"] when it is a bool (Vex's word, typed into the price
+    box), else key in DEFAULT_PANTRY, else a DEFAULT_PANTRY key contained
+    in it as whole words ("kosher salt" -> salt, "garlic" alone -> no).
+    Never raises; False for a blank key."""
+    if isinstance(entry, dict) and isinstance(entry.get("pantry"), bool):
+        return entry["pantry"]
+    key = " ".join(str(key or "").lower().split())
+    if not key:
+        return False
+    if key in DEFAULT_PANTRY:
+        return True
+    if key in DEFAULT_NOT_PANTRY or any(_contains(key, p) for p in DEFAULT_NOT_PANTRY):
+        return False
+    if key.startswith("dried "):             # dried herbs live on the shelf, whatever the herb
+        return True
+    return any(_contains(key, p) for p in DEFAULT_PANTRY)
+
+
 # ── the book ───────────────────────────────────────────────────────────────
 def empty_book():
     """A book with nothing in it, the shape load_book hands out for a
@@ -464,32 +562,53 @@ def _base_of(entry):
     return entry.get("per_unit") if isinstance(entry, dict) and entry.get("per_unit") in BASES else None
 
 
-def lookup(key, book, base=None):
-    """The entry for `key`: exact; else the entry whose key is contained in
-    `key` as whole words, longest first ("boneless chicken thigh" ->
-    "chicken thigh" before "chicken"); else the entry `key` is contained in,
-    shortest first ("thigh" -> "chicken thigh"). None when nothing. Pure.
-
-    `base` is the line's own base (g / ml / pc): among the candidates of
-    one level an entry priced in that base comes first, then the level's
-    length rule, then the name, so "500 g chicken" against "chicken stock"
-    (ml) and "chicken thigh" (g) takes the thigh, not the alphabet."""
-    key = (key or "").strip()
-    entries = (book or {}).get("entries") or {}
-    if not key:
-        return None
-    if key in entries:
-        return entries[key]
-
+def _candidates(key, entries, base=None):
+    """The book keys that could price `key`, best first: the exact key;
+    then the entries contained in `key` as whole words, longest first
+    ("boneless chicken thigh" -> "chicken thigh" before "chicken"); then
+    the entries `key` is contained in, shortest first ("thigh" -> "chicken
+    thigh"). Within a level an entry priced in `base` (the line's own base,
+    g / ml / pc) comes first, then the level's length rule, then the name,
+    so "500 g chicken" against "chicken stock" (ml) and "chicken thigh" (g)
+    takes the thigh, not the alphabet."""
     def off_base(k):
         return 1 if base and _base_of(entries[k]) != base else 0
-    inner = [k for k in entries if _contains(key, k)]
-    if inner:
-        return entries[min(inner, key=lambda k: (off_base(k), -len(k), k))]
-    outer = [k for k in entries if _contains(k, key)]
-    if outer:
-        return entries[min(outer, key=lambda k: (off_base(k), len(k), k))]
-    return None
+    out = [key] if key in entries else []
+    inner = [k for k in entries if k != key and _contains(key, k)]
+    out += sorted(inner, key=lambda k: (off_base(k), -len(k), k))
+    outer = [k for k in entries if k != key and _contains(k, key)]
+    out += sorted(outer, key=lambda k: (off_base(k), len(k), k))
+    return out
+
+
+def _usable(entry):
+    """Can this entry price a line: a dict with a per-unit price."""
+    return isinstance(entry, dict) and _entry_per(entry)[0] is not None
+
+
+def _lookup_key(key, book, base=None):
+    """(book key, entry) for `key`: the first USABLE candidate of
+    _candidates (a per-unit price in g / ml / pc), else the first
+    candidate as it is, so a bare pantry-flag entry or a broken one never
+    shadows a priced cousin ("kosher salt" flipped to pantry still costs
+    by "salt") yet still comes back when it is all there is (the flag is
+    read off it). (None, None) when nothing. Pure."""
+    key = (key or "").strip()
+    entries = (book or {}).get("entries") or {}
+    if not key or not isinstance(entries, dict):
+        return None, None
+    cands = _candidates(key, entries, base)
+    for k in cands:
+        if _usable(entries[k]):
+            return k, entries[k]
+    return (cands[0], entries[cands[0]]) if cands else (None, None)
+
+
+def lookup(key, book, base=None):
+    """The entry for `key` (see _lookup_key: exact, contained, containing;
+    the line's `base` breaks ties; a usable entry before a bare one), or
+    None when nothing. Pure."""
+    return _lookup_key(key, book, base)[1]
 
 
 # ── cost ───────────────────────────────────────────────────────────────────
@@ -525,52 +644,163 @@ def _piece_g(entry):
     return g if g > 0 else 0.0
 
 
+def _resolve(line, book):
+    """The parts line_cost and pack_need share for one line: (key, q,
+    amount, base, entry_key, entry, per, unit), the line's own price
+    suffix ignored; the entry parts None when the book has nothing usable
+    for the key. Pure."""
+    key = ingredient_key(line)
+    q = ms.parse_quantity(strip_price(line or ""))
+    amount, base = to_base(q)
+    entry_key, entry = _lookup_key(key, book, base) if key else (None, None)
+    per, unit = _entry_per(entry) if entry else (None, None)
+    return key, q, amount, base, entry_key, entry, per, unit
+
+
+def _in_entry_base(amount, base, entry, unit):
+    """(need, approx, how): the line's `amount` in `base` brought to the
+    entry's `unit`, the ONE conversion table of the module (line_cost's
+    cost and pack_need's need must never disagree about a line): the same
+    base as it is; g and ml 1:1, approx; a piece line against a g / ml
+    entry times piece_g, a g / ml line against a piece entry over piece_g,
+    both approx; None when none of that applies (a unit mismatch). `how`
+    is the middle of the shelf-tag note: "", " as ml", " x 150 g", " / 60 g
+    a piece"."""
+    if unit == base:
+        return amount, False, ""
+    if {unit, base} == {"g", "ml"}:
+        return amount, True, f" as {unit}"
+    g = _piece_g(entry)
+    if base == "pc" and g:
+        return amount * g, True, f" x {_num(g)} g"
+    if unit == "pc" and g:
+        return amount / g, True, f" / {_num(g)} g a piece"
+    return None
+
+
 def line_cost(line, book):
     """Cost(line, key, cost, per_line_note, approx, reason) for one
     checklist line, its own price suffix ignored (a re-price reads the
     titles it wrote). cost is euro to the cent or None; reason is "priced",
     "free" (water, ice), "no amount" (a header, a bare "Avocado oil"),
-    "no entry" (nothing in the book) or "unit mismatch" (pieces against a
-    per-gram price without piece_g). approx: a spoon taken as grams, a
-    range at its midpoint, a piece converted through piece_g. Cost.line is
-    the line as given."""
-    key = ingredient_key(line)
-    q = ms.parse_quantity(strip_price(line or ""))
-    amount, base = to_base(q)
+    "no entry" (nothing in the book, or only an entry without a per-unit
+    price: a bare pantry flag, a broken number) or "unit mismatch" (pieces
+    against a per-gram price without piece_g). approx: a spoon taken as
+    grams, a range at its midpoint, a piece converted through piece_g.
+    Cost.line is the line as given."""
+    key, q, amount, base, _entry_key, entry, per, unit = _resolve(line, book)
     if not key:                              # a step line, a blank: nothing to buy
         return Cost(line, key, None, "not an ingredient", False, "no amount")
     if key in FREE:
         return Cost(line, key, 0.0, "free", False, "free")
     if amount is None:
         return Cost(line, key, None, "no amount", False, "no amount")
-    entry = lookup(key, book, base) if key else None
-    per, unit = _entry_per(entry) if entry else (None, None)
     if per is None:
         return Cost(line, key, None, f"no price for {key or 'this line'}", False, "no entry")
     approx = q.range_hi is not None
     amt_text = f"{_num(amount)} {base}" + (" (midpoint)" if approx else "")
-    if unit == base:
-        cost = amount * per
-        note = f"{amt_text} at {_per_text(per, unit)}"
-    elif {unit, base} == {"g", "ml"}:
-        cost = amount * per
-        approx = True
-        note = f"{amt_text} as {unit} at {_per_text(per, unit)}"
-    elif base == "pc" and _piece_g(entry):
-        g = _piece_g(entry)
-        cost = amount * g * per
-        approx = True
-        note = f"{amt_text} x {_num(g)} g at {_per_text(per, unit)}"
-    elif unit == "pc" and _piece_g(entry):
-        g = _piece_g(entry)
-        cost = amount / g * per
-        approx = True
-        note = f"{amt_text} / {_num(g)} g a piece at {_per_text(per, unit)}"
-    else:
+    conv = _in_entry_base(amount, base, entry, unit)
+    if conv is None:
         return Cost(line, key, None, f"{base} line, {unit} price", False, "unit mismatch")
+    need, conv_approx, how = conv
+    note = f"{amt_text}{how} at {_per_text(per, unit)}"
     if entry.get("product"):
         note += f" · {entry['product']}"
-    return Cost(line, key, _round2(cost), note, approx, "priced")
+    return Cost(line, key, _round2(need * per), note, approx or conv_approx, "priced")
+
+
+# ── the till ───────────────────────────────────────────────────────────────
+_CEIL_EPS = 1e-9               # 20 eggs / 10 a pack is 2 packs, not 3 on float noise
+
+
+def _pack_of(entry, unit):
+    """(pack_amount, pack_unit, price) of an entry as the till needs them;
+    pack_amount None when the pack is unusable: missing, not a number or
+    not above zero, priced in another base than the per-unit price (the
+    need is in `unit`, so the pack must be too), or with no price to
+    multiply. price None when there is none; pack_unit falls back on
+    `unit` so a Need always names a base."""
+    pack_unit = entry.get("pack_unit") if entry.get("pack_unit") in BASES else unit
+    try:
+        amount = float(entry.get("pack_amount") or 0)
+    except Exception:
+        amount = 0.0
+    try:
+        price = float(entry.get("price"))
+    except Exception:
+        price = None
+    if price is not None and (not math.isfinite(price) or price < 0):
+        price = None
+    if not (amount > 0) or price is None or pack_unit != unit:
+        return None, pack_unit, price
+    return amount, pack_unit, price
+
+
+def _packs(need, pack_amount):
+    """How many packs cover `need`: the ceiling, with a hair of float
+    slack so 20 / 10 is 2 and 0.3 / 0.1 is 3."""
+    return int(math.ceil(need / pack_amount - _CEIL_EPS))
+
+
+def pack_need(line, book):
+    """Need(key, entry_key, need, base, packs, pack_amount, pack_unit,
+    price, till, pantry) for one line, or None for a line line_cost does
+    not price (free, no amount, no entry, unit mismatch). need is the
+    amount in the entry's pack base (the conversion line_cost uses), packs
+    the ceiling of need / pack_amount, till = packs x price to the cent;
+    an entry with no usable pack (see _pack_of) gives packs None,
+    pack_amount None and its consumption cost as till (the same cent
+    line_cost says), so a list's till is never lower than what it eats.
+    pantry is is_pantry of the entry that priced the line."""
+    key, _q, amount, base, entry_key, entry, per, unit = _resolve(line, book)
+    if not key or key in FREE or amount is None or per is None:
+        return None
+    conv = _in_entry_base(amount, base, entry, unit)
+    if conv is None:
+        return None
+    need = conv[0]
+    pack_amount, pack_unit, price = _pack_of(entry, unit)
+    pantry = is_pantry(entry_key, entry)
+    if pack_amount is None:
+        return Need(key, entry_key, need, base, None, None, pack_unit, price, _round2(need * per), pantry)
+    packs = _packs(need, pack_amount)
+    return Need(key, entry_key, need, base, packs, pack_amount, pack_unit, price, _round2(packs * price), pantry)
+
+
+def list_till(lines, book):
+    """Till(total, pantry, packs, lines) for ONE 🛒 list: the needs pooled
+    per entry key BEFORE rounding up (two salt lines are one pack; eggs
+    14 + 6 are two packs of ten, not three), total the sum to the cent,
+    pantry the part of it from pantry entries, packs = {entry_key: (packs,
+    pack_amount, pack_unit, price)} in first-seen order (packs and
+    pack_amount None for an unusable pack, whose lines are summed as their
+    consumption cost), lines the number of lines that took part."""
+    needs = [n for n in (pack_need(ln, book) for ln in (lines or [])) if n is not None]
+    groups = {}
+    for n in needs:
+        groups.setdefault(n.entry_key, []).append(n)
+    total = pantry = 0.0
+    packs = {}
+    for entry_key, ns in groups.items():
+        first = ns[0]
+        if first.packs is None:
+            till = _round2(sum(n.till for n in ns))
+            packs[entry_key] = (None, None, first.pack_unit, first.price)
+        else:
+            count = _packs(sum(n.need for n in ns), first.pack_amount)
+            till = _round2(count * first.price)
+            packs[entry_key] = (count, first.pack_amount, first.pack_unit, first.price)
+        total += till
+        if first.pantry:
+            pantry += till
+    return Till(_round2(total), _round2(pantry), packs, len(needs))
+
+
+def week_till(lists_of_lines, book):
+    """list_till over every list of the week at once (a list of lists of
+    lines): the pooling crosses the lists, which is the whole point - eggs
+    in two recipes are bought once."""
+    return list_till([ln for lines in (lists_of_lines or []) for ln in (lines or [])], book)
 
 
 UNPRICED_REASONS = ("no entry", "unit mismatch")
@@ -603,15 +833,22 @@ def list_cost(lines, book, portions=7):
     return Total(total, priced, unpriced, per_portion, approx, costs)
 
 
-def cost_line(total):
+def cost_line(total, till=None):
     """The one line for the top of the checklist description:
-    "≈ 18.40 € · 2.60 €/portion", plus " · 3 unpriced" when the book had
-    holes, or "≈ 0.00 € · nothing priced yet" when it had nothing."""
+    "≈ 18.40 € · 2.60 €/portion", plus " · till ≈ 25.30 €" when `till` (a
+    euro figure, or a Till whose total is taken) is given, plus " · 3
+    unpriced" when the book had holes, or "≈ 0.00 € · nothing priced yet"
+    when it had nothing (then no till either: nothing was priced). The
+    till chip sits between the per-portion chip and the unpriced chip so
+    the line reads eaten, per head, bought, holes."""
     if not total.priced and total.unpriced and not total.total:
         return "≈ 0.00 € · nothing priced yet"
     s = f"≈ {total.total:.2f} €"
     if total.per_portion is not None:
         s += f" · {total.per_portion:.2f} €/portion"
+    till = getattr(till, "total", till)
+    if till is not None:
+        s += f" · till ≈ {till:.2f} €"
     if total.unpriced:
         s += f" · {len(total.unpriced)} unpriced"
     return s
@@ -620,7 +857,7 @@ def cost_line(total):
 # the cost line's own shape, "≈ 18.40 €" and whatever follows it, taken
 # with the ONE blank line the writer may have put under it
 _COST_LINE = re.compile(r"(?m)^≈ \d+\.\d\d €[^\n]*(?:\n(?:[ \t]*\n)?|$)")
-_COST_READ = re.compile(r"(?m)^≈ (\d+\.\d\d) €(?: · (\d+\.\d\d) €/portion)?"
+_COST_READ = re.compile(r"(?m)^≈ (\d+\.\d\d) €(?: · (\d+\.\d\d) €/portion)?(?: · till ≈ (\d+\.\d\d) €)?"
                         r"(?: · (\d+) unpriced)?( · nothing priced yet)?[ \t]*$")
 
 
@@ -635,20 +872,25 @@ def strip_cost_line(desc):
 
 
 def read_cost_line(desc):
-    """(total, per_portion, unpriced) from the module's own cost line in
-    `desc`, or None when there is none: "≈ 18.40 € · 2.60 €/portion · 3
-    unpriced" -> (18.4, 2.6, 3); "≈ 8.99 € · 1.28 €/portion" -> (8.99,
-    1.28, 0), no holes were reported; "≈ 0.00 € · nothing priced yet" ->
-    (0.0, None, None), the count of holes was never said. Only the shape
-    cost_line writes is read; a recipe's own "≈ 3.00 € worth" is not."""
+    """(total, per_portion, unpriced, till) from the module's own cost line
+    in `desc`, or None when there is none: "≈ 8.24 € · 1.18 €/portion ·
+    till ≈ 12.90 € · 2 unpriced" -> (8.24, 1.18, 2, 12.9); "≈ 18.40 € ·
+    2.60 €/portion · 3 unpriced" (a line cut before the till existed) ->
+    (18.4, 2.6, 3, None); "≈ 8.99 € · 1.28 €/portion" -> (8.99, 1.28, 0,
+    None), no holes were reported; "≈ 0.00 € · nothing priced yet" ->
+    (0.0, None, None, None), the count of holes was never said. Only the
+    shape cost_line writes is read; a recipe's own "≈ 3.00 € worth" is
+    not. A 4-tuple since the till (2026-09-23): every reader unpacks
+    four."""
     m = _COST_READ.search(desc or "")
     if not m:
         return None
     total = float(m.group(1))
     per = float(m.group(2)) if m.group(2) else None
-    if m.group(4):
-        return total, per, None
-    return total, per, int(m.group(3)) if m.group(3) else 0
+    till = float(m.group(3)) if m.group(3) else None
+    if m.group(5):
+        return total, per, None, till
+    return total, per, int(m.group(4)) if m.group(4) else 0, till
 
 
 def price_suffix(cost):
@@ -918,6 +1160,20 @@ def entry_from(product, key, term, today):
             "date": _iso(today), "pinned": False, "url": product.url}
 
 
+def _carry(old, fresh):
+    """What a re-picked entry keeps from the one it replaces: Vex's words on
+    it. piece_g (grams a piece, typed for a pieces-vs-kilo line) and the
+    pantry flag ("pantry" / "not pantry" in the price box) are his, the
+    product and its price are the shop's; a refresh must never undo the
+    former while renewing the latter (the till review caught the flag
+    being dropped)."""
+    if _piece_g(old):
+        fresh["piece_g"] = old["piece_g"]
+    if isinstance(old.get("pantry"), bool):
+        fresh["pantry"] = old["pantry"]
+    return fresh
+
+
 def refresh(keys, book, today, fetch=None, pace=0.5, sleep=None):
     """Re-price `keys` in order into book["entries"] and stamp
     book["updated"]: {"updated": [..], "unpriced": [..], "kept": [..],
@@ -962,8 +1218,7 @@ def refresh(keys, book, today, fetch=None, pace=0.5, sleep=None):
             if same:
                 fresh = entry_from(same[0], key, old.get("search") or search_term(key, book), today)
                 fresh["pinned"] = True
-                if _piece_g(old):
-                    fresh["piece_g"] = old["piece_g"]
+                _carry(old, fresh)
                 entries[key] = fresh
                 out["updated"].append(key)
             else:
@@ -972,15 +1227,15 @@ def refresh(keys, book, today, fetch=None, pace=0.5, sleep=None):
         term = search_term(key, book)
         product = pick(search(term), term)
         if product is None:
-            if isinstance(old, dict):
+            if isinstance(old, dict) and _usable(old):
                 out["kept"].append(key)
                 out["stale"].append(key)
-            else:
+            else:                       # nothing, or a bare flag entry: no price to be stale
                 out["unpriced"].append(key)
             continue
         fresh = entry_from(product, key, term, today)
-        if isinstance(old, dict) and _piece_g(old):
-            fresh["piece_g"] = old["piece_g"]
+        if isinstance(old, dict):
+            _carry(old, fresh)
         entries[key] = fresh
         out["updated"].append(key)
     book["updated"] = _iso(today)
@@ -1092,10 +1347,20 @@ if __name__ == "__main__":       # python3 src/meal_price.py Eier | --cost "14 E
     if _args[0] == "--cost":
         _book = load_book()
         _lines = _args[1:]
-        for _c in list_cost(_lines, _book).costs:
+        _total, _till = list_cost(_lines, _book), list_till(_lines, _book)
+        for _c in _total.costs:
             _euro = "" if _c.cost is None else f"{_c.cost:.2f} €"
-            print(f"{_euro:>9}  {_c.reason:<14} {_c.key:<24} {_c.per_line_note}")
-        print(cost_line(list_cost(_lines, _book)))
+            _n = pack_need(_c.line, _book)
+            if _n is None:                  # eaten, then bought: the till per line, unpooled
+                _at_till = ""
+            elif _n.packs is None:
+                _at_till = f"{_n.till:.2f} € (no pack)"
+            else:
+                _at_till = f"{_n.till:.2f} € ({_n.packs} x {_num(_n.pack_amount)} {_n.pack_unit})"
+            print(f"{_euro:>9}  {_at_till:>22}  {_c.reason:<14} {_c.key:<24} {_c.per_line_note}")
+        print(cost_line(_total, till=_till.total if _total.priced else None))
+        if _till.pantry:
+            print(f"pantry {_till.pantry:.2f} € of the till")
     else:
         _term = " ".join(_args)
         _found = knuspr_search(_term)
