@@ -386,7 +386,8 @@ def habit_lines_daily():
     habits = _habits()
     if not habits:
         return None
-    day = date.today()
+    import dayroll
+    day = dayroll.today()             # the note's day, not the clock's
     today = _stamp(day)
     checks = _checkins(today - 1)
     if checks is None:

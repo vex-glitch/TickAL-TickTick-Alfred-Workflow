@@ -4739,8 +4739,9 @@ def render_rconfirm(ids, query):
                         "ctx:routines")
     t = cache_store.find_task(r["tid"]) or {}
     name = t.get("title") or r["label"]
-    st = rt.due_state(t)
-    today = _date.today()
+    import dayroll
+    today = dayroll.today()           # the routine's day rolls at 04:00
+    st = rt.due_state(t, today)
     nxt, prev = st["date"], st["prev"]
 
     def when(d):
@@ -4792,8 +4793,8 @@ def render_rtrack(ids, query):
     ⌃ goes back to Routines."""
     import routines as rt
     import habits_model as hm
-    from datetime import date as _date
-    today = _date.today()
+    import dayroll
+    today = dayroll.today()           # the routine's day rolls at 04:00
     ts = hm.stamp(today)
     want = [r for r in rt.ROUTINES if r.get("habit")]
     habits = {h["id"]: h for h in (cache_store.get("habits") or [])}

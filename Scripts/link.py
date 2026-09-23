@@ -122,10 +122,10 @@ def _rolled_past_today(xact, pid, tid):
     if not (raw and t.get("repeatFlag")):
         return ""
     try:
-        from datetime import datetime, timezone
+        import dayroll
         import filtering
         day = filtering.utc_str_to_local_date(raw)
-        if day and day > datetime.now(timezone.utc).astimezone().date():
+        if day and day > dayroll.today():       # the routine's day rolls at 04:00
             return f"✅ Already done · next {day.strftime('%a %d %b')}"
     except Exception:
         return ""
@@ -432,8 +432,8 @@ def _money(xact, as_sticky=False, as_window=False):
     (made within the last sync hour), else the newest one, said out loud.
     as_sticky = the same note as a desktop sticky (no row-click retry);
     as_window = the same note in its live floating window."""
-    from datetime import date
-    today = date.today()
+    import dayroll
+    today = dayroll.today()
     pid, cs = rl.MONEY_LIST, xact.cache_store
     pool = [t for k in ("all_tasks", "all_notes") for t in (cs.get(k) or [])
             if t.get("projectId") == pid]

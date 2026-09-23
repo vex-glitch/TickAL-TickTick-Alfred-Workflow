@@ -620,7 +620,8 @@ def _api():
 
 
 def _today():
-    return datetime.now().strftime("%Y-%m-%d")   # LOCAL date, on purpose
+    import dayroll                  # LOCAL day, rolling at 04:00 (dayroll)
+    return dayroll.today_iso()
 
 
 def _task_title(tid, default=None, pid=None):
@@ -11475,8 +11476,8 @@ def routine_checkin(tid):
         if not r or not r.get("habit"):
             return ""
         import habits_model as hm
-        from datetime import date as _d
-        ok, msg = _habit_tick_core(r["habit"], hm.stamp(_d.today()), quiet=True)
+        import dayroll                # a Shutdown ticked at 00:18 is yesterday's
+        ok, msg = _habit_tick_core(r["habit"], hm.stamp(dayroll.today()), quiet=True)
         if not ok:
             return " · 🔄 habit not ticked"
         return " · 🔄 already done" if "already done" in msg else " · 🔄 ticked"

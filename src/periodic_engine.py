@@ -565,7 +565,8 @@ def ensure_note(p, index=None):
 
 # ── data sources ─────────────────────────────────────────────────────────────
 def _today():
-    return date.today()
+    import dayroll                  # the day rolls at 04:00, not midnight
+    return dayroll.today()
 
 
 def _okr_pid():
@@ -813,7 +814,7 @@ def _ledger_expired(key, horizon):
 
 def _swept_add(key, tids):
     d = _swept_load()
-    horizon = date.today() - timedelta(days=2)
+    horizon = _today() - timedelta(days=2)
     d = {k: v for k, v in d.items() if not _ledger_expired(k, horizon)}
     d[key] = sorted(set(d.get(key, [])) | set(tids))
     try:

@@ -171,7 +171,9 @@ def due_state(task, today=None):
          "prev": date|None, "rule": str, "days": int}
     "ahead" is the one that needs a question: today's is done, or today is
     not this routine's day, so starting would run the NEXT occurrence."""
-    today = today or _dt.date.today()
+    if today is None:
+        import dayroll                # a routine's day rolls at 04:00
+        today = dayroll.today()
     task = task or {}
     day = local_date(task.get("startDate") or task.get("dueDate"))
     rule = rule_text(task.get("repeatFlag"))

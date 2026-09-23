@@ -20,6 +20,12 @@ from datetime import date, timedelta
 import focus_blocks as fb
 import mdtext
 
+
+def _dayroll_today():
+    """The workflow's day (src/dayroll.py: rolls at 04:00, not midnight)."""
+    import dayroll
+    return dayroll.today()
+
 # ── English name tables (weekday() / month index) ────────────────────────────
 DAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTH_NAME = [None, "January", "February", "March", "April", "May", "June",
@@ -974,7 +980,7 @@ def day_label(d, today=None):
     A retrospective entry must ALWAYS say which day it hit, and a screen that
     can reach any past date must not make last year look like this one - the
     bare stamp rendered 2025-09-15 and 2026-09-15 identically."""
-    today = today or date.today()
+    today = today or _dayroll_today()
     base = f"{DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]}"
     return base if d.year == today.year else f"{base} {d.year}"
 
@@ -1220,7 +1226,7 @@ def past_day(token, today=None):
     yet) · an ISO date. Anything else, or any day in the FUTURE, is None -
     there is no money in a day you have not had.
     """
-    today = today or date.today()
+    today = today or _dayroll_today()
     t = " ".join((token or "").split()).casefold().lstrip("*@").strip()
     if not t or t == "today":
         return today
