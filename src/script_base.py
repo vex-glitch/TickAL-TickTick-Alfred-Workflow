@@ -80,6 +80,26 @@ def emit_error(msg):
     emit([{"uid": "err", "title": "TickTick Error", "subtitle": msg, "valid": False}])
 
 
+def wait_for_network(host="api.ticktick.com", timeout=120, step=5):
+    """Block until `host` resolves, up to `timeout` s - for HEADLESS agent runs
+    only. launchd fires a missed 04:30 mint and the hourly sync at login, and
+    on 2026-09-23 both ran 20 s after a reboot, before the Mullvad tunnel and
+    its local resolver were up: two "FAILED" banners over nothing. A DNS probe
+    costs no API call. True when the host resolves, False on timeout - the
+    caller then fails exactly as before."""
+    import socket
+    import time
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            socket.getaddrinfo(host, 443)
+            return True
+        except OSError:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(step)
+
+
 def notify(text, title="TickAL"):
     """User-visible notification. Primary route: Alfred's own
     notification chain - fire ET XAct with the pass-through `notify` verb;

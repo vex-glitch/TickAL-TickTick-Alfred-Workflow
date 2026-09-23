@@ -7873,6 +7873,9 @@ def pn_refresh(rest=""):
 def pn_mint():
     if not _pn_gate():
         return
+    if not os.environ.get("alfred_version"):   # a login-time run waits for DNS
+        from script_base import wait_for_network
+        wait_for_network()
     minted = _pn().mint_ahead()
     if minted is None:
         print("💫 Already minted for tomorrow")

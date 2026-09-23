@@ -318,6 +318,9 @@ def main():
     # Alfred's manual Update→Sync already surfaces stdout as a notification;
     # only headless runs (the hourly LaunchAgent) need their own.
     headless = not os.environ.get("alfred_version")
+    if headless:                         # a login-time run waits for DNS
+        from script_base import wait_for_network
+        wait_for_network()
     try:
         summary = do_sync()
         if headless:
