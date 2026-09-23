@@ -48,8 +48,8 @@ def check(name, cond, detail=""):
 
 TMP = tempfile.mkdtemp(prefix="okr_write_test_")
 ow.LOCK_FILE = os.path.join(TMP, "okr.lock")
-ow.HEAL_STAMP = os.path.join(TMP, "okr_heal.stamp")
-ow.HEAL_LOG = os.path.join(TMP, "okr.log")
+ow.UPKEEP_STAMP = os.path.join(TMP, "okr_heal.stamp")
+ow.UPKEEP_LOG = os.path.join(TMP, "okr.log")
 ow.LOCK_WAIT = 0.4
 ow.CD_REGISTRY = os.path.join(TMP, "okr_countdowns.json")
 ow._mtime = lambda key: None       # the in-memory cache has no files to date
@@ -323,121 +323,6 @@ def ids(out):
 
 
 try:
-    # ── 1. apply_spans: stored items, later wins, v2 then v1, the cache ──────
-    print("apply_spans")
-    api, v2 = world()
-    snap = snapshot(api, v2)
-    check("fixture: a live, complete read (writable)", snap.writable, snap.detail)
-    by = okr.index(snap.items)
-    heal = okr.heal_diff(snap.items)
-    check("fixture: O1 is stale at the same length", heal == [("O1", d(9, 19), d(10, 14))], heal)
-    res = ow.apply_spans(snap, heal, api, v2)
-    body = v2.batches[0][0]
-    check("heal written through ONE v2 batch", len(v2.batches) == 1 and res.written == ["O1"],
-          (v2.batches, res))
-    check("trap 1: the STORED O1 shifts onto its wanted span (not a zero shift)",
-          okr.span(body) == (d(9, 19), d(10, 14)), okr.span(body))
-    check("the body is the stored raw with the fields over it",
-          body["etag"] == "e0" and body["title"] == "🥅 O • TickAL" and body["isAllDay"] is True)
-    check("same length on an all-day item = a SHIFT keeping its own form",
-          body["startDate"] == okr.shift_raw(by["O1"].raw["startDate"],
-                                             by["O1"].raw["dueDate"], -10)[0])
-    for key in ("all_tasks", f"project_data_{PID}", "okr_rows"):
-        c = cached(key, "O1")
-        check(f"cache {key}: O1 patched", c and c["startDate"] == body["startDate"]
-              and c["dueDate"] == body["dueDate"], c)
-    check("cache: the unrelated row survives", cached("all_tasks", "zz") is not None)
-    rc = MEM["okr_rows"]
-    check("okr_rows REBUILT from the live read: its shape, the done KR, the read's own "
-          "detail (never the seed's)",
-          rc.get("list_id") == PID and rc.get("name") == "🏆Goals Planning"
-          and rc.get("done_complete") is True and rc.get("detail") == snap.detail != "t"
-          and sorted(rc) == ["detail", "done_complete", "list_id", "name", "rows"]
-          and cached("okr_rows", "K4")["status"] == 2, sorted(rc))
-    oc = MEM.get("okr_complete") or {}
-    check("C3 a complete live read is kept as okr_complete too: list, ts, every row with "
-          "the write over it",
-          sorted(oc) == ["list_id", "rows", "ts"] and oc["list_id"] == PID
-          and isinstance(oc["ts"], int)
-          and sorted(t["id"] for t in oc["rows"]) == sorted(t["id"] for t in rc["rows"])
-          and cached("okr_complete", "O1")["startDate"] == body["startDate"]
-          and cached("okr_complete", "K4")["status"] == 2, oc and sorted(oc))
-    check("the write folds back into the snap (a second mirror builds on it)",
-          okr.index(snap.items)["O1"].start == d(9, 19))
-
-    api, v2 = world()
-    api.store["K2"].update({"startDate": "2026-10-05T08:00:00+0000",
-                            "dueDate": "2026-10-14T09:00:00+0000",
-                            "timeZone": "Europe/Berlin", "isAllDay": False})
-    snap = snapshot(api, v2)
-    k2 = okr.index(snap.items)["K2"]
-    check("fixture: a TIMED K2 on Oct 5 - Oct 14", (k2.start, k2.end) == (d(10, 5), d(10, 14)),
-          (k2.start, k2.end))
-    res = ow.apply_spans(snap, [("K2", d(10, 5), d(10, 14))], api, v2)
-    body = v2.batches[0][0] if v2.batches else {}
-    check("a timed item on the SAME span is still written, all-day (the rule)",
-          res.written == ["K2"] and body.get("isAllDay") is True
-          and okr.span(body) == (d(10, 5), d(10, 14)), (res, body.get("dueDate")))
-    check("... in the exclusive midnight form, not the shifted timed stamp",
-          body.get("dueDate") == okr.span_raw(d(10, 5), d(10, 14), "Europe/Berlin",
-                                              like="2026-10-05T08:00:00+0000")[1],
-          body.get("dueDate"))
-
-    api, v2 = world(completed=False)
-    snap = snapshot(api, v2)
-    r = refused(ow.apply_spans, snap, [("K2", d(10, 6), d(10, 16))], api, v2)
-    check("W8 apply_spans refuses a live read without every completed KR, whoever calls",
-          r and "Not written" in r and wrote_nothing(api, v2), r)
-    api, v2 = boom_world()
-    snap = snapshot(api, v2)
-    r = refused(ow.apply_spans, snap, [("K2", d(10, 6), d(10, 16))], api, v2)
-    check("... and a cache read", snap.source == "cache" and r and "unreachable" in r
-          and wrote_nothing(api, v2), r)
-    r = refused(ow.apply_spans, snap, [], api, v2)
-    check("... even with nothing to write", r is not None, r)
-
-    api, v2 = world()
-    snap = snapshot(api, v2)
-    pairs = [("K2", d(10, 5), d(10, 20)), ("K2", d(10, 6), d(10, 16)),
-             ("K1", d(9, 19), d(10, 4)), ("K4", d(1, 1), d(1, 2))]
-    res = ow.apply_spans(snap, pairs, api, v2)
-    wrote = {b["id"]: b for b in v2.batches[0]}
-    check("the LATER pair for an id wins (moves, then heals)",
-          okr.span(wrote["K2"]) == (d(10, 6), d(10, 16)), okr.span(wrote["K2"]))
-    check("an all-day item already on that span is not written", "K1" not in wrote)
-    check("history (a done KR) never moves", "K4" not in wrote and res.written == ["K2"])
-
-    api, v2 = world(token="")
-    snap = snapshot(api, FakeV2(api))          # read complete, write tokenless
-    res = ow.apply_spans(snap, [("K2", d(10, 6), d(10, 16))], api, v2)
-    up = api.of("update_task")
-    check("no v2 token: v1, one full object, TASK id first then list id (trap 2)",
-          len(up) == 1 and up[0][1] == "K2" and up[0][2] == PID, up)
-    check("v1 fields carry isAllDay True, so v1 never guesses it (trap 3)",
-          up and up[0][3].get("isAllDay") is True and "startDate" in up[0][3], up)
-    check("v1 posts over the stored raw (current=)", up and up[0][4]["etag"] == "e0")
-
-    api, v2 = world(ok=False)
-    snap = snapshot(api, v2)
-    res = ow.apply_spans(snap, [("K2", d(10, 6), d(10, 16))], api, v2)
-    check("a refused v2 batch falls back to v1", len(v2.batches) == 1
-          and len(api.of("update_task")) == 1 and res.written == ["K2"])
-
-    api, v2 = world(ok=False)
-    snap = snapshot(api, v2)
-    api.fail_update = True
-    before = cached("all_tasks", "K2")["startDate"]
-    res = ow.apply_spans(snap, [("K2", d(10, 6), d(10, 16))], api, v2)
-    check("v1 failing too: reported failed, not written", res.failed == ["K2"] and not res.written)
-    check("a failed write leaves the cache alone", cached("all_tasks", "K2")["startDate"] == before)
-
-    api, v2 = world()
-    many = [D(f"X{i}", f"🔑 KR • x{i} - TA", d(11, 1), d(11, 2), "O1") for i in range(120)]
-    snap = okr.Snapshot(okr.items_from(many), "live", "t", PID, "", True)
-    res = ow.apply_spans(snap, [(f"X{i}", d(11, 3), d(11, 4)) for i in range(120)], api, v2)
-    check("batches of 50: 120 items = 3 requests", [len(b) for b in v2.batches] == [50, 50, 20],
-          [len(b) for b in v2.batches])
-
     # ── 3. add_krs ───────────────────────────────────────────────────────────
     print("add_krs")
     api, v2 = world()
@@ -1796,8 +1681,8 @@ try:
     check("no v2 token at all: a retag needs only a live read, and goes v1",
           len(up) == 1 and up[0][3] == {"tags": ["1️⃣work"]}, up)
 
-    # ── 6. heal_and_tick ─────────────────────────────────────────────────────
-    print("heal_and_tick")
+    # ── 6. upkeep: auto-tick + countdowns (no heal since 2026-09-23) ─────────
+    print("upkeep")
     api, v2 = world()
     seen = []
 
@@ -1805,9 +1690,10 @@ try:
         seen.append((p, t))
         return True if t == "f" * 24 else None
 
-    r = ow.heal_and_tick(api, v2, is_done=is_done)
-    check("heals the stale O and ticks the KR whose original is done",
-          (r.healed, r.ticked) == (1, 1), r)
+    r = ow.upkeep(api, v2, is_done=is_done)
+    check("ticks the KR whose original is done; the stale O is NOT healed (heal off)",
+          r.ticked == 1 and not hasattr(r, "healed")
+          and okr.span(api.store["O1"]) == (d(9, 29), d(10, 24)), r)
     check("the done lookup is asked about the LINKED original only",
           seen == [("e" * 24, "f" * 24)], seen)
     check("complete_task is LIST id first (trap 2)", api.of("complete_task") == [
@@ -1815,20 +1701,20 @@ try:
     i_get = api.calls.index(("get_task", PID, "K9")) if ("get_task", PID, "K9") in api.calls else 99
     check("W6 the KR is RE-READ in the second hold, right before its tick",
           i_get < api.calls.index(("complete_task", PID, "K9")), api.calls[-3:])
-    check("chip", r.chip == "🥅 1 span healed · 🔑 1 KR ticked · original done", r.chip)
+    check("chip", r.chip == "🔑 1 KR ticked · original done", r.chip)
     check("cache: the ticked KR leaves the open pools",
           cached("all_tasks", "K9") is None and cached(f"project_data_{PID}", "K9") is None)
     check("cache: okr_rows keeps it, as done (progress counts it)",
           cached("okr_rows", "K9")["status"] == 2)
-    check("cache: okr_rows is still the WHOLE list, the heal's span in it (spans, then ticks)",
+    check("cache: okr_rows is still the WHOLE list, the O's bar as stored",
           len(MEM["okr_rows"]["rows"]) == 14
-          and okr.span(cached("okr_rows", "O1")) == (d(9, 19), d(10, 14)),
+          and okr.span(cached("okr_rows", "O1")) == (d(9, 29), d(10, 24)),
           len(MEM["okr_rows"]["rows"]))
     check("cache: completed_tasks gets it first", MEM["completed_tasks"][0]["id"] == "K9"
           and MEM["completed_tasks"][0]["status"] == 2)
 
     api, v2 = world()
-    r = ow.heal_and_tick(api, v2, is_done=lambda p, t: None)
+    r = ow.upkeep(api, v2, is_done=lambda p, t: None)
     check("unknown (None) never ticks", r.ticked == 0 and not api.of("complete_task"), r)
 
     # W11 the tick race: heal B runs start to end while heal A sits between
@@ -1838,20 +1724,20 @@ try:
 
     def racing(p, t):
         if not inner:
-            inner.append(ow.heal_and_tick(api, v2, is_done=is_done))
+            inner.append(ow.upkeep(api, v2, is_done=is_done))
         return is_done(p, t)
 
-    r = ow.heal_and_tick(api, v2, is_done=racing)
+    r = ow.upkeep(api, v2, is_done=racing)
     check("W6 two overlapping heals tick a KR ONCE",
           len(api.of("complete_task")) == 1 and inner and inner[0].ticked == 1
           and r.ticked == 0, (api.of("complete_task"), inner, r))
-    check("... the late one counts and banners only what it did",
-          r.chip == "🥅 1 span healed" and "no longer open 1" in r.note, r)
+    check("... the late one counts and banners only what it did (nothing)",
+          r.chip == "" and "no longer open 1" in r.note, r)
 
     api, v2 = world()
     real_get = api.get_task                     # K9 ticked by hand after the read
     api.get_task = lambda p, t: dict(real_get(p, t), status=2) if t == "K9" else real_get(p, t)
-    r = ow.heal_and_tick(api, v2, is_done=is_done)
+    r = ow.upkeep(api, v2, is_done=is_done)
     check("W6 a candidate no longer open at the re-read is not ticked",
           r.ticked == 0 and not api.of("complete_task") and "🔑" not in r.chip, r)
     for why, patch in (("won't do", lambda t: dict(t, status=-1)),
@@ -1868,7 +1754,7 @@ try:
             return _patch(_real(p, t))
 
         api.get_task = reread
-        r = ow.heal_and_tick(api, v2, is_done=is_done)
+        r = ow.upkeep(api, v2, is_done=is_done)
         check(f"W6 a candidate {why} at the re-read is never ticked",
               r.ticked == 0 and not api.of("complete_task") and "🔑" not in r.chip, r)
     api, v2 = world()
@@ -1878,7 +1764,7 @@ try:
         raise RuntimeError("500")
 
     api.complete_task = complete_fails
-    r = ow.heal_and_tick(api, v2, is_done=is_done)
+    r = ow.upkeep(api, v2, is_done=is_done)
     check("W6 a tick whose complete_task FAILED is not counted, bannered or mirrored",
           r.ticked == 0 and "🔑" not in r.chip and cached("all_tasks", "K9") is not None
           and cached("okr_rows", "K9")["status"] == 0, (r, cached("okr_rows", "K9")))
@@ -1889,13 +1775,13 @@ try:
         MEM["okr_rows"] = {"list_id": PID, "name": "x", "rows": []}   # another writer
         return is_done(p, t)
 
-    r = ow.heal_and_tick(api, v2, is_done=hub_rewrites)
+    r = ow.upkeep(api, v2, is_done=hub_rewrites)
     check("okr_rows left by ANOTHER writer between the holds: dropped, never overwritten "
           "with the older read", r.ticked == 1 and "okr_rows" not in MEM
           and cached("all_tasks", "K9") is None, (r, sorted(MEM)))
 
     api, v2 = world(completed=False)
-    r = ow.heal_and_tick(api, v2, is_done=is_done)
+    r = ow.upkeep(api, v2, is_done=is_done)
     check("not writable: silent refusal, nothing written",
           r.chip == "" and r.note.startswith("refused") and not v2.batches
           and not api.of("complete_task"), r)
@@ -1904,7 +1790,7 @@ try:
     with open(ow.LOCK_FILE, "a") as held:
         fcntl.flock(held, fcntl.LOCK_EX)
         t0 = time.monotonic()
-        r = ow.heal_and_tick(api, v2, is_done=is_done)
+        r = ow.upkeep(api, v2, is_done=is_done)
         waited = time.monotonic() - t0
         fcntl.flock(held, fcntl.LOCK_UN)
     check("the lock busy: skipped AT ONCE (never waits), nothing read",
@@ -1914,7 +1800,7 @@ try:
     api, v2 = world()
     os.environ["okr_list_id"] = ""
     try:
-        r = ow.heal_and_tick(api, v2, is_done=is_done)
+        r = ow.upkeep(api, v2, is_done=is_done)
     finally:
         os.environ["okr_list_id"] = PID
     check("OKRs off: nothing", r.note == "okr list off" and not api.calls, r)
@@ -1923,7 +1809,7 @@ try:
     api.store["O1"] = cp(dict(api.store["O1"], **okr.write_fields(
         okr.from_task(api.store["O1"]), d(9, 19), d(10, 14))))
     MEM.pop("okr_complete", None)
-    r = ow.heal_and_tick(api, v2, is_done=lambda p, t: False)
+    r = ow.upkeep(api, v2, is_done=lambda p, t: False)
     check("nothing stale, nothing done: an empty chip", r.chip == "" and not v2.batches, r)
     check("C3 ... and its complete read is kept as okr_complete all the same",
           cached("okr_complete", "K4") is not None
@@ -1931,12 +1817,12 @@ try:
           MEM.get("okr_complete"))
 
     b, bv2 = boom_world()
-    r = ow.heal_and_tick(b, bv2, is_done=is_done)
+    r = ow.upkeep(b, bv2, is_done=is_done)
     check("v1 down: the cache answers, which is never writable", r.chip == ""
           and r.note.startswith("refused"), r)
 
-    # ── 7. spawn_heal ────────────────────────────────────────────────────────
-    print("spawn_heal")
+    # ── 7. spawn_upkeep ──────────────────────────────────────────────────────
+    print("spawn_upkeep")
     spawned = []
 
     class _Sub:
@@ -1949,15 +1835,15 @@ try:
     real_sub = ow.subprocess
     ow.subprocess = _Sub
     try:
-        if os.path.exists(ow.HEAL_STAMP):
-            os.remove(ow.HEAL_STAMP)
-        first = ow.spawn_heal()
-        second = ow.spawn_heal()
+        if os.path.exists(ow.UPKEEP_STAMP):
+            os.remove(ow.UPKEEP_STAMP)
+        first = ow.spawn_upkeep()
+        second = ow.spawn_upkeep()
         os.environ["okr_list_id"] = ""
-        os.remove(ow.HEAL_STAMP)
-        off = ow.spawn_heal()
+        os.remove(ow.UPKEEP_STAMP)
+        off = ow.spawn_upkeep()
         os.environ["okr_list_id"] = PID
-        fresh = ow.spawn_heal(debounce_s=0.0001)
+        fresh = ow.spawn_upkeep(debounce_s=0.0001)
     finally:
         ow.subprocess = real_sub
         os.environ["okr_list_id"] = PID
@@ -1965,9 +1851,9 @@ try:
           first is True and second is False, (first, second))
     check("OKRs off: no spawn", off is False)
     args, kw = spawned[0]
-    check("the child: py.sh + xact.py xact:okr_heal",
+    check("the child: py.sh + xact.py xact:okr_upkeep",
           args[0] == "/bin/bash" and args[1].endswith("Scripts/py.sh")
-          and args[2].endswith("Scripts/xact.py") and args[3] == "xact:okr_heal", args)
+          and args[2].endswith("Scripts/xact.py") and args[3] == "xact:okr_upkeep", args)
     check("detached: own session, TICKAL_DETACHED=1",
           kw.get("start_new_session") is True and kw["env"].get("TICKAL_DETACHED") == "1")
     check("never the render's stdout: a log file, stdin /dev/null (trap 9)",
@@ -2068,10 +1954,9 @@ try:
         _real_set("okr_rows", stale)
         time.sleep(0.01)
         api = FakeAPI(o, dn)
-        # the heal is the span writer now (2026-09-23): O1's stored span is
-        # stale in the fixture, so this pass writes one span through
-        # apply_spans + patch_cache, the road the check is about
-        ow.heal_and_tick(api, FakeV2(api), is_done=lambda p_, t: None, today=TODAY)
+        # a title write (link) goes through patch_cache, the road the check
+        # is about (no span writer exists since 2026-09-23)
+        ow.link({"id": "K3", "to": "task", "pid": "e" * 24, "tid": "0" * 24}, api, FakeV2(api))
 
         def mt(k):
             return os.stat(os.path.join(cache.CACHE_DIR, f"{k}.json")).st_mtime_ns
@@ -2081,10 +1966,10 @@ try:
               all(mt("okr_rows") >= mt(k) for k in ("all_tasks", f"project_data_{PID}",
                                                     "completed_tasks")))
         rc = cache.get("okr_rows")
-        o1 = next((t for t in rc["rows"] if t["id"] == "O1"), {})
+        k3 = next((t for t in rc["rows"] if t["id"] == "K3"), {})
         check("file cache: rebuilt fresh - the stale row gone, the write in, the shape",
               all(t["id"] != "GONE" for t in rc["rows"]) and rc["done_complete"] is True
-              and okr.span(o1) == (d(9, 19), d(10, 14)), (rc.get("done_complete"), okr.span(o1)))
+              and "[Eagle](" in k3.get("title", ""), (rc.get("done_complete"), k3.get("title")))
     finally:
         cache.get, cache.set, cache.invalidate, cache.age_seconds = mem_fns
         cache.CACHE_DIR = real_dir
@@ -2209,27 +2094,28 @@ try:
         check("xact:okr_addkr still routes (phase-2 rows), a plain toast, the back",
               out == "🔑 got O1\n" and trig == [("BrowseCtx", "ctx:okr:o:O1")], (out, trig))
 
-        real_heal = ow.heal_and_tick
-        ow.heal_and_tick = lambda: ow.HealResult(1, 0, "🥅 1 span healed", "healed 1")
+        real_up = ow.upkeep
+        ow.upkeep = lambda: ow.Upkeep(1, "🔑 1 KR ticked · original done", "ticked 1")
         try:
             os.environ["TICKAL_DETACHED"] = "1"
-            out = run(xact.okr_heal)
-            check("detached heal: a log line, and ONE banner for the change",
-                  "okr_heal: healed 1" in out and said == ["🥅 1 span healed"], (out, said))
+            out = run(xact.okr_upkeep)
+            check("detached upkeep: a log line, and ONE banner for the change",
+                  "okr_upkeep: ticked 1" in out and said == ["🔑 1 KR ticked · original done"],
+                  (out, said))
             os.environ.pop("TICKAL_DETACHED")
             said.clear()
-            out = run(xact.okr_heal)
+            out = run(xact.okr_upkeep)
             check("on an Alfred road: the chip is the toast, no banner",
-                  out == "🥅 1 span healed\n" and not said, (out, said))
-            ow.heal_and_tick = lambda: ow.HealResult(0, 0, "", "refused")
-            out = run(xact.okr_heal)
+                  out == "🔑 1 KR ticked · original done\n" and not said, (out, said))
+            ow.upkeep = lambda: ow.Upkeep(0, "", "refused")
+            out = run(xact.okr_upkeep)
             check("nothing changed: silent (no toast)", out == "" and not said, out)
             os.environ["TICKAL_DETACHED"] = "1"
-            out = run(xact.okr_heal)
+            out = run(xact.okr_upkeep)
             check("detached, nothing changed: a log line, NO banner",
-                  "okr_heal: refused" in out and not said, (out, said))
+                  "okr_upkeep: refused" in out and not said, (out, said))
         finally:
-            ow.heal_and_tick = real_heal
+            ow.upkeep = real_up
             os.environ.pop("TICKAL_DETACHED", None)
 
         saved = {}
@@ -2273,7 +2159,7 @@ try:
 
     # ── 10. phase 5: ⏳ countdowns ───────────────────────────────────────────
     print("countdowns")
-    SEP20 = d(9, 20)
+    OCT1 = d(10, 1)          # O1's STORED bar (Sep 29 - Oct 24) has started
     items = okr.items_from(fixture()[0] + fixture()[1])
     n = [0]
 
@@ -2288,21 +2174,21 @@ try:
         c.update(kw)
         return c
 
-    check("targets: an open O that has STARTED, on its wanted end; not-yet-started, "
-          "done and undated ones have none",
-          [(it.id, e) for it, e in okr.countdown_targets(items, SEP20)]
-          == [("O1", d(10, 14))], okr.countdown_targets(items, SEP20))
+    check("targets: an open O whose STORED bar has started, on that bar's end; "
+          "not-yet-started, done and undated ones have none",
+          [(it.id, e) for it, e in okr.countdown_targets(items, OCT1)]
+          == [("O1", d(10, 24))], okr.countdown_targets(items, OCT1))
     check("targets: the day before the start there is none",
-          okr.countdown_targets(items, d(9, 18)) == [])
-    check("targets: one running late keeps it (counts the days since)",
-          [it.id for it, _e in okr.countdown_targets(items, d(11, 1))] == ["O1", "O2"])
+          okr.countdown_targets(items, d(9, 28)) == [])
+    check("targets: one running late keeps it (counts the days since), soonest end first",
+          [it.id for it, _e in okr.countdown_targets(items, d(11, 1))] == ["O2", "O1"])
 
     p = ow.countdown_plan(items, [{"id": "x" * 24, "name": "Mama", "sortOrder": 100}],
-                          {}, SEP20, nid)
+                          {}, OCT1, nid)
     a = p.add[0] if p.add else {}
     check("plan: mints ONE for the started O - ⏳ kind 4, its inclusive end, named with its glyph",
           len(p.add) == 1 and not p.update and not p.archive
-          and a["name"] == "🥅 TickAL" and a["date"] == 20261014 and a["type"] == 4
+          and a["name"] == "🥅 TickAL" and a["date"] == 20261024 and a["type"] == 4
           and a["repeatFlag"] is None, p)
     check("plan: marked as ours in the remark, the remark hidden, no reminders, on top",
           a.get("remark") == ow.CD_MARK + "O1" and a.get("showRemark") is False
@@ -2311,62 +2197,62 @@ try:
     check("plan: the registry remembers what was minted",
           p.registry == {"O1": {"cid": a.get("id"), "by_us": False}}, p.registry)
     mama = {"id": "x" * 24, "name": "Mama", "remark": "", "status": 0}
-    p = ow.countdown_plan(items, [mama, ours("O1", "🥅 TickAL", 20261014)], {}, SEP20, nid)
+    p = ow.countdown_plan(items, [mama, ours("O1", "🥅 TickAL", 20261024)], {}, OCT1, nid)
     check("plan: in step = nothing to write", not (p.add or p.update or p.archive), p)
-    p = ow.countdown_plan(items, [ours("O1", "🥅 Old name", 20261001)], {}, SEP20, nid)
+    p = ow.countdown_plan(items, [ours("O1", "🥅 Old name", 20261001)], {}, OCT1, nid)
     check("plan: a moved end or a new name updates the WHOLE listed entity",
-          p.update == [ours("O1", "🥅 TickAL", 20261014)] and not p.add, p)
-    p = ow.countdown_plan(items, [ours("O2", "🥅 Workflows", 20261001)], {}, SEP20, nid)
+          p.update == [ours("O1", "🥅 TickAL", 20261024)] and not p.add, p)
+    p = ow.countdown_plan(items, [ours("O2", "🥅 Workflows", 20261001)], {}, OCT1, nid)
     check("plan: one not started yet is kept in step, never archived for being early",
           [c["date"] for c in p.update] == [20261020] and not p.archive
           and [c["name"] for c in p.add] == ["🥅 TickAL"], p)
-    p = ow.countdown_plan(items, [ours("O3", "🥅 Other things", 20260830)], {}, SEP20, nid)
+    p = ow.countdown_plan(items, [ours("O3", "🥅 Other things", 20260830)], {}, OCT1, nid)
     check("plan: a DONE objective's countdown is archived, by us",
           [(c["id"], c["status"]) for c in p.archive] == [(ours("O3", "", 0)["id"], 1)]
           and p.registry.get("O3", {}).get("by_us") is True, p)
-    p = ow.countdown_plan(items, [ours("GONE", "🥅 Deleted", 20261201)], {}, SEP20, nid)
+    p = ow.countdown_plan(items, [ours("GONE", "🥅 Deleted", 20261201)], {}, OCT1, nid)
     check("plan: one whose objective left the plan is archived too",
           [c["name"] for c in p.archive] == ["🥅 Deleted"], p)
-    p = ow.countdown_plan(items, [ours("O4", "🥅 ✨", 20261201)], {}, SEP20, nid)
+    p = ow.countdown_plan(items, [ours("O4", "🥅 ✨", 20261201)], {}, OCT1, nid)
     check("plan: an objective that lost its dates loses its countdown",
           [c["name"] for c in p.archive] == ["🥅 ✨"], p)
-    p = ow.countdown_plan(items, [], {"O1": {"cid": "9" * 24, "by_us": False}}, SEP20, nid)
+    p = ow.countdown_plan(items, [], {"O1": {"cid": "9" * 24, "by_us": False}}, OCT1, nid)
     check("plan: minted before and gone now = Vex removed it: never minted again",
           not p.add, p)
-    p = ow.countdown_plan(items, [], {"O1": {"cid": "9" * 24, "by_us": True}}, SEP20, nid)
+    p = ow.countdown_plan(items, [], {"O1": {"cid": "9" * 24, "by_us": True}}, OCT1, nid)
     check("plan: archived by US and no longer listed: minted afresh",
           [c["name"] for c in p.add] == ["🥅 TickAL"]
           and p.registry["O1"]["by_us"] is False, p)
     arch = ours("O1", "🥅 TickAL", 20261001, status=1)
-    p = ow.countdown_plan(items, [arch], {"O1": {"cid": arch["id"], "by_us": True}}, SEP20, nid)
+    p = ow.countdown_plan(items, [arch], {"O1": {"cid": arch["id"], "by_us": True}}, OCT1, nid)
     check("plan: archived by us and still listed: brought back, on the new end",
-          [(c["status"], c["date"]) for c in p.update] == [(0, 20261014)] and not p.add, p)
-    p = ow.countdown_plan(items, [arch], {}, SEP20, nid)
+          [(c["status"], c["date"]) for c in p.update] == [(0, 20261024)] and not p.add, p)
+    p = ow.countdown_plan(items, [arch], {}, OCT1, nid)
     check("plan: archived by VEX (no by_us record): left alone, nothing minted beside it",
           not (p.add or p.update or p.archive), p)
     edited = dict(ours("O1", "🥅 TickAL", 20261001), remark="my words")
     p = ow.countdown_plan(items, [edited], {"O1": {"cid": edited["id"], "by_us": False}},
-                          SEP20, nid)
+                          OCT1, nid)
     check("plan: a remark Vex edited: the registry still knows it is ours",
           [c["id"] for c in p.update] == [edited["id"]] and not p.add, p)
-    live1 = ours("O1", "🥅 TickAL", 20261014)
-    p = ow.countdown_plan(items, [live1], {}, SEP20, nid)
+    live1 = ours("O1", "🥅 TickAL", 20261024)
+    p = ow.countdown_plan(items, [live1], {}, OCT1, nid)
     check("plan: a live countdown of ours the registry lost (a failed save) is back-filled",
           p.known == {"O1": {"cid": live1["id"], "by_us": False}}
           and p.registry == p.known and not (p.add or p.update or p.archive), p)
     p = ow.countdown_plan(items, [live1], {"O1": {"cid": live1["id"], "by_us": True}},
-                          SEP20, nid)
+                          OCT1, nid)
     check("plan: a stale by_us on a LIVE countdown is cleared (a later archive by Vex holds)",
           p.known["O1"]["by_us"] is False, p)
-    p2 = ow.countdown_plan(items, [dict(live1, status=1)], p.known, SEP20, nid)
+    p2 = ow.countdown_plan(items, [dict(live1, status=1)], p.known, OCT1, nid)
     check("... and Vex archiving it then is respected: nothing un-archived, nothing minted",
           not (p2.add or p2.update or p2.archive), p2)
-    p = ow.countdown_plan(items, [], {}, SEP20, nid)
+    p = ow.countdown_plan(items, [], {}, OCT1, nid)
     check("plan: an add waits for the ack - it is in registry, not in known",
           "O1" in p.registry and "O1" not in p.known, p)
     retitled = okr.items_from([D("O1", "TickAL (retitled)", d(9, 19), d(10, 14))]
                               + fixture()[0][1:] + fixture()[1])
-    p = ow.countdown_plan(retitled, [live1], {}, SEP20, nid)
+    p = ow.countdown_plan(retitled, [live1], {}, OCT1, nid)
     check("plan: an objective retitled into a plain task (or a KR) loses its countdown",
           [c["id"] for c in p.archive] == [live1["id"]]
           and p.known["O1"] == {"cid": live1["id"], "by_us": True}, p)
@@ -2374,32 +2260,32 @@ try:
     api, v2 = world()
     snap = snapshot(api, v2)
     v2.cds = []
-    r = ow.sync_countdowns(snap, v2, SEP20)
+    r = ow.sync_countdowns(snap, v2, OCT1)
     check("sync: writes the plan, says so", r[0] == "⏳ 1 countdown added"
           and len(v2.cds) == 1 and v2.cds[0]["name"] == "🥅 TickAL", r)
     reg = json.load(open(ow.CD_REGISTRY))
     check("sync: the registry is saved after the write", list(reg) == ["O1"], reg)
-    r = ow.sync_countdowns(snap, v2, SEP20)
+    r = ow.sync_countdowns(snap, v2, OCT1)
     check("sync: a second pass is quiet", r[0] == "" and "in step" in r[1], r)
     os.remove(ow.CD_REGISTRY)
     api, v2 = world()
     snap = snapshot(api, v2)
     v2.cds, v2.cd_ok = [], False
-    r = ow.sync_countdowns(snap, v2, SEP20)
+    r = ow.sync_countdowns(snap, v2, OCT1)
     check("sync: a refused batch saves NO add record (it would block the mint for good)",
           r[0] == "" and "refused" in r[1] and not os.path.exists(ow.CD_REGISTRY), r)
     api, v2 = world()
     snapd = snapshot(api, v2)
     v2.cds = [ours("O3", "🥅 Other things", 20260830)]
     v2.cd_ok = False
-    r = ow.sync_countdowns(snapd, v2, SEP20)
+    r = ow.sync_countdowns(snapd, v2, OCT1)
     reg = json.load(open(ow.CD_REGISTRY)) if os.path.exists(ow.CD_REGISTRY) else {}
     check("sync: a refused batch still saves its ARCHIVE records (by_us - safe either way)",
           reg.get("O3", {}).get("by_us") is True and "O1" not in reg, reg)
     os.remove(ow.CD_REGISTRY)
     v2.cd_ok = True
-    v2.cds = [ours("O1", "🥅 TickAL", 20261014)]
-    r = ow.sync_countdowns(snapd, v2, SEP20)
+    v2.cds = [ours("O1", "🥅 TickAL", 20261024)]
+    r = ow.sync_countdowns(snapd, v2, OCT1)
     reg = json.load(open(ow.CD_REGISTRY)) if os.path.exists(ow.CD_REGISTRY) else {}
     check("sync: in step, but the registry lacked the live one: saved anyway",
           r[0] == "" and "in step" in r[1] and reg.get("O1", {}).get("by_us") is False, (r, reg))
@@ -2408,38 +2294,39 @@ try:
     snap = snapshot(api, v2)
     v2.cds, v2.cd_ok = [], True
     v2.cds, v2.cd_ok = None, True
-    r = ow.sync_countdowns(snap, v2, SEP20)
+    r = ow.sync_countdowns(snap, v2, OCT1)
     check("sync: an unreadable list writes nothing", r[0] == "" and "unreadable" in r[1]
           and not v2.cd_batches, r)
     v2.cds = []
     snap.done_complete = False
-    r = ow.sync_countdowns(snap, v2, SEP20)
+    r = ow.sync_countdowns(snap, v2, OCT1)
     check("sync: a read missing completed items writes nothing (THE WRITER RULE)",
           r[0] == "" and not v2.cd_batches, r)
     snap.done_complete = True
     v2.token = ""
-    r = ow.sync_countdowns(snap, v2, SEP20)
+    r = ow.sync_countdowns(snap, v2, OCT1)
     check("sync: no v2 token, no countdowns", r[0] == "" and "token" in r[1], r)
     MEM["countdowns"] = [{"id": "x" * 24, "name": "Mama", "status": 0}]
     api, v2 = world()
     MEM["countdowns"] = [{"id": "x" * 24, "name": "Mama", "status": 0},
                          ours("O3", "🥅 Other things", 20260830)]
     v2.cds = cp(MEM["countdowns"])
-    r = ow.sync_countdowns(snapshot(api, v2), v2, SEP20)
+    r = ow.sync_countdowns(snapshot(api, v2), v2, OCT1)
     check("sync: the countdowns cache follows - the new one in, the archived one out",
           sorted(c["name"] for c in MEM["countdowns"]) == ["Mama", "🥅 TickAL"], MEM["countdowns"])
     os.remove(ow.CD_REGISTRY)
 
     api, v2 = world()
     v2.cds = []
-    r = ow.heal_and_tick(api, v2, is_done=lambda p_, t: None, today=SEP20)
-    check("heal: the countdown rides the heal pass, off the HEALED span, in the chip",
-          r.chip == "🥅 1 span healed · ⏳ 1 countdown added"
-          and v2.cds[0]["date"] == 20261014 and "countdowns: " in r.note, (r, v2.cds))
+    r = ow.upkeep(api, v2, is_done=lambda p_, t: None, today=OCT1)
+    check("upkeep: the countdown rides the pass, off the STORED bar, in the chip",
+          r.chip == "⏳ 1 countdown added"
+          and v2.cds[0]["date"] == 20261024 and "countdowns: " in r.note, (r, v2.cds))
     os.remove(ow.CD_REGISTRY)
 
     # ── 11. phase 5: ↪️ the quarter carry-over ────────────────────────────────
     print("carry")
+    SEP20 = d(9, 20)
     check("closing quarter: inside the last two weeks = the quarter now ending",
           okr.closing_quarter(d(9, 17)).start == d(7, 1))
     check("closing quarter: earlier = the quarter before (a late review still closes it)",
@@ -2472,9 +2359,9 @@ try:
           cached("okr_rows", "K7")["status"] == -1)
     api, v2 = world()
     out = attempt(ow.carry, {"id": "K2", "action": "wontdo"}, api, v2, SEP20)
-    check("won't do: the last KR gone, its O heals in the same hold",
-          isinstance(out, str) and "1 parent healed" in out
-          and okr.span(api.store["O1"]) == (d(9, 19), d(10, 4)), (out, api.store.get("O1")))
+    check("won't do: nothing else moves (heal off) - the O keeps the bar Vex drew",
+          isinstance(out, str) and "healed" not in out
+          and okr.span(api.store["O1"]) == (d(9, 29), d(10, 24)), (out, api.store.get("O1")))
     api, v2 = world(token="")
     check("won't do: no v2 token = refused, nothing written",
           "Attachment Login" in (refused(ow.carry, {"id": "K7", "action": "wontdo"},
@@ -2511,10 +2398,10 @@ try:
     up = api.of("update_task")[0] if api.of("update_task") else ()
     check("someday: v1 nulls both dates (the proven clear)",
           up and up[1] == "K2" and up[3] == {"startDate": None, "dueDate": None}, up)
-    check("someday: toast + the O heals onto what is left",
+    check("someday: toast, the O keeps its bar (heal off)",
           isinstance(out, str) and out.startswith("💤 Hub → someday")
-          and "1 parent healed" in out
-          and okr.span(api.store["O1"]) == (d(9, 19), d(10, 4)), (out, api.store.get("O1")))
+          and "healed" not in out
+          and okr.span(api.store["O1"]) == (d(9, 29), d(10, 24)), (out, api.store.get("O1")))
     check("someday: the caches show it undated",
           cached("all_tasks", "K2")["startDate"] is None
           and cached("okr_rows", "K2")["dueDate"] is None)

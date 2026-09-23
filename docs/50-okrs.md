@@ -10,7 +10,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 A plan is a forecast, and reality drifts from it. OKRs here are not a daily to-do list: they are the plan you set once a year (or whenever), review every quarter and month, and keep in view while the real work happens in your normal lists. Every OKR item is an all-day entry with no time, so it sits on top of your calendar, outside your time blocks: you see what the ideal plan says for today, and you adjust.
 
-The plan lives in ONE TickTick list you schedule by hand in the **timeline view** - drag an item, stretch it, slide it. TickAL never replaces that. It reads the plan and keeps its arithmetic right: parents that cover their children, progress and pace. It never moves a date on its own.
+The plan lives in ONE TickTick list you schedule by hand in the **timeline view** - drag an item, stretch it, slide it. TickAL never replaces that. It reads the plan and keeps its arithmetic right: progress and pace. It never writes a date, not even a parent's.
 
 > [!IMPORTANT]
 > OKRs are a workflow, not a single action - a list, three levels, a naming convention and a few automations. Give this page a full read before first use.
@@ -25,7 +25,7 @@ The plan lives in ONE TickTick list you schedule by hand in the **timeline view*
 | **🔑 KR • Key result - CODE** | A deliverable that gets the objective there - a task or subtask, never a number | You, or 🥅 Add to OKRs |
 | **The code** | A short suffix per objective (TickAL → `TA`), stamped on every KR under it | The automation - proposed, you can override |
 | **Area tags** | The lanes of the timeline: the subtags of your `0️⃣Area` tag (plus the tags your Y/O items carry) | You, once |
-| **Heal + auto-tick** | Parents re-cover their children; a KR whose linked task is done gets ticked | The automation - on hub open and on the hourly sync |
+| **Auto-tick** | A KR whose linked task is done gets ticked | The automation - on hub open and on the hourly sync |
 | **Countdowns** | One TickTick countdown per started objective, to its end | The automation - the same passes |
 
 ## Planning copies
@@ -70,7 +70,7 @@ The last row is **⚖️ Capacity**: the key results your plan puts due in the n
 
 ## Scheduling
 
-All of it happens in TickTick's timeline: drag an item, stretch it, slide it. TickAL moves no dates on its own, and nothing you drag moves anything else. The one thing that follows a drag is the parent: an objective re-covers its key results, a year objective its objectives, on the next hub open or hourly sync (the heal below).
+All of it happens in TickTick's timeline: drag an item, stretch it, slide it. TickAL moves no dates on its own, and nothing you drag moves anything else, parents included: an objective's bar is yours too, and it is what every screen and note reads. When a bar no longer covers its open key results, the hub says so on its row (`⚠️ KRs outside`) and leaves the dragging to you. A done key result outside the bar is your call and is not flagged.
 
 ## Adding to the plan
 
@@ -129,7 +129,7 @@ On the list, ⇧ still ticks a key result done. After each decision the list reo
 
 ## Countdowns
 
-Every objective and year objective that has **started** gets a TickTick countdown to its end, named like the plan item (`🥅 TickAL`). It moves when the end moves, and it is archived when the objective is done, won't do, deleted or loses its dates. Archive or delete one yourself and it is never made again. The countdowns show in TickTick's countdown view, the ⏳ hub and the daily note's ⏳ Countdowns. They need the v2 token.
+Every objective and year objective that has **started** gets a TickTick countdown to its end, named like the plan item (`🥅 TickAL`). It follows the bar's end when you move it, and it is archived when the objective is done, won't do, deleted or loses its dates. Archive or delete one yourself and it is never made again. The countdowns show in TickTick's countdown view, the ⏳ hub and the daily note's ⏳ Countdowns. They need the v2 token.
 
 ## OKR steps in your routines
 
@@ -145,19 +145,18 @@ Each routine checklist can open an OKR screen with a Link verb (`alfred://runtri
 
 ## Automations
 
-- **Heal:** a parent always runs from its first dated child's start to its last dated child's end.
 - **Auto-tick:** a key result that links a single task is ticked when that task is completed.
 - **Countdowns:** kept in step with the started objectives (above).
 
-All three run when you open the hub (at most every five minutes) and with the optional hourly sync ([Settings & sync](90-settings-sync.md)). Writes only happen from a complete live read of the list; anything less and the automation waits.
+Both run when you open the hub (at most every five minutes) and with the optional hourly sync ([Settings & sync](90-settings-sync.md)). Writes only happen from a complete live read of the list; anything less and the automation waits.
 
 ## Limitations
 
 - Key results are deliverables. There are no numeric key results; the only number is progress (ticked key results over all of them).
-- TickAL moves no dates: scheduling, and pushing later items along when one slips, is done by hand in the timeline.
+- TickAL writes no dates: scheduling, pushing later items along when one slips, and keeping a parent's bar over its key results are all done by hand in the timeline. An undated objective is in no period's plan until you date it.
 
 ## Related
 
 - [Projects](49-projects.md) - the 📌CTA tasks objectives link to
 - [Periodic notes](48-periodic.md) - the notes the plan feeds
-- [Settings & sync](90-settings-sync.md) - the hourly sync that runs the heal
+- [Settings & sync](90-settings-sync.md) - the hourly sync that runs the auto-tick and the countdowns

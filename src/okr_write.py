@@ -2,11 +2,10 @@
 """okr_write.py - every TickTick write the 🥅 OKR hub makes (HANDOFF_OKR
 phase 2). okr.py plans, this module writes; okr.py stays pure.
 
-Why src/ and not Scripts/xact.py: the hourly agent (src/sync.py) heals and
-auto-ticks too, and it cannot import Scripts/. So the xact verbs
-(okr_add, okr_addkr, okr_link, okr_tag, okr_carry, okr_heal) are thin
-wrappers over the functions here, and sync.py calls heal_and_tick()
-directly. Phase 3 (import) adds add_items (every new Y / O / KR, typed or
+Why src/ and not Scripts/xact.py: the hourly agent (src/sync.py) auto-ticks
+and keeps the countdowns too, and it cannot import Scripts/. So the xact
+verbs (okr_add, okr_addkr, okr_link, okr_tag, okr_carry, okr_upkeep) are
+thin wrappers over the functions here, and sync.py calls upkeep() directly. Phase 3 (import) adds add_items (every new Y / O / KR, typed or
 linked; add_krs is its KR alias), import_source (what the import screen
 previews, pure over the caches) and import_plan - THE answer to "can this
 be added, and if not why", which the ⌘ Actions row and the import screen
@@ -14,33 +13,30 @@ ask and nothing else. It asks plan_of / _verdict / planned exactly as
 add_items asks them of its live read, so the row, the screen and the verb
 never disagree, and a screen never offers a ⏎ the verb can only refuse.
 
-THE WRITER RULE (okr.py module docstring). A span write (the heal), the
-auto-tick and the countdowns write only from a Snapshot
-that is .writable: a live read with every completed KR. A cache read, or one
-missing completed KRs, reads a ticked deliverable as deleted, and a plan
-built on that writes a wrong plan over the right one. Title, tag and new-KR
-writes need a LIVE read (settled names and codes, the O's KRs) but not the
-completed feed.
+NO DATE WRITES (Vex 2026-09-23, scheduling out, then "Heal off"): nothing
+here moves an OKR item or a parent's span. The writes left are titles,
+tags, new copies, ticks, won't do / someday, and the countdowns.
+
+THE WRITER RULE (okr.py module docstring). The auto-tick and the countdowns
+write only from a Snapshot that is .writable: a live read with every
+completed KR. A cache read, or one missing completed KRs, reads a ticked
+deliverable as deleted. Title, tag and new-KR writes need a LIVE read
+(settled names and codes, the O's KRs) but not the completed feed.
 
 THE LOCK (~/.ticktick_alfred/okr.lock). Every writer loads INSIDE it, so no
 plan comes from a snapshot another writer has already made stale. User verbs
 wait for it (LOCK_WAIT, then refuse "busy" rather than hang); the background
-heal takes it non-blocking and leaves when it is taken. Full-object writes
-clobber whatever changed since the read (a KR ticked in between would be
-posted back open), so load -> write stays inside one hold. The heal's ticks
-come from a SECOND hold (its done lookups run between the two), so each
-candidate is re-read inside that hold and ticked only while still open: two
-overlapping heals tick a KR once.
-
-STORED ITEMS ONLY. apply_spans puts snap.items on their new dates, never an
-okr.healed() copy: a healed copy's start/end moved but its raw still holds
-the stored stamps, and write_fields would read "same length, shift by 0" and
-leave a stale O where it was (map trap 1).
+upkeep takes it non-blocking and leaves when it is taken. Full-object
+writes clobber whatever changed since the read (a KR ticked in between
+would be posted back open), so load -> write stays inside one hold. The
+upkeep's ticks come from a SECOND hold (its done lookups run between the
+two), so each candidate is re-read inside that hold and ticked only while
+still open: two overlapping passes tick a KR once.
 
 WRITES: one v2 batch per 50 items (the road the app itself writes on), and
 v1 one full object each when there is no v2 token or a batch is refused.
-The values are absolute dates / titles / tags on full objects, so a v1 retry
-after a half-applied batch lands the same.
+The values are absolute titles / tags on full objects, so a v1 retry after
+a half-applied batch lands the same.
 
 CACHE: patch_cache() mirrors every write into all_tasks, all_notes, the
 list's project_data_<pid> (the browse screens read that) and the hub's own
@@ -59,7 +55,7 @@ KRs still knows which closed items exist (plan_of).
 
 NO SYNC CLICK HERE. Every road a verb runs on ends at ET End, which already
 clicks File > Sync; a second click inside the same breath is the double
-click that wedged TickTick's sync on 2026-09-12. The detached heal banners
+click that wedged TickTick's sync on 2026-09-12. The detached upkeep banners
 through the same End (xact _crm_say), and the hourly sync's headless banner
 does too.
 """
@@ -80,9 +76,9 @@ import okr
 import periodic_model as pm
 
 LOCK_FILE = os.path.join(cfg.CONFIG_DIR, "okr.lock")
-HEAL_STAMP = os.path.join(cfg.CONFIG_DIR, "okr_heal.stamp")
-HEAL_LOG = "/tmp/tickal_okr.log"
-LOCK_WAIT = 90.0          # seconds a user verb waits out a running heal
+UPKEEP_STAMP = os.path.join(cfg.CONFIG_DIR, "okr_heal.stamp")   # the file predates the rename
+UPKEEP_LOG = "/tmp/tickal_okr.log"
+LOCK_WAIT = 90.0          # seconds a user verb waits out a running upkeep
 BATCH = 50                # v2 batch/task bodies per request
 ROWS_KEY = "okr_rows"     # the hub's cached snapshot (browse ctx:okr)
 COMPLETE_KEY = "okr_complete"   # the last COMPLETE read (remember_complete)
@@ -113,7 +109,7 @@ Outcome = namedtuple("Outcome", "msg reopen ids")
 def _lock(wait=None):
     """Hold the OKR write lock; yields True when held, False when another
     writer kept it past `wait` seconds (0 = one non-blocking try, the
-    background heal). A lock file that cannot even be opened yields True:
+    background upkeep). A lock file that cannot even be opened yields True:
     a broken lock must not block every write (app_sync.claim fails open
     the same way)."""
     wait = LOCK_WAIT if wait is None else wait
@@ -252,7 +248,7 @@ def remember_complete(snap):
     exist, for the reads that come back without them (plan_of). Written
     only from a live read with every completed KR (done_complete) - a
     partial read is never remembered as whole. Called by every writer's
-    _load, by patch_cache (with the writes over it), by heal_and_tick, and
+    _load, by patch_cache (with the writes over it), by upkeep, and
     by browse._okr_snapshot after its own live read. -> True when kept.
     Never raises."""
     try:
@@ -284,7 +280,7 @@ def patch_cache(snap, patches=None, done=(), add=(), rebuild=True):
     minutes ago, the app may have moved things since, and patched and
     re-stamped it would pass browse._okr_fresh as the new plan. rebuild=False
     drops okr_rows instead - for a caller whose snap may be OLDER than a
-    copy another writer left (the heal's second hold). Written LAST: the
+    copy another writer left (the upkeep's second hold). Written LAST: the
     hub trusts okr_rows only while its mtime is not older than
     project_data / all_tasks / completed_tasks.
 
@@ -295,7 +291,7 @@ def patch_cache(snap, patches=None, done=(), add=(), rebuild=True):
 
     The written rows are folded back into snap.items (what TickTick now
     holds), so a second mirror in the same hold builds on the first
-    (add_krs: the O's 🏷️ line, then its KRs; the heal: spans, then ticks).
+    (add_krs: the O's 🏷️ line, then its KRs).
     Never raises. A failure drops okr_rows only - never all_tasks (map
     trap 10): the hub re-reads live on its next empty bar."""
     patches = {k: v for k, v in (patches or {}).items() if k and v}
@@ -419,42 +415,6 @@ def _write(snap, todo, api, v2):
             except Exception:
                 failed.append(it.id)
     return written, failed
-
-
-SpanResult = namedtuple("SpanResult", "written failed")
-
-
-def apply_spans(snap, pairs, api=None, v2=None):
-    """Put items on new all-day spans: pairs = [(id, start, end_inclusive)]
-    - the later entry for an id wins. Since 2026-09-23 the ONLY caller is
-    the heal (scheduling is TickTick's). Planned from snap.items as STORED
-    (the module docstring: never a healed() copy). History never moves; an item
-    already all-day on that exact span is not written (a TIMED one on it is:
-    OKR items are all-day by rule). The cache follows only what TickTick
-    took. THE WRITER RULE is checked here, whoever calls: a snap that is not
-    .writable is a Refusal before anything is planned.
-    -> SpanResult(written ids, failed ids)."""
-    if not snap.writable:
-        raise Refusal(_why_not(snap, v2))
-    by = okr.index(snap.items)
-    final = {}
-    for iid, s, e in pairs or ():
-        final[iid] = (s, e)
-    todo = []
-    for iid, (s, e) in final.items():
-        it = by.get(iid)
-        if it is None or it.history:
-            continue
-        if (it.start, it.end) == (s, e) and (it.raw or {}).get("isAllDay") is True:
-            continue
-        todo.append((it, okr.write_fields(it, s, e)))
-    if not todo:
-        return SpanResult([], [])
-    api, v2 = _clients(api, v2) if api is None else (api, v2)
-    written, failed = _write(snap, todo, api, v2)
-    ok = set(written)
-    patch_cache(snap, patches={it.id: f for it, f in todo if it.id in ok})
-    return SpanResult(written, failed)
 
 
 # ── 🔑 KRs under an O from one piped line ────────────────────────────────────
@@ -1526,53 +1486,48 @@ def retag(spec, api=None, v2=None):
     return msg
 
 
-# ── heal + auto-tick (hub open, hourly sync) ─────────────────────────────────
-HealResult = namedtuple("HealResult", "healed ticked chip note")
+# ── upkeep: auto-tick + the countdowns (hub open, hourly sync) ──────────────
+Upkeep = namedtuple("Upkeep", "ticked chip note")
 
 
-def heal_and_tick(api=None, v2=None, is_done=None, today=None):
-    """The background pass (HANDOFF_OKR section 4): every open Y/O onto its
-    wanted span (okr.heal_diff, deepest first), then every open KR whose
-    linked single task is COMPLETED gets ticked ("Auto-tick: YES", only a
-    live status 2 ticks). Silent unless it wrote: -> HealResult(healed,
-    ticked, chip, note); chip is "" when nothing changed, note always says
-    what happened (the detached run's log line).
+def upkeep(api=None, v2=None, is_done=None, today=None):
+    """The background pass: the ⏳ countdowns kept in step (sync_countdowns),
+    then every open KR whose linked single task is COMPLETED gets ticked
+    ("Auto-tick: YES", only a live status 2 ticks). NO span heal since
+    2026-09-23 ("Heal off"): a parent's dates are Vex's. Silent unless it
+    wrote: -> Upkeep(ticked, chip, note); chip is "" when nothing changed,
+    note always says what happened (the detached run's log line).
 
     Never blocks: the lock is taken non-blocking and a busy lock skips the
-    pass - a user verb holds it, and heals as part of its own write. The
-    done lookups (one GET per task-linked open KR) run OUTSIDE the lock so
-    a hub open never makes a schedule action wait on them; the ticks take
-    the lock again, because a full-object span write that raced a tick
-    would post the KR back open. Inside that second hold every candidate is
-    RE-READ and ticked only while still open (status 0): another heal (the
-    hourly one and a hub open overlap) or Vex may have ticked it since the
-    first read, and only the ticks that happened are counted. okr_rows is
-    rebuilt from the first hold's read only while no other writer has left
-    a copy since; otherwise it is dropped (patch_cache rebuild=False). Never
-    raises (the hourly sync must not die on a nicety)."""
+    pass - a user verb holds it. The done lookups (one GET per task-linked
+    open KR) run OUTSIDE the lock so a hub open never makes a verb wait on
+    them; the ticks take the lock again, and inside that second hold every
+    candidate is RE-READ and ticked only while still open (status 0):
+    another pass (the hourly one and a hub open overlap) or Vex may have
+    ticked it since the first read, and only the ticks that happened are
+    counted. okr_rows is rebuilt from the first hold's read only while no
+    other writer has left a copy since; otherwise it is dropped (patch_cache
+    rebuild=False). Never raises (the hourly sync must not die on a
+    nicety)."""
     try:
         pid = cfg.get_okr_list_id()
         if not pid:
-            return HealResult(0, 0, "", "okr list off")
+            return Upkeep(0, "", "okr list off")
         api, v2 = _clients(api, v2)
         with _lock(wait=0) as got:
             if not got:
-                return HealResult(0, 0, "", "busy: another OKR write holds the lock")
+                return Upkeep(0, "", "busy: another OKR write holds the lock")
             try:
                 snap = okr.load(api=api, v2=v2, list_id=pid)
             except okr.OkrLoadError as e:
-                return HealResult(0, 0, "", f"unreadable: {e}")
+                return Upkeep(0, "", f"unreadable: {e}")
             if not snap.writable:
-                return HealResult(0, 0, "", f"refused (not a complete live read): {snap.detail}")
+                return Upkeep(0, "", f"refused (not a complete live read): {snap.detail}")
             remember_complete(snap)
-            res = apply_spans(snap, okr.heal_diff(snap.items), api, v2)
-            # the countdowns read the spans just healed (patch_cache folded
-            # them into snap.items); same hold, so two heals never mint twice
             cd_chip, cd_note = sync_countdowns(snap, v2, today)
             linked = [k for k in snap.items if k.kind == "KR" and not k.history
                       and (k.target or ("",))[0] == "task"]
             left = cache_store.get(ROWS_KEY) if linked else None
-        healed = len(res.written)
         ticked, tick_fail, moved_on = [], 0, 0
         if linked:
             look = is_done or okr.done_lookup(api)
@@ -1601,41 +1556,38 @@ def heal_and_tick(api=None, v2=None, is_done=None, today=None):
                     else:
                         tick_fail = len(cands)
         parts = []
-        if healed:
-            parts.append(f"🥅 {healed} span{'' if healed == 1 else 's'} healed")
         if ticked:
             parts.append(f"🔑 {len(ticked)} KR{'' if len(ticked) == 1 else 's'} ticked · "
                          f"original{'' if len(ticked) == 1 else 's'} done")
         if cd_chip:
             parts.append(cd_chip)
-        note = (f"healed {healed} (failed {len(res.failed)}), ticked {len(ticked)} "
-                f"(failed {tick_fail}, no longer open {moved_on}), "
+        note = (f"ticked {len(ticked)} (failed {tick_fail}, no longer open {moved_on}), "
                 f"{len(linked)} linked open KRs · {cd_note} · {snap.detail}")
-        return HealResult(healed, len(ticked), " · ".join(parts), note)
+        return Upkeep(len(ticked), " · ".join(parts), note)
     except Exception as e:
-        return HealResult(0, 0, "", f"failed: {type(e).__name__}: {e}")
+        return Upkeep(0, "", f"failed: {type(e).__name__}: {e}")
 
 
-def spawn_heal(debounce_s=300):
-    """Fire-and-forget "xact:okr_heal", detached (xact._pn_bg's shape): safe
+def spawn_upkeep(debounce_s=300):
+    """Fire-and-forget "xact:okr_upkeep", detached (xact._pn_bg's shape): safe
     from a script filter render, returns at once. Debounced through
     app_sync.claim on its own stamp - the hub re-renders on every
     keystroke, and one pass per `debounce_s` is plenty. The child never
     inherits the render's stdout (it would corrupt the Alfred JSON, map
-    trap 9): stdout/stderr go to HEAL_LOG, stdin is /dev/null, and it runs
+    trap 9): stdout/stderr go to UPKEEP_LOG, stdin is /dev/null, and it runs
     in its own session with TICKAL_DETACHED=1 (so it banners, not prints).
     -> True when a child was started."""
     try:
         if not cfg.get_okr_list_id():
             return False
         import app_sync
-        if not app_sync.claim(min_gap=debounce_s, stamp=HEAL_STAMP):
+        if not app_sync.claim(min_gap=debounce_s, stamp=UPKEEP_STAMP):
             return False
         wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        with open(HEAL_LOG, "a") as logf:
+        with open(UPKEEP_LOG, "a") as logf:
             subprocess.Popen(
                 ["/bin/bash", os.path.join(wf, "Scripts", "py.sh"),
-                 os.path.join(wf, "Scripts", "xact.py"), "xact:okr_heal"],
+                 os.path.join(wf, "Scripts", "xact.py"), "xact:okr_upkeep"],
                 stdin=subprocess.DEVNULL, stdout=logf, stderr=logf,
                 start_new_session=True, env=dict(os.environ, TICKAL_DETACHED="1"))
         return True
@@ -1723,7 +1675,6 @@ def countdown_plan(items, existing, registry, today=None, new_id=None):
         c = by_cid.get(rec.get("cid"))
         if c is not None and iid not in ours:
             ours[iid] = c                 # its remark was edited: still ours
-    want = okr.wanted_spans(items)
     active = {it.id for it, _e in okr.countdown_targets(items, today)}
     top = min((c.get("sortOrder") or 0 for c in listed), default=0)
     add, update, archive = [], [], []
@@ -1731,7 +1682,7 @@ def countdown_plan(items, existing, registry, today=None, new_id=None):
         if it.kind not in okr.PARENT_KINDS:
             continue
         c, rec = ours.get(it.id), reg.get(it.id)
-        _s, e = okr._effective(it, want)
+        e = it.end                       # STORED: the bar Vex drew
         if it.history or e is None:
             if c is not None and _cd_live(c):
                 archive.append({**c, "status": 1})
@@ -1885,7 +1836,7 @@ def _mirror_wontdo(snap, it, live, stamp):
     """xact.wontdo's cache mirror, from src/: the wontdo_tasks log (the 🚫
     screen and ⇧ undo read it), out of all_tasks, completed_tasks and the
     list's project_data; then patch_cache folds status -1 into snap.items
-    (so the heal that follows no longer counts it) and rebuilds okr_rows
+    (so nothing that follows counts it) and rebuilds okr_rows
     LAST, where the hub shows it 🚫 with ⇧ ↩️ until the next live read."""
     tid = it.id
     try:
@@ -1911,16 +1862,10 @@ def _mirror_wontdo(snap, it, live, stamp):
 
 
 def _after_close(snap, api, v2, today):
-    """A decision took an item off the timeline: its parents heal in the
-    same hold, the countdowns follow. -> toast tail."""
-    tail = ""
-    heals = okr.heal_diff(snap.items)
-    if heals:
-        res = apply_spans(snap, heals, api, v2)
-        if res.written:
-            tail += f" · {_plural(len(res.written), 'parent')} healed"
+    """A decision took an item off the timeline: the countdowns follow (a
+    parent's span is Vex's - no heal). -> toast tail."""
     chip, _note = sync_countdowns(snap, v2, today)
-    return tail + (f" · {chip}" if chip else "")
+    return f" · {chip}" if chip else ""
 
 
 def carry(spec, api=None, v2=None, today=None):
@@ -1931,12 +1876,12 @@ def carry(spec, api=None, v2=None, today=None):
 
       wontdo   TickTick's won't do (v2 status -1 + a stamped completedTime,
                the write xact.wontdo makes): out of progress, pace and
-               spans; the parents heal in the same hold
+               the carry-over
       someday  undated (v1 nulls - the proven clear, dispatch
                attr_cleardate): off the timeline, still in the plan and in
-               its O's KR count; the parents heal
+               its O's KR count
 
-    All three from a writable read inside the lock, like every span write."""
+    Both from a writable read inside the lock (the countdowns follow)."""
     iid = str(spec.get("id") or "")
     action = spec.get("action")
     if not iid or action not in CARRY_ACTIONS:

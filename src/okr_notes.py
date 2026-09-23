@@ -230,11 +230,11 @@ def bar(done, total, cells=BAR_CELLS):
     return "▰" * n + "▱" * (cells - n)
 
 
-def _top_line(it, items, want, today, ref, list_id):
+def _top_line(it, items, today, ref, list_id):
     """"- 🏔️ <name> ▰▰▱▱▱ d/n \u2022 <span> \u2022 🔴 Nd" - a scorecard's top line."""
     d, n = okr.progress(it, items)
     bits = [f"{GLYPH[it.kind]} {item_link(it, list_id)} {bar(d, n)} {d}/{n}",
-            okr.span_txt(*okr._effective(it, want), ref)]
+            okr.span_txt(it.start, it.end, ref)]
     behind = okr.pace(it, items, today).behind_days if today else 0
     if behind > 0:
         bits.append(f"🔴 {behind}d")
@@ -250,20 +250,19 @@ def scorecard_lines(p, items, today, list_id):
     one line per 🏔️ Y overlapping the year, its O's tab-indented under it.
     With no Y (the live list on 2026-09-19) the O's overlapping the year
     ARE the top level, and take the Y line's shape - bar and 🔴 - since they
-    are what the year is scored on. Spans are the WANTED spans (a stale
-    stored one is exactly what the next heal fixes), written with the year
-    only when it is not the note's. [] when the year has no plan.
+    are what the year is scored on. Spans are the STORED spans - the bars
+    Vex drew (heal off, 2026-09-23) - written with the year only when it is
+    not the note's. [] when the year has no plan.
 
     Only the plan: the goals he picked for the year live in the same
     section (pm.GOAL_SECTION["yearly"]) and merge_scorecard keeps them."""
-    want = okr.wanted_spans(items)
     ref = p.start                       # the year a span is written without
     plan = plan_for("yearly", p.start, p.end, items)
     ys = [it for it in plan if it.kind == "Y"]
     kids = okr._kids(items)
     out = []
     for top in ys or [it for it in plan if it.kind == "O"]:
-        out.append(_top_line(top, items, want, today, ref, list_id))
+        out.append(_top_line(top, items, today, ref, list_id))
         if top.kind != "Y":
             continue
         for o in kids.get(top.id, []):
@@ -271,7 +270,7 @@ def scorecard_lines(p, items, today, list_id):
                 continue
             d, n = okr.progress(o, items)
             out.append(f"\t- {GLYPH['O']} {item_link(o, list_id)} {d}/{n}{SEP}"
-                       + okr.span_txt(*okr._effective(o, want), ref))
+                       + okr.span_txt(o.start, o.end, ref))
     return out
 
 

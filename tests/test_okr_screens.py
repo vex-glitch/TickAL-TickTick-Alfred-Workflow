@@ -77,8 +77,8 @@ def T(tid, title, s=None, e=None, parent=None, status=0, tags=(), pid=PID, **kw)
     return t
 
 
-# The plan. One Y with one O (its stored span STALE: the heal would move it
-# onto its KRs), a loose O with a list-linked KR and an undated one, a
+# The plan. One Y with one O (its stored bar OFF its KRs - shown as stored,
+# heal off since 2026-09-23), a loose O with a list-linked KR and an undated one, a
 # closed O, a KR with no O, an unprefixed item, one completed KR that only
 # a live read (v2 project_completed) knows about, and a won't-do KR (undated,
 # so no period's plan and no span counts it).
@@ -205,7 +205,7 @@ try:
     okr.load = fake_load
     import okr_write as _real_okr_write                    # noqa: E402
     stub = types.ModuleType("okr_write")
-    stub.spawn_heal = lambda debounce_s=300: SPAWNS.append(debounce_s) or True
+    stub.spawn_upkeep = lambda debounce_s=300: SPAWNS.append(debounce_s) or True
     stub.code_ok = _real_okr_write.code_ok                 # pure: the title test
     stub.tag_pool = _real_okr_write.tag_pool               # pure: what retag accepts
     stub.Refusal = _real_okr_write.Refusal
@@ -273,7 +273,7 @@ try:
     carry_row = next((r for r in rows if r.get("uid") == "okr-carry"), None)
     rows = [r for r in rows if r.get("uid") != "okr-carry"]
     titles = [r["title"] for r in rows]
-    check("root: one live read, one heal spawn", len(LOADS) == 1 and len(SPAWNS) == 1,
+    check("root: one live read, one upkeep spawn", len(LOADS) == 1 and len(SPAWNS) == 1,
           (LOADS, SPAWNS))
     check("root: head row first - list name, open count, no cache chip on a live read",
           titles[0] == f"{NAME} · 10 open" and "cache" not in rows[0]["subtitle"]
@@ -364,8 +364,19 @@ try:
     check("O screen: the head row opens the copy, it does not drill again",
           head["arg"] == f"open:ticktick:///webapp/#p/{PID}/tasks/{O1}"
           and head["mods"]["alt"]["valid"] is False, head)
-    check("O screen: the O shows its WANTED span (its KRs), not the stale stored one",
-          head["subtitle"].startswith(okr.span_txt(day(-12), day(12), TODAY)), head["subtitle"])
+    check("O screen: the O shows its STORED bar (heal off), not what its KRs would say",
+          head["subtitle"].startswith(okr.span_txt(day(5), day(20), TODAY)), head["subtitle"])
+    check("O screen: a bar that no longer covers its OPEN KRs is flagged, never fixed",
+          "⚠️ KRs outside" in head["subtitle"], head["subtitle"])
+    done_out = okr.items_from([T("od", "🥅 O • Later", day(10), day(12)),
+                               T("kd", "🔑 KR • Early - LA", day(1), day(2), parent="od", status=2),
+                               T("ko", "🔑 KR • Now - LA", day(10), day(12), parent="od")])
+    flag_rows = browse._okr_row(okr.index(done_out)["od"], done_out, TODAY, PID, ({}, {}))
+    check("a DONE KR outside the bar is his design: no flag",
+          "⚠️" not in flag_rows["subtitle"], flag_rows["subtitle"])
+    o2 = by_title(render(f"ctx:okr:o:{O2}"), "🥅 Onboard TickTicks")
+    check("O screen: a bar that covers its KRs carries no flag",
+          o2 is not None and "⚠️" not in o2["subtitle"], o2)
     kr1, kr2, kr4 = rows[1], rows[2], rows[4]
     check("O screen: ⏎ on a KR opens the copy in TickTick",
           kr2["arg"] == f"open:ticktick:///webapp/#p/{PID}/tasks/{KR2}")
@@ -649,10 +660,10 @@ try:
     check("import: reads the cache only, never spawns a heal",
           len(LOADS) == n_loads and len(SPAWNS) == n_spawns, (LOADS, SPAWNS))
     titles = [r["title"] for r in rows]
-    check("import task: head, then KR rows first (a task plans a KR), running O first",
+    check("import task: head, then KR rows first (a task plans a KR), soonest bar first",
           titles == ["↗️ Buy stamps",
-                     "🔑 KR under 🥅 TickAL · code TA",
                      "🔑 KR under 🥅 Onboard TickTicks · code OT",
+                     "🔑 KR under 🥅 TickAL · code TA",
                      "🔑 KR under 🥅 Brand new thing · code BNT",
                      "🥅 New objective · code BS",
                      "🥅 New objective under 🏔️ Productivity System",
@@ -662,14 +673,15 @@ try:
           and rows[0]["arg"] == f"open:ticktick:///webapp/#p/{OTHERP}/tasks/{OTHERT}", rows[0])
     check("import: ⌃ backs to the hub", all(r["variables"]["browse_back"] == "ctx:okr" for r in rows))
     LINK_T = {"to": "task", "pid": OTHERP, "tid": OTHERT}
-    p = b64(rows[1]["arg"], "xact:okr_add:")
+    ta = by_title(rows, "🔑 KR under 🥅 TickAL")
+    p = b64(ta["arg"], "xact:okr_add:")
     check("import task: KR row = kind KR under the O, the O's code (none sent), back to the O",
           p == {"kind": "KR", "parent": O1, "names": ["Buy stamps"], "code": None,
                 "link": LINK_T, "then": None, "back": f"ctx:okr:o:{O1}"}, p)
     check("import task: a KR row names the O's Y and its span",
-          rows[1]["subtitle"].startswith("🏔️ Productivity System · "), rows[1]["subtitle"])
+          ta["subtitle"].startswith("🏔️ Productivity System · "), ta["subtitle"])
     check("import task: an O with no code yet says its proposal is new",
-          "new 🏷️" in rows[3]["subtitle"] and "new 🏷️" not in rows[1]["subtitle"])
+          "new 🏷️" in rows[3]["subtitle"] and "new 🏷️" not in ta["subtitle"])
     p = b64(rows[4]["arg"], "xact:okr_add:")
     check("import task: New objective = kind O, no parent, tag picker next, back to the hub",
           p == {"kind": "O", "parent": None, "names": ["Buy stamps"], "code": None,
@@ -690,7 +702,7 @@ try:
     check("import list: named without its 💼P prefix, objective rows first",
           titles[:4] == ["↗️ Website", "🥅 New objective · code W",
                          "🥅 New objective under 🏔️ Productivity System", "🏔️ New year objective"]
-          and titles[4].startswith("🔑 KR under 🥅 TickAL"), titles)
+          and titles[4].startswith("🔑 KR under 🥅 Onboard TickTicks"), titles)
     check("import list: the head says it links the project's 📌 CTA",
           rows[0]["subtitle"].startswith("📂 List · links its 📌 CTA")
           and rows[0]["arg"] == f"open:ticktick:///webapp/#p/{PROJP}/tasks", rows[0])

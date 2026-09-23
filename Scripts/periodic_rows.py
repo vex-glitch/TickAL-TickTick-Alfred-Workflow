@@ -919,7 +919,6 @@ def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None):
         if not items:
             return []
         picks = goal_choices(kind, p.start, p.end, items, today) or []
-        want = okr.wanted_spans(items)
     except Exception:
         return []
     tids, names = _goal_keys(have_lines, getattr(okr_write, "_clean_name", None))
@@ -938,11 +937,7 @@ def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None):
         if _norm(it.name) in names or (
                 t is not None and _norm(pm.strip_md_links(t["title"])) in names):
             continue                      # already the goal, as text or by title
-        try:
-            s, e = okr._effective(it, want)
-            when = okr.span_txt(s, e, today)
-        except Exception:
-            when = okr.span_txt(it.start, it.end, today)
+        when = okr.span_txt(it.start, it.end, today)      # the stored span, his
         rows.append(alfred.item(
             uid=f"pn-goal-plan-{kind}-{it.id}",
             title=f"🔮 {okr_write.GLYPH.get(it.kind, '▫️')} {it.name[:60]}",

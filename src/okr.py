@@ -16,16 +16,20 @@ told apart by the title prefix alone:
     🥅 O • TickAL                                    objective (under a Y, or loose)
     🔑 KR • [Goals wf](<task link>) - TA             key result = a deliverable
 
-This module reads that list and answers: the tree, the dates, the parent
-spans a timeline drag has left stale (heal), progress (ticked KRs over all
-KRs), pace, the plan for a period, the KRs whose linked original is already
-done (auto-tick) and the objective codes. Nothing here writes: the planners
-RETURN what a writer should do, and phase 1 only prints it.
+This module reads that list and answers: the tree, the dates, progress
+(ticked KRs over all KRs), pace, the plan for a period, the KRs whose linked
+original is already done (auto-tick), the objective codes, and - as a
+report line only - the parents that no longer cover their children
+(heal_diff). Nothing here writes: the planners RETURN what a writer should
+do, and phase 1 only prints it.
 
-SCHEDULING IS TICKTICK'S (Vex 2026-09-23: "just remove any scheduling and
-ripple from workflow, I will handle it myself"). TickAL never moves a date
-by itself: no schedule action, no ripple, no carry move. It heals parents
-onto their children and that is all the date writing there is.
+DATES ARE TICKTICK'S (Vex 2026-09-23: "just remove any scheduling and
+ripple from workflow, I will handle it myself", then "Heal off"). TickAL
+never writes an OKR date: no schedule action, no ripple, no carry move, and
+no heal - a parent's span is what Vex drags it to, read as STORED
+everywhere (pace, the period plans, the countdowns, the notes). heal_diff
+stays as a diagnostic: the report says which parents do not cover their
+KRs, and he drags them.
 
 Pure part: no I/O. The one impure piece is load() at the bottom (v1 open
 tasks + v2 completed ones, cache fallback that SAYS it fell back) and the
@@ -33,14 +37,13 @@ __main__ report:
 
     python3 src/okr.py          # the live tree, read-only
 
-THE WRITER RULE (phase 2 and on). Every writer this model feeds - the span
-heal, the auto-tick, the countdowns - must REFUSE unless
-the Snapshot it planned from says source == "live" AND done_complete
-(Snapshot.writable). A cache read is minutes to hours old, and a plan
-without every completed KR reads a ticked deliverable as deleted: it counts
-nowhere, shapes no span, and a heal built on that would write a
-wrong plan over the right one. Reading (the report, the notes' forecast
-lines) may use any Snapshot; writing may not.
+THE WRITER RULE (phase 2 and on). Every writer this model feeds - the
+auto-tick, the countdowns - must REFUSE unless the Snapshot it planned from
+says source == "live" AND done_complete (Snapshot.writable). A cache read
+is minutes to hours old, and a plan without every completed KR reads a
+ticked deliverable as deleted: it counts nowhere, and a countdown archived
+on that would be wrong. Reading (the report, the notes' forecast lines) may
+use any Snapshot; writing may not.
 """
 import os
 import re
@@ -390,8 +393,8 @@ class Item:
 
     @property
     def history(self):
-        """Done or won't do: HISTORY. It never moves - no heal rewrites a
-        done Y/O's span."""
+        """Done or won't do: HISTORY. Out of pace, the countdowns and the
+        carry-over; heal_diff never lists it."""
         return self.done or self.abandoned
 
     @property
@@ -564,7 +567,10 @@ PARENT_KINDS = ("Y", "O")
 def wanted_spans(items):
     """{id: (start, end)} for every Y and O with at least one DATED
     descendant: "an O runs from its first dated KR's start to its last dated
-    KR's end; a Y the same over its O's" (HANDOFF section 4).
+    KR's end; a Y the same over its O's" (HANDOFF section 4). Since
+    2026-09-23 (heal OFF) nothing WRITES these: heal_diff reports them, and
+    _leaf reads them to tell a parent from a hand-dated leaf. Everything
+    that shows or scores a parent reads its STORED span.
 
     Bottom-up: a Y/O child contributes its OWN wanted span when it has one
     (a stale stored span on an O must not stretch its Y), else its stored
@@ -603,12 +609,11 @@ def wanted_spans(items):
 
 
 def heal_diff(items):
-    """[(id, want_start, want_end)] for every Y/O whose STORED dates differ
-    from its wanted span, deepest first (an O before its Y), so a writer can
-    apply them in order. A drag in TickTick never ripples - nothing can see
-    it happen - but its parent heals on the next pass. A done or won't-do
-    Y/O is HISTORY and is never a target: its span stays what it was when
-    it closed."""
+    """[(id, want_start, want_end)] for every open Y/O whose STORED dates
+    differ from its wanted span, deepest first (an O before its Y). A REPORT
+    line since 2026-09-23 (heal off): nothing applies them, Vex drags the
+    parent when he agrees. A done or won't-do Y/O is HISTORY and is never
+    listed: its span stays what it was when it closed."""
     by = index(items)
     want = wanted_spans(items)
     out = []
@@ -622,21 +627,12 @@ def heal_diff(items):
 
 def healed(items):
     """The items with heal_diff applied to replace()d copies: every open Y/O
-    on its WANTED span, everything else as it is. The input is untouched -
-    what every screen and note SHOWS for a parent."""
+    on its WANTED span, everything else as it is. The input is untouched.
+    What a heal WOULD give - nothing shows this since 2026-09-23 (heal off:
+    screens and notes read the stored span)."""
     fix = {iid: (s, e) for iid, s, e in heal_diff(items)}
     return [replace(it, start=fix[it.id][0], end=fix[it.id][1])
             if it.id in fix else it for it in items]
-
-
-def _effective(it, want):
-    """The span a Y/O is READ on: its wanted span when it has one, else its
-    stored dates (pace and overlapping share this)."""
-    if it.kind in PARENT_KINDS:
-        w = want.get(it.id)
-        if w:
-            return w
-    return it.start, it.end
 
 
 # ── Progress + pace ──────────────────────────────────────────────────────────
@@ -693,10 +689,8 @@ def pace(item, items, today=None):
       elapsed      0.0-1.0 through the item's span, None when it has none:
                    day N of M, TODAY COUNTED AS ELAPSED - (today - start)
                    + 1 day over the span's days, clamped; 0.0 before the
-                   start, so the first day reads 1/M and the last 1.0. The
-                   WANTED span when there is one - a stale stored span is
-                   exactly what the next heal fixes, and pace should not
-                   read it meanwhile.
+                   start, so the first day reads 1/M and the last 1.0. On
+                   the STORED span - the bar Vex drew (heal off, 2026-09-23).
 
     Undated KRs never count in expected or behind (a done one still counts
     in actual)."""
@@ -707,7 +701,7 @@ def pace(item, items, today=None):
     actual = sum(1 for k in krs if k.done)
     late = [k.end for k in dated if not k.done and k.end < today]
     behind = (today - min(late)).days if late else 0
-    s, e = _effective(item, wanted_spans(items))
+    s, e = item.start, item.end
     elapsed = None
     if s is not None:
         total = (e - s).days + 1
@@ -743,20 +737,16 @@ def overlapping(items, start, end, kinds=KINDS):
     start..end (inclusive both ends), in start order. kinds=None = every
     item, unprefixed too. Done items stay in: they were the plan.
 
-    A Y/O is tested (and ordered) on its WANTED span when it has one - the
-    fallback pace uses - never on a stale stored one: live 2026-09-18,
-    🥅 O • Workflows was stored 1-24 Dec while its Typinator WF ran 26-30
-    Nov, and November's plan must show the O. An undated O whose KRs are
-    dated is in the plan too. The items come back as they are (stored
-    dates); only the test reads the wanted span.
+    Every item is tested on its STORED span - a parent's bar is the one Vex
+    drew (heal off, 2026-09-23): an O whose KR runs in November but whose
+    own bar starts in December is December's, until he drags the bar.
     The periodic notes read this (HANDOFF section 4): 🎉 Year = Y's (+ O's),
     🌓 Quarter = O's, 🗓️ Month = O's + KRs, ♻️ Week and ☀️ Day = KRs."""
-    want = wanted_spans(items)
     out = []
     for it in items:
         if kinds is not None and it.kind not in kinds:
             continue
-        s, e = _effective(it, want)
+        s, e = it.start, it.end
         if s is not None and s <= end and e >= start:
             out.append((s, it))
     out.sort(key=lambda r: (r[0], r[1].name))
@@ -786,18 +776,17 @@ def countdown_targets(items, today=None):
     active objective, to its end"; Vex: "Automate so that they show ends of
     goals periods") -> [(item, end)], soonest end first.
 
-    ACTIVE = an OPEN Y or O whose span has STARTED (start on or before
-    today), read on its wanted span - the end every screen shows. One
-    running late keeps its countdown (it then counts the days since, which
-    is the point); a done or won't-do one, an undated one and one that has
-    not started yet has none."""
+    ACTIVE = an OPEN Y or O whose STORED span has STARTED (start on or
+    before today) - the bar as Vex drew it. One running late keeps its
+    countdown (it then counts the days since, which is the point); a done
+    or won't-do one, an undated one and one that has not started yet has
+    none."""
     today = today or date.today()
-    want = wanted_spans(items)
     out = []
     for it in items:
         if it.kind not in PARENT_KINDS or it.history:
             continue
-        s, e = _effective(it, want)
+        s, e = it.start, it.end
         if s is None or s > today:
             continue
         out.append((it, e))
@@ -1348,7 +1337,8 @@ def report(snap, today=None, is_done=None):
             _walk(n, items, today, 1, out)
         out.append("")
     heals = heal_diff(items)
-    out.append(f"Heal (would write, read-only here): {len(heals) or 'none'}")
+    out.append("Parents not covering their KRs (heal is OFF since 2026-09-23 - "
+               f"yours to drag): {len(heals) or 'none'}")
     for iid, s, e in heals:
         it = by[iid]
         out.append(f"    {PREFIX.get(it.kind, '')}{it.name}: "

@@ -237,14 +237,16 @@ def do_sync():
     nudged = _people_nudge(api, all_tasks)
     if nudged:
         summary += f" · 🫂 {nudged} reach-out" + ("s" if nudged > 1 else "")
-    # 🥅 OKR heal + auto-tick, "on the hourly sync" (HANDOFF_OKR section 4).
-    # AFTER _people_nudge on purpose: it re-sets all_tasks from its own local
-    # list, which would erase the heal's cache patches. heal_and_tick refuses
-    # unless the read is live and complete, and never raises; the headless
-    # banner below rides XAct → End, which clicks Sync - so no click here.
+    # 🥅 OKR upkeep - auto-tick + the ⏳ countdowns, "on the hourly sync"
+    # (HANDOFF_OKR section 4; no heal since 2026-09-23, OKR dates are
+    # TickTick's). AFTER _people_nudge on purpose: it re-sets all_tasks from
+    # its own local list, which would erase the ticks' cache patches. upkeep
+    # refuses unless the read is live and complete, and never raises; the
+    # headless banner below rides XAct → End, which clicks Sync - so no
+    # click here.
     try:
         import okr_write
-        _okr = okr_write.heal_and_tick(api=api)
+        _okr = okr_write.upkeep(api=api)
         if _okr.chip:
             summary += f" · {_okr.chip}"
     except Exception:

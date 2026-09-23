@@ -403,12 +403,13 @@ WF = [
 ]
 WI = okr.items_from(LIVE_TASKS + WF)
 nov = okr.overlapping(WI, d(11, 1), d(11, 30), kinds=("O", "KR"))
-check("November's plan (O's + KRs): the Workflows / Typinator WF pair",
-      [i.id for i in nov] == ["typ", "wf"], str([i.id for i in nov]))
-check("November's O's alone: Workflows, on its WANTED span",
-      [i.id for i in okr.overlapping(WI, d(11, 1), d(11, 30), kinds=("O",))] == ["wf"])
-check("the stored span alone would have missed it",
-      okr.index(WI)["wf"].start == d(12, 1))
+check("November's plan (O's + KRs): Typinator WF alone - Workflows' bar is December's "
+      "(heal off: a parent is read on the bar Vex drew)",
+      [i.id for i in nov] == ["typ"], str([i.id for i in nov]))
+check("November's O's alone: none until he drags the Workflows bar back",
+      [i.id for i in okr.overlapping(WI, d(11, 1), d(11, 30), kinds=("O",))] == [])
+check("... and heal_diff is the report line that says so",
+      "wf" in [h[0] for h in okr.heal_diff(WI)], okr.heal_diff(WI))
 
 # ── 8. tree with orphans ─────────────────────────────────────────────────────
 TREE = [
@@ -585,8 +586,8 @@ p = okr.pace(okr.index(PAI)["ott"], PAI, today=d(10, 30))
 check("after the span: everything dated due, all elapsed",
       (p.expected, p.elapsed) == (5, 1.0) and p.behind_days == (d(10, 30) - d(9, 22)).days, str(p))
 p = okr.pace(LBY["tal"], LI, today=d(9, 20))
-check("pace reads the WANTED span, not TickAL's stale one",
-      p.elapsed is not None and p.elapsed > 0, str(p))
+check("pace reads the STORED span (heal off): TickAL's bar has not started yet",
+      p.elapsed == 0.0, str(p))
 p = okr.pace(okr.from_task(D("x", "🥅 O • Undated")), [], today=d(9, 20))
 check("an undated O with no KRs: no elapsed", p == okr.Pace(0, 0, 0, None), str(p))
 
@@ -613,8 +614,8 @@ check("an item starting ON the period's last day is in it",
       [i.id for i in okr.overlapping(PAI, d(9, 16), d(9, 18), kinds=("KR",))] == ["k_fin"])
 check("an item ending ON the period's first day is in it",
       [i.id for i in okr.overlapping(PAI, d(9, 28), d(10, 5), kinds=("KR",))] == ["k_rev"])
-check("an undated O whose KRs are dated is in the plan",
-      "o2" in [i.id for i in okr.overlapping(HI, d(11, 1), d(11, 30), kinds=("O",))])
+check("an undated O whose KRs are dated is NOT in the plan (heal off: its bar is the test)",
+      not ("o2" in [i.id for i in okr.overlapping(HI, d(11, 1), d(11, 30), kinds=("O",))]))
 
 # ── 12b. the pace of one period (📈 Pace rows) ──────────────────────────────
 PP = okr.items_from([
@@ -1054,7 +1055,8 @@ try:
     lines = okr.report(snap, today=d(9, 18))
     txt = "\n".join(lines)
     check("report: the tree, the heal, the dangling count",
-          "🥅 O • TickAL" in txt and "Heal (would write, read-only here): 1" in txt
+          "🥅 O • TickAL" in txt
+          and "Parents not covering their KRs (heal is OFF since 2026-09-23 - yours to drag): 1" in txt
           and "Dangling childIds (deleted or won't-do, counted nowhere): 1" in txt, txt)
     check("report: a Snapshot without done_complete says writers would refuse",
           "writers: would REFUSE" in txt, txt)

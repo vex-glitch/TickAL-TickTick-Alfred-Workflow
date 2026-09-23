@@ -66,7 +66,7 @@ def live_plan():
     """The live list on 2026-09-19, the parts the five notes read."""
     rows = [
         D("o_ot", "🥅 O • Onboard TickTicks", d(9, 18), d(9, 28)),
-        D("o_ta", "🥅 O • TickAL", d(9, 29), d(10, 14)),   # stale stored span
+        D("o_ta", "🥅 O • TickAL", d(9, 19), d(10, 14)),   # the bar as Vex drew it
         D("o_kc", "🥅 O • KeyCue/MIAs/Shared actions", d(10, 15), d(11, 13)),
         D("o_au", "🥅 O • Audits • Execute & Establish (Naming Conventions)",
           d(11, 14), d(11, 25)),
@@ -162,9 +162,9 @@ check("3.plan-names-link-the-planning-copy",
 # (Vex 2026-09-19: "we still have 🎯 Productivity system and 🎯 none and
 # 🎯 TickAL ... Please remove those")
 check("3.no-goal-line-anywhere", not any("🎯" in ln for ln in lines), lines)
-check("3.stale-stored-span-read-wanted",
-      # TickAL is STORED 29 Sep - 14 Oct but its Goals wf KR starts 19 Sep:
-      # the quarter sees it (okr.overlapping, wanted span)
+check("3.o-read-on-its-own-bar",
+      # TickAL's bar is 19 Sep - 14 Oct (heal off: the bar Vex drew is what
+      # every period reads, okr.overlapping on stored spans)
       "\t- 🥅 TickAL 0/6" in flat(lines)[9:13])
 
 
@@ -184,10 +184,16 @@ for kind, n in (("weekly", 4), ("monthly", 3), ("quarterly", 2), ("yearly", 1)):
     check(f"3.{kind}-has-{n}-periods", blocks(got) == blocks(lines)[:n], flat(got))
 
 # ── 4. every rule the mock does not show ─────────────────────────────────────
-Y = [D("y1", "🏔️ Y • Productivity System"), D("y2", "🏔️ Y • Health"),
-     D("y3", "🏔️ Y • Money"), D("y4", "🏔️ Y • Learning"),
-     D("o1", "🥅 O • TickAL", parent="y1"), D("o2", "🥅 O • Gym", parent="y2"),
-     D("o3", "🥅 O • Budget", parent="y3"), D("o4", "🥅 O • Books", parent="y4"),
+# parents DATED over their KRs, as Vex drags them (heal off since 2026-09-23:
+# an undated or off parent is in no period until he does)
+Y = [D("y1", "🏔️ Y • Productivity System", d(9, 1), d(9, 17)),
+     D("y2", "🏔️ Y • Health", d(9, 19), d(9, 19)),
+     D("y3", "🏔️ Y • Money", d(9, 14), d(9, 20)),
+     D("y4", "🏔️ Y • Learning", d(9, 16), d(9, 20)),
+     D("o1", "🥅 O • TickAL", d(9, 1), d(9, 17), "y1"),
+     D("o2", "🥅 O • Gym", d(9, 19), d(9, 19), "y2"),
+     D("o3", "🥅 O • Budget", d(9, 14), d(9, 20), "y3"),
+     D("o4", "🥅 O • Books", d(9, 16), d(9, 20), "y4"),
      D("r1", "🔑 KR • Ship - TA", d(9, 1), d(9, 5), "o1", status=2),
      D("r2", "🔑 KR • Docs - TA", d(9, 10), d(9, 17), "o1"),
      D("r3", "🔑 KR • Squat - GY", d(9, 19), d(9, 19), "o2"),
@@ -275,7 +281,7 @@ check("7.y-count", sum(1 for s in sc if s.startswith("- 🏔️")) == 4, sc)
 sl = flat(on.scorecard_lines(yr, ITEMS, TODAY, LIST))
 check("7.no-y-os-on-top", len(sl) == 6 and sl[0]
       == "- 🥅 Onboard TickTicks ▱▱▱▱▱ 0/5 • Sep 18 - Sep 28 • 🔴 1d", sl)
-check("7.wanted-span", "- 🥅 TickAL ▱▱▱▱▱ 0/6 • Sep 19 - Oct 14" in sl, sl)
+check("7.stored-span", "- 🥅 TickAL ▱▱▱▱▱ 0/6 • Sep 19 - Oct 14" in sl, sl)
 check("7.every-line-is-a-plan-line",
       all(pm.is_plan_line(x) for x in on.scorecard_lines(yr, YI, TODAY, LIST)
           + on.scorecard_lines(yr, ITEMS, TODAY, LIST)))

@@ -94,8 +94,13 @@ understand how what I want could actually be automated." TickAL moves no
 OKR date on its own: no 📅 Schedule screen or ⌘ Actions row, no
 `xact:okr_sched`, no `okr.ripple_plan` / `schedule_plan` / `lane_of`, no
 carry move in the carry-over (its row now opens the copy to drag). The
-heal is the only date writer left. The **Ripple** and **Schedule actions**
-bullets below are history, kept for the reasoning. The one thing he named
+heal was the only date writer left - until later the same day: **HEAL OFF
+TOO** (Vex, asked "should a DONE KR still shape its objective's span?":
+"Heal off"). TickAL now writes NO OKR date at all. A parent's span is the
+bar he drew, read as STORED by every screen, pace, period plan, countdown
+and note; `okr.heal_diff` is a report line + a `⚠️ KRs outside` chip on the
+hub row. The **Parent span**, **Ripple** and **Schedule actions** bullets
+below are history, kept for the reasoning. The one thing he named
 wanting later: "move all other tasks equally according to that one task"
 (push the rest from where a late one now ends) - not built, not understood
 well enough by either of us yet.
@@ -500,3 +505,19 @@ Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
   later, in his words: "I reschedule what I am late on (couple of tasks) and
   then can say move all other tasks from when this task ends" - a manual
   "push the rest" verb; parked until he can picture it.
+- 2026-09-23, later: HEAL OFF (Vex moved TickAL's bar to its open KRs, the
+  heal put it back on its done Goals wf; asked whether done KRs should shape
+  the span he chose "Heal off"). `heal_and_tick` -> `okr_write.upkeep`
+  (auto-tick + countdowns; `Upkeep(ticked, chip, note)`), `spawn_heal` ->
+  `spawn_upkeep`, `xact:okr_heal` -> `xact:okr_upkeep`, `apply_spans` /
+  `SpanResult` gone (no span writer exists), `okr._effective` gone: pace,
+  overlapping, countdown_targets, the notes' scorecard, the 🔮 rows and
+  every hub row read `it.start, it.end`. `wanted_spans` / `heal_diff` /
+  `healed` stay PURE: the report prints "Parents not covering their KRs
+  (heal is OFF ... yours to drag)" and `_okr_row` appends `⚠️ KRs outside`
+  to a Y/O whose bar is off. CONSEQUENCES he accepted implicitly: an
+  UNDATED objective (a fresh import) is in no period's plan, no picker and
+  no countdown until he drags a bar for it; a bar behind its KRs makes the
+  O drop out of a month it still has KRs in. The hub Y/O rows also took the
+  📈 Pace rows' words ("d/n KRs · N due · behind Nd", the ⏳ elapsed chip
+  dropped) - Vex: "pace should be in top list just as is in pace row".

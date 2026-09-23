@@ -4869,9 +4869,9 @@ def render_rtrack(ids, query):
 # plan" (Vex 2026-09-18). The plan is ONE list of all-day planning copies
 # (src/okr.py reads it); these screens show it and hand every change to an
 # xact:okr_* verb, which re-reads LIVE before it writes (the writer rule in
-# okr.py's docstring). Nothing here writes TickTick. SCHEDULING IS
-# TICKTICK'S (Vex 2026-09-23): no screen here moves a date - he drags the
-# timeline, the parents heal.
+# okr.py's docstring). Nothing here writes TickTick. DATES ARE TICKTICK'S
+# (Vex 2026-09-23): no screen here moves a date, and no pass heals a parent
+# - every span shown is the STORED one, the bar he drew.
 #
 # Chords, ALL SIX spelled out on EVERY row (a missing mod fires the row's
 # default arg down that chord's edge: ⌥ dumps it in the bar, ⇧ runs an
@@ -5070,15 +5070,6 @@ def _okr_home(it, by):
             if p is not None and p.kind in ("Y", "O") else "ctx:okr")
 
 
-def _okr_span(it, want):
-    """The span a row SHOWS: an open Y/O on its wanted span (what its KRs
-    say, and what the next heal writes - a stale stored one is exactly what
-    the hub-open heal fixes), everything else as stored."""
-    if it.kind in ("Y", "O") and not it.history and want.get(it.id):
-        return want[it.id]
-    return it.start, it.end
-
-
 def _okr_real():
     """{id: task} + {parent id: open children} over the open caches, built
     once per render for the KR ⌥ hop (cache.find_task re-reads the whole
@@ -5109,7 +5100,7 @@ def _okr_real_ctx(it, real):
     return f"ctx:subtasks:{p}:{tg[2]}"
 
 
-def _okr_row(it, items, today, pid, want, real, head=False, where=None):
+def _okr_row(it, items, today, pid, real, head=False, where=None):
     """One Y / O / KR as a FULL task row (task_id, task_list_id, list_id,
     section_id, the RAW title, item_type), so ⌘ opens ⌘ Actions on it.
     head=True is the item a Y/O screen is about: ⏎ opens it, no drill.
@@ -5118,8 +5109,7 @@ def _okr_row(it, items, today, pid, want, real, head=False, where=None):
     under two objectives read the same."""
     import okr
     link = f"ticktick:///webapp/#p/{pid}/tasks/{it.id}"
-    s, e = _okr_span(it, want)
-    bits = [okr.span_txt(s, e, today)]
+    bits = [okr.span_txt(it.start, it.end, today)]      # STORED: the bar he drew
     up = where.get(it.parent) if where is not None and it.parent else None
     if up is not None and up.kind in okr.PARENT_KINDS:
         nm = up.name if len(up.name) <= 24 else up.name[:23] + "…"
@@ -5127,13 +5117,21 @@ def _okr_row(it, items, today, pid, want, real, head=False, where=None):
     parent = it.kind in okr.PARENT_KINDS
     if parent:
         d, n = okr.progress(it, items)
-        bits.append(f"{d}/{n} KRs")
-        if not it.history:
+        if it.history:
+            bits.append(f"{d}/{n} KRs")
+        else:
+            # the 📈 Pace rows' words, exactly (Vex 2026-09-23: "pace should
+            # be in top list just as is in pace row"): done/all · N due ·
+            # behind Nd - pace.expected = the KRs that should be done by now
             p = okr.pace(it, items, today)
-            if p.behind_days:
-                bits.append(f"behind {p.behind_days}d")
-            if p.elapsed:                      # 0 = not started: no chip
-                bits.append(f"⏳{round(p.elapsed * 100)}%")
+            bits += _okr_pace_bits(okr.PeriodPace(n, d, p.expected, p.behind_days))
+            # heal off (2026-09-23): the bar is his, so a bar that no longer
+            # covers its OPEN KRs is SAID, never fixed - he drags it. Done
+            # KRs outside are his design (he moved TickAL's bar off its done
+            # Goals wf to cover the current ones) and never flagged.
+            if any(k.dated and not k.history and (k.start < it.start or k.end > it.end)
+                   for k in okr.krs_of(it, items)):
+                bits.append("⚠️ KRs outside")
     elif it.dated and not it.history and it.end < today:
         bits.append(f"late {(today - it.end).days}d")
     mods = _okr_dead_mods()
@@ -5190,14 +5188,14 @@ def _okr_open_first(xs):
                                      x.start or _date.max, x.name))
 
 
-def _okr_heal_nudge():
-    """Hub open = a heal pass (HANDOFF_OKR section 4), fired DETACHED: the
-    verb loads live, refuses unless the read is writable, and spawn_heal
-    debounces it. Lazy and silent: the screens must work before the writer
-    layer exists."""
+def _okr_upkeep_nudge():
+    """Hub open = an upkeep pass (auto-tick + the ⏳ countdowns; no heal since
+    2026-09-23), fired DETACHED: the verb loads live, refuses unless the
+    read is writable, and spawn_upkeep debounces it. Lazy and silent: the
+    screens must work before the writer layer exists."""
     try:
         import okr_write
-        okr_write.spawn_heal()
+        okr_write.spawn_upkeep()
     except Exception:
         pass
 
@@ -5220,14 +5218,13 @@ def render_okr(ids, query):
         return _okr_problem(why, "ctx:folders" if not ids else "ctx:okr")
     items, pid, today = snap.items, snap.list_id, _date.today()
     by = okr.index(items)
-    want = okr.wanted_spans(items)
     real = _okr_real()
     # the search reads the bar WITHOUT a "=XY" code word (that one is for
     # the ➕ rows); a bar that is only a code searches nothing
     stext = _okr_typed(query)[2] if query else ""
 
     def row(it, head=False):
-        return _okr_row(it, items, today, pid, want, real, head=head)
+        return _okr_row(it, items, today, pid, real, head=head)
 
     def search(rows):
         if not stext:
@@ -5271,7 +5268,7 @@ def render_okr(ids, query):
             match="carry over quarter leftovers",
             variables=dict(_OKR_NO_TASK), mods=_okr_nav_mods("ctx:okrcarry")))
     if query:
-        rows = search([_okr_row(x, items, today, pid, want, real, where=by)
+        rows = search([_okr_row(x, items, today, pid, real, where=by)
                        for x in _okr_open_first(items)] + extra)
         rows = (rows + _okr_plus_rows(None, query, items)) or [alfred.item(
             uid="okr-none", title=f'No OKR matching "{query}"',
@@ -5296,7 +5293,7 @@ def render_okr(ids, query):
     if not roots:
         rows.append(alfred.item(uid="okr-empty", title="The plan is empty",
                                 subtitle="⌃🔙", valid=False))
-    _okr_heal_nudge()
+    _okr_upkeep_nudge()
     return add_back(_okr_seal(rows), "ctx:folders")
 
 
@@ -5357,10 +5354,9 @@ def render_okrpace(ids, query):
     kind, emo, word, kinds = tier
     p = pm.period_for(kind, today)
     pp = okr.period_pace(items, p.start, p.end, today)
-    want = okr.wanted_spans(items)
     real = _okr_real()
     by = okr.index(items)
-    rows = [_okr_row(x, items, today, pid, want, real, where=by)
+    rows = [_okr_row(x, items, today, pid, real, where=by)
             for x in okr.overlapping(items, p.start, p.end, kinds)]
     if query:
         rows = fuzz.filter_and_score(query, rows, key_fn=lambda x: x["match"]) \
@@ -5438,8 +5434,7 @@ def render_okrcarry(ids, query):
         if problem:
             return add_back(problem, home)
         items = snap.items
-        want = okr.wanted_spans(items)
-        s, e = _okr_span(it, want)
+        s, e = it.start, it.end
         up = by.get(it.parent) if it.parent else None
         head = alfred.item(
             uid="okrc-head",
@@ -5488,12 +5483,11 @@ def render_okrcarry(ids, query):
         return _okr_problem(why)
     items, pid = snap.items, snap.list_id
     by = okr.index(items)
-    want = okr.wanted_spans(items)
     real = _okr_real()
     left = okr.carry_candidates(items, q.end)
     rows = []
     for it in left:
-        r = _okr_row(it, items, today, pid, want, real, where=by)
+        r = _okr_row(it, items, today, pid, real, where=by)
         r["arg"] = f"xact:crmbrowse:{home}:{it.id}"
         r["subtitle"] = (r["subtitle"].replace("⏎↗️", "⏎↪️", 1)
                          .replace("⏎⤵️", "⏎↪️", 1))
@@ -6184,10 +6178,9 @@ def render_okrimport(ids, query):
     override = found[-1] if found else None
     ftext = " ".join(_OKR_CODE_TOKEN.sub(" ", query or "").split())
     bad = "Code: one word, capital first" if _okr_code_bad(override) else None
-    want = okr.wanted_spans(items)
 
     def now_first(o):
-        s, e = _okr_span(o, want)
+        s, e = o.start, o.end
         running = s is not None and s <= today <= (e or s)
         return (not running, s is None, s or _date.max, o.name.lower())
 
@@ -6197,7 +6190,7 @@ def render_okrimport(ids, query):
         code = have or _okr_propose(o.name)
         up = by.get(o.parent) if o.parent else None
         bits = ([f"🏔️ {up.name}"] if up is not None and up.kind == "Y" else []) \
-            + [okr.span_txt(*_okr_span(o, want), today)] + (["new 🏷️"] if code and not have else [])
+            + [okr.span_txt(o.start, o.end, today)] + (["new 🏷️"] if code and not have else [])
         kr_rows.append(_okr_add_row(
             f"okri-kr-{o.id}",
             f"🔑 KR under 🥅 {o.name} · {f'code {code}' if code else 'no code'}",

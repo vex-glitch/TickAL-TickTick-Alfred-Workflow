@@ -92,8 +92,10 @@ Y1, O1, O2, ODONE = "y1", "o1", "o2", "odone"
 KLINK, KTEXT, KDONE, KGONE, KCOPY, KWONT = "klink", "ktext", "kdone", "kgone", "kcopy", "kwont"
 KTMRW, KNEXT, KNEXTL = "ktmrw", "knext", "knextl"
 PLAN = [
-    T(Y1, "🏔️ Y • Productivity System"),
-    T(O1, "🥅 O • TickAL", parent=Y1),
+    # parents DATED over their KRs, as Vex drags them (heal off since
+    # 2026-09-23: an undated parent is in no period's plan)
+    T(Y1, "🏔️ Y • Productivity System", day(-5), day(40)),
+    T(O1, "🥅 O • TickAL", day(-5), day(10), parent=Y1),
     T(KLINK, f"🔑 KR • [Goals wf]({link(OLDP, REALT)}) - TA", day(0), day(2), parent=O1),
     T(KTEXT, "🔑 KR • Review - TA", day(0), day(0), parent=O1),
     T(KDONE, "🔑 KR • Kickoff - TA", day(-1), day(0), parent=O1, status=2),

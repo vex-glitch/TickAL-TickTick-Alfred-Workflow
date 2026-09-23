@@ -258,9 +258,10 @@ write through BrowseCtx - clean bar):
                                     copy's title links the real thing
     xact:okr_tag:<b64>              🏷 {"id","tag"} swap the OKR-pool tag; an
                                     O takes its open KRs along
-    xact:okr_heal                   detached heal + auto-tick + the ⏳
-                                    countdowns (the hub spawns it on open,
-                                    debounced; hourly sync too)
+    xact:okr_upkeep                 detached auto-tick + the ⏳ countdowns
+                                    (the hub spawns it on open, debounced;
+                                    hourly sync too). No heal since
+                                    2026-09-23: OKR dates are TickTick's
     xact:okr_carry:<b64>            ↪️ {"id","action":wontdo|someday} one
                                     quarter carry-over decision (phase 5):
                                     wontdo = v2 status -1, someday = undated;
@@ -12437,18 +12438,18 @@ def okr_carry(rest):
     _okr_run(rest, ow.carry)
 
 
-def okr_heal():
-    """The detached pass the hub spawns on open (okr_write.spawn_heal,
-    debounced): heal every stale Y/O span, tick every KR whose linked
-    original is done. Refuses silently unless the read is writable. Run
+def okr_upkeep():
+    """The detached pass the hub spawns on open (okr_write.spawn_upkeep,
+    debounced): the ⏳ countdowns kept in step, every KR whose linked
+    original is done ticked. Refuses silently unless the read is writable. Run
     DETACHED, stdout is the log (/tmp/tickal_okr.log), so it banners only
     when something changed (_crm_say rides XAct → End, whose own Sync click
     is the nudge - no second click here). Run on an Alfred road instead,
     the print is the toast, and an empty stdout shows none."""
     import okr_write as ow
-    r = ow.heal_and_tick()
+    r = ow.upkeep()
     if os.environ.get("TICKAL_DETACHED"):
-        print(f"{datetime.now():%Y-%m-%d %H:%M:%S} okr_heal: {r.note}")
+        print(f"{datetime.now():%Y-%m-%d %H:%M:%S} okr_upkeep: {r.note}")
         if r.chip:
             _crm_say(r.chip)
     elif r.chip:
@@ -12705,8 +12706,8 @@ def main():
             okr_link(rest)
         elif verb == "okr_tag":
             okr_tag(rest)
-        elif verb == "okr_heal":
-            okr_heal()
+        elif verb == "okr_upkeep":
+            okr_upkeep()
         elif verb == "okr_carry":
             okr_carry(rest)
         elif verb == "okr_setlist":
