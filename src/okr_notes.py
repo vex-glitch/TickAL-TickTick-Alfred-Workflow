@@ -71,8 +71,9 @@ BAR_CELLS = 5
 def plan_for(kind, start, end, items):
     """The plan of a `kind` period start..end: the items of that tier's
     levels (PLAN_KINDS) whose span touches it, level by level, each in plan
-    (start) order. okr.overlapping does the test, on the WANTED span of a
-    Y/O, so a stale stored span never hides an objective from its month.
+    (start) order. okr.overlapping does the test, on the STORED span - the
+    bar Vex drew (heal off, 2026-09-23): an objective is in the months its
+    bar touches, and in no month while it is undated.
 
     Done items stay in - they were the plan, and a note shows them as ✅.
     Won't-do items are left out: dropping one is Vex changing the plan, not
