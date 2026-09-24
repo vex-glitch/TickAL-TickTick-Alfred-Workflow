@@ -326,6 +326,104 @@ with open(os.path.join(ROOT, "Makefile"), encoding="utf-8") as f:
     mk = f.read()
 check("R10 the Makefile comment tells the truth about which suites set the gate", "each file sets it too" not in mk)
 
+# ── R11 the periodic notes show in Alfred's day views, untouched by bulk verbs ─
+# (Vex's ruling 2026-09-24 evening: "Show them")
+import filtering  # noqa: E402
+from datetime import time as _time  # noqa: E402
+
+_today = date.today()
+PNOTE = {"id": "pn1", "projectId": "PN", "kind": "NOTE", "title": f"☀️ {_today.isoformat()} · note",
+         "status": 0, **dm.timed_at(_today, _time(4, 30))}
+PTASK = {"id": "pt1", "projectId": "L", "title": "Buy milk", "status": 0, **dm.all_day(_today)}
+areas.PERIODIC_LIST_ID = "PN"
+got = {t["id"] for t in filtering.smart_filter([PNOTE, PTASK], "today")}
+check("R11 Today shows the day's periodic note beside the tasks", got == {"pn1", "pt1"}, got)
+cache_store.set("all_tasks", [PNOTE, PTASK])
+vt, _lab = xact._view_tasks("today")
+check("R11 the bulk verbs' view (send all to focus, buffer all, the date rolls) leaves the note out",
+      [t["id"] for t in (vt or [])] == ["pt1"], vt)
+import browse  # noqa: E402
+
+row = browse.task_item(PNOTE, "PN", 0)
+check("R11 a periodic note row in Browse carries no ⇧ Complete",
+      row["mods"]["shift"].get("valid") is False, row["mods"]["shift"])
+row2 = browse.task_item(PTASK, "L", 0)
+check("R11 a task row keeps its ⇧ Complete",
+      row2["mods"]["shift"].get("arg", "").startswith("complete:"), row2["mods"]["shift"])
+import everything_search as es  # noqa: E402
+
+r3 = es._inline_task_row(PNOTE, "Today", [PNOTE, PTASK])
+check("R11 a periodic note row in the search's Today carries no ⇧ Complete",
+      r3["mods"]["shift"].get("valid") is False, r3["mods"]["shift"])
+
+# ── R12 the resume after a goal pick is detached again ───────────────────────
+# (Vex 2026-09-24 evening: "why not now"; the link log points at the picker half)
+BG, INPROC = [], []
+_rb, _rj = xact._pn_bg, xact.pn_journal
+xact._pn_bg = lambda arg, *a, **k: BG.append(arg)
+xact.pn_journal = lambda slot: INPROC.append(slot)
+xact.JOURNAL_LOG = os.path.join(TMP, "journal.log")
+xact._resume_journal("evening", date(2026, 9, 24))
+xact._pn_bg, xact.pn_journal = _rb, _rj
+check("R12 the pick reopens the journal detached, pinned to the note, never in its own process",
+      BG == ["xact:pn_journal:evening@2026-09-24"] and not INPROC, (BG, INPROC))
+check("R12 the log says so", "resume detached" in open(xact.JOURNAL_LOG).read())
+
+# ── R13 the picker half is instrumented ──────────────────────────────────────
+import goal_handoff as gh  # noqa: E402
+
+gh.LOG_PATH = os.path.join(TMP, "journal2.log")
+gh._SEEN = os.path.join(TMP, "seen.txt")
+gh._PATH = os.path.join(TMP, "goaljnl.json")
+gh._SKIPS = os.path.join(TMP, "skips.json")
+gh.save("evening", date(2026, 9, 24), now=1000.0)
+st = gh.load(now=1000.0)
+_mr = getattr(gh, "mark_rendered", None) or (lambda *a, **k: None)   # red, not a crash, before round 3
+a, b = _mr(st, rows=5), _mr(st, rows=5)
+L2 = open(gh.LOG_PATH).read() if os.path.exists(gh.LOG_PATH) else ""
+check("R13 the goal screen logs 'screen rendered' ONCE per handoff (it re-renders per keystroke)",
+      a is True and b is False and L2.count("screen rendered") == 1 and "rows=5" in L2, (a, b, L2))
+gh.save("evening", date(2026, 9, 24), now=2000.0)
+check("R13 a new handoff logs again",
+      _mr(gh.load(now=2000.0)) is True and os.path.exists(gh.LOG_PATH)
+      and open(gh.LOG_PATH).read().count("screen rendered") == 2)
+check("R13 the handoff line says which app owns the screen (no AppKit here: says so)",
+      getattr(xact, "_activation_trail", lambda: None)() == " appkit=no"
+      and getattr(xact, "_yield_activation", lambda: None)() == "no")
+
+
+class _JPE:
+    """The evening journal with the bridge and the highlight answered: the
+    next question is the goal handoff."""
+    def __init__(self):
+        pairs = pm.journal_pairs(pm.seed_journal_lines([q for _k, q in pm.journal_fixed("evening", {})]))
+        self.pairs = [(n, q, ("x" if n <= 2 else a), i) for n, q, a, i in pairs]
+
+    def journal_seed(self, slot, day=None):
+        class P:
+            start = date(2026, 9, 24)
+        return pm.journal_keys(self.pairs), self.pairs, P()
+
+    def journal_merge(self, slot, answers, period=None, questions=None):
+        return len(answers)
+
+    def day_goal_on(self, day):
+        return ""
+
+
+_rt, _rpn = xact._run_trigger, xact._pn
+xact._run_trigger = lambda name, arg=None: subprocess.CompletedProcess([], 0, stdout="ok\n", stderr="")
+xact._pn = lambda: _JPE()
+xact._ask = lambda q, title="", multiline=False: None
+with contextlib.redirect_stdout(io.StringIO()):
+    xact.pn_journal("evening@2026-09-24")
+xact._run_trigger, xact._pn = _rt, _rpn
+L3 = open(xact.JOURNAL_LOG).read()
+check("R13 the handoff line carries the activation trail",
+      any("handoff set" in ln and "appkit=no" in ln for ln in L3.splitlines()), L3)
+check("R13 the trigger line carries rc, the yield and stdout",
+      any("picker trigger rc=0" in ln and "yielded=no" in ln and "out=ok" in ln for ln in L3.splitlines()), L3)
+
 # ── summary ──────────────────────────────────────────────────────────────────
 for item in sorted(ITEMS, key=lambda s: int(s[1:])):
     print(f"ITEM {item} {'green' if ITEMS[item] else 'red'}")

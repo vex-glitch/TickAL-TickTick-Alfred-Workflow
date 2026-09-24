@@ -478,7 +478,13 @@ def _inline_task_row(t, crumb_head, pool, completed=False, wontdo=False):
         subtitle = build_subtitle(sub_count, "Task", breadcrumb=breadcrumb, actions=True,
                                   note=note_snippet(t.get("content"))
                                   if t.get("kind") != "NOTE" else "")
-        shift = _shift_complete(pid, tid, name)
+        import areas as _ar
+        if t.get("kind") == "NOTE" and _ar.PERIODIC_LIST_ID and pid == _ar.PERIODIC_LIST_ID:
+            # a periodic note in Today (Vex 2026-09-24): opened, never
+            # completed from a row (a completed note leaves the index)
+            shift = {"valid": False, "subtitle": ""}
+        else:
+            shift = _shift_complete(pid, tid, name)
         alt   = {"arg": "", "subtitle": "Browse subtasks",
                  "variables": {"browse_ctx": f"ctx:subtasks:{pid}:{tid}"}}
         # ⌥⇧ → buffer

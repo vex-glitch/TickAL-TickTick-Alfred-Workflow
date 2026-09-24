@@ -9612,6 +9612,13 @@ def _view_tasks(key):
         kind = {"today": "today", "tomorrow": "tomorrow",
                 "next7": "next7days", "overdue": "overdue"}[key]
         tasks = smart_filter(all_tasks, kind)
+        # the periodic notes show in these views (Vex 2026-09-24) but no
+        # bulk verb may touch them: a note moved, buffered or completed
+        # leaves the index and a blank twin gets minted
+        import areas
+        if areas.PERIODIC_LIST_ID:
+            tasks = [t for t in tasks
+                     if (t.get("projectId") or t.get("_projectId")) != areas.PERIODIC_LIST_ID]
         if key in ("today", "tomorrow"):   # time order, like the app's view
             tasks = sorted(tasks, key=lambda t: (t.get("startDate")
                                                  or t.get("dueDate") or "~"))

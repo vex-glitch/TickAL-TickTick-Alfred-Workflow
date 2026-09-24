@@ -337,9 +337,14 @@ def task_item(t, pid, sub_count, breadcrumb="", uid="", child_level="subtasks",
     name = t.get("title", "Untitled")
     link = f"ticktick:///webapp/#p/{pid}/tasks/{tid}"
     is_note = t.get("kind") == "NOTE"
+    # a periodic note (in Today since 2026-09-24) is never completed from a
+    # row: a completed note leaves the index and a blank twin is minted
+    pn_note = is_note and bool(_areas.PERIODIC_LIST_ID) and pid == _areas.PERIODIC_LIST_ID
     mods = {
         "cmd":     {"arg": "", "subtitle": "⌘ Actions"},
-        "shift":   {"arg": f"complete:{pid}:{tid}:{name}", "subtitle": "Complete"},
+        "shift":   ({"valid": False, "subtitle": "a periodic note: refresh it, never complete it"}
+                    if pn_note else
+                    {"arg": f"complete:{pid}:{tid}:{name}", "subtitle": "Complete"}),
         "alt":     {"arg": "", "subtitle": "Browse subtasks",
                     "valid": bool(sub_count),
                     "variables": {"browse_ctx": f"ctx:{child_level}:{pid}:{tid}"}},

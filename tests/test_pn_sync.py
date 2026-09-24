@@ -475,9 +475,9 @@ _today_utc = _dt.now().strftime("%Y-%m-%dT12:00:00+0000")
 _sm = [task("pn1", "☀️ today's note", pid=areas.PERIODIC_LIST_ID, kind="NOTE", startDate=_today_utc),
        task("w1", "real work", startDate=_today_utc)]
 got = [t["id"] for t in filtering.smart_filter(_sm, "today")]
-check("Today keeps the work and drops the periodic note", got == ["w1"], got)
+check("Today shows the work AND the periodic note (Vex 2026-09-24 evening: show them)", set(got) == {"pn1", "w1"}, got)
 got = [t["id"] for t in filtering.smart_filter(_sm, "next7days")]
-check("Next 7 Days drops it too", got == ["w1"], got)
+check("Next 7 Days shows it too", set(got) == {"pn1", "w1"}, got)
 
 # (c) after midnight the day that is ending keeps its weather, quote and
 # countdowns: they are fetched for the CALENDAR day, and after_done now
