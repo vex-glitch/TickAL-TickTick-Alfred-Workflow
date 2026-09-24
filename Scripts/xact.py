@@ -9155,9 +9155,13 @@ def _shift_dates(t, delta_days):
 
 def _date_bulk_pool(key):
     """(tasks, label, repeating_kept, crm_kept) - a date-bulk scope with
-    the two hard exemptions: repeating tasks (the date IS the recurrence -
-    clearing kills the series, shifting re-anchors it unverified) and the
-    CRM calendar list (bookings are records the CRM math reads)."""
+    the hard exemptions: repeating tasks (the date IS the recurrence -
+    clearing kills the series, shifting re-anchors it unverified), the
+    CRM calendar list (bookings are records the CRM math reads), and the
+    periodic notes (dated since 2026-09-24; a note is a record, never a
+    date obligation - the smart lists already leave them out, the buffer
+    scope did not: review 2026-09-24). The notes are left out silently,
+    like the smart lists do."""
     tasks, label = _view_tasks(key)
     if tasks is None:
         return None, key, 0, 0
@@ -9167,6 +9171,8 @@ def _date_bulk_pool(key):
         pid = t.get("projectId") or t.get("_projectId", "")
         if areas.CRM_ID and pid == areas.CRM_ID:
             crm += 1
+        elif areas.PERIODIC_LIST_ID and pid == areas.PERIODIC_LIST_ID:
+            continue                    # a periodic note: never rolled or cleared
         elif t.get("repeatFlag"):
             rep += 1
         elif t.get("startDate") or t.get("dueDate"):
