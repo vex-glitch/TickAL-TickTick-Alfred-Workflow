@@ -1222,7 +1222,10 @@ def rows(query):
                                         title="🎯 This goal screen expired",
                                         subtitle="Run the journal again",
                                         valid=False, mods=_mods())]
-                return tier_goal_rows("daily", sub, jnl=state)
+                rows = tier_goal_rows("daily", sub, jnl=state)
+                # once per handoff, for the journal log: the picker WAS shown
+                goal_handoff.mark_rendered(state, rows=len(rows))
+                return rows
             for tier in _GOAL_TIERS:
                 sub = _after(rest, tier)
                 if sub is not None:

@@ -7470,6 +7470,41 @@ def _ask_trail():
     return " " + " ".join(bits)
 
 
+def _activation_trail():
+    """' front=<bundle> active=yes|no' when AppKit is loaded in this run (an
+    ask_box drew a box), ' appkit=no' otherwise: which app owns the screen
+    at the goal handoff, for the journal log (review 2026-09-24: a picker
+    that never appears is one of the two halves that can end a journal)."""
+    try:
+        ak = sys.modules.get("AppKit")
+        if ak is None:
+            return " appkit=no"
+        front = ak.NSWorkspace.sharedWorkspace().frontmostApplication()
+        me = ak.NSRunningApplication.currentApplication()
+        fb = front.bundleIdentifier() if front is not None else "?"
+        return f" front={fb} active={'yes' if me.isActive() else 'no'}"
+    except Exception as e:
+        return f" appkit_err={type(e).__name__}"
+
+
+def _yield_activation():
+    """Unproven mitigation for the picker half, logged: a run that drew an
+    NSAlert made itself the active app; hand activation back BEFORE Alfred
+    shows, so this run's exit a moment later cannot pull the panel down
+    with it. -> "yes" | "no" (nothing to yield) | "err"."""
+    try:
+        ak = sys.modules.get("AppKit")
+        if ak is None:
+            return "no"
+        me = ak.NSRunningApplication.currentApplication()
+        if not me.isActive():
+            return "no"
+        ak.NSApplication.sharedApplication().deactivate()
+        return "yes"
+    except Exception:
+        return "err"
+
+
 _JOURNAL_UI = {"morning": ("🌅", "Morning"), "evening": ("🌙", "Evening"),
                "weekly": ("📔", "Weekly"), "monthly": ("📔", "Monthly"),
                "quarterly": ("📔", "Quarterly")}
@@ -7672,7 +7707,7 @@ def pn_journal(slot):
     if handoff:
         # ── the goal question: dialogs can't host the picker, so stop here,
         # remember where, and let the pick reopen this journal
-        _jlog(tag, f"handoff {handoff} (saved {filled}) -> goal picker")
+        _jlog(tag, f"handoff {handoff} (saved {filled}) -> goal picker{_activation_trail()}")
         gh.save(slot, day0, mode=handoff)
         gh.remember_skips(slot, day0, carried + skipped)
         when = "tomorrow's" if slot == "evening" else "today's"
@@ -7681,10 +7716,17 @@ def pn_journal(slot):
         print(line)
         if os.environ.get("TICKAL_DETACHED") and bridge_said:
             _crm_say(line)             # a link-started run's bridge result is shown
+        yielded = _yield_activation()
         r = _run_trigger("Search", "pn goals journal ")
         rc = getattr(r, "returncode", "?")
+        out = " ".join((getattr(r, "stdout", "") or "").split())[-160:]
         err = " ".join((getattr(r, "stderr", "") or "").split())[-160:]
-        _jlog(tag, f"picker trigger rc={rc}" + (f" err={err}" if err else ""))
+        _jlog(tag, f"picker trigger rc={rc} yielded={yielded}"
+                   + (f" out={out}" if out else "") + (f" err={err}" if err else ""))
+        # unproven mitigation, cheap: a detached run that exits the instant
+        # after the trigger may pull Alfred's panel down with it (macOS hands
+        # activation on when the active app quits); one second costs nothing
+        time.sleep(1.0)
         return
     bits = [f"{emoji} {label} saved {done_now}/{total}"]
     if bridge_said:
