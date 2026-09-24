@@ -284,8 +284,10 @@ check("its source is its own id, not the weekly's",
 import periodic_journal as pj                                    # noqa: E402
 
 fixed_m = pm.journal_fixed("monthly", {"goals": "💼 P • TickAL 🔗"})
-check("two fixed questions, the weekly's pair one tier up",
-      [k for k, _q in fixed_m] == ["mhighlight", "mgoals"], fixed_m)
+check("the set block with an empty ctx: the weekly's pair one tier up, Vex's six, then mind (2026-09-24)",
+      [k for k, _q in pm.journal_fixed("monthly", {"goals": "💼 P • TickAL 🔗"})]
+      == ["mhighlight", "mgoals", "mgrateful", "mlearned", "mkeep", "mchange", "mdrained", "mtime", "free"],
+      pm.journal_fixed("monthly", {"goals": "💼 P • TickAL 🔗"}))
 check("the goal question names the goal",
       "💼 P • TickAL 🔗" in fixed_m[1][1], fixed_m[1][1])
 check("…and stands alone when there is none",
@@ -317,8 +319,10 @@ check("the goal reaches the question through journal_ctx",
 pe._seed_slot(jdoc, pm.SEC_MONTHLY_JNL, "monthly", date(2026, 9, 1),
               pe.journal_ctx("monthly", jdoc))
 jb = ps.find(jdoc, pm.SEC_MONTHLY_JNL).body
-check("seven questions land in the note",
-      len(pm.journal_pairs(jb)) == 7, len(pm.journal_pairs(jb)))
+check("the set questions plus the month's draw land in the note",
+      len(pm.journal_pairs(jb)) == len(pm.journal_fixed("monthly", pe.journal_ctx("monthly", jdoc)))
+      + len(pm.select_prompts(pj.load_pool("monthly"), date(2026, 9, 1), "monthly")),
+      len(pm.journal_pairs(jb)))
 check("…and the goal one carries the goal",
       any("Ship it" in (q or "") for _n, q, _a, _i in pm.journal_pairs(jb)), jb)
 

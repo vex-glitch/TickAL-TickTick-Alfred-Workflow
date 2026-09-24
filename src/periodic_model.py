@@ -1802,6 +1802,11 @@ POOL_EPOCH = date(2026, 9, 25)
 # Monday whose note is seeded the new way (W39 was seeded the old way).
 WEEKLY_CATEGORIES = ("retrospect", "priorities", "energy", "people", "open")
 WEEK_EPOCH = date(2026, 9, 28)
+# The monthly random block (Vex 2026-09-24, late: "the bigger the scope, the
+# more retrospective"): TEN prompts, two from every category, cycling per
+# category by month; MONTH_EPOCH is the first month seeded the new way.
+MONTHLY_CATEGORIES = ("patterns", "direction", "cost", "people", "open")
+MONTH_EPOCH = date(2026, 10, 1)
 
 
 def _clip(s, n=140):
@@ -1898,10 +1903,12 @@ def journal_fixed(slot, ctx=None):
         # a three-things horizon.
         adj = "monthly" if slot == "monthly" else "quarterly"
         goals = (ctx.get("goals") or "").strip()
-        return [
+        weeks = (ctx.get("weeks") or "").strip() if slot == "monthly" else ""
+        out = [
             (f"{word[0]}highlight",
              f"What was the highlight of the {word}? "
-             "Think of one thing that stands out."),
+             "Think of one thing that stands out."
+             + (f" Your weeks: {weeks}" if weeks else "")),
             (f"{word[0]}goals",
              (f"Did you achieve your {adj} goals, {goals}? "
               "Describe success/fail factors on each."
@@ -1909,6 +1916,52 @@ def journal_fixed(slot, ctx=None):
               f"Did you achieve your {adj} goals? "
               "Describe success/fail factors on each.")),
         ]
+        if slot == "quarterly":
+            return out
+        # the monthly is the OKR checkpoint (Vex 2026-09-24, late): the
+        # month's objectives one by one, the quarter's guiding-star check,
+        # the month's habit line, the money line with its chip, each only
+        # when the note carries it; "What is on your mind?" is the border
+        # before the ten drawn prompts, the open-ended goal editor follows.
+        objs = (ctx.get("objectives") or "").strip()
+        if objs:
+            out.append(("mobjectives", f"🥅 Objective by objective, {objs}: what moved, "
+                                       "what stalled, and why?"))
+        quarter = (ctx.get("quarter") or "").strip()
+        if quarter:
+            left = ctx.get("months_left")
+            if left is not None and left <= 0:
+                q = (f"🌓 The quarter's objectives, {quarter}: this was its last month. "
+                     "Which carry into next quarter, and which stop here?")
+            else:
+                when = (f"with {left} month{'s' if left != 1 else ''} left" if left
+                        else "with the quarter still running")
+                q = (f"🌓 The quarter's objectives, {quarter}, {when}: still the right "
+                     "ones? What to cut, add or move in the timeline?")
+            out.append(("qcheck", q))
+        habits = (ctx.get("habits") or "").strip()
+        if habits:
+            out.append(("habits", f"🔄 Habit consistency this month: {habits}. "
+                                  "Which held all month, which only held for a week?"))
+        money = (ctx.get("money") or "").strip()
+        if money:
+            out.append(("mmoney", f"💰 Income this month: {money}. Does this align with "
+                                  "your forecast? What could you do to improve it?"))
+        # Vex's six (2026-09-24, late: "month should be more set"), after the
+        # OKR block, before the border; fixed wording, recognised by rule so
+        # an older note gains them on its next run
+        out += [
+            ("mgrateful", "🙏 What three things, moments or people are you most grateful "
+                          "for over the past month?"),
+            ("mlearned", "📚 What have you learned this month? Think of the challenges."),
+            ("mkeep", "♻️ What would you like to keep doing next month exactly as you "
+                      "did this month?"),
+            ("mchange", "🔧 What must change next month? What can you improve?"),
+            ("mdrained", "🪫 What drained your energy this month?"),
+            ("mtime", "⏳ How do you want to spend your time next month?"),
+            ("free", "What is on your mind?"),
+        ]
+        return out
     # weekly - the three-things picker is NOT a seeded question: it runs as
     # the Alfred goal-picker handoff after the dialogs (phones edit next
     # week's 🎯 Goals directly instead)
@@ -1987,6 +2040,18 @@ JOURNAL_KEY_RULES = (
     ("wforecast", re.compile(r"^🔮 What is the intention for next week\?")),
     ("wfcheck", re.compile(r"^🔮 How did the week go\b")),
     ("wrating", re.compile(r"^Rate the week\b")),
+    # the monthly's OKR checkpoint and money line (2026-09-24, late)
+    ("mobjectives", re.compile(r"^🥅 Objective by objective\b")),
+    ("qcheck", re.compile(r"^🌓 The quarter's objectives\b")),
+    ("mmoney", re.compile(r"^💰 Income this month\b")),
+    # Vex's six monthly set questions (emoji-prefixed so no pool prompt can
+    # match; VS16 optional where the glyph carries one)
+    ("mgrateful", re.compile(r"^🙏 What three things, moments or people\b")),
+    ("mlearned", re.compile(r"^📚 What have you learned this month\?")),
+    ("mkeep", re.compile(r"^♻️? What would you like to keep doing\b")),
+    ("mchange", re.compile(r"^🔧 What must change next month\?")),
+    ("mdrained", re.compile(r"^🪫 What drained your energy\b")),
+    ("mtime", re.compile(r"^⏳ How do you want to spend your time\b")),
     # the day's and the week's highlights are DIFFERENT answers in different
     # notes, so their rules must not be able to match each other's question
     ("dhighlight", re.compile(r"^✨ What was the highlight of the day\?")),
@@ -2241,6 +2306,15 @@ def select_prompts(pool, d, which, k=None):
             lst = list(cats.get(c) or [])
             out += _draw(lst, f"weekly:{c}", wk * JOURNAL_PER_CATEGORY, min(JOURNAL_PER_CATEGORY, len(lst)))
         return out
+    # the monthly: every category, two each, cycling by month (any day of the
+    # month gives the month's picks: the note is pinned to its first day)
+    if which == "monthly" and any(c in cats for c in MONTHLY_CATEGORIES) and d >= MONTH_EPOCH:
+        mi = (d.year - MONTH_EPOCH.year) * 12 + (d.month - MONTH_EPOCH.month)
+        out = []
+        for c in MONTHLY_CATEGORIES:
+            lst = list(cats.get(c) or [])
+            out += _draw(lst, f"monthly:{c}", mi * JOURNAL_PER_CATEGORY, min(JOURNAL_PER_CATEGORY, len(lst)))
+        return out
     rnd_pool = list(pool.get("random", []))
     k = JOURNAL_RANDOM_K.get(which, 3) if k is None else k
     k = min(k, len(rnd_pool))
@@ -2299,11 +2373,39 @@ _LATE_CHIP_RE = re.compile(r"\s*🔴\s*\d+d\b")
 _PLAN_GLYPHS = {"🔑", "✅", "🥅", "🏔"}          # okr_notes' item glyphs, VS16 dropped
 # fixed questions that only exist while the note plans something: dropped
 # again while unanswered when the plan goes (periodic_engine._refresh_fixed_q)
-CONDITIONAL_KEYS = ("kr", "objectives", "habits")
+CONDITIONAL_KEYS = ("kr", "objectives", "habits", "mobjectives", "qcheck", "mmoney")
 # fixed questions that QUOTE free text (a forecast, a KR title): the needle
 # readers and writers skip them, or "rate the day" inside a forecast would
 # catch the stars (review 2026-09-24)
-QUOTING_KEYS = ("fcheck", "kr", "objectives", "habits", "wfcheck")
+QUOTING_KEYS = ("fcheck", "kr", "objectives", "habits", "wfcheck", "mobjectives", "qcheck", "mmoney")
+
+
+def months_left_in_quarter(d):
+    """Months of d's quarter AFTER d's month: 2, 1 or 0 (the last month)."""
+    q_end = ((d.month - 1) // 3 + 1) * 3
+    return q_end - d.month
+
+
+def bullet_head(body_lines, label):
+    """The TOP-LEVEL bullet's own text after its `label` ("- 💰 Income: 1845
+    · 🔴 ▼ 200 (−26%)" with label "💰 Income" → "1845 · 🔴 ▼ 200 (−26%)"),
+    '' when the bullet is missing or bare. Emoji, case and the app's escapes
+    are ignored in the match."""
+    want = _label_key(label)
+    if not want:
+        return ""
+    for ln in body_lines or []:
+        if ln[:1] in ("\t", " "):
+            continue
+        s = unescape_md(ln.strip())
+        if not s.startswith("- ") or not _label_key(s[2:]).startswith(want):
+            continue
+        text = s[2:]
+        for i in range(1, len(text) + 1):
+            if _label_key(text[:i]) == want:
+                return text[i:].strip().lstrip(":·").strip()
+        return ""
+    return ""
 
 
 def _label_key(s):
@@ -2358,12 +2460,18 @@ def days_summary(children):
 
 def okr_journal_ctx(body_lines, kr_tier="daily", keep_state=False):
     """(the `kr_tier` bullet's KR titles, this month's objectives with their
-    d/n), each " · "-joined, off a 🥅 OKRs section body
-    (okr_notes.okr_section_lines shape: a tier bullet, its plan indented
-    under it). '' when the tier has no plan. Done items keep their name (the
-    question is about progress); keep_state=True keeps their ✅/🔑 glyph too
-    (the weekly asks about the week's whole list). Lines are unescaped
-    first: the app backslashes the link brackets."""
+    d/n), each " · "-joined: okr_tier_items twice."""
+    return (" · ".join(okr_tier_items(body_lines, kr_tier, keep_state)),
+            " · ".join(okr_tier_items(body_lines, "monthly")))
+
+
+def okr_tier_items(body_lines, tier, keep_state=False):
+    """The `tier` bullet's plan items (names with their d/n) off a 🥅 OKRs
+    section body (okr_notes.okr_section_lines shape: a tier bullet, its plan
+    indented under it), [] when the tier has no plan. Done items keep their
+    name (the question is about progress); keep_state=True keeps their
+    ✅/🔑 glyph too (the weekly asks about the week's whole list). Lines are
+    unescaped first: the app backslashes the link brackets."""
     def kids(emoji):
         base = emoji.replace("️", "")
         out, on = [], False
@@ -2386,9 +2494,8 @@ def okr_journal_ctx(body_lines, kr_tier="daily", keep_state=False):
             return f"{head} {rest.strip()}" if state else rest.strip()
         return s
 
-    krs = [name(x, keep_state) for x in kids(TIER_EMOJI.get(kr_tier, TIER_EMOJI["daily"]))]
-    objs = [name(x) for x in kids(TIER_EMOJI["monthly"])]
-    return " · ".join(x for x in krs if x), " · ".join(x for x in objs if x)
+    items = [name(x, keep_state) for x in kids(TIER_EMOJI.get(tier, TIER_EMOJI["daily"]))]
+    return [x for x in items if x]
 
 
 def seed_journal_lines(prompts):

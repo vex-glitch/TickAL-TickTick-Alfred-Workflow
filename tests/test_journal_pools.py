@@ -110,6 +110,11 @@ check("2.vex-prompts-in", any(q.startswith("What is the one obstacle most likely
 WP = pj.load_pool("weekly")
 check("2.weekly-categories", list(WP["categories"]) == list(pm.WEEKLY_CATEGORIES)
       and all(len(v) >= 10 for v in WP["categories"].values()) and not WP["chains"], {k: len(v) for k, v in WP["categories"].items()})
+MOP = pj.load_pool("monthly")
+check("2.monthly-categories", list(MOP["categories"]) == list(pm.MONTHLY_CATEGORIES)
+      and all(len(v) >= 10 for v in MOP["categories"].values()) and not MOP["chains"], {k: len(v) for k, v in MOP["categories"].items()})
+check("2.monthly-no-pool-prompt-is-fixed", not [q for v in MOP["categories"].values() for q in v if pm.journal_key(q) != "free"])
+check("2.monthly-no-dashes", not any(DASH.search(q) for v in MOP["categories"].values() for q in v))
 check("2.weekly-vex-prompts-in", any(q.startswith("Read your last seven days of entries") for q in WP["categories"]["retrospect"])
       and any(q.startswith("Write next week's intention in a single sentence") for q in WP["categories"]["priorities"]))
 QP = pj.load_quotes()
@@ -458,6 +463,73 @@ check("12.bullet-label-with-emoji", pm.bullet_children(["- 🔄 Habit consistenc
       and pm.bullet_children(["- ✨ Highlight", "\t- x"], "✨ Highlights") == [])
 tiny = {"categories": {"prepare": ["A?", "B?", "C?"], "people": [f"Q{i}?" for i in range(10)], "perspective": [f"R{i}?" for i in range(10)]}, "chains": []}
 check("12.tiny-category-never-doubles", all(len(set(b)) == len(b) for b in (pm.select_prompts(tiny, EPOCH + timedelta(days=i), "morning") for i in range(40))))
+
+
+# ── 13. the monthly set block (Vex 2026-09-24, late: the OKR checkpoint, money rephrased, mind last) ──
+M0 = pm.journal_fixed("monthly", {"goals": "TickAL"})
+check("13.monthly-plain-order", [k for k, _ in M0] == ["mhighlight", "mgoals", "mgrateful", "mlearned", "mkeep", "mchange", "mdrained", "mtime", "free"], M0)
+MCTX = {"goals": "TickAL", "objectives": "Onboard TickTicks 0/5 · TickAL 1/6", "quarter": "Onboard TickTicks 0/5 · TickAL 1/6",
+        "months_left": 0, "habits": "🌅 Startup 12/13 · 🌆 Shutdown 10/13", "weeks": "W3 · 14th-20th Sep · Situation with Ivona",
+        "money": "1845 · 🔴 ▼ 200 (−26%)"}
+M1 = pm.journal_fixed("monthly", MCTX)
+check("13.monthly-full-order", [k for k, _ in M1] == ["mhighlight", "mgoals", "mobjectives", "qcheck", "habits", "mmoney", "mgrateful", "mlearned", "mkeep", "mchange", "mdrained", "mtime", "free"], [k for k, _ in M1])
+check("13.vex-six-wording", M1[6][1] == "🙏 What three things, moments or people are you most grateful for over the past month?"
+      and M1[7][1] == "📚 What have you learned this month? Think of the challenges."
+      and M1[8][1].startswith("♻️ What would you like to keep doing next month") and M1[9][1] == "🔧 What must change next month? What can you improve?"
+      and M1[10][1] == "🪫 What drained your energy this month?" and M1[11][1] == "⏳ How do you want to spend your time next month?", M1[6:12])
+check("13.six-recognised-without-vs16", pm.journal_key("♻ What would you like to keep doing next month exactly as you did this month?") == "mkeep")
+check("13.highlight-shows-the-weeks", M1[0][1].startswith("What was the highlight of the month? Think of one thing that stands out.")
+      and "Your weeks: W3 · 14th-20th Sep · Situation with Ivona" in M1[0][1], M1[0])
+check("13.objectives-wording", M1[2][1] == "🥅 Objective by objective, Onboard TickTicks 0/5 · TickAL 1/6: what moved, what stalled, and why?", M1[2])
+check("13.quarter-last-month", M1[3][1] == "🌓 The quarter's objectives, Onboard TickTicks 0/5 · TickAL 1/6: this was its last month. Which carry into next quarter, and which stop here?", M1[3])
+check("13.quarter-months-left", pm.journal_fixed("monthly", {"quarter": "A 0/1", "months_left": 2})[2][1]
+      == "🌓 The quarter's objectives, A 0/1, with 2 months left: still the right ones? What to cut, add or move in the timeline?"
+      and "with 1 month left" in pm.journal_fixed("monthly", {"quarter": "A 0/1", "months_left": 1})[2][1]
+      and "with the quarter still running" in pm.journal_fixed("monthly", {"quarter": "A 0/1"})[2][1])
+check("13.habits-wording", M1[4][1] == "🔄 Habit consistency this month: 🌅 Startup 12/13 · 🌆 Shutdown 10/13. Which held all month, which only held for a week?", M1[4])
+check("13.money-wording", M1[5][1] == "💰 Income this month: 1845 · 🔴 ▼ 200 (−26%). Does this align with your forecast? What could you do to improve it?", M1[5])
+check("13.mind-last", M1[-1] == ("free", "What is on your mind?"))
+check("13.monthly-keys-recognised", all(pm.journal_key(q) == k for k, q in M1), [(k, pm.journal_key(q)) for k, q in M1])
+check("13.quarterly-untouched", [k for k, _ in pm.journal_fixed("quarterly", {"goals": "G"})] == ["qhighlight", "qgoals"])
+check("13.months-left", [pm.months_left_in_quarter(date(2026, m, 1)) for m in (7, 8, 9, 10, 12)] == [2, 1, 0, 2, 0])
+check("13.quarter-items", pm.okr_tier_items(OKR_BODY, "quarterly") == ["Onboard TickTicks 0/5", "TickAL 1/6"]
+      and pm.okr_tier_items(OKR_BODY, "yearly") == ["Productivity System 1/41"] and pm.okr_tier_items([], "monthly") == [])
+MDATA = ["- ✨ Highlights", "\t- W3 · 14th-20th Sep · Situation with Ivona", "", "- 😊 Moods: Average 3.3",
+         "\t- W2 · 7th-13th Sep · 🙂 3.7", "", "- 💰 Income: 1845 · 🔴 ▼ 200 (−26%)", "\t- W2 · 7th-13th Sep • 495",
+         "\t\t- **Total = 1845**", "", "- 👽 People"]
+check("13.bullet-head", pm.bullet_head(MDATA, "💰 Income") == "1845 · 🔴 ▼ 200 (−26%)" and pm.bullet_head(["- 💰 Income: 1845"], "💰 Income") == "1845"
+      and pm.bullet_head(MDATA, "🔥 Nothing") == "" and pm.bullet_head(["- 👽 People"], "👽 People") == "", pm.bullet_head(MDATA, "💰 Income"))
+MSTATS = ["- Top lists:", "\t- 📌CTA · 11 done", "", "- Habit consistency", "\t- 🌅 Startup · 12/13 · 92%", "\t- 🌆 Shutdown · 10/13 · 76%", "---"]
+MNOTE = "\n".join(["#### 🥅 OKRs"] + OKR_BODY + [
+    "#### 🏆 Goals", "- 🌓 Quarterly goal", "\t- _(mirrors this quarter's note - set it there)_", "", "- 🗓️ Monthly goal",
+    "\t- [ ] [TickAL](https://ticktick.com/webapp/#p/x/tasks/y)", "",
+    "#### ✨ Highlight", "---", "#### 📌 This Month", "##### 📊 Stats"] + MSTATS + ["##### 💿 Data"] + MDATA + ["---",
+    "##### ⏪ Last month", "- Completed: 305", "---",
+    "##### 📔 Monthly journal", "\t- *Q1 · What was the highlight of the month? Think of one thing that stands out.*", "\t\t- A: ",
+    "\t- *Q2 · Did you achieve your monthly goals, TickAL? Describe success/fail factors on each.*", "\t\t- A: ",
+    "\t- *Q3 · What did you carry all month without finishing?*", "\t\t- A: ", "---"])
+mdoc = ps.parse_sections(MNOTE)
+mctx = pe.journal_ctx("monthly", mdoc, date(2026, 9, 1))
+check("13.ctx-goals", mctx.get("goals") == "TickAL", mctx)
+check("13.ctx-objectives-quarter", mctx.get("objectives") == "Onboard TickTicks 0/5 · TickAL 1/6" and mctx.get("quarter") == "Onboard TickTicks 0/5 · TickAL 1/6", mctx)
+check("13.ctx-months-left", mctx.get("months_left") == 0 and "months_left" not in pe.journal_ctx("monthly", mdoc), mctx)
+check("13.ctx-habits-weeks-money", mctx.get("habits") == "🌅 Startup 12/13 · 🌆 Shutdown 10/13"
+      and mctx.get("weeks") == "W3 · 14th-20th Sep · Situation with Ivona" and mctx.get("money") == "1845 · 🔴 ▼ 200 (−26%)", mctx)
+msec = ps.find(mdoc, pm.SEC_MONTHLY_JNL)
+mbody, madded = pm.insert_fixed_questions(msec.body, pm.journal_fixed("monthly", mctx))
+mkeys = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(mbody)]
+check("13.old-monthly-gains-the-set", madded == ["mobjectives", "qcheck", "habits", "mmoney", "mgrateful", "mlearned", "mkeep", "mchange", "mdrained", "mtime"]
+      and mkeys == ["mhighlight", "mgoals", "mobjectives", "qcheck", "habits", "mmoney", "mgrateful", "mlearned", "mkeep", "mchange", "mdrained", "mtime", "free"], (madded, mkeys))
+MPOOL = {"categories": {c: [f"{c}{i}?" for i in range(10)] for c in pm.MONTHLY_CATEGORIES}, "chains": []}
+mo1 = pm.select_prompts(MPOOL, pm.MONTH_EPOCH, "monthly")
+check("13.monthly-ten", len(mo1) == 10 and len(set(mo1)) == 10
+      and [c for c in pm.MONTHLY_CATEGORIES for _ in range(2)] == [next(c for c in pm.MONTHLY_CATEGORIES if q in MPOOL["categories"][c]) for q in mo1], mo1)
+check("13.monthly-same-month-same-picks", pm.select_prompts(MPOOL, date(2026, 10, 31), "monthly") == mo1)
+mo2 = pm.select_prompts(MPOOL, date(2026, 11, 1), "monthly")
+check("13.monthly-next-month-differs", len(mo2) == 10 and not set(mo1) & set(mo2), set(mo1) & set(mo2))
+check("13.monthly-year-boundary", len(pm.select_prompts(MPOOL, date(2027, 1, 1), "monthly")) == 10
+      and pm.select_prompts(MPOOL, date(2027, 1, 15), "monthly") == pm.select_prompts(MPOOL, date(2027, 1, 1), "monthly"))
+check("13.monthly-pre-epoch-old-style", len(pm.select_prompts(dict(MPOOL, random=[f"r{i}" for i in range(20)]), date(2026, 9, 1), "monthly")) == 5)
 
 print(f"journal pools: {PASS} passed, {FAIL} failed")
 for f in FAILURES:

@@ -2557,7 +2557,7 @@ def _fill_monthly(doc, p, index):
 
     # ── 📔 Monthly journal - seed + dynamic-goal prompt refresh
     _seed_slot(doc, pm.SEC_MONTHLY_JNL, "monthly", p.start,
-               journal_ctx("monthly", doc))
+               journal_ctx("monthly", doc, p.start))
 
     # ── ♻️ Monthly Review - the weekly's mirror, its own source
     _fill_review(doc, pm.SEC_MREVIEW, cfg.get_monthly_review_id())
@@ -3570,7 +3570,7 @@ def journal_seed(slot, day=None):
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
 
     def mutate(doc, live):
-        ctx = journal_ctx(slot, doc)
+        ctx = journal_ctx(slot, doc, p.start)
         sec = ps.find(doc, sec_name)
         if sec is None:
             return None
@@ -3581,8 +3581,10 @@ def journal_seed(slot, day=None):
     return keys, pairs, p
 
 
-def journal_ctx(slot, doc):
-    """The live text a journal's fixed questions bake in, read off the note."""
+def journal_ctx(slot, doc, day=None):
+    """The live text a journal's fixed questions bake in, read off the note.
+    `day` (the note's period start) only matters to the monthly: how many
+    months its quarter has left."""
     ctx = {}
     if slot == "morning":
         # 🌉 yesterday's bridge already lives IN this note - echo it as a prompt
@@ -3633,6 +3635,24 @@ def journal_ctx(slot, doc):
                                 for nm in pm.goal_section_names(slot))
                     if x is not None), None)
         ctx["goals"] = "; ".join(pm.goal_titles(sec.body)[:5]) if sec else ""
+        if slot == "monthly":
+            # the OKR checkpoint (Vex 2026-09-24, late): the month's and the
+            # quarter's objectives off 🥅 OKRs (EXACT name, the kill switch),
+            # the habit line off 📊 Stats, the weeks' ✨ highlights and the
+            # 💰 Income header (with its chip against last month) off 💿 Data
+            osec = ps.find(doc, pm.SEC_OKR)
+            if osec is not None and osec.name == pm.SEC_OKR:
+                ctx["objectives"] = " · ".join(pm.okr_tier_items(osec.body, "monthly"))
+                ctx["quarter"] = " · ".join(pm.okr_tier_items(osec.body, "quarterly"))
+            if day is not None:
+                ctx["months_left"] = pm.months_left_in_quarter(day)
+            st = ps.find(doc, pm.SEC_WK_STATS)
+            if st is not None:
+                ctx["habits"] = pm.habit_summary(pm.bullet_children(st.body, pm.SEC_HABIT_WEEK))
+            dt = ps.find(doc, pm.SEC_WK_DATA)
+            if dt is not None:
+                ctx["weeks"] = pm.days_summary(pm.bullet_children(dt.body, pm.SEC_HL_WEEK))
+                ctx["money"] = pm.bullet_head(dt.body, pm.SEC_INCOME)
     return ctx
 
 
