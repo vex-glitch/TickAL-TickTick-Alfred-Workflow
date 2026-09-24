@@ -340,16 +340,25 @@ def _run_trigger(name, arg=None):
     do not care ignore it. Output is captured, so a failed send never lands
     in a toast."""
     if arg is None:
-        return subprocess.run(["osascript", "-e",
-                               f'tell application id "com.runningwithcrayons.Alfred" to '
-                               f'run trigger "{name}" in workflow "com.vex.tickal"'],
-                              check=False, capture_output=True, text=True)
-    return subprocess.run(["osascript", "-e",
-                           ('on run argv\n'
+        r = subprocess.run(["osascript", "-e",
                             f'tell application id "com.runningwithcrayons.Alfred" to '
-                            f'run trigger "{name}" in workflow "com.vex.tickal" '
-                            'with argument (item 1 of argv)\nend run'),
-                           arg], check=False, capture_output=True, text=True)
+                            f'run trigger "{name}" in workflow "com.vex.tickal"'],
+                           check=False, capture_output=True, text=True)
+    else:
+        r = subprocess.run(["osascript", "-e",
+                            ('on run argv\n'
+                             f'tell application id "com.runningwithcrayons.Alfred" to '
+                             f'run trigger "{name}" in workflow "com.vex.tickal" '
+                             'with argument (item 1 of argv)\nend run'),
+                            arg], check=False, capture_output=True, text=True)
+    if r.returncode:
+        # the capture hid osascript's stderr from every road (Alfred's
+        # debugger, the periodic log of a detached run, the routine log):
+        # keep it visible there - Alfred forwards stdout only, so a toast
+        # never carries it (review 2026-09-24)
+        sys.stderr.write(f"_run_trigger {name}: rc={r.returncode} "
+                         f"{' '.join((r.stderr or '').split())[-200:]}\n")
+    return r
 
 
 def _app_sync():
