@@ -74,6 +74,93 @@ def all_day(day, tz=None):
     return out
 
 
+def _midnight(dt):
+    return (dt.hour, dt.minute, dt.second) == (0, 0, 0)
+
+
+def _all_day_of(task, first, tz):
+    """Is this task all-day - its flag weighed against its first stamp (an
+    aware local datetime). See shift_fields."""
+    utc_mid = _midnight(first.astimezone(timezone.utc))
+    here_mid = _midnight(first)
+    flag = task.get("isAllDay")
+    if flag is None:
+        return utc_mid or here_mid
+    if not flag:
+        return utc_mid
+    own_mid = False
+    try:
+        from zoneinfo import ZoneInfo
+        if task.get("timeZone"):
+            own_mid = _midnight(first.astimezone(ZoneInfo(task["timeZone"])))
+    except Exception:
+        own_mid = False
+    return utc_mid or here_mid or own_mid
+
+
+def shift_fields(task, days, tz=None):
+    """{startDate, dueDate, isAllDay[, timeZone]} moving a task `days` LOCAL
+    calendar days, or None when a stamp cannot be read (skip the task whole).
+
+    Adding N x 24 h to the UTC stamp - what the ⏭️ roll did until 2026-09-24 -
+    is right only while the clock does not change in between. Across a DST
+    change local midnight moves by an hour: an all-day task on 20 Oct
+    (19T22:00Z, CEST) rolled on 28 Oct landed on 27T22:00Z = 23:00 CET on the
+    27th, the api's all-day guess then said timed, and the task sat at 23:00
+    on the wrong day, still overdue (review 2026-09-24; DST ends 25 Oct).
+
+    So each date moves by LOCAL days in `tz` (the Mac's zone, the one the
+    roll's own "which day is it" reads):
+      all-day -> local midnight of the new day, isAllDay True, and the zone
+                 NAMED, so TickTick reads the day in it (a task created
+                 without one carries the account's zone);
+      timed   -> the same local wall-clock time on the new day, isAllDay
+                 False; the task's own zone is left as it is.
+    Start and due move by the same count, so a multi-day span keeps its
+    length in days; a timed span that would come out backwards (it sat in
+    the repeated autumn hour) keeps its real duration instead.
+
+    All-day is read from the flag AND the stamp, because a cached flag can
+    be stale (review 2026-09-24): isAllDay True counts only on a stamp that
+    is midnight somewhere it could mean one (UTC, this zone, the task's own
+    zone) - True on 09:00 is a timed task whose flag lagged; False counts
+    as all-day only on UTC midnight, the date-only picker's shape - a real
+    00:00 local task stays timed; no flag = the api's guess (UTC or local
+    midnight)."""
+    tz = tz or _local_tz()
+    stamps = {}
+    for f in ("startDate", "dueDate"):
+        v = task.get(f)
+        if not v:
+            continue
+        dt = _parse(v)
+        if dt is None:
+            return None
+        stamps[f] = dt.astimezone(tz)
+    if not stamps:
+        return None
+    flag = _all_day_of(task, stamps.get("startDate") or stamps.get("dueDate"), tz)
+    out, moved = {}, {}
+    for f, local in stamps.items():
+        day = local.date() + timedelta(days=days)
+        clock = time(0, 0) if flag else local.time().replace(tzinfo=None, fold=0)
+        moved[f] = datetime.combine(day, clock).replace(tzinfo=tz)
+    s0, d0 = stamps.get("startDate"), stamps.get("dueDate")
+    if not flag and s0 and d0:
+        # compared and measured in UTC: two times in the SAME zone compare
+        # and subtract by wall clock, which cannot see the repeated hour
+        u = timezone.utc
+        if moved["dueDate"].astimezone(u) < moved["startDate"].astimezone(u):
+            moved["dueDate"] = moved["startDate"].astimezone(u) + (d0.astimezone(u) - s0.astimezone(u))
+    for f, dt in moved.items():
+        out[f] = _out(dt)
+    out["isAllDay"] = bool(flag)
+    name = getattr(tz, "key", None)
+    if flag and name:
+        out["timeZone"] = name
+    return out
+
+
 def is_timed(task, tz=None):
     """True when the task carries a real clock time (not all-day, not
     local midnight)."""

@@ -201,7 +201,20 @@ def _patch_task_cache(tid, **fields):
     all_tasks then all_notes. That went unnoticed while only CRM Records was
     NOTE-kind; the Content PL lists became NOTE-kind on 2026-07-30 and it
     started mattering to the whole 📸 pipeline. Same reasoning as the
-    attr_delete branch below, which has cleared both pools since 2026-07-17."""
+    attr_delete branch below, which has cleared both pools since 2026-07-17.
+
+    A date write that did not say isAllDay was GUESSED by api.update_task
+    from the stamp, and the server holds that guess - so the cache takes the
+    same guess here. It used to keep the task's OLD flag until the hourly
+    sync, and the ⏭️ roll (day_move.shift_fields) reads it (review
+    2026-09-24: a timed task picked onto a date-only day rolled to 02:00)."""
+    if ("startDate" in fields or "dueDate" in fields) and "isAllDay" not in fields:
+        v = fields.get("startDate") or fields.get("dueDate")
+        try:
+            from api import _is_all_day
+            fields["isAllDay"] = _is_all_day(v) if v else False
+        except Exception:
+            pass
     try:
         pid_old = pid_new = None
         touched = False

@@ -9144,26 +9144,13 @@ def view_buffer(key):
 
 
 def _shift_dates(t, delta_days):
-    """startDate/dueDate shifted by whole days - wall-clock time survives,
-    so all-day stays all-day (_is_all_day sees the same local midnight)
-    and timed keeps its hour. Tolerates both '.000+0000' (cache/server)
-    and bare '+0000' stamps."""
-    out = {}
-    for f in ("startDate", "dueDate"):
-        v = t.get(f)
-        if not v:
-            continue
-        for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z"):
-            try:
-                dt = datetime.strptime(v, fmt)
-                break
-            except ValueError:
-                dt = None
-        if dt is None:
-            return None      # unparseable stamp - skip the whole task
-        out[f] = (dt + timedelta(days=delta_days)).strftime(
-            "%Y-%m-%dT%H:%M:%S.000+0000")
-    return out or None
+    """The fields that move a task delta_days LOCAL calendar days
+    (day_move.shift_fields): all-day stays all-day on the new day, timed
+    keeps its wall-clock hour - across a DST change too, which the old
+    N x 24 h UTC shift broke (all-day became 23:00 timed on the day before).
+    None = an unreadable stamp, skip the task."""
+    import day_move
+    return day_move.shift_fields(t, delta_days)
 
 
 def _date_bulk_pool(key):
@@ -9250,8 +9237,9 @@ def dateclear(key):
 
 def dateroll(key):
     """⏭️ Roll a scope's tasks to today: each task's whole span shifts by
-    whole days so its day lands TODAY - hour and duration survive, all-day
-    stays all-day. Same exemptions as dateclear."""
+    whole LOCAL days so its day lands TODAY - the wall-clock hour and the
+    span in days survive, all-day stays all-day, across a DST change too
+    (_shift_dates). Same exemptions as dateclear."""
     from filtering import task_local_date
     tasks, label, rep, crm = _date_bulk_pool(key)
     if tasks is None:

@@ -63,6 +63,7 @@ test:
 	@$(PYTHON) tests/test_fold_comments.py
 	@$(PYTHON) tests/test_journal_goal.py
 	@$(PYTHON) tests/test_pn_sync.py
+	@$(PYTHON) tests/test_day_shift.py
 	@$(PYTHON) tests/test_meal.py
 	@$(PYTHON) tests/test_meal_scale.py
 	@$(PYTHON) tests/test_meal_price.py
