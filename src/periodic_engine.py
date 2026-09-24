@@ -1081,15 +1081,27 @@ def _mood_of_doc(doc):
 
 # _JOURNAL_SECTIONS is defined further down; the highlight reader only uses
 # it at call time, never at import
-_HL_NEEDLE = {"weekly": "highlight of the week",
-              "monthly": "highlight of the month",
-              "quarterly": "highlight of the quarter"}
+_HL_KEY = {"weekly": "highlight", "monthly": "mhighlight", "quarterly": "qhighlight"}
+
+
+def _answer_by_key(doc, sec_name, key):
+    """The answer to the journal question whose route KEY is `key`, or ''.
+    A key match is exact wording, so unlike _answer_in it reads QUOTING
+    questions too (the quarterly's highlight quotes the wins into itself)."""
+    sec = ps.find(doc, sec_name)
+    if sec is None:
+        return ""
+    for _n, q, a, i in pm.journal_pairs(sec.body):
+        if a and pm.journal_key(q) == key:
+            return pm.journal_answer_text(sec.body, i)     # the WHOLE answer
+    return ""
 
 
 def _tier_highlight_of(doc, kind="weekly"):
     """A note's ✨ highlight: the section where one survives, else that tier's
     journal ANSWER (which is the record since 2026-09-17 - the section was
-    only ever its copy). '' when neither says anything."""
+    only ever its copy), found by its route key. '' when neither says
+    anything."""
     hsec = ps.find(doc, pm.SEC_HIGHLIGHT)
     if hsec is not None:
         # a divider can sit in the last section's body (decor only migrates
@@ -1100,8 +1112,8 @@ def _tier_highlight_of(doc, kind="weekly"):
         hit = " ".join(x for x in parts if x)
         if hit:
             return hit
-    return _answer_in(doc, _JOURNAL_SECTIONS.get(kind, pm.SEC_WEEKLY_JNL),
-                      _HL_NEEDLE.get(kind, "highlight of the week"))
+    return _answer_by_key(doc, _JOURNAL_SECTIONS.get(kind, pm.SEC_WEEKLY_JNL),
+                          _HL_KEY.get(kind, "highlight"))
 
 
 def _weekly_highlight_of(wdoc):
@@ -1500,6 +1512,14 @@ def _fill_daily(doc, p, index, is_today):
         # 🌅/🌙 journal Q lines seed at refresh (never-empty sections,
         # phone-answerable); unanswered fixed prompts refresh their text so
         # the evening 'did you achieve {goal}' bakes in a goal set at noon
+        _seed_daily_journals(doc, day)
+    elif day == _today() + timedelta(days=1):
+        # TOMORROW's note, minted a day early by the evening's 🎯 pick (Vex
+        # 2026-09-24: "there is literally nothing in there. No bridge, no
+        # journal prompts"): its journals seed now, off the bridge read above
+        # and the goal it already carries, so the shell is usable tonight;
+        # the numbers stay pending until its day. The draws are by date, so
+        # they are the ones the 04:30 fill would have made.
         _seed_daily_journals(doc, day)
     elif day == _today() - timedelta(days=1):
         # YESTERDAY's note, on its grace day, gets the tick pass too. A
@@ -2747,8 +2767,15 @@ def _fill_quarterly(doc, p, index):
 
     # ── ⏪ Last quarter - the same composite, off last quarter's months
     if known_prev:
-        lq = [f"- Completed: {sum(st['done'] for st in known_prev)}",
-              f"- Created: {sum(st['created'] for st in known_prev)}"]
+        # a last quarter summed out of SOME of its months says so, like the
+        # note's own Completed header (review 2026-09-24: the quarterly's
+        # compare question must not read half a quarter as a whole one)
+        prev_spans = pm.child_spans(prev)
+        cre_prev = [st["created"] for st in known_prev if st["created"] is not None]
+        lq = [f"- Completed: {sum(st['done'] for st in known_prev)}"
+              f"{_partial(known_prev, prev_spans, 'month')}"]
+        if cre_prev:
+            lq.append(f"- Created: {sum(cre_prev)}{_partial(cre_prev, prev_spans, 'month')}")
         pf = getattr(t2, "focus_minutes", lambda a, b: None)(prev.start,
                                                              prev.end) \
             if t2 else None
@@ -2758,6 +2785,11 @@ def _fill_quarterly(doc, p, index):
         if pmood is not None:
             lq.append(f"- Mood: {pmood:.1f} avg")
         lq.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        # last quarter's own words: where it wanted to be by now (the
+        # quarterly journal's compare question quotes it back)
+        pt = lookup(index, prev)
+        if pt:
+            lq += _quarter_words(ps.parse_sections(pt.get("content") or ""))
         top_tasks = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
                                                           for st in known_prev]))
         top_lists = [f"{pm.T1}- 🗂 {nm} · {c}" for nm, c in pm.top_n(
@@ -2772,8 +2804,18 @@ def _fill_quarterly(doc, p, index):
 
     # ── 📔 Quarterly journal + ♻️ Quarterly Review
     _seed_slot(doc, pm.SEC_QTR_JNL, "quarterly", p.start,
-               journal_ctx("quarterly", doc))
+               journal_ctx("quarterly", doc, p.start))
     _fill_review(doc, pm.SEC_QREVIEW, cfg.get_quarterly_review_id())
+
+
+def _quarter_words(pdoc):
+    """The ⏪ Last quarter lines that carry last quarter's OWN words: its
+    answer to "Where do you want to be in 3 months?" as "- 🔮 Wanted: ...",
+    links flattened. [] when it never answered."""
+    want = pm.unescape_md(_answer_by_key(pdoc, pm.SEC_QTR_JNL, "qforecast"))
+    if not want:
+        return []
+    return [f"- 🔮 Wanted: {mdtext.flatten_links(want).strip()}"]
 
 
 def _fill_rollup_money(doc, p, index):
@@ -3151,7 +3193,7 @@ def set_highlight(text, day=None, kind="weekly"):
         sec = ps.find(doc, pm.SEC_HIGHLIGHT)
         if sec is None:
             return False
-        ps.set_body(doc, pm.SEC_HIGHLIGHT, [text])
+        ps.set_body(doc, pm.SEC_HIGHLIGHT, pm.highlight_body(text))
         return True
     ok, _doc = _pn_rmw(pid, tid, mutate)
     if ok:
@@ -3348,6 +3390,15 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
     task["content"] = ps.serialize_sections(doc_out)
     if kind == "weekly" and not ahead:      # only THIS week mirrors into today
         _mirror_week_goals(doc_out)
+    if kind == "daily" and target_day == _today() + timedelta(days=1):
+        # the note this pick may have just minted: fill what a day-early
+        # note can have (tonight's bridge, the mirrors, its journals) so it
+        # is not a shell until 04:30 (Vex 2026-09-24)
+        try:
+            refresh_period(p)
+            _stamp_refresh(p)
+        except Exception as e:
+            _log(f"ahead refresh {pm.title(p)}: {e}")
     shown = text or title or ""
     when = " (next)" if ahead else ""
     if kind == "daily" and target_day != _today():
@@ -3635,6 +3686,8 @@ def journal_ctx(slot, doc, day=None):
                                 for nm in pm.goal_section_names(slot))
                     if x is not None), None)
         ctx["goals"] = "; ".join(pm.goal_titles(sec.body)[:5]) if sec else ""
+        if slot == "quarterly":
+            _quarterly_ctx(doc, day, ctx)
         if slot == "monthly":
             # the OKR checkpoint (Vex 2026-09-24, late): the month's and the
             # quarter's objectives off 🥅 OKRs (EXACT name, the kill switch),
@@ -3654,6 +3707,56 @@ def journal_ctx(slot, doc, day=None):
                 ctx["weeks"] = pm.days_summary(pm.bullet_children(dt.body, pm.SEC_HL_WEEK))
                 ctx["money"] = pm.bullet_head(dt.body, pm.SEC_INCOME)
     return ctx
+
+
+def _quarterly_ctx(doc, day, ctx):
+    """The quarterly set block's quotes (Vex 2026-09-24, late night), each
+    off the note's own sections and '' when a section is gone (the kill
+    switch): the quarter's and the year's objectives off 🥅 OKRs (EXACT
+    name), how many quarters the year has left, the habit line and the
+    focus line (header + its months) off 📊 Stats, the months' ✨
+    highlights, the 🟢 wins, the 🔴 nags, the moods and the income (headers
+    + their months) off 💿 Data, this quarter against last off the same
+    heads and ⏪ Last quarter's lines, and last quarter's 🔮 Wanted line."""
+    osec = ps.find(doc, pm.SEC_OKR)
+    if osec is not None and osec.name == pm.SEC_OKR:
+        ctx["objectives"] = " · ".join(pm.okr_tier_items(osec.body, "quarterly"))
+        ctx["year"] = " · ".join(pm.okr_tier_items(osec.body, "yearly"))
+    if day is not None:
+        ctx["quarters_left"] = pm.quarters_left_in_year(day)
+
+    def headed(body, label):
+        head = pm.bullet_head(body, label)
+        kids = [k for k in pm.bullet_children(body, label) if not k.startswith("**")]
+        return f"{head} ({'; '.join(kids)})" if head and kids else (head or "; ".join(kids))
+
+    this = {}
+    st = ps.find(doc, pm.SEC_WK_STATS)
+    if st is not None:
+        ctx["habits"] = pm.habit_summary(pm.bullet_children(st.body, pm.SEC_HABIT_WEEK))
+        ctx["focus"] = headed(st.body, "Focus")
+        this["Completed"] = pm.bullet_head(st.body, pm.SEC_COMPLETED)
+        this["Focus"] = pm.bullet_head(st.body, "Focus")
+    dt = ps.find(doc, pm.SEC_WK_DATA)
+    if dt is not None:
+        ctx["months"] = pm.days_summary([c.rstrip(".").strip()
+                                         for c in pm.bullet_children(dt.body, pm.SEC_HL_WEEK)])
+        ctx["wins"] = pm.entries_summary(pm.entry_children(dt.body, pm.SEC_ENTRIES, "🟢 Wins"))
+        ctx["nags"] = pm.entries_summary(pm.entry_children(dt.body, pm.SEC_ENTRIES, "🔴 Nags"))
+        mh, mk = pm.bullet_head(dt.body, pm.SEC_MOODS), pm.bullet_children(dt.body, pm.SEC_MOODS)
+        ctx["moods"] = f"{'; '.join(mk)} ({mh})" if mh and mk else (mh or "; ".join(mk))
+        ctx["money"] = headed(dt.body, pm.SEC_INCOME)
+        this["Mood"] = mh
+        this["Income"] = pm.bullet_head(dt.body, pm.SEC_INCOME)
+    lq = ps.find(doc, pm.SEC_LAST_QTR)
+    if lq is not None:
+        last = {k: pm.bullet_head(lq.body, k) for k in ("Completed", "Focus", "Mood", "Income")}
+        ctx["compare"] = pm.quarter_compare(this, last)
+        for ln in lq.body:
+            s = pm.unescape_md(ln.strip())
+            if s.startswith("- 🔮 Wanted:"):
+                ctx["wanted"] = s[len("- 🔮 Wanted:"):].strip()
+                break
 
 
 def _when(day):

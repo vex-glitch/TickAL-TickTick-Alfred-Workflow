@@ -217,7 +217,7 @@ Not wanted: KRs as numbers. The weekly confidence score (skipped, Vex may ask).
    screen, aligned-work ratio, focus per objective (read off the LINKED
    originals, low priority), capacity check (KRs per week, not focus).
 
-Then the parked quarterly journal (HANDOFF_ROUTINES section 12) resumes on top.
+Then the quarterly journal, shipped 2026-09-24 on top of it (HANDOFF_ROUTINES section 18).
 
 ## 7. Phase log
 

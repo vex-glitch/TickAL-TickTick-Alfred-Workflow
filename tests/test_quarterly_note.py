@@ -9,8 +9,8 @@ The monthly's shape counted by MONTH. What this guards:
   * the pyramid's next storey: a quarter reads its months' notes, and an
     unfilled one is unknown rather than a quarter-month of zero
   * a month never straddles a quarter, so nothing needs clipping
-  * the quarterly journal's two fixed questions route to their own keys and
-    not to the month's or the week's
+  * the quarterly journal's fixed questions (its own set block since
+    2026-09-24) route to their own keys and not to the month's or the week's
 
 No network: the notes are rendered from the shipped templates into a fake
 index.
@@ -132,11 +132,12 @@ check("the OKR skeleton is gone",
 
 # ── its journal ────────────────────────────────────────────────────────────
 fx = pm.journal_fixed("quarterly", {"goals": "G"})
-check("two fixed questions", [k for k, _q in fx] == ["qhighlight", "qgoals"], fx)
+check("its own set block, mind last", [k for k, _q in fx] == ["qhighlight", "qlowlights", "qgoals", "qeffort", "qenergy", "qpriorities", "qforecast", "free"], fx)
 for key, q in (fx + pm.journal_fixed("monthly", {"goals": "G"})
                + pm.journal_fixed("weekly", {"goals": "G"})):
     check(f"'{q[:30]}' routes to {key}", pm.journal_key(q) == key, pm.journal_key(q))
-check("its pool is its own", len(pj.load_pool("quarterly")["random"]) >= 20)
+check("its pool is its own", set(pj.load_pool("quarterly")["categories"]) == set(pm.QUARTERLY_CATEGORIES)
+      and sum(len(v) for v in pj.load_pool("quarterly")["categories"].values()) == 30)
 check("its draw is not the month's",
       pm.select_prompts(pj.load_pool("quarterly"), date(2026, 7, 1), "quarterly")
       != pm.select_prompts(pj.load_pool("monthly"), date(2026, 7, 1), "monthly"))

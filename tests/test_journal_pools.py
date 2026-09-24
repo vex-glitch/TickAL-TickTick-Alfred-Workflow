@@ -490,7 +490,7 @@ check("13.habits-wording", M1[4][1] == "🔄 Habit consistency this month: 🌅 
 check("13.money-wording", M1[5][1] == "💰 Income this month: 1845 · 🔴 ▼ 200 (−26%). Does this align with your forecast? What could you do to improve it?", M1[5])
 check("13.mind-last", M1[-1] == ("free", "What is on your mind?"))
 check("13.monthly-keys-recognised", all(pm.journal_key(q) == k for k, q in M1), [(k, pm.journal_key(q)) for k, q in M1])
-check("13.quarterly-untouched", [k for k, _ in pm.journal_fixed("quarterly", {"goals": "G"})] == ["qhighlight", "qgoals"])
+check("13.quarterly-has-its-own-branch", [k for k, _ in pm.journal_fixed("quarterly", {"goals": "G"})][:3] == ["qhighlight", "qlowlights", "qgoals"])
 check("13.months-left", [pm.months_left_in_quarter(date(2026, m, 1)) for m in (7, 8, 9, 10, 12)] == [2, 1, 0, 2, 0])
 check("13.quarter-items", pm.okr_tier_items(OKR_BODY, "quarterly") == ["Onboard TickTicks 0/5", "TickAL 1/6"]
       and pm.okr_tier_items(OKR_BODY, "yearly") == ["Productivity System 1/41"] and pm.okr_tier_items([], "monthly") == [])
@@ -530,6 +530,176 @@ check("13.monthly-next-month-differs", len(mo2) == 10 and not set(mo1) & set(mo2
 check("13.monthly-year-boundary", len(pm.select_prompts(MPOOL, date(2027, 1, 1), "monthly")) == 10
       and pm.select_prompts(MPOOL, date(2027, 1, 15), "monthly") == pm.select_prompts(MPOOL, date(2027, 1, 1), "monthly"))
 check("13.monthly-pre-epoch-old-style", len(pm.select_prompts(dict(MPOOL, random=[f"r{i}" for i in range(20)]), date(2026, 9, 1), "monthly")) == 5)
+
+# ── 14. the quarterly set block (Vex 2026-09-24, late night: his findings + the OKR checkpoint, ten drawn) ──
+Q0 = pm.journal_fixed("quarterly", {"goals": "G"})
+check("14.quarterly-plain-order", [k for k, _ in Q0] == ["qhighlight", "qlowlights", "qgoals", "qeffort", "qenergy", "qpriorities", "qforecast", "free"], [k for k, _ in Q0])
+QCTX = {"goals": "G", "objectives": "Onboard TickTicks 0/5 · TickAL 1/6", "year": "Productivity System 1/41", "quarters_left": 1,
+        "habits": "Weekly Review 1/2 · 🌆 Shutdown 10/13", "months": "M1 · July · Readme; M3 · September · OKRs",
+        "wins": "Did weekly review; readme done", "nags": "Journal exits after highlight prompt.",
+        "moods": "M1 · July · 🙂 4.0; M3 · September · 😐 3.3 (Average 3.5)",
+        "money": "2955 (M1 · July • 1110; M2 · August • no notes; M3 · September • 1845)",
+        "focus": "97h 11m (M1 · July · 30h 54m · CRM Testing; M3 · September · 66h 17m · Onboard TickTick)",
+        "compare": "Completed 665 vs 500 · Focus 97h 11m vs 49h 00m · Mood 3.5 vs 3.4 · Income 2955 vs 2100",
+        "wanted": "TickAL shipped and ten customers onboarded"}
+Q1 = pm.journal_fixed("quarterly", QCTX)
+QKEYS = [k for k, _ in Q1]
+check("14.quarterly-full-order", QKEYS == ["qhighlight", "qlowlights", "qgoals", "qobjectives", "ycheck", "qcompare", "habits", "qmoney",
+                                          "qeffort", "qenergy", "qpriorities", "qforecast", "free"], QKEYS)
+QT = dict(Q1)
+check("14.highlights-wording", QT["qhighlight"] == "✨ What are the three biggest highlights of the quarter? Your months: M1 · July · Readme; M3 · September · OKRs. Your wins: Did weekly review; readme done.", QT["qhighlight"])
+check("14.lowlights-wording", QT["qlowlights"] == "🔴 What are the three biggest lowlights? Your nags: Journal exits after highlight prompt. Moods: M1 · July · 🙂 4.0; M3 · September · 😐 3.3 (Average 3.5).", QT["qlowlights"])
+check("14.goals-as-is", QT["qgoals"] == "Did you achieve your quarterly goals, G? Describe success/fail factors on each.", QT["qgoals"])
+check("14.objectives-wording", QT["qobjectives"] == "🥅 Objective by objective, Onboard TickTicks 0/5 · TickAL 1/6: hit, partial or miss, and the factor that decided it? Was the bar set too high or too low?", QT["qobjectives"])
+check("14.year-one-left", QT["ycheck"] == "🎉 The year's goal, Productivity System 1/41, with 1 quarter left: ahead, on track or behind, and what must next quarter deliver? Has this review given you information that alters your yearly goals?", QT["ycheck"])
+check("14.year-last-quarter", dict(pm.journal_fixed("quarterly", {"year": "Y 1/4", "quarters_left": 0}))["ycheck"]
+      == "🎉 The year's goal, Y 1/4: this was its last quarter. Which carry into next year, and which stop here?")
+check("14.year-still-running", "with the year still running" in dict(pm.journal_fixed("quarterly", {"year": "Y 1/4"}))["ycheck"]
+      and "with 3 quarters left" in dict(pm.journal_fixed("quarterly", {"year": "Y 1/4", "quarters_left": 3}))["ycheck"])
+check("14.compare-both", QT["qcompare"] == "⏪ How does this quarter compare to last quarter? Completed 665 vs 500 · Focus 97h 11m vs 49h 00m · Mood 3.5 vs 3.4 · Income 2955 vs 2100. Last quarter you wanted: TickAL shipped and ten customers onboarded. Did you get there?", QT["qcompare"])
+check("14.compare-numbers-only", dict(pm.journal_fixed("quarterly", {"compare": "Completed 1 vs 2"}))["qcompare"] == "⏪ How does this quarter compare to last quarter? Completed 1 vs 2.")
+check("14.compare-wanted-only", dict(pm.journal_fixed("quarterly", {"wanted": "x"}))["qcompare"] == "⏪ How does this quarter compare to last quarter? Last quarter you wanted: x. Did you get there?")
+check("14.habits-wording", QT["habits"] == "🔄 Habit consistency this quarter: Weekly Review 1/2 · 🌆 Shutdown 10/13. Which held, which broke, and which habits do you want to build next quarter?", QT["habits"])
+check("14.money-wording", QT["qmoney"] == "💰 Income this quarter: 2955 (M1 · July • 1110; M2 · August • no notes; M3 · September • 1845). Does this align with your forecast? What could you do to improve it? Can you cut down on any expense category?", QT["qmoney"])
+check("14.effort-wording", QT["qeffort"] == "⏱ What effort is not worth your time, what are you spending your time on that is not leading towards the desired outcome? Your focus: 97h 11m (M1 · July · 30h 54m · CRM Testing; M3 · September · 66h 17m · Onboard TickTick)."
+      and dict(Q0)["qeffort"].endswith("desired outcome?"), QT["qeffort"])
+check("14.vex-three-wording", QT["qenergy"] == "🔥 When did you feel most passionate this quarter, and why then? When did you feel bored or resentful, and why?"
+      and QT["qpriorities"] == "🧭 What are your top three priorities, and why do they matter?"
+      and QT["qforecast"] == "🔮 If you continue at this pace, where will you be in three months? Where do you want to be in 3 months? What do you want to achieve?", (QT["qenergy"], QT["qpriorities"], QT["qforecast"]))
+check("14.mind-last", Q1[-1] == ("free", "What is on your mind?"))
+check("14.quarterly-keys-recognised", all(pm.journal_key(q) == k for k, q in Q1), [(k, pm.journal_key(q)) for k, q in Q1])
+check("14.old-highlight-still-qhighlight", pm.journal_key("What was the highlight of the quarter? Think of one thing that stands out.") == "qhighlight")
+check("14.monthly-objectives-still-mobjectives", pm.journal_key("🥅 Objective by objective, A 0/1: what moved, what stalled, and why?") == "mobjectives"
+      and pm.journal_key("⏱️ What effort is not worth your time, x?") == "qeffort")
+check("14.no-rule-hits-a-pool-prompt", all(pm.journal_key(q) == "free" for c in pj.load_pool("quarterly")["categories"].values() for q in c))
+check("14.conditional-and-quoting", {"qobjectives", "ycheck", "qcompare", "qmoney", "habits"} <= set(pm.CONDITIONAL_KEYS)
+      and {"qobjectives", "ycheck", "qcompare", "qmoney", "qeffort", "qlowlights", "qhighlight"} <= set(pm.QUOTING_KEYS)
+      and "qenergy" not in pm.CONDITIONAL_KEYS)
+check("14.quarters-left", [pm.quarters_left_in_year(date(2026, m, 1)) for m in (1, 3, 4, 6, 7, 9, 10, 12)] == [3, 3, 2, 2, 1, 1, 0, 0])
+QDATA = ["- ✨ Highlights", "\t- M1 · July · Readme", "\t- M3 · September · OKRs", "",
+         "- 📨 Entries", "\t- **🟢 Wins**", "\t\t- Did weekly review · Sun 20 Sep 09:58", "\t\t- readme done · Wed 15 Jul 19:44", "",
+         "\t- **🔴 Nags**", "\t\t- Journal exits after highlight prompt. · Sun 20 Sep 22:05", "", "\t- **💭 Thoughts**", "\t\t- m4 tests · Sat 11 Jul 21:45", "",
+         "- 😊 Moods: Average 3.5", "\t- M1 · July · 🙂 4.0", "\t- M3 · September · 😐 3.3", "",
+         "- 💰 Income: 2955", "\t- M1 · July • 1110", "\t- M2 · August • no notes", "\t- M3 · September • 1845", "\t\t- **Total = 2955**", "",
+         "- 👽 People", "\t- 🎂 Andres · in 64d"]
+check("14.entry-children", pm.entry_children(QDATA, "📨 Entries", "🟢 Wins") == ["Did weekly review · Sun 20 Sep 09:58", "readme done · Wed 15 Jul 19:44"]
+      and pm.entry_children(QDATA, "📨 Entries", "🔴 Nags") == ["Journal exits after highlight prompt. · Sun 20 Sep 22:05"]
+      and pm.entry_children(QDATA, "📨 Entries", "🔗 Links") == [] and pm.entry_children([], "📨 Entries", "🟢 Wins") == [], pm.entry_children(QDATA, "📨 Entries", "🟢 Wins"))
+check("14.entries-summary", pm.entries_summary(pm.entry_children(QDATA, "📨 Entries", "🟢 Wins")) == "Did weekly review; readme done"
+      and pm.entries_summary([f"w{i} · Mon 1 Sep 10:00" for i in range(10)]) == "; ".join(f"w{i}" for i in range(8)) + " (+2 more)"
+      and pm.entries_summary(["Journal exits after highlight prompt. · Sun 20 Sep 22:05", "Late again. · Mon 21 Sep 09:00"]) == "Journal exits after highlight prompt; Late again"
+      and pm.entries_summary([]) == "")
+check("14.quarter-compare", pm.quarter_compare({"Completed": "665 · 🟢 ▲ 12 (+2%)", "Focus": "97h 11m · 🟢 ▲ 47h 37m (+96%)", "Mood": "Average 3.5", "Income": "2955"},
+                                                {"Completed": "500", "Focus": "49h 00m", "Mood": "3.4 avg", "Income": "2100"})
+      == "Completed 665 vs 500 · Focus 97h 11m vs 49h 00m · Mood 3.5 vs 3.4 · Income 2955 vs 2100"
+      and pm.quarter_compare({"Completed": "665"}, {"Focus": "1h"}) == "" and pm.quarter_compare({}, {}) == "")
+check("14.quarter-compare-partial-dropped", pm.quarter_compare({"Completed": "665 · 1 of 3 months", "Income": "2955"}, {"Completed": "500", "Income": "2100"}) == "Income 2955 vs 2100"
+      and pm.quarter_compare({"Completed": "700"}, {"Completed": "665 · 1 of 3 months", "Income": "1"}) == "")
+QSTATS = ["- Top lists:", "\t- 📌CTA · 84 done", "", "- Completed: 665 · 1 of 3 months", "\t- 🗂 📌CTA · 187", "",
+          "- Focus: 97h 11m · 🟢 ▲ 47h 37m (+96%)", "\t- M1 · July · 30h 54m · CRM Testing", "\t- M3 · September · 66h 17m · Onboard TickTick", "\t\t- **Total = 97h 11m**", "",
+          "- Habit consistency", "\t- Weekly Review · 1/2 · 50%", "\t- 🌆 Shutdown · 10/13 · 76%", "---"]
+QNOTE = "\n".join(["#### 🥅 OKRs"] + OKR_BODY + [
+    "#### 🏆 Goals", "- 🎉 Yearly goal", "\t- [ ] [💼 P • Productivity System 🔗](https://ticktick.com/webapp/#p/x/tasks/y)", "",
+    "- 🌓 Quarterly goal", "\t- [ ] [TickAL](https://ticktick.com/webapp/#p/x/tasks/z)", "",
+    "#### ✨ Highlight", "---", "##### 📊 Stats"] + QSTATS + ["##### 💿 Data"] + QDATA + ["---",
+    "##### ⏪ Last quarter", "- Completed: 500", "- Created: 900", "- Focus: 49h 00m", "- Mood: 3.4 avg", "- Income: 2100",
+    "- 🔮 Wanted: TickAL shipped and ten customers onboarded", "", "- Top Tasks:", "\t- x · 3×", "---",
+    "##### 📔 Quarterly journal", "\t- *Q1 · What was the highlight of the quarter? Think of one thing that stands out.*", "\t\t- A: Readme week",
+    "\t- *Q2 · Did you achieve your quarterly goals? Describe success/fail factors on each.*", "\t\t- A: ",
+    "\t- *Q3 · Which month of this quarter would you live again, and what made it that one?*", "\t\t- A: ", "---"])
+qdoc = ps.parse_sections(QNOTE)
+qctx = pe.journal_ctx("quarterly", qdoc, date(2026, 7, 1))
+check("14.ctx-goals-objectives-year", qctx.get("goals") == "TickAL" and qctx.get("objectives") == "Onboard TickTicks 0/5 · TickAL 1/6"
+      and qctx.get("year") == "Productivity System 1/41", qctx)
+check("14.ctx-quarters-left", qctx.get("quarters_left") == 1 and "quarters_left" not in pe.journal_ctx("quarterly", qdoc)
+      and pe.journal_ctx("quarterly", qdoc, date(2026, 10, 1)).get("quarters_left") == 0, qctx)
+check("14.ctx-habits-months", qctx.get("habits") == "Weekly Review 1/2 · 🌆 Shutdown 10/13" and qctx.get("months") == "M1 · July · Readme; M3 · September · OKRs", qctx)
+check("14.ctx-wins-nags-moods", qctx.get("wins") == "Did weekly review; readme done" and qctx.get("nags") == "Journal exits after highlight prompt"
+      and qctx.get("moods") == "M1 · July · 🙂 4.0; M3 · September · 😐 3.3 (Average 3.5)", qctx)
+check("14.ctx-money-focus", qctx.get("money") == "2955 (M1 · July • 1110; M2 · August • no notes; M3 · September • 1845)"
+      and qctx.get("focus") == "97h 11m · 🟢 ▲ 47h 37m (+96%) (M1 · July · 30h 54m · CRM Testing; M3 · September · 66h 17m · Onboard TickTick)", qctx)
+check("14.ctx-compare-wanted", qctx.get("compare") == "Focus 97h 11m vs 49h 00m · Mood 3.5 vs 3.4 · Income 2955 vs 2100"
+      and qctx.get("wanted") == "TickAL shipped and ten customers onboarded", qctx)
+qctx_np = pe.journal_ctx("quarterly", ps.parse_sections(QNOTE.replace("##### ⏪ Last quarter\n- Completed: 500\n- Created: 900\n- Focus: 49h 00m\n- Mood: 3.4 avg\n- Income: 2100\n- 🔮 Wanted: TickAL shipped and ten customers onboarded\n", "##### ⏪ Last quarter\n\t_(pending)_\n")), date(2026, 7, 1))
+check("14.ctx-no-last-quarter", not qctx_np.get("compare") and not qctx_np.get("wanted"), qctx_np)
+check("14.highlight-read-by-key", pe._tier_highlight_of(qdoc, "quarterly") == "Readme week"
+      and pe._tier_highlight_of(mdoc, "monthly") == "" and pe._tier_highlight_of(ps.parse_sections("#### ✨ Highlight\n- Best\n---\n##### 📔 Quarterly journal\n\t- *Q1 · ✨ What are the three biggest highlights of the quarter? Your wins: x.*\n\t\t- A: y\n"), "quarterly") == "Best"
+      and pe._tier_highlight_of(ps.parse_sections("##### 📔 Quarterly journal\n\t- *Q1 · ✨ What are the three biggest highlights of the quarter? Your wins: highlight of the quarter.*\n\t\t- A: three things\n"), "quarterly") == "three things")
+QPREV = ps.parse_sections("##### 📔 Quarterly journal\n\t- *Q12 · 🔮 If you continue at this pace, where will you be in three months? Where do you want to be in 3 months? What do you want to achieve?*\n\t\t- A: [Shipped](https://x) and calm\n")
+check("14.wanted-line", pe._quarter_words(QPREV) == ["- 🔮 Wanted: Shipped and calm"] and pe._quarter_words(ps.parse_sections("##### 📔 Quarterly journal\n\t- *Q1 · x?*\n\t\t- A: \n")) == [])
+check("14.compare-wanted-no-double-stop", dict(pm.journal_fixed("quarterly", {"wanted": "Shipped and calm."}))["qcompare"]
+      == "⏪ How does this quarter compare to last quarter? Last quarter you wanted: Shipped and calm. Did you get there?"
+      and dict(pm.journal_fixed("quarterly", {"wanted": "Ten customers!"}))["qcompare"].endswith("Ten customers! Did you get there?"))
+QBLOCK = ["\t- *Q11 · 🔮 If you continue at this pace, where will you be in three months? Where do you want to be in 3 months? What do you want to achieve?*",
+          "\t\t- A: At this pace: half the backlog, tired.", "\t\t- Where I want to be: TickAL 3.0 shipped, five customers onboarded.",
+          "\t\t- *Achieve: the OKR loop running weekly.*", "", "\t- *Q12 · What is on your mind?*", "\t\t- A: nothing"]
+check("14.whole-answer", pm.journal_answer_text(QBLOCK, 1) == "At this pace: half the backlog, tired. Where I want to be: TickAL 3.0 shipped, five customers onboarded. Achieve: the OKR loop running weekly."
+      and pm.journal_answer_text(QBLOCK, 6) == "nothing" and pm.journal_answer_text(QBLOCK, 0) == "" and pm.journal_answer_text(["\t- *Q1 · x?*", "\t\t- A: "], 1) == "")
+check("14.wanted-line-whole-wish", pe._quarter_words(ps.parse_sections("##### 📔 Quarterly journal\n" + "\n".join(QBLOCK)))
+      == ["- 🔮 Wanted: At this pace: half the backlog, tired. Where I want to be: TickAL 3.0 shipped, five customers onboarded. Achieve: the OKR loop running weekly."])
+check("14.months-lose-their-stops", pe.journal_ctx("quarterly", ps.parse_sections("##### 💿 Data\n- ✨ Highlights\n\t- M1 · July · Shipped the workflow.\n\t- M2 · August · Rest\n"), date(2026, 7, 1)).get("months")
+      == "M1 · July · Shipped the workflow; M2 · August · Rest")
+check("14.entries-flatten-markdown", pm.entries_summary(["Shipped [TickAL](https://x/y) · Sun 20 Sep 09:58", "**Big** win · Mon 21 Sep 10:00"]) == "Shipped TickAL; Big win")
+check("14.rule-anchor-monthly-title", pm.journal_key("🥅 Objective by objective, hit, partial or miss 0/1: what moved, what stalled, and why?") == "mobjectives"
+      and pm.journal_key("🥅 Objective by objective, hit, partial or miss 0/1: hit, partial or miss, and the factor that decided it? Was the bar set too high or too low?") == "qobjectives")
+check("14.highlight-body", pm.highlight_body("Nap") == ["Nap"] and pm.highlight_body("One\n\nTwo [x](https://u)\n- Three") == ["- One", "- Two x", "- Three"]
+      and pm.highlight_body("") == [""])
+qsec = ps.find(qdoc, pm.SEC_QTR_JNL)
+qbody, qadded = pm.insert_fixed_questions(qsec.body, pm.journal_fixed("quarterly", qctx))
+qkeys = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(qbody)]
+check("14.old-quarterly-gains-the-set", qadded == ["qlowlights", "qobjectives", "ycheck", "qcompare", "habits", "qmoney", "qeffort", "qenergy", "qpriorities", "qforecast"]
+      and qkeys == ["qhighlight", "qlowlights", "qgoals", "qobjectives", "ycheck", "qcompare", "habits", "qmoney", "qeffort", "qenergy", "qpriorities", "qforecast", "free"], (qadded, qkeys))
+QPOOL = {"categories": {c: [f"{c}{i}?" for i in range(10)] for c in pm.QUARTERLY_CATEGORIES}, "chains": []}
+qo1 = pm.select_prompts(QPOOL, pm.QUARTER_EPOCH, "quarterly")
+check("14.quarterly-ten", len(qo1) == 10 and len(set(qo1)) == 10
+      and [c for c in pm.QUARTERLY_CATEGORIES for _ in range(2)] == [next(c for c in pm.QUARTERLY_CATEGORIES if q in QPOOL["categories"][c]) for q in qo1], qo1)
+check("14.quarterly-same-quarter-same-picks", pm.select_prompts(QPOOL, date(2026, 9, 30), "quarterly") == qo1 and pm.select_prompts(QPOOL, date(2026, 8, 15), "quarterly") == qo1)
+qo2 = pm.select_prompts(QPOOL, date(2026, 10, 1), "quarterly")
+check("14.quarterly-next-quarter-differs", len(qo2) == 10 and not set(qo1) & set(qo2), set(qo1) & set(qo2))
+check("14.quarterly-year-boundary", len(pm.select_prompts(QPOOL, date(2027, 1, 1), "quarterly")) == 10
+      and pm.select_prompts(QPOOL, date(2027, 3, 31), "quarterly") == pm.select_prompts(QPOOL, date(2027, 1, 1), "quarterly")
+      and not set(pm.select_prompts(QPOOL, date(2027, 1, 1), "quarterly")) & set(pm.select_prompts(QPOOL, date(2026, 12, 31), "quarterly")))
+check("14.quarterly-pre-epoch-old-style", len(pm.select_prompts(dict(QPOOL, random=[f"r{i}" for i in range(20)]), date(2026, 4, 1), "quarterly")) == 5)
+QSHIP = pj.load_pool("quarterly")
+check("14.shipped-pool-shape", set(QSHIP["categories"]) == set(pm.QUARTERLY_CATEGORIES) and all(len(v) == 6 for v in QSHIP["categories"].values())
+      and not QSHIP.get("chains"), {k: len(v) for k, v in QSHIP["categories"].items()})
+check("14.shipped-pool-clean", all(not re.search("[\\u2013\\u2014]", q) and q.strip()[-1] in "?." and q[0].isupper() for v in QSHIP["categories"].values() for q in v)
+      and len({q for v in QSHIP["categories"].values() for q in v}) == 30)
+QS = {q for v in QSHIP["categories"].values() for q in v}
+check("14.shipped-pool-no-set-twins", not any("highlight" in q.casefold() or "lowlight" in q.casefold() or "three months" in q.casefold() and "want to be" in q.casefold() for q in QS))
+qship = [pm.select_prompts(QSHIP, d, "quarterly") for d in (pm.QUARTER_EPOCH, date(2026, 10, 1), date(2027, 1, 1), date(2027, 4, 1))]
+check("14.shipped-three-quarters-cover-all", all(len(x) == 10 for x in qship) and set().union(*qship[:3]) == QS
+      and not (set(qship[0]) & set(qship[1]) or set(qship[1]) & set(qship[2]) or set(qship[2]) & set(qship[3])), len(set().union(*qship[:3])))
+
+# ── 15. a note minted a day early gets its bridge and journals (Vex 2026-09-24: "literally nothing in there") ──
+_real_today, _real_bridge = pe._today, pe._bridge_text
+try:
+    pe._today = lambda: date(2026, 9, 24)
+    pe._bridge_text = lambda d: "Finished OKRs and debugged Periodics.\nQuarterly journal is next." if d == date(2026, 9, 24) else ""
+    def shell(day):
+        p = pm.period_for("daily", day)
+        tpl = pe._load_template("daily")
+        content = pm.render_template(tpl, {"breadcrumbs": "x", "daylinks": "", "weeklinks": "", "monthlinks": "", "quarterlinks": ""})
+        return p, ps.parse_sections(content)
+    p25, d25 = shell(date(2026, 9, 25))
+    pe._fill_daily(d25, p25, {}, False)
+    b = ps.find(d25, pm.SEC_YBRIDGE)
+    mj, ej = ps.find(d25, pm.SEC_MORNING), ps.find(d25, pm.SEC_EVENING)
+    mk = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(mj.body)]
+    ek = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(ej.body)]
+    check("15.tomorrow-gets-the-bridge", b is not None and [ln for ln in b.body if ln.strip()] == ["> Finished OKRs and debugged Periodics.", "> Quarterly journal is next."], b.body if b else None)
+    # Fri 25 Sep is a chain night: the evening block is the chain's seven steps, the date's own draw either way
+    ev_n = len(pm.select_prompts(pj.load_pool("evening"), date(2026, 9, 25), "evening"))
+    check("15.tomorrow-gets-both-journals", mk[:4] == ["mood", "ybridge", "gcheck", "forecast"] and len(mk) == 5 + 6
+          and ek[:4] == ["bridge", "dhighlight", "tgoal", "goal"] and len(ek) == 8 + ev_n and ev_n == 7, (mk, ek, ev_n))
+    check("15.bridge-echo-in-the-morning-question", any("Yesterday's bridge: Finished OKRs and debugged Periodics." in q for _n, q, _a, _i in pm.journal_pairs(mj.body)))
+    check("15.numbers-stay-pending", any("_(pending)_" in ln for ln in ps.find(d25, pm.SEC_HABITS).body), ps.find(d25, pm.SEC_HABITS).body)
+    p26, d26 = shell(date(2026, 9, 26))
+    pe._fill_daily(d26, p26, {}, False)
+    check("15.day-after-tomorrow-stays-a-shell", not any(pm.JOURNAL_Q_RE.match(ln) for ln in ps.find(d26, pm.SEC_MORNING).body)
+          and not any(pm.JOURNAL_Q_RE.match(ln) for ln in ps.find(d26, pm.SEC_EVENING).body))
+finally:
+    pe._today, pe._bridge_text = _real_today, _real_bridge
 
 print(f"journal pools: {PASS} passed, {FAIL} failed")
 for f in FAILURES:

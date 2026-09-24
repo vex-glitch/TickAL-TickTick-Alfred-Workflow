@@ -1783,7 +1783,7 @@ JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)
 # 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
 # live day-goal / weekly-goals text baked into the prompt.
 JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5,
-                    "monthly": 5, "quarterly": 5}   # the single-pool tiers (and legacy dicts)
+                    "monthly": 5, "quarterly": 5}   # the legacy draw: a plain {'random'} dict, or a date before a tier's epoch
 
 # The daily random block (Vex 2026-09-24): SIX prompts, two per category.
 # The morning draws its three categories every day; the evening draws three
@@ -1807,6 +1807,14 @@ WEEK_EPOCH = date(2026, 9, 28)
 # category by month; MONTH_EPOCH is the first month seeded the new way.
 MONTHLY_CATEGORIES = ("patterns", "direction", "cost", "people", "open")
 MONTH_EPOCH = date(2026, 10, 1)
+# The quarterly random block (Vex 2026-09-24, late night: "10"): TEN prompts,
+# two from every category, cycling per category by quarter, from a pool of
+# thirty (six a category: each prompt is asked once in every three quarters
+# and never two quarters running; repeats land two to four quarters apart).
+# QUARTER_EPOCH is the first quarter seeded the new way: Q3 2026, whose
+# journal was reseeded clean (it was all unanswered).
+QUARTERLY_CATEGORIES = ("lookback", "lessons", "decisions", "direction", "system")
+QUARTER_EPOCH = date(2026, 7, 1)
 
 
 def _clip(s, n=140):
@@ -1896,14 +1904,16 @@ def journal_fixed(slot, ctx=None):
             ("free", "What is on your mind?"),
         ]
         return out
-    if slot in ("monthly", "quarterly"):
-        word = "month" if slot == "monthly" else "quarter"
+    if slot == "quarterly":
+        return _quarterly_fixed(ctx)
+    if slot == "monthly":
+        word = "month"
         # the weekly's two, one tier up. No picker handoff: next month's goal
         # is set from the 🎯 row like every other tier's, and a month is not
         # a three-things horizon.
-        adj = "monthly" if slot == "monthly" else "quarterly"
+        adj = "monthly"
         goals = (ctx.get("goals") or "").strip()
-        weeks = (ctx.get("weeks") or "").strip() if slot == "monthly" else ""
+        weeks = (ctx.get("weeks") or "").strip()
         out = [
             (f"{word[0]}highlight",
              f"What was the highlight of the {word}? "
@@ -1916,8 +1926,6 @@ def journal_fixed(slot, ctx=None):
               f"Did you achieve your {adj} goals? "
               "Describe success/fail factors on each.")),
         ]
-        if slot == "quarterly":
-            return out
         # the monthly is the OKR checkpoint (Vex 2026-09-24, late): the
         # month's objectives one by one, the quarter's guiding-star check,
         # the month's habit line, the money line with its chip, each only
@@ -2011,6 +2019,91 @@ def journal_fixed(slot, ctx=None):
     return out
 
 
+def _quarterly_fixed(ctx):
+    """The quarterly set block (Vex 2026-09-24, late night): his findings as
+    fixed questions around the OKR checkpoint one tier up, every line quoting
+    what the note already knows. He REMOVED the prose-planning questions
+    (differently this / next quarter, the plan, how achieve, one rule): the
+    goal editor after the run is the plan. Order: look back (three highlights
+    with the months' ✨ and the 🟢 wins, three lowlights with the 🔴 nags and
+    the moods), score (his goals stem, objective by objective + the bar, the
+    year's goal with the quarters it has left, this quarter against last with
+    last quarter's own wish echoed), the lines (habits, income + an expense
+    to cut, effort with the focus hours), his three (passionate/bored, top
+    three priorities, pace + where in 3 months), "What is on your mind?" the
+    border before the ten drawn prompts. Conditional lines skip when the note
+    has nothing to quote (CONDITIONAL_KEYS)."""
+    def _s(k):
+        return (ctx.get(k) or "").strip()
+
+    def _q(label, text):
+        """" Your nags: <text>." - a quote that already ends a sentence
+        (a nag logged with its full stop) is not given a second one."""
+        return f" {label}: {text}" + ("" if text[-1] in ".!?" else ".")
+    goals, months, wins = _s("goals"), _s("months"), _s("wins")
+    nags, moods = _s("nags"), _s("moods")
+    out = [
+        ("qhighlight", "✨ What are the three biggest highlights of the quarter?"
+                       + (_q("Your months", months) if months else "")
+                       + (_q("Your wins", wins) if wins else "")),
+        ("qlowlights", "🔴 What are the three biggest lowlights?"
+                       + (_q("Your nags", nags) if nags else "")
+                       + (_q("Moods", moods) if moods else "")),
+        ("qgoals", (f"Did you achieve your quarterly goals, {goals}? "
+                    "Describe success/fail factors on each."
+                    if goals else
+                    "Did you achieve your quarterly goals? "
+                    "Describe success/fail factors on each.")),
+    ]
+    objs = _s("objectives")
+    if objs:
+        out.append(("qobjectives", f"🥅 Objective by objective, {objs}: hit, partial or miss, "
+                                   "and the factor that decided it? Was the bar set too high "
+                                   "or too low?"))
+    year = _s("year")
+    if year:
+        left = ctx.get("quarters_left")
+        if left is not None and left <= 0:
+            q = (f"🎉 The year's goal, {year}: this was its last quarter. "
+                 "Which carry into next year, and which stop here?")
+        else:
+            when = (f"with {left} quarter{'s' if left != 1 else ''} left" if left
+                    else "with the year still running")
+            q = (f"🎉 The year's goal, {year}, {when}: ahead, on track or behind, and "
+                 "what must next quarter deliver? Has this review given you "
+                 "information that alters your yearly goals?")
+        out.append(("ycheck", q))
+    compare, wanted = _s("compare"), _s("wanted")
+    if compare or wanted:
+        out.append(("qcompare", "⏪ How does this quarter compare to last quarter?"
+                                + (f" {compare}." if compare else "")
+                                + (_q("Last quarter you wanted", wanted) + " Did you get there?"
+                                   if wanted else "")))
+    habits = _s("habits")
+    if habits:
+        out.append(("habits", f"🔄 Habit consistency this quarter: {habits}. Which held, "
+                              "which broke, and which habits do you want to build next "
+                              "quarter?"))
+    money = _s("money")
+    if money:
+        out.append(("qmoney", f"💰 Income this quarter: {money}. Does this align with your "
+                              "forecast? What could you do to improve it? Can you cut down "
+                              "on any expense category?"))
+    focus = _s("focus")
+    out += [
+        ("qeffort", "⏱ What effort is not worth your time, what are you spending your time "
+                    "on that is not leading towards the desired outcome?"
+                    + (_q("Your focus", focus) if focus else "")),
+        ("qenergy", "🔥 When did you feel most passionate this quarter, and why then? "
+                    "When did you feel bored or resentful, and why?"),
+        ("qpriorities", "🧭 What are your top three priorities, and why do they matter?"),
+        ("qforecast", "🔮 If you continue at this pace, where will you be in three months? "
+                      "Where do you want to be in 3 months? What do you want to achieve?"),
+        ("free", "What is on your mind?"),
+    ]
+    return out
+
+
 # Which fixed question a seeded Q line IS, by its wording. Every question
 # journal_fixed has ever seeded must match its rule (older wordings too), and
 # no rule may match another key's question or a pool prompt.
@@ -2040,6 +2133,19 @@ JOURNAL_KEY_RULES = (
     ("wforecast", re.compile(r"^🔮 What is the intention for next week\?")),
     ("wfcheck", re.compile(r"^🔮 How did the week go\b")),
     ("wrating", re.compile(r"^Rate the week\b")),
+    # the quarterly's set block (2026-09-24, late night). qobjectives shares
+    # the monthly's stem and is told apart by its verdict words, so it MUST
+    # sit before mobjectives; ⏱ with or without VS16
+    ("qobjectives", re.compile(r"^🥅 Objective by objective\b.*: hit, partial or miss, and the factor "
+                               r"that decided it\? Was the bar set too high or too low\?$")),
+    ("qlowlights", re.compile(r"^🔴 What are the three biggest lowlights\?")),
+    ("ycheck", re.compile(r"^🎉 The year's goal\b")),
+    ("qcompare", re.compile(r"^⏪ How does this quarter compare\b")),
+    ("qmoney", re.compile(r"^💰 Income this quarter\b")),
+    ("qeffort", re.compile(r"^⏱\ufe0f? What effort is not worth your time\b")),
+    ("qenergy", re.compile(r"^🔥 When did you feel most passionate\b")),
+    ("qpriorities", re.compile(r"^🧭 What are your top three priorities\b")),
+    ("qforecast", re.compile(r"^🔮 If you continue at this pace\b")),
     # the monthly's OKR checkpoint and money line (2026-09-24, late)
     ("mobjectives", re.compile(r"^🥅 Objective by objective\b")),
     ("qcheck", re.compile(r"^🌓 The quarter's objectives\b")),
@@ -2062,7 +2168,8 @@ JOURNAL_KEY_RULES = (
     # wrong tier's note
     ("mhighlight", re.compile(r"^What was the highlight of the month\?")),
     ("mgoals", re.compile(r"^Did you achieve your monthly goals\b")),
-    ("qhighlight", re.compile(r"^What was the highlight of the quarter\?")),
+    # the quarter's: the old single-highlight stem and the three-highlights one
+    ("qhighlight", re.compile(r"^(?:✨ )?What (?:was the highlight|are the three biggest highlights) of the quarter\?")),
     ("qgoals", re.compile(r"^Did you achieve your quarterly goals\b")),
 )
 
@@ -2219,7 +2326,10 @@ def _cycle_order(prompts, key, cyc):
     are kept out of the first JOURNAL_PER_CATEGORY slots (moved to the end,
     in order), so a draw that straddles a cycle boundary never asks one
     prompt twice and the next draw never repeats the previous one (review
-    2026-09-24: an odd-sized category hit both). Lists shorter than two
+    2026-09-24: an odd-sized category hit both). That promise holds for
+    lists of at least 2*per+2 prompts (six at two a draw, the shipped
+    minimum); a shorter list (a user override of four or five) only keeps
+    _draw's own guarantee, never twice in one draw. Lists shorter than two
     draws are left alone. random.Random(key:cycle) - NEVER hash(), which is
     salted per process."""
     n, per = len(prompts), JOURNAL_PER_CATEGORY
@@ -2267,11 +2377,11 @@ def select_prompts(pool, d, which, k=None):
     (journal_categories), each category cycling through its own list; a
     chain night returns one chain's steps in order (chains rotate by chain
     night, the file's order). The weekly pool: two from EVERY
-    WEEKLY_CATEGORIES category, cycling by week index from WEEK_EPOCH.
-    Everything else - the monthly and quarterly pools (one ## random
-    section), a plain {'random': [...]} dict, and any date before the
-    epochs - keeps the old k seeded-random picks from 'random'. Fixed
-    prompts live in journal_fixed, not the pool."""
+    WEEKLY_CATEGORIES category, cycling by week index from WEEK_EPOCH; the
+    monthly and the quarterly the same by month / quarter index from their
+    epochs. Everything else - a plain {'random': [...]} dict and any date
+    before the epochs - keeps the old k seeded-random picks from 'random'.
+    Fixed prompts live in journal_fixed, not the pool."""
     if k == 0:
         return []
     cats = pool.get("categories") or {}
@@ -2314,6 +2424,15 @@ def select_prompts(pool, d, which, k=None):
         for c in MONTHLY_CATEGORIES:
             lst = list(cats.get(c) or [])
             out += _draw(lst, f"monthly:{c}", mi * JOURNAL_PER_CATEGORY, min(JOURNAL_PER_CATEGORY, len(lst)))
+        return out
+    # the quarterly: every category, two each, cycling by quarter (any day
+    # of the quarter gives its picks: the note is pinned to its first day)
+    if which == "quarterly" and any(c in cats for c in QUARTERLY_CATEGORIES) and d >= QUARTER_EPOCH:
+        qi = quarter_index(d)
+        out = []
+        for c in QUARTERLY_CATEGORIES:
+            lst = list(cats.get(c) or [])
+            out += _draw(lst, f"quarterly:{c}", qi * JOURNAL_PER_CATEGORY, min(JOURNAL_PER_CATEGORY, len(lst)))
         return out
     rnd_pool = list(pool.get("random", []))
     k = JOURNAL_RANDOM_K.get(which, 3) if k is None else k
@@ -2373,17 +2492,98 @@ _LATE_CHIP_RE = re.compile(r"\s*🔴\s*\d+d\b")
 _PLAN_GLYPHS = {"🔑", "✅", "🥅", "🏔"}          # okr_notes' item glyphs, VS16 dropped
 # fixed questions that only exist while the note plans something: dropped
 # again while unanswered when the plan goes (periodic_engine._refresh_fixed_q)
-CONDITIONAL_KEYS = ("kr", "objectives", "habits", "mobjectives", "qcheck", "mmoney")
+CONDITIONAL_KEYS = ("kr", "objectives", "habits", "mobjectives", "qcheck", "mmoney",
+                    "qobjectives", "ycheck", "qcompare", "qmoney")
 # fixed questions that QUOTE free text (a forecast, a KR title): the needle
 # readers and writers skip them, or "rate the day" inside a forecast would
 # catch the stars (review 2026-09-24)
-QUOTING_KEYS = ("fcheck", "kr", "objectives", "habits", "wfcheck", "mobjectives", "qcheck", "mmoney")
+QUOTING_KEYS = ("fcheck", "kr", "objectives", "habits", "wfcheck", "mobjectives", "qcheck", "mmoney",
+                "qobjectives", "ycheck", "qcompare", "qmoney", "qeffort", "qlowlights", "qhighlight")
 
 
 def months_left_in_quarter(d):
     """Months of d's quarter AFTER d's month: 2, 1 or 0 (the last month)."""
     q_end = ((d.month - 1) // 3 + 1) * 3
     return q_end - d.month
+
+
+def quarters_left_in_year(d):
+    """Quarters of d's year AFTER d's quarter: 3, 2, 1 or 0 (the last)."""
+    return 4 - ((d.month - 1) // 3 + 1)
+
+
+def quarter_index(d):
+    """Quarters from QUARTER_EPOCH's quarter to d's (0 in the epoch's)."""
+    return ((d.year - QUARTER_EPOCH.year) * 4
+            + (d.month - 1) // 3 - (QUARTER_EPOCH.month - 1) // 3)
+
+
+def entry_children(body_lines, label, sub):
+    """The bullets under the `sub` bullet under the top-level `label` bullet:
+    💿 Data holds "- 📨 Entries" with "**🟢 Wins**" one level in and the wins
+    one level under that. Depth is the indent width, so tabs and a phone's
+    spaces both read; emoji, bold stars, case and escapes are ignored in the
+    two labels. [] when either is missing."""
+    want, want_sub = _label_key(label), _label_key(sub)
+    out, on, sub_w = [], False, None
+    for ln in body_lines or []:
+        s = unescape_md(ln.strip())
+        if not s:
+            continue
+        w = len(ln) - len(ln.lstrip("\t "))
+        if w == 0:
+            on = s.startswith("- ") and _label_key(s[2:]).startswith(want)
+            sub_w = None
+            continue
+        if not on or not s.startswith("- "):
+            continue
+        if sub_w is None or w <= sub_w:
+            sub_w = w if _label_key(s[2:]).startswith(want_sub) else None
+            continue
+        out.append(s[2:].strip())
+    return out
+
+
+_ENTRY_STAMP_RE = re.compile(r"\s·\s[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}(?: \d{2}:\d{2})?$")
+
+
+def entries_summary(children, cap=8):
+    """📨 Entries lines ("Did weekly review · Sun 20 Sep 09:58") without their
+    stamps and their own full stops (a nag logged as a sentence would read
+    "prompt.; next"), "; "-joined, the first `cap` with "(+N more)" after
+    them."""
+    texts = [mdtext.flatten_links(_ENTRY_STAMP_RE.sub("", c)).replace("**", "").strip().rstrip(".").strip()
+             for c in children if c]
+    texts = [t for t in texts if t]
+    more = len(texts) - cap
+    return "; ".join(texts[:cap]) + (f" (+{more} more)" if more > 0 else "")
+
+
+_COMPARE_KEYS = ("Completed", "Focus", "Mood", "Income")
+_PARTIAL_RE = re.compile(r"\b\d+ of \d+ (?:days|weeks|months|quarters)\b")
+
+
+def quarter_compare(this, last):
+    """"Completed 665 vs 500 · Focus 97h 11m vs 49h 00m · ..." from two
+    {label: header text} dicts (📊 Stats / 💿 Data heads for this quarter,
+    the ⏪ Last quarter lines for last); each head's first " · " token, "avg"
+    and "Average" dropped; only labels both sides carry; a side summed out
+    of SOME of its months ("665 · 1 of 3 months") drops its label, the
+    roll-up's own rule (half a quarter against a whole one is a number
+    nobody can act on); '' when none."""
+    def first(v):
+        v = v or ""
+        if _PARTIAL_RE.search(v):
+            return ""
+        v = v.split(" · ")[0].strip()
+        v = re.sub(r"^Average\s+", "", v)
+        return re.sub(r"\s+avg$", "", v).strip()
+    parts = []
+    for k in _COMPARE_KEYS:
+        a, b = first((this or {}).get(k)), first((last or {}).get(k))
+        if a and b:
+            parts.append(f"{k} {a} vs {b}")
+    return " · ".join(parts)
 
 
 def bullet_head(body_lines, label):
@@ -2527,6 +2727,47 @@ def journal_pairs(body_lines):
                 continue
         i += 1
     return out
+
+
+def journal_answer_text(body_lines, a_idx):
+    """The WHOLE answer whose A line is body_lines[a_idx]: the A-line text
+    plus the continuation bullets under it (the dialog's multiline box lands
+    every further paragraph as a sibling bullet under the A line), joined
+    with a space, bullets and italics stripped. Stops at the next Q line, a
+    divider, or a line no deeper than the Q line. '' when unanswered."""
+    if not (0 < a_idx < len(body_lines)):
+        return ""
+    m = JOURNAL_A_RE.match(body_lines[a_idx])
+    if not m:
+        return ""
+    parts = [m.group("a").strip()]
+    q_line = body_lines[a_idx - 1]
+    q_indent = len(q_line) - len(q_line.lstrip())
+    for ln in body_lines[a_idx + 1:]:
+        if not ln.strip():
+            continue
+        if JOURNAL_Q_RE.match(ln) or ln.strip() == "---":
+            break
+        if len(ln) - len(ln.lstrip()) <= q_indent:
+            break
+        t = ln.strip()
+        if t.startswith("- "):
+            t = t[2:]
+        t = t.strip().strip("*").strip()
+        if t:
+            parts.append(t)
+    return " ".join(x for x in parts if x)
+
+
+def highlight_body(text):
+    """The ✨ Highlight section body for a highlight answer: one line as it
+    is (the weekly's shape since 2026-09-12); several lines (the quarterly's
+    three biggest highlights, typed one per line) as bullets, links
+    flattened, blanks dropped, a line already bulleted left alone."""
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    if len(lines) <= 1:
+        return [text]
+    return [ln if ln.startswith("- ") else f"- {mdtext.flatten_links(ln)}" for ln in lines]
 
 
 def same_question(a, b):
