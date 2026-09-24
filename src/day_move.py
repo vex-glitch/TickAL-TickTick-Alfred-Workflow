@@ -205,8 +205,12 @@ def move_fields(task, day, tz=None):
         new_start = datetime.combine(day, clock).replace(tzinfo=tz)
         return {"startDate": _out(new_start), "dueDate": _out(new_start + span),
                 "isAllDay": False}, "timed"
-    midnight = datetime.combine(day, time(0, 0)).replace(tzinfo=tz)
-    return {"startDate": _out(midnight), "dueDate": _out(midnight), "isAllDay": True}, "all-day"
+    # the zone is NAMED, as all_day and shift_fields do: TickTick reads an
+    # all-day stamp in the task's own zone, and a task made in the app
+    # carries the account's (Europe/London), so a bare Berlin-midnight stamp
+    # showed the day before (review 2026-09-24: a goal picked for tomorrow
+    # sat on today)
+    return all_day(day, tz), "all-day"
 
 
 def occurs_on(task, day, tz=None):

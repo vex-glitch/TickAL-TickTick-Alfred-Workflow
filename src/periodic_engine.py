@@ -3189,7 +3189,8 @@ def _goal_task_to_day(pid, tid, day, title=None):
         try:
             posted = _api().update_task(tid, live.get("projectId") or pid, current=live,
                                         **fields) or {}
-            when = {k: posted.get(k, fields.get(k)) for k in ("startDate", "dueDate", "isAllDay")}
+            when = {k: posted.get(k, fields.get(k))
+                    for k in ("startDate", "dueDate", "isAllDay", "timeZone") if k in fields or k in posted}
             try:
                 from dispatch import _patch_task_cache
                 _patch_task_cache(tid, **when)          # isAllDay too, as posted
