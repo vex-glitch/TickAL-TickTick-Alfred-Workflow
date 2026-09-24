@@ -607,8 +607,10 @@ def _split_next(rest):
     r = (rest or "").lstrip()
     if r.startswith(pm.GOAL_NEXT_MARK):
         # the space after the mark is not part of the query: " tickal"
-        # would drop every title that STARTS with the word (review 2026-09-24)
-        return True, r[len(pm.GOAL_NEXT_MARK):].lstrip()
+        # would drop every title that STARTS with the word (review 2026-09-24);
+        # neither is the variation selector the macOS emoji picker types
+        # after the glyph (U+FE0F), which is not whitespace
+        return True, r[len(pm.GOAL_NEXT_MARK):].lstrip("\ufe0f \t")
     return False, rest or ""
 
 
@@ -627,7 +629,10 @@ def _week_switch_row(uid, manual_next, back_to, ahead_to):
 
 def goal_rows(frag):
     seq = _goalseq_active()
-    manual, frag = (False, frag) if seq else _split_next(frag)
+    # the mark is stripped ALWAYS (typed under a live handoff it became goal
+    # text, review 2026-09-24); it only turns the screen when no handoff owns it
+    manual, frag = _split_next(frag)
+    manual = manual and not seq
     nxt = bool(seq) or manual
     sub = ("⏎ Goal for NEXT week" if nxt else "⏎ Set as this week's goal")
     flag = ":next" if manual else ""
@@ -1053,8 +1058,9 @@ def tier_goal_rows(kind, rest, jnl=None):
     # it as typed text; the ⏭ ROW is offered on the weekly screen only.
     seq = bool(not jnl and kind != "daily" and _goalseq_active(kind))
     manual_next = False
-    if not jnl and kind != "daily" and not seq:
-        manual_next, rest = _split_next(rest)
+    if not jnl and kind != "daily":
+        manual_next, rest = _split_next(rest)      # stripped even under a handoff
+        manual_next = manual_next and not seq
     ahead = seq or manual_next
     if ahead:
         label += " · next"
