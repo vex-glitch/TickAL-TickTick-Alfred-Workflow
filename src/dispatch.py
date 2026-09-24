@@ -474,6 +474,9 @@ def main():
                 # check-in too (Vex 2026-09-12). Suffix-only, like the
                 # autolog above - it never blocks or fails the completion.
                 log_suffix += _xact.routine_checkin(tid)
+                # the daily note's ticks follow (Vex 2026-09-23) - queued,
+                # debounced and detached, so the toast never waits on it
+                _xact.pn_done_nudge()
             except Exception:
                 pass
             # Vex 2026-09-20: raw md link in the ⇧ complete toast

@@ -11,6 +11,7 @@ Run: python3 tests/test_alb_move.py   (or unittest discover)
 """
 import json
 import os
+os.environ["TICKAL_NO_SETTLE"] = "1"   # no background follow-ups (note catch-up, settle)
 import sys
 import unittest
 

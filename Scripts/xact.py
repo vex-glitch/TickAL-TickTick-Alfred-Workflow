@@ -225,6 +225,9 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
     xact:pn_highlight[:<b64|text>]  ✨ weekly Highlight (empty → dialog)
     xact:pn_sched:today|pid|tid[|HH:MM]  ☀️/🌙 Add-to picker commit
     xact:pn_refresh[:<spec>]        rebuild generated sections (bg-open path)
+    xact:pn_donesync                the daily note's catch-up after a
+                                    completion (detached, debounced:
+                                    src/done_sync.py, pn_done_nudge)
                                     (sweeps ticked ✅ Today boxes first)
     xact:pn_mint                    the 04:30 agent run: mint-ahead + catch-up
                                     + refresh + roll-ups (launchd fires this)
@@ -332,18 +335,21 @@ def _now_iso():
 
 
 def _run_trigger(name, arg=None):
+    """Fire one of our External Triggers. Returns the osascript result (the
+    journal log records a handoff whose picker never opened); callers that
+    do not care ignore it. Output is captured, so a failed send never lands
+    in a toast."""
     if arg is None:
-        subprocess.run(["osascript", "-e",
-                        f'tell application id "com.runningwithcrayons.Alfred" to '
-                        f'run trigger "{name}" in workflow "com.vex.tickal"'],
-                       check=False)
-    else:
-        subprocess.run(["osascript", "-e",
-                        ('on run argv\n'
-                         f'tell application id "com.runningwithcrayons.Alfred" to '
-                         f'run trigger "{name}" in workflow "com.vex.tickal" '
-                         'with argument (item 1 of argv)\nend run'),
-                        arg], check=False)
+        return subprocess.run(["osascript", "-e",
+                               f'tell application id "com.runningwithcrayons.Alfred" to '
+                               f'run trigger "{name}" in workflow "com.vex.tickal"'],
+                              check=False, capture_output=True, text=True)
+    return subprocess.run(["osascript", "-e",
+                           ('on run argv\n'
+                            f'tell application id "com.runningwithcrayons.Alfred" to '
+                            f'run trigger "{name}" in workflow "com.vex.tickal" '
+                            'with argument (item 1 of argv)\nend run'),
+                           arg], check=False, capture_output=True, text=True)
 
 
 def _app_sync():
@@ -424,6 +430,8 @@ def buffer_complete():
         except Exception:
             skipped += 1
     _write_buffer([])
+    if done:
+        pn_done_nudge()
     print(f"🅿️ {done} completed" + (f", {skipped} skipped" if skipped else "")
           + "".join(plogged))
     # Complete-guard: completing the focused task ends its session too.
@@ -718,6 +726,38 @@ def _complete_cache_patch(pid, tid):
         _patch_project_data(tid, pid_old=pid, remove=True)
     except Exception:
         cache_store.invalidate("all_tasks")
+    pn_done_nudge()          # the daily note's ticks follow (src/done_sync.py)
+
+
+def pn_done_nudge():
+    """A completion TickAL made: queue the daily note's catch-up (Vex
+    2026-09-23, "checkboxes in notes are not synced"). Trailing-debounced in
+    src/done_sync.py, so a burst of ticks costs ONE refresh, DELAY seconds
+    after the last. Silent and never raises: the completion already
+    happened, and the note is bookkeeping. TICKAL_NO_SETTLE (the switch the
+    tests and the repeat-settle child already set) turns it off: a test that
+    runs a completion road must never refresh Vex's real notes."""
+    if os.environ.get("TICKAL_NO_SETTLE"):
+        return
+    try:
+        import areas
+        if not areas.periodic_configured():
+            return
+        import done_sync
+        done_sync.request(lambda: _pn_bg("xact:pn_donesync"))
+    except Exception:
+        pass
+
+
+def pn_donesync():
+    """The detached half of pn_done_nudge: wait for the completions to go
+    quiet, then refresh today's note and tick yesterday's
+    (periodic_engine.after_done). Output goes to the periodic log."""
+    if not _pn_gate():
+        return
+    import done_sync
+    done_sync.wait_quiet()
+    print(f"{datetime.now():%Y-%m-%d %H:%M:%S} done-sync: {_pn().after_done()}")
 
 
 def _children_state(fpid, ftid):
@@ -1160,6 +1200,9 @@ def _osa_dialog(body):
         capture_output=True, text=True)
 
 
+_ASK_LAST = {}          # how the last _ask went: via box|osa, and any error
+
+
 def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False):
     """Module-level dialog helper. Returns None on Cancel, "" on
     empty-OK - the journal flow assigns those OPPOSITE meanings (cancel =
@@ -1170,14 +1213,21 @@ def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False):
     invites prose, because `display dialog`'s field is one line: it does not
     wrap, you cannot see what you wrote, and Return submits. It falls back
     here wherever PyObjC is missing, and is never used with `hidden` (a
-    password wants the one-line secure field)."""
+    password wants the one-line secure field).
+
+    _ASK_LAST records which box answered and why one failed, for the journal
+    log (a journal that "exits" is otherwise impossible to tell apart from
+    one whose box never showed)."""
+    _ASK_LAST.clear()
     if multiline and not hidden:
         try:
             import ask_box
             if ask_box.available():
+                _ASK_LAST["via"] = "box"
                 return ask_box.ask(prompt, title, default)
-        except Exception:
-            pass                      # no AppKit, or it would not draw
+        except Exception as e:
+            _ASK_LAST["box_err"] = f"{type(e).__name__}: {e}"[:160]
+    _ASK_LAST["via"] = "osa"
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace('"', '\\"')
     osa = ('text returned of (display dialog "{}" default answer "{}" '
@@ -1185,6 +1235,7 @@ def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False):
                                         " with hidden answer" if hidden else "")
     r = _osa_dialog(osa)
     if r.returncode != 0:
+        _ASK_LAST["osa_err"] = " ".join((r.stderr or "").split())[-160:]
         return None
     return r.stdout.rstrip("\n") if hidden else r.stdout.strip()
 
@@ -7357,6 +7408,37 @@ def pn_income(rest):
         pass
 
 
+# Every journal run leaves its trail here, beside the link log (Vex
+# 2026-09-22: "Shutdown journal exits after choose goal prompt ... Then I need
+# to go and start journal again"). /tmp is wiped by every reboot, and on the
+# morning that bug was filed there were three - nothing was left to show what
+# the resumed run did. Events and timings only, NEVER an answer's text.
+JOURNAL_LOG = run_path("tickal_journal.log")
+JOURNAL_LOG_MAX = 64 * 1024
+
+
+def _jlog(tag, event):
+    try:
+        if os.path.exists(JOURNAL_LOG) and os.path.getsize(JOURNAL_LOG) > JOURNAL_LOG_MAX:
+            with open(JOURNAL_LOG) as f:
+                tail = f.readlines()[-300:]
+            with open(JOURNAL_LOG, "w") as f:
+                f.writelines(tail)
+        with open(JOURNAL_LOG, "a") as f:
+            f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S}\t{os.getpid()}\t{tag}\t{event}\n")
+    except OSError:
+        pass
+
+
+def _ask_trail():
+    """' via box' / ' via osa (err …)' - how the last _ask went."""
+    bits = [f"via {_ASK_LAST.get('via', '?')}"]
+    for k in ("box_err", "osa_err"):
+        if _ASK_LAST.get(k):
+            bits.append(f"{k}={_ASK_LAST[k]}")
+    return " " + " ".join(bits)
+
+
 _JOURNAL_UI = {"morning": ("🌅", "Morning"), "evening": ("🌙", "Evening"),
                "weekly": ("📔", "Weekly"), "monthly": ("📔", "Monthly"),
                "quarterly": ("📔", "Quarterly")}
@@ -7437,9 +7519,11 @@ def pn_journal(slot):
     import goal_handoff as gh
     keys, pairs, jper = pe.journal_seed(slot, day=pin_day)
     if pairs is None:
+        _jlog(f"{slot}@{pin}", "no journal section")
         print("💫 No journal section in the note (header renamed?)")
         return
     day0 = jper.start          # pin the note - dialog runs can cross midnight
+    tag = f"{slot}@{day0.isoformat()}"
     emoji, label = _JOURNAL_UI[slot]
     open_pairs = [(n, q) for n, q, a, _i in pairs if not a]
     # questions skipped (empty OK) before the goal picker paused this run stay
@@ -7458,6 +7542,9 @@ def pn_journal(slot):
         # earlier run left open - a pick there must not overwrite this run
         gh.clear()
     total = len(pairs)
+    _jlog(tag, f"start {'resumed' if pin else 'fresh'}"
+               f" detached={'yes' if os.environ.get('TICKAL_DETACHED') else 'no'}"
+               f" open={len(open_pairs)}/{total} held={held}")
     answers, cancelled, routed = {}, False, []
     skipped = []
     bridge_said = ""
@@ -7473,7 +7560,9 @@ def pn_journal(slot):
                 handoff = "set"
                 break
             # a real Cancel button: display dialog maps Esc only onto one
+            t0 = time.time()
             b = _dialog(q, ["Cancel", "Change…", "Keep"], "Keep")
+            _jlog(tag, f"q{n}/{total} gcheck -> {b or 'esc'} {time.time() - t0:.0f}s")
             if b == "Keep":
                 answers[n] = gh.answer_text(slot, "kept", goal)
                 continue
@@ -7484,8 +7573,11 @@ def pn_journal(slot):
             break
         # mood / money / rating are parsed out of ONE short line; the rest
         # are prose, and prose gets the big box (Vex 2026-09-16).
+        t0 = time.time()
         a = _ask(q, title=f"{label} journal · {n}/{total}",
                  multiline=key not in ("mood", "money", "rating"))
+        outcome = "cancel" if a is None else ("skip" if not a.strip() else "answered")
+        _jlog(tag, f"q{n}/{total} {key} -> {outcome} {time.time() - t0:.0f}s{_ask_trail()}")
         if a is None:                     # Cancel: stop, keep what we have
             cancelled = True
             break
@@ -7543,6 +7635,7 @@ def pn_journal(slot):
     if handoff:
         # ── the goal question: dialogs can't host the picker, so stop here,
         # remember where, and let the pick reopen this journal
+        _jlog(tag, f"handoff {handoff} (saved {filled}) -> goal picker")
         gh.save(slot, day0, mode=handoff)
         gh.remember_skips(slot, day0, carried + skipped)
         when = "tomorrow's" if slot == "evening" else "today's"
@@ -7551,13 +7644,17 @@ def pn_journal(slot):
         print(line)
         if os.environ.get("TICKAL_DETACHED") and bridge_said:
             _crm_say(line)             # a link-started run's bridge result is shown
-        _run_trigger("Search", "pn goals journal ")
+        r = _run_trigger("Search", "pn goals journal ")
+        rc = getattr(r, "returncode", "?")
+        err = " ".join((getattr(r, "stderr", "") or "").split())[-160:]
+        _jlog(tag, f"picker trigger rc={rc}" + (f" err={err}" if err else ""))
         return
     bits = [f"{emoji} {label} saved {done_now}/{total}"]
     if bridge_said:
         bits.append(bridge_said)
     if cancelled:
         bits.append("(cancelled)")
+    _jlog(tag, f"end saved {done_now}/{total}{' cancelled' if cancelled else ''}")
     print(" ".join(bits))
     if os.environ.get("TICKAL_DETACHED"):
         # a routine step's journal runs detached (_pn_bg) and its stdout only
@@ -7603,10 +7700,13 @@ def _goal_seq_step(toast, kind="weekly"):
     return "next"
 
 
-def pn_goal(pid, tid):
+def pn_goal(pid, tid, nxt=False):
+    """🎯 A task as a week goal. nxt = the row came from the screen's ⏭ Next
+    week mode (Vex 2026-09-20: the Sunday review); the weekly journal's
+    handoff aims at next week by its own state file."""
     if not _pn_gate():
         return
-    week = "next" if _goalseq_load() else "current"
+    week = "next" if (nxt or _goalseq_load()) else "current"
     title = _task_title(tid, default="Task", pid=pid)
     toast = _pn().set_goal(pid, tid, title, week=week)
     if week == "next":
@@ -7640,9 +7740,10 @@ def pn_setgoal(rest):
         print(toast)
     else:
         # every tier that APPENDS re-opens its screen, so he can keep adding
-        # or Esc - the add-a-subtask shape (Vex 2026-09-17)
+        # or Esc - the add-a-subtask shape (Vex 2026-09-17) - in the mode it
+        # was in: a pick in ⏭ Next week lands back in ⏭ Next week
         print(toast)
-        _run_trigger("Search", f"pn goals {kind} ")
+        _run_trigger("Search", _goal_screen(kind, ahead))
 
 
 def pn_goaldel(rest):
@@ -7655,20 +7756,28 @@ def pn_goaldel(rest):
     if kind not in ("weekly", "monthly", "quarterly", "yearly"):
         print(f"💫 {kind or 'that tier'} has no goal list")
         return
-    print(_pn().remove_period_goal(kind, spec.get("line") or "",
-                                   ahead=bool(spec.get("ahead"))))
-    _run_trigger("Search", f"pn goals {kind} ")
+    ahead = bool(spec.get("ahead"))
+    print(_pn().remove_period_goal(kind, spec.get("line") or "", ahead=ahead))
+    _run_trigger("Search", _goal_screen(kind, ahead and not _goalseq_load(kind)))
 
 
 def pn_goaldone(rest):
-    """✅ Done: end an open-ended handoff and say what stands."""
+    """✅ Done: end an open-ended handoff and say what stands - for the period
+    the screen was on (next week's count after ⏭, not this week's)."""
     spec = _pn_decode(rest) or {}
     kind = (spec.get("kind") or "").strip() or "weekly"
+    ahead = bool(spec.get("ahead"))
     _goalseq_save(0, kind)
     if not _pn_gate():
         return
-    n = len(_pn().period_goals(kind))
-    print(f"🎯 {n} goal{'s' if n != 1 else ''} set")
+    n = len(_pn().period_goals(kind, ahead=ahead))
+    print(f"🎯 {n} goal{'s' if n != 1 else ''} set" + (" · next" if ahead else ""))
+
+
+def _goal_screen(kind, manual_next=False):
+    """The query that reopens a tier's goal screen, ⏭ mode kept."""
+    import periodic_model as pm
+    return f"pn goals {kind} " + (f"{pm.GOAL_NEXT_MARK} " if manual_next else "")
 
 
 def _jnl_spec(raw):
@@ -7687,9 +7796,21 @@ def _jnl_spec(raw):
 
 
 def _resume_journal(slot, note_day):
-    """Reopen the paused journal, detached (the picker's End toast goes out
-    now; the dialogs follow). TICKAL_DETACHED makes its final line notify."""
-    _pn_bg(f"xact:pn_journal:{slot}@{note_day.isoformat()}")
+    """Carry on with the paused journal IN THIS PROCESS: the pick's own run,
+    on the road the Alfred row starts a journal from.
+
+    It used to be a DETACHED second run (_pn_bg), and that is the one step of
+    the goal handoff that kept failing (Vex 2026-09-22: "Shutdown journal
+    exits after choose goal prompt ... It shows notification journal done.
+    Then I need to go and start journal again"). His link log shows a fresh
+    start seconds after the pick on 20, 21 and 23 Sep; the resumed run's own
+    output went to /tmp, which the reboots wiped, so why it failed was never
+    seen. Its logic replays clean. So the spawn is gone, not patched: the
+    dialogs now follow the pick where the pick itself ran, and the journal
+    log records every step either way. Its final line reaches the End toast
+    beside the pick's (TICKAL_DETACHED is not set here, so no banner)."""
+    _jlog(f"{slot}@{note_day.isoformat()}", "resume in the pick's process")
+    pn_journal(f"{slot}@{note_day.isoformat()}")
 
 
 def _goal_from_journal(spec, kind, pid, tid, title):
@@ -7705,6 +7826,8 @@ def _goal_from_journal(spec, kind, pid, tid, title):
     pe = _pn()
     toast = pe.set_period_goal("daily", spec.get("text") or "", pid, tid, title,
                                day=for_day)
+    _jlog(f"{slot}@{note_day.isoformat()}",
+          f"pick {'refused' if toast.startswith('💫') else 'landed'} for {for_day.isoformat()}")
     if toast.startswith("💫"):
         # the goal did not land (no ☀️ Daily in that note): leave the question
         # open and the screen live, so the journal asks again
@@ -7741,6 +7864,7 @@ def pn_goal_skip(rest):
     slot, mode, note_day, _for_day = j
     key = "tgoal" if slot == "evening" else "gcheck"
     pe = _pn()
+    _jlog(f"{slot}@{note_day.isoformat()}", f"pick skipped ({mode})")
     if mode == "changed":
         # Change… and then nothing: the goal stays, so the answer says kept
         goal = pe.day_goal_on(note_day)
@@ -7761,7 +7885,7 @@ def pn_goal_text(rest):
     if not text:
         print("🎯 Nothing to set")
         return
-    week = "next" if _goalseq_load() else "current"
+    week = "next" if (spec.get("next") or _goalseq_load()) else "current"
     toast = _pn().set_goal(text, week=week)
     if week == "next":
         _goal_seq_step(toast)
@@ -12880,7 +13004,10 @@ def main():
         elif verb == "pn_goal_skip":
             pn_goal_skip(rest)
         elif verb == "pn_goal":
-            pid, tid = rest.split(":", 1); pn_goal(pid, tid)
+            # pid:tid[:next] - :next = the screen's ⏭ Next week mode
+            pid, _, rest2 = rest.partition(":")
+            tid, _, flag = rest2.partition(":")
+            pn_goal(pid, tid, nxt=(flag == "next"))
         elif verb == "pn_goal_text":
             pn_goal_text(rest)
         elif verb == "pn_day_goal":
@@ -12895,6 +13022,8 @@ def main():
             pn_sched(rest)
         elif verb == "pn_refresh":
             pn_refresh(rest)
+        elif verb == "pn_donesync":
+            pn_donesync()
         elif verb == "pn_setloc":
             pn_setloc(rest)
         elif verb == "pn_setgoal":

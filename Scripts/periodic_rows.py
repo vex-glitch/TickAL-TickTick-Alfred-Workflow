@@ -27,7 +27,7 @@ import areas
 import cache as cache_store
 import fuzzy as fuzz
 import periodic_model as pm
-from display import md_links_display, pick_title, pick_where
+from display import md_links_display, pick_title, pick_where, search_key
 from script_base import run_path
 
 
@@ -536,10 +536,22 @@ def income_rows(rest):
     return day_strip_rows(MONEY, rest, "pn $ ")
 
 
-def _task_pool(include_notes=False):
+def _is_bridge(t):
+    """A bridge note: the daily ones live in the 🌉Bridges list, a project's
+    carries the 🌉bridge tag in its own list (bridges.py)."""
+    if areas.BRIDGES_ID and (t.get("projectId") or t.get("_projectId")) == areas.BRIDGES_ID:
+        return True
+    return "🌉bridge" in {str(x).lower() for x in (t.get("tags") or [])}
+
+
+def _task_pool(include_notes=False, goals=False):
     # Never the OKR planning copies (review 2026-09-19): a daily goal set
     # from a task MOVES it onto the day, which would drag a KR copy into a
-    # time block - the 🔮 rows offer the plan, aimed at the linked originals
+    # time block - the 🔮 rows offer the plan, aimed at the linked originals.
+    # goals=True (every goal picker) drops the BRIDGE notes too: they are a
+    # record of a session, never a goal, and a pick moves its task onto the
+    # day - on 2026-09-21 tomorrow's goal became "P • TickAL • WF • Bridge
+    # 🌉 2026/09/19" and that note was dated onto the 22nd.
     try:
         import config as _cfg
         okr_pid = _cfg.get_okr_list_id()
@@ -549,23 +561,77 @@ def _task_pool(include_notes=False):
     pool = [t for t in (cache_store.get("all_tasks") or [])
             if t.get("status", 0) == 0
             and (include_notes or t.get("kind") != "NOTE")
-            and (t.get("projectId") or t.get("_projectId")) not in skip]
+            and (t.get("projectId") or t.get("_projectId")) not in skip
+            and not (goals and _is_bridge(t))]
     return pool
+
+
+def _rank(frag, pool):
+    """The main search's relevance sort (fuzzy.rank), for every pn picker
+    (Vex 2026-09-22: "If I type in TickAL, it will first list all the bridge
+    notes etc. Unlike our search engine which shows correct items at the
+    top"). Matched on the title as it READS - a link's text, never its URL,
+    so "tickal" no longer finds every routine step whose link carries
+    com.vex.tickal. Within a match strength: tasks before notes, top-level
+    before subtasks, higher priority first."""
+    return fuzz.rank(
+        " ".join((frag or "").split()), pool,
+        key_fn=lambda t: search_key(t.get("title") or ""),
+        order_fn=lambda t: (2 if t.get("kind") == "NOTE" else 1,
+                            1 if t.get("parentId") else 0,
+                            -int(t.get("priority") or 0)))
 
 
 def _picker_rows(frag, pool, row_fn, empty_hint):
     if frag:
-        pool = fuzz.filter_and_score(frag, pool,
-                                     key_fn=lambda t: t.get("title") or "")
+        pool = _rank(frag, pool)
     items = [row_fn(t) for t in pool[:40]]
     if not items:
         items = [alfred.item(title=empty_hint, valid=False, mods=_mods())]
     return items
 
 
+def _pn_today():
+    """The goal screens' day: dayroll's, the engine's (a weekly review that
+    runs past midnight on Sunday is still Sunday's, so ⏭ still means the
+    week that is starting, not the one after it)."""
+    try:
+        import dayroll
+        return dayroll.today()
+    except Exception:
+        return date.today()
+
+
+def _split_next(rest):
+    """(manual_next, rest without the ⏭ mark)."""
+    r = (rest or "").lstrip()
+    if r.startswith(pm.GOAL_NEXT_MARK):
+        # the space after the mark is not part of the query: " tickal"
+        # would drop every title that STARTS with the word (review 2026-09-24)
+        return True, r[len(pm.GOAL_NEXT_MARK):].lstrip()
+    return False, rest or ""
+
+
+def _week_switch_row(uid, manual_next, back_to, ahead_to):
+    """⏭ Next week / 🔙 This week: the one row that flips a weekly goal
+    screen between the two (Vex 2026-09-20, the Sunday review)."""
+    wk = pm.period_for("weekly", _pn_today())
+    if manual_next:
+        return alfred.item(uid=uid, title=f"🔙 This week · {pm.title(wk)}",
+                           subtitle="⏎ Back to its goals", valid=False,
+                           autocomplete=back_to, mods=_mods())
+    return alfred.item(uid=uid, title=f"⏭ Next week · {pm.title(pm.next_period(wk))}",
+                       subtitle="⏎ Set its goals now", valid=False,
+                       autocomplete=ahead_to, mods=_mods())
+
+
 def goal_rows(frag):
     seq = _goalseq_active()
-    sub = ("⏎ Goal for NEXT week" if seq else "⏎ Set as this week's goal")
+    manual, frag = (False, frag) if seq else _split_next(frag)
+    nxt = bool(seq) or manual
+    sub = ("⏎ Goal for NEXT week" if nxt else "⏎ Set as this week's goal")
+    flag = ":next" if manual else ""
+    _text_payload = _text_payload_for(manual)
 
     def row(t):
         pid = t.get("projectId") or t.get("_projectId", "")
@@ -573,9 +639,9 @@ def goal_rows(frag):
             uid=f"pn-goal-{t['id']}",
             title="📋 " + pick_title(t),
             subtitle=pick_where(t) + "  |  " + sub,
-            arg=f"xact:pn_goal:{pid}:{t['id']}",
+            arg=f"xact:pn_goal:{pid}:{t['id']}{flag}",
             valid=True, mods=_mods())
-    items = _picker_rows(frag, _task_pool(), row,
+    items = _picker_rows(frag, _task_pool(goals=True), row,
                          "Type to pick a goal task…")
     if not frag.strip():
         # 🔮 the weekly journal's three-things screen is a goal picker too
@@ -583,27 +649,36 @@ def goal_rows(frag):
         # plan pick counts down the three exactly like a picked task.
         def arg(text, t=None):
             if t is not None:
-                return f"xact:pn_goal:{t['projectId']}:{t['id']}"
-            return f"xact:pn_goal_text:{_b64({'text': text})}"
-        gp = pm.period_for("weekly", date.today())
-        if seq:
+                return f"xact:pn_goal:{t['projectId']}:{t['id']}{flag}"
+            return f"xact:pn_goal_text:{_b64(_text_payload(text))}"
+        gp = pm.period_for("weekly", _pn_today())
+        if nxt:
             gp = pm.next_period(gp)
         try:
-            held = [raw for _s, raw in _pe().period_goals("weekly", ahead=bool(seq))]
+            held = [raw for _s, raw in _pe().period_goals("weekly", ahead=nxt)]
         except Exception:
             held = []
-        plan = plan_goal_rows("weekly", gp, "♻️ Weekly" + (" · next" if seq else ""),
+        plan = plan_goal_rows("weekly", gp, "♻️ Weekly" + (" · next" if nxt else ""),
                               arg, held)
         if plan and items and items[0].get("valid") is False:
             items = []                    # the "Type to pick…" hint: the 📋 row says it
         items = plan + items
+        if not seq:
+            items.insert(0, _week_switch_row("pn-goal-weekswitch", manual, "pn goal ",
+                                             f"pn goal {pm.GOAL_NEXT_MARK} "))
     if frag.strip():
         items.append(alfred.item(
             title=f'➕ Goal: "{frag.strip()[:50]}"',
-            subtitle="Plain-text goal",
-            arg=f"xact:pn_goal_text:{_b64({'text': frag.strip()})}",
+            subtitle="Plain-text goal" + (" · next week" if nxt else ""),
+            arg=f"xact:pn_goal_text:{_b64(_text_payload(frag.strip()))}",
             valid=True, mods=_mods()))
     return items
+
+
+def _text_payload_for(manual):
+    def build(text):
+        return {"text": text, "next": True} if manual else {"text": text}
+    return build
 
 
 def day_goal_rows(frag):
@@ -615,7 +690,7 @@ def day_goal_rows(frag):
             subtitle=pick_where(t) + "  |  ⏎ The one thing · scheduled today",
             arg=f"xact:pn_day_goal:{pid}:{t['id']}",
             valid=True, mods=_mods())
-    items = _picker_rows(frag, _task_pool(include_notes=True), row,
+    items = _picker_rows(frag, _task_pool(include_notes=True, goals=True), row,
                          "Type to pick today's one thing…")
     if frag.strip():
         items.append(alfred.item(
@@ -681,7 +756,7 @@ def task_rows(rest):
     frag = rest.strip()
     pool = _task_pool(include_notes=True)
     if frag:
-        pool = fuzz.filter_and_score(frag, pool, key_fn=lambda t: t.get("title") or "")
+        pool = _rank(frag, pool)
     items = [row(t) for t in pool[:40]]
     if frag:
         items.append(alfred.item(
@@ -972,10 +1047,19 @@ def tier_goal_rows(kind, rest, jnl=None):
     prefix = f"pn goals {kind}"
     # aimed at the NEXT period while a journal handoff is live (Vex
     # 2026-09-17: the month's and the quarter's journals set the next one's
-    # goals, the way the weekly's always has)
-    ahead = bool(not jnl and kind != "daily" and _goalseq_active(kind))
+    # goals, the way the weekly's always has) - or by hand, with ⏭ in the
+    # query (Vex 2026-09-20: the Sunday review had no way to reach next
+    # week). The mark is read on every tier so a reopened screen never shows
+    # it as typed text; the ⏭ ROW is offered on the weekly screen only.
+    seq = bool(not jnl and kind != "daily" and _goalseq_active(kind))
+    manual_next = False
+    if not jnl and kind != "daily" and not seq:
+        manual_next, rest = _split_next(rest)
+    ahead = seq or manual_next
     if ahead:
         label += " · next"
+    if manual_next:
+        prefix += f" {pm.GOAL_NEXT_MARK}"
     if jnl:
         day = jnl["for_day"]
         label = ("☀️ Tomorrow" if jnl["slot"] == "evening" else "☀️ Today") \
@@ -1019,8 +1103,12 @@ def tier_goal_rows(kind, rest, jnl=None):
             items.append(alfred.item(
                 uid=f"pn-goal-done-{kind}", title="✅ Done",
                 subtitle=f"{len(have)} goal{'s' if len(have) > 1 else ''} set",
-                arg="xact:pn_goaldone:" + _b64({"kind": kind}),
+                arg="xact:pn_goaldone:" + _b64({"kind": kind, "ahead": ahead}),
                 valid=True, mods=_mods()))
+        if kind == "weekly" and not seq:
+            items.append(_week_switch_row(
+                "pn-goal-weekly-switch", manual_next, "pn goals weekly ",
+                f"pn goals weekly {pm.GOAL_NEXT_MARK} "))
     if not (rest or "").strip():
         # 🔮 the plan for the period the goal LANDS in, then 📋 Pick a goal.
         # The daily's goal lines are read for the skip too: the journal's
@@ -1028,7 +1116,7 @@ def tier_goal_rows(kind, rest, jnl=None):
         if jnl:
             gp = pm.period_for("daily", jnl["for_day"])
         else:
-            gp = pm.period_for(kind, date.today())
+            gp = pm.period_for(kind, _pn_today())
             if ahead:
                 gp = pm.next_period(gp)
         held = ([raw for _shown, raw in have] if kind != "daily"
@@ -1046,11 +1134,10 @@ def tier_goal_rows(kind, rest, jnl=None):
             valid=True, autocomplete=f"{prefix} {text} | ",
             mods=_mods()))
 
-    pool = _task_pool(include_notes=(kind == "daily"))
+    pool = _task_pool(include_notes=(kind == "daily"), goals=True)
     pick = frag if combining else text
     if pick:
-        pool = fuzz.filter_and_score(pool and pick, pool,
-                                     key_fn=lambda t: t.get("title") or "")
+        pool = _rank(pick, pool)
     for t in pool[:30]:
         items.append(alfred.item(
             uid=f"pn-goal-{kind}-{t['id']}",

@@ -25,6 +25,9 @@ install: bundle
 	open $(BUNDLE)
 
 # ── Unit tests (pure stdlib, no credentials or network needed) ────────────
+# Tests never start background follow-ups against the real account (the
+# daily note catch-up, the repeat settle) - each file sets it too.
+test: export TICKAL_NO_SETTLE := 1
 test:
 	@$(PYTHON) tests/test_periodic.py
 	@$(PYTHON) tests/test_focus_blocks.py
@@ -59,6 +62,7 @@ test:
 	@$(PYTHON) tests/test_repeat_settle.py
 	@$(PYTHON) tests/test_fold_comments.py
 	@$(PYTHON) tests/test_journal_goal.py
+	@$(PYTHON) tests/test_pn_sync.py
 	@$(PYTHON) tests/test_meal.py
 	@$(PYTHON) tests/test_meal_scale.py
 	@$(PYTHON) tests/test_meal_price.py

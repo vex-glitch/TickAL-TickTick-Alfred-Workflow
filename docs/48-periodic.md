@@ -20,7 +20,7 @@ Try it tomorrow: `tmj` fills the morning journal, `tdn` opens the daily note. Se
 | Part | What it is | Who makes it |
 |---|---|---|
 | **💫 Notes list** | One TickTick list of your choosing holds every periodic note (`periodic_list_id`) | You, once |
-| **The notes** | Daily / weekly / monthly / quarterly / yearly - normal TickTick notes with generated sections | The automation - minted when you open them, or by the agent |
+| **The notes** | Daily / weekly / monthly / quarterly / yearly - normal TickTick notes with generated sections, each an all-day item on its period's last day (the daily on its day, the weekly on Sunday, the month, quarter and year on their last day), so TickTick's Today and calendar show them. Alfred's Today, Tomorrow and Next 7 Days lists leave them out: their bulk verbs act on every row | The automation - minted when you open them, or by the agent |
 | **💫 tag family** | 💫Daily … 💫Yearly, nested under 💫Periodic - group the list by Tag and they become kanban columns | The automation |
 | **Refresh** | Rebuilds the generated sections, completes ticked boxes, recomputes roll-ups | The automation - on open, on 🔄, or by the agent |
 | **♻️ Weekly review mirror** | A list (or a task with subtasks) the weekly note mirrors both ways (`weekly_review_id`) | You, optional |
@@ -101,7 +101,9 @@ Without `periodic_list_id`, every one of these shows a setup pointer instead. Op
 
 The head of the note (the breadcrumb, then the weather and the quote) is composed for you above the first section. Your mood and the day's stars live in the journals now, with the questions that ask for them. Then, grouped under `#` headers with dividers: **🌉 Yesterday's bridge** → **✨ Highlight** (the one thing the day is remembered for, asked at shutdown) → **🏆 Goals** (🗓️ Weekly mirror + ☀️ Daily one-thing) → **☀️ Today** (✅ Tasks - every task scheduled today as a checkbox link → 📓 Notes → 🔄 Habits → ⏳ Countdowns → 💰 Money) → **🔎 Summaries** (📊 Today → ⏪ Yesterday, the full list of what you completed → ⏩ Tomorrow) → 🌅 / 🌙 journals.
 
-**Tick a box in ✅ Tasks or ⏩ Tomorrow - in the app, on your phone, anywhere - and the next refresh completes the real task.** Refresh happens when you open the note through `pn`, when the agent runs, or on the 🔄 row; TickTick can't run code when a note opens, so a note opened via breadcrumbs shows its last-refreshed state.
+**Tick a box in ✅ Tasks or ⏩ Tomorrow - in the app, on your phone, anywhere - and the next refresh completes the real task.** Refresh happens when you open the note through `pn` (if the last one is more than a minute old), when the agent runs, or on the 🔄 row; TickTick can't run code when a note opens, so a note opened via breadcrumbs shows its last-refreshed state.
+
+**It works the other way too: complete a task and its line ticks.** Every completion TickAL makes - ⇧ on a row, a routine's Finish link, the focus bar's ● and ○, the buffer, the CRM verbs - queues a catch-up of today's note, run once about 20 seconds after the last completion in a burst, so ticking a routine's ten steps costs one refresh. Today's note gets the full refresh (ticks, 🔄 Habits, the summaries); yesterday's note gets its ticks, so a Shutdown finished after midnight still ticks in the day it ends. A task completed in the TickTick app ticks at the next refresh.
 
 ## Journals
 
@@ -114,6 +116,8 @@ All five journals seed their questions into the note at mint, so you can answer 
 
 Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly,monthly,quarterly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
 
+The goal questions (the evening's 🎯 tomorrow, the morning's ☀️ check) stop the dialogs and open the goal picker in Alfred; your pick answers the question and the journal carries on with the next one in the same run. Every run leaves a trail in `~/.ticktick_alfred/run/tickal_journal.log`: when it started, how each question went (answered, skipped, cancelled, and how long it took), the handoff and the pick. Events and timings only - never an answer.
+
 ## Goals
 
 One 🏆 Goals screen per tier (`pn` → 🏆 Goals). The daily keeps **one** - the One Thing, which replaces itself. Every other tier **appends**, so a week, a month, a quarter or a year can carry several.
@@ -121,6 +125,10 @@ One 🏆 Goals screen per tier (`pn` → 🏆 Goals). The daily keeps **one** - 
 Each screen shows **what is already there**, one row per goal, `⏎` to remove it, with a ✅ Done row underneath. Typing gives you the three shapes: plain text, a task to pick, or `text | task` for both. After each one it re-opens, so you can keep adding and Esc when you are finished - the way adding subtasks works.
 
 The weekly, monthly and quarterly journals end by opening that screen aimed at the **next** period: the weekly asks for three things, the month and the quarter for as many as you want.
+
+**Next week, by hand:** the ♻️ Weekly screen and the 🎯 goal picker carry a **⏭ Next week** row. ⏎ turns every row on the screen towards next week - its goals, its plan, what you pick or type - and **🔙 This week** turns it back. Made for the Sunday review, when "this week" is the one ending.
+
+The pickers rank the way search does: a whole-name match, then a match at the start of a word, then inside a word, and within each of those tasks before notes and top-level tasks before subtasks. A link's address never matches, only the words you see. Bridge notes never show up in a goal picker - a bridge records a session, it is not a goal.
 
 Goals mirror downward, read-only: the quarter's appear in each month, the month's in each week, the week's in each day. Setting them anywhere but their own note is not a thing - the mirror resets to a pointer the moment the parent's goal is cleared.
 
@@ -205,7 +213,7 @@ Same shape for `xact:pn_income:485 tattoo deposit`, `xact:pn_journal:evening`, `
 
 - The `###` section headers are the machine's anchors - rename one inside a note and its filler goes quietly blind (the rest of the note is untouched). Deleting a section from your note-template override turns that feature off: that's the intended kill switch. (Power users: copy `src/periodic_templates/` into `~/.ticktick_alfred/periodic_templates/` and edit - the same override mechanism as the journal pools.)
 - Opening via `pn` is instant; the refresh lands a few seconds later and the open note redraws. Watch it happen, or use 🔄 to refresh in the foreground.
-- Ticked boxes complete their real tasks for about a day after the note's period ends; older ticks in stale notes are left alone on purpose (a note is a record - re-completing a long-reopened task would be worse).
+- Ticked boxes complete their real tasks for about a day after the note's period ends; older ticks in stale notes are left alone on purpose (a note is a record - re-completing a long-reopened task would be worse). The same day of grace runs the other way: a completion ticks today's and yesterday's lines, never an older note's.
 - Don't complete a periodic note itself; if you did, uncomplete it - a completed note drops out of the index and a blank twin gets minted.
 - Group-by-Tag on the list is a view setting the API can't set - one manual click in TickTick.
 - Weather (Open-Meteo, located once by IP) and the quote of the day are best-effort: no network, no lines, no error.

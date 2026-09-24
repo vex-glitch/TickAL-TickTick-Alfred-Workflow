@@ -36,3 +36,46 @@ def filter_and_score(query, items, key_fn=None):
             scored.append((s, it))
     scored.sort(key=lambda x: -x[0])
     return [it for _, it in scored]
+
+
+# ── Relevance-first ranking (the main search's sort, shared) ─────────────────
+# Vex 2026-09-22: "Task picker when choosing goals does not filter correctly.
+# If I type in TickAL, it will first list all the bridge notes etc. Unlike our
+# search engine which shows correct items at the top". The pickers ranked by
+# score() alone, where "inside the text" is 800 minus the POSITION of the hit,
+# so a bridge note NAMED "P • TickAL • …" beat the task "💼 P • TickAL • WF"
+# by three characters. The search engine had the sort that fixes it, inline
+# in everything_search.main; it lives here now so both read ONE rule.
+
+def strength(query, key):
+    """How the query hits the key, best first:
+        0 the whole name · 1 at a word start ("test" in "test ⌘V", "Testo")
+        2 inside a word ("rest" in "interests") · 3 letters scattered.
+    Whitespace runs collapse and case folds on both sides."""
+    import re
+    q = " ".join((query or "").split()).lower()
+    k = " ".join((key or "").split()).lower()
+    if k == q:
+        return 0
+    if re.search(r'(?:^|[^\w])' + re.escape(q), k):
+        return 1
+    if q in k:
+        return 2
+    return 3
+
+
+def rank(query, items, key_fn, order_fn=None):
+    """filter_and_score(), then match STRENGTH first and order_fn(item) (a
+    tuple: type, depth, priority...) within a strength class. Scatter hits
+    are DROPPED whenever any word-or-better hit exists; with none they stay,
+    so a typo still finds something. Stable: fuzzy order survives inside each
+    (strength, order) group. An empty query returns the items as they came."""
+    if not (query or "").strip():
+        return list(items)
+    items = filter_and_score(query, items, key_fn=key_fn)
+    ann = {id(x): (strength(query, key_fn(x)),) + tuple(order_fn(x) if order_fn else ())
+           for x in items}
+    if any(a[0] <= 1 for a in ann.values()):
+        items = [x for x in items if ann[id(x)][0] < 3]
+    items.sort(key=lambda x: ann[id(x)])
+    return items

@@ -338,6 +338,7 @@ check("after Change… the way out keeps the goal", chg[-1]["title"] == "↩️ 
 
 # ── 8. the journal run itself, with the dialogs faked ─────────────────────────
 import xact  # noqa: E402
+xact.JOURNAL_LOG = os.path.join(tmp, "journal.log")       # never the real trail
 
 
 class FakePE:
@@ -446,7 +447,11 @@ gh.save("morning", date(2026, 9, 15), now=None)
 run("evening", pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])), answers=["x"])
 check("a fresh journal run clears an old goal screen", gh.load() is None)
 
-# the pick on that screen
+# the pick on that screen - the journal carries on IN the pick's process now
+# (2026-09-24: the detached resume was the step that kept failing)
+RESUMED = []
+_real_pn_journal = xact.pn_journal
+xact.pn_journal = lambda slot: RESUMED.append(slot)
 for v in calls.values():
     v.clear()
 fake = FakePE([])
@@ -459,8 +464,9 @@ check("the pick sets the ☀️ goal on TOMORROW",
       fake.goal_calls == [("daily", "Ship it", "P", "T1", "Write the brief", date(2026, 9, 16))], fake.goal_calls)
 check("and answers tonight's question with it",
       fake.answers == [("evening", "tgoal", "🎯 Ship it · Write the brief", date(2026, 9, 15))], fake.answers)
-check("then reopens the journal pinned to tonight's note",
-      calls["bg"] == ["xact:pn_journal:evening@2026-09-15"], calls["bg"])
+check("then carries on with the journal in the SAME process, pinned to tonight's note",
+      RESUMED == ["evening@2026-09-15"] and not calls["bg"], (RESUMED, calls["bg"]))
+RESUMED.clear()
 
 for v in calls.values():
     v.clear()
@@ -468,9 +474,10 @@ fake = FakePE([])
 xact._pn = lambda: fake
 xact.pn_goal_skip(base64.b64encode(json.dumps(
     {"slot": "morning", "mode": "set", "note_day": "2026-09-16", "for_day": "2026-09-16"}).encode()).decode())
-check("⏭ answers the morning check and resumes",
+check("⏭ answers the morning check and resumes, in the same process",
       fake.answers == [("morning", "gcheck", "⏭ No goal set", date(2026, 9, 16))]
-      and calls["bg"] == ["xact:pn_journal:morning@2026-09-16"], (fake.answers, calls["bg"]))
+      and RESUMED == ["morning@2026-09-16"] and not calls["bg"], (fake.answers, RESUMED, calls["bg"]))
+RESUMED.clear()
 
 for v in calls.values():
     v.clear()
@@ -478,7 +485,8 @@ fake = FakePE([])
 xact._pn = lambda: fake
 spec["jnl"] = {"slot": "bogus"}
 xact.pn_setgoal(base64.b64encode(json.dumps(spec).encode()).decode())
-check("a broken handoff writes nothing", not fake.goal_calls and not fake.answers and not calls["bg"])
+check("a broken handoff writes nothing", not fake.goal_calls and not fake.answers
+      and not calls["bg"] and not RESUMED)
 
 # the goal did not land: the question stays open, nothing resumes
 for v in calls.values():
@@ -488,7 +496,8 @@ fake.set_period_goal = lambda *a, **k: "💫 No ☀️ Daily section in the dail
 xact._pn = lambda: fake
 spec["jnl"] = {"slot": "evening", "mode": "set", "note_day": "2026-09-15", "for_day": "2026-09-16"}
 xact.pn_setgoal(base64.b64encode(json.dumps(spec).encode()).decode())
-check("a failed goal write leaves the journal question open", not fake.answers and not calls["bg"], fake.answers)
+check("a failed goal write leaves the journal question open",
+      not fake.answers and not calls["bg"] and not RESUMED, fake.answers)
 
 # Change… then the way out: the goal stays and the answer says kept
 for v in calls.values():
@@ -499,6 +508,38 @@ xact.pn_goal_skip(base64.b64encode(json.dumps(
     {"slot": "morning", "mode": "changed", "note_day": "2026-09-16", "for_day": "2026-09-16"}).encode()).decode())
 check("Change… then keep answers 'Kept', not 'No goal'",
       fake.answers == [("morning", "gcheck", "✅ Kept: Ship it", date(2026, 9, 16))], fake.answers)
+xact.pn_journal = _real_pn_journal
+
+# the whole road, pick to resumed dialogs, with the real pn_journal: the pick
+# answers tomorrow's goal and the SAME process asks the next question
+for v in calls.values():
+    v.clear()
+EV2 = pm.journal_pairs(pm.seed_journal_lines([q for _k, q in pm.journal_fixed("evening", {})]))
+EV2 = [(n, q, ("x" if n <= 2 else a), i) for n, q, a, i in EV2]      # bridge + highlight done
+fake = FakePE(EV2)
+
+
+def _answer_tgoal(slot, key, text, day):
+    fake.answers.append((slot, key, text, day))
+    fake.pairs = [(n, q, (text if pm.journal_key(q) == key else a), i) for n, q, a, i in fake.pairs]
+    return True
+
+
+fake.journal_answer_key = _answer_tgoal
+xact._pn = lambda: fake
+xact._ask = lambda q, title="", multiline=False: calls["ask"].append(q) or None
+xact.JOURNAL_LOG = os.path.join(tmp, "journal.log")
+gh.save("evening", date(2026, 9, 15))
+spec = {"kind": "daily", "text": "", "pid": "P", "tid": "T1", "title": "Write the brief",
+        "jnl": {"slot": "evening", "mode": "set", "note_day": "2026-09-15", "for_day": "2026-09-16"}}
+xact.pn_setgoal(base64.b64encode(json.dumps(spec).encode()).decode())
+check("pick -> the next question is asked by the pick's own run",
+      calls["ask"][:1] == ["What is on your mind?"] and not calls["bg"], (calls["ask"], calls["bg"]))
+LOG = open(xact.JOURNAL_LOG).read()
+check("the journal log has the pick, the resume, the start, the question and the end",
+      all(w in LOG for w in ("pick landed", "resume in the pick's process", "start resumed",
+                             "free -> cancel", "end saved")), LOG)
+check("the journal log never holds an answer's text", "Write the brief" not in LOG, LOG)
 
 # ── 9. the review of the 04:30 run ────────────────────────────────────────────
 tasks = ["\t- [ ] [Write the brief · 18:00](https://ticktick.com/webapp/#p/P/tasks/aaaaaaaaaaaaaaaaaaaaaaaa)"]

@@ -50,8 +50,20 @@ def smart_filter(all_tasks, smartlist):
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     in7days  = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
 
+    # The periodic notes are all-day items on their period's last day since
+    # 2026-09-24 (TickTick's own Today shows the day's note - Vex's ask), but
+    # these lists are WORK: their bulk verbs (🎯 Send all to focus, 🅿️ Buffer
+    # all, the date rolls) act on every row, and a periodic note moved under a
+    # focus task or completed leaves the index, so a blank twin gets minted
+    # (review 2026-09-24). The note is one keyword away on its own surface.
+    try:
+        import areas
+        pn_list = areas.PERIODIC_LIST_ID or ""
+    except Exception:
+        pn_list = ""
     incomplete = [t for t in all_tasks
-                  if t.get("status", 0) == 0 and not t.get("parentId")]
+                  if t.get("status", 0) == 0 and not t.get("parentId")
+                  and not (pn_list and (t.get("projectId") or t.get("_projectId")) == pn_list)]
 
     if smartlist == "today":
         return [t for t in incomplete if task_local_date(t) == today]

@@ -1432,12 +1432,7 @@ def main():
             tag_scope_assembled = True
 
         if query and not tag_scope_assembled:
-            items = fuzz.filter_and_score(
-                query, items,
-                key_fn=lambda x: search_key(x.get("variables", {}).get("search_name", x["title"])),
-            )
-
-            # ── Relevance-first sort ──────────────────────────────────────────
+            # ── Relevance-first sort (fuzzy.rank - the pn pickers read it too)
             # Match STRENGTH always beats type: exact name → word-start match
             # ("test" in "test ⌘V…" / "Testo") → inside-a-word ("rest" in
             # "interests") → letter-scatter (t…e…s…t across a whole row - the
@@ -1447,32 +1442,19 @@ def main():
             # DROPPED entirely whenever a word-or-better match exists; with no
             # word match they stay (typos still find things). sorted() is
             # stable, so fuzzy order survives within each (strength, type).
-            import re as _re
-            q = " ".join(query.split()).lower()
-            word_re = _re.compile(r'(?:^|[^\w])' + _re.escape(q))
             _ORD = {"list": 0, "view": 0, "filter": 0, "folder": 0, "task": 1,
                     "note": 2, "tag": 3, "section": 4}
 
-            def _annot(x):
+            def _order(x):
                 v = x.get("variables", {})
-                key = " ".join(search_key(
-                    v.get("search_name", x["title"])).split()).lower()
-                if key == q:
-                    s = 0
-                elif word_re.search(key):
-                    s = 1
-                elif q in key:
-                    s = 2
-                else:
-                    s = 3
                 itype = v.get("item_type", "task")
                 depth = v.get("type_rank", 2) if itype == "task" else 0
-                return (s, _ORD.get(itype, 1), depth, -int(v.get("_priority") or 0))
+                return (_ORD.get(itype, 1), depth, -int(v.get("_priority") or 0))
 
-            ann = {id(x): _annot(x) for x in items}
-            if any(a[0] <= 1 for a in ann.values()):
-                items = [x for x in items if ann[id(x)][0] < 3]
-            items.sort(key=lambda x: ann[id(x)])
+            items = fuzz.rank(
+                query, items,
+                key_fn=lambda x: search_key(x.get("variables", {}).get("search_name", x["title"])),
+                order_fn=_order)
 
         if not items:
             if scope == "tag" and exact_tag:

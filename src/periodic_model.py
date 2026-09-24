@@ -195,6 +195,13 @@ GOAL_SECTION_ALT = {"monthly": [SEC_MONTH_GOAL],
                     "quarterly": [SEC_OKR_REVIEW]}
 
 
+# ⏭ in a goal screen's query = that screen aimed at the NEXT period, by hand
+# (Vex 2026-09-20: "I must be able to set goal for next week. When doing
+# weekly review on Sunday, that is impossible."). A glyph, not a word: a goal
+# typed as "next steps" must stay a goal.
+GOAL_NEXT_MARK = "⏭"
+
+
 def goal_section_names(kind):
     return [GOAL_SECTION[kind]] + GOAL_SECTION_ALT.get(kind, [])
 
@@ -460,6 +467,44 @@ def stable_key(note_title):
     """The index key for a non-daily note TITLE: everything before " • ",
     without the tier emoji."""
     return strip_tier_emoji(note_title).split(" • ")[0].strip()
+
+
+def note_day(p):
+    """The day a periodic note sits on in TickTick: its period's LAST day
+    (Vex 2026-09-19: "Daily note should get scheduled. Full day item for
+    corresponding day. Weekly for Sunday end of week, monthly for 30th of
+    the month" - the 30th read as the month's last day, so February, 31-day
+    months, quarters and the year all land where their period ends)."""
+    return p.end
+
+
+def period_from_title(kind, note_title):
+    """The Period a note's TITLE names, or None - the index key read back
+    (daily "2026-09-23 · Wed", weekly "2026-W39 • 21st-27th Sep", monthly
+    "2026-09 September", quarterly "2026-Q3", yearly "2026"; the tier emoji
+    and the weekly date range are tolerated)."""
+    try:
+        if kind == "daily":
+            d = parse_daily_title(note_title)
+            return period_for("daily", d) if d else None
+        key = stable_key(note_title or "")
+        if kind == "weekly":
+            m = re.match(r"^(\d{4})-W(\d{2})$", key)
+            d = date.fromisocalendar(int(m.group(1)), int(m.group(2)), 1) if m else None
+        elif kind == "monthly":
+            m = re.match(r"^(\d{4})-(\d{2})(?:\s|$)", key)
+            d = date(int(m.group(1)), int(m.group(2)), 1) if m else None
+        elif kind == "quarterly":
+            m = re.match(r"^(\d{4})-Q([1-4])$", key)
+            d = date(int(m.group(1)), 3 * (int(m.group(2)) - 1) + 1, 1) if m else None
+        elif kind == "yearly":
+            m = re.match(r"^(\d{4})$", key)
+            d = date(int(m.group(1)), 1, 1) if m else None
+        else:
+            return None
+    except (ValueError, AttributeError):
+        return None
+    return period_for(kind, d) if d else None
 
 
 def parse_daily_title(s):

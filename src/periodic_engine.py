@@ -43,7 +43,11 @@ STAMP_FILE = os.path.join(cfg.CONFIG_DIR, "pn_last_mint")
 LOG_FILE = "/tmp/tickal_periodic.log"
 TPL_REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "periodic_templates")
 TPL_USER = os.path.join(cfg.CONFIG_DIR, "periodic_templates")
-REFRESH_TTL = 600          # pn_open skips a re-refresh younger than this
+# An open skips a refresh younger than this. It was 600 s, which left a note
+# opened a few minutes after the last refresh showing ticks and numbers from
+# before whatever happened in between (Vex 2026-09-23: "Daily tasks
+# checkboxes in notes are not synced with actual tasks completions").
+REFRESH_TTL = 60
 POST_GAP = 0.25            # rate-limit insurance between consecutive POSTs
 
 SPECS = ("daily", "yesterday", "weekly", "monthly", "quarterly", "yearly")
@@ -544,10 +548,16 @@ def create_note(p, index):
     # Child tag ONLY - TickTick's group-by-tag prefers the PARENT when both
     # are attached, which would collapse the kanban into one 💫Periodic
     # column. The parent exists as the tree node, never on tasks.
+    # Minted ONTO its day, all-day: the period's last day (pm.note_day - Vex
+    # 2026-09-19, "Daily note should get scheduled"), so TickTick's Today
+    # and calendar show the day's note. v1 fills startDate from dueDate.
+    import day_move
+    when = day_move.all_day(pm.note_day(p))
     task = _api().create_task(
         title=pm.long_title(p), project_id=areas.PERIODIC_LIST_ID,
         content=content, kind="NOTE",
-        tags=[pm.tag(p)])
+        tags=[pm.tag(p)], due_date=when["dueDate"],
+        time_zone=when.get("timeZone"))
     index[(p.kind, pm.title_key(p))] = task
     _log(f"minted {p.kind} {pm.title(p)} ({task.get('id')})")
     return task
@@ -941,8 +951,14 @@ def refresh_period(p, index=None, force=False):
         # historical notes only get their breadcrumb healed (a sealed note's
         # quote is its record)
         if p.start <= today <= p.end + timedelta(days=1):
+            # weather and quote are fetched for the CALENDAR day (their
+            # caches and APIs know nothing of the 04:00 roll): between
+            # midnight and 04:00 "today" is still the day that is ending, and
+            # refetching would write tomorrow's forecast and quote over its
+            # record - which a completion now triggers (after_done)
             _compose_lead(doc, p, index,
-                          refetch=(p.kind == "daily" and p.start == today))
+                          refetch=(p.kind == "daily" and p.start == today
+                                   and p.start == date.today()))
         else:
             pm.set_breadcrumb(doc, _crumb(p, index))
             # a sealed week's day links heal like the crumb above them, but
@@ -1236,7 +1252,7 @@ def _sync_ticks(doc, p, day):
     change, never a guess."""
     comp = _completed_between(day - timedelta(days=1), day + timedelta(days=1))
     if comp is None:
-        return
+        return []
     ticked = []
     for sec_name, line_day in ((pm.SEC_TODAY, day),
                                (pm.SEC_TOMORROW, day + timedelta(days=1))):
@@ -1250,6 +1266,58 @@ def _sync_ticks(doc, p, day):
             ticked += hit
     if ticked:
         _swept_add(pm.title_key(p), ticked)
+    return ticked
+
+
+def tick_pass(p, index=None):
+    """Only the ☑️ tick pass, on one daily note that is live or on its grace
+    day -> the task ids it ticked. The light half of after_done: yesterday's
+    note needs its lines to follow TickTick, not a whole refresh."""
+    if p.kind != "daily":
+        return []
+    today = _today()
+    if not (p.start <= today <= p.end + timedelta(days=1)):
+        return []
+    index = index if index is not None else build_index()
+    task = lookup(index, p)
+    if not task:
+        return []
+    pid = task.get("projectId") or areas.PERIODIC_LIST_ID
+
+    def mutate(doc, live):
+        return _sync_ticks(doc, p, p.start)
+    ticked, doc_out = _pn_rmw(pid, task.get("id"), mutate)
+    task["content"] = ps.serialize_sections(doc_out)
+    return ticked or []
+
+
+def after_done():
+    """The daily note catches up after a completion TickAL made (Vex
+    2026-09-23: "Daily tasks checkboxes in notes are not synced with actual
+    tasks completions"). The ticks used to follow TickTick only when a
+    refresh happened to run - 04:30, or an open more than ten minutes after
+    the last one - so a Startup finished three minutes after the morning
+    refresh stayed unticked all day, and so did its habit line and the
+    day's numbers.
+
+    TODAY's note gets the whole refresh (ticks, habits, summaries); its day
+    is dayroll's, so a Shutdown finished at 00:18 lands in the note of the
+    day it ends. YESTERDAY's note gets the tick pass alone. Neither is ever
+    minted here: a completion is not a reason for a note to exist. Fired by
+    xact.pn_donesync once the completions have gone quiet (src/done_sync.py).
+    Returns a log line."""
+    today = _today()
+    index = build_index(force=True)
+    out = []
+    p = pm.period_for("daily", today)
+    if lookup(index, p):
+        out.append(f"{pm.title(p)} {refresh_period(p, index=index)}")
+        _stamp_refresh(p)
+    y = pm.period_for("daily", today - timedelta(days=1))
+    if lookup(index, y):
+        n = len(tick_pass(y, index=index))
+        out.append(f"{pm.title(y)} ticked {n}")
+    return " · ".join(out) or "no note to catch up"
 
 
 def _bridge_text(day):
@@ -1314,7 +1382,11 @@ def _fill_daily(doc, p, index, is_today):
     if is_today:
         t2 = _tier2()
         if t2:
-            cd = getattr(t2, "countdown_lines", lambda: None)()
+            # the countdowns count from the CALENDAR day: after midnight they
+            # would already be tomorrow's numbers, so the day that is ending
+            # keeps the ones it had
+            cd = (getattr(t2, "countdown_lines", lambda: None)()
+                  if day == date.today() else None)
             if cd:
                 ps.set_body(doc, pm.SEC_COUNTDOWNS, pm.ind(cd))
             hb = getattr(t2, "habit_lines_daily", lambda: None)()
@@ -1386,6 +1458,13 @@ def _fill_daily(doc, p, index, is_today):
         # phone-answerable); unanswered fixed prompts refresh their text so
         # the evening 'did you achieve {goal}' bakes in a goal set at noon
         _seed_daily_journals(doc, day)
+    elif day == _today() - timedelta(days=1):
+        # YESTERDAY's note, on its grace day, gets the tick pass too. A
+        # routine finished after the day turned (the Shutdown of the 22nd
+        # completed at 00:00:31 on the 23rd) never ticked there: the closing
+        # refresh at 04:30 ran every filler for a note that is not today's
+        # except this one, so its line stayed open for good.
+        _sync_ticks(doc, p, day)
 
     # 🕰️ On this day - any daily note, not just today's: opening an old note
     # shows ITS memories. Looked up only when the section is there (deleting

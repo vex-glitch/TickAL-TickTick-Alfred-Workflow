@@ -59,6 +59,21 @@ def _out(dt):
     return dt.astimezone(timezone.utc).strftime(_FMT)
 
 
+def all_day(day, tz=None):
+    """{startDate, dueDate, isAllDay, timeZone} putting something on `day` as
+    an all-day item: local midnight written in UTC (a bare date is accepted
+    and silently dropped by v1), the zone NAMED so TickTick reads the day in
+    it and not in the account's. The periodic notes sit on their period's
+    last day this way (Vex 2026-09-19)."""
+    tz = tz or _local_tz()
+    stamp = _out(datetime.combine(day, time(0, 0)).replace(tzinfo=tz))
+    out = {"startDate": stamp, "dueDate": stamp, "isAllDay": True}
+    name = getattr(tz, "key", None)
+    if name:
+        out["timeZone"] = name
+    return out
+
+
 def is_timed(task, tz=None):
     """True when the task carries a real clock time (not all-day, not
     local midnight)."""
