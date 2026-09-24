@@ -94,7 +94,7 @@ def settle(pid, tid, since, api, v2, sleep=time.sleep, log=None):
         copies = pick_copies(v2.project_completed(pid, days=1, limit=100), tid, since)
         if not copies:
             continue
-        if v2.update_tasks([nudge_body(c) for c in copies]):
+        if v2.update_tasks([nudge_body(c) for c in copies], fresh=True):   # copies read live just now
             msg = f"resent {len(copies)} copy of {name!r}: " + ", ".join(c['id'] for c in copies)
             say(msg)
             return msg

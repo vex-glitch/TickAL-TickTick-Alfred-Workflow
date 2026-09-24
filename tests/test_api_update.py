@@ -64,22 +64,22 @@ OLD, NEW, T = "o" * 24, "n" * 24, "t" * 24
 
 # the bug: move-then-update with a PRE-move current (its list = OLD)
 c = client(NEW)
-r = c.update_task(T, NEW, current={"id": T, "projectId": OLD, "title": "x"}, parentId="p" * 24)
+r = c.update_task(T, NEW, current={"id": T, "projectId": OLD, "title": "x"}, fresh=True, parentId="p" * 24)
 check("pre-move current: retries the positional list", c.session.posted == [OLD, NEW], c.session.posted)
 check("pre-move current: write lands", r.get("projectId") == NEW)
 
 # the 09-09 case must keep working: stale positional, live current knows best
 c = client(NEW)
-c.update_task(T, OLD, current={"id": T, "projectId": NEW}, tags=["a"])
+c.update_task(T, OLD, current={"id": T, "projectId": NEW}, fresh=True, tags=["a"])
 check("records case: current wins, one post", c.session.posted == [NEW], c.session.posted)
 
 # explicit projectId (the contract for moves): no guessing, loud on empty
 c = client(NEW)
-c.update_task(T, NEW, current={"id": T, "projectId": OLD}, projectId=NEW)
+c.update_task(T, NEW, current={"id": T, "projectId": OLD}, fresh=True, projectId=NEW)
 check("explicit projectId: one post under it", c.session.posted == [NEW], c.session.posted)
 c = client(NEW)
 try:
-    c.update_task(T, NEW, current={"id": T, "projectId": NEW}, projectId=OLD)
+    c.update_task(T, NEW, current={"id": T, "projectId": NEW}, fresh=True, projectId=OLD)
     check("explicit wrong projectId raises (no retry)", False)
 except RuntimeError:
     check("explicit wrong projectId raises (no retry)", c.session.posted == [OLD], c.session.posted)
@@ -87,7 +87,7 @@ except RuntimeError:
 # neither candidate is right: two posts, then the loud error
 c = client("z" * 24)
 try:
-    c.update_task(T, NEW, current={"id": T, "projectId": OLD})
+    c.update_task(T, NEW, current={"id": T, "projectId": OLD}, fresh=True)
     check("both wrong raises", False)
 except RuntimeError as e:
     check("both wrong raises after 2 posts", c.session.posted == [OLD, NEW] and "empty reply" in str(e))
@@ -95,7 +95,7 @@ except RuntimeError as e:
 # current without a list: positional only, no bogus retry
 c = client("z" * 24)
 try:
-    c.update_task(T, NEW, current={"id": T})
+    c.update_task(T, NEW, current={"id": T}, fresh=True)
     check("no current list: raises after 1 post", False)
 except RuntimeError:
     check("no current list: raises after 1 post", c.session.posted == [NEW], c.session.posted)

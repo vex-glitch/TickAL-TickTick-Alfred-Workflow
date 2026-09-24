@@ -160,7 +160,7 @@ def run(api, v2, pid, tid, start_iso, end_iso=None, extra_reminders=()):
         bodies.append(b)
     if bodies:
         try:
-            if not v2.update_tasks(bodies):
+            if not v2.update_tasks(bodies, fresh=True):    # this run's creates
                 problems.append("subtask order not restored")
         except Exception:
             problems.append("subtask order not restored")

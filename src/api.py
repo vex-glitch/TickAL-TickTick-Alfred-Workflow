@@ -23,6 +23,36 @@ _RETRY = Retry(
 )
 
 
+# ── read provenance (the no-revert rule, Meal Prep bug 2026-09-24) ──────────
+# update_task posts the WHOLE object, so the object it builds on decides
+# every field the caller did not name. A copy read by THIS process a moment
+# ago is the server's truth; a cache row is up to an hour old and posting it
+# reverts whatever Vex changed in the app since (parentId, sortOrder, dates,
+# tags). Every task dict get_task / get_project_data return carries a stamp;
+# update_task trusts `current` only while its stamp is this run's and young.
+import time as _time  # noqa: E402
+import uuid as _uuid  # noqa: E402
+
+READ_RUN = _uuid.uuid4().hex   # this process; a cached row never matches
+LIVE_WINDOW = 120              # s a same-run read stays trusted
+LAST_POSTED = {}               # tid -> the reply of this process's last POST (dispatch mirrors it)
+
+
+def stamp_read(t):
+    if isinstance(t, dict) and t.get("id"):
+        t["_read_run"] = READ_RUN
+        t["_read_at"] = _time.time()
+    return t
+
+
+def is_fresh(t, window=None):
+    """True for a task dict read by this process less than LIVE_WINDOW ago."""
+    if not isinstance(t, dict) or t.get("_read_run") != READ_RUN:
+        return False
+    w = LIVE_WINDOW if window is None else window
+    return _time.time() - (t.get("_read_at") or 0) < w
+
+
 class RateLimitError(Exception):
     """TickTick Open API rate limit (300 requests / 5 min), returned as HTTP 500."""
 
@@ -124,12 +154,86 @@ class TickTickAPI:
         """Returns dict with keys: project, tasks, groups (sections)."""
         r = self.session.get(f"{BASE_URL}/project/{project_id}/data")
         _check(r)
-        return r.json()
+        d = r.json()
+        if isinstance(d, dict):
+            for t in d.get("tasks") or []:
+                stamp_read(t)
+        return d
 
     def get_task(self, project_id, task_id):
         r = self.session.get(f"{BASE_URL}/project/{project_id}/task/{task_id}")
         _check(r)
-        return r.json()
+        return stamp_read(r.json())
+
+    def live_tasks(self, pairs):
+        """{tid: live task} for [(pid, tid)], ONE project-data read per distinct
+        list (L requests for N tasks, not N): the bulk roads' live base. A
+        task absent from its list's live data (done, deleted or moved in the
+        app since the hourly sync) is simply missing, so the caller skips
+        it. Every row is stamped, so update_task trusts it without a GET.
+        RateLimitError propagates: nothing should be posted then."""
+        want = {}
+        for pid, tid in pairs:
+            key = "inbox" if (pid or "inbox").startswith("inbox") else pid
+            want.setdefault(key, set()).add(tid)
+        out = {}
+        for pid, ids in want.items():
+            try:
+                rows = self.get_project_data(pid).get("tasks") or []
+            except (RateLimitError, requests.ConnectionError, requests.Timeout):
+                raise                           # nothing should be posted then
+            except Exception as e:
+                # one unreadable list (gone, 403) must not abort the whole bulk:
+                # its tasks read as absent and the caller skips them
+                sys.stderr.write(f"live_tasks {pid}: {type(e).__name__}, its tasks skipped\n")
+                continue
+            for t in rows:
+                if t.get("id") in ids:
+                    out[t["id"]] = t
+        return out
+
+    def _live_base(self, task_id, project_id, current, moved_to=None):
+        """The live object update_task builds on. Candidates: the move target,
+        the positional list, then current's own lists (a wrong-list GET 404s,
+        probe 2026-09-09). Never `current` itself: a live read that fails
+        RAISES (RateLimitError, a transport error, a 5xx, 404 everywhere),
+        because a POST needs the same server, and reviving the given copy is
+        the very revert this rule exists to stop (review 2026-09-24).
+
+        TickTick's read lag: the first GET after a write can serve the
+        pre-write object once (the logbook verbs learned it). When `current`
+        is a cache row carrying TickAL's own last write (_written, mirrored by
+        dispatch._patch_task_cache from the POST reply) and the live object
+        predates it, those fields are laid over the live base, so a second
+        Alfred action seconds after the first never posts the first away."""
+        cur = current if isinstance(current, dict) else {}
+        cands = [p for p in dict.fromkeys(
+            [moved_to, project_id, cur.get("projectId"), cur.get("_projectId")]) if p]
+        last, live = None, None
+        for pid in cands:
+            try:
+                t = self.get_task(pid, task_id)
+            except RateLimitError:
+                raise
+            except requests.HTTPError as e:
+                code = getattr(getattr(e, "response", None), "status_code", None)
+                last = e
+                if code == 404:
+                    continue
+                raise
+            except ValueError as e:       # 200 with an empty body
+                last = e
+                continue
+            if isinstance(t, dict) and t.get("id"):
+                live = t
+                break
+        if live is None:
+            raise last or KeyError(task_id)
+        w = cur.get("_written") or {}
+        if (isinstance(w, dict) and w.get("modifiedTime") and isinstance(w.get("fields"), dict)
+                and str(live.get("modifiedTime") or "") < str(w["modifiedTime"])):
+            live = {**live, **w["fields"]}
+        return live
 
     def create_task(self, title, project_id=None, due_date=None, content=None,
                     priority=0, tags=None, column_id=None, parent_id=None, kind=None,
@@ -166,7 +270,7 @@ class TickTickAPI:
             payload["reminders"] = reminders
         r = self.session.post(f"{BASE_URL}/task", json=payload)
         _check(r)
-        return r.json()
+        return stamp_read(r.json())      # a create response is this run's fresh read
 
     def complete_task(self, project_id, task_id, task_data=None):
         r = self.session.post(
@@ -183,15 +287,34 @@ class TickTickAPI:
             pass
         return True
 
-    def update_task(self, task_id, project_id, current=None, **fields):
+    def update_task(self, task_id, project_id, current=None, fresh=None,
+                    derive=None, **fields):
         """Merge changes into the full task object and post it.
         TickTick ignores partial updates - full object required to persist.
         Pass field=None to send explicit null (clears the field in TickTick).
-        Pass `current` (e.g. the cached task) to skip the GET round-trip;
-        falls back to fetching only when not supplied.
+
+        THE NO-REVERT RULE (review 2026-09-24): the object this builds on
+        decides every field the caller did not name, so `current` is
+        trusted only when it is this run's own read or create (is_fresh:
+        same READ_RUN, younger than LIVE_WINDOW) or the caller passes
+        fresh=True to vouch for it. Anything else - a cache row above all -
+        is only a hint for the list id: _live_base reads the task live and
+        lays the named fields over that. `derive(base)` computes fields
+        FROM the base (tag and reminder merges, a roll's delta); None from
+        it means skip, and update_task returns None without a POST. A live
+        read that fails raises: RateLimitError, a transport error, a 5xx,
+        or 404 everywhere. The reply is stamped and kept in LAST_POSTED.
         """
-        if current is None:
-            current = self.get_task(project_id, task_id)
+        trusted = current is not None and (
+            fresh is True or (fresh is None and is_fresh(current)))
+        if not trusted:
+            current = self._live_base(task_id, project_id, current,
+                                      moved_to=fields.get("projectId"))
+        if derive is not None:
+            extra = derive(current)
+            if extra is None:
+                return None
+            fields = {**fields, **extra}
         # Drop workflow-internal (_-prefixed) keys so we post clean API fields
         payload = {k: v for k, v in current.items() if not k.startswith("_")}
         for key, value in fields.items():
@@ -235,7 +358,10 @@ class TickTickAPI:
         if not (r.text or "").strip():
             raise RuntimeError(f"update_task {task_id}: empty reply - the task "
                                f"is not in list {payload.get('projectId')}")
-        return r.json()
+        resp = stamp_read(r.json())
+        if isinstance(resp, dict):
+            LAST_POSTED[task_id] = resp
+        return resp
 
     def move_task(self, task_id, from_project_id, to_project_id):
         payload = [{"fromProjectId": from_project_id, "toProjectId": to_project_id, "taskId": task_id}]

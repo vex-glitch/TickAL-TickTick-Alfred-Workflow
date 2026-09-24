@@ -40,7 +40,15 @@ def find_task(tid):
     return None
 
 
+_READ_STAMPS = ("_read_run", "_read_at")   # api.stamp_read's marks: this process's reads only
+
+
 def set(key, value):
+    # the read stamps never belong in a file: a row read back from the
+    # cache is a cache row, whatever process wrote it (review 2026-09-24)
+    if isinstance(value, list):
+        value = [({k: v for k, v in t.items() if k not in _READ_STAMPS} if isinstance(t, dict) else t)
+                 for t in value]
     # atomic: a kill mid-dump used to leave a truncated file, and every
     # reader treats an unparseable cache as EMPTY - so one bad abort
     # could blank all_notes for whoever read next (review 2026-07-31)

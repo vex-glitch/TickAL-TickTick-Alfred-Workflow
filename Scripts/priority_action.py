@@ -48,20 +48,15 @@ except (ValueError, TypeError):
 # 🧺 BUFFER sentinel: apply the picked priority to every buffered task
 if tid == "BUFFER":
     try:
-        import xact
+        from dispatch import _buffer_apply, _buffer_toast
         api = TickTickAPI(cfg.get_token())
-        done = 0
-        for ln in xact.buffer_ids():
-            bpid, btid = ln.split(":", 1)
-            try:
-                api.update_task(btid, bpid, current=cache_store.find_task(btid),
-                                priority=priority)
-                done += 1
-                _patch_task_cache(btid, priority=priority)
-            except Exception:
-                pass
-        open(run_path("tickal_buffer.txt"), "w").close()
-        print(f"🅿️ {done} tasks → priority {LABELS.get(priority, priority)}")
+        # dispatch._buffer_apply reads every buffered task LIVE first (one
+        # list read per list), skips what changed in the app, keeps the
+        # buffer on a failed read or a rate limit (review 2026-09-24)
+        res = _buffer_apply(lambda bpid, btid, cur:
+                            (api.update_task(btid, bpid, current=cur, priority=priority),
+                             _patch_task_cache(btid, priority=priority)))
+        print(_buffer_toast(res, f"→ priority {LABELS.get(priority, priority)}"))
     except Exception as e:
         print(f"Priority update failed: {e}")
         sys.exit(1)

@@ -240,11 +240,11 @@ class _Sess:
 
 _c = _api_mod.TickTickAPI.__new__(_api_mod.TickTickAPI)
 _c.session = _Sess()
-_c.update_task("T", "P", current={"id": "T", "projectId": "P"},
+_c.update_task("T", "P", current={"id": "T", "projectId": "P"}, fresh=True,
                startDate="2026-09-16T00:00:00+0000", dueDate="2026-09-16T01:00:00+0000", isAllDay=False)
 check("update_task keeps an explicit isAllDay over its 00:00 UTC guess",
       _c.session.posted["isAllDay"] is False, _c.session.posted)
-_c.update_task("T", "P", current={"id": "T", "projectId": "P"}, startDate="2026-09-16T00:00:00+0000")
+_c.update_task("T", "P", current={"id": "T", "projectId": "P"}, fresh=True, startDate="2026-09-16T00:00:00+0000")
 check("and still guesses when none is given", _c.session.posted["isAllDay"] is True)
 
 # the goal task decisions (API faked)
@@ -255,7 +255,7 @@ class _FakeAPI:
     def get_task(self, pid, tid):
         return dict(self.task)
 
-    def update_task(self, tid, pid, current=None, **fields):
+    def update_task(self, tid, pid, current=None, fresh=None, **fields):
         self.posts.append(fields)
         return dict(self.task, **fields)
 

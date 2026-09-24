@@ -502,6 +502,13 @@ finally:
         xact._wait_for_pick = _rw
 check("R14 a detached handoff waits for the pick before the run exits", WAITED == ["evening@2026-09-24"], WAITED)
 
+# ── R15 writes never revert the app (tests/test_no_stale_revert.py) ──────────
+_r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "test_no_stale_revert.py")],
+                    capture_output=True, text=True, env={**os.environ, "TICKAL_NO_SETTLE": "1"})
+_last = (_r.stdout.strip().splitlines() or [""])[-1]
+check("R15 the no-revert suite is green (a cached body is never posted, live first, only the named fields)",
+      _r.returncode == 0 and "/" in _last and _last.split("/")[0] == _last.split("/")[1].split()[0], _last)
+
 # ── summary ──────────────────────────────────────────────────────────────────
 for item in sorted(ITEMS, key=lambda s: int(s[1:])):
     print(f"ITEM {item} {'green' if ITEMS[item] else 'red'}")

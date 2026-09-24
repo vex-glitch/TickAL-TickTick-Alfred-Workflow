@@ -572,13 +572,13 @@ def _settle_kids(api, v2, made, pid, parent_id, tz, sibs=()):
     ok = False
     if _has_token(v2):
         try:
-            ok = bool(v2.update_tasks(bodies))
+            ok = bool(v2.update_tasks(bodies, fresh=True))   # this run's creates
         except Exception:
             ok = False
     for k, f, n in todo:
         if not ok and n:
             try:
-                api.update_task(k["id"], pid, current=clean(k), **f)
+                api.update_task(k["id"], pid, current=clean(k), fresh=True, **f)
             except Exception:
                 continue
         k.update(f)

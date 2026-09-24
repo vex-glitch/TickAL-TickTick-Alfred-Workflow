@@ -167,27 +167,81 @@ def _patch_project_data(tid, fields=None, pid_old=None, pid_new=None, remove=Fal
         pass
 
 
-def _buffer_apply(fn):
-    """Run fn(pid, tid, cached_task) over every buffered task (🧺).
-    Skips strays that error; clears the buffer afterwards. Returns count."""
-    done = 0
+def _buffer_apply(fn, needs_live=True):
+    """Run fn(pid, tid, task) over every buffered task (🧺) -> (done, skipped,
+    kept), or None when nothing could be applied.
+
+    With needs_live (every road that posts a full object) each task is read
+    LIVE first, one list read per distinct list (api.live_tasks): a body
+    built from the hourly cache posted back whatever Vex changed in the app
+    since the sync, a re-parented subtask included (review 2026-09-24). A
+    task absent from its list's live data (done, deleted or moved in the app)
+    is `skipped`, never posted. The move road posts no body (move_task) and
+    passes needs_live=False. When the live read itself fails nothing is
+    applied, the buffer is KEPT and None comes back, so the toast can say
+    so. A rate limit partway stops the loop and writes the unapplied lines
+    back (`kept`) instead of losing them. Strays that error are skipped."""
     try:
         with open(run_path("tickal_buffer.txt")) as f:
             lines = [ln.strip() for ln in f if ln.strip()]
     except OSError:
         lines = []
-    for ln in lines:
+    pairs = [tuple(ln.split(":", 1)) for ln in lines if ":" in ln]
+    live = None
+    if needs_live and pairs:
         try:
-            bpid, btid = ln.split(":", 1)
-            fn(bpid, btid, _cached_task(btid) or {})
+            live = TickTickAPI(cfg.get_token()).live_tasks(pairs)
+        except Exception as e:
+            sys.stderr.write(f"buffer: live read failed ({type(e).__name__}), nothing applied, buffer kept\n")
+            return None
+    done = skipped = 0
+    left = []
+    for i, (bpid, btid) in enumerate(pairs):
+        cur = live.get(btid) if live is not None else (_cached_task(btid) or {})
+        if needs_live and cur is None:
+            skipped += 1
+            continue
+        try:
+            fn(bpid, btid, cur)
             done += 1
+        except RateLimitError:
+            left = [f"{p}:{q}" for p, q in pairs[i:]]
+            break
         except Exception:
             pass
     try:
-        open(run_path("tickal_buffer.txt"), "w").close()
+        with open(run_path("tickal_buffer.txt"), "w") as f:
+            f.write("\n".join(left) + ("\n" if left else ""))
     except OSError:
         pass
-    return done
+    return done, skipped, len(left)
+
+
+def _buffer_toast(res, verb):
+    """The 🅿️ line for a _buffer_apply result: what was done, what was
+    skipped because it changed in the app, what a rate limit kept."""
+    if res is None:
+        return "🅿️ Live read failed · buffer kept, retry in a minute"
+    done, skipped, kept = res
+    out = f"🅿️ {done} tasks {verb}"
+    if skipped:
+        out += f" · {skipped} changed in the app, skipped"
+    if kept:
+        out += f" · rate limit, {kept} kept in the buffer"
+    return out
+
+
+def _tag_derive(change):
+    """derive= for a tag write: change(live_tags) -> the new list, computed on
+    the LIVE task inside update_task (a merge on the cached list dropped a
+    tag added in the app and the post reverted the rest, review 2026-09-24).
+    The holder keeps the value for the cache mirror."""
+    out = {}
+
+    def d(base):
+        out["tags"] = change(list(base.get("tags") or []))
+        return {"tags": out["tags"]}
+    return d, out
 
 
 def _patch_task_cache(tid, **fields):
@@ -215,6 +269,18 @@ def _patch_task_cache(tid, **fields):
             fields["isAllDay"] = _is_all_day(v) if v else False
         except Exception:
             pass
+    # TickAL's own last write rides the cache row (_written): the POST reply's
+    # modifiedTime and the fields, so api._live_base can lay them over a
+    # lagging live read seconds later (review 2026-09-24)
+    try:
+        from api import LAST_POSTED
+        resp = LAST_POSTED.pop(tid, None)
+        if isinstance(resp, dict) and resp.get("modifiedTime"):
+            fields = {**fields, "_written": {
+                "modifiedTime": resp.get("modifiedTime"), "etag": resp.get("etag"),
+                "fields": {k: v for k, v in fields.items() if not k.startswith("_")}}}
+    except Exception:
+        pass
     try:
         pid_old = pid_new = None
         touched = False
@@ -265,7 +331,7 @@ def _order_children(api, made, pid, parent_id):
         bodies.append(b)
     try:
         import api_v2
-        api_v2.TickTickV2().update_tasks(bodies)
+        api_v2.TickTickV2().update_tasks(bodies, fresh=True)   # bodies = this run's creates
     except Exception:
         pass          # order is cosmetic; the subtasks themselves are made
 
@@ -358,10 +424,7 @@ def _merge_reminders(api, pid, tid, current, tokens):
     """Merge reminder tokens (→ TRIGGER strings) into the task's existing
     reminders. Returns (merged_list, resolved_current). Dedup, order preserved."""
     if current is None:
-        try:
-            current = api.get_task(pid, tid)
-        except Exception:
-            current = {}
+        current = api.get_task(pid, tid)     # a failed read raises, never {}
     existing = (current or {}).get("reminders") or []
     triggers = [t for t in (rem.trigger(tok) for tok in tokens) if t]
     merged = list(dict.fromkeys(list(existing) + triggers))
@@ -541,11 +604,16 @@ def main():
                     pass
 
             api = TickTickAPI(cfg.get_token())
-            current = _cached_task(tid)
+            # the cache row is a LIST hint only (a second candidate when the
+            # positional list 404s, the 2026-09-09 rule): update_task reads live
+            # and lays these fields over it, the reminders merged on the LIVE
+            # list (review 2026-09-24)
             fields = {"startDate": due, "dueDate": due}
+            derive = ((lambda b: {"reminders": _merge_reminders(api, pid, tid, b, rem_tokens)[0]})
+                      if rem_tokens else None)
+            posted = api.update_task(tid, pid, current=_cached_task(tid), derive=derive, **fields) or {}
             if rem_tokens:
-                fields["reminders"], current = _merge_reminders(api, pid, tid, current, rem_tokens)
-            api.update_task(tid, pid, current=current, **fields)
+                fields["reminders"] = posted.get("reminders") or []
             _patch_task_cache(tid, **fields)
 
             task_title = md_links_display(os.environ.get("task_title", "Task"))
@@ -568,11 +636,12 @@ def main():
 
             had_date = os.environ.get("has_date", "0") == "1"
             api = TickTickAPI(cfg.get_token())
-            current = _cached_task(tid)
             fields = {"startDate": start_iso, "dueDate": end_iso}
+            derive = ((lambda b: {"reminders": _merge_reminders(api, pid, tid, b, rem_tokens)[0]})
+                      if rem_tokens else None)
+            posted = api.update_task(tid, pid, current=_cached_task(tid), derive=derive, **fields) or {}
             if rem_tokens:
-                fields["reminders"], current = _merge_reminders(api, pid, tid, current, rem_tokens)
-            api.update_task(tid, pid, current=current, **fields)
+                fields["reminders"] = posted.get("reminders") or []
             _patch_task_cache(tid, **fields)
 
             task_title = md_links_display(os.environ.get("task_title", "Task"))
@@ -639,16 +708,11 @@ def main():
             pid, tid, tag = parts[0], parts[1], parts[2]
             _ensure_tags_exist([tag])
             api = TickTickAPI(cfg.get_token())
-            # Prefer the cached task (no live GET); fetch only if not cached
-            task = _cached_task(tid)
-            if task is None:
-                try:
-                    task = api.get_task(pid, tid)
-                except Exception:
-                    task = {}
-            existing = task.get("tags") or []
-            merged = _norm_tags(existing + [tag])  # deduplicated, lowercase (server case)
-            api.update_task(tid, pid, current=(task or None), tags=merged)
+            # merged on the LIVE tags inside update_task (_tag_derive); the
+            # cache row is a list hint only
+            d, out = _tag_derive(lambda cur: _norm_tags(cur + [tag]))   # deduplicated, lowercase
+            api.update_task(tid, pid, current=_cached_task(tid), derive=d)
+            merged = out.get("tags", [])
             _patch_task_cache(tid, tags=merged)
             task_title = md_links_display(os.environ.get("task_title", "Task"))
             print(f"{task_title} tagged #{tag}")
@@ -663,16 +727,15 @@ def main():
             api = TickTickAPI(cfg.get_token())
             if tid == "BUFFER":
                 # 🧺 apply to every buffered task
-                done = _buffer_apply(lambda bpid, btid, cur:
+                res = _buffer_apply(lambda bpid, btid, cur:          # cur = the LIVE task
                     (api.update_task(btid, bpid, current=cur,
                                      tags=_norm_tags((cur.get("tags") or []) + new_tags)),
                      _patch_task_cache(btid, tags=_norm_tags((cur.get("tags") or []) + new_tags))))
-                print(f"🅿️ {done} tasks tagged {'  '.join('#'+t for t in new_tags)}")
+                print(_buffer_toast(res, f"tagged {'  '.join('#'+t for t in new_tags)}"))
                 return
-            current = _cached_task(tid) or api.get_task(pid, tid)
-            existing = current.get("tags") or []
-            merged = _norm_tags(existing + new_tags)
-            api.update_task(tid, pid, current=current, tags=merged)
+            d, out = _tag_derive(lambda cur: _norm_tags(cur + new_tags))
+            api.update_task(tid, pid, current=_cached_task(tid), derive=d)
+            merged = out.get("tags", [])
             _patch_task_cache(tid, tags=merged)
             task_title = md_links_display(os.environ.get("task_title", "Task"))
             tags_display = "  ".join(f"#{t}" for t in new_tags)
@@ -684,9 +747,9 @@ def main():
             parts = raw.split(":", 2)
             pid, tid, tag = parts[0], parts[1], parts[2]
             api = TickTickAPI(cfg.get_token())
-            current = _cached_task(tid) or api.get_task(pid, tid)
-            updated = [t for t in (current.get("tags") or []) if t.lower() != tag.lower()]
-            api.update_task(tid, pid, current=current, tags=updated)
+            d, out = _tag_derive(lambda cur: [t for t in cur if t.lower() != tag.lower()])
+            api.update_task(tid, pid, current=_cached_task(tid), derive=d)
+            updated = out.get("tags", [])
             _patch_task_cache(tid, tags=updated)
             task_title = md_links_display(os.environ.get("task_title", "Task"))
             print(f"{task_title} tag #{tag} removed")
@@ -716,8 +779,8 @@ def main():
                     _patch_task_cache(btid, projectId=new_pid, _projectId=new_pid,
                                       _projectName=new_list, columnId=None,
                                       _columnName="", parentId=None)
-                done = _buffer_apply(_mv)
-                print(f"🅿️ {done} tasks moved to {new_list or 'list'}")
+                res = _buffer_apply(_mv, needs_live=False)      # move_task posts no body
+                print(_buffer_toast(res, f"moved to {new_list or 'list'}"))
                 return
             api.move_task(tid, old_pid, new_pid)
             task_title = md_links_display(os.environ.get("task_title", "Task"))

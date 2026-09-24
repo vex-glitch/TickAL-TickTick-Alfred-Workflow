@@ -25,6 +25,11 @@ ALLOWED = {
     "tests/test_routine_link.py", "tests/test_journal_goal.py", "tests/test_pn_sync.py",
     "tests/test_monthly_note.py", "tests/test_quarterly_note.py", "tests/test_review_20260924.py",
     "tests/verify_review_20260924.py", "Makefile", "docs/48-periodic.md", "CLAUDE.md",
+    "src/api.py", "src/api_v2.py", "src/dispatch.py", "src/okr_write.py", "src/duplicate.py",
+    "src/repeat_settle.py", "Scripts/priority_action.py", "Scripts/change_tag_exec.py",
+    "Scripts/reminder_action.py", "tests/test_no_stale_revert.py", "tests/test_api_update.py",
+    "tests/test_okr_write.py", "tests/test_repeat_settle.py", "src/cache.py", "Scripts/note_load.py",
+    "tests/test_day_shift.py",
 }
 DASHES = re.compile("[\\u2013\\u2014]")
 PY = sys.executable

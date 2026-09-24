@@ -39,15 +39,17 @@ if not list_id or not tid:
         pass
 
 content = ""
-task = cache_store.find_task(tid) if tid else None
-if task:
-    content = task.get("content") or ""
-if not content and list_id and tid:
+# LIVE first: the editor's text is what note_save posts back as the whole
+# body, so a cached body would overwrite what Vex typed in the app since
+# the hourly sync (review 2026-09-24); the cache is the fallback when the
+# read fails (offline, rate-limited)
+if list_id and tid:
     try:
         full = TickTickAPI(cfg.get_token()).get_task(list_id, tid)
         content = full.get("content") or ""
     except Exception:
-        pass  # offline / rate-limited → open an empty editor
+        task = cache_store.find_task(tid)
+        content = (task or {}).get("content") or ""
 
 # stdout (verbatim) becomes the Text View's editable text
 sys.stdout.write(content)

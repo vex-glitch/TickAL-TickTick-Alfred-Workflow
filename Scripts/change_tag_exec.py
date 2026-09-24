@@ -33,14 +33,18 @@ def main():
 
     try:
         api     = TickTickAPI(cfg.get_token())
-        current = cache_store.find_task(tid) or api.get_task(pid, tid)
-        tags    = current.get("tags") or []
-        # Remove old tag, add new tag, preserve everything else. Lowercase -
-        # TickTick's server-side tag-name case (labels keep theirs).
-        updated = _norm_tags([t for t in tags if t.lower() != old_tag.lower()]
-                             + [new_tag])
         _ensure_tags_exist([new_tag])   # a ➕ picker row may coin it
-        api.update_task(tid, pid, current=current, tags=updated)
+        out = {}
+
+        def _d(base):
+            # computed on the LIVE tags inside update_task (review 2026-09-24):
+            # remove old tag, add new tag, preserve everything else. Lowercase -
+            # TickTick's server-side tag-name case (labels keep theirs).
+            out["tags"] = _norm_tags([t for t in (base.get("tags") or []) if t.lower() != old_tag.lower()]
+                                     + [new_tag])
+            return {"tags": out["tags"]}
+        api.update_task(tid, pid, current=cache_store.find_task(tid), derive=_d)   # the row: a list hint
+        updated = out.get("tags", [])
         # all_tasks + the per-list project_data mirror in one call
         _patch_task_cache(tid, tags=updated)
         task_title = os.environ.get("task_title", "Task")

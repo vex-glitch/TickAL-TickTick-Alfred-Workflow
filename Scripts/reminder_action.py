@@ -48,15 +48,15 @@ if not trigger:
 
 try:
     api = TickTickAPI(cfg.get_token())
-    current = cache_store.find_task(tid)
-    if current is None:
-        try:
-            current = api.get_task(pid, tid)
-        except Exception:
-            current = {}
-    existing = (current or {}).get("reminders") or []
-    merged = list(dict.fromkeys(list(existing) + [trigger]))   # dedup, order preserved
-    api.update_task(tid, pid, current=current, reminders=merged)
+    out = {}
+
+    def _d(base):
+        # merged on the LIVE list inside update_task: a merge on the cached
+        # list dropped a reminder added in the app (review 2026-09-24)
+        out["reminders"] = list(dict.fromkeys(list(base.get("reminders") or []) + [trigger]))
+        return {"reminders": out["reminders"]}
+    api.update_task(tid, pid, current=cache_store.find_task(tid), derive=_d)   # the row: a list hint
+    merged = out.get("reminders", [trigger])
 
     # all_tasks + the per-list project_data mirror in one call
     _patch_task_cache(tid, reminders=merged)

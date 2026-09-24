@@ -121,19 +121,23 @@ class FakeAPI:
         self.fail_create = None            # an exception every create raises
 
     def get_project_data(self, pid):
+        # rows are stamped like the real client's (api.stamp_read): a live
+        # read is this run's, and the v2 gate trusts it (review 2026-09-24)
+        import api as _api_mod
         self.calls.append(("get_project_data", pid))
         return {"project": {"id": pid, "name": "🏆Goals Planning"},
-                "tasks": [cp(t) for t in self.store.values()
+                "tasks": [_api_mod.stamp_read(cp(t)) for t in self.store.values()
                           if t.get("projectId") == pid and t.get("status") == 0]}
 
     def get_task(self, pid, tid):
+        import api as _api_mod
         self.calls.append(("get_task", pid, tid))
         t = self.store.get(tid) or self.done.get(tid)
         if not t:
             raise RuntimeError("404")
-        return cp(t)
+        return _api_mod.stamp_read(cp(t))
 
-    def update_task(self, tid, pid, current=None, **fields):
+    def update_task(self, tid, pid, current=None, fresh=None, **fields):
         self.calls.append(("update_task", tid, pid, cp(fields), cp(current)))
         if self.fail_update or tid in self.fail_ids:
             raise RuntimeError("v1 down")
@@ -192,7 +196,12 @@ class FakeV2:
             return None
         return [cp(t) for t in self.api.done.values()]
 
-    def update_tasks(self, bodies):
+    def update_tasks(self, bodies, fresh=None, **kw):
+        # the real gate (api_v2.update_tasks): a body that is not this run's
+        # read is refused unless the caller vouches with fresh=True
+        import api as _api_mod
+        if fresh is not True and not all(_api_mod.is_fresh(b) for b in bodies):
+            return False
         self.batches.append(cp(bodies))
         if not self.token or not self.ok:
             return False

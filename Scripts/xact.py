@@ -9282,27 +9282,60 @@ def _date_bulk_pool(key):
     return keep, label, rep, crm
 
 
-def _date_bulk_run(tasks, fields_fn):
-    """Pooled updates: fields_fn(task) → update fields (None skips).
-    → (done, failed). Cache mirrored per task."""
+def _scope_keep(key):
+    """The LIVE-side re-check of a date bulk's scope, or None (keep all). The
+    pool was picked on the hourly cache; a task Vex rescheduled, completed or
+    moved in the app since the sync must not be cleared or rolled (review
+    2026-09-24). The smart scopes reuse smart_filter on the one live task."""
+    from filtering import smart_filter
+    kind = {"today": "today", "tomorrow": "tomorrow",
+            "next7": "next7days", "overdue": "overdue"}.get(key)
+    if kind:
+        return lambda b: bool(smart_filter([b], kind))
+    if key == "buffer":
+        return lambda b: bool(b.get("startDate") or b.get("dueDate"))
+    return None
+
+
+def _date_bulk_run(tasks, fields_fn, keep=None):
+    """Pooled updates: fields_fn(live_task) → update fields (None skips).
+    → (done, skipped, failed). Cache mirrored per task.
+
+    Every task is read LIVE first, one list read per distinct list
+    (api.live_tasks): the body used to be the hourly cache's copy, and a
+    full-object post from it put back whatever Vex had changed in the app
+    since the sync - a dragged subtask went back under its old parent
+    (review 2026-09-24). A task that is gone, done or repeating on the live
+    read, one that keep(base) rejects (it left the scope in the app), or one
+    whose fields_fn says None (already on today) is `skipped`, never posted;
+    the delta is computed from the live dates. A rate limit or a transport
+    error on the read propagates: nothing is posted then. `failed` counts
+    real write errors only."""
     from concurrent.futures import ThreadPoolExecutor
     from dispatch import _patch_task_cache
+    live = _api().live_tasks([(t.get("projectId") or t.get("_projectId", ""), t["id"])
+                              for t in tasks])
 
     def _one(t):
         try:
-            fields = fields_fn(t)
+            base = live.get(t["id"])
+            if base is None or base.get("status", 0) != 0 or base.get("repeatFlag"):
+                return "skip"             # changed in the app since the sync: not ours to move
+            if keep is not None and not keep(base):
+                return "skip"             # left the scope in the app
+            fields = fields_fn(base)
             if not fields:
-                return None
-            pid = t.get("projectId") or t.get("_projectId", "")
-            _api().update_task(t["id"], pid, current=t, **fields)
-            _patch_task_cache(t["id"], **fields)
-            return t["id"]
+                return "skip"
+            pid = base.get("projectId") or t.get("projectId") or t.get("_projectId", "")
+            _api().update_task(base["id"], pid, current=base, **fields)   # a client per worker
+            _patch_task_cache(base["id"], **fields)
+            return "done"
         except Exception:
             return None
 
     with ThreadPoolExecutor(max_workers=min(4, len(tasks))) as pool:
-        done = [r for r in pool.map(_one, tasks) if r]
-    return len(done), len(tasks) - len(done)
+        res = list(pool.map(_one, tasks))
+    return res.count("done"), res.count("skip"), res.count(None)
 
 
 def _exempt_bits(rep, crm):
@@ -9332,9 +9365,11 @@ def dateclear(key):
                ["Cancel", "Clear"], "Clear") != "Clear":
         print("📅 Dates kept")
         return
-    done, failed = _date_bulk_run(
-        tasks, lambda t: {"startDate": None, "dueDate": None})
+    done, skipped, failed = _date_bulk_run(
+        tasks, lambda t: {"startDate": None, "dueDate": None}, keep=_scope_keep(key))
     msg = f"📅 {done} cleared" + _exempt_bits(rep, crm)
+    if skipped:
+        msg += f" · {skipped} changed in the app, skipped"
     if failed:
         msg += f" · {failed} failed"
     if key == "buffer" and not failed:
@@ -9372,8 +9407,10 @@ def dateroll(key):
         delta = (today - datetime.strptime(d, "%Y-%m-%d").date()).days
         return _shift_dates(t, delta) if delta else None
 
-    done, failed = _date_bulk_run(tasks, _fields)
+    done, skipped, failed = _date_bulk_run(tasks, _fields, keep=_scope_keep(key))
     msg = f"⏭️ {done} rolled to today" + _exempt_bits(rep, crm)
+    if skipped:
+        msg += f" · {skipped} changed in the app, skipped"
     if failed:
         msg += f" · {failed} failed"
     if key == "buffer" and not failed:

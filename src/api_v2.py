@@ -212,11 +212,15 @@ class TickTickV2:
             if not r.ok:
                 return None
             d = r.json() if r.text.strip() else []
+            if isinstance(d, list):
+                from api import stamp_read
+                for t in d:
+                    stamp_read(t)
             return d if isinstance(d, list) else None
         except Exception:
             return None
 
-    def update_tasks(self, tasks):
+    def update_tasks(self, tasks, fresh=None):
         """POST /api/v2/batch/task `update` with FULL task objects - the road
         the app itself writes on, and the only one that carries MANY tasks in
         a single request (v1 is one object per POST, plus a GET to build it).
@@ -224,6 +228,13 @@ class TickTickV2:
         change. True when the server acks every one."""
         if not self.token or not tasks:
             return False
+        # the no-revert rule (api.is_fresh): a full body built on anything
+        # but a same-run read would post stale fields back. fresh=True is the
+        # caller vouching (objects it created seconds ago, parents restated).
+        if fresh is not True:
+            from api import is_fresh
+            if not all(is_fresh(t) for t in tasks):
+                return False
         bodies = [{k: v for k, v in t.items() if not k.startswith("_")}
                   for t in tasks]
         try:

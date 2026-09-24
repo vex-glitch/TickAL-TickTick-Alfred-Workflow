@@ -177,7 +177,7 @@ try:
     got = {}
     xact._date_bulk_pool = lambda key: (tasks, "Overdue", 0, 0)
     xact._dialog = lambda prompt, buttons, default: "Roll"
-    xact._date_bulk_run = lambda ts, fn: (got.update({t["id"]: fn(t) for t in ts}) or (len(ts), 0))
+    xact._date_bulk_run = lambda ts, fn, keep=None: (got.update({t["id"]: fn(t) for t in ts}) or (len(ts), 0, 0))
     import filtering  # noqa: E402
     _tld = filtering.task_local_date
     filtering.task_local_date = lambda t: dm._parse(t.get("startDate") or t.get("dueDate")).astimezone(BER).date().isoformat()

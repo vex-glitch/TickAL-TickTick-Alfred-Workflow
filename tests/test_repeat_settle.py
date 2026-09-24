@@ -77,7 +77,10 @@ class FakeV2:
         self.reads += 1
         return self.feeds.pop(0) if self.feeds else []
 
-    def update_tasks(self, tasks):
+    def update_tasks(self, tasks, fresh=None, **kw):
+        import api as _api_mod                 # the real gate, as api_v2 applies it
+        if fresh is not True and not all(_api_mod.is_fresh(b) for b in tasks):
+            return False
         self.writes.append(tasks)
         return self.ok
 
@@ -136,7 +139,10 @@ class FlakyV2(FakeV2):
         super().__init__(feeds)
         self.oks = list(oks)
 
-    def update_tasks(self, tasks):
+    def update_tasks(self, tasks, fresh=None, **kw):
+        import api as _api_mod
+        if fresh is not True and not all(_api_mod.is_fresh(b) for b in tasks):
+            return False
         self.writes.append(tasks)
         return self.oks.pop(0) if self.oks else False
 
