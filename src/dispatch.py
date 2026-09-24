@@ -355,6 +355,43 @@ def _merge_reminders(api, pid, tid, current, tokens):
     return merged, current
 
 
+
+def completion_snapshot(tid):
+    """A cached task as it reads once completed (status 2, completedTime
+    now) - taken BEFORE the completion, while the cache still holds it.
+    None when the cache does not know the task."""
+    try:
+        snap = next((t for key in ("all_tasks", "all_notes")
+                     for t in (cache_store.get(key) or [])
+                     if isinstance(t, dict) and t.get("id") == tid), None)
+        if not snap:
+            return None
+        from datetime import datetime, timezone
+        snap = dict(snap)
+        snap["status"] = 2
+        snap["completedTime"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
+        return snap
+    except Exception:
+        return None
+
+
+def record_completed(snap):
+    """Put a completion TickTick has ACCEPTED at the head of the local
+    completed-tasks log (the Open API cannot list completed tasks; the
+    hourly sync replaces this list with the server's). Every completion road
+    calls it after the API call returns - dispatch's complete: here, and
+    xact._complete_cache_patch - so the Finish guard (routines.finished_days)
+    sees a routine finished a minute ago whichever road finished it."""
+    if not isinstance(snap, dict) or not snap.get("id"):
+        return
+    try:
+        completed = cache_store.get("completed_tasks") or []
+        completed = [t for t in completed if t.get("id") != snap["id"]]
+        completed.insert(0, snap)
+        cache_store.set("completed_tasks", completed[:200])
+    except Exception:
+        pass
+
 def main():
     if len(sys.argv) < 2:
         return
@@ -399,24 +436,12 @@ def main():
             pid, tid = parts[0], parts[1]
             title = parts[2] if len(parts) > 2 else "Task"
 
-            # Snapshot the task before completing so we can add it to the
-            # local completed-tasks log (the Open API doesn't expose completed tasks)
-            try:
-                all_tasks = cache_store.get("all_tasks") or []
-                snap = next((t for t in all_tasks if t["id"] == tid), None)
-                if snap:
-                    from datetime import datetime, timezone
-                    snap = dict(snap)
-                    snap["status"] = 2
-                    snap["completedTime"] = datetime.now(timezone.utc).strftime(
-                        "%Y-%m-%dT%H:%M:%S+0000"
-                    )
-                    completed = cache_store.get("completed_tasks") or []
-                    completed = [t for t in completed if t.get("id") != tid]
-                    completed.insert(0, snap)
-                    cache_store.set("completed_tasks", completed[:200])
-            except Exception:
-                pass
+            # Snapshot the task BEFORE completing (the cache drops it below);
+            # it joins the local completed-tasks log only once TickTick has
+            # ACCEPTED the completion - a failed call used to leave a record
+            # saying it was done, and the Finish guard then refused the retry
+            # as "Already done" (review 2026-09-24)
+            snap = completion_snapshot(tid)
 
             # Complete-guard: completing the CURRENT focus task also ends
             # its session (sweep + note + record) - BEFORE the complete,
@@ -444,6 +469,7 @@ def main():
 
             api = TickTickAPI(cfg.get_token())
             api.complete_task(pid, tid)
+            record_completed(snap)
             # Remove task from all_tasks in-place (no full cache wipe),
             # and from the per-list cache the browse screens read
             try:

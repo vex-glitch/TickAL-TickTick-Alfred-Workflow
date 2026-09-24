@@ -165,6 +165,71 @@ def prev_occurrence(day, repeat_flag):
     return None
 
 
+def local_moment(iso):
+    """A TickTick timestamp as a LOCAL naive datetime, or None (anything that
+    is not a timestamp string included: a bad cache record is skipped, never
+    a reason for the Finish guard to give up)."""
+    if not iso or not isinstance(iso, str):
+        return None
+    try:
+        txt = iso.replace("Z", "+00:00")
+        if _re.search(r"[+-]\d{4}$", txt):
+            txt = txt[:-2] + ":" + txt[-2:]
+        return _dt.datetime.fromisoformat(txt).astimezone().replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return None
+
+
+def finished_days(tid, completed):
+    """The workflow days (dayroll, 04:00) this routine was finished on, read
+    from completed-task records: the Finish road's own snapshot carries the
+    series id, a synced record is a copy whose repeatTaskId is the series."""
+    import dayroll
+    out = set()
+    for t in completed or ():
+        if not isinstance(t, dict) or tid not in (t.get("id"), t.get("repeatTaskId")):
+            continue
+        when = local_moment(t.get("completedTime"))
+        if when is not None:
+            out.add(dayroll.today(when))
+    return out
+
+
+def finish_verdict(task, done_days=(), today=None):
+    """What a Finish click may do with a routine's live task -> (verdict, date):
+        "go"      complete it: the live occurrence is today's, a late one, or
+                  undated, or the task does not repeat
+        "closed"  refuse: a one-off task that is already completed
+        "done"    refuse: the series has rolled past today AND today's
+                  occurrence is resolved - the rule's previous occurrence IS
+                  today (a daily routine one day ahead, the Sunday review
+                  clicked again on Sunday), or the records show it finished
+                  today (a review finished a day early, clicked again). A
+                  second click would complete the NEXT occurrence, which is
+                  the guard's whole reason to exist
+        "early"   the next occurrence is a later day and nothing says it was
+                  finished today: a Finish a day early (the Sunday review on
+                  Saturday), or a completion the record has not caught up with
+    `date` is the live occurrence's day (None when undated). Pure: the day
+    rolls at 04:00 (dayroll), exactly like the ⌃ Start guard (due_state)."""
+    task = task or {}
+    if task.get("status") not in (None, 0):
+        return "closed", None
+    if not task.get("repeatFlag"):
+        return "go", local_date(task.get("startDate") or task.get("dueDate"))
+    st = due_state(task, today)
+    if st["state"] != "ahead":
+        return "go", st["date"]
+    if today is None:
+        import dayroll
+        today = dayroll.today()
+    # the RULE first: a completion made by a road that writes no record (the
+    # focus bar's ●, the note sweep, the app) is still known this way
+    # (review 2026-09-24: a Finish after ● asked instead of refusing)
+    resolved = st["prev"] == today or today in set(done_days or ())
+    return ("done" if resolved else "early"), st["date"]
+
+
 def due_state(task, today=None):
     """Which occurrence a start would open:
         {"state": "today"|"ahead"|"overdue"|"undated", "date": date|None,

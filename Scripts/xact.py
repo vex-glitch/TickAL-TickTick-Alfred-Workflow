@@ -715,7 +715,16 @@ def _complete_cache_patch(pid, tid):
     dropping it from one pool only means the next lookup resurrects the
     completed copy. Concretely: a second ⌥⇧ Posted on the same tattoo would
     re-run the whole Eagle 03 Post sweep instead of refusing. Latent until
-    the Content PL lists became NOTE-kind (2026-07-30)."""
+    the Content PL lists became NOTE-kind (2026-07-30).
+
+    Every caller runs it AFTER complete_task returned, so it also records the
+    completion in the completed-tasks log, like dispatch's ⇧ road: the Finish
+    guard then knows a routine the focus bar's ● finished a minute ago."""
+    try:
+        from dispatch import completion_snapshot, record_completed
+        record_completed(completion_snapshot(tid))
+    except Exception:
+        pass
     try:
         for key in ("all_tasks", "all_notes"):
             cached = cache_store.get(key)

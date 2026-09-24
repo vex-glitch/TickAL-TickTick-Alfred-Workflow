@@ -104,31 +104,54 @@ def _quiet(fn, *a, **kw):
     return " · ".join(ln.strip() for ln in buf.getvalue().splitlines() if ln.strip())
 
 
-def _rolled_past_today(xact, pid, tid):
-    """A refusal line when this routine is already finished for now, else "".
-    A repeating task keeps its id and rolls its due date forward on
-    completion, so "already done" reads as "due after today". Fails OPEN (a
-    live read that errors returns "", the click goes through): a missed
-    refusal costs one extra completion, a false refusal costs the routine."""
+def _finish_guard(xact, pid, tid):
+    """A refusal line when this Finish must not complete, else "" (go).
+
+    A repeating routine keeps its id and rolls its date forward when it is
+    completed, so a second Finish would complete TOMORROW's occurrence. The
+    verdict is routines.finish_verdict, read with the same 04:00 day as the
+    ⌃ Start guard:
+      go      today's (or a late, or undated) occurrence is open -> complete
+      closed  a one-off task already completed -> "✅ Already done"
+      done    rolled past today AND the records show it finished today ->
+              "✅ Already done · next <day>", no question
+      early   the next occurrence is a later day and nothing says it was
+              finished today - a Finish a day early (the Sunday review on
+              Saturday), or one right after the focus bar's ● that the
+              records have not caught up with. It ASKS, naming the day (Vex
+              2026-09-24: "Ask first"), with Cancel as the default button:
+              a reflexive ⏎ must never complete the wrong occurrence.
+
+    It compared a 'YYYY-MM-DD' string with a date until 2026-09-24, so it
+    raised, fell into the except, and let every click through (review).
+    Still fails OPEN on a live read that errors: a missed refusal costs one
+    extra completion, a false refusal costs the routine."""
     try:
         t = xact._api().get_task(pid, tid)
     except Exception:
         return ""
     if not t:
         return ""
-    if t.get("status"):                      # already completed, not repeating
-        return "✅ Already done"
-    raw = t.get("startDate") or t.get("dueDate")
-    if not (raw and t.get("repeatFlag")):
-        return ""
     try:
-        import dayroll
-        import filtering
-        day = filtering.utc_str_to_local_date(raw)
-        if day and day > dayroll.today():       # the routine's day rolls at 04:00
-            return f"✅ Already done · next {day.strftime('%a %d %b')}"
+        import routines as rt
+        done = rt.finished_days(tid, xact.cache_store.get("completed_tasks"))
+        verdict, day = rt.finish_verdict(t, done)
+        when = day.strftime("%a %d %b") if day else ""
     except Exception:
         return ""
+    if verdict == "closed":
+        return "✅ Already done"
+    if verdict == "done":
+        return f"✅ Already done · next {when}"
+    if verdict == "early":
+        name = ((rt.by_tid(tid) or {}).get("label") or t.get("title") or "This routine").strip()
+        try:
+            b = xact._dialog(f"{name} is next due {when}. Finish it now?",
+                             ["Cancel", "Finish it"], "Cancel")
+        except Exception:
+            b = ""
+        if b != "Finish it":
+            return f"↩️ Not finished · next due {when}"
     return ""
 
 
@@ -528,13 +551,17 @@ def run(verb, tid, pid_hint):
         # already finished today is refused, because a repeating task rolls
         # forward under the SAME id: a second click would complete
         # TOMORROW's occurrence (the 5 s debounce does not cover a click a
-        # minute later, or a re-walk of the routine's steps).
+        # minute later, or a re-walk of the routine's steps); one whose next
+        # occurrence is a later day ASKS first (_finish_guard).
         import routines as rt
         if not rt.by_tid(tid):
             return "🔗 Not a routine", False
-        rolled = _rolled_past_today(xact, pid, tid)
-        if rolled:
-            return rolled, False
+        refused = _finish_guard(xact, pid, tid)
+        if refused:
+            # a deliberate Cancel on the early-Finish question counts as a
+            # handled click, so a double-click queued behind the dialog is
+            # debounced instead of asking again (review 2026-09-24)
+            return refused, refused.startswith("↩️")
         return _complete(pid, tid, title), True
     if verb in ("focus", "focuswindow", "timer"):
         clash = _timer_clash(xact, tid)

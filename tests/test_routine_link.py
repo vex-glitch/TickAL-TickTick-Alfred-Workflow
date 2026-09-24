@@ -285,6 +285,184 @@ check("every routine has a mintable Finish link",
       all(rl.url("done", r["tid"], r["pid"]).startswith("alfred://runtrigger/")
           for r in rt.ROUTINES))
 
+# ── the Finish guard (review 2026-09-24): it compared a 'YYYY-MM-DD' string
+# with a date, raised, and let every click through. Vex's ruling for a Finish
+# ahead of the next occurrence: ask first, Cancel by default. Every fixture
+# time is LOCAL, so the suite reads the same in any time zone.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))), "Scripts"))
+import link as _link  # noqa: E402
+import datetime as _dtm  # noqa: E402
+_date = _dtm.date
+
+_SH = next(r for r in rt.ROUTINES if r["key"] == "shutdown")
+_TODAY = _date(2026, 9, 24)                    # a Thursday
+_DAILY = "RRULE:FREQ=DAILY;INTERVAL=1"
+_WEEKLY = "RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=SU"
+
+
+def _utc(d, h, mi=0):
+    """A LOCAL wall-clock time on day d, as TickTick writes it (UTC)."""
+    return (_dtm.datetime(d.year, d.month, d.day, h, mi).astimezone()
+            .astimezone(_dtm.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000+0000"))
+
+
+def _series(day, rule=_DAILY, **kw):
+    t = {"id": _SH["tid"], "title": "🌆 Shutdown", "status": 0, "repeatFlag": rule,
+         "startDate": _utc(day, 22) if day else None}
+    t.update(kw)
+    return t
+
+
+def _copy(done_iso, series=_SH["tid"]):
+    return {"id": "c0ffee" * 4, "repeatTaskId": series, "status": 2, "completedTime": done_iso}
+
+
+V = rt.finish_verdict
+check("verdict: today's occurrence open -> go", V(_series(_TODAY), set(), today=_TODAY) == ("go", _TODAY))
+check("verdict: a late occurrence -> go", V(_series(_date(2026, 9, 22)), set(), today=_TODAY)[0] == "go")
+check("verdict: a daily series one day ahead is DONE even with no record (the focus bar's ● writes none)",
+      V(_series(_date(2026, 9, 25)), set(), today=_TODAY) == ("done", _date(2026, 9, 25)))
+check("verdict: rolled further ahead, finished today by the record -> done",
+      V(_series(_date(2026, 9, 27)), {_TODAY}, today=_TODAY)[0] == "done")
+check("verdict: rolled ahead, nothing says today -> early (ask)",
+      V(_series(_date(2026, 9, 27)), {_date(2026, 9, 20)}, today=_TODAY)[0] == "early")
+_SAT, _SUN = _date(2026, 9, 26), _date(2026, 9, 27)
+check("verdict: the Sunday review clicked on Saturday -> early (ask)",
+      V(_series(_SUN, _WEEKLY), set(), today=_SAT) == ("early", _SUN))
+check("verdict: finished on Sunday, clicked again on Sunday -> done by the rule",
+      V(_series(_date(2026, 10, 4), _WEEKLY), set(), today=_SUN)[0] == "done")
+check("verdict: finished early on Saturday, clicked again Saturday -> done by the record",
+      V(_series(_date(2026, 10, 4), _WEEKLY), {_SAT}, today=_SAT)[0] == "done")
+check("verdict: a completed one-off -> closed", V({"status": 2}, set(), today=_TODAY)[0] == "closed")
+check("verdict: a one-off open task -> go",
+      V({"status": 0, "startDate": _utc(_date(2026, 9, 30), 8)}, set(), today=_TODAY)[0] == "go")
+check("verdict: undated series -> go", V(_series(None), set(), today=_TODAY)[0] == "go")
+
+# finished_days: the Finish road's own snapshot (series id) and a synced copy
+# (repeatTaskId); a completion at 00:18 belongs to the day that is ending
+_days = rt.finished_days(_SH["tid"], [
+    {"id": _SH["tid"], "completedTime": _utc(_TODAY, 12)},
+    _copy(_utc(_date(2026, 9, 25), 0, 18)),
+    _copy(_utc(_date(2026, 9, 20), 22), series="0" * 24),        # another series
+    {"id": _SH["tid"], "completedTime": 7}, "junk", None])
+check("finished_days reads both record shapes, the 04:00 roll, skips junk", _days == {_TODAY}, _days)
+
+
+class _Api:
+    def __init__(self, t, boom=False):
+        self.t, self.boom = t, boom
+
+    def get_task(self, pid, tid):
+        if self.boom:
+            raise OSError("offline")
+        return self.t
+
+
+class _Cache:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def get(self, key):
+        return self.rows if key == "completed_tasks" else None
+
+
+class _X:
+    def __init__(self, t, rows=(), button="", boom=False):
+        self._t, self._button, self._boom = t, button, boom
+        self.cache_store = _Cache(list(rows))
+        self.asked = []
+
+    def _api(self):
+        return _Api(self._t, self._boom)
+
+    def _dialog(self, prompt, buttons, default):
+        self.asked.append((prompt, tuple(buttons), default))
+        return self._button
+
+
+import dayroll as _dayroll  # noqa: E402
+_real_today = _dayroll.today
+_dayroll.today = lambda now=None: _TODAY if now is None else _real_today(now)
+try:
+    G = lambda x: _link._finish_guard(x, _SH["pid"], _SH["tid"])     # noqa: E731
+    x = _X(_series(_TODAY))
+    check("guard: a series due today completes, no question", G(x) == "" and not x.asked)
+    x = _X(_series(_date(2026, 9, 25)))
+    out = G(x)
+    check("guard: rolled to tomorrow is REFUSED, no question, even with no record",
+          out == "✅ Already done · next Fri 25 Sep" and not x.asked, (out, x.asked))
+    x = _X(_series(_date(2026, 9, 27)), button="")
+    out = G(x)
+    check("guard: early Finish ASKS, naming the routine and the day, Cancel by default",
+          x.asked and "🌆 Shutdown is next due Sun 27 Sep" in x.asked[0][0]
+          and x.asked[0][2] == "Cancel" and out.startswith("↩️ Not finished"), (out, x.asked))
+    x = _X(_series(_date(2026, 9, 27)), button="Finish it")
+    check("guard: early Finish confirmed -> completes", G(x) == "" and x.asked)
+    check("guard: a completed one-off is refused", G(_X({"status": 2})) == "✅ Already done")
+    check("guard: an offline read fails OPEN, never throws", G(_X(None, boom=True)) == "")
+    check("guard: a garbage date never throws", G(_X(_series(_TODAY, startDate="not a date"))) == "")
+    check("guard: a garbage completed cache never throws, still asks",
+          G(_X(_series(_date(2026, 9, 27)), rows=[{"id": _SH["tid"], "completedTime": 7}],
+               button="Cancel")).startswith("↩️"))
+finally:
+    _dayroll.today = _real_today
+
+# run(): a deliberate Cancel is a handled click (a queued twin is debounced);
+# a refusal still lets an immediate retry through
+_rsrc = _link_src[_link_src.index('if verb == "done":'):]
+_rsrc = _rsrc[:_rsrc.index("return _complete(")]
+check("run(): Cancel counts as handled, refusals do not",
+      'return refused, refused.startswith("↩️")' in _rsrc)
+
+# the completion record lands only once TickTick accepted it, on every road
+import tempfile as _tf  # noqa: E402
+import cache as _cache  # noqa: E402
+_cache.CACHE_DIR = _tf.mkdtemp()
+os.environ["TICKAL_NO_SETTLE"] = "1"
+import dispatch as _dispatch  # noqa: E402
+_cache.set("all_tasks", [dict(_series(_TODAY), projectId="P")])
+_cache.set("completed_tasks", [])
+
+
+class _FailAPI:
+    def __init__(self, *a, **k):
+        pass
+
+    def complete_task(self, pid, tid):
+        raise OSError("rate limited")
+
+
+_dispatch.TickTickAPI = _FailAPI
+_dispatch.cfg.get_token = lambda: "t"
+_rundir = _tf.mkdtemp()
+_dispatch.run_path = lambda name: os.path.join(_rundir, name)   # never the real focus timer
+_argv = sys.argv
+sys.argv = ["dispatch", f"complete:P:{_SH['tid']}:Shutdown"]
+try:
+    import contextlib as _cl
+    import io as _io
+    with _cl.redirect_stdout(_io.StringIO()):
+        try:
+            _dispatch.main()
+        except BaseException:
+            pass
+finally:
+    sys.argv = _argv
+check("a FAILED complete leaves no completed record (the guard would say Already done)",
+      (_cache.get("completed_tasks") or []) == [], _cache.get("completed_tasks"))
+_dispatch.record_completed(_dispatch.completion_snapshot(_SH["tid"]))
+_rec = _cache.get("completed_tasks") or []
+check("an accepted completion is recorded with status 2 and a completedTime",
+      len(_rec) == 1 and _rec[0]["id"] == _SH["tid"] and _rec[0]["status"] == 2
+      and rt.finished_days(_SH["tid"], _rec), _rec)
+_xsrc = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "Scripts", "xact.py"), encoding="utf-8").read()
+_ccp = _xsrc[_xsrc.index("def _complete_cache_patch"):]
+_ccp = _ccp[:_ccp.index("\ndef ")]
+check("xact's completion mirror (the bar's ●, CRM, content) records it too",
+      "record_completed(completion_snapshot(tid))" in _ccp)
+
 print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
 if __name__ == "__main__":            # make test / python3 tests/...: exit code
     sys.exit(1 if FAILS else 0)
