@@ -7547,9 +7547,10 @@ def pn_journal(slot):
     elif slot == "evening" and _before_day_rollover():
         # an evening journal at 00:30 still belongs to the day that is ending
         # (dayroll's day, the 04:00 rule): its tomorrow is the day that has
-        # just begun
-        import dayroll
-        pin_day = dayroll.today()
+        # just begun. Before the roll that day is always calendar today
+        # minus one, which is what the predicate above guarantees.
+        from datetime import date as _date, timedelta as _td
+        pin_day = _date.today() - _td(days=1)
     pe = _pn()
     import re as _re
     import goal_handoff as gh

@@ -411,7 +411,7 @@ finally:
 # run(): a deliberate Cancel is a handled click (a queued twin is debounced);
 # a refusal still lets an immediate retry through
 _rsrc = _link_src[_link_src.index('if verb == "done":'):]
-_rsrc = _rsrc[:_rsrc.index("return _complete(")]
+_rsrc = _rsrc[:_rsrc.index("out = _complete(")]
 check("run(): Cancel counts as handled, refusals do not",
       'return refused, refused.startswith("↩️")' in _rsrc)
 
