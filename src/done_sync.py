@@ -44,7 +44,14 @@ def _state(path=None):
     written back. An unreadable file reads as empty - a broken stamp must
     never cost a completion its catch-up."""
     path = path or _path()
-    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    except OSError:
+        # an unopenable state file (a directory in its place, mode 000, a
+        # full disk): the catch-up must still happen, so the state reads
+        # as empty and nothing is written back (review 2026-09-24)
+        yield {}
+        return
     try:
         try:
             import fcntl
@@ -65,9 +72,12 @@ def _state(path=None):
             st = {}
         yield st
         data = json.dumps(st).encode("utf-8")
-        os.lseek(fd, 0, os.SEEK_SET)
-        os.ftruncate(fd, 0)
-        os.write(fd, data)
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.ftruncate(fd, 0)
+            os.write(fd, data)
+        except OSError:
+            pass                        # a failed write-back is a lost stamp, not a lost catch-up
     finally:
         os.close(fd)
 
@@ -75,18 +85,22 @@ def _state(path=None):
 def request(spawn, now=None, path=None):
     """A completion happened. Moves the deadline, and calls spawn() to start
     the catch-up job unless one is already waiting. -> True when it spawned.
+    spawn() must return something truthy when a job actually STARTED: the
+    slot is stamped only then, so a spawn that yields no process (a Popen
+    that failed, swallowed upstream) cannot hold it for JOB_TTL and cost
+    every completion in that window its catch-up (review 2026-09-24).
     Never raises: the completion it follows already happened."""
     try:
+        spawned = False
         with _state(path) as st:
             now = time.time() if now is None else now
             st["ts"] = now
             beat = float(st.get("job") or 0)
             waiting = bool(beat) and 0 <= now - beat < JOB_TTL
             if not waiting:
-                st["job"] = now
-        if not waiting:
-            spawn()
-        return not waiting
+                spawned = bool(spawn())
+                st["job"] = now if spawned else 0
+        return spawned
     except Exception:
         return False
 
@@ -101,7 +115,13 @@ def wait_quiet(sleep=time.sleep, clock=time.time, path=None):
         while True:
             with _state(path) as st:
                 now = clock()
-                wait = float(st.get("ts") or 0) + DELAY - now
+                ts = float(st.get("ts") or 0)
+                if ts > now:
+                    # the clock stepped back since the request: re-anchor,
+                    # or the job idles for the whole skew while every new
+                    # completion is refused a job (review 2026-09-24)
+                    st["ts"] = ts = now
+                wait = ts + DELAY - now
                 if wait <= 0:
                     st["job"] = 0
                     return True

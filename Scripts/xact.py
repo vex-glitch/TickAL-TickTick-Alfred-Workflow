@@ -766,7 +766,14 @@ def pn_donesync():
         return
     import done_sync
     done_sync.wait_quiet()
-    print(f"{datetime.now():%Y-%m-%d %H:%M:%S} done-sync: {_pn().after_done()}")
+    try:
+        line = _pn().after_done()
+    except Exception as e:
+        # offline, a rate limit, a wake before the tunnel is up: a log line,
+        # never a banner (main's catch-all would post one for a job nobody
+        # asked for); the next completion or open retries (review 2026-09-24)
+        line = f"FAILED {type(e).__name__}: {e} (the next completion or open retries)"
+    print(f"{datetime.now():%Y-%m-%d %H:%M:%S} done-sync: {line}")
 
 
 def _children_state(fpid, ftid):
@@ -7189,19 +7196,21 @@ def km_run(rest):
 def _pn_bg(arg):
     """Detached background xact run - the instant-open path (opens were slow
     when the full refresh + Tier-2 fetches ran BEFORE the app opened). The
-    child inherits env (config gate + Alfred vars ride)."""
+    child inherits env (config gate + Alfred vars ride). Returns the Popen,
+    or None when the child could not start (done_sync.request stamps its
+    slot only for a job that started, review 2026-09-24)."""
     wf = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
         with open("/tmp/tickal_periodic.log", "a") as logf:
             # stdout goes to the log here, never to a notification - a verb
             # the user is waiting on reads TICKAL_DETACHED and posts its own
-            subprocess.Popen(
+            return subprocess.Popen(
                 ["/bin/bash", os.path.join(wf, "Scripts", "py.sh"),
                  os.path.join(wf, "Scripts", "xact.py"), arg],
                 stdout=logf, stderr=logf, start_new_session=True,
                 env=dict(os.environ, TICKAL_DETACHED="1"))
     except Exception:
-        pass
+        return None
 
 
 def pn_open(spec):

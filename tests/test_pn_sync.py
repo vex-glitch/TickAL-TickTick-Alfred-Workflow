@@ -42,7 +42,7 @@ pe.LOG_FILE = os.path.join(tmp, "periodic.log")          # never the real log
 
 # ── 1. the trailing debounce ──────────────────────────────────────────────────
 spawned = []
-spawn = lambda: spawned.append(1)                          # noqa: E731
+spawn = lambda: spawned.append(1) or True                  # noqa: E731  (a spawn reports that a job STARTED)
 check("first completion spawns the catch-up job",
       done_sync.request(spawn, now=1000.0, path=STATE) and spawned == [1])
 check("a second one while the job waits only moves the deadline",
@@ -66,7 +66,7 @@ check("a completion after the job freed its slot spawns the next job",
 
 # a completion that lands WHILE the job sleeps pushes it further
 STATE2 = os.path.join(tmp, "donesync2.json")
-done_sync.request(lambda: None, now=0.0, path=STATE2)
+done_sync.request(lambda: True, now=0.0, path=STATE2)
 clock2 = [5.0]
 
 
@@ -74,7 +74,7 @@ def nap2(secs):
     clock2[0] += secs
     if clock2[0] < 30 and not getattr(nap2, "hit", False):
         nap2.hit = True
-        done_sync.request(lambda: None, now=clock2[0], path=STATE2)    # mid-sleep tick
+        done_sync.request(lambda: True, now=clock2[0], path=STATE2)    # mid-sleep tick
 
 
 done_sync.wait_quiet(sleep=nap2, clock=lambda: clock2[0], path=STATE2)
@@ -83,9 +83,9 @@ check("a tick during the wait moves the run past it", clock2[0] >= 15.0 + done_s
 # a job that died leaves a stale heartbeat: the next completion still gets one
 STATE3 = os.path.join(tmp, "donesync3.json")
 got = []
-done_sync.request(lambda: got.append("a"), now=0.0, path=STATE3)
+done_sync.request(lambda: got.append("a") or True, now=0.0, path=STATE3)
 check("a dead job's slot frees after JOB_TTL",
-      done_sync.request(lambda: got.append("b"), now=done_sync.JOB_TTL + 1, path=STATE3)
+      done_sync.request(lambda: got.append("b") or True, now=done_sync.JOB_TTL + 1, path=STATE3)
       and got == ["a", "b"], got)
 
 # a broken state file never costs a completion its catch-up
@@ -93,7 +93,7 @@ STATE4 = os.path.join(tmp, "donesync4.json")
 with open(STATE4, "w") as f:
     f.write("{not json")
 got = []
-check("a corrupt stamp still spawns", done_sync.request(lambda: got.append(1), now=5.0, path=STATE4) and got == [1])
+check("a corrupt stamp still spawns", done_sync.request(lambda: got.append(1) or True, now=5.0, path=STATE4) and got == [1])
 check("a spawn that raises never escapes",
       done_sync.request(lambda: 1 / 0, now=5.0, path=os.path.join(tmp, "x.json")) is False)
 
