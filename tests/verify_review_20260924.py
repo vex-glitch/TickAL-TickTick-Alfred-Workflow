@@ -20,7 +20,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = "340553e"
 ALLOWED = {
     "src/day_move.py", "src/periodic_engine.py", "src/fuzzy.py", "src/done_sync.py",
-    "src/goal_handoff.py", "Scripts/xact.py", "Scripts/periodic_rows.py", "Scripts/link.py",
+    "src/goal_handoff.py", "src/filtering.py", "Scripts/xact.py", "Scripts/periodic_rows.py",
+    "Scripts/link.py", "Scripts/browse.py", "Scripts/everything_search.py", "tests/test_okr_pickers.py",
     "tests/test_routine_link.py", "tests/test_journal_goal.py", "tests/test_pn_sync.py",
     "tests/test_monthly_note.py", "tests/test_quarterly_note.py", "tests/test_review_20260924.py",
     "tests/verify_review_20260924.py", "Makefile", "docs/48-periodic.md", "CLAUDE.md",
