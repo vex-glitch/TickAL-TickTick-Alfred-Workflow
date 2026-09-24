@@ -449,8 +449,8 @@ gh.save("morning", date(2026, 9, 15), now=None)
 run("evening", pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])), answers=["x"])
 check("a fresh journal run clears an old goal screen", gh.load() is None)
 
-# the pick on that screen - the journal carries on IN the pick's process now
-# (2026-09-24: the detached resume was the step that kept failing)
+# the pick on that screen - the journal is reopened DETACHED (a fresh run
+# right after the pick; it ran in the pick's process for one day, 2026-09-24)
 RESUMED = []
 _real_pn_journal = xact.pn_journal
 xact.pn_journal = lambda slot: RESUMED.append(slot)
@@ -466,8 +466,8 @@ check("the pick sets the ☀️ goal on TOMORROW",
       fake.goal_calls == [("daily", "Ship it", "P", "T1", "Write the brief", date(2026, 9, 16))], fake.goal_calls)
 check("and answers tonight's question with it",
       fake.answers == [("evening", "tgoal", "🎯 Ship it · Write the brief", date(2026, 9, 15))], fake.answers)
-check("then carries on with the journal in the SAME process, pinned to tonight's note",
-      RESUMED == ["evening@2026-09-15"] and not calls["bg"], (RESUMED, calls["bg"]))
+check("then reopens the journal detached, pinned to tonight's note",
+      calls["bg"] == ["xact:pn_journal:evening@2026-09-15"] and not RESUMED, (RESUMED, calls["bg"]))
 RESUMED.clear()
 
 for v in calls.values():
@@ -476,9 +476,9 @@ fake = FakePE([])
 xact._pn = lambda: fake
 xact.pn_goal_skip(base64.b64encode(json.dumps(
     {"slot": "morning", "mode": "set", "note_day": "2026-09-16", "for_day": "2026-09-16"}).encode()).decode())
-check("⏭ answers the morning check and resumes, in the same process",
+check("⏭ answers the morning check and reopens the journal detached",
       fake.answers == [("morning", "gcheck", "⏭ No goal set", date(2026, 9, 16))]
-      and RESUMED == ["morning@2026-09-16"] and not calls["bg"], (fake.answers, RESUMED, calls["bg"]))
+      and calls["bg"] == ["xact:pn_journal:morning@2026-09-16"] and not RESUMED, (fake.answers, RESUMED, calls["bg"]))
 RESUMED.clear()
 
 for v in calls.values():
@@ -512,8 +512,8 @@ check("Change… then keep answers 'Kept', not 'No goal'",
       fake.answers == [("morning", "gcheck", "✅ Kept: Ship it", date(2026, 9, 16))], fake.answers)
 xact.pn_journal = _real_pn_journal
 
-# the whole road, pick to resumed dialogs, with the real pn_journal: the pick
-# answers tomorrow's goal and the SAME process asks the next question
+# the whole road with the real pn_journal: the pick answers tomorrow's goal,
+# asks nothing itself, and reopens the journal detached
 for v in calls.values():
     v.clear()
 EV2 = pm.journal_pairs(pm.seed_journal_lines([q for _k, q in pm.journal_fixed("evening", {})]))
@@ -535,12 +535,11 @@ gh.save("evening", date(2026, 9, 15))
 spec = {"kind": "daily", "text": "", "pid": "P", "tid": "T1", "title": "Write the brief",
         "jnl": {"slot": "evening", "mode": "set", "note_day": "2026-09-15", "for_day": "2026-09-16"}}
 xact.pn_setgoal(base64.b64encode(json.dumps(spec).encode()).decode())
-check("pick -> the next question is asked by the pick's own run",
-      calls["ask"][:1] == ["What is on your mind?"] and not calls["bg"], (calls["ask"], calls["bg"]))
+check("pick -> the pick's run asks nothing and reopens the journal detached",
+      not calls["ask"] and calls["bg"] == ["xact:pn_journal:evening@2026-09-15"], (calls["ask"], calls["bg"]))
 LOG = open(xact.JOURNAL_LOG).read()
-check("the journal log has the pick, the resume, the start, the question and the end",
-      all(w in LOG for w in ("pick landed", "resume in the pick's process", "start resumed",
-                             "free -> cancel", "end saved")), LOG)
+check("the journal log has the pick and the detached resume",
+      all(w in LOG for w in ("pick landed", "resume detached")), LOG)
 check("the journal log never holds an answer's text", "Write the brief" not in LOG, LOG)
 
 # ── 9. the review of the 04:30 run ────────────────────────────────────────────

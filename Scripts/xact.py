@@ -7833,21 +7833,24 @@ def _jnl_spec(raw):
 
 
 def _resume_journal(slot, note_day):
-    """Carry on with the paused journal IN THIS PROCESS: the pick's own run,
-    on the road the Alfred row starts a journal from.
+    """Reopen the paused journal DETACHED (_pn_bg): the pick's End toast goes
+    out now, the dialogs follow in their own run, and the sequential modOpen
+    node the pick rode is free again at once.
 
-    It used to be a DETACHED second run (_pn_bg), and that is the one step of
-    the goal handoff that kept failing (Vex 2026-09-22: "Shutdown journal
-    exits after choose goal prompt ... It shows notification journal done.
-    Then I need to go and start journal again"). His link log shows a fresh
-    start seconds after the pick on 20, 21 and 23 Sep; the resumed run's own
-    output went to /tmp, which the reboots wiped, so why it failed was never
-    seen. Its logic replays clean. So the spawn is gone, not patched: the
-    dialogs now follow the pick where the pick itself ran, and the journal
-    log records every step either way. Its final line reaches the End toast
-    beside the pick's (TICKAL_DETACHED is not set here, so no banner)."""
-    _jlog(f"{slot}@{note_day.isoformat()}", "resume in the pick's process")
-    pn_journal(f"{slot}@{note_day.isoformat()}")
+    It ran IN the pick's process for one day (2026-09-24, 9829531) on the
+    guess that the detached resume was the step that failed after a pick
+    (Vex 2026-09-22: "Shutdown journal exits after choose goal prompt").
+    The review that evening found no fault in the spawn, read the link log
+    as pointing at the OTHER half (the picker not appearing after the
+    handoff: three fresh starts in 46 s on the morning of the 23rd, none of
+    which could draw a box before its handoff), and measured the cost of
+    the in-process run: every main-search ⏎ queued behind the dialogs for
+    minutes. Vex: "why not now". So the resume is detached again, every
+    log line stays, and the handoff half is instrumented in pn_journal:
+    one real evening decides. The run's final line is a banner
+    (TICKAL_DETACHED rides _pn_bg)."""
+    _jlog(f"{slot}@{note_day.isoformat()}", "resume detached")
+    _pn_bg(f"xact:pn_journal:{slot}@{note_day.isoformat()}")
 
 
 def _goal_from_journal(spec, kind, pid, tid, title):

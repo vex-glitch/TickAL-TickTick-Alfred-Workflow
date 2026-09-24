@@ -116,7 +116,7 @@ All five journals seed their questions into the note at mint, so you can answer 
 
 Edit the pools: copy `src/periodic_prompts/{morning,evening,weekly,monthly,quarterly}.md` to `~/.ticktick_alfred/periodic_prompts/` and make them yours.
 
-The goal questions (the evening's 🎯 tomorrow, the morning's ☀️ check) stop the dialogs and open the goal picker in Alfred; your pick answers the question and the journal carries on with the next one in the same run. Every run leaves a trail in `~/.ticktick_alfred/run/tickal_journal.log`: when it started, how each question went (answered, skipped, cancelled, and how long it took), the handoff and the pick. Events and timings only - never an answer.
+The goal questions (the evening's 🎯 tomorrow, the morning's ☀️ check) stop the dialogs and open the goal picker in Alfred; your pick answers the question and the journal carries on with the next one in a fresh run that starts right after the pick. Every run leaves a trail in `~/.ticktick_alfred/run/tickal_journal.log`: when it started, how each question went (answered, skipped, cancelled, and how long it took), the handoff and the pick. Events and timings only - never an answer.
 
 ## Goals
 

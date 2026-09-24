@@ -459,9 +459,10 @@ try:
     xact._pn = lambda: fake
     xact._pn_gate = lambda: True
     xact._run_trigger = lambda *a, **k: None
-    xact._pn_bg = lambda *a, **k: None
+    BG = []
+    xact._pn_bg = lambda arg, *a, **k: BG.append(arg)    # the journal is reopened detached
     RESUMED = []
-    xact.pn_journal = lambda slot: RESUMED.append(slot)   # the journal carries on in-process
+    xact.pn_journal = lambda slot: RESUMED.append(slot)
     xact._goalseq_load = lambda kind=None: None
     import goal_handoff as gh                              # noqa: E402
     gh._PATH = os.path.join(tmp, "goaljnl.json")
@@ -482,8 +483,8 @@ try:
         xact.pn_setgoal(by_name(rows, "🔑 Tomorrow only")["arg"][len("xact:pn_setgoal:"):])
     check("verb: the evening journal's pick lands on tomorrow",
           fake.calls == [("daily", "Tomorrow only", None, None, None, False, TOMORROW)], fake.calls)
-    check("verb: and the journal carries on in the pick's own process",
-          RESUMED == [f"evening@{jnl['note_day'].isoformat()}"], RESUMED)
+    check("verb: and the journal is reopened detached, pinned to the note",
+          BG == [f"xact:pn_journal:evening@{jnl['note_day'].isoformat()}"] and not RESUMED, (BG, RESUMED))
 finally:
     os.environ.clear()
     os.environ.update(_env)
