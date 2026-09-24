@@ -71,7 +71,13 @@ def rank(query, items, key_fn, order_fn=None):
     so a typo still finds something. Stable: fuzzy order survives inside each
     (strength, order) group. An empty query returns the items as they came."""
     if not (query or "").strip():
-        return list(items)
+        # a blank bar: nothing to match, so the order function alone ranks
+        # (tasks before notes, top-level first) instead of the cache order
+        # (review 2026-09-24)
+        items = list(items)
+        if order_fn:
+            items.sort(key=lambda x: tuple(order_fn(x)))
+        return items
     items = filter_and_score(query, items, key_fn=key_fn)
     ann = {id(x): (strength(query, key_fn(x)),) + tuple(order_fn(x) if order_fn else ())
            for x in items}
