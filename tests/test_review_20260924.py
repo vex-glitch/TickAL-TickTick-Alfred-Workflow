@@ -424,6 +424,84 @@ check("R13 the handoff line carries the activation trail",
 check("R13 the trigger line carries rc, the yield and stdout",
       any("picker trigger rc=0" in ln and "yielded=no" in ln and "out=ok" in ln for ln in L3.splitlines()), L3)
 
+# ── R14 the picker survives the run that opened it (journal log 2026-09-24 18:00) ─
+import types  # noqa: E402
+
+
+class _FakeApp:
+    def __init__(self):
+        self.calls = []
+
+    def setActivationPolicy_(self, p):
+        self.calls.append(("policy", p))
+        return True
+
+    def deactivate(self):
+        self.calls.append(("deactivate",))
+
+
+_app = _FakeApp()
+_fake_ak = types.SimpleNamespace(
+    NSApplicationActivationPolicyProhibited=2,
+    NSApplication=types.SimpleNamespace(sharedApplication=lambda: _app),
+    NSRunningApplication=types.SimpleNamespace(currentApplication=lambda: types.SimpleNamespace(isActive=lambda: True)),
+    NSWorkspace=types.SimpleNamespace(sharedWorkspace=lambda: types.SimpleNamespace(frontmostApplication=lambda: None)))
+sys.modules["AppKit"] = _fake_ak
+try:
+    y = getattr(xact, "_yield_activation", lambda: None)()
+finally:
+    del sys.modules["AppKit"]
+check("R14 before the trigger the run stops being an app that can be active (policy Prohibited), then deactivates",
+      y == "prohibited" and _app.calls == [("policy", 2), ("deactivate",)], (y, _app.calls))
+
+_wfp = getattr(xact, "_wait_for_pick", None)
+gh._PATH = os.path.join(TMP, "goaljnl_wait.json")
+gh.save("evening", date(2026, 9, 24))
+xact.JOURNAL_LOG = os.path.join(TMP, "journal3.log")
+naps = []
+
+
+def _nap(s):
+    naps.append(s)
+    if len(naps) == 3:
+        gh.clear()                      # the pick lands
+
+
+res = _wfp("evening@2026-09-24", sleep=_nap, clock=lambda: 0.0) if _wfp else None
+check("R14 a detached run idles until the pick consumed the handoff, then exits",
+      res == "pick" and len(naps) == 3 and "exit after pick" in open(xact.JOURNAL_LOG).read(), (res, naps))
+gh.save("evening", date(2026, 9, 24))
+clk = [0.0]
+
+
+def _tick(s):
+    clk[0] += 300
+
+
+res = _wfp("evening@2026-09-24", sleep=_tick, clock=lambda: clk[0]) if _wfp else None
+check("R14 and gives up after PICK_WAIT_MAX when nothing is picked",
+      res == "wait" and clk[0] >= getattr(xact, "PICK_WAIT_MAX", 10**9)
+      and "exit after wait" in open(xact.JOURNAL_LOG).read(), (res, clk))
+gh.clear()
+
+WAITED = []
+_rw = getattr(xact, "_wait_for_pick", None)
+xact._wait_for_pick = lambda tag, *a, **k: WAITED.append(tag) or "pick"
+_rt2, _rpn2 = xact._run_trigger, xact._pn
+xact._run_trigger = lambda name, arg=None: subprocess.CompletedProcess([], 0, stdout="", stderr="")
+xact._pn = lambda: _JPE()
+xact._ask = lambda q, title="", multiline=False: None
+os.environ["TICKAL_DETACHED"] = "1"
+try:
+    with contextlib.redirect_stdout(io.StringIO()):
+        xact.pn_journal("evening@2026-09-24")
+finally:
+    os.environ.pop("TICKAL_DETACHED", None)
+    xact._run_trigger, xact._pn = _rt2, _rpn2
+    if _rw is not None:
+        xact._wait_for_pick = _rw
+check("R14 a detached handoff waits for the pick before the run exits", WAITED == ["evening@2026-09-24"], WAITED)
+
 # ── summary ──────────────────────────────────────────────────────────────────
 for item in sorted(ITEMS, key=lambda s: int(s[1:])):
     print(f"ITEM {item} {'green' if ITEMS[item] else 'red'}")

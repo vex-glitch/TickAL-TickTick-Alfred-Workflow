@@ -7488,21 +7488,46 @@ def _activation_trail():
 
 
 def _yield_activation():
-    """Unproven mitigation for the picker half, logged: a run that drew an
-    NSAlert made itself the active app; hand activation back BEFORE Alfred
-    shows, so this run's exit a moment later cannot pull the panel down
-    with it. -> "yes" | "no" (nothing to yield) | "err"."""
+    """A run that drew an NSAlert made itself the active app. Before Alfred
+    shows the goal picker this run stops being an app that CAN be active:
+    activation policy Prohibited, then deactivate. Proven need (journal
+    log 2026-09-24 18:00:55): with deactivate alone the picker drew and
+    vanished the second this run exited, because macOS hands activation
+    on when the active app quits and Alfred hides when it loses focus.
+    -> "prohibited" | "no" (AppKit never loaded, nothing to yield) | "err"."""
     try:
         ak = sys.modules.get("AppKit")
         if ak is None:
             return "no"
-        me = ak.NSRunningApplication.currentApplication()
-        if not me.isActive():
-            return "no"
-        ak.NSApplication.sharedApplication().deactivate()
-        return "yes"
+        app = ak.NSApplication.sharedApplication()
+        app.setActivationPolicy_(ak.NSApplicationActivationPolicyProhibited)
+        try:
+            app.deactivate()
+        except Exception:
+            pass
+        return "prohibited"
     except Exception:
         return "err"
+
+
+PICK_WAIT_MAX = 20 * 60        # a detached run outlives its picker this long at most
+
+
+def _wait_for_pick(tag, sleep=time.sleep, clock=time.time, limit=None):
+    """A DETACHED journal run stays alive, idle, until the goal handoff it
+    opened is consumed (the pick or ⏭ clears it) or PICK_WAIT_MAX passes,
+    so its exit can never coincide with Alfred's picker being up (the
+    proven failure of 2026-09-24). Returns "pick" | "wait". Logged."""
+    import goal_handoff as gh
+    limit = PICK_WAIT_MAX if limit is None else limit
+    t0 = clock()
+    while gh.load() is not None:
+        if clock() - t0 >= limit:
+            _jlog(tag, f"exit after wait {int(clock() - t0)}s (no pick)")
+            return "wait"
+        sleep(0.5)
+    _jlog(tag, f"exit after pick {int(clock() - t0)}s")
+    return "pick"
 
 
 _JOURNAL_UI = {"morning": ("🌅", "Morning"), "evening": ("🌙", "Evening"),
@@ -7723,10 +7748,14 @@ def pn_journal(slot):
         err = " ".join((getattr(r, "stderr", "") or "").split())[-160:]
         _jlog(tag, f"picker trigger rc={rc} yielded={yielded}"
                    + (f" out={out}" if out else "") + (f" err={err}" if err else ""))
-        # unproven mitigation, cheap: a detached run that exits the instant
-        # after the trigger may pull Alfred's panel down with it (macOS hands
-        # activation on when the active app quits); one second costs nothing
-        time.sleep(1.0)
+        # the run's exit pulled the picker down (proven 2026-09-24 18:00): a
+        # detached run now idles until the pick consumed the handoff; the
+        # hotkey road holds Alfred's own node and cannot wait, so it only
+        # gives Alfred a moment to draw
+        if os.environ.get("TICKAL_DETACHED"):
+            _wait_for_pick(tag)
+        else:
+            time.sleep(1.0)
         return
     bits = [f"{emoji} {label} saved {done_now}/{total}"]
     if bridge_said:
