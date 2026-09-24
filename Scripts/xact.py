@@ -7510,10 +7510,14 @@ def _goalseq_save(remaining, kind="weekly"):
 
 
 def _before_day_rollover(now=None):
-    """True between midnight and 04:30, when the periodic day has not turned
-    over yet (the 04:30 agent mints the new day's notes)."""
+    """True while the workflow's day has not turned over yet: dayroll's
+    04:00, the ONE rule every other road reads. It said 04:30 until
+    2026-09-24, so an evening journal started at 04:10 wrote yesterday's
+    note while the Finish guard, the ticks and the hub already said today
+    (review)."""
+    import dayroll
     now = now or datetime.now()
-    return (now.hour, now.minute) < (4, 30)
+    return dayroll.today(now) != now.date()
 
 
 def pn_journal(slot):
@@ -7542,9 +7546,10 @@ def pn_journal(slot):
             pin_day = None
     elif slot == "evening" and _before_day_rollover():
         # an evening journal at 00:30 still belongs to the day that is ending
-        # (the 04:30 agent's day): its tomorrow is the day that has just begun
-        from datetime import date as _date, timedelta as _td
-        pin_day = _date.today() - _td(days=1)
+        # (dayroll's day, the 04:00 rule): its tomorrow is the day that has
+        # just begun
+        import dayroll
+        pin_day = dayroll.today()
     pe = _pn()
     import re as _re
     import goal_handoff as gh
