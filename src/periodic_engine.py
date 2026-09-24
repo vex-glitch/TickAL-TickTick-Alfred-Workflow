@@ -548,15 +548,16 @@ def create_note(p, index):
     # Child tag ONLY - TickTick's group-by-tag prefers the PARENT when both
     # are attached, which would collapse the kanban into one 💫Periodic
     # column. The parent exists as the tree node, never on tasks.
-    # Minted ONTO its day, all-day: the period's last day (pm.note_day - Vex
-    # 2026-09-19, "Daily note should get scheduled"), so TickTick's Today
-    # and calendar show the day's note. v1 fills startDate from dueDate.
+    # Minted ONTO its day at its hour: the period's last day (pm.note_day -
+    # Vex 2026-09-19, "Daily note should get scheduled"), the daily at 04:30
+    # and every longer tier at 05:00 (pm.note_time - Vex 2026-09-24), so
+    # TickTick's Today and calendar show the note at the top of its day.
     import day_move
-    when = day_move.all_day(pm.note_day(p))
+    when = day_move.timed_at(pm.note_day(p), pm.note_time(p))
     task = _api().create_task(
         title=pm.long_title(p), project_id=areas.PERIODIC_LIST_ID,
         content=content, kind="NOTE",
-        tags=[pm.tag(p)], due_date=when["dueDate"],
+        tags=[pm.tag(p)], start_date=when["startDate"], due_date=when["dueDate"],
         time_zone=when.get("timeZone"))
     index[(p.kind, pm.title_key(p))] = task
     _log(f"minted {p.kind} {pm.title(p)} ({task.get('id')})")

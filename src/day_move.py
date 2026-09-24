@@ -74,6 +74,20 @@ def all_day(day, tz=None):
     return out
 
 
+def timed_at(day, clock, tz=None):
+    """{startDate, dueDate, isAllDay False, timeZone}: a point in time at the
+    LOCAL wall-clock `clock` on `day` (start = due), written in UTC, the
+    zone named so TickTick shows it at that local time. The periodic notes
+    sit on their day this way (Vex 2026-09-24: 04:30 / 05:00)."""
+    tz = tz or _local_tz()
+    stamp = _out(datetime.combine(day, clock).replace(tzinfo=tz))
+    out = {"startDate": stamp, "dueDate": stamp, "isAllDay": False}
+    name = getattr(tz, "key", None)
+    if name:
+        out["timeZone"] = name
+    return out
+
+
 def _midnight(dt):
     return (dt.hour, dt.minute, dt.second) == (0, 0, 0)
 

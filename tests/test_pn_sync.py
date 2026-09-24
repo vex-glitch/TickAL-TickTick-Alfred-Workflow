@@ -435,14 +435,27 @@ pe._ensure_tags = lambda: None
 pe._load_template = lambda kind: "{{breadcrumbs}}\n"
 pe._child_links = lambda p, index: []
 pe._crumb = lambda p, index: "crumb"
+import datetime as _dtm  # noqa: E402
+check("the daily note sits at 04:30", pm.note_time(pm.period_for("daily", date(2026, 9, 25))) == _dtm.time(4, 30))
+for _k in ("weekly", "monthly", "quarterly", "yearly"):
+    check(f"the {_k} note sits at 05:00", pm.note_time(pm.period_for(_k, date(2026, 9, 25))) == _dtm.time(5, 0))
+f = day_move.timed_at(date(2026, 9, 27), _dtm.time(5, 0), tz=BER)
+check("05:00 on a CEST Sunday = 03:00Z, timed, zone named",
+      f == {"startDate": "2026-09-27T03:00:00+0000", "dueDate": "2026-09-27T03:00:00+0000",
+            "isAllDay": False, "timeZone": "Europe/Berlin"}, f)
+check("05:00 after the clocks change = 04:00Z",
+      day_move.timed_at(date(2026, 10, 31), _dtm.time(5, 0), tz=BER)["dueDate"] == "2026-10-31T04:00:00+0000")
 pe.create_note(pm.period_for("weekly", date(2026, 9, 21)), {})
-want = day_move.all_day(date(2026, 9, 27))
-check("a weekly note is minted all-day on its Sunday",
-      mint.kw and mint.kw.get("due_date") == want["dueDate"]
+want = day_move.timed_at(date(2026, 9, 27), _dtm.time(5, 0))
+check("a weekly note is minted on its Sunday at 05:00, not all-day",
+      mint.kw and mint.kw.get("due_date") == want["dueDate"] and mint.kw.get("start_date") == want["startDate"]
       and mint.kw.get("time_zone") == want.get("timeZone") and mint.kw.get("kind") == "NOTE", mint.kw)
 pe.create_note(pm.period_for("daily", date(2026, 9, 25)), {})
-check("a daily note is minted all-day on its own day",
-      mint.kw.get("due_date") == day_move.all_day(date(2026, 9, 25))["dueDate"], mint.kw)
+check("a daily note is minted on its own day at 04:30",
+      mint.kw.get("due_date") == day_move.timed_at(date(2026, 9, 25), _dtm.time(4, 30))["dueDate"], mint.kw)
+import api as _api_mod  # noqa: E402
+check("…and the api posts it as timed, not all-day",
+      _api_mod._is_all_day(mint.kw["due_date"]) is False)
 
 # ── 7. what the review of 2026-09-24 caught ───────────────────────────────────
 # (a) ⏭ then a word: the space after the mark is not part of the query

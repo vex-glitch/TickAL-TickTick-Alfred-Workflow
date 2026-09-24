@@ -20,7 +20,7 @@ Try it tomorrow: `tmj` fills the morning journal, `tdn` opens the daily note. Se
 | Part | What it is | Who makes it |
 |---|---|---|
 | **💫 Notes list** | One TickTick list of your choosing holds every periodic note (`periodic_list_id`) | You, once |
-| **The notes** | Daily / weekly / monthly / quarterly / yearly - normal TickTick notes with generated sections, each an all-day item on its period's last day (the daily on its day, the weekly on Sunday, the month, quarter and year on their last day), so TickTick's Today and calendar show them. Alfred's Today, Tomorrow and Next 7 Days lists leave them out: their bulk verbs act on every row | The automation - minted when you open them, or by the agent |
+| **The notes** | Daily / weekly / monthly / quarterly / yearly - normal TickTick notes with generated sections, each sitting on its period's last day - the daily on its own day at 04:30, the weekly on Sunday and the month, quarter and year on their last day at 05:00 - so TickTick's Today and calendar show them at the top of the day. Alfred's Today, Tomorrow and Next 7 Days lists leave them out: their bulk verbs act on every row | The automation - minted when you open them, or by the agent |
 | **💫 tag family** | 💫Daily … 💫Yearly, nested under 💫Periodic - group the list by Tag and they become kanban columns | The automation |
 | **Refresh** | Rebuilds the generated sections, completes ticked boxes, recomputes roll-ups | The automation - on open, on 🔄, or by the agent |
 | **♻️ Weekly review mirror** | A list (or a task with subtasks) the weekly note mirrors both ways (`weekly_review_id`) | You, optional |

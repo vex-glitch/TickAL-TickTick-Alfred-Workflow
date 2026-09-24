@@ -470,12 +470,22 @@ def stable_key(note_title):
 
 
 def note_day(p):
-    """The day a periodic note sits on in TickTick: its period's LAST day
+    """The day a periodic note sits on in TickTick (at pm.note_time): its
+    period's LAST day
     (Vex 2026-09-19: "Daily note should get scheduled. Full day item for
     corresponding day. Weekly for Sunday end of week, monthly for 30th of
     the month" - the 30th read as the month's last day, so February, 31-day
     months, quarters and the year all land where their period ends)."""
     return p.end
+
+
+def note_time(p):
+    """The local time a periodic note sits at on its day (Vex 2026-09-24:
+    "Daily notes should get scheduled on the day at 4:30am and weekly or
+    monthly or quarterly on 5 am"). 04:30 is also when the agent mints the
+    day; the yearly note sits at 05:00 with the other long tiers."""
+    import datetime as _dt
+    return _dt.time(4, 30) if p.kind == "daily" else _dt.time(5, 0)
 
 
 def period_from_title(kind, note_title):
