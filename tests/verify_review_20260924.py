@@ -25,7 +25,7 @@ ALLOWED = {
     "tests/test_monthly_note.py", "tests/test_quarterly_note.py", "tests/test_review_20260924.py",
     "tests/verify_review_20260924.py", "Makefile", "docs/48-periodic.md", "CLAUDE.md",
 }
-DASHES = re.compile("[–—]")
+DASHES = re.compile("[\\u2013\\u2014]")
 PY = sys.executable
 
 
