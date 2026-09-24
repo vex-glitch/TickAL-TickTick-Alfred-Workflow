@@ -987,7 +987,16 @@ def refresh_period(p, index=None, force=False):
             _fill_daily(doc, p, index, p.start == today)
         elif p.kind == "weekly":
             _fill_weekly(doc, p, index)
-        elif p.kind == "quarterly":
+        # 🥅 OKRs FIRST as well as last: the journal seeds below quote the
+        # plan (today's KR, the week's KRs, the month's objectives), and a
+        # fresh note's section still reads "_(pending)_" until it is filled
+        # (review 2026-09-24). Idempotent; the plan is cached for a minute.
+        if p.start <= today <= p.end + timedelta(days=1):
+            try:
+                _fill_okr(doc, p, index)
+            except Exception as e:
+                _log(f"okr fill (early) {pm.title(p)}: {e}")
+        if p.kind == "quarterly":
             _fill_quarterly(doc, p, index)
             _fill_rollup_money(doc, p, index)     # the old 💰 Money section
         elif p.kind == "monthly":
@@ -1886,8 +1895,9 @@ def _fill_weekly(doc, p, index):
     _fill_people(doc, t2, days=14, within=_in(pm.SEC_PEOPLE))
 
     # ── 📔 Weekly journal - seed + dynamic-goal prompt refresh
-    goals = "; ".join(pm.goal_titles(_week_goals_of(doc)[0])[:5])
-    _seed_slot(doc, pm.SEC_WEEKLY_JNL, "weekly", p.start, {"goals": goals})
+    # the SAME ctx the journal run builds (goals, the OKR lines, the habit
+    # line, the days' highlights): the sections above are filled by now
+    _seed_slot(doc, pm.SEC_WEEKLY_JNL, "weekly", p.start, journal_ctx("weekly", doc))
 
     # ── ♻️ Weekly Review mirror (sweep already completed ticked ones)
     _fill_review(doc)
@@ -1907,6 +1917,17 @@ def _fill_weekly(doc, p, index):
         if pmood is not None:
             lw.append(f"- Mood: {pmood:.1f} avg")
         lw.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        # last week's own words: the 🔮 intention it set for THIS week (the
+        # weekly journal's check quotes it back) and the stars it gave itself
+        pt = lookup(index, prev)
+        if pt:
+            pdoc = ps.parse_sections(pt.get("content") or "")
+            fc = pm.unescape_md(_answer_in(pdoc, pm.SEC_WEEKLY_JNL, "intention for next week"))
+            if fc:
+                lw.append(f"- 🔮 Forecast: {mdtext.flatten_links(fc).strip()}")
+            stars = _answer_in(pdoc, pm.SEC_WEEKLY_JNL, "Rate the week")
+            if stars:
+                lw.append(f"- Rating: {stars.strip()}")
         prev_done_bp = _by_proj(_drop_ignored(comp_prev), projects)
         top_tasks = pm.top_task_lines(_drop_ignored(comp_prev))
         top_lists = [f"{pm.T1}- 🗂 {nm} · {c}" for nm, c in
@@ -3584,6 +3605,28 @@ def journal_ctx(slot, doc):
                 ctx["kr"], ctx["objectives"] = pm.okr_journal_ctx(osec.body)
     elif slot == "weekly":
         ctx["goals"] = "; ".join(pm.goal_titles(_week_goals_of(doc)[0])[:5])
+        # 🥅 the month's objectives and 🔑 the week's KRs (with their ✅/🔑
+        # state) off the note's own 🥅 OKRs section (EXACT name, the kill
+        # switch), 🔄 the habit line off 📊 Stats, the days' ✨ highlights off
+        # 💿 Data (Vex 2026-09-24, the weekly set block)
+        osec = ps.find(doc, pm.SEC_OKR)
+        if osec is not None and osec.name == pm.SEC_OKR:
+            ctx["kr"], ctx["objectives"] = pm.okr_journal_ctx(osec.body, kr_tier="weekly", keep_state=True)
+        st = ps.find(doc, pm.SEC_WK_STATS)
+        if st is not None:
+            ctx["habits"] = pm.habit_summary(pm.bullet_children(st.body, pm.SEC_HABIT_WEEK))
+        dt = ps.find(doc, pm.SEC_WK_DATA)
+        if dt is not None:
+            ctx["days"] = pm.days_summary(pm.bullet_children(dt.body, pm.SEC_HL_WEEK))
+        # 🔮 last Sunday's intention for this week, copied into ⏪ Last week
+        # by the refresh (the previous note's own journal answer)
+        lw = ps.find(doc, pm.SEC_LAST_WEEK)
+        if lw is not None:
+            for ln in lw.body:
+                s = pm.unescape_md(ln.strip())
+                if s.startswith("- 🔮 Forecast:"):
+                    ctx["wforecast"] = s[len("- 🔮 Forecast:"):].strip()
+                    break
     elif slot in ("monthly", "quarterly"):
         sec = next((x for x in (ps.find(doc, nm, pm.SEC_GOALS)
                                 or ps.find(doc, nm)

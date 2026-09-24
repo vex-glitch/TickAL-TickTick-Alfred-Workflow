@@ -1797,6 +1797,11 @@ JOURNAL_PER_CATEGORY = 2
 EVENING_CATEGORIES_PER_DAY = 3
 CHAIN_WEEKDAY = 4                      # Friday
 POOL_EPOCH = date(2026, 9, 25)
+# The weekly random block (Vex 2026-09-24, late): TEN prompts, two from EVERY
+# category, cycling per category by week; no chains. WEEK_EPOCH is the first
+# Monday whose note is seeded the new way (W39 was seeded the old way).
+WEEKLY_CATEGORIES = ("retrospect", "priorities", "energy", "people", "open")
+WEEK_EPOCH = date(2026, 9, 28)
 
 
 def _clip(s, n=140):
@@ -1913,11 +1918,44 @@ def journal_fixed(slot, ctx=None):
                if goals else
                "Did you achieve your weekly goals? "
                "Describe success/fail factors on each.")
-    return [
+    # the days' own ✨ highlights ride the question (Vex 2026-09-24), after
+    # the fixed stem the key rule matches on
+    days = (ctx.get("days") or "").strip()
+    out = [
         ("highlight", "What was the highlight of the week? "
-                      "Think of one thing that stands out."),
+                      "Think of one thing that stands out."
+                      + (f" Your days: {days}" if days else "")),
         ("wgoals", goals_q),
     ]
+    # 🥅 the month's objectives BEFORE 🔑 the week's key results (ruling),
+    # then 🔄 the habit line off 📊 Stats; each only when the note has it.
+    # "What is on your mind?" is the border before the ten drawn prompts; the
+    # three-things picker still follows the whole run.
+    objs = (ctx.get("objectives") or "").strip()
+    if objs:
+        word = "objectives" if " · " in objs else "objective"
+        out.append(("objectives", f"🥅 How are you progressing on this month's {word}, {objs}?"))
+    kr = (ctx.get("kr") or "").strip()
+    if kr:
+        word = "key results" if " · " in kr else "key result"
+        out.append(("kr", f"🔑 Did you achieve or make progress on this week's {word}, {kr}?"))
+    habits = (ctx.get("habits") or "").strip()
+    if habits:
+        out.append(("habits", f"🔄 Habit consistency this week: {habits}. "
+                              "Which habit earned its keep, which did not, and why?"))
+    # 🔮 last Sunday's intention quoted back (the weekly refresh copies it
+    # into ⏪ Last week), the week's stars (the answer is the record), then
+    # the intention for the week ahead (Vex 2026-09-24: "The intention for
+    # the week goes. Rate the week goes.")
+    fc = _clip(ctx.get("wforecast"), 140)
+    out.append(("wfcheck", f"🔮 How did the week go compared to last week's forecast: {fc}?"
+                           if fc else
+                           "🔮 How did the week go compared to what you expected?"))
+    out.append(("wrating", "Rate the week, 1-5 stars"))
+    out.append(("wforecast", "🔮 What is the intention for next week? How will it go, "
+                             "what will you achieve? Forecast the best scenario."))
+    out.append(("free", "What is on your mind?"))
+    return out
 
 
 # Which fixed question a seeded Q line IS, by its wording. Every question
@@ -1943,6 +1981,12 @@ JOURNAL_KEY_RULES = (
     ("fcheck", re.compile(r"^🔮 How did the day go\b")),
     ("kr", re.compile(r"^🔑 Did you achieve or make progress on\b")),
     ("objectives", re.compile(r"^🥅 How are you progressing on\b")),
+    ("habits", re.compile(r"^🔄 Habit consistency\b")),
+    # the weekly's 🔮 pair and stars: "next week" / "the week" keep them apart
+    # from the daily's "today" / "the day"
+    ("wforecast", re.compile(r"^🔮 What is the intention for next week\?")),
+    ("wfcheck", re.compile(r"^🔮 How did the week go\b")),
+    ("wrating", re.compile(r"^Rate the week\b")),
     # the day's and the week's highlights are DIFFERENT answers in different
     # notes, so their rules must not be able to match each other's question
     ("dhighlight", re.compile(r"^✨ What was the highlight of the day\?")),
@@ -2136,12 +2180,18 @@ def _cycle_order(prompts, key, cyc):
 
 def _draw(prompts, key, position, k):
     """k prompts from `position` of a per-category cycle (_cycle_order):
-    nothing repeats until the whole list has been asked."""
+    nothing repeats until the whole list has been asked. A list too short
+    for the cycle guard (a user override of three) still never asks one
+    prompt twice in the same draw."""
     n = len(prompts)
     out = []
     for i in range(k if n else 0):
         cyc, off = divmod(position + i, n)
-        out.append(_cycle_order(prompts, key, cyc)[off])
+        order = _cycle_order(prompts, key, cyc)
+        pick = order[off]
+        if pick in out and n > len(out):
+            pick = next(p for p in order[off:] + order[:off] if p not in out)
+        out.append(pick)
     return out
 
 
@@ -2151,10 +2201,12 @@ def select_prompts(pool, d, which, k=None):
     A daily pool with categories: two prompts per drawn category
     (journal_categories), each category cycling through its own list; a
     chain night returns one chain's steps in order (chains rotate by chain
-    night, the file's order). Everything else - the weekly, monthly and
-    quarterly pools, and a plain {'random': [...]} dict - keeps the old k
-    seeded-random picks from 'random'. Fixed prompts live in journal_fixed,
-    not the pool."""
+    night, the file's order). The weekly pool: two from EVERY
+    WEEKLY_CATEGORIES category, cycling by week index from WEEK_EPOCH.
+    Everything else - the monthly and quarterly pools (one ## random
+    section), a plain {'random': [...]} dict, and any date before the
+    epochs - keeps the old k seeded-random picks from 'random'. Fixed
+    prompts live in journal_fixed, not the pool."""
     if k == 0:
         return []
     cats = pool.get("categories") or {}
@@ -2179,6 +2231,15 @@ def select_prompts(pool, d, which, k=None):
             lst = list(cats.get(c) or [])
             out += _draw(lst, f"{which}:{c}", _appearances(which, c, d) * JOURNAL_PER_CATEGORY,
                          min(JOURNAL_PER_CATEGORY, len(lst)))
+        return out
+    # the weekly: every category, two each, cycling by week (any day of the
+    # week gives the week's picks: the note is pinned to its Monday)
+    if which == "weekly" and any(c in cats for c in WEEKLY_CATEGORIES) and d >= WEEK_EPOCH:
+        wk = (d - WEEK_EPOCH).days // 7
+        out = []
+        for c in WEEKLY_CATEGORIES:
+            lst = list(cats.get(c) or [])
+            out += _draw(lst, f"weekly:{c}", wk * JOURNAL_PER_CATEGORY, min(JOURNAL_PER_CATEGORY, len(lst)))
         return out
     rnd_pool = list(pool.get("random", []))
     k = JOURNAL_RANDOM_K.get(which, 3) if k is None else k
@@ -2238,19 +2299,71 @@ _LATE_CHIP_RE = re.compile(r"\s*🔴\s*\d+d\b")
 _PLAN_GLYPHS = {"🔑", "✅", "🥅", "🏔"}          # okr_notes' item glyphs, VS16 dropped
 # fixed questions that only exist while the note plans something: dropped
 # again while unanswered when the plan goes (periodic_engine._refresh_fixed_q)
-CONDITIONAL_KEYS = ("kr", "objectives")
+CONDITIONAL_KEYS = ("kr", "objectives", "habits")
 # fixed questions that QUOTE free text (a forecast, a KR title): the needle
 # readers and writers skip them, or "rate the day" inside a forecast would
 # catch the stars (review 2026-09-24)
-QUOTING_KEYS = ("fcheck", "kr", "objectives")
+QUOTING_KEYS = ("fcheck", "kr", "objectives", "habits", "wfcheck")
 
 
-def okr_journal_ctx(body_lines):
-    """(today's KR titles, this month's objectives with their d/n), each
-    " · "-joined, off a 🥅 OKRs section body (okr_notes.okr_section_lines
-    shape: a tier bullet, its plan indented under it). '' when the tier has
-    no plan. Done items keep their name (the question is about progress).
-    Lines are unescaped first: the app backslashes the link brackets."""
+def _label_key(s):
+    """A bullet label with its emoji, punctuation, spacing and case gone:
+    "🔄 Habit consistency" and "Habit consistency" are the same bullet (the
+    de-emoji / re-emoji edits ps._norm exists for)."""
+    return re.sub(r"[\W_]+", "", unescape_md(s or "")).casefold()
+
+
+def bullet_children(body_lines, label):
+    """The child bullets (text after "- ") of the TOP-LEVEL bullet whose
+    label is `label` (emoji, case and the app's escapes ignored), off a
+    group section's body (📊 Stats holds "- Habit consistency" with its
+    habits indented under it). [] when the bullet is missing."""
+    want = _label_key(label)
+    out, on = [], False
+    for ln in body_lines or []:
+        s = unescape_md(ln.strip())
+        if not s:
+            continue
+        indented = ln[:1] in ("\t", " ")
+        if not indented:
+            on = s.startswith("- ") and _label_key(s[2:]).startswith(want)
+            continue
+        if on and s.startswith("- "):
+            out.append(s[2:].strip())
+    return out
+
+
+def stars_answer(text):
+    """"4" (or "4 something") → "★★★★"; None when the answer is not a
+    1-5 rating. The day and the week rating store their stars this way."""
+    m = re.match(r"^([1-5])(?!\d)", (text or "").strip())
+    return "★" * int(m.group(1)) if m else None
+
+
+def habit_summary(children):
+    """"Weekly Review · 0/1 · 0%" lines → "Weekly Review 0/1 · ..." (the
+    percent dropped: the fraction says it)."""
+    parts = []
+    for c in children:
+        bits = [b.strip() for b in c.split(" · ")]
+        parts.append(f"{bits[0]} {bits[1]}" if len(bits) > 1 else bits[0])
+    return " · ".join(p for p in parts if p)
+
+
+def days_summary(children):
+    """The weekly 💿 Data ✨ Highlights lines ("Wed · Meal I prepped
+    yesterday"), joined for the highlight question."""
+    return "; ".join(c for c in children if c)
+
+
+def okr_journal_ctx(body_lines, kr_tier="daily", keep_state=False):
+    """(the `kr_tier` bullet's KR titles, this month's objectives with their
+    d/n), each " · "-joined, off a 🥅 OKRs section body
+    (okr_notes.okr_section_lines shape: a tier bullet, its plan indented
+    under it). '' when the tier has no plan. Done items keep their name (the
+    question is about progress); keep_state=True keeps their ✅/🔑 glyph too
+    (the weekly asks about the week's whole list). Lines are unescaped
+    first: the app backslashes the link brackets."""
     def kids(emoji):
         base = emoji.replace("️", "")
         out, on = [], False
@@ -2266,14 +2379,14 @@ def okr_journal_ctx(body_lines):
                 out.append(s[2:])
         return out
 
-    def name(item):
+    def name(item, state=False):
         s = re.sub(r"\s+", " ", _LATE_CHIP_RE.sub("", _MDLINK_RE.sub(r"\1", item))).strip()
         head, _, rest = s.partition(" ")
         if head.replace("️", "") in _PLAN_GLYPHS:     # only a glyph is stripped
-            return rest.strip()
+            return f"{head} {rest.strip()}" if state else rest.strip()
         return s
 
-    krs = [name(x) for x in kids(TIER_EMOJI["daily"])]
+    krs = [name(x, keep_state) for x in kids(TIER_EMOJI.get(kr_tier, TIER_EMOJI["daily"]))]
     objs = [name(x) for x in kids(TIER_EMOJI["monthly"])]
     return " · ".join(x for x in krs if x), " · ".join(x for x in objs if x)
 

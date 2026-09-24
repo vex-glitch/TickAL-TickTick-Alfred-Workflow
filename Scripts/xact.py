@@ -7672,7 +7672,7 @@ def pn_journal(slot):
         # are prose, and prose gets the big box (Vex 2026-09-16).
         t0 = time.time()
         a = _ask(q, title=f"{label} journal · {n}/{total}",
-                 multiline=key not in ("mood", "money", "rating"))
+                 multiline=key not in ("mood", "money", "rating", "wrating"))
         outcome = "cancel" if a is None else ("skip" if not a.strip() else "answered")
         _jlog(tag, f"q{n}/{total} {key} -> {outcome} {time.time() - t0:.0f}s{_ask_trail()}")
         if a is None:                     # Cancel: stop, keep what we have
@@ -7704,6 +7704,10 @@ def pn_journal(slot):
             if m:
                 routed.append(pe.set_day_rating(int(m.group(1)), day=day0))
                 a = "★" * int(m.group(1))
+        elif key == "wrating":
+            # the week's stars: the answer is the record (the next weekly
+            # refresh mirrors it into ⏪ Last week)
+            a = pm.stars_answer(a) or a
         elif key in ("mhighlight", "qhighlight"):
             # the month's and the quarter's ✨, same rule as the week's: the
             # ANSWER is the record, and the section is only written where one

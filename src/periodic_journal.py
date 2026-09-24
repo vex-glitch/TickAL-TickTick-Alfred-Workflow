@@ -8,9 +8,11 @@ block inside a section lists steps that are asked IN ORDER on a chain night
 malformed or empty falls back to the repo default, so a broken user file can
 never blank the journal.
 
-The daily files carry the categories periodic_model draws from
-(MORNING_CATEGORIES / EVENING_CATEGORIES, Vex 2026-09-24); the weekly,
-monthly and quarterly files keep one "## random" section. quotes.md is the
+The daily and weekly files carry the categories periodic_model draws from
+(MORNING_CATEGORIES / EVENING_CATEGORIES / WEEKLY_CATEGORIES, Vex
+2026-09-24; a user override is per category, a user file with only
+"## random" is not drawn from); the monthly and quarterly files keep one
+"## random" section. quotes.md is the
 quote pool: "## stoic" and "## others", one `- “text” · Author` per line.
 
 Selection itself is pure and lives in periodic_model.select_prompts.

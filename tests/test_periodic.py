@@ -200,7 +200,7 @@ check("14.the-two-highlights-never-cross",
       (pm.journal_key("✨ What was the highlight of the day?"),
        pm.journal_key("What was the highlight of the week?")))
 fixed_w = pm.journal_fixed("weekly", {"goals": "A; B"})
-check("14.fixed-weekly", [k for k, _q in fixed_w] == ["highlight", "wgoals"]
+check("14.fixed-weekly", [k for k, _q in fixed_w] == ["highlight", "wgoals", "wfcheck", "wrating", "wforecast", "free"]   # mind LAST (2026-09-24)
       and "A; B" in fixed_w[1][1])
 seeded = pm.seed_journal_lines([q for _k, q in fixed_m] + p1)
 pairs = pm.journal_pairs(seeded)

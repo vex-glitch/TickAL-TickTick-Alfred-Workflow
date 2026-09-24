@@ -108,7 +108,10 @@ check("2.vex-prompts-in", any(q.startswith("What is the one obstacle most likely
       and any(q.startswith("Where did I fall short today?") for q in EP["categories"]["review"])
       and any("[person]" in q for q in MP["categories"]["people"]))
 WP = pj.load_pool("weekly")
-check("2.weekly-still-random", len(WP["random"]) >= 20 and any("past week" in q for q in WP["random"]), len(WP["random"]))
+check("2.weekly-categories", list(WP["categories"]) == list(pm.WEEKLY_CATEGORIES)
+      and all(len(v) >= 10 for v in WP["categories"].values()) and not WP["chains"], {k: len(v) for k, v in WP["categories"].items()})
+check("2.weekly-vex-prompts-in", any(q.startswith("Read your last seven days of entries") for q in WP["categories"]["retrospect"])
+      and any(q.startswith("Write next week's intention in a single sentence") for q in WP["categories"]["priorities"]))
 QP = pj.load_quotes()
 check("2.quotes-pool", len(QP["stoic"]) >= 300 and len(QP["others"]) >= 500
       and all(a and q for q, a in QP["stoic"]), (len(QP.get("stoic", [])), len(QP.get("others", []))))
@@ -166,7 +169,20 @@ while len(review_seen) < len(ecat["review"]) - 1:
         review_seen += [q for q in pm.select_prompts(EP, d, "evening") if q in ecat["review"]]
     d += timedelta(days=1)
 check("4.category-cycles-no-repeat", len(review_seen) == len(set(review_seen)), f"{len(review_seen)} vs {len(set(review_seen))}")
-check("4.weekly-unchanged", len(pm.select_prompts(WP, mon, "weekly")) == 5)
+wk = pm.select_prompts(WP, pm.WEEK_EPOCH, "weekly")
+check("4.weekly-ten", len(wk) == 10 and len(set(wk)) == 10, wk)
+wcat = {c: WP["categories"][c] for c in pm.WEEKLY_CATEGORIES}
+check("4.weekly-two-per-category", all(sum(1 for q in wk if q in wcat[c]) == 2 for c in pm.WEEKLY_CATEGORIES)
+      and [c for c in pm.WEEKLY_CATEGORIES for _ in range(2)] == [next(c for c in pm.WEEKLY_CATEGORIES if q in wcat[c]) for q in wk], wk)
+wk2 = pm.select_prompts(WP, pm.WEEK_EPOCH + timedelta(days=7), "weekly")
+check("4.weekly-next-week-differs", not set(wk) & set(wk2) and len(wk2) == 10, set(wk) & set(wk2))
+check("4.weekly-same-week-same-picks", pm.select_prompts(WP, pm.WEEK_EPOCH + timedelta(days=3), "weekly") == wk)
+old_wk = pm.select_prompts(WP, date(2026, 9, 21), "weekly")
+check("4.weekly-pre-epoch-old-style", len(old_wk) == 5 and old_wk != wk[:5], old_wk)
+seen_w = []
+for i in range(5):
+    seen_w += [q for q in pm.select_prompts(WP, pm.WEEK_EPOCH + timedelta(days=7 * i), "weekly") if q in wcat["people"]]
+check("4.weekly-category-cycles", len(seen_w) == len(set(seen_w)) == 10, seen_w)
 
 # ── 5. the fixed heads ───────────────────────────────────────────────────────
 mo = pm.journal_fixed("morning", {"ybridge": "b", "goal": "g"})
@@ -375,6 +391,73 @@ check("10h.reader-skips-quoting-keys", pe._answer_in(FDOC, pm.SEC_EVENING, "rate
 # i. the goal check survives a phone edit that drops the sun's VS16
 check("10i.gcheck-without-vs16", pm.journal_key("☀ Does your goal for today still align with: X?") == "gcheck"
       and pm.journal_key("☀️ What is today's goal?") == "gcheck")
+
+
+# ── 12. the weekly set block (Vex 2026-09-24: objectives before the KRs, habits, mind last) ──
+W0 = pm.journal_fixed("weekly", {"goals": "TickTick"})
+check("12.weekly-plain-order", [k for k, _ in W0] == ["highlight", "wgoals", "wfcheck", "wrating", "wforecast", "free"], W0)
+check("12.weekly-mind-last", W0[-1] == ("free", "What is on your mind?"))
+WCTX = {"goals": "TickTick", "objectives": "Onboard TickTicks 0/5 · TickAL 1/6",
+        "kr": "✅ Goals wf · 🔑 Finish periodic notes · 🔑 Curriculums",
+        "habits": "Weekly Review 0/1 · Call mum 0/1 · 🌅 Startup 3/7 · 🌆 Shutdown 2/7",
+        "days": "Mon · tattooing; Wed · Meal I prepped yesterday"}
+W1 = pm.journal_fixed("weekly", WCTX)
+check("12.weekly-full-order", [k for k, _ in W1] == ["highlight", "wgoals", "objectives", "kr", "habits", "wfcheck", "wrating", "wforecast", "free"], [k for k, _ in W1])
+check("12.wfcheck-plain", W1[5][1] == "🔮 How did the week go compared to what you expected?", W1[5])
+check("12.wfcheck-quotes-last-week", pm.journal_fixed("weekly", {"wforecast": "Ship the weekly"})[2][1]
+      == "🔮 How did the week go compared to last week's forecast: Ship the weekly?")
+check("12.wrating-wording", W1[6] == ("wrating", "Rate the week, 1-5 stars"))
+check("12.wforecast-wording", W1[7][1].startswith("🔮 What is the intention for next week?") and "Forecast the best scenario" in W1[7][1])
+check("12.weekly-keys-apart-from-daily", pm.journal_key("🔮 What is the intention for next week? x") == "wforecast"
+      and pm.journal_key("🔮 How did the week go compared to what you expected?") == "wfcheck"
+      and pm.journal_key("Rate the week, 1-5 stars") == "wrating" and pm.journal_key("Rate the day, 1-5 stars") == "rating")
+check("12.stars", pm.stars_answer("4") == "★★★★" and pm.stars_answer("5 great") == "★★★★★" and pm.stars_answer("10") is None and pm.stars_answer("ok") is None)
+check("12.highlight-shows-the-days", W1[0][1].startswith("What was the highlight of the week? Think of one thing that stands out.")
+      and "Your days: Mon · tattooing; Wed · Meal I prepped yesterday" in W1[0][1], W1[0])
+check("12.objectives-wording", W1[2][1] == "🥅 How are you progressing on this month's objectives, Onboard TickTicks 0/5 · TickAL 1/6?", W1[2])
+check("12.kr-wording", W1[3][1] == "🔑 Did you achieve or make progress on this week's key results, ✅ Goals wf · 🔑 Finish periodic notes · 🔑 Curriculums?", W1[3])
+check("12.habits-wording", W1[4][1] == "🔄 Habit consistency this week: Weekly Review 0/1 · Call mum 0/1 · 🌅 Startup 3/7 · 🌆 Shutdown 2/7. Which habit earned its keep, which did not, and why?", W1[4])
+check("12.weekly-keys-recognised", all(pm.journal_key(q) == k for k, q in W1), [(k, pm.journal_key(q)) for k, q in W1])
+check("12.weekly-kr-singular", "this week's key result, 🔑 A?" in pm.journal_fixed("weekly", {"kr": "🔑 A"})[2][1])
+# the OKR reader on the WEEK bullet keeps the ✅/🔑 state
+wkr, wobj = pm.okr_journal_ctx(OKR_BODY, kr_tier="weekly", keep_state=True)
+check("12.week-krs-with-state", wkr == "✅ Goals wf · 🔑 Finish periodic notes" and wobj == "Onboard TickTicks 0/5 · TickAL 1/6", (wkr, wobj))
+# children of a labelled bullet inside a group section
+STATS = ["- Top lists:", "\t- 📌CTA · 11 done · 10 added", "", "- Habit consistency", "\t- Weekly Review · 0/1 · 0%",
+         "\t- Call mum · 0/1 · 0%", "\t- 🌅 Startup · 3/7 · 42%", "\t- 🌆 Shutdown · 2/7 · 28%", "---"]
+check("12.bullet-children", pm.bullet_children(STATS, "Habit consistency") == ["Weekly Review · 0/1 · 0%", "Call mum · 0/1 · 0%", "🌅 Startup · 3/7 · 42%", "🌆 Shutdown · 2/7 · 28%"]
+      and pm.bullet_children(STATS, "Nothing") == [], pm.bullet_children(STATS, "Habit consistency"))
+check("12.habit-summary", pm.habit_summary(pm.bullet_children(STATS, "Habit consistency")) == "Weekly Review 0/1 · Call mum 0/1 · 🌅 Startup 3/7 · 🌆 Shutdown 2/7")
+DATA = ["- ✨ Highlights", "\t- Wed · Meal I prepped yesterday", "\t- Mon · tattooing", "", "- 📨 Entries", "\t- **❗️ Reminders**"]
+check("12.days-summary", pm.days_summary(pm.bullet_children(DATA, "✨ Highlights")) == "Wed · Meal I prepped yesterday; Mon · tattooing")
+# the weekly ctx off a weekly note
+WNOTE = "\n".join(["#### 🥅 OKRs"] + OKR_BODY + [
+    "#### 🏆 Goals", "- 🌓 Quarterly", "\t- _(mirrors this quarter's note - set it there)_", "", "- 🗓️ Monthly",
+    "\t- _(mirrors this month's note - set it there)_", "", "- ♻️ Weekly", "\t- [ ] [TickTick](https://ticktick.com/webapp/#p/x/tasks/y)", "",
+    "#### ✨ Highlight", "---", "#### 📌 This Week", "##### 📊 Stats"] + STATS + ["##### 💿 Data"] + DATA + ["---",
+    "##### ⏪ Last week", "- Completed: 195", "- 🔮 Forecast: Ship the weekly", "- Rating: ★★★★", "---",
+    "##### 📔 Weekly journal", "\t- *Q1 · What was the highlight of the week? Think of one thing that stands out.*", "\t\t- A: ",
+    "\t- *Q2 · Did you achieve your weekly goals, TickTick? Describe success/fail factors on each.*", "\t\t- A: ",
+    "\t- *Q3 · Which system broke this week - and what is its two-minute patch?*", "\t\t- A: ", "---"])
+wdoc = ps.parse_sections(WNOTE)
+wctx = pe.journal_ctx("weekly", wdoc)
+check("12.ctx-goals", wctx.get("goals") == "TickTick", wctx)
+check("12.ctx-objectives", wctx.get("objectives") == "Onboard TickTicks 0/5 · TickAL 1/6", wctx)
+check("12.ctx-kr", wctx.get("kr") == "✅ Goals wf · 🔑 Finish periodic notes", wctx)
+check("12.ctx-habits", wctx.get("habits") == "Weekly Review 0/1 · Call mum 0/1 · 🌅 Startup 3/7 · 🌆 Shutdown 2/7", wctx)
+check("12.ctx-days", wctx.get("days") == "Wed · Meal I prepped yesterday; Mon · tattooing", wctx)
+check("12.ctx-wforecast-off-last-week", wctx.get("wforecast") == "Ship the weekly", wctx)
+# an already-seeded W39 layout gets objectives, kr, habits and mind inserted after the goals question, in order
+wsec = ps.find(wdoc, pm.SEC_WEEKLY_JNL)
+wbody, wadded = pm.insert_fixed_questions(wsec.body, pm.journal_fixed("weekly", wctx))
+wkeys = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(wbody)]
+# (the trailing free is W39's legacy Q3; "What is on your mind?" itself is a free key and is never inserted)
+check("12.old-weekly-gains-the-set", wadded == ["objectives", "kr", "habits", "wfcheck", "wrating", "wforecast"]
+      and wkeys == ["highlight", "wgoals", "objectives", "kr", "habits", "wfcheck", "wrating", "wforecast", "free"], (wadded, wkeys))
+check("12.bullet-label-with-emoji", pm.bullet_children(["- 🔄 Habit consistency", "\t- A · 1/1 · 100%"], "Habit consistency") == ["A · 1/1 · 100%"]
+      and pm.bullet_children(["- ✨ Highlight", "\t- x"], "✨ Highlights") == [])
+tiny = {"categories": {"prepare": ["A?", "B?", "C?"], "people": [f"Q{i}?" for i in range(10)], "perspective": [f"R{i}?" for i in range(10)]}, "chains": []}
+check("12.tiny-category-never-doubles", all(len(set(b)) == len(b) for b in (pm.select_prompts(tiny, EPOCH + timedelta(days=i), "morning") for i in range(40))))
 
 print(f"journal pools: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
