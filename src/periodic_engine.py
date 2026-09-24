@@ -1251,7 +1251,11 @@ def _sync_ticks(doc, p, day):
     so reopening that task in TickTick later is never undone by the note.
     Nothing is unticked. No completed feed (no v2 token, offline) = no
     change, never a guess."""
-    comp = _completed_between(day - timedelta(days=1), day + timedelta(days=1))
+    # the feed keys a completion by its CALENDAR day; a routine finished
+    # between 00:00 and 04:00 on the grace day's night is keyed two days
+    # after the note's day, and the grace pass is the last look this note
+    # gets (review 2026-09-24), so the window reaches that far
+    comp = _completed_between(day - timedelta(days=1), day + timedelta(days=2))
     if comp is None:
         return []
     ticked = []
