@@ -376,7 +376,7 @@ class _X:
     def _api(self):
         return _Api(self._t, self._boom)
 
-    def _dialog(self, prompt, buttons, default):
+    def _dialog(self, prompt, buttons, default, **kw):
         self.asked.append((prompt, tuple(buttons), default))
         return self._button
 

@@ -146,8 +146,11 @@ def _finish_guard(xact, pid, tid):
     if verdict == "early":
         name = ((rt.by_tid(tid) or {}).get("label") or t.get("title") or "This routine").strip()
         try:
+            # gives up after a minute: the question runs on the sequential
+            # Link node, and a box left open would queue every other link
+            # click behind it (review 2026-09-24); a gave-up box reads Cancel
             b = xact._dialog(f"{name} is next due {when}. Finish it now?",
-                             ["Cancel", "Finish it"], "Cancel")
+                             ["Cancel", "Finish it"], "Cancel", giveup=60)
         except Exception:
             b = ""
         if b != "Finish it":
@@ -562,7 +565,11 @@ def run(verb, tid, pid_hint):
             # handled click, so a double-click queued behind the dialog is
             # debounced instead of asking again (review 2026-09-24)
             return refused, refused.startswith("↩️")
-        return _complete(pid, tid, title), True
+        out = _complete(pid, tid, title)
+        # a completion TickTick refused (rate limit, offline) is not an acted
+        # click: stamping it would debounce the retry inside 5 s (review
+        # 2026-09-24)
+        return out, not out.startswith(("Error", "⏳", "✅ Complete failed"))
     if verb in ("focus", "focuswindow", "timer"):
         clash = _timer_clash(xact, tid)
         if clash:

@@ -1587,14 +1587,18 @@ SYNC_AGENT_PLIST = os.path.expanduser(
 SYNC_AGENT_LOG = "/tmp/tickal_cachesync.log"
 
 
-def _dialog(prompt, buttons, default):
-    """display-dialog wrapper; returns the clicked button ('' on Esc)."""
+def _dialog(prompt, buttons, default, giveup=None):
+    """display-dialog wrapper; returns the clicked button ('' on Esc).
+    giveup = seconds after which the box closes on its own and answers ''
+    (read as Cancel everywhere): for a question that must not hold a
+    sequential Alfred node all day (review 2026-09-24)."""
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace('"', '\\"')
     blist = ", ".join(f'"{esc(b)}"' for b in buttons)
     osa = ('button returned of (display dialog "{}" with title "TickAL" '
-           'buttons {{{}}} default button "{}")').format(
-               esc(prompt), blist, esc(default))
+           'buttons {{{}}} default button "{}"{})').format(
+               esc(prompt), blist, esc(default),
+               f" giving up after {int(giveup)}" if giveup else "")
     r = _osa_dialog(osa)
     return r.stdout.strip() if r.returncode == 0 else ""
 
