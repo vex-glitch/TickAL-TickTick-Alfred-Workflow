@@ -27,6 +27,8 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 import periodic_sections as ps
 import periodic_model as pm
 import periodic_engine as pe
+import tempfile
+pe.LOG_FILE = os.path.join(tempfile.mkdtemp(), "periodic.log")   # never the real log (review 2026-09-24)
 import periodic_journal as pj
 
 P = F = 0

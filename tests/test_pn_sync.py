@@ -484,6 +484,7 @@ check("Next 7 Days drops it too", got == ["w1"], got)
 # refreshes "today" (dayroll's) right after a Shutdown finished at 00:18
 import importlib  # noqa: E402
 pe = importlib.reload(pe)                     # the real engine again (section 2 stubbed it)
+pe.LOG_FILE = os.path.join(tmp, "periodic.log")      # a reload re-reads the real paths
 pe.SWEPT_FILE = os.path.join(tmp, "swept2.json")
 _real_date = pe.date
 
@@ -514,6 +515,8 @@ check("00:18 on the 23rd: the 22nd's note does NOT refetch weather and quote; on
       LEADS == [False, True], LEADS)
 
 pe = importlib.reload(pe)
+pe.LOG_FILE = os.path.join(tmp, "periodic.log")      # never the real log or ledger
+pe.SWEPT_FILE = os.path.join(tmp, "swept3.json")
 pe._today = lambda: date(2026, 9, 22)
 pe._completed_between = lambda a, b: None
 CD = []

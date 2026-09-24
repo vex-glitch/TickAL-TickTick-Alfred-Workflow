@@ -26,7 +26,8 @@ install: bundle
 
 # ── Unit tests (pure stdlib, no credentials or network needed) ────────────
 # Tests never start background follow-ups against the real account (the
-# daily note catch-up, the repeat settle) - each file sets it too.
+# daily note catch-up, the repeat settle). The suites that run a completion
+# road set it themselves too, for standalone runs.
 test: export TICKAL_NO_SETTLE := 1
 test:
 	@$(PYTHON) tests/test_periodic.py

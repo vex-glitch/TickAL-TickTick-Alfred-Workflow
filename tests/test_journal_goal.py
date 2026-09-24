@@ -31,6 +31,8 @@ import periodic_journal as pj  # noqa: E402
 import periodic_model as pm  # noqa: E402
 import periodic_engine as pe  # noqa: E402
 import periodic_sections as ps  # noqa: E402
+import cache as cache_store  # noqa: E402
+cache_store.CACHE_DIR = tempfile.mkdtemp()     # never Vex's real cache (review 2026-09-24)
 
 PASS = FAIL = 0
 FAILURES = []
