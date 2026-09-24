@@ -109,8 +109,9 @@ The head of the note (the breadcrumb, then the weather and the quote) is compose
 
 All five journals seed their questions into the note at mint, so you can answer from any device by typing after `A:`. Running them from Alfred asks each **unanswered** question in a dialog - ⏎ saves and advances, empty ⏎ skips, Cancel stops and keeps what you answered. Phone answers are never overwritten.
 
-- **Morning** (3 fixed + 3 drawn from an editable pool, below): mood (1-5), what's on your mind, the one thing - then, if no day goal is set, the ☀️ picker opens by itself.
-- **Evening** (6 fixed + 5 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, on your mind, *did you achieve your daily goal - {your goal}?*, money earned, rate the day (the stars stay in the journal answer).
+- **Morning** (up to 5 set + 6 drawn): mood (1-5), 🌉 yesterday's bridge echoed back, ☀️ *does your goal for today still align with {your goal}?* (Keep or Change through the picker), 🔮 your forecast for the day, then "What is on your mind?" as the border before the drawn prompts.
+- **Evening** (up to 10 set + 6 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, *did you achieve your daily goal - {your goal}?*, 🔑 *did you make progress on today's key result?* and 🥅 *how are this month's objectives going?* (only when your 🥅 OKRs plan has them), 🔮 how the day compared to your morning forecast, money earned, rate the day (the stars stay in the journal answer), and "What is on your mind?" last.
+- **Drawn prompts** come in categories, two per category: mornings draw prepare, people and perspective every day; evenings draw three of review, control, virtue, desire, connection and open, the window moving one step a day. Friday evening is a chain night: one guided sequence asked step by step (the worry sort, alignment, hedonic adaptation, repair). A people prompt names someone from your 👽 People list, family most often, never the same person two days running. Pools are `src/periodic_prompts/*.md` (one `## category` section each, `### chain:` blocks), overridable per section from `~/.ticktick_alfred/periodic_prompts/`.
 - **Weekly** (2 fixed + 5 drawn): the week's highlight (the answer IS the record, and 🕰️ On this day reads it back years later), *did you achieve your weekly goals?* - then a picker asks for **three things that would make next week a success**, written into next week's 🎯 Goals.
 - **Monthly** and **Quarterly** (2 fixed + 5 drawn each): that period's highlight and *did you achieve your goals?*, named - then the goal editor opens aimed at the **next** month or quarter, and stays open until you Esc.
 
@@ -216,7 +217,7 @@ Same shape for `xact:pn_income:485 tattoo deposit`, `xact:pn_journal:evening`, `
 - Ticked boxes complete their real tasks for about a day after the note's period ends; older ticks in stale notes are left alone on purpose (a note is a record - re-completing a long-reopened task would be worse). The same day of grace runs the other way: a completion ticks today's and yesterday's lines, never an older note's.
 - Don't complete a periodic note itself; if you did, uncomplete it - a completed note drops out of the index and a blank twin gets minted.
 - Group-by-Tag on the list is a view setting the API can't set - one manual click in TickTick.
-- Weather (Open-Meteo, located once by IP) and the quote of the day are best-effort: no network, no lines, no error.
+- Weather (Open-Meteo, located once by IP) is best-effort: no network, no line, no error. The quote of the day comes from a local pool of the ancient Stoics (`src/periodic_prompts/quotes.md`, one per date), no network needed.
 - Generated sections (Nav, 📌 This Week, 📨 Entries, recaps, money roll-ups, the ♻️ mirror) are rewritten on refresh - your own text belongs in 📓 Notes, 🎯 Goals and the journal answers, which are never rewritten.
 - The weekly's rankings skip your routines list by id. Another list you want out of them: `stats_ignore_lists` in the environment, comma-separated ids.
 

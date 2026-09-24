@@ -63,6 +63,7 @@ test:
 	@$(PYTHON) tests/test_repeat_settle.py
 	@$(PYTHON) tests/test_fold_comments.py
 	@$(PYTHON) tests/test_journal_goal.py
+	@$(PYTHON) tests/test_journal_pools.py
 	@$(PYTHON) tests/test_pn_sync.py
 	@$(PYTHON) tests/test_day_shift.py
 	@$(PYTHON) tests/test_no_stale_revert.py

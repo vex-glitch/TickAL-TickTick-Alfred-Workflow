@@ -177,18 +177,20 @@ p3 = pm.select_prompts(pool, d, "evening")
 check("14.deterministic", p1 == p2 and len(p1) == 3)
 check("14.slot-differs", p1 != p3 and len(p3) == 5)
 fixed_m = pm.journal_fixed("morning")
-check("14.fixed-morning", [k for k, _q in fixed_m] == ["mood", "gcheck", "free"])
+check("14.fixed-morning", [k for k, _q in fixed_m] == ["mood", "gcheck", "forecast", "free"])
 fixed_mb = pm.journal_fixed("morning", {"ybridge": "Ship the bridge"})
 check("14.fixed-morning-bridge",
-      [k for k, _q in fixed_mb] == ["mood", "ybridge", "gcheck", "free"]
+      [k for k, _q in fixed_mb] == ["mood", "ybridge", "gcheck", "forecast", "free"]
       and "Ship the bridge" in fixed_mb[1][1])
 fixed_e = pm.journal_fixed("evening", {"goal": "Ship the thing"})
 check("14.fixed-evening",                     # bridge FIRST (Vex 2026-09-12),
       # then ✨ the day's highlight (Vex 2026-09-17: "logged on shutdown …
       # after bridge"), ahead of tgoal because tgoal hands off to the picker
-      [k for k, _q in fixed_e] == ["bridge", "dhighlight", "tgoal", "free",
-                                   "goal", "money", "rating"]
-      and "Ship the thing" in fixed_e[4][1], [k for k, _q in fixed_e])
+      # (Vex 2026-09-24: the forecast check after the goal, money and rating
+      # before "What is on your mind?", which is now the LAST set prompt)
+      [k for k, _q in fixed_e] == ["bridge", "dhighlight", "tgoal", "goal",
+                                   "fcheck", "money", "rating", "free"]
+      and "Ship the thing" in fixed_e[3][1], [k for k, _q in fixed_e])
 check("14.the-two-highlights-never-cross",
       # the day's and the week's are different answers in different notes
       pm.journal_key("✨ What was the highlight of the day? Think of one "
@@ -202,7 +204,7 @@ check("14.fixed-weekly", [k for k, _q in fixed_w] == ["highlight", "wgoals"]
       and "A; B" in fixed_w[1][1])
 seeded = pm.seed_journal_lines([q for _k, q in fixed_m] + p1)
 pairs = pm.journal_pairs(seeded)
-check("14.seed-parse", len(pairs) == 6 and all(a == "" for _, _, a, _ in pairs))
+check("14.seed-parse", len(pairs) == 7 and all(a == "" for _, _, a, _ in pairs))   # 4 fixed + 3 picks
 seeded[3] = "\t\tA: phone answer"                   # Q2 answered on phone
 merged, filled = pm.merge_journal_answers(
     seeded, {1: "mine", 2: "should NOT overwrite", 3: ""})

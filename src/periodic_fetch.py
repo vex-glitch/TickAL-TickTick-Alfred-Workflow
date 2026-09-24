@@ -1,6 +1,7 @@
 """periodic_fetch.py - Tier-2 fetchers for periodic notes.
 
-Weather + quote (first external HTTP in the repo) and the three v2 readers
+Weather (the repo's first external HTTP; the quote is LOCAL since
+2026-09-24, see get_quote) and the three v2 readers
 probed live 2026-07-11: GET /api/v2/habits + POST /api/v2/habitCheckins/query,
 GET /api/v2/countdown/list, GET /api/v2/pomodoros/timeline (records carry
 startTime/endTime/pauseDuration).
@@ -164,19 +165,20 @@ def get_weather():
         return None
 
 
-def get_quote():
-    """'> "text" - Author' from zenquotes.io, once per date. Deliberately
-    easy to discard if it proves naggy."""
-    today = date.today().isoformat()
-    st = cache_store.get("pn_quote") or {}
-    if st.get("date") == today:
-        return st.get("line")
+def get_quote(today=None):
+    """'> “text” · Author' - the day's quote from the LOCAL Stoic pool
+    (src/periodic_prompts/quotes.md, the Stoic app's library scraped
+    2026-09-24; ruling: the ancient Stoics only), one per date, no network.
+    Replaced zenquotes.io the same day. None when the pool is missing."""
     try:
-        r = requests.get("https://zenquotes.io/api/today", timeout=_TIMEOUT)
-        j = r.json()[0]
-        line = f"> “{j['q'].strip()}” · {j['a'].strip()}"
-        cache_store.set("pn_quote", {"date": today, "line": line})
-        return line
+        import random
+        import periodic_journal as pj
+        pool = pj.load_quotes().get("stoic") or []
+        if not pool:
+            return None
+        d = today or date.today()
+        q, a = random.Random(f"{d.isoformat()}:quote").choice(pool)
+        return f"> “{q}” · {a}"
     except Exception:
         return None
 

@@ -49,12 +49,12 @@ def check(name, cond, detail=""):
 
 # ── 1. the fixed heads ────────────────────────────────────────────────────────
 ev = pm.journal_fixed("evening", {"goal": "Ship it"})
-check("evening order: bridge, ✨ highlight, tomorrow's goal, mind, review, money, rating",
-      [k for k, _ in ev] == ["bridge", "dhighlight", "tgoal", "free", "goal",
-                             "money", "rating"], ev)
+check("evening order: bridge, ✨ highlight, tomorrow's goal, review, forecast check, money, rating, mind",
+      [k for k, _ in ev] == ["bridge", "dhighlight", "tgoal", "goal", "fcheck",
+                             "money", "rating", "free"], ev)
 mo = pm.journal_fixed("morning", {"ybridge": "Call Anna", "goal": "Ship it"})
-check("morning order: mood, bridge, goal check, mind",
-      [k for k, _ in mo] == ["mood", "ybridge", "gcheck", "free"], mo)
+check("morning order: mood, bridge, goal check, forecast, mind",
+      [k for k, _ in mo] == ["mood", "ybridge", "gcheck", "forecast", "free"], mo)
 check("the goal check names last night's goal", "Ship it" in mo[2][1], mo[2])
 check("no goal = asks for today's goal",
       pm.journal_fixed("morning", {})[1] == ("gcheck", "☀️ What is today's goal?"))
@@ -103,12 +103,13 @@ body, added = pm.insert_fixed_questions(OLD_EVENING, pm.journal_fixed("evening",
 pairs = pm.journal_pairs(body)
 # ✨ the day's highlight joined the evening set on 2026-09-17, right behind
 # the bridge and AHEAD of tgoal (tgoal hands off to the picker and stops the run)
+# ... and 🔮 the forecast check joined on 2026-09-24, right behind the goal question
 check("the missing fixed questions are inserted once",
-      added == ["dhighlight", "tgoal"], added)
+      added == ["dhighlight", "tgoal", "fcheck"], added)
 check("right after the bridge, in order",
       [pm.journal_key(pairs[i][1]) for i in (0, 1, 2)]
       == ["bridge", "dhighlight", "tgoal"], [p[1] for p in pairs[:3]])
-check("numbered 1..8 in order", [n for n, *_ in pairs] == list(range(1, 9)), [n for n, *_ in pairs])
+check("numbered 1..9 in order", [n for n, *_ in pairs] == list(range(1, 10)), [n for n, *_ in pairs])
 by_q = {q: a for _n, q, a, _i in pairs}
 check("every answer stays under its own question",
       by_q[OLD_EVENING[0][len("\t- *Q1 · "):-1]] == "call the printer"
@@ -118,7 +119,7 @@ again, added2 = pm.insert_fixed_questions(body, pm.journal_fixed("evening", {}))
 check("a second run inserts nothing", added2 == [] and again == body)
 check("routing follows the wording after the insert",
       pm.journal_keys(pairs) == {1: "bridge", 2: "dhighlight", 3: "tgoal", 4: "free",
-                                 5: "goal", 6: "money", 7: "rating", 8: "free"},
+                                 5: "goal", 6: "fcheck", 7: "money", 8: "rating", 9: "free"},
       pm.journal_keys(pairs))
 
 # an old morning journal (mood, mind, the retired one-thing question)
@@ -127,8 +128,8 @@ OLD_MORNING = ["\t- *Q1 · Mood 1-5 (1 😢 · 3 😐 · 5 😁), optional note 
                f"\t- *Q3 · {retired}*", "\t\t- A: ", "\t- *Q4 · Pool?*", "\t\t- A: "]
 mb, madd = pm.insert_fixed_questions(OLD_MORNING, pm.journal_fixed("morning", {"ybridge": "b", "goal": "g"}))
 mk = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(mb)]
-check("old morning gains the bridge echo and the goal check after mood, in order",
-      madd == ["ybridge", "gcheck"] and mk[:3] == ["mood", "ybridge", "gcheck"], (madd, mk))
+check("old morning gains the bridge echo, the goal check and the forecast after mood, in order",
+      madd == ["ybridge", "gcheck", "forecast"] and mk[:4] == ["mood", "ybridge", "gcheck", "forecast"], (madd, mk))
 check("the mood answer is untouched", pm.journal_pairs(mb)[0][2] == "4 · ok")
 check("an unseeded journal is left for the seeder",
       pm.insert_fixed_questions(["\t_(pending)_"], pm.journal_fixed("evening", {})) == (["\t_(pending)_"], []))
@@ -164,8 +165,8 @@ bdoc = ps.parse_sections("\n".join([
     "---", "#### 📓 Journals", "- 🌅 Morning journal", "", "- 🌙 Evening journal", ""]))
 pe._seed_daily_journals(bdoc, date(2026, 9, 16))
 mkeys = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(ps.find(bdoc, pm.SEC_MORNING).body)]
-check("a morning seeded in the background already has the bridge echo and the goal check",
-      mkeys[:4] == ["mood", "ybridge", "gcheck", "free"], mkeys)
+check("a morning seeded in the background already has the bridge echo, the goal check and the forecast",
+      mkeys[:5] == ["mood", "ybridge", "gcheck", "forecast", "free"], mkeys)
 _b2, again_added = pm.insert_fixed_questions(ps.find(bdoc, pm.SEC_MORNING).body,
                                              pm.journal_fixed("morning", pe.journal_ctx("morning", bdoc)))
 check("so the morning run inserts nothing (no daily renumbering)", again_added == [], again_added)
@@ -407,9 +408,9 @@ check("the picker opens on the journal goal screen", calls["trigger"] == [("Sear
 MO_PAIRS = pm.journal_pairs(pm.seed_journal_lines(
     [q for _k, q in pm.journal_fixed("morning", {"goal": "Ship it"})] + ["Pool?"]))
 MO_PAIRS[0] = (1, MO_PAIRS[0][1], "4", MO_PAIRS[0][3])            # mood already answered
-fake, saved = run("morning", MO_PAIRS, answers=["mind", "pool"], button="Keep", goal="Ship it")
-check("morning Keep: answered as kept, the journal carries on",
-      fake.merged.get(2) == "✅ Kept: Ship it" and len(calls["ask"]) == 2 and not saved, (fake.merged, saved))
+fake, saved = run("morning", MO_PAIRS, answers=["forecast", "mind", "pool"], button="Keep", goal="Ship it")
+check("morning Keep: answered as kept, the journal carries on (forecast, mind, pool)",
+      fake.merged.get(2) == "✅ Kept: Ship it" and len(calls["ask"]) == 3 and not saved, (fake.merged, saved))
 check("the Keep dialog shows the goal", calls["dialog"] and "Ship it" in calls["dialog"][0])
 fake, saved = run("morning", MO_PAIRS, button="Change…", goal="Ship it")
 check("morning Change…: stops for the picker in changed mode",

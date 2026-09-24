@@ -1,0 +1,1081 @@
+# Quotes pool: the Stoic app's public library (getstoic.com daily quotes 2021 to 2026 plus its quote category pages), scraped 2026-09-24.
+# One quote per line: - “text” · Author. Sections: stoic = the ancient Stoics (Seneca, Marcus Aurelius, Epictetus, Zeno, Musonius Rufus, Cato); others = everyone else the app quotes.
+# Dashes inside quotes were normalised to a plain hyphen (house rule). Author names are as the app wrote them.
+
+## stoic
+- “Don’t promise twice what you can do at once.” · Cato the Younger
+- “Everyone has the gift of speech. But few have the gift of wisdom.” · Cato the Younger
+- “Flee sloth; for the indolence of the soul is the decay of the body.” · Cato the Younger
+- “I would rather be right than be king.” · Cato the Younger
+- “Patience is the greatest of all virtues.” · Cato the Younger
+- “Regard not dreams, since they are but the images of our hopes and fears.” · Cato the Younger
+- “The primary virtue is: hold your tongue; who knows how to keep quiet is close to God.” · Cato the Younger
+- “The Fates guide the person who accepts them and hinder the person who resists them.” · Cleanthes
+- “3. "Don't explain your philosophy. Embody it.” · Epictetus
+- “4. "Wealth consists not in having great possessions, but in having few wants.” · Epictetus
+- “5. "Progress is not achieved by luck or accident, but by working on yourself daily.” · Epictetus
+- “A real friend is one who walks in when the rest of the world walks out.” · Epictetus
+- “A ship ought not to be held by one anchor, nor life by a single hope.” · Epictetus
+- “All learning consists in turning words into things.” · Epictetus
+- “Another person will not hurt you without your cooperation. You are hurt the moment you believe yourself to be.” · Epictetus
+- “Any person capable of angering you becomes your master; he can anger you only when you permit yourself to be disturbed by him.” · Epictetus
+- “Attach yourself to what is spiritually superior, regardless of what other people think or do. Hold to your true aspirations no matter what is going on around you.” · Epictetus
+- “Caretake this moment. Immerse yourself in its particulars. Respond to this person or that person, this challenge, this deed.” · Epictetus
+- “Circumstances do not make the man; they merely reveal him to himself.” · Epictetus
+- “Circumstances don’t make the man, they only reveal him to himself.” · Epictetus
+- “Curb your desire - don't set your heart on so many things and you will get what you need.” · Epictetus
+- “Define for me now what the “indifferents” are. Whatever things we cannot control. Tell me the upshot. They are nothing to me.” · Epictetus
+- “Deliberate much before saying or doing anything, for you will not have the power of recalling what is said or done.” · Epictetus
+- “Demand not that things happen as you wish, but wish them to happen as they do, and you will go on well.” · Epictetus
+- “Difficulties are things that show a person what they are.” · Epictetus
+- “Difficulties show a person's character.” · Epictetus
+- “Difficulty shows what men are.” · Epictetus
+- “Disease is an impediment to the body, but not to the will.” · Epictetus
+- “Do not seek for things to happen the way you want them to; rather, wish that what happens happen the way it happens: then you will be happy.” · Epictetus
+- “Don’t explain your philosophy. Embody it.” · Epictetus
+- “First learn the meaning of what you say, and then speak.” · Epictetus
+- “First say to yourself what you would be; and then do what you have to do.” · Epictetus
+- “Freedom is not procured by a full enjoyment of what is desired, but by controlling the desire.” · Epictetus
+- “Freedom is the only worthy goal in life. It is won by disregarding things that lie beyond our control” · Epictetus
+- “Freedom is the right to live as we wish.” · Epictetus
+- “Happiness and freedom begin with a clear understanding of one principle. Some things are within your control. And some things are not.” · Epictetus
+- “Happiness and freedom begin with a clear understanding of one principle: Some things are within our control, and some things are not.” · Epictetus
+- “He is a wise man who does not grieve for the things which he has not, but rejoices for those which he has.” · Epictetus
+- “He who laughs at himself never runs out of things to laugh at” · Epictetus
+- “How long are you going to wait before you demand the best for yourself?” · Epictetus
+- “I cannot escape death, but at least I can escape the fear of it.” · Epictetus
+- “I laugh at those who think they can damage me. They do not know who I am, they do not know what I think, they cannot even touch the things which are really mine and with which I live.” · Epictetus
+- “If you seek truth you will not seek victory by dishonorable means, and if you find truth you will become invincible.” · Epictetus
+- “If you want to improve, be content to be thought foolish and stupid.” · Epictetus
+- “If you wish to be good, first believe that you are bad.” · Epictetus
+- “It is better to do wrong seldom and to own it, and to act right for the most part, than seldom to admit that you have done wrong and to do wrong often.” · Epictetus
+- “It is impossible for a man to learn what he thinks he already knows.” · Epictetus
+- “It is not things that upset us, but our judgments about things.” · Epictetus
+- “It is not what happens to you, but how you react to it that matters.” · Epictetus
+- “It takes more than just a good-looking body. You’ve got to have the heart and soul to go with it.” · Epictetus
+- “It’s not what happens to you, but how you react to it that matters.” · Epictetus
+- “Just keep in mind: the more we value things outside our control, the less control we have.” · Epictetus
+- “Know, first, who you are, and then adorn yourself accordingly.” · Epictetus
+- “Make the best use of what is in your power, and take the rest as it happens.” · Epictetus
+- “Man is affected not by events but by the view he takes of them.” · Epictetus
+- “Man is not worried by real problems so much as by his imagined anxieties about real problems.” · Epictetus
+- “Men are disturbed not by things, but by the view which they take of them.” · Epictetus
+- “Men are disturbed not by things, but by the views which they take of things.” · Epictetus
+- “No great thing is created suddenly.” · Epictetus
+- “No man is free who is not master of himself.” · Epictetus
+- “Only the educated are free.” · Epictetus
+- “Other people’s views and troubles can be contagious. Don’t sabotage yourself by unwittingly adopting negative, unproductive attitudes through your associations with others.” · Epictetus
+- “People are not disturbed by things, but by the views they take of them.” · Epictetus
+- “Remember that you are an actor in a drama, of such a kind as the author pleases to make it. If short, of a short one; if long, of a long one.” · Epictetus
+- “Seek not the good in external things; seek it in yourselves.” · Epictetus
+- “Small-minded people blame others. Average people blame themselves. The wise see all blame as foolishness.” · Epictetus
+- “Some things are in our control and others not.” · Epictetus
+- “The carpenter does not come and say, “Hear me talk about the carpenter’s art”; but having undertaken to build a house, he makes it, and proves that he knows the art.” · Epictetus
+- “The essence of philosophy is that a man should so live that his happiness shall depend as little as possible on external things.” · Epictetus
+- “The greater the difficulty, the more glory in surmounting it. Skillful pilots gain their reputation from storms and tempests.” · Epictetus
+- “The key is to keep company only with people who uplift you, whose presence calls forth your best.” · Epictetus
+- “The trials you encounter will introduce you to your strengths.” · Epictetus
+- “There is only one way to happiness and that is to cease worrying about things which are beyond the power or our will.” · Epictetus
+- “These are the signs of a wise man: to reprove nobody, to praise nobody, to blame nobody, nor even speak of himself or his own merits.” · Epictetus
+- “Those who are well constituted in the body endure both heat and cold: and so those who are well constituted in the soul endure both anger and grief and excessive joy and the other affects.” · Epictetus
+- “Try to enjoy the great festival of life.” · Epictetus
+- “We are disturbed not by things, but by the views which we take of them.” · Epictetus
+- “We are not privy to the stories behind people's actions, so we should be patient with others and suspend judgement of them, recognizing the limits of our understanding.” · Epictetus
+- “We cannot choose our external circumstances, but we can always choose how we respond to them.” · Epictetus
+- “We cannot control our external circumstances, but we can always control how we respond to them.” · Epictetus
+- “We cannot control the external events around us; we can control ourselves. It is not things that trouble us, but our judgments about things.” · Epictetus
+- “We cannot control the impressions others form about us, and the effort to do so only debases our character.” · Epictetus
+- “We cannot step twice into the same river.” · Epictetus
+- “We control our opinion, choice, desire, aversion, and in a word, everything of our own doing.” · Epictetus
+- “We have two ears and one mouth so that we can listen twice as much as we speak.” · Epictetus
+- “We should always be asking ourselves - is this something that is, or is not, in my control?” · Epictetus
+- “Wealth consists not in having great possessions, but in having few wants.” · Epictetus
+- “What really frightens and dismays us is not external events themselves, but the way in which we think about them. It is not things that disturb us, but our interpretation of their significance.” · Epictetus
+- “What upsets people is not things themselves, but their judgements about these things.” · Epictetus
+- “When I see an anxious person, I ask myself, what do they want? For if a person wasn’t wanting something outside of their own control, why would they be stricken by anxiety?” · Epictetus
+- “When you are offended at any man's fault, turn to yourself and study your own failings.” · Epictetus
+- “Whenever you kiss your child, sibling, or friend, don't layer on top of the experience all the things you might wish, but hold them back and stop them, just as those who ride behind triumphant generals remind them they are mortal.” · Epictetus
+- “Who's my master? Whoever controls what you desire or dislike.” · Epictetus
+- “Whoever you are who wish to be a friend, let these judgments be first made and beyond altering.” · Epictetus
+- “You are a little soul carrying about a corpse.” · Epictetus
+- “You are a little soul carrying around a corpse.” · Epictetus
+- “You become what you give your attention to.” · Epictetus
+- “You become what you give your attention to. If you yourself don’t choose what thoughts and images you expose yourself to, someone else will … and their motives may not be the highest.” · Epictetus
+- “for your part, do not desire to be a general, or a senator, or a consul, but to be free; and the only way to this is a disregard of things which lie not within our own power.” · Epictetus
+- “1. "The happiness of your life depends upon the quality of your thoughts.” · Marcus Aurelius
+- “10. "Life is neither good nor bad, but only a place for good and bad.” · Marcus Aurelius
+- “10. “The best revenge is not to be like your enemy.” · Marcus Aurelius
+- “2. "It never ceases to amaze me: we all love ourselves more than other people, but care more about their opinions than our own.” · Marcus Aurelius
+- “4. "People look for retreats for themselves, in the country, by the coast, or in the hills. There is nowhere that a person can find a more peaceful and trouble-free retreat than in his own mind.” · Marcus Aurelius
+- “4. "When you arise in the morning, think of what a precious privilege it is to be alive - to breathe, to think, to enjoy, to love.” · Marcus Aurelius
+- “5. "Just as nature takes every obstacle, every impediment, and works around it - turns it to its purposes, incorporates it into itself - so, too, a rational being can turn each setback into raw material and use it to achieve its goal.” · Marcus Aurelius
+- “6. "If you seek tranquility, do less. Or (more accurately) do what’s essential - what the reason of a social being requires, and in the requisite way. Which brings a double satisfaction: to do less, better.” · Marcus Aurelius
+- “7. "It is not death that a man should fear, but he should fear never beginning to live.” · Marcus Aurelius
+- “7. “The object of life is not to be on the side of the majority, but to escape finding oneself in the ranks of the insane.” · Marcus Aurelius
+- “8. "Waste no more time arguing about what a good person should be. Be one.” · Marcus Aurelius
+- “9. "Accept the things to which fate binds you, and love the people with whom fate brings you together, but do so with all your heart.” · Marcus Aurelius
+- “9. "Waste no more time arguing about what a good man should be. Be one.” · Marcus Aurelius
+- “Accept the things to which fate binds you, and love the people with whom fate brings you together, but do so with all your heart.” · Marcus Aurelius
+- “Adapt yourself to the life you have been given, and truly love the people with whom destiny has surrounded you.” · Marcus Aurelius
+- “Anyone who aspires to make observations about mankind should look upon the human scene as from some lofty height.” · Marcus Aurelius
+- “Asia and Europe: distant recesses of the universe. The ocean: a drop of water. Mount Athos: a molehill. The present: a split second in eternity. Minuscule, transitory, insignificant.” · Marcus Aurelius
+- “Be content to seem what you really are.” · Marcus Aurelius
+- “Be tolerant with others and strict with yourself.” · Marcus Aurelius
+- “Bear in mind that everything that exists is already fraying at the edges, and in transition, subject to fragmentation and to rot.” · Marcus Aurelius
+- “Choose not to be harmed - and you won’t feel harmed. Don’t feel harmed - and you haven’t been.” · Marcus Aurelius
+- “Confine yourself to the present.” · Marcus Aurelius
+- “Death smiles at us all, but all a man can do is smile back.” · Marcus Aurelius
+- “Do every act of your life as though it were the very last act of your life.” · Marcus Aurelius
+- “Don’t let your imagination be crushed by life as a whole. Don’t try to picture everything bad that could possibly happen. Stick with the situation at hand.” · Marcus Aurelius
+- “Everything we hear is an opinion, not a fact. Everything we see is a perspective, not the truth.” · Marcus Aurelius
+- “External things are not the problem. It’s your assessment of them. Which you can erase right now.” · Marcus Aurelius
+- “Forward, as occasion offers. Never look round to see whether any shall note it. Be satisfied with success in even the smallest matter, and think that even such a result is no trifle.” · Marcus Aurelius
+- “From the philosopher Catulus, never to be dismissive of a friend’s accusation, even if it seems unreasonable, but to make every effort to restore the relationship to its normal condition.” · Marcus Aurelius
+- “Get busy with life's purpose, toss aside empty hopes, get active in your own rescue.” · Marcus Aurelius
+- “He who lives in harmony with himself lives in harmony with the universe.” · Marcus Aurelius
+- “How much more damage anger and grief do than the things that cause them.” · Marcus Aurelius
+- “How much more grievous are the consequences of anger than the causes of it.” · Marcus Aurelius
+- “How much more harmful are the consequences of anger and grief than the circumstances that aroused them in us!” · Marcus Aurelius
+- “I have often wondered how it is that every man loves himself more than all the rest of men, but yet sets less value on his own opinion of himself than on the opinion of others.” · Marcus Aurelius
+- “If anyone can refute me - show me I’m making a mistake or looking at things from the wrong perspective - I’ll gladly change. It’s the truth I’m after, and the truth never harmed anyone.” · Marcus Aurelius
+- “If it is not right, do not do it; if it is not true, do not say it.” · Marcus Aurelius
+- “If you are distressed by anything external, the pain is not due to the thing itself, but to your estimate of it; and this you have the power to revoke at any moment.” · Marcus Aurelius
+- “If you are pained by any external thing, it is not this thing that disturbs you, but your own judgment about it. And it is in your power to wipe out this judgment now.” · Marcus Aurelius
+- “Is a world without pain possible? Then don't ask the impossible.” · Marcus Aurelius
+- “It is not death that a man should fear, but he should fear never beginning to live.” · Marcus Aurelius
+- “It never ceases to amaze me: we all love ourselves more than other people, but care more about their opinion than our own.” · Marcus Aurelius
+- “It's silly to try to escape other people's faults. They are inescapable. Just try to escape your own.” · Marcus Aurelius
+- “It’s time you realized that you have something in you more powerful and miraculous than the things that affect you and make you dance like a puppet.” · Marcus Aurelius
+- “Just that you do the right thing. The rest does not matter.” · Marcus Aurelius
+- “Kindness is invincible, but only when it’s sincere, with no hypocrisy or faking.” · Marcus Aurelius
+- “Learn to be indifferent to what makes no difference.” · Marcus Aurelius
+- “Life is neither good nor evil, but only a place for good and evil.” · Marcus Aurelius
+- “Look back over the past, with its changing empires that rose and fell, and you can foresee the future too.” · Marcus Aurelius
+- “Look within. Within is the fountain of good, and it will ever bubble up, if thou wilt ever dig.” · Marcus Aurelius
+- “Love is not about possession, love is about appreciation.” · Marcus Aurelius
+- “Love the discipline you know, and let it support you.” · Marcus Aurelius
+- “Never esteem anything as of advantage to you that will make you break your word or lose your self-respect.” · Marcus Aurelius
+- “Never let the future disturb you. You will meet it, if you have to, with the same weapons of reason which today arm you against the present.” · Marcus Aurelius
+- “Nowhere can man find a quieter or more untroubled retreat than in his own soul.” · Marcus Aurelius
+- “Our life is what our thoughts make it.” · Marcus Aurelius
+- “Passions stem from frustrated desires.” · Marcus Aurelius
+- “Plato has a fine saying, that he who would discourse of man should survey, as from some high watchtower, the things of earth.” · Marcus Aurelius
+- “Receive without conceit, release without struggle.” · Marcus Aurelius
+- “Remember: Matter. How tiny your share of it. Time. How brief and fleeting your allotment of it. Fate. How small a role you play in it.” · Marcus Aurelius
+- “Settle on the type of person you want to be and stick to it, whether alone or in company.” · Marcus Aurelius
+- “So other people hurt me? That's their problem. Their character and actions are not mine.” · Marcus Aurelius
+- “That we are not given complete control is to our mutual advantage, so that we might learn to live in a community of equals. To get angry at something means you’ve forgotten: We always die, and we’re all equal at birth and death.” · Marcus Aurelius
+- “That which is not good for the bee-hive cannot be good for the bees.” · Marcus Aurelius
+- “The best kind of revenge is not to be like your enemy.” · Marcus Aurelius
+- “The best revenge is not to be like your enemy.” · Marcus Aurelius
+- “The best revenge is to be unlike him who performed the injustice.” · Marcus Aurelius
+- “The first rule is to keep an untroubled spirit. The second is to look things in the face and know them for what they are.” · Marcus Aurelius
+- “The happiness of your life depends upon the quality of your thoughts.” · Marcus Aurelius
+- “The nearer a man comes to a calm mind, the closer he is to strength.” · Marcus Aurelius
+- “The obstacle is the way.” · Marcus Aurelius
+- “The soul becomes dyed with the colour of its thoughts.” · Marcus Aurelius
+- “The things you think about determine the quality of your mind.” · Marcus Aurelius
+- “The true worth of a man is to be measured by the objects he pursues.” · Marcus Aurelius
+- “The universe is change; our life is what our thoughts make it.” · Marcus Aurelius
+- “Things stand outside of us, themselves by themselves, neither knowing anything of themselves nor expressing any judgment.” · Marcus Aurelius
+- “This is the mark of perfection of character - to spend each day as if it were your last, without frenzy, laziness, or any pretending.” · Marcus Aurelius
+- “This thou must always bear in mind, what is the nature of the whole, and what is my nature.” · Marcus Aurelius
+- “Time is a sort of river of passing events, and strong is its current; no sooner is a thing brought to sight than it is swept by and another takes its place, and this too will be swept away.” · Marcus Aurelius
+- “To live a good life: We have the potential for it. If we can learn to be indifferent to what makes no difference.” · Marcus Aurelius
+- “To love is to wish well for someone and seek their good.” · Marcus Aurelius
+- “Today I escaped from anxiety. Or no, I discarded it, because it was within me, in my own perceptions - not outside.” · Marcus Aurelius
+- “Very little is needed to make a happy life; it is all within yourself, in your way of thinking.” · Marcus Aurelius
+- “Very little is needed to make a happy life; it is already within yourself, your way of thinking.” · Marcus Aurelius
+- “Waste no more time arguing what a good man should be. Be one.” · Marcus Aurelius
+- “What is not good for the swarm is not good for the bee.” · Marcus Aurelius
+- “Whatever happens to you has been waiting to happen since the beginning of time. The twining strands of fate wove both of them together.” · Marcus Aurelius
+- “When you arise in the morning think of what a privilege it is to be alive, to think, to enjoy, to love” · Marcus Aurelius
+- “When you arise in the morning, think of what a precious privilege it is to be alive - to breathe, to think, to enjoy, to love.” · Marcus Aurelius
+- “Whenever you want to cheer yourself up, consider the good qualities of your companions, for example, the energy of one, the modesty of another, the generosity of yet another, and some other quality of another.” · Marcus Aurelius
+- “While you live - while you can - be a good man.” · Marcus Aurelius
+- “You are a little soul carrying about a corpse, as Epictetus used to say.” · Marcus Aurelius
+- “You could leave life right now. Let that determine what you do and say and think.” · Marcus Aurelius
+- “You don’t love yourself enough. Or you’d love your nature too, and what it demands of you.” · Marcus Aurelius
+- “You have power over your mind - not outside events. Realize this, and you will find strength.” · Marcus Aurelius
+- “You shouldn’t give circumstances the power to rouse anger, for they don’t care at all.” · Marcus Aurelius
+- “Your mind will take the shape of what you frequently hold in thought, for the human spirit is colored by such impressions.” · Marcus Aurelius
+- “Exile is the time to live like a wise man.” · Musonius Rufus
+- “If one accomplishes some good though with toil, the toil passes, but the good remains.” · Musonius Rufus
+- “It is not the consuming of food but the desire for food that hinders the philosopher.” · Musonius Rufus
+- “It is possible to be a good man without anyone realizing it. Remember that the gods, not other people, will reward us.” · Musonius Rufus
+- “One should avoid seeking [luxury]… for what one seeks, one is enslaved to.” · Musonius Rufus
+- “Philosophy needs no special time or place or circumstances in which to practice it.” · Musonius Rufus
+- “The best kind of friendship is one in which each person is concerned for the other's character.” · Musonius Rufus
+- “Virtue is not simply theoretical knowledge, but it is practical application as well.” · Musonius Rufus
+- “We should not abandon our training, but stand up to disaster and learn to confront it.” · Musonius Rufus
+- “We will be invincible if we enter the fight armed with proper training.” · Musonius Rufus
+- “You will earn the respect of all if you begin by earning the respect of yourself.” · Musonius Rufus
+- “We are born with a desire for our own good.” · Musonius Rufus
+- “1. "We are more often frightened than hurt; and we suffer more in imagination than in reality.” · Seneca
+- “10. "True happiness is to enjoy the present, without anxious dependence upon the future, not to amuse ourselves with either hopes or fears but to rest satisfied with what we have, which is sufficient, for he that is so wants nothing.” · Seneca
+- “2. "He who fears death will never do anything worth of a living person.” · Seneca
+- “3. "Let all your efforts be directed to something, let it keep that end in view. It's not activity that disturbs people, but false conceptions of things that drive them mad.” · Seneca
+- “3. “If a man knows not which port he sails, no wind is favorable.” · Seneca
+- “5. “No person has the power to have everything they want, but it is in their power not to want what they don’t have, and to cheerfully put to good use what they do have.” · Seneca
+- “6. "Wherever there is a human being, there is an opportunity for kindness.” · Seneca
+- “6. “He who fears death will never do anything worthy of a man who is alive.” · Seneca
+- “7. "It does not matter what you bear, but how you bear it.” · Seneca
+- “8. "If a man knows not to which port he sails, no wind is favorable.” · Seneca
+- “8. “Life is very short and anxious for those who forget the past, neglect the present, and fear the future.” · Seneca
+- “9. "Withdraw into yourself, as far as you can. Associate with those who will make a better man of you.” · Seneca
+- “A gem cannot be polished without friction, nor a man perfected without trials.” · Seneca
+- “A gift consists not in what is done or given, but in the intention of the giver or doer.” · Seneca
+- “A person’s fears are lighter when the danger is at hand.” · Seneca
+- “A sword never kills anybody; it is a tool in the killer’s hand.” · Seneca
+- “A wise man is content with his lot, whatever it may be, without wishing for what he has not.” · Seneca
+- “All cruelty springs from weakness.” · Seneca
+- “Anger always outlasts hurt. Best to take the opposite course.” · Seneca
+- “Anger, if not restrained, is frequently more destructive than the injury that provoked it.” · Seneca
+- “Anger, if not restrained, is frequently more hurtful to us than the injury that provokes it.” · Seneca
+- “As is a tale, so is life: not how long it is, but how good it is, is what matters.” · Seneca
+- “As long as you live, keep learning how to live.” · Seneca
+- “Associate with people who are likely to improve you.” · Seneca
+- “Associate with those who will make a better man of you. Welcome those whom you yourself can improve.” · Seneca
+- “Associate with those who will make a better person of you.” · Seneca
+- “Before friendship is formed, you must pass judgment. Those persons indeed put last first and confound their duties, who judge a man after they have made him their friend, instead of making him their friend after they have judged him.” · Seneca
+- “Begin at once to live, and count each separate day as a separate life.” · Seneca
+- “Beyond all things is the sea.” · Seneca
+- “But life is very short and anxious for those who forget the past, neglect the present, and fear the future.” · Seneca
+- “Difficulties strengthen the mind, as labor does the body.” · Seneca
+- “Enjoy present pleasures in such a way as not to injure future ones.” · Seneca
+- “Every new beginning comes from some other beginning’s end.” · Seneca
+- “Everyone prefers belief to the exercise of judgement.” · Seneca
+- “Fate leads the willing, and drags along the reluctant.” · Seneca
+- “Fire tests gold, suffering tests brave men.” · Seneca
+- “For love of bustle is not industry it is only the restlessness of a hunted mind.” · Seneca
+- “Friendship is settled, you must trust; before friendship is formed, you must pass judgment.” · Seneca
+- “Friendship produces between us a partnership in all our interests.” · Seneca
+- “Hang on to your youthful enthusiasms - you’ll be able to use them better when you’re older.” · Seneca
+- “Hang on to your youthful enthusiasms, you’ll be able to use them better when you are older.” · Seneca
+- “He suffers more than necessary, who suffers before it is necessary.” · Seneca
+- “He who fears death will never do anything worth of a living man.” · Seneca
+- “He who fears death will never do anything worth of a man who is alive.” · Seneca
+- “He who fears death will never do anything worthy of a man who is alive.” · Seneca
+- “He who fears he will suffer, already suffers because he fears.” · Seneca
+- “He who has injured thee was either stronger or weaker than thee. If weaker, spare him; if stronger, spare thyself.” · Seneca
+- “He who is brave is free.” · Seneca
+- “He who spares the wicked injures the good.” · Seneca
+- “I am not born for one corner; the whole world is my native land.” · Seneca
+- “I shall never be ashamed of citing a bad author if the line is good.” · Seneca
+- “If a man knows not to which port he sails, no wind is favorable.” · Seneca
+- “If a man knows not which port he sails, no wind is favorable.” · Seneca
+- “If what you have seems insufficient to you, then though you possess the world, you will yet be miserable.” · Seneca
+- “If you consider any man a friend whom you do not trust as you trust yourself, you are mightily mistaken and you do not sufficiently understand what true friendship means.” · Seneca
+- “If you live in harmony with nature you will never be poor; if you live according what others think, you will never be rich.” · Seneca
+- “If you really want to escape the things that harass you, what you’re needing is not to be in a different place but to be a different person.” · Seneca
+- “Ignorance is the cause of fear.” · Seneca
+- “It does not matter how many books you have, but how good the books are which you have.” · Seneca
+- “It does not matter what you bear, but how you bear it.” · Seneca
+- “It is a rough road that leads to the heights of greatness.” · Seneca
+- “It is better to conquer our grief than to deceive it.” · Seneca
+- “It is difficult to bring people to goodness with lessons, but it is easy to do so by example.” · Seneca
+- “It is more civilized to make fun of life than to bewail it.” · Seneca
+- “It is not because things are difficult that we do not dare; it is because we do not dare that they are difficult.” · Seneca
+- “It is not because things are difficult that we do not dare; it is because we do not dare that things are difficult.” · Seneca
+- “It is not that we have so little time but that we lose so much. … The life we receive is not short but we make it so; we are not ill provided but use what we have wastefully.” · Seneca
+- “It is not the man who has too little that is poor, but the one who hankers after more.” · Seneca
+- “It is not the man who has too little who is poor, but the one who hankers after more.” · Seneca
+- “It is not the man who has too little, but the man who craves more, that is poor.” · Seneca
+- “It is quality rather than quantity that matters.” · Seneca
+- “It is the power of the mind to be unconquerable.” · Seneca
+- “It's not that we have a short time to live, but that we waste much of it.” · Seneca
+- “It’s not because things are difficult that we dare not venture. It’s because we dare not venture that they are difficult.” · Seneca
+- “Joy comes to us from those whom we love, even when they are absent.” · Seneca
+- “Leisure without books is death, and burial of a man alive.” · Seneca
+- “Let us enjoy our friends avidly, for how long this blessing will fall to our lot is uncertain.” · Seneca
+- “Let us meet with bravery whatever may befall us. Let us never feel a shudder at the thought of being wounded or of being made a prisoner, or of poverty or persecution.” · Seneca
+- “Let us train our minds to desire what the situation demands.” · Seneca
+- “Life is like a play: it’s not the length, but the excellence of the acting that matters.” · Seneca
+- “Life is long, if you know how to use it.” · Seneca
+- “Life, if well lived, is long enough.” · Seneca
+- “Live in such a way that there is nothing which you could not as easily tell your enemy as keep to yourself.” · Seneca
+- “Luck is what happens when preparation meets opportunity.” · Seneca
+- “Most powerful is he who has himself in his own power.” · Seneca
+- “No man can have a peaceful life who thinks too much about lengthening it.” · Seneca
+- “No man is crushed by misfortune unless he has first been deceived by prosperity.” · Seneca
+- “No man is more unhappy than he who never faces adversity. For he is not permitted to prove himself.” · Seneca
+- “No man was ever wise by chance.” · Seneca
+- “No person has the power to have everything they want, but it is in their power not to want what they don’t have.” · Seneca
+- “Nothing is burdensome if taken lightly, and nothing need arouse one’s irritation so long as one doesn’t make it bigger than it is by getting irritated.” · Seneca
+- “Nothing is more honorable than a grateful heart.” · Seneca
+- “Nothing, to my way of thinking, is a better proof of a well-ordered mind than a man’s ability to stop just where he is and pass some time in his own company.” · Seneca
+- “Of this one thing make sure against your dying day - that your faults die before you do.” · Seneca
+- “Often a very old man has no other proof of his long life than his age.” · Seneca
+- “One of the most beautiful qualities of true friendship is to understand and be understood.” · Seneca
+- “Only time can heal what reason cannot.” · Seneca
+- “Our plans miscarry because they have no aim. When a man does not know what harbor he is making for, no wind is the right wind.” · Seneca
+- “People are frugal in guarding their personal property; but as soon as it comes to squandering time they are most wasteful of the one thing in which it is right to be stingy.” · Seneca
+- “Ponder for a long time whether you shall admit a given person to your friendship; but when you have decided to admit him, welcome him with all your heart and soul.” · Seneca
+- “Regard him as loyal and you will make him loyal.” · Seneca
+- “Religion is regarded by the common people as true, by the wise as false, and by rulers as useful.” · Seneca
+- “Show me a man who isn’t a slave; one who is a slave to sex, another to money, another to ambition; all are slaves to hope or fear.” · Seneca
+- “Sometimes even to live is an act of courage.” · Seneca
+- “That man lives badly who does not know how to die well.” · Seneca
+- “The best ideas are common property” · Seneca
+- “The final hour when we cease to exist does not itself bring death; it merely of itself completes the death-process. We reach death at that moment, but we have been a long time on the way.” · Seneca
+- “The greatest blessings of mankind are within us and within our reach. A wise man is content with his lot, whatever it may be, without wishing for what he has not.” · Seneca
+- “The greatest cure for anger is to wait, so that the initial passion it engenders may die down, and the fog that shrouds the mind may subside, or become less thick.” · Seneca
+- “The greatest obstacle to living is expectancy, which depends upon the morrow and wastes today.” · Seneca
+- “The greatest remedy for anger is delay.” · Seneca
+- “The greatest wealth is a poverty of desires.” · Seneca
+- “The mind that is anxious about future events is miserable.” · Seneca
+- “The other side shall be heard as well.” · Seneca
+- “The part of life we really live is small.’ For all the rest of existence is not life, but merely time..” · Seneca
+- “The process is mutual; for men learn while they teach.” · Seneca
+- “The sun also shines on the wicked.” · Seneca
+- “The things you run from are inside you.” · Seneca
+- “The whole future lies in uncertainty: live immediately.” · Seneca
+- “The willing are led by fate, the reluctant dragged.” · Seneca
+- “The wise man will live as long as he ought, not as long as he can.” · Seneca
+- “There is no easy way from the earth to the stars.” · Seneca
+- “There is nothing the busy man is less busied with than living; there is nothing harder to learn.” · Seneca
+- “They lose the day in expectation of the night, and the night in fear of the dawn.” · Seneca
+- “Throw me to the wolves and I will return leading the pack.” · Seneca
+- “To be always fortunate, and to pass through life with a soul that has never known sorrow, is to be ignorant of one half of nature.” · Seneca
+- “To be everywhere is to be nowhere.” · Seneca
+- “To enjoy life, we must touch much of it lightly.” · Seneca
+- “To things which you bear with impatience you should accustom yourself, and, by habit you will bear them well.” · Seneca
+- “To wish to be well is a part of becoming well.” · Seneca
+- “True happiness is to enjoy the present, without anxious dependence upon the future, not to amuse ourselves with either hopes or fears but to rest satisfied with what we have.” · Seneca
+- “True happiness is... to enjoy the present, without anxious dependence upon the future.” · Seneca
+- “True wisdom comes to each of us when we realize how little we understand about life, ourselves, and the world around us.” · Seneca
+- “Until we have begun to go without them, we fail to realize how unnecessary many things are. We’ve been using them not because we needed them but because we had them.” · Seneca
+- “Virtue is nothing else than right reason.” · Seneca
+- “We are more often frightened than hurt; and we suffer more from imagination than from reality.” · Seneca
+- “We cease to be so angry once we cease to be so hopeful” · Seneca
+- “We learn not in the school, but in life.” · Seneca
+- “We should always allow some time to elapse, for time discloses the truth.” · Seneca
+- “We should not, like sheep, follow the herd of creatures in front of us, making our way where others go, not where we ought to go.” · Seneca
+- “We suffer more often in imagination than in reality.” · Seneca
+- “Wealth is the slave of a wise man. The master of a fool.” · Seneca
+- “What is harder than rock? What is softer than water? Yet hard rocks are hollowed out by soft water?” · Seneca
+- “What need is there to weep over parts of life? The whole of it calls for tears.” · Seneca
+- “Whatever can happen at any time can happen today.” · Seneca
+- “When friendship is settled, you must trust; before friendship is formed, you must pass judgment.” · Seneca
+- “Wherever there is a human being, there is an opportunity for a kindness.” · Seneca
+- “Wherever there is a human being, there is an opportunity for kindness.” · Seneca
+- “While we wait for life, life passes.” · Seneca
+- “Withdraw into yourself, as far as you can. Associate with those who will make a better man of you. Welcome those whom you yourself can improve. The process is mutual; for men learn while they teach.” · Seneca
+- “You act like mortals in all that you fear, and like immortals in all that you desire.” · Seneca
+- “You should keep learning…to the end of your life.” · Seneca
+- “A friend is a second self.” · Zeno of Citium
+- “Fate is the endless chain of causation, whereby things are; the reason or formula by which the world goes on.” · Zeno of Citium
+- “Happiness is a good flow of life.” · Zeno of Citium
+- “He who is greedy is always in want.” · Zeno of Citium
+- “Man conquers the world by conquering himself.” · Zeno of Citium
+- “Man’s proper work is the practice of the virtues, which alone produce happiness.” · Zeno of Citium
+- “Nature hath given men one tongue but two ears, that we may hear from others twice as much as we speak.” · Zeno of Citium
+- “Nature must be followed.” · Zeno of Citium
+- “Our individual life is a part of the entire cosmos, governed by the universal reason, logos.” · Zeno of Citium
+- “We have two ears and one mouth, so we should listen more than we say.” · Zeno of Citium
+- “We should not spoil what we have by desiring what we have not; but remember that what we now have was once among the things we only hoped for.” · Zeno of Citium
+- “Well-being is realized by small steps, but is truly no small thing.” · Zeno of Citium
+
+## others
+- “He who fears death will never do anything worth of a living person.” · -
+- “If you seek tranquility, do less. Or (more accurately) do what’s essential - what the reason of a social being requires, and in the requisite way. Which brings a double satisfaction: to do less, better.” · -
+- “It never ceases to amaze me: we all love ourselves more than other people, but care more about their opinions than our own.” · -
+- “Just as nature takes every obstacle, every impediment, and works around it - turns it to its purposes, incorporates it into itself - so, too, a rational being can turn each setback into raw material and use it to achieve its goal.” · -
+- “Let all your efforts be directed to something, let it keep that end in view. It's not activity that disturbs people, but false conceptions of things that drive them mad.” · -
+- “Life is neither good nor bad, but only a place for good and bad.” · -
+- “Life is very short and anxious for those who forget the past, neglect the present, and fear the future.” · -
+- “No person has the power to have everything they want, but it is in their power not to want what they don’t have, and to cheerfully put to good use what they do have.” · -
+- “People look for retreats for themselves, in the country, by the coast, or in the hills. There is nowhere that a person can find a more peaceful and trouble-free retreat than in his own mind.” · -
+- “Progress is not achieved by luck or accident, but by working on yourself daily.” · -
+- “The object of life is not to be on the side of the majority, but to escape finding oneself in the ranks of the insane.” · -
+- “True happiness is to enjoy the present, without anxious dependence upon the future, not to amuse ourselves with either hopes or fears but to rest satisfied with what we have, which is sufficient, for he that is so wants nothing.” · -
+- “Waste no more time arguing about what a good man should be. Be one.” · -
+- “Waste no more time arguing about what a good person should be. Be one.” · -
+- “We are more often frightened than hurt; and we suffer more in imagination than in reality.” · -
+- “Withdraw into yourself, as far as you can. Associate with those who will make a better man of you.” · -
+- “Your purpose in life is to find your purpose and give your whole heart and soul to it.” · - Buddha
+- “He who has a why to live can bear almost any how.” · - Friedrich Nietzsche
+- “Weeds are flowers, too, once you get to know them.” · A.A. Milne
+- “You can’t stay in your corner of the Forest waiting for others to come to you; You have to go to them sometimes.” · A.A. Milne
+- “It is a curious thought, but it is only when you see people looking ridiculous that you realize just how much you love them.” · Agatha Christie
+- “Desires make slaves out of kings and patience makes kings out of slaves.” · Al Ghazali
+- “The largest part of what we call ‘personality’ is determined by how we’ve opted to defend ourselves against anxiety and sadness.” · Alain de Botton
+- “Blessed are the hearts that can bend; they shall never be broken.” · Albert Camus
+- “In the middle of winter I at last discovered that there was in me an invincible summer.” · Albert Camus
+- “Real generosity towards the future lies in giving all to the present.” · Albert Camus
+- “Where there is no hope, it is incumbent on us to invent it.” · Albert Camus
+- “Education is what remains after one has forgotten what one has learned in school.” · Albert Einstein
+- “Intellectual growth should commence at birth and cease only at death.” · Albert Einstein
+- “The measure of intelligence is the ability to change.” · Albert Einstein
+- “The only reason for time is so that everything doesn’t happen at once.” · Albert Einstein
+- “Happiness can be found even in the darkest of times, if one only remembers to turn on the light.” · Albus Dumbledore
+- “Every man's memory is his private literature.” · Aldous Huxley
+- “Maybe this world is another planet’s hell.” · Aldous Huxley
+- “The secret of genius is to carry the spirit of the child into old age, which means never losing your enthusiasm.” · Aldous Huxley
+- “There are things known and there are things unknown, and in between are the doors of perception.” · Aldous Huxley
+- “There is only one corner of the universe you can be certain of improving, and that’s your own self.” · Aldous Huxley
+- “You shall know the truth and the truth shall make you mad.” · Aldous Huxley
+- “Before anything else, preparation is the key to success.” · Alexander Graham Bell
+- “If you fall in love with the imagination, you understand that it is a free spirit. It will go anywhere, and it can do anything.” · Alice Walker
+- “If I choose, not out of fear, but out of courage, to speak, then there's something unique that my words can become... It might feel like every story has been told before, but the truth is, no one's ever told my story in the way I would tell it.” · Amanda Gorman
+- “Stay true to yourself and your vision. Don’t let any one person’s opinion move you; listen, but be confident.” · Amanda Kahlow
+- “A single act of kindness throws out roots in all directions, and the roots spring up and make new trees.” · Amelia Earhart
+- “Courage is the price that life exacts for granting peace.” · Amelia Earhart
+- “Decide… whether or not the goal is worth the risks involved. If it is, stop worrying.” · Amelia Earhart
+- “Preparation, I have often said, is rightly two-thirds of any venture.” · Amelia Earhart
+- “The most effective way to do it, is to do it.” · Amelia Earhart
+- “There’s more to life than being a passenger.” · Amelia Earhart
+- “Use your fear, it can take you to the place where you store your courage.” · Amelia Earhart
+- “The secret to doing good research is always to be a little underemployed. You waste years by not being able to waste hours.” · Amos Tversky
+- “I am not afraid of storms for I am learning how to sail my ship.” · Amy March
+- “If you can dance and be free and be embarrassed, you can rule the world.” · Amy Poehler
+- “Age does not protect you from love. But love, to some extent, protects you from age.” · Anaïs Nin
+- “How wrong is it for a woman to expect the man to build the world she wants, rather than to create it herself?” · Anaïs Nin
+- “I believe one writes because one has to create a world in which one can live.” · Anaïs Nin
+- “Life shrinks or expands in proportion to one's courage.” · Anaïs Nin
+- “Stories do not end.” · Anaïs Nin
+- “There are many ways to be free. One of them is to transcend reality by imagination, as I try to do.” · Anaïs Nin
+- “An artist discovers his genius the day he dares not to please.” · André Malraux
+- “Opportunities are usually disguised as hard work, so most people don’t recognize them.” · Ann Landers
+- “Beauty remains, even in misfortune. If you just look for it, you discover more and more happiness and regain your balance.” · Anne Frank
+- “Almost everything will work again if you unplug it for a few minutes, including you.” · Anne Lamott
+- “The person who moves a mountain begins by carrying away small stones.” · Anonymous
+- “A rock pile ceases to be a rock pile the moment a single man contemplates it, bearing within him the image of a cathedral.” · Antoine de Saint-Exupery
+- “But eyes are blind. You have to look with the heart.” · Antoine de Saint-Exupery
+- “People have stars, but they aren't the same. For travelers, the stars are guides. For other people, they're nothing but tiny lights.” · Antoine de Saint-Exupery
+- “True happiness comes from the joy of deeds well done, the zest of creating things new.” · Antoine de Saint-Exupery
+- “True love begins when nothing is looked for in return.” · Antoine de Saint-Exupery
+- “We don’t ask to be eternal beings. We only ask that things do not lose all their meaning.” · Antoine de Saint-Exupery
+- “If you want to build a ship, don’t drum up the men to gather wood, divide the work and give orders. Instead, teach them to yearn for the vast and endless sea.” · Antoine de Saint-Exupéry
+- “We need to accept that we won’t always make the right decisions, that we’ll screw up royally sometimes - understanding that failure is not the opposite of success, it’s part of success.” · Arianna Huffington
+- “A true friend is one soul in two bodies.” · Aristotle
+- “Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution; it represents the wise choice of many alternatives - choice, not chance, determines your destiny.” · Aristotle
+- “Happiness depends upon ourselves.” · Aristotle
+- “Happiness is a state of activity.” · Aristotle
+- “He who has overcome his fears will truly be free.” · Aristotle
+- “Hope is a waking dream.” · Aristotle
+- “Learning is an ornament in prosperity, a refuge in adversity, and a provision in old age.” · Aristotle
+- “Pleasure in the job puts perfection in the work.” · Aristotle
+- “Quality is not an act, it is a habit.” · Aristotle
+- “The antidote for fifty enemies is one friend.” · Aristotle
+- “The energy of the mind is the essence of life.” · Aristotle
+- “There is no genius without a touch of madness.” · Aristotle
+- “Through discipline comes freedom.” · Aristotle
+- “Start where you are. Use what you have. Do what you can.” · Arthur Ashe
+- “Where there is no imagination, there is no horror.” · Arthur Conan Doyle
+- “Language can become a screen which stands between the thinker and reality. This is the reason why true creativity often starts where language ends.” · Arthur Koestler
+- “Change alone is eternal, perpetual, immortal.” · Arthur Schopenhauer
+- “What we really need is to realize how little we really need.” · Ashleigh Brilliant
+- “Do not harm the environment. Do not harm the water and the flora. Earth is our mother, and we are her children.” · Atharva Veda
+- “When I dare to be powerful - to use my strength in the service of my vision, then it becomes less and less important whether I am afraid.” · Audre Lorde
+- “Ignore the glass ceiling and do your work. If you’re focusing on the glass ceiling, focusing on what you don’t have, focusing on the limitations, then you will be limited.” · Ava DuVernay
+- “You need imagination in order to imagine a future that doesn’t exist.” · Azar Nafisi
+- “It’s hard to beat a person who never gives up.” · Babe Ruth
+- “By failing to prepare, you are preparing to fail.” · Benjamin Franklin
+- “Either write something worth reading or do something worth writing.” · Benjamin Franklin
+- “Instead of cursing the darkness, light a candle.” · Benjamin Franklin
+- “Lost time is never found again.” · Benjamin Franklin
+- “Tell me and I forget, teach me and I may remember, involve me and I learn.” · Benjamin Franklin
+- “Well done is better than well said.” · Benjamin Franklin
+- “Art is not a mirror held up to reality but a hammer with which to shape it.” · Bertolt Brecht
+- “Time you enjoy wasting, was not wasted.” · Bertrand Russel
+- “Do not fear to be eccentric in opinion, for every opinion now accepted was once eccentric.” · Bertrand Russell
+- “Your writing is never as good as you hoped; but never as bad as you feared.” · Bertrand Russell
+- “It's your outlook on life that counts. If you take yourself lightly and don't take yourself too seriously, pretty soon you can find the humor in our everyday lives. And sometimes it can be a lifesaver.” · Betty White
+- “Hugs are like boomerangs - you get them back right away.” · Bil Keane
+- “As we look ahead into the next century, leaders will be those who empower others.” · Bill Gates
+- “I choose a lazy person to do a hard job. Because a lazy person will find an easy way to do it.” · Bill Gates
+- “Success is a lousy teacher. It seduces smart people into thinking they can’t lose.” · Bill Gates
+- “We’re so busy watching out for what’s just ahead of us that we don’t take time to enjoy where we are.” · Bill Watterson
+- “Champions keep playing until they get it right.” · Billie Jean King
+- “The heart has its reasons which reason knows nothing of.” · Blaise Pascal
+- “Set your goals high, and don’t stop till you get there.” · Bo Jackson
+- “I don’t have to chase extraordinary moments to find happiness - it’s right in front of me if I’m paying attention and practicing gratitude.” · Brené Brown
+- “Imperfections are not inadequacies; they are reminders that we’re all in this together.” · Brené Brown
+- “Let go of who you think you’re supposed to be; embrace who you are.” · Brené Brown
+- “Sometimes the bravest and most important thing you can do is just show up.” · Brené Brown
+- “Talk to yourself like you would to someone you love.” · Brené Brown
+- “There is no innovation and creativity without failure. Period.” · Brené Brown
+- “We can choose courage or we can choose comfort, but we can’t have both. Not at the same time.” · Brené Brown
+- “We don’t have to do all of it alone. We were never meant to.” · Brené Brown
+- “We need to be selective about the feedback we let into our lives. For me, if you’re not in the arena also getting your ass kicked, I’m not interested in your feedback.” · Brené Brown
+- “What’s the greater risk? Letting go of what people think - or letting go of how I feel, what I believe, and who I am?” · Brené Brown
+- “You are imperfect, you are wired for struggle, but you are worthy of love and belonging.” · Brené Brown
+- “You can choose courage, or you can choose comfort, but you cannot choose both.” · Brené Brown
+- “You either walk inside your story and own it or you stand outside your story and hustle for your worthiness.” · Brené Brown
+- “Set peace of mind as your highest goal, and organize your life around it.” · Brian Tracy
+- “I fear not the man who has practiced 10,000 kicks, but I do fear the man who has practiced one kick 10,000 times.” · Bruce Lee
+- “If you spend too much time thinking about a thing, you'll never get it done.” · Bruce Lee
+- “One does not accumulate but eliminate. It is not daily increase but daily decrease. The height of cultivation always runs to simplicity.” · Bruce Lee
+- “When it comes to luck, you make your own.” · Bruce Springsteen
+- “Be the person your dog thinks you are.” · C.J. Frick
+- “You can make anything by writing.” · C.S Lewis
+- “Courage, dear heart.” · C.S. Lewis
+- “Friendship is unnecessary, like philosophy, like art. It has no survival value; rather it is one of those things which give value to survival.” · C.S. Lewis
+- “Every form of addiction is bad, no matter whether the narcotic be alcohol, morphine or idealism.” · Carl Jung
+- “Everything that irritates us about others can lead us to an understanding of ourselves.” · Carl Jung
+- “I am not what happened to me, I am what I choose to become.” · Carl Jung
+- “Loneliness does not come from having no people about one, but from being unable to communicate the things that seem important to oneself, or from holding certain views which others find inadmissible.” · Carl Jung
+- “No tree, it is said, can grow to heaven unless its roots reach down to hell.” · Carl Jung
+- “Until you make the unconscious conscious, it will direct your life and you will call it fate.” · Carl Jung
+- “You are what you do, not what you say you’ll do.” · Carl Jung
+- “Your visions will become clear only when you can look into your own heart. Who looks outside, dreams; who looks inside, awakes.” · Carl Jung
+- “Imagination will often carry us to worlds that never were. But without it, we go nowhere.” · Carl Sagan
+- “Science is not only compatible with spirituality; it is a profound source of spirituality.” · Carl Sagan
+- “Somewhere, something incredible is waiting to be known.” · Carl Sagan
+- “The soul always knows what to do to heal itself. The challenge is to silence the mind.” · Caroline Myss
+- “My rule is that the right time is always right now.” · Casey Neistat
+- “A wonderful fact to reflect upon, that every human creature is constituted to be that profound secret and mystery to every other.” · Charles Dickens
+- “Every traveler has a home of his own, and he learns to appreciate it the more from his wandering.” · Charles Dickens
+- “Have a heart that never hardens, and a temper that never tires, and a touch that never hurts.” · Charles Dickens
+- “Heaven knows we need never be ashamed of our tears, for they are rain upon the blinding dust of earth, overlying our hard hearts.” · Charles Dickens
+- “Never close your lips to those whom you have already opened your heart.” · Charles Dickens
+- “Procrastination is the thief of time, collar him.” · Charles Dickens
+- “Reflect upon your present blessings - of which every man has many - not on your past misfortunes, of which all men have some.” · Charles Dickens
+- “There is nothing in the world so irresistibly contagious as laughter and good humor.” · Charles Dickens
+- “Adventure is out there!” · Charles Muntz
+- “A day without laughter is a day wasted.” · Charlie Chaplin
+- “Happiness is the secret to all beauty. There is no beauty without happiness.” · Christian Dior
+- “Self-compassion is simply giving the same kindness to ourselves that we would give to others.” · Christopher Germer
+- “If you know how quickly people forget the dead… You will stop living to impress people.” · Christopher Walken
+- “People fall so in love with their pain, they can’t leave it behind. The same as the stories they tell. We trap ourselves.” · Chuck Palahniuk
+- “The things you own end up owning you.” · Chuck Palahniuk
+- “A friend is, as it were, a second self.” · Cicero
+- “While there's life, there's hope.” · Cicero
+- “Just because it’s what’s done, doesn’t mean it’s what should be done.” · Cinderella
+- “The man who asks a question is a fool for a minute, the man who does not ask is a fool for life.” · Confucius
+- “Never measure the height of a mountain until you reach the top. Then you will see how low it was.” · Dag Hammarskjold
+- “Be kind whenever possible. It is always possible.” · Dalai Lama XIV
+- “Sleep is the best meditation.” · Dalai Lama XIV
+- “Any fool can criticize, complain, and condemn - and most fools do. But it takes character and self-control to be understanding and forgiving.” · Dale Carnegie
+- “Develop success from failures. Discouragement and failure are two of the surest stepping stones to success.” · Dale Carnegie
+- “Do the hard jobs first. The easy jobs will take care of themselves.” · Dale Carnegie
+- “Don’t be afraid of enemies who attack you. Be afraid of the friends who flatter you.” · Dale Carnegie
+- “Even god doesn’t propose to judge a man till his last days, why should you and I?” · Dale Carnegie
+- “Happiness doesn’t depend on outward conditions. It depends on inner conditions.” · Dale Carnegie
+- “If you are not in the process of becoming the person you want to be, you are automatically engaged in becoming the person you don’t want to be.” · Dale Carnegie
+- “It isn’t what you have or who you are or where you are or what you are doing that makes you happy or unhappy. It is what you think about it.” · Dale Carnegie
+- “Knowledge isn’t power until it is applied.” · Dale Carnegie
+- “Most of the important things in the world have been accomplished by people who have kept on trying when there seemed to be no hope at all.” · Dale Carnegie
+- “Our fatigue is often caused not by work, but by worry, frustration and resentment.” · Dale Carnegie
+- “Our thoughts make us what we are.” · Dale Carnegie
+- “Remember, today is the tomorrow you worried about yesterday.” · Dale Carnegie
+- “Talk to someone about themselves and they’ll listen for hours.” · Dale Carnegie
+- “The successful man will profit from his mistakes and try again in a different way.” · Dale Carnegie
+- “When dealing with people, remember you are not dealing with creatures of logic, but with creatures bristling with prejudice and motivated by pride and vanity.” · Dale Carnegie
+- “When we hate our enemies, we are giving them power over us - power over our sleep, our appetites, our blood pressure, our health, and our happiness.” · Dale Carnegie
+- “You can conquer almost any fear if you will only make up your mind to do so. For remember, fear doesn’t exist anywhere except in the mind.” · Dale Carnegie
+- “You don’t have to control your thoughts. You just have to stop letting them control you.” · Dan Millman
+- “Your mind is for having ideas, not holding them.” · David Allen
+- “I don’t know where I’m going from here, but I promise it won’t be boring.” · David Bowie
+- “Negativity is the enemy of creativity.” · David Lynch
+- “It is not joy that makes us grateful; it is gratitude that makes us joyful.” · David Steindl-Rast
+- “Take care of your mind, your body will thank you. Take care of your body, your mind will thank you.” · Debbie Hampton
+- “Spirituality is not about what you believe. It is about the kind of person you are.” · Deepak Chopra
+- “The most creative act you will ever undertake is the act of creating yourself.” · Deepak Chopra
+- “Doors are for people with no imagination.” · Derek Landy
+- “If your actions create a legacy that inspires others to dream more, learn more, do more and become more, then, you are an excellent leader.” · Dolly Parton
+- “There’s no place like home.” · Dorothy
+- “Real loss is only possible when you love something more than you love yourself.” · Dr. Sean Maguire
+- “I like nonsense, it wakes up the brain cells. Fantasy is a necessary ingredient in living.” · Dr. Seuss
+- “Instead of trying to make your life perfect, give yourself the freedom to make it an adventure.” · Drew Houston
+- “Plans are nothing; planning is everything.” · Dwight D. Eisenhower
+- “When you are present, you can allow the mind to be as it is without getting entangled in it.” · Eckhart Tolle
+- “You have a treasure within you that is infinitely greater than anything the world can offer.” · Eckhart Tolle
+- “The inner fire is the most important thing mankind possesses.” · Edith Södergran
+- “The love we give away is the only love we keep.” · Elbert Hubbard
+- “Courage is more exhilarating than fear and in the long run it is easier. We do not have to become heroes overnight. Just one step at a time, meeting each thing that comes up, seeing it is not as dreadful as it appeared, discovering we have the strength to stare it down.” · Eleanor Roosevelt
+- “Happiness is not a goal; it is a by-product of a life well-lived.” · Eleanor Roosevelt
+- “It isn’t enough to talk about peace. One must believe in it. And it isn’t enough to believe in it. One must work at it.” · Eleanor Roosevelt
+- “Remember always that you have not only the right to be an individual; you have an obligation to be one. You cannot make any useful contribution in life unless you do this.” · Eleanor Roosevelt
+- “Surely, in the light of history, it is more intelligent to hope rather than to fear, to try rather than not to try. For one thing we know beyond all doubt: Nothing has ever been achieved by the person who says, ‘It can’t be done.’” · Eleanor Roosevelt
+- “The future belongs to those who believe in the beauty of their dreams.” · Eleanor Roosevelt
+- “The important thing is neither your nationality nor the religion you professed, but how your faith translated itself in your life.” · Eleanor Roosevelt
+- “The world of the future is in our making. Tomorrow is now.” · Eleanor Roosevelt
+- “With the new day comes new strength and new thoughts.” · Eleanor Roosevelt
+- “You gain strength, courage and confidence by every experience in which you really stop to look fear in the face. You are able to say to yourself, ‘I have lived through this horror. I can take the next thing that comes along.’ You must do the thing you think you cannot do.” · Eleanor Roosevelt
+- “Find ecstasy in life; the mere sense of living is joy enough.” · Emily Dickinson
+- “If I can stop one heart from breaking, I shall not live in vain.” · Emily Dickinson
+- “Love is anterior to life, posterior to death, initial of creation, and the exponent of breath.” · Emily Dickinson
+- “The Heart wants what it wants - or else it does not care.” · Emily Dickinson
+- “Till I loved I never lived.” · Emily Dickinson
+- “Truth is so rare, it is delightful to tell it.” · Emily Dickinson
+- “Unable are the loved to die. For love is immortality.” · Emily Dickinson
+- “Do not spoil what you have by desiring what you have not; remember that what you now have was once among the things you only hoped for.” · Epicurus
+- “Life did not intend to make us perfect. Whoever is perfect belongs in a museum.” · Erich Maria Remarque
+- “There is nothing noble in being superior to your fellow man; true nobility is being superior to your former self.” · Ernest Hemingway
+- “Never confuse a single defeat with a final defeat.” · F. Scott Fitzgerald
+- “At the end of the day, you are the only one that is limiting your ability to dream, or to actually execute on your dreams. Don’t let yourself get in the way of that.” · Falon Fatemi
+- “Life moves pretty fast. If you don’t stop and look around once in a while, you could miss it.” · Ferris Bueller
+- “How very little can be done under the spirit of fear.” · Florence Nightingale
+- “I attribute my success to this - I never gave or took any excuse.” · Florence Nightingale
+- “Our bodies are apt to be our autobiographies.” · Frank Gelett Burgess
+- “What do you despise? By this are you truly known.” · Frank Herbert
+- “Courage is not the absence of fear, but rather the assessment that something else is more important than fear.” · Franklin D. Roosevelt
+- “The only thing we have to fear is fear itself.” · Franklin D. Roosevelt
+- “When you reach the end of your rope, tie a knot in it and hang on.” · Franklin D. Roosevelt
+- “Love doesn’t make the world go round. Love is what makes the ride worthwhile.” · Franklin P. Jones
+- “Productivity is being able to do things that you were never able to do before.” · Franz Kafka
+- “We tend to forget that happiness doesn’t come as a result of getting something we don’t have, but rather of recognizing and appreciating what we do have.” · Frederick Keonig
+- “One must still have chaos in oneself to be able to give birth to a dancing star.” · Friedrich Nietzsche
+- “Above all, do not lie to yourself.” · Fyodor Dostoyevsky
+- “You cannot teach a man anything; you can only help him find it within himself.” · Galileo Galilei
+- “Imagination is the beginning of creation. You imagine what you desire, you will what you imagine, and at last, you create what you will.” · George Bernard Shaw
+- “Adventure is not outside man; it is within.” · George Eliot
+- “It is never too late to be what you might have been.” · George Eliot
+- “Life began with waking up and loving my mother's face.” · George Eliot
+- “You simply have to put one foot in front of the other and keep going. Put blinders on and plow right ahead.” · George Lucas
+- “You’ll never find peace of mind until you listen to your heart.” · George Michael
+- “Autobiography is only to be trusted when it reveals something disgraceful. A man who gives a good account of himself is probably lying, since any life when viewed from the inside is simply a series of defeats.” · George Orwell
+- “Perseverance and spirit have done wonders in all ages.” · George Washington
+- “The harder the conflict, the greater the triumph.” · George Washington
+- “It's not enough to be nice in life. You've got to have nerve.” · Georgia O’Keeffe
+- “Your value will be not what you know; it will be what you share.” · Ginni Rometty
+- “So whatever you want to do, just do it... Making a damn fool of yourself is absolutely essential.” · Gloria Steinem
+- “Without leaps of imagination or dreaming, we lose the excitement of possibilities. Dreaming, after all, is a form of planning.” · Gloria Steinem
+- “Somewhere between the bottom of the climb and the summit is the answer to the mystery why we climb.” · Greg Child
+- “If you fell down yesterday, stand up today.” · H. G. Wells
+- “If you have the courage to begin, you have the courage to succeed.” · Harry Hoover
+- “I have the power!” · He-Man
+- “If you wish to be loved, love.” · Hecato, quoted by
+- “I would rather walk with a friend in the dark, than alone in the light.” · Helen Keller
+- “Optimism is the faith that leads to achievement. Nothing can be done without hope and confidence.” · Hellen Keller
+- “It is by logic that we prove, but by intuition that we discover.” · Henri Poincaré
+- “To doubt everything or to believe everything are two equally convenient solutions; both dispense with the necessity of reflection.” · Henri Poincaré
+- “I am grateful for what I am and have. My thanksgiving is perpetual.” · Henry David Thoreau
+- “It is not enough to be busy; so are the ants. The question is: What are we busy about?” · Henry David Thoreau
+- “It’s not what you look at that matters, it’s what you see.” · Henry David Thoreau
+- “Not until we are lost do we begin to understand ourselves.” · Henry David Thoreau
+- “Our truest life is when we are in dreams awake.” · Henry David Thoreau
+- “The world is but a canvas to our imagination.” · Henry David Thoreau
+- “Destiny is what you are supposed to do in life. Fate is what kicks you in the ass to make you do it.” · Henry Miller
+- “One's destination is never a place, but a new way of seeing things.” · Henry Miller
+- “The aim of life is to live, and to live means to be aware, joyously, drunkenly, serenely, divinely aware.” · Henry Miller
+- “The only thing we never get enough of is love; and the only thing we never give enough of is love.” · Henry Miller
+- “Day by day, what you do is who you become.” · Heraclitus
+- “A wealth of information creates a poverty of attention.” · Herbert Simon
+- “Within you, there is a stillness and a sanctuary to which you can retreat at any time and be yourself.” · Herman Hesse
+- “You can get excited about the future. The past won’t mind.” · Hillary DePiano
+- “Healing is a matter of time, but it is sometimes a matter of opportunity.” · Hippocrates
+- “Anger is a brief madness.” · Horace
+- “He who has begun has half done. Dare to be wise; begin!” · Horace
+- “He who postpones the hour of living rightly is like the rustic who waits for the river to run out before he crosses.” · Horace
+- “Once a word has been allowed to escape, it cannot be recalled.” · Horace
+- “Dare to think!” · Immanuel Kant
+- “Rules for happiness: something to do, someone to love, something to hope for.” · Immanuel Kant
+- “To die will be an awfully big adventure.” · J.M. Barrie
+- “Courage is found in unlikely places.” · J.R.R. Tolkien
+- “Faithless is he that says farewell when the road darkens.” · J.R.R. Tolkien
+- “It is not the strength of the body that counts, but the strength of the spirit.” · J.R.R. Tolkien
+- “Not all those who wander are lost.” · J.R.R. Tolkien
+- “The world is indeed full of peril, and in it there are many dark places; but still there is much that is fair, and though in all lands love is now mingled with grief, it grows perhaps the greater.” · J.R.R. Tolkien
+- “Where there's life there's hope.” · J.R.R. Tolkien
+- “You can only come to the morning through the shadows.” · J.R.R. Tolkien
+- “Live, travel, adventure, bless, and don't be sorry.” · Jack Kerouac
+- “You can’t wait for inspiration. You have to go after it with a club.” · Jack London
+- “I imagine one of the reasons people cling to their hates so stubbornly is because they sense, once hate is gone, they will be forced to deal with pain.” · James Baldwin
+- “Habits are the compound interest of self-improvement. The same way that money multiplies through interest.” · James Clear
+- “It is so easy to overestimate the importance of one defining moment and underestimating the value of making small improvements on a daily basis.” · James Clear
+- “Mistakes are the portals of discovery.” · James Joyce
+- “Shut your eyes and see.” · James Joyce
+- “The supreme question about a work of art is out of how deep a life does it spring.” · James Joyce
+- “Imagination is the soul’s happiest retreat.” · James Lendall Basford
+- “Someday is not a day of the week.” · Janet Dailey
+- “There is no end to the adventures that we can have if only we seek them with our eyes open.” · Jawaharlal Nehru
+- “The world of reality has its limits; the world of imagination is boundless.” · Jean-Jacques Rousseau
+- “If you absolutely can’t tolerate critics, then don’t do anything new or interesting.” · Jeff Bezos
+- “Discipline is the bridge between goals and accomplishment.” · Jim Rohn
+- “Either you run the day, or the day runs you.” · Jim Rohn
+- “Take care of your body. It’s the only place you have to live.” · Jim Rohn
+- “Your life does not get better by chance, it gets better by change.” · Jim Rohn
+- “Do not whine... Do not complain. Work harder. Spend more time alone.” · Joan Didion
+- “I wish I could tell you it gets better. But, it doesn't get better. You get better.” · Joan Rivers
+- “In the end, winning is sleeping better.” · Jodie Foster
+- “Constantly talking isn’t necessarily communicating.” · Joel Barish
+- “Every day it gets a little easier… But you gotta do it every day - that’s the hard part. But it does get easier.” · Jogging Baboon
+- “A man sees in the world what he carries in his heart.” · Johann Wolfgang von Goethe
+- “A man should hear a little music, read a little poetry, and see a fine picture every day of his life, in order that worldly cares may not obliterate the sense of the beautiful which God has implanted in the human soul.” · Johann Wolfgang von Goethe
+- “As soon as you trust yourself, you will know how to live.” · Johann Wolfgang von Goethe
+- “Daring ideas are like chessmen moved forward. They may be beaten, but they may start a winning game.” · Johann Wolfgang von Goethe
+- “Enjoy when you can, and endure when you must.” · Johann Wolfgang von Goethe
+- “If you’ve never eaten while crying you don’t know what life tastes like” · Johann Wolfgang von Goethe
+- “Instruction does much, but encouragement everything.” · Johann Wolfgang von Goethe
+- “Knowing is not enough; we must apply. Willing is not enough; we must do.” · Johann Wolfgang von Goethe
+- “Life belongs to the living, and he who lives must be prepared for changes.” · Johann Wolfgang von Goethe
+- “Magic is believing in yourself, if you can do that, you can make anything happen.” · Johann Wolfgang von Goethe
+- “Nothing shows a man's character more than what he laughs at.” · Johann Wolfgang von Goethe
+- “The greatest thing in this world is not so much where we stand as in what direction we are moving.” · Johann Wolfgang von Goethe
+- “To think is easy. To act is hard. But the hardest thing in the world is to act in accordance with your thinking.” · Johann Wolfgang von Goethe
+- “Treat people as if they were what they ought to be, and you help them become what they are capable of being.” · Johann Wolfgang von Goethe
+- “You can easily judge the character of a man by how he treats those who can do nothing for him.” · Johann Wolfgang von Goethe
+- “If a man can reduce his needs to zero, he is truly free: there is nothing that can be taken from him; nothing can hurt him.” · John Boyd
+- “Creativity is not a talent. It is a way of operating.” · John Cleese
+- “Don't compromise yourself - you're all you have.” · John Grisham
+- “Heard melodies are sweet, but those unheard, are sweeter.” · John Keats
+- “I am certain of nothing but the holiness of the heart’s affections, and the truth of imagination.” · John Keats
+- “The poetry of the earth is never dead.” · John Keats
+- “The mind is its own place and in itself, can make a Heaven of Hell, a Hell of Heaven.” · John Milton
+- “Celebrate endings - for they precede new beginnings.” · Jonathan Huie
+- “The big question is whether you are going to be able to say a hearty yes to your adventure.” · Joseph Campbell
+- “Your sacred space is where you can find yourself over and over again.” · Joseph Campbell
+- “I don't like work--no man does--but I like what is in the work--the chance to find yourself. Your own reality--for yourself not for others.” · Joseph Conrad
+- “Failure comes from a failure to imagine failure.” · Josh Wolfe
+- “You cannot have a positive life and a negative mind.” · Joyce Meyer
+- “Always be a first-rate version of yourself, instead of a second-rate version of somebody else.” · Judy Garland
+- “Life’s a little bit messy. We all make mistakes. No matter what type of animal you are, change starts with you.” · Judy Hopps
+- “How hurtful it can be to deny one's true self and live a life of lies just to appease others.” · June Ahern
+- “Remember this, whoever you are, however you are, you are equally valid, equally justified and equally beautiful.” · Juno Dawson
+- “You give but little when you give of your possessions. It is when you give of yourself that you truly give.” · Kahlil Gibran
+- “The things you do for yourself are gone when you are gone, but the things you do for others remain as your legacy.” · Kalu Ndukwe Kalu
+- “You are never too old to start over. Every day is a chance to make changes to create the life we want.” · Karon Waddell
+- “If you’re not prepared to be wrong, you'll never come up with anything original.” · Ken Robinson
+- “I don’t believe you have to be better than everybody else. I believe you have to be better than you ever thought you could be.” · Ken Venturi
+- “Learn to embrace your own unique beauty, celebrate your unique gifts with confidence. Your imperfections are actually a gift.” · Kerry Washington
+- “Everything negative - pressure, challenges - is all an opportunity for me to rise.” · Kobe Bryant
+- “And I urge you to please notice when you are happy, and exclaim or murmur or think at some point, if this isn’t nice, I don’t know what is.” · Kurt Vonnegut
+- “The arts are not a way to make a living. They are a very human way of making life more bearable.” · Kurt Vonnegut
+- “To practice any art, no matter how well or badly, is a way to make your soul grow. So do it.” · Kurt Vonnegut
+- “Being deeply loved by someone gives you strength, while loving someone deeply gives you courage.” · Lao Tzu
+- “Do the difficult things while they are easy and do the great things while they are small. A journey of a thousand miles must begin with a single step.” · Lao Tzu
+- “Nature does not hurry, yet everything is accomplished.” · Lao Tzu
+- “Time is a created thing. To say “I don’t have time” is to say “I don’t want to.” · Lao Tzu
+- “When you realize nothing is lacking, the whole world belongs to you.” · Lao Tzu
+- “Well-behaved women seldom make history.” · Laurel Thatcher Ulrich
+- “If watching is all you’re gonna do, then you’re gonna watch your life go by without ya.” · Laverne
+- “Fate is like a strange, unpopular restaurant filled with odd little waiters who bring you things you never asked for and don’t always like.” · Lemony Snicket
+- “Everyone thinks of changing the world, but no one thinks of changing himself.” · Leo Tolstoy
+- “Just as one candle lights another and can light thousands of other candles, so one heart illuminates another heart and can illuminate thousands of other hearts.” · Leo Tolstoy
+- “Life could be limitless joy, if we would only take it for what it is, in the way it is given to us.” · Leo Tolstoy
+- “The two most powerful warriors are patience and time.” · Leo Tolstoy
+- “This will be our reply to violence: to make music more intensely, more beautifully, more devotedly than ever before.” · Leonard Bernstein
+- “There is a crack in everything, that’s how the light gets in.” · Leonard Cohen
+- “We need to remember what's important in life: friends, waffles, work. Or waffles, friends, work. Doesn't matter, but work is third.” · Leslie Knope
+- “Curiouser and curiouser!” · Lewis Carroll
+- “Imagination is the only weapon in the war against reality.” · Lewis Carroll
+- “We’re all mad here.” · Lewis Carroll
+- “The plan is to fan this spark into a flame.” · Lin-Manuel Miranda
+- “The best way to have a good idea is to have lots of ideas.” · Linus Pauling
+- “Just because no one else can heal or do your inner work for you doesn’t mean you can, should, or need to do it alone.” · Lisa Olivera
+- “Your imagination, my dear fellow, is worth more than you imagine.” · Louis Aragon
+- “There will never come a time when I will be able to resist my emotions.” · Louise Erdrich
+- “Every material is only worth what we make out of it.” · Ludwig Mies van der Rohe
+- “Quiet the mind and the soul will speak.” · Ma Jaya Sati Bhagavati
+- “Inspiration usually comes during work, rather than before it.” · Madeleine L’Engle
+- “You only live once, but if you do it right, once is enough.” · Mae West
+- “Happiness radiates like the fragrance from a flower and draws all good things towards you.” · Maharishi Mahesh Yogi
+- “Happiness is when what you think, what you say, and what you do are in harmony.” · Mahatma Gandhi
+- “Live as if you were to die tomorrow. Learn as if you were to live forever.” · Mahatma Gandhi
+- “To me, the moral of the story was that there will always be hurdles in life, but if you want to achieve a goal, you must continue.” · Malala Yousafzai
+- “We realize the importance of our voices only when we are silenced.” · Malala Yousafzai
+- “Let us be grateful to people who make us happy; they are the charming gardeners who make our souls blossom.” · Marcel Proust
+- “The real voyage of discovery consists not in seeking new landscapes, but in having new eyes.” · Marcel Proust
+- “Gratitude is not only the greatest of virtues, but the parent of all others.” · Marcus Tullius Cicero
+- “Joy is what happens to us when we allow ourselves to recognize how good things really are.” · Marianne Williamson
+- “The spiritual journey is the unlearning of fear and the acceptance of love.” · Marianne Williamson
+- “Nothing in life is to be feared, it is only to be understood. Now is the time to understand more, so that we may fear less.” · Marie Curie
+- “Continuous improvement is better than delayed perfection.” · Mark Twain
+- “If you tell the truth, you don't have to remember anything.” · Mark Twain
+- “Whenever you find yourself on the side of the majority, it is time to reform (or pause and reflect).” · Mark Twain
+- “You can’t depend on your eyes when your imagination is out of focus.” · Mark Twain
+- “A dog wags its tail with its heart.” · Martin Buxbaum
+- “Forgiveness is not an occasional act, it is a constant attitude.” · Martin Luther King Jr.
+- “If I cannot do great things, I can do small things in a great way.” · Martin Luther King Jr.
+- “If you can't fly then run, if you can't run then walk, if you can't walk then crawl, but whatever you do you have to keep moving forward.” · Martin Luther King Jr.
+- “No work is insignificant. All labor that uplifts humanity has dignity and importance and should be undertaken with painstaking excellence.” · Martin Luther King Jr.
+- “We must accept finite disappointment, but never lose infinite hope.” · Martin Luther King Jr.
+- “We must live together as brothers or perish together as fools.” · Martin Luther King Jr.
+- “Creativity is inventing, experimenting, growing, taking risks, breaking rules, making mistakes, and having fun.” · Mary Lou Cook
+- “Instructions for living a life.\nPay attention.\nBe astonished.\nTell about it.” · Mary Oliver
+- “Keep some room in your heart for the unimaginable.” · Mary Oliver
+- “Someone I loved once gave me a box full of darkness. It took me years to understand that this too, was a gift.” · Mary Oliver
+- “Tell me, what is it you plan to do with your one wild and precious life?” · Mary Oliver
+- “The more you know yourself, the more you seek inner peace.” · Maxime Lagacé
+- “What we do in life echoes in eternity.” · Maximus
+- “As soon as healing takes place, go out and heal somebody else.” · Maya Angelou
+- “Everything in the universe has a rhythm, everything dances.” · Maya Angelou
+- “Have enough courage to trust love one more time and always one more time.” · Maya Angelou
+- “Never make someone a priority when all you are to them is an option.” · Maya Angelou
+- “The desire to reach for the stars is ambitious. The desire to reach hearts is wise.” · Maya Angelou
+- “There is no greater agony than bearing an untold story inside you.” · Maya Angelou
+- “To describe my mother would be to write about a hurricane in its perfect power.” · Maya Angelou
+- “Try to be a rainbow in someone’s cloud.” · Maya Angelou
+- “We delight in the beauty of the butterfly, but rarely admit the changes it has gone through to achieve that beauty.” · Maya Angelou
+- “Without courage we cannot practice any other virtue with consistency. We can’t be kind, true, merciful, generous, or honest.” · Maya Angelou
+- “You can't use up creativity. The more you use, the more you have.” · Maya Angelou
+- “Gratitude unlocks the fullness of life. It turns what we have into enough, and more. It turns denial into acceptance, chaos to order, confusion to clarity. It can turn a meal into a feast, a house into a home, a stranger into a friend.” · Melody Beattie
+- “Falling is one of the ways of moving.” · Merce Cunningham
+- “The only way to do it is to do it.” · Merce Cunningham
+- “My life has been full of terrible misfortunes most of which never happened.” · Michel de Montaigne
+- “The end of friendship is a commerce the most strict and homely that can be joined.” · Michel de Montaigne
+- “Don’t ever underestimate the importance you can have, because history has shown us that courage can be contagious, and hope can take on a life of its own.” · Michelle Obama
+- “Failure is an important part of your growth and developing resilience. Don’t be afraid to fail.” · Michelle Obama
+- “If there’s one thing I’ve learned in life, it’s the power of using your voice.” · Michelle Obama
+- “If you don’t get out there and define yourself, you’ll be quickly and inaccurately defined by others.” · Michelle Obama
+- “It’s not about being perfect. It’s not about where you get yourself in the end. There’s power in allowing yourself to be known and heard, in owning your unique story, in using your authentic voice.” · Michelle Obama
+- “Success is only meaningful and enjoyable if it feels like your own.” · Michelle Obama
+- “Success isn’t about how your life looks to others. It’s about how it feels to you.” · Michelle Obama
+- “There is no limit to what we, as women, can accomplish.” · Michelle Obama
+- “When you’ve worked hard, and done well, and walked through that doorway of opportunity, you do not slam it shut behind you.” · Michelle Obama
+- “You can't make decisions based on fear and the possibility of what might happen.” · Michelle Obama
+- “Your story is what you have, what you will always have. It is something to own.” · Michelle Obama
+- “Love unlocks doors and opens windows that weren't even there before.” · Mignon McLaughlin
+- “Time ripens all things; no man is born wise.” · Miguel de Cervantes Saavedra
+- “The most important thing in life is to learn how to give out love and to let it come in.” · Morrie Schwartz
+- “Imagining something may be the first step in making it happen, but it takes the real time and real efforts of real people to learn things, make things, turn thoughts into deeds or visions into inventions.” · Mr. Rogers
+- “Don’t count the days, make the days count.” · Muhammad Ali
+- “Friendship... is not something you learn in school. But if you haven't learned the meaning of friendship, you really haven't learned anything.” · Muhammad Ali
+- “The flower that blooms in adversity is the most rare and beautiful of all.” · Mulan
+- “A genius is the man who can do the average thing when everyone else around him are losing their mind.” · Napoleon Bonaparte
+- “Do not wait; the time will never be ‘just right.’ Start where you stand, and work with whatever tools you may have at your command.” · Napoleon Hill
+- “My idea of the modern Stoic sage is someone who transforms fear into prudence, pain into information, mistakes into initiation, and desire into undertaking.” · Nassim Nicholas Taleb
+- “Let’s focus on what people with autism can do, rather than what they can’t.” · National Autistic Society
+- “A rational person can find peace by cultivating indifference to things outside of their control.” · Naval Ravikant
+- “Don't take yourself so seriously. You're just a monkey with a plan.” · Naval Ravikant
+- “We are all connected; To each other, biologically. To the earth, chemically. To the rest of the universe atomically.” · Neil DeGrasse Tyson
+- “Do not judge me by my successes, judge me by how many times I fell down and got back up again.” · Nelson Mandela
+- “It always seems impossible until it's done.” · Nelson Mandela
+- “Be alone, that is the secret of invention; be alone, that is when ideas are born.” · Nikola Tesla
+- “Feeling too much is a hell of a lot better than feeling nothing.” · Nora Roberts
+- “Be happy for this moment. This moment is your life.” · Omar Khayyam
+- “Be thankful for what you have; you’ll end up having more. If you concentrate on what you don’t have, you will never, ever have enough.” · Oprah Winfrey
+- “Challenges are gifts that force us to search for a new center of gravity. Don’t fight them. Just find a new way to stand.” · Oprah Winfrey
+- “Cheers to a new year and another chance for us to get it right.” · Oprah Winfrey
+- “Create the highest, grandest vision possible for your life, because you become what you believe.” · Oprah Winfrey
+- “Doing the best at this moment puts you in the best place for the next moment.” · Oprah Winfrey
+- “Everyone wants to ride with you in the limo, but what you want is someone who will take the bus with you when the limo breaks down.” · Oprah Winfrey
+- “If you are still breathing, you have a second chance.” · Oprah Winfrey
+- “Knowing your deepest intention can be your guiding force in the creation of a better life.” · Oprah Winfrey
+- “One of the hardest things in life to learn are which bridges to cross and which bridges to burn.” · Oprah Winfrey
+- “Real integrity is doing the right thing, knowing that nobody’s going to know whether you did it or not.” · Oprah Winfrey
+- “The big secret in life is that there is no big secret. Whatever your goal, you can get there if you’re willing to work.” · Oprah Winfrey
+- “The biggest adventure you can ever take is to live the life of your dreams.” · Oprah Winfrey
+- “The thing you fear most has no power. Your fear of it is what has the power. Facing the truth really will set you free.” · Oprah Winfrey
+- “When you undervalue what you do, the world will undervalue who you are.” · Oprah Winfrey
+- “You can have it all. Just not all at once.” · Oprah Winfrey
+- “You define your own life. Don’t let other people write your script.” · Oprah Winfrey
+- “You don’t become what you want, you become what you believe.” · Oprah Winfrey
+- “You have to know what sparks the light in you so that you, in your own way, can illuminate the world.” · Oprah Winfrey
+- “Sometimes even the wisest of men and machines can be in error.” · Optimus Prime
+- “Be yourself; everyone else is already taken.” · Oscar Wilde
+- “There are only two tragedies in life: one is not getting what one wants, and the other is getting it.” · Oscar Wilde
+- “You can never be overdressed or overeducated.” · Oscar Wilde
+- “All of our miseries are nothing but attachment.” · Osho
+- “Creativity is the greatest rebellion in existence.” · Osho
+- “Falling in love you remain a child; rising in love you mature. By and by love becomes not a relationship, it becomes a state of your being. Not that you are in love - now you are love.” · Osho
+- “Life begins where fear ends.” · Osho
+- “The real question is not whether life exists after death. The real question is whether you are alive before death.” · Osho
+- “They say: Think twice before you jump. I say: Jump first and then think as much as you want!” · Osho
+- “To be creative means to be in love with life. You can be creative only if you love life enough that you want to enhance its beauty, you want to bring a little more music to it, a little more poetry to it, a little more dance to it.” · Osho
+- “Nothing is more powerful than habit.” · Ovid
+- “Laughter is the language of the soul.” · Pablo Neruda
+- “You can cut all the flowers but you cannot keep Spring from coming.” · Pablo Neruda
+- “Art is the lie that enables us to realize the truth.” · Pablo Picasso
+- “Learn the rules like a pro, so you can break them like an artist.” · Pablo Picasso
+- “I shut my eyes in order to see.” · Paul Gauguin
+- “When love is not madness it is not love.” · Pedro Calderon de la Barca
+- “Fear is a natural reaction to moving closer to the truth.” · Pema Chödrön
+- “Gloriousness and wretchedness need each other. One inspires us, the other softens us. They go together.” · Pema Chödrön
+- “If we learn to open our hearts, anyone, including the people who drive us crazy, can be our teacher.” · Pema Chödrön
+- “Life is like that. We don’t know anything. We call something bad; we call it good. But really we just don’t know.” · Pema Chödrön
+- “Meditation practice isn’t about trying to throw ourselves away and become something better. It’s about befriending who we are already.” · Pema Chödrön
+- “The healing comes from letting there be room for all of this to happen: room for grief, for relief, for misery, for joy.” · Pema Chödrön
+- “This very moment is the perfect teacher, and, lucky for us, it’s with us wherever we are.” · Pema Chödrön
+- “To be fully alive, fully human, and completely awake is to be continually thrown out of the nest.” · Pema Chödrön
+- “To live fully is to be always in no-man’s land, to experience each moment as completely new and fresh.” · Pema Chödrön
+- “We don’t set out to save the world; we set out to wonder how other people are doing and to reflect on how our actions affect other people’s hearts.” · Pema Chödrön
+- “We think that the point is to pass the test or to overcome the problem, but the truth is that things don’t really get solved. They come together and they fall apart.” · Pema Chödrön
+- “You are the sky. Everything else - it’s just the weather.” · Pema Chödrön
+- “All love is sweet, given or received…” · Percy Bysshe Shelley
+- “Fear not for the future, weep not for the past.” · Percy Bysshe Shelley
+- “If you want something new, you have to stop doing something old.” · Peter Drucker
+- “Nothing is less productive than to make more efficient what should not be done at all.” · Peter Drucker
+- “Life is a journey, and if you fall in love with the journey, you will be in love forever.” · Peter Hagerty
+- “If you want peace, stop fighting. If you want peace of mind, stop fighting with your thoughts.” · Peter McWilliams
+- “Don’t spend a dollar’s worth of time on a ten-cent decision.” · Peter Turla
+- “The things that make me different are the things that make me.” · Piglet
+- “Love is born into every human being; it calls back the halves of our original nature together.” · Plato
+- “Nothing taught by force stays in the soul.” · Plato
+- “The measure of a man is what he does with power.” · Plato
+- “Life is a journey to be experienced, not a problem to be solved.” · Pooh
+- “Awareness, not age, leads to wisdom.” · Publilius Syrus
+- “Poetry is language at its most distilled and most powerful.” · RIta Dove
+- “You can’t cross the sea merely by standing and staring at the water.” · Rabindranath Tagore
+- “If we were meant to stay in one place, we would have roots instead of feet.” · Rachel Wolchin
+- “Everything terrible is something that needs our love.” · Rainer Maria Rilke
+- “God speaks to each of us as he makes us, then walks with us silently out of the night.” · Rainer Maria Rilke
+- “Let life happen to you. Believe me: life is in the right, always.” · Rainer Maria Rilke
+- “Our heart always transcends us.” · Rainer Maria Rilke
+- “Think... of the world you carry within you.” · Rainer Maria Rilke
+- “This is the miracle that happens every time to those who really love: the more they give, the more they possess.” · Rainer Maria Rilke
+- “What you do today can improve all your tomorrows.” · Ralph Marston
+- “A friend is a person with whom I may be sincere.” · Ralph Waldo Emerson
+- “A hero is no braver than an ordinary man, but he is brave five minutes longer.” · Ralph Waldo Emerson
+- “Cultivate the habit of being grateful for every good thing that comes to you, and to give thanks continuously. And because all things have contributed to your advancement, you should include all things in your gratitude.” · Ralph Waldo Emerson
+- “Every artist was first an amateur.” · Ralph Waldo Emerson
+- “Love of beauty is taste. The creation of beauty is art.” · Ralph Waldo Emerson
+- “The mind, once stretched by a new idea, never returns to its original dimensions.” · Ralph Waldo Emerson
+- “Without ambition one starts nothing. Without work one finishes nothing. The prize will not be sent to you. You have to win it.” · Ralph Waldo Emerson
+- “When the flower blooms, the bees come uninvited.” · Ramakrishna
+- “Complaining does not work as a strategy. We all have finite time and energy. Any time we spend whining is unlikely to help us achieve our goals. And it won’t make us happier.” · Randy Pausch
+- “We are an impossibility in an impossible universe.” · Ray Bradbury
+- “True love stories never have endings.” · Richard Bach
+- “Fall in love with some activity, and do it! Nobody ever figures out what life is all about, and it doesn’t matter.” · Richard Feynman
+- “Nobody ever figures out what life is all about, and it doesn’t matter. Explore the world. Nearly everything is really interesting if you go into it deeply enough.” · Richard Feynman
+- “The first principle is that you must not fool yourself - and you are the easiest person to fool.” · Richard Feynman
+- “The highest forms of understanding we can achieve are laughter and human compassion.” · Richard Feynman
+- “Work as hard and as much as you want to on the things you like to do the best. Don’t think about what you want to be, but what you want to do.” · Richard Feynman
+- “You have no responsibility to live up to what other people think you ought to accomplish.” · Richard Feynman
+- “Those who don't believe in magic will never find it.” · Roald Dahl
+- “Make visible what, without you, might never have been seen.” · Robert Bresson
+- “In three words I can sum up everything I've learned about life: it goes on.” · Robert Frost
+- “Learning to ignore things is one of the great paths to inner peace.” · Robert J. Sawyer
+- “The truth knocks on the door and you say, "Go away, I’m looking for the truth,’ and so it goes away. Puzzling".” · Robert M. Pirsig
+- “A healthy outside starts from the inside.” · Robert Urich
+- “Small daily improvements over time lead to stunning results.” · Robin Sharma
+- “Stop being afraid of getting older. With age comes wisdom and confidence.” · Robin Williams
+- “You're only given a little spark of madness. You mustn’t lose it.” · Robin Williams
+- “You're only given a spark of madness. You musn’t lose it.” · Robin Williams
+- “Going in one more round when you don’t think you can. That’s what makes all the difference in your life.” · Rocky Balboa
+- “We will fail when we fail to try.” · Rosa Parks
+- “I will have to remember "I am here today to cross the swamp, not to fight all the alligators".” · Rosamund Stone Zander
+- “Let the improvement of yourself keep you so busy that you have no time to criticize others.” · Roy T. Bennett
+- “Stop giving other people the power to control your happiness, your mind, and your life. If you don’t take control of yourself and your own life, someone else is bound to try.” · Roy T. Bennett
+- “Don't be satisfied with stories, how things have gone with others. Unfold your own myth.” · Rumi
+- “What’s the greatest lesson a woman should learn? That since day one, she’s already had everything she needs within herself. It’s the world that convinced her she did not.” · Rupi Kaur
+- “The joy we feel has little to do with the circumstances of our lives and everything to do with the focus of our lives.” · Russel M. Nelson
+- “Real change, enduring change, happens one step at a time.” · Ruth Bader Ginsburg
+- “Focus on the moment, not the monsters that may or may not be up ahead.” · Ryan Holiday
+- “Most successful people are people you’ve never heard of. They want it that way. It keeps them sober. It helps them do their jobs.” · Ryan Holiday
+- “The obstacle in the path becomes the path. Never forget, within every obstacle is an opportunity to improve our condition.” · Ryan Holiday
+- “Think progress, not perfection.” · Ryan Holiday
+- “Those who have subdued their ego understand that it doesn’t degrade you when others treat you poorly; it degrades them.” · Ryan Holiday
+- “We don’t get to choose what happens to us, but we can always choose how we feel about it. And why on earth would you choose to feel anything but good?” · Ryan Holiday
+- “We forget: In life, it doesn’t matter what happens to you or where you came from. It matters what you do with what happens and what you’ve been given.” · Ryan Holiday
+- “Where the head goes, the body follows. Perception precedes action. Right action follows the right perspective” · Ryan Holiday
+- “Wherever we are, whatever we’re doing and wherever we are going, we owe it to ourselves, to our art, to the world to do it well.” · Ryan Holiday
+- “The sun is a daily reminder that we too can rise again from the darkness, that we too can shine our own light.” · S. Ajna
+- “I like to say it’s an attitude of not just thinking outside the box, but not even seeing the box.” · Safra A. Catz
+- “I was smiling yesterday, I am smiling today and I will smile tomorrow. Simply because life is too short to cry for anything.” · Santosh Kalwar
+- “Don’t be intimidated by what you don’t know. That can be your greatest strength and ensure that you do things differently from everyone else.” · Sara Blakely
+- “Slow down, you’re doing fine.” · Shaquille O'Neal
+- “Seeking is endless. It never comes to a state of rest; it never ceases.” · Sharon Salzberg
+- “If they don’t give you a seat at the table, bring a folding chair.” · Shirley Chisholm
+- “We must reject not only the stereotypes that others hold of us, but also the stereotypes that we hold of ourselves.” · Shirley Chisholm
+- “Absolutely unmixed attention is prayer.” · Simone Weil
+- “Attention is the rarest and purest form of generosity.” · Simone Weil
+- “Compassion directed toward oneself is true humility.” · Simone Weil
+- “I can, therefore I am” · Simone Weil
+- “If we go down into ourselves, we find that we possess exactly what we desire.” · Simone Weil
+- “Love is not consolation. It is light.” · Simone Weil
+- “Love of God is pure when joy and suffering inspire an equal degree of gratitude.” · Simone Weil
+- “We must not wish for the disappearance of our troubles but for the grace to transform them.” · Simone Weil
+- “Each of us is responsible for everything and to every human being.” · Simone de Beauvoir
+- “I wish that every human life might be pure transparent freedom.” · Simone de Beauvoir
+- “One is not born, but rather becomes, a woman.” · Simone de Beauvoir
+- “One's life has value so long as one attributes value to the life of others, by means of love, friendship, and compassion.” · Simone de Beauvoir
+- “Self-knowledge is no guarantee of happiness, but it is on the side of happiness and can supply the courage to fight for it.” · Simone de Beauvoir
+- “That's what I consider true generosity: You give your all, and yet you always feel as if it costs you nothing.” · Simone de Beauvoir
+- “Beware the barrenness of a busy life.” · Socrates
+- “The secret of happiness, you see, is not found in seeking more, but in developing the capacity to enjoy less.” · Socrates
+- “Surrender to what is. Let go of what was. Have faith in what will be.” · Sonia Ricotti
+- “All men make mistakes, but a good man yields when he knows his course is wrong, and repairs the evil. The only crime is pride.” · Sophocles
+- “Anxiety is the dizziness of freedom.” · Soren Kierkegaard
+- “Life can only be understood backwards; but it must be lived forwards.” · Soren Kierkegaard
+- “Good, better, best. Never let it rest. ‘Til your good is better and your better is best.” · St. Jerome
+- “May the Force be with you.” · Star Wars
+- “If I really want to improve my situation, I can work on the one thing over which I have control - myself.” · Stephen Covey
+- “However difficult life may seem, there is always something you can do and succeed at.” · Stephen Hawking
+- “Remember to look up at the stars and not down at your feet.” · Stephen Hawking
+- “Work gives you meaning and purpose and life is empty without it.” · Stephen Hawking
+- “Amateurs sit and wait for inspiration, the rest of us just get up and go to work.” · Stephen King
+- “Go then, there are other worlds than these.” · Stephen King
+- “Nobody likes a clown at midnight.” · Stephen King
+- “Remember, Hope is a good thing, maybe the best of things, and no good thing ever dies.” · Stephen King
+- “The scariest moment is always just before you start.” · Stephen King
+- “Don’t let the noise of others’ opinions drown out your own inner voice.” · Steve Jobs
+- “Have the courage to follow your heart and intuition. They somehow already know what you truly want to become.” · Steve Jobs
+- “Let’s go invent tomorrow rather than worrying about what happened yesterday.” · Steve Jobs
+- “My favorite things in life don’t cost any money. It’s really clear that the most precious resource we all have is time.” · Steve Jobs
+- “Remembering that I’ll be dead soon is the most important tool I’ve ever encountered to help me make the big choices in life.” · Steve Jobs
+- “You can’t connect the dots looking forward; you can only connect them looking backward. So you have to trust that the dots will somehow connect in your future.” · Steve Jobs
+- “Your time is limited, so don’t waste it living someone else’s life.” · Steve Jobs
+- “Don’t die without embracing the daring adventure your life was meant to be.” · Steve Pavlina
+- “You must go on adventures to find out where you truly belong” · Sue Fitzmaurice
+- “The worst enemy to creativity is self-doubt.” · Sylvia Plath
+- “Every moment is a fresh beginning.” · T.S. Eliot
+- “Love is most nearly itself\nWhen here and now cease to matter.” · T.S. Eliot
+- “Only those who will risk going too far can possibly find out how far one can go.” · T.S. Eliot
+- “To do the useful thing, to say the courageous thing, to contemplate the beautiful thing: that is enough for one man’s life.” · T.S. Eliot
+- “Give a man a fire and he's warm for a day, but set fire to him and he's warm for the rest of his life.” · Terry Pratchett
+- “Stories of imagination tend to upset those without one.” · Terry Pratchett
+- “Keep your eyes on the stars, and your feet on the ground.” · Theodore Roosevelt
+- “Anxiety, the illness of our time, comes primarily from our inability to dwell in the present moment.” · Thich Nhat Hanh
+- “Hope is important because it can make the present moment less difficult to bear. If we believe that tomorrow will be better, we can bear a hardship today.” · Thich Nhat Hanh
+- “I promise myself that I will enjoy every minute of the day that is given me to live.” · Thich Nhat Hanh
+- “In true love, you attain freedom.” · Thich Nhat Hanh
+- “Letting go gives us freedom, and freedom is the only condition for happiness. If, in our heart, we still cling to anything - anger, anxiety, or possessions - we cannot be free.” · Thich Nhat Hanh
+- “Life is a miracle, and being aware of simply this can already make us very happy.” · Thich Nhat Hanh
+- “Life is available only in the present moment.” · Thich Nhat Hanh
+- “People have a hard time letting go of their suffering. Out of a fear of the unknown, they prefer suffering that is familiar.” · Thich Nhat Hanh
+- “Sometimes your joy is the source of your smile, but sometimes your smile can be the source of your joy.” · Thich Nhat Hanh
+- “We are trying to prove ourselves wrong as quickly as possible, because only in that way can we find progress.” · Thich Nhat Hanh
+- “We have more possibilities available in each moment than we realize.” · Thich Nhat Hanh
+- “When we are mindful, deeply in touch with the present moment, our understanding of what is going on deepens, and we begin to be filled with acceptance, joy, peace and love.” · Thich Nhat Hanh
+- “Our greatest weakness lies in giving up. The most certain way to succeed is always to try just one more time.” · Thomas A. Edison
+- “To invent, you need a good imagination and a pile of junk.” · Thomas A. Edison
+- “All things are difficult before they are easy.” · Thomas Fuller
+- “The present moment is filled with joy and happiness. If you are attentive, you will see it.” · Thích Nhất Hạnh
+- “Sometimes, you’ve got to let everything go - purge yourself. If you are unhappy with anything…whatever is bringing you down, get rid of it. Because you’ll find that when you’re free, your true creativity, your true self, comes out.” · Tina Turner
+- “If you carry your childhood with you, you never become older.” · Tom Stoppard
+- “Practice wanting what you already have.” · Unknown
+- “You don’t need more to be happy, you need less distraction from what truly matters.” · Unknown Author
+- “But it is one thing to read about dragons and another to meet them.” · Ursula K. Le Guin
+- “Love doesn't just sit there, like a stone, it has to be made, like bread; remade all the time, made new.” · Ursula K. Le Guin
+- “People who deny the existence of dragons are often eaten by dragons. From within.” · Ursula K. Le Guin
+- “Truth is a matter of the imagination.” · Ursula K. Le Guin
+- “Life is never made unbearable by circumstances, but only by lack of meaning and purpose.” · Victor Frankl
+- “Those who do not weep, do not see.” · Victor Hugo
+- “The only place where success comes before work is in the dictionary.” · Vidal Sassoon
+- “Our greatest freedom is the freedom to choose our attitude.” · Viktor E. Frankl
+- “When we are no longer able to change a situation, we are challenged to change ourselves.” · Viktor E. Frankl
+- “When a person can’t find a deep sense of meaning they distract themselves with pleasure” · Viktor Frankl
+- “It's as much fun to scare as to be scared.” · Vincent Price
+- “It is good to love many things, for therein lies the true strength, and whosoever loves much performs much, and can accomplish much, and what is done in love is well done.” · Vincent Van Gogh
+- “Lock up your libraries if you like; but there is no gate, no lock, no bolt that you can set upon the freedom of my mind.” · Virginia Woolf
+- “There is the strange power we have of changing facts by the force of the imagination.” · Virginia Woolf
+- “Everything you say should be true but not everything true should be said.” · Voltaire
+- “Faith consists in believing what reason cannot.” · Voltaire
+- “Let us read, and let us dance; these two amusements will never do any harm to the world.” · Voltaire
+- “Life is a shipwreck, but we must not forget to sing in the lifeboats.” · Voltaire
+- “Love is a canvas furnished by nature and embroidered by imagination.” · Voltaire
+- “No opinion is worth burning your neighbor for.” · Voltaire
+- “The most important decision you make is to be in a good mood.” · Voltaire
+- “Think for yourself and let others enjoy the privilege of doing so too.” · Voltaire
+- “We keep moving forward, opening new doors, and doing new things, because we’re curious and curiosity keeps leading us down new paths.” · Walt Disney
+- “Why worry? If you’ve done the very best you can, then worrying won’t make it any better.” · Walt Disney
+- “A great pleasure in life is doing what people say you cannot do.” · Walter Bagehot
+- “Perseverance is not a long race; it is many short races one after the other.” · Walter Elliot
+- “As soon as we wish to be happier, we are no longer happy.” · Walter Landor
+- “The thankful receiver bears a plentiful harvest.” · William Blake
+- “What is now proved was once only imagined.” · William Blake
+- “All empty souls tend toward extreme opinions.” · William Butler Yeats
+- “Action may not always bring happiness, but there is no happiness without action.” · William James
+- “The greatest weapon against stress is our ability to choose one thought over another.” · William James
+- “A good laugh is sunshine in the house.” · William Makepeace Thackeray
+- “Time is what we want most, but what we use worst.” · William Penn
+- “For death remembered should be like a mirror, Who tells us life’s but breath, to trust it error.” · William Shakespeare
+- “It is vain to do with more what can be done with less.” · William of Occam
+- “A man is about as big as the things that make him angry.” · Winston Churchill
+- “Character may be manifested in the great moments, but it is made in the small ones.” · Winston Churchill
+- “If you’re going through hell, keep going.” · Winston Churchill
+- “To improve is to change, so to be perfect is to have changed often.” · Winston Churchill
+- “We make a living by what we get, but we make a life by what we give.” · Winston Churchill
+- “You have enemies? Good. That means you’ve stood up for something, sometime in your life.” · Winston Churchill
+- “You will never get to the end of the journey if you stop to shy a stone at every dog that barks.” · Winston Churchill
+- “Success is not final, failure is not fatal: it is the courage to continue that counts.” · Winston S. Churchill
+- “Do or do not. There is no try.” · Yoda
+- “Wars not make one great” · Yoda
+- “Character, like a photograph, develops in darkness.” · Yousuf Karsh
+- “The word adventure has gotten overused. For me, when everything goes wrong - that’s when adventure starts.” · Yvon Chouinard
+- “Be who you are and say what you feel, because those who mind don’t matter and those who matter don’t mind.” · Unknown
+- “The soul becomes dyed with the color of its thoughts.” · Unknown

@@ -1783,7 +1783,20 @@ JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)
 # 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
 # live day-goal / weekly-goals text baked into the prompt.
 JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5,
-                    "monthly": 5, "quarterly": 5}   # 2 fixed + 5 everywhere
+                    "monthly": 5, "quarterly": 5}   # the single-pool tiers (and legacy dicts)
+
+# The daily random block (Vex 2026-09-24): SIX prompts, two per category.
+# The morning draws its three categories every day; the evening draws three
+# of its six, the window sliding one step a day, so each category lands on
+# three evenings in six. Friday evening is chain night: the block is ONE
+# chain asked in order (Sunday is the weekly review, so not Sunday). Pools
+# cycle per category without repeats; POOL_EPOCH is day 0 of the rotation.
+MORNING_CATEGORIES = ("prepare", "people", "perspective")
+EVENING_CATEGORIES = ("review", "control", "virtue", "desire", "connection", "open")
+JOURNAL_PER_CATEGORY = 2
+EVENING_CATEGORIES_PER_DAY = 3
+CHAIN_WEEKDAY = 4                      # Friday
+POOL_EPOCH = date(2026, 9, 25)
 
 
 def _clip(s, n=140):
@@ -1814,6 +1827,13 @@ def journal_fixed(slot, ctx=None):
         goal = _clip(ctx.get("goal"), 100)
         out.append(("gcheck", f"☀️ Does your goal for today still align with: {goal}?"
                               if goal else "☀️ What is today's goal?"))
+        # 🔮 the forecast (Vex 2026-09-24): the evening quotes this answer
+        # back in its own check. Ahead of "What is on your mind?", which is
+        # the LAST set prompt on both journals: the border before the random
+        # block.
+        out.append(("forecast", "🔮 What is the intention for today? How will this "
+                                "day go, what will you achieve? Forecast the best "
+                                "scenario."))
         out.append(("free", "What is on your mind?"))
         return out
     if slot == "evening":
@@ -1828,7 +1848,7 @@ def journal_fixed(slot, ctx=None):
         # Bridges board - so it should not be the question you reach tired.
         # Tomorrow's goal right after it (Vex 2026-09-15): picked through the
         # goal picker, it creates tomorrow's note and fills its ☀️ Daily.
-        return [
+        out = [
             ("bridge", "🌉 Daily bridge - what should tomorrow-you know? "
                        "(saves to the Bridges board + tomorrow's note)"),
             # ✨ right after the bridge (Vex 2026-09-17: "logged on shutdown …
@@ -1840,11 +1860,32 @@ def journal_fixed(slot, ctx=None):
                            "Think of one thing that stands out."),
             ("tgoal", "🎯 What is the goal for tomorrow? The one thing that, "
                       "if done, makes the day a success?"),
-            ("free", "What is on your mind?"),
             ("goal", goal_q),
+        ]
+        # 🔑 today's key result and 🥅 the month's objectives (Vex 2026-09-24:
+        # "Currently we only ask about goal"), each only when the note's
+        # 🥅 OKRs section plans one (ruling: skip, never ask about nothing).
+        # Then 🔮 the morning forecast quoted back, always. ctx text comes
+        # off the note at run time (_refresh_fixed_q), never the 04:30 mint.
+        kr = (ctx.get("kr") or "").strip()
+        if kr:
+            word = "key results" if " · " in kr else "key result"
+            out.append(("kr", f"🔑 Did you achieve or make progress on today's {word}, {kr}?"))
+        objs = (ctx.get("objectives") or "").strip()
+        if objs:
+            word = "objectives" if " · " in objs else "objective"
+            out.append(("objectives", f"🥅 How are you progressing on this month's {word}, {objs}?"))
+        fc = _clip(ctx.get("forecast"), 140)
+        out.append(("fcheck", f"🔮 How did the day go compared to your morning forecast: {fc}?"
+                              if fc else
+                              "🔮 How did the day go compared to what you expected this morning?"))
+        out += [
             ("money", "How much money did you earn today?"),
             ("rating", "Rate the day, 1-5 stars"),
+            # the border: last set prompt, the random block follows
+            ("free", "What is on your mind?"),
         ]
+        return out
     if slot in ("monthly", "quarterly"):
         word = "month" if slot == "monthly" else "quarter"
         # the weekly's two, one tier up. No picker handoff: next month's goal
@@ -1889,12 +1930,19 @@ JOURNAL_KEY_RULES = (
     # that never reaches the note's summary
     ("mood", re.compile(r"^Mood 1[-\u2010-\u2015]5\b")),
     ("ybridge", re.compile(r"^🌉 Yesterday's bridge\b")),
-    ("gcheck", re.compile(r"^☀️ (?:Does your goal for today still align|What is today's goal\?)")),
+    # the sun with or without VARIATION SELECTOR-16 (a phone edit drops it)
+    ("gcheck", re.compile(r"^☀️? (?:Does your goal for today still align|What is today's goal\?)")),
     ("bridge", re.compile(r"^🌉 Daily bridge\b")),
     ("tgoal", re.compile(r"^🎯 What is the goal for tomorrow\?")),
     ("goal", re.compile(r"^Did you achieve your daily goal\b")),
     ("money", re.compile(r"^How much money did you earn today\?")),
     ("rating", re.compile(r"^Rate the day\b")),
+    # the 2026-09-24 set: the morning forecast and its evening check share
+    # the 🔮 glyph but never a stem; the OKR pair is keyed on its own verbs
+    ("forecast", re.compile(r"^🔮 What is the intention for today\?")),
+    ("fcheck", re.compile(r"^🔮 How did the day go\b")),
+    ("kr", re.compile(r"^🔑 Did you achieve or make progress on\b")),
+    ("objectives", re.compile(r"^🥅 How are you progressing on\b")),
     # the day's and the week's highlights are DIFFERENT answers in different
     # notes, so their rules must not be able to match each other's question
     ("dhighlight", re.compile(r"^✨ What was the highlight of the day\?")),
@@ -2009,16 +2057,225 @@ def renumber_journal(body_lines):
     return out
 
 
+def is_chain_night(which, d):
+    """Friday evening: the random block is one chain, asked in order."""
+    return which == "evening" and d.weekday() == CHAIN_WEEKDAY
+
+
+def _chain_nights_before(d):
+    """Chain nights in [POOL_EPOCH, d)."""
+    if d <= POOL_EPOCH:
+        return 0
+    days = (d - POOL_EPOCH).days
+    return sum(1 for i in range(days)
+               if (POOL_EPOCH + timedelta(days=i)).weekday() == CHAIN_WEEKDAY)
+
+
+def _evening_index(d):
+    """Number of drawing (non-chain) evenings in [POOL_EPOCH, d): the
+    category window's position. 0 for any day before the epoch, so an old
+    day seeded later gets the first window."""
+    if d <= POOL_EPOCH:
+        return 0
+    return (d - POOL_EPOCH).days - _chain_nights_before(d)
+
+
+def journal_categories(which, d):
+    """The categories a date's random block draws from, in order. Morning:
+    all three, every day. Evening: three of the six, the window sliding one
+    step per drawing evening; a chain night draws none (and does not move the
+    window)."""
+    if which == "morning":
+        return list(MORNING_CATEGORIES)
+    if which != "evening" or is_chain_night(which, d):
+        return []
+    n, k = _evening_index(d), len(EVENING_CATEGORIES)
+    return [EVENING_CATEGORIES[(n + i) % k] for i in range(EVENING_CATEGORIES_PER_DAY)]
+
+
+def _appearances(which, cat, d):
+    """How many draws `cat` had before day d: its position in its own cycle."""
+    if which == "morning":
+        return max(0, (d - POOL_EPOCH).days)
+    n, k = _evening_index(d), len(EVENING_CATEGORIES)
+    j = EVENING_CATEGORIES.index(cat)
+    hits = {(j - i) % k for i in range(EVENING_CATEGORIES_PER_DAY)}
+    full, rem = divmod(n, k)
+    return full * EVENING_CATEGORIES_PER_DAY + sum(1 for r in range(rem) if r in hits)
+
+
+def _cycle_order(prompts, key, cyc):
+    """The shuffled order of cycle `cyc` of a category's list. From the
+    second cycle on, the previous cycle's last JOURNAL_PER_CATEGORY prompts
+    are kept out of the first JOURNAL_PER_CATEGORY slots (moved to the end,
+    in order), so a draw that straddles a cycle boundary never asks one
+    prompt twice and the next draw never repeats the previous one (review
+    2026-09-24: an odd-sized category hit both). Lists shorter than two
+    draws are left alone. random.Random(key:cycle) - NEVER hash(), which is
+    salted per process."""
+    n, per = len(prompts), JOURNAL_PER_CATEGORY
+    # the draw before the boundary, the straddling one and the one after it
+    # together reach 2*per-1 slots either side, so the old cycle's last
+    # 2*per-1 prompts stay out of the new cycle's first 2*per-1 slots (as
+    # far as n allows), the newest of them moved furthest back
+    span = 2 * per - 1
+    guard = min(span, n - span)
+    order, tail = [], ()
+    for c in range(cyc + 1):
+        order = random.Random(f"{key}:{c}").sample(list(prompts), n)
+        if tail and guard > 0:
+            for _ in range(span):
+                bad = [p for p in order[:guard] if p in tail]
+                if not bad:
+                    break
+                bad.sort(key=tail.index)
+                order = [p for p in order if p not in bad] + bad
+        tail = tuple(order[-span:])
+    return order
+
+
+def _draw(prompts, key, position, k):
+    """k prompts from `position` of a per-category cycle (_cycle_order):
+    nothing repeats until the whole list has been asked."""
+    n = len(prompts)
+    out = []
+    for i in range(k if n else 0):
+        cyc, off = divmod(position + i, n)
+        out.append(_cycle_order(prompts, key, cyc)[off])
+    return out
+
+
 def select_prompts(pool, d, which, k=None):
-    """k seeded-random picks from the pool's random section. Deterministic
-    across processes: random.Random(f'{date}:{slot}') - NEVER hash(), which
-    is salted per process. Fixed prompts live in journal_fixed, not the
-    pool."""
+    """The date's random block, deterministic across processes.
+
+    A daily pool with categories: two prompts per drawn category
+    (journal_categories), each category cycling through its own list; a
+    chain night returns one chain's steps in order (chains rotate by chain
+    night, the file's order). Everything else - the weekly, monthly and
+    quarterly pools, and a plain {'random': [...]} dict - keeps the old k
+    seeded-random picks from 'random'. Fixed prompts live in journal_fixed,
+    not the pool."""
+    if k == 0:
+        return []
+    cats = pool.get("categories") or {}
+    want = MORNING_CATEGORIES if which == "morning" else EVENING_CATEGORIES
+    # a day before the epoch (a skipped day re-seeded later) keeps the OLD
+    # draw, the date's own picks from the whole list: the cycles only start
+    # at POOL_EPOCH, and every earlier day would otherwise share day 0's block
+    if which in ("morning", "evening") and any(c in cats for c in want) and d >= POOL_EPOCH:
+        if is_chain_night(which, d):
+            chains = [c for c in (pool.get("chains") or []) if c.get("category") in want and c.get("prompts")]
+            if chains:
+                return list(chains[_chain_nights_before(d) % len(chains)]["prompts"])
+            # no chain to ask: an old-style draw of the block's size, which
+            # cannot collide with Saturday's window (Fridays do not move it)
+            rnd_pool = list(pool.get("random", []))
+            kk = min(JOURNAL_PER_CATEGORY * EVENING_CATEGORIES_PER_DAY, len(rnd_pool))
+            return random.Random(f"{d.isoformat()}:{which}").sample(rnd_pool, kk) if kk else []
+        # k= is the single-pool tiers' count; a category pool always draws
+        # JOURNAL_PER_CATEGORY per category (the cycle stride)
+        out = []
+        for c in journal_categories(which, d):
+            lst = list(cats.get(c) or [])
+            out += _draw(lst, f"{which}:{c}", _appearances(which, c, d) * JOURNAL_PER_CATEGORY,
+                         min(JOURNAL_PER_CATEGORY, len(lst)))
+        return out
     rnd_pool = list(pool.get("random", []))
     k = JOURNAL_RANDOM_K.get(which, 3) if k is None else k
     k = min(k, len(rnd_pool))
-    picks = random.Random(f"{d.isoformat()}:{which}").sample(rnd_pool, k) if k else []
-    return picks
+    return random.Random(f"{d.isoformat()}:{which}").sample(rnd_pool, k) if k else []
+
+
+_PERSON_RE = re.compile(r"\[person(?:'s)?\]")
+
+
+def pick_person(candidates, d):
+    """A name for the day's [person] prompt from [(name, weight)] - weight
+    is how often (family 3, friends 2, work and orbit 1) - seeded by the
+    date, and never the name the day before got. Walked day by day from
+    POOL_EPOCH so every day agrees on every other day's pick."""
+    # sorted and merged by name: the pick must not depend on the cache's row
+    # order (review 2026-09-24). A change of MEMBERSHIP still re-walks the
+    # sequence; that looser rule is accepted.
+    merged = {}
+    for n, w in (candidates or []):
+        if n and w > 0:
+            merged[n] = max(w, merged.get(n, 0))
+    cands = sorted(merged.items())
+    if not cands:
+        return ""
+    if len(cands) == 1:
+        return cands[0][0]
+
+    def one(day, avoid=None):
+        pool = [(n, w) for n, w in cands if n != avoid] or cands
+        return random.Random(f"{day.isoformat()}:person").choices(
+            [n for n, _w in pool], [w for _n, w in pool])[0]
+
+    if d <= POOL_EPOCH:
+        return one(d)
+    prev, day = one(POOL_EPOCH), POOL_EPOCH
+    while day < d:
+        day += timedelta(days=1)
+        prev = one(day, avoid=prev)
+    return prev
+
+
+def fill_person(text, name):
+    """[person] → the name, [person's] → its possessive; no name = "someone
+    close to you" / "their". "this [person's] character" reads "Ana's
+    character"."""
+    if "[person" not in (text or ""):
+        return text
+    who = name or "someone close to me"          # first person, like the prompt
+    whos = f"{name}'s" if name else "their"
+    out = _PERSON_RE.sub(lambda m: whos if m.group(0) == "[person's]" else who, text)
+    return out.replace(f"this {whos}", whos)
+
+
+_MDLINK_RE = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_LATE_CHIP_RE = re.compile(r"\s*🔴\s*\d+d\b")
+_PLAN_GLYPHS = {"🔑", "✅", "🥅", "🏔"}          # okr_notes' item glyphs, VS16 dropped
+# fixed questions that only exist while the note plans something: dropped
+# again while unanswered when the plan goes (periodic_engine._refresh_fixed_q)
+CONDITIONAL_KEYS = ("kr", "objectives")
+# fixed questions that QUOTE free text (a forecast, a KR title): the needle
+# readers and writers skip them, or "rate the day" inside a forecast would
+# catch the stars (review 2026-09-24)
+QUOTING_KEYS = ("fcheck", "kr", "objectives")
+
+
+def okr_journal_ctx(body_lines):
+    """(today's KR titles, this month's objectives with their d/n), each
+    " · "-joined, off a 🥅 OKRs section body (okr_notes.okr_section_lines
+    shape: a tier bullet, its plan indented under it). '' when the tier has
+    no plan. Done items keep their name (the question is about progress).
+    Lines are unescaped first: the app backslashes the link brackets."""
+    def kids(emoji):
+        base = emoji.replace("️", "")
+        out, on = [], False
+        for ln in body_lines or []:
+            s = unescape_md(ln.strip())
+            if not s.startswith("- "):
+                continue
+            indented = ln[:1] in ("\t", " ")
+            if not indented:
+                on = s[2:].replace("️", "").startswith(base)
+                continue
+            if on and not s[2:].startswith("+"):
+                out.append(s[2:])
+        return out
+
+    def name(item):
+        s = re.sub(r"\s+", " ", _LATE_CHIP_RE.sub("", _MDLINK_RE.sub(r"\1", item))).strip()
+        head, _, rest = s.partition(" ")
+        if head.replace("️", "") in _PLAN_GLYPHS:     # only a glyph is stripped
+            return rest.strip()
+        return s
+
+    krs = [name(x) for x in kids(TIER_EMOJI["daily"])]
+    objs = [name(x) for x in kids(TIER_EMOJI["monthly"])]
+    return " · ".join(x for x in krs if x), " · ".join(x for x in objs if x)
 
 
 def seed_journal_lines(prompts):

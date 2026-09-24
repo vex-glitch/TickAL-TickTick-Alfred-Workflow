@@ -1050,6 +1050,8 @@ def _answer_in(doc, sec_name, needle):
     if sec is None:
         return ""
     for _n, q, a, _i in pm.journal_pairs(sec.body):
+        if pm.journal_key(q) in pm.QUOTING_KEYS:      # quotes free text: never a needle hit
+            continue
         if a and needle.casefold() in (q or "").casefold():
             return a.strip()
     return ""
@@ -1173,6 +1175,33 @@ def _people_logged(day):
                 out.append((ts, name, mdtext.flatten_links(text)))
     out.sort(reverse=True)
     return [(n, tx) for _ts, n, tx in out]
+
+
+_PERSON_WEIGHT = {"👽family": 3, "👽friends": 2, "👽work": 1, "👽orbit": 1, "👽admin": 0}
+
+
+def _journal_person(day):
+    """A name off the 👽 People list for the journal's [person] prompts:
+    family weighted 3, friends 2, the rest 1, never the same name two days
+    running (pm.pick_person). '' when People is off or the cache is empty -
+    the prompt then reads "someone close to you"."""
+    try:
+        import people as _pe
+        if not areas.people_configured():
+            return ""
+        cands = []
+        for t in (cache_store.get("all_tasks") or []):
+            if (t.get("_projectId") or t.get("projectId")) != areas.PEOPLE_ID:
+                continue
+            title = t.get("title", "")
+            if not _pe.is_person(title) or _pe.is_archive(title):
+                continue
+            w = _PERSON_WEIGHT.get(_pe.circle_of(t.get("tags") or []), 1)
+            cands.append((_pe.person_name(title), w))
+        return pm.pick_person(cands, day)
+    except Exception as e:
+        _log(f"journal person: {e}")
+        return ""
 
 
 def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
@@ -1504,6 +1533,18 @@ def _refresh_fixed_q(sec, fixed):
         if raw != want:
             body[a_idx - 1] = want
             changed = True
+    # a CONDITIONAL question (today's KR, the month's objectives) whose plan
+    # is gone: dropped while UNANSWERED, so no run asks about a KR that is no
+    # longer today's (ruling 2026-09-24: skip, never ask about nothing).
+    # Answered ones are history and stay.
+    kill = set()
+    for _n, q, a, a_idx in pm.journal_pairs(body):
+        key = pm.journal_key(q)
+        if not a and key in pm.CONDITIONAL_KEYS and key not in by_key:
+            kill.update((a_idx - 1, a_idx))
+    if kill:
+        body = pm.renumber_journal([ln for i, ln in enumerate(body) if i not in kill])
+        changed = True
     if changed:
         sec.body = body
 
@@ -1542,8 +1583,11 @@ def _seed_slot(doc, sec_name, slot, d, ctx, insert=False):
         return
     fixed = pm.journal_fixed(slot, ctx)
     if not any(pm.JOURNAL_Q_RE.match(ln) for ln in sec.body):
-        prompts = ([q for _k, q in fixed]
-                   + pm.select_prompts(pj.load_pool(slot), d, slot))
+        rnd = pm.select_prompts(pj.load_pool(slot), d, slot)
+        if any("[person" in q for q in rnd):
+            who = _journal_person(d)
+            rnd = [pm.fill_person(q, who) for q in rnd]
+        prompts = [q for _k, q in fixed] + rnd
         sec.body = [ln for ln in sec.body if not pm.PENDING_RE.match(ln.strip())]
         ps.append_body(doc, sec_name, pm.seed_journal_lines(prompts))
     else:
@@ -3007,6 +3051,8 @@ def _journal_answer(slot, needle, text, day=None):
             return False
         body = list(sec.body)
         for n, q, a, idx in pm.journal_pairs(body):
+            if pm.journal_key(q) in pm.QUOTING_KEYS:  # a forecast naming "rate the day" is not the rating
+                continue
             if needle.casefold() not in (q or "").casefold():
                 continue
             m = pm.JOURNAL_A_RE.match(body[idx])
@@ -3528,6 +3574,14 @@ def journal_ctx(slot, doc):
     if slot in ("morning", "evening"):
         gsec = ps.find(doc, pm.SEC_DAY_GOAL)
         ctx["goal"] = pm.day_goal_title(gsec.body) if gsec else ""
+        if slot == "evening":
+            # 🔮 the morning's forecast, quoted back; 🔑 today's KR and 🥅 the
+            # month's objectives off the note's own 🥅 OKRs section (EXACT
+            # name, like _fill_okr: a deleted section is the kill switch)
+            ctx["forecast"] = pm.unescape_md(_answer_in(doc, pm.SEC_MORNING, "Forecast the best scenario"))
+            osec = ps.find(doc, pm.SEC_OKR)
+            if osec is not None and osec.name == pm.SEC_OKR:
+                ctx["kr"], ctx["objectives"] = pm.okr_journal_ctx(osec.body)
     elif slot == "weekly":
         ctx["goals"] = "; ".join(pm.goal_titles(_week_goals_of(doc)[0])[:5])
     elif slot in ("monthly", "quarterly"):
@@ -3563,8 +3617,9 @@ def set_day_answer(slot, key, text, day=None):
     Vex 2026-09-17: "What if I skip shutdown routine for whatever reason?" -
     a day he skipped has no evening questions at all, so there is nothing to
     answer until they are planted. Planting them on an old day is safe and
-    gives that day what it would have had: select_prompts is seeded by
-    f"{date}:{slot}" so the random prompts are the date's own, and journal_ctx
+    gives that day what it would have had: select_prompts is deterministic per
+    date (the category cycles run from POOL_EPOCH; a day before it keeps the
+    old per-date sample) so the random prompts are the date's own, and journal_ctx
     reads the goal off THAT day's note, so nothing of today leaks backwards.
 
     The ✨ mirror rides the SAME write. Nothing in the UI can refresh an
