@@ -26,11 +26,15 @@ import routine_link as rl                       # noqa: E402
 LIST = "6a268ea18f081f1de80eaeb5"               # 🌅 Routines
 PARENT = {"weekly":    "6aa4eaad7c035e06a3686a2f",
           "monthly":   "6aa517f607a3ba2e0339b7bd",
-          "quarterly": "6aa520b28f084b1907ea08e2"}
+          "quarterly": "6aa520b28f084b1907ea08e2",
+          "startup":   "6a9faa51635ed1022425af34",   # the two daily routines,
+          "shutdown":  "6a268ea28f081f1de80eb10b"}   # reviewed 2026-09-25 late
 # the parents' own kanban column: new subtasks are born beside their parent
 COLUMN = {"weekly":    "6aa4f1337c035e06a3687ff7",
           "monthly":   "6aa517bd07a3ba2e0339b7b5",
-          "quarterly": "6aa51eac07a3ba2e0339cdce"}
+          "quarterly": "6aa51eac07a3ba2e0339cdce",
+          "startup":   "6a268ea18f081f1de80eadd5",
+          "shutdown":  "6a268ea18f081f1de80eadd4"}
 
 # last day of the month: probe-verified 2026-09-25 on a throwaway task
 # (30 Sep completed -> 31 Oct -> 30 Nov), so February gets its 28th or 29th
@@ -48,7 +52,8 @@ KM = {"inboxes":  "9476B133-2F11-4405-BADA-4E58E314C1D0",   # Process Inboxes
       "content":  "FE82B637-9B78-42F0-B217-FB2AC87E0909",   # Update Content PL
       "drawing":  "C7EE88C3-4027-4524-8878-B5A7D8FB44EA",   # Update Drawing PL
       "downloads": "DDC34222-4219-46A5-8F21-025AF1982292",  # made 2026-09-25
-      "obsidian": "C53EBB10-1D6B-4520-A8BA-0EC6BEC9897D"}   # made 2026-09-25
+      "obsidian": "C53EBB10-1D6B-4520-A8BA-0EC6BEC9897D",   # made 2026-09-25
+      "photos":   "1CD816FB-D18E-405F-B83A-0FA4BBFFB8BC"}   # S - App Invokes-, was linked by name
 
 FILTER = {"status":   "69fed6b260ac110a6914f83f",           # 🚦Status
           "projects": "69fedd25018d510d8510c4c2",           # 💼Projects
@@ -251,7 +256,67 @@ def quarterly():
     ]
 
 
-TREES = {"weekly": weekly, "monthly": monthly, "quarterly": quarterly}
+def startup():
+    """Vex 2026-09-25 (🟢 on the review): the YNAB link by UID (two macros
+    are called YNAB), "alligns" spelled right. Everything else as it was."""
+    tid, pid = PARENT["startup"], LIST
+    return [
+        N(A("Startup • Start", "routine", "startup")),
+        N(A("Calendar", "view", "calendar"),
+          N("Check todays schedule"),
+          N("Check next two days tasks"),
+          N("Adjust if necessary")),
+        N(A("Daily Note", "notesticky", "daily"),
+          N("Check yesterdays completed tasks"),
+          N(A("Make sure your daily plan aligns with your goals", "view", "okrdaily")),
+          N(A("Journal", "journal", "morning"))),
+        N(L("YNAB", km("ynab")),
+          N("Quick glance to remember where you are at")),
+        N(A("Finish Startup", "done", tid, pid)),
+    ]
+
+
+def shutdown():
+    """Vex 2026-09-25 (🟢): "Set Tomorrow's MIT" goes (the evening journal's
+    🎯 question hands off to the goal picker); the Journal moves to the end
+    of the TickTick block, after Plan tomorrow, so the goal is picked after
+    tomorrow's calendar and the status filter were looked at; the photos
+    macro by UID; the overdue and status-filter lines get their doors."""
+    tid, pid = PARENT["shutdown"], LIST
+    return [
+        N(A("Shutdown • Start", "routine", "shutdown")),
+        N(A("CRM", "view", "crmcal"),
+          N("Mark session as done",
+            N(f"Add {L('photos', km('photos'))} to Content PL")),
+          N("Add any new entries"),
+          N("Check next week worth of appointments")),
+        N(A("Money", "moneysticky"),
+          N("Money note",
+            N("Make sure all income is entered and all sums are updated")),
+          N("YNAB",
+            N("Add/approve/review transactions"),
+            N("Reconcile all accounts"))),
+        N("TickTick",
+          N(A("D Note", "notesticky", "daily")),
+          N(A("Wrap the day", "view", "calendar"),
+            N("Cross off completed tasks"),
+            N(L("Reschedule or delete overdue tasks", filter_url("overdue"))),
+            N(L("Check in habits", HABITS)),
+            N(L("Inbox 0", INBOX)),
+            N("Daily notes 0"),
+            N("Check completed tasks")),
+          N(A("Plan tomorrow", "view", "calendar"),
+            N("Open Calendar on Week View"),
+            N("Check tomorrows schedule and next 7 days schedule and adjust if necessary"),
+            N(L("Check status filter and schedule something if necessary", filter_url("status"))),
+            N(A("Check the OKR plan", "view", "okrweekly"))),
+          N(A("Journal", "journal", "evening"))),
+        N(A("Finish Shutdown", "done", tid, pid)),
+    ]
+
+
+TREES = {"weekly": weekly, "monthly": monthly, "quarterly": quarterly,
+         "startup": startup, "shutdown": shutdown}
 
 # a reworded line -> the live title(s) it replaces (flattened, casefolded)
 ALIASES = {
@@ -265,4 +330,6 @@ ALIASES = {
     # (their ids and completion history) as the single lines the page shows
     "ynab: review categories": ("ynab",),
     "numbers: compare with the same quarter last year": ("numbers",),
+    # the startup's typo, kept id
+    "make sure your daily plan aligns with your goals": ("make sure your daily plan alligns with your goals",),
 }

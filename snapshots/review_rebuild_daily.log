@@ -1,0 +1,115 @@
+== review rebuild 2026-09-25 23:52:24 tiers=['startup'] apply=False
+
+#### startup: {'keep': 12, 'retitle': 2, 'create': 0, 'delete': 0, 'reopen': 0}
+  - [Startup • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Astartup)
+  - [Calendar](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+    - Check todays schedule
+    - Check next two days tasks
+    - Adjust if necessary
+  - [Daily Note](alfred://runtrigger/com.vex.tickal/Link/?argument=notesticky%3Adaily)
+    - Check yesterdays completed tasks
+R   - [Make sure your daily plan aligns with your goals](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrdaily)
+    - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Amorning)
+R - [YNAB](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+    - Quick glance to remember where you are at
+  - [Finish Startup](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6a9faa51635ed1022425af34%3A6a268ea18f081f1de80eaeb5)
+
+(dry run; --apply to write)
+== review rebuild 2026-09-25 23:52:27 tiers=['shutdown'] apply=False
+
+#### shutdown: {'keep': 27, 'retitle': 3, 'create': 1, 'delete': 2, 'reopen': 0}
+  - [Shutdown • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Ashutdown)
+  - [CRM](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acrmcal)
+    - Mark session as done
+R     - Add [photos](kmtrigger://macro=1CD816FB-D18E-405F-B83A-0FA4BBFFB8BC) to Content PL
+    - Add any new entries
+    - Check next week worth of appointments
+  - [Money](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+    - Money note
+      - Make sure all income is entered and all sums are updated
+    - YNAB
+      - Add/approve/review transactions
+      - Reconcile all accounts
+  - TickTick
+    - [D Note](alfred://runtrigger/com.vex.tickal/Link/?argument=notesticky%3Adaily)
+    - [Wrap the day](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+      - Cross off completed tasks
+R     - [Reschedule or delete overdue tasks](ticktick:///webapp/#f/6a3418f9ba90110c0d077b12/tasks)
+      - [Check in habits](ticktick://habit)
+      - [Inbox 0](ticktick:///webapp/#p/inbox/tasks)
+      - Daily notes 0
+      - Check completed tasks
+D     - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aevening)
+    - [Plan tomorrow](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+      - Open Calendar on Week View
+      - Check tomorrows schedule and next 7 days schedule and adjust if necessary
+R     - [Check status filter and schedule something if necessary](ticktick:///webapp/#f/69fed6b260ac110a6914f83f/tasks)
+      - [Check the OKR plan](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrweekly)
+D     - Set Tomorrow's MIT
+C   - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aevening)
+  - [Finish Shutdown](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6a268ea28f081f1de80eb10b%3A6a268ea18f081f1de80eaeb5)
+
+(dry run; --apply to write)
+== review rebuild 2026-09-25 23:52:42 tiers=['startup'] apply=True
+
+#### startup: {'keep': 12, 'retitle': 2, 'create': 0, 'delete': 0, 'reopen': 0}
+  - [Startup • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Astartup)
+  - [Calendar](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+    - Check todays schedule
+    - Check next two days tasks
+    - Adjust if necessary
+  - [Daily Note](alfred://runtrigger/com.vex.tickal/Link/?argument=notesticky%3Adaily)
+    - Check yesterdays completed tasks
+R   - [Make sure your daily plan aligns with your goals](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrdaily)
+    - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Amorning)
+R - [YNAB](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+    - Quick glance to remember where you are at
+  - [Finish Startup](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6a9faa51635ed1022425af34%3A6a268ea18f081f1de80eaeb5)
+
+>> applying startup
+   batch: 12 bodies (order 12, retitle 2, reopen 0)
+   verify startup: CLEAN
+   cache all_tasks invalidated
+== done, clean
+== review rebuild 2026-09-25 23:52:48 tiers=['shutdown'] apply=True
+
+#### shutdown: {'keep': 27, 'retitle': 3, 'create': 1, 'delete': 2, 'reopen': 0}
+  - [Shutdown • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Ashutdown)
+  - [CRM](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acrmcal)
+    - Mark session as done
+R     - Add [photos](kmtrigger://macro=1CD816FB-D18E-405F-B83A-0FA4BBFFB8BC) to Content PL
+    - Add any new entries
+    - Check next week worth of appointments
+  - [Money](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+    - Money note
+      - Make sure all income is entered and all sums are updated
+    - YNAB
+      - Add/approve/review transactions
+      - Reconcile all accounts
+  - TickTick
+    - [D Note](alfred://runtrigger/com.vex.tickal/Link/?argument=notesticky%3Adaily)
+    - [Wrap the day](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+      - Cross off completed tasks
+R     - [Reschedule or delete overdue tasks](ticktick:///webapp/#f/6a3418f9ba90110c0d077b12/tasks)
+      - [Check in habits](ticktick://habit)
+      - [Inbox 0](ticktick:///webapp/#p/inbox/tasks)
+      - Daily notes 0
+      - Check completed tasks
+D     - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aevening)
+    - [Plan tomorrow](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+      - Open Calendar on Week View
+      - Check tomorrows schedule and next 7 days schedule and adjust if necessary
+R     - [Check status filter and schedule something if necessary](ticktick:///webapp/#f/69fed6b260ac110a6914f83f/tasks)
+      - [Check the OKR plan](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrweekly)
+D     - Set Tomorrow's MIT
+C   - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aevening)
+  - [Finish Shutdown](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6a268ea28f081f1de80eb10b%3A6a268ea18f081f1de80eaeb5)
+
+>> applying shutdown
+   deleted 6a9fc7694f07110224282543
+   deleted 6a270decf367d14e91e23cd0
+   created 6ab6ed348f08ffc311df3edf  [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aevening)
+   batch: 28 bodies (order 28, retitle 3, reopen 0)
+   verify shutdown: CLEAN
+   cache all_tasks invalidated
+== done, clean

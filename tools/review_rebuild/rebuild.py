@@ -341,12 +341,12 @@ def set_repeat(api, tier, log):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--tier", choices=["weekly", "monthly", "quarterly", "all"], default="all")
+    ap.add_argument("--tier", choices=list(spec.TREES) + ["all"], default="all")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--repeat", action="store_true", help="also set the last-day repeat rules")
     ap.add_argument("--log", default=None)
     a = ap.parse_args(argv)
-    tiers = ["weekly", "monthly", "quarterly"] if a.tier == "all" else [a.tier]
+    tiers = list(spec.TREES) if a.tier == "all" else [a.tier]
 
     import config as cfg
     import api_v2

@@ -35,6 +35,8 @@ _MD = re.compile(r"\[([^\]]*)\]\(([^)]*)\)")
 # ── 1. the spec ───────────────────────────────────────────────────────────────
 trees = {t: spec.TREES[t]() for t in ("weekly", "monthly", "quarterly")}
 titles = {t: [x for _, x in flat(n)] for t, n in trees.items()}
+daily = {t: spec.TREES[t]() for t in ("startup", "shutdown")}
+dtitles = {t: [x for _, x in flat(n)] for t, n in daily.items()}
 
 check("1.no-dashes", all("–" not in x and "—" not in x for xs in titles.values() for x in xs))
 links = [(t, m.group(2)) for t, xs in titles.items() for x in xs for m in _MD.finditer(x)]
@@ -50,6 +52,22 @@ for t, url in links:
 check("1.alfred-links-parse", not bad, str(bad))
 check("1.km-by-uid", all(re.fullmatch(r"kmtrigger://macro=[0-9A-F-]{36}", u)
                          for _, u in links if u.startswith("kmtrigger")))
+# the two daily routines (Vex 2026-09-25 late, 🟢): links by UID, MIT gone, journal last, doors
+dlinks = [(t, m.group(2)) for t, xs in dtitles.items() for x in xs for m in _MD.finditer(x)]
+check("5.daily-km-by-uid", all(re.fullmatch(r"kmtrigger://macro=[0-9A-F-]{36}", u)
+                               for _, u in dlinks if u.startswith("kmtrigger")) and len([u for _, u in dlinks if u.startswith("kmtrigger")]) == 2)
+check("5.daily-alfred-links-parse", all(rl.parse(__import__("urllib.parse").parse.unquote(u.split("argument=", 1)[1])) or True
+                                        for _, u in dlinks if u.startswith("alfred://")))
+check("5.no-set-mit", not any("mit" in rb.norm(x).split() for x in dtitles["shutdown"]))
+_tt = next(n for n in daily["shutdown"] if n[0] == "TickTick")
+check("5.journal-last-of-ticktick", "journal%3Aevening" in _tt[1][-1][0]
+      and not any("journal" in rb.norm(k[0]) for k in next(n for n in _tt[1] if rb.norm(n[0]) == "wrap the day")[1]))
+check("5.doors", any("#f/" + spec.FILTER["overdue"] in x and "overdue" in rb.norm(x) for x in dtitles["shutdown"])
+      and any("#f/" + spec.FILTER["status"] in x and "status filter" in rb.norm(x) for x in dtitles["shutdown"]))
+check("5.aligns", any(rb.norm(x) == "make sure your daily plan aligns with your goals" for x in dtitles["startup"])
+      and "make sure your daily plan aligns with your goals" in spec.ALIASES)
+check("5.counts", (len(dtitles["startup"]), len(dtitles["shutdown"])) == (12, 28), str((len(dtitles["startup"]), len(dtitles["shutdown"]))))
+check("5.parents-known", all(k in spec.PARENT and k in spec.COLUMN for k in ("startup", "shutdown")))
 check("1.tag-urls", spec.tag_url("🚦waiting").endswith("#t/8J-apndhaXRpbmc/tasks")
       and spec.tag_url("🔮someday").endswith("#t/8J-UrnNvbWVkYXk/tasks"))
 check("1.counts", (len(titles["weekly"]), len(titles["monthly"]), len(titles["quarterly"])) == (37, 64, 24),
