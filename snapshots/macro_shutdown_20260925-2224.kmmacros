@@ -1,0 +1,631 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Actions</key>
+	<array>
+		<dict>
+			<key>ActionName</key>
+			<string>Restart TickTick (quit)</string>
+			<key>ActionUID</key>
+			<integer>17159781</integer>
+			<key>DisplayKind</key>
+			<string>Briefly</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>bid="com.TickTick.task.mac"; name="TickTick"
+pgrep -x "$name" &gt;/dev/null || exit 0
+osascript -e 'on run argv' -e 'with timeout of 15 seconds' -e 'tell application id (item 1 of argv) to quit' -e 'end timeout' -e 'end run' "$bid" &gt;/dev/null 2&gt;&amp;1
+for i in $(seq 1 75); do pgrep -x "$name" &gt;/dev/null || exit 0; sleep 0.2; done
+echo "$name did not quit in 15 s"</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159782</integer>
+			<key>AllWindows</key>
+			<false/>
+			<key>AlreadyActivatedActionType</key>
+			<string>Normal</string>
+			<key>Application</key>
+			<dict>
+				<key>BundleIdentifier</key>
+				<string>com.TickTick.task.mac</string>
+				<key>Name</key>
+				<string>TickTick</string>
+				<key>NewFile</key>
+				<string>/Applications/TickTick.app</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>ActivateApplication</string>
+			<key>ReopenWindows</key>
+			<true/>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159783</integer>
+			<key>Conditions</key>
+			<dict>
+				<key>ConditionList</key>
+				<array>
+					<dict>
+						<key>Application</key>
+						<dict>
+							<key>BundleIdentifier</key>
+							<string>com.TickTick.task.mac</string>
+							<key>Name</key>
+							<string>TickTick</string>
+							<key>NewFile</key>
+							<string>/Applications/TickTick.app</string>
+						</dict>
+						<key>ApplicationConditionType</key>
+						<string>Active</string>
+						<key>ConditionType</key>
+						<string>Application</string>
+					</dict>
+				</array>
+				<key>ConditionListMatch</key>
+				<string>All</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>PauseUntil</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159784</integer>
+			<key>HonorExcluded</key>
+			<false/>
+			<key>MacroActionType</key>
+			<string>HideOthers</string>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159785</integer>
+			<key>IsDefaultApplication</key>
+			<true/>
+			<key>MacroActionType</key>
+			<string>OpenURL</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>URL</key>
+			<string>ticktick:///webapp/#p/6a268ea18f081f1de80eaeb5/tasks/6a268ea28f081f1de80eb10b</string>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Link timer:Shutdown</string>
+			<key>ActionUID</key>
+			<integer>17159786</integer>
+			<key>DisplayKind</key>
+			<string>Briefly</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>cd "$HOME/Library/Mobile Documents/com~apple~CloudDocs/💫 DarwOS/❌/02 Backup/Alfred/Alfred.alfredpreferences/workflows/user.workflow.B1125D97-B38E-4937-95B7-7655DFC3AFAB" &amp;&amp; TICKAL_BAR_AT=3055,10 bash Scripts/py.sh Scripts/link.py "timer:6a268ea28f081f1de80eb10b:6a268ea18f081f1de80eaeb5"</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Place TickTick</string>
+			<key>ActionUID</key>
+			<integer>17160917</integer>
+			<key>DisplayKind</key>
+			<string>None</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>osascript - "com.TickTick.task.mac" 1089 -856 2037 848 &lt;&lt;'OSA'
+on run argv
+	set bid to item 1 of argv
+	set nx to (item 2 of argv) as integer
+	set ny to (item 3 of argv) as integer
+	set nw to (item 4 of argv) as integer
+	set nh to (item 5 of argv) as integer
+	tell application "System Events"
+		repeat 75 times
+			try
+				tell (first process whose bundle identifier is bid)
+					if exists (first window whose subrole is "AXStandardWindow") then
+						set position of (first window whose subrole is "AXStandardWindow") to {nx, ny}
+						set size of (first window whose subrole is "AXStandardWindow") to {nw, nh}
+						return "placed"
+					end if
+				end tell
+			end try
+			delay 0.2
+		end repeat
+	end tell
+	return "no window to place"
+end run
+OSA</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159788</integer>
+			<key>AllWindows</key>
+			<true/>
+			<key>AlreadyActivatedActionType</key>
+			<string>Normal</string>
+			<key>Application</key>
+			<dict>
+				<key>BundleIdentifier</key>
+				<string>com.apple.Photos</string>
+				<key>Name</key>
+				<string>Photos</string>
+				<key>NewFile</key>
+				<string>/System/Applications/Photos.app</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>ActivateApplication</string>
+			<key>ReopenWindows</key>
+			<true/>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159789</integer>
+			<key>Conditions</key>
+			<dict>
+				<key>ConditionList</key>
+				<array>
+					<dict>
+						<key>Application</key>
+						<dict>
+							<key>BundleIdentifier</key>
+							<string>com.apple.Photos</string>
+							<key>Name</key>
+							<string>Photos</string>
+							<key>NewFile</key>
+							<string>/System/Applications/Photos.app</string>
+						</dict>
+						<key>ApplicationConditionType</key>
+						<string>Active</string>
+						<key>ConditionType</key>
+						<string>Application</string>
+					</dict>
+				</array>
+				<key>ConditionListMatch</key>
+				<string>All</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>PauseUntil</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Place Photos</string>
+			<key>ActionUID</key>
+			<integer>17160918</integer>
+			<key>DisplayKind</key>
+			<string>None</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>osascript - "com.apple.Photos" 10 10 869 1060 &lt;&lt;'OSA'
+on run argv
+	set bid to item 1 of argv
+	set nx to (item 2 of argv) as integer
+	set ny to (item 3 of argv) as integer
+	set nw to (item 4 of argv) as integer
+	set nh to (item 5 of argv) as integer
+	tell application "System Events"
+		repeat 75 times
+			try
+				tell (first process whose bundle identifier is bid)
+					if exists (first window whose subrole is "AXStandardWindow") then
+						set position of (first window whose subrole is "AXStandardWindow") to {nx, ny}
+						set size of (first window whose subrole is "AXStandardWindow") to {nw, nh}
+						return "placed"
+					end if
+				end tell
+			end try
+			delay 0.2
+		end repeat
+	end tell
+	return "no window to place"
+end run
+OSA</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159791</integer>
+			<key>AllWindows</key>
+			<true/>
+			<key>AlreadyActivatedActionType</key>
+			<string>Normal</string>
+			<key>Application</key>
+			<dict>
+				<key>BundleIdentifier</key>
+				<string>com.apple.Safari.WebApp.33619214-A054-4466-9B40-FF08655838E4</string>
+				<key>Name</key>
+				<string>YNAB</string>
+				<key>NewFile</key>
+				<string>~/Local Applications/YNAB.app</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>ActivateApplication</string>
+			<key>ReopenWindows</key>
+			<true/>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159792</integer>
+			<key>Conditions</key>
+			<dict>
+				<key>ConditionList</key>
+				<array>
+					<dict>
+						<key>Application</key>
+						<dict>
+							<key>BundleIdentifier</key>
+							<string>com.apple.Safari.WebApp.33619214-A054-4466-9B40-FF08655838E4</string>
+							<key>Name</key>
+							<string>YNAB</string>
+							<key>NewFile</key>
+							<string>~/Local Applications/YNAB.app</string>
+						</dict>
+						<key>ApplicationConditionType</key>
+						<string>Active</string>
+						<key>ConditionType</key>
+						<string>Application</string>
+					</dict>
+				</array>
+				<key>ConditionListMatch</key>
+				<string>All</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>PauseUntil</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Place YNAB</string>
+			<key>ActionUID</key>
+			<integer>17160919</integer>
+			<key>DisplayKind</key>
+			<string>None</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>osascript - "com.apple.Safari.WebApp.33619214-A054-4466-9B40-FF08655838E4" 1288 10 1264 1060 &lt;&lt;'OSA'
+on run argv
+	set bid to item 1 of argv
+	set nx to (item 2 of argv) as integer
+	set ny to (item 3 of argv) as integer
+	set nw to (item 4 of argv) as integer
+	set nh to (item 5 of argv) as integer
+	tell application "System Events"
+		repeat 75 times
+			try
+				tell (first process whose bundle identifier is bid)
+					if exists (first window whose subrole is "AXStandardWindow") then
+						set position of (first window whose subrole is "AXStandardWindow") to {nx, ny}
+						set size of (first window whose subrole is "AXStandardWindow") to {nw, nh}
+						return "placed"
+					end if
+				end tell
+			end try
+			delay 0.2
+		end repeat
+	end tell
+	return "no window to place"
+end run
+OSA</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159794</integer>
+			<key>AllWindows</key>
+			<false/>
+			<key>AlreadyActivatedActionType</key>
+			<string>Normal</string>
+			<key>Application</key>
+			<dict>
+				<key>BundleIdentifier</key>
+				<string>com.TickTick.task.mac</string>
+				<key>Name</key>
+				<string>TickTick</string>
+				<key>NewFile</key>
+				<string>/Applications/TickTick.app</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>ActivateApplication</string>
+			<key>ReopenWindows</key>
+			<true/>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159795</integer>
+			<key>Conditions</key>
+			<dict>
+				<key>ConditionList</key>
+				<array>
+					<dict>
+						<key>Application</key>
+						<dict>
+							<key>BundleIdentifier</key>
+							<string>com.TickTick.task.mac</string>
+							<key>Name</key>
+							<string>TickTick</string>
+							<key>NewFile</key>
+							<string>/Applications/TickTick.app</string>
+						</dict>
+						<key>ApplicationConditionType</key>
+						<string>Active</string>
+						<key>ConditionType</key>
+						<string>Application</string>
+					</dict>
+				</array>
+				<key>ConditionListMatch</key>
+				<string>All</string>
+			</dict>
+			<key>MacroActionType</key>
+			<string>PauseUntil</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Link sticky:Shutdown</string>
+			<key>ActionUID</key>
+			<integer>17159796</integer>
+			<key>DisplayKind</key>
+			<string>Briefly</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>cd "$HOME/Library/Mobile Documents/com~apple~CloudDocs/💫 DarwOS/❌/02 Backup/Alfred/Alfred.alfredpreferences/workflows/user.workflow.B1125D97-B38E-4937-95B7-7655DFC3AFAB" &amp;&amp; TICKAL_STICKY_FRAME=2556,10,496,1060 bash Scripts/py.sh Scripts/link.py "sticky:6a268ea28f081f1de80eb10b:6a268ea18f081f1de80eaeb5"</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Link moneysticky</string>
+			<key>ActionUID</key>
+			<integer>17159797</integer>
+			<key>DisplayKind</key>
+			<string>Briefly</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>cd "$HOME/Library/Mobile Documents/com~apple~CloudDocs/💫 DarwOS/❌/02 Backup/Alfred/Alfred.alfredpreferences/workflows/user.workflow.B1125D97-B38E-4937-95B7-7655DFC3AFAB" &amp;&amp; TICKAL_STICKY_FRAME=879,10,406,1061 bash Scripts/py.sh Scripts/link.py "moneysticky"</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Link notesticky:daily</string>
+			<key>ActionUID</key>
+			<integer>17159798</integer>
+			<key>DisplayKind</key>
+			<string>Briefly</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>cd "$HOME/Library/Mobile Documents/com~apple~CloudDocs/💫 DarwOS/❌/02 Backup/Alfred/Alfred.alfredpreferences/workflows/user.workflow.B1125D97-B38E-4937-95B7-7655DFC3AFAB" &amp;&amp; TICKAL_STICKY_FRAME=3850,-845,1060,1900 bash Scripts/py.sh Scripts/link.py "notesticky:daily"</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionName</key>
+			<string>Link view:calendar</string>
+			<key>ActionUID</key>
+			<integer>17159799</integer>
+			<key>DisplayKind</key>
+			<string>Briefly</string>
+			<key>HonourFailureSettings</key>
+			<true/>
+			<key>IncludeStdErr</key>
+			<false/>
+			<key>IncludedVariables</key>
+			<array>
+				<string>9999</string>
+			</array>
+			<key>MacroActionType</key>
+			<string>ExecuteShellScript</string>
+			<key>Path</key>
+			<string></string>
+			<key>Source</key>
+			<string>Nothing</string>
+			<key>Text</key>
+			<string>cd "$HOME/Library/Mobile Documents/com~apple~CloudDocs/💫 DarwOS/❌/02 Backup/Alfred/Alfred.alfredpreferences/workflows/user.workflow.B1125D97-B38E-4937-95B7-7655DFC3AFAB" &amp;&amp; bash Scripts/py.sh Scripts/link.py "view:calendar"</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>TrimResults</key>
+			<true/>
+			<key>TrimResultsNew</key>
+			<true/>
+			<key>UseText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>ActionUID</key>
+			<integer>17159800</integer>
+			<key>IsDefaultApplication</key>
+			<true/>
+			<key>MacroActionType</key>
+			<string>OpenURL</string>
+			<key>TimeOutAbortsMacro</key>
+			<true/>
+			<key>URL</key>
+			<string>alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acrmcal</string>
+		</dict>
+	</array>
+	<key>CreationDate</key>
+	<real>810846176.62820196</real>
+	<key>IsActive</key>
+	<false/>
+	<key>ModificationDate</key>
+	<real>810909749.97090101</real>
+	<key>Name</key>
+	<string>Shutdown • Start</string>
+	<key>Triggers</key>
+	<array/>
+	<key>UID</key>
+	<string>D896DA99-5DD0-4247-9C4E-17DA9E657009</string>
+</dict>
+</plist>
+

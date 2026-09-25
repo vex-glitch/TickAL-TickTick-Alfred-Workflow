@@ -1,0 +1,29 @@
+== review rebuild 2026-09-25 22:29:28 tiers=['quarterly'] apply=False
+
+#### quarterly: {'keep': 24, 'retitle': 0, 'create': 0, 'delete': 0, 'reopen': 0}
+  - [Run the Monthly Review first](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Amonthly)
+  - [Quarterly Review • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Aquarterly)
+  - [Money](kmtrigger://macro=2DC599C6-CDDC-4AE7-8989-731118A89254)
+    - [Check how much money you made this quarter](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+    - [YNAB: Review Categories](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+    - Review recurring charges and subscriptions
+    - Sweep bank statements and bills for non-monthly expenses
+    - [Numbers: compare with the same quarter last year](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+  - Work
+    - Pricing review
+    - Portfolio refresh: swap in the best recent pieces
+    - Effective hourly rate over the last ten pieces
+    - Where new clients came from this quarter
+  - TickTick
+    - [Check OKRs](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrquarterly)
+      - [Adjust OKRs if needed](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrcarry)
+    - [Check last quarter and next quarter](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+    - System pass
+      - Audit recurring tasks
+      - Delete dead tags
+      - [Archive dropped habits](ticktick://habit)
+      - Back up TickTick data
+  - [📔 Quarterly journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aquarterly)
+  - [Finish Quarterly Review](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6aa520b28f084b1907ea08e2%3A6a268ea18f081f1de80eaeb5)
+
+(dry run; --apply to write)

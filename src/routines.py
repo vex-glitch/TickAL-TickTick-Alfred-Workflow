@@ -135,7 +135,15 @@ def rule_text(repeat_flag):
         return when if every == 1 else f"{when}, every {every} weeks"
     if freq in ("MONTHLY", "YEARLY"):
         day = p.get("BYMONTHDAY")
-        on = f"the {_ORDINAL.get(int(day), str(int(day)) + 'th')}" if day and day.isdigit() else freq.lower()
+        if day and day.lstrip("-").isdigit() and int(day) < 0:
+            # BYMONTHDAY=-1: the last day (the reviews since 2026-09-25, so
+            # February has a review day); -2 and below read "2nd from last"
+            n = -int(day)
+            on = "the last day" if n == 1 else f"the {_ORDINAL.get(n, str(n) + 'th')} from last day"
+        elif day and day.isdigit():
+            on = f"the {_ORDINAL.get(int(day), str(int(day)) + 'th')}"
+        else:
+            on = freq.lower()
         unit = "month" if freq == "MONTHLY" else "year"
         return f"{on} of every {unit}" if every == 1 else f"{on}, every {every} {unit}s"
     return freq.lower()
@@ -161,6 +169,12 @@ def prev_occurrence(day, repeat_flag):
             y -= 1
         last = [31, 29 if y % 4 == 0 and (y % 100 or y % 400 == 0) else 28,
                 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]
+        bmd = p.get("BYMONTHDAY") or ""
+        if bmd.lstrip("-").isdigit() and int(bmd) < 0:
+            # a last-day rule: the previous occurrence is that month's last
+            # day, never the same day number clamped (30 Nov -> 31 Oct, the
+            # Finish guard's "prev == today" check; review 2026-09-25)
+            return _dt.date(y, m, max(1, last + 1 + int(bmd)))
         return _dt.date(y, m, min(day.day, last))
     return None
 

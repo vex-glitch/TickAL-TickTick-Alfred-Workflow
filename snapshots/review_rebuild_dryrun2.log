@@ -1,0 +1,186 @@
+== review rebuild 2026-09-25 22:24:32 tiers=['weekly', 'monthly', 'quarterly'] apply=False
+
+#### weekly: {'keep': 28, 'retitle': 4, 'create': 9, 'delete': 8, 'reopen': 0}
+  - [Weekly Review • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Aweekly)
+  - [Process my digital inboxes](kmtrigger://macro=9476B133-2F11-4405-BADA-4E58E314C1D0)
+    - [Email](kmtrigger://macro=4E7D2C37-C0C3-4B4B-9CCE-952D68E16BE3)
+    - [Eagle](kmtrigger://macro=97F027F1-84D8-4F4B-A48C-118DE70D4EA3)
+    - [TickTick](ticktick:///webapp/#p/inbox/tasks)
+    - [Anybox](kmtrigger://macro=BD28D179-1B91-4F26-9E26-98B388E42335)
+C   - [Downloads](kmtrigger://macro=DDC34222-4219-46A5-8F21-025AF1982292)
+C   - Collect loose papers
+C   - [Obsidian vault inbox](kmtrigger://macro=C53EBB10-1D6B-4520-A8BA-0EC6BEC9897D)
+  - [Money](kmtrigger://macro=2DC599C6-CDDC-4AE7-8989-731118A89254)
+    - [Check how much money you made this week](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+C   - [YNAB](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+C     - Clear and approve transactions
+C     - Reconcile all accounts
+D   - [Numbers](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+D     - Add Income
+D     - Add Expenses
+D     - Check Progress
+D     - Compare to YNAB
+  - Work
+    - [Update CRM](kmtrigger://macro=62AC623E-751E-41B9-ACC9-A684139AA2D2)
+      - Add any new entries
+      - Adjust any old entries
+    - [Update Content PL](kmtrigger://macro=FE82B637-9B78-42F0-B217-FB2AC87E0909)
+      - Pick material to edit
+      - Adjust any edited, posted entries
+    - [Update Drawing PL](kmtrigger://macro=C7EE88C3-4027-4524-8878-B5A7D8FB44EA)
+      - Pick one idea to draw
+      - Adjust any drawn ideas
+  - TickTick
+    - [Check OKRs](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrweekly)
+C   - [Overdue: reschedule or drop, all in one go](ticktick:///webapp/#f/6a3418f9ba90110c0d077b12/tasks)
+C   - [No date: give it a date or send it to someday](ticktick:///webapp/#f/6a5fbd9063dd110397594304/tasks)
+C   - [Waiting for: chase what others owe you](ticktick:///webapp/#t/8J-apndhaXRpbmc/tasks)
+R   - [Review status filter, clear stale statuses](ticktick:///webapp/#f/69fed6b260ac110a6914f83f/tasks)
+    - Skim through lists
+      - Assign proper statuses
+R   - [Check active projects](ticktick:///webapp/#f/69fedd25018d510d8510c4c2/tasks)
+R   - [Check last week and next week](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+R   - [Schedule next week using OKRs and status filter](ticktick://v1/show?smartlist=next_7_days)
+D   - Check stale status
+D   - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aweekly)
+D   - Set Weekly goal
+  - [📔 Weekly journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aweekly)
+  - [Finish Weekly Review](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6aa4eaad7c035e06a3686a2f%3A6a268ea18f081f1de80eaeb5)
+
+#### monthly: {'keep': 47, 'retitle': 25, 'create': 17, 'delete': 4, 'reopen': 0}
+  - [Monthly Review • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Amonthly)
+  - [Process my digital inboxes](kmtrigger://macro=9476B133-2F11-4405-BADA-4E58E314C1D0)
+    - [Email](kmtrigger://macro=4E7D2C37-C0C3-4B4B-9CCE-952D68E16BE3)
+C     - Unsubscribe from newly discovered low-value email
+    - [Eagle](kmtrigger://macro=97F027F1-84D8-4F4B-A48C-118DE70D4EA3)
+C     - Uncategorized and Untagged views
+    - [TickTick](ticktick:///webapp/#p/inbox/tasks)
+    - [Anybox](kmtrigger://macro=BD28D179-1B91-4F26-9E26-98B388E42335)
+C   - [Downloads](kmtrigger://macro=DDC34222-4219-46A5-8F21-025AF1982292)
+C   - Collect loose papers
+C   - [Obsidian vault inbox](kmtrigger://macro=C53EBB10-1D6B-4520-A8BA-0EC6BEC9897D)
+  - [Money](kmtrigger://macro=2DC599C6-CDDC-4AE7-8989-731118A89254)
+R   - [Check how much money you made this month](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+    - [YNAB](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+      - Clear and approve all transactions
+      - Reconcile all accounts
+C     - Cover overspending before the rollover
+      - Move available money to Ready to assign
+      - Spend time in insights view
+      - Adjust next month targets
+      - Assign money to next month
+C     - Work toward a month ahead
+D     - Review Categories
+R   - [Numbers](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+R     - Add Income
+R     - Add Expenses
+R     - Check Progress
+R     - Compare forecast to reality, then adjust the forecast
+R     - Compare to YNAB
+C   - File the month's receipts
+R - Work
+R   - [Update CRM](kmtrigger://macro=62AC623E-751E-41B9-ACC9-A684139AA2D2)
+R     - Add any new entries
+R     - Adjust any old entries
+      - Cross compare with Eagle
+C     - Follow up clients from six months ago
+R   - [Update Content PL](kmtrigger://macro=FE82B637-9B78-42F0-B217-FB2AC87E0909)
+R     - Pick material to edit
+R     - Adjust any edited, posted entries
+      - Look for candidates for editing in raw
+      - Cross compare with Eagle
+R   - [Update Drawing PL](kmtrigger://macro=C7EE88C3-4027-4524-8878-B5A7D8FB44EA)
+R     - Pick one idea to draw
+R     - Adjust any drawn ideas
+      - Cross compare with Eagle
+C   - Check the website and the contact form
+C   - [Check how many weeks you are booked out](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acrmcal)
+R - TickTick
+    - MindSweep
+    - Check [inbox](ticktick:///webapp/#p/inbox/tasks) for mindsweep triggers and act on them
+R   - [Check OKRs](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrmonthly)
+C   - [Overdue: reschedule or drop, all in one go](ticktick:///webapp/#f/6a3418f9ba90110c0d077b12/tasks)
+C   - [Long Overdue and Postponed views: do, split or drop](ticktick://v1/show?smartlist=today)
+C   - [No date: give it a date or send it to someday](ticktick:///webapp/#f/6a5fbd9063dd110397594304/tasks)
+C   - [Waiting for: chase what others owe you](ticktick:///webapp/#t/8J-apndhaXRpbmc/tasks)
+R   - [Review status filter, clear stale statuses](ticktick:///webapp/#f/69fed6b260ac110a6914f83f/tasks)
+R   - Skim through lists
+R     - Assign proper statuses
+R   - [Check active projects](ticktick:///webapp/#f/69fedd25018d510d8510c4c2/tasks)
+C     - Archive completed or inactive projects
+C   - [Review Someday](ticktick:///webapp/#t/8J-UrnNvbWVkYXk/tasks)
+R   - [Check last month and next month](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+R   - [Schedule next month using OKRs and status filter](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+D   - Check stale status 
+D   - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Amonthly) 
+D   - Set Monthly goal 
+  - [📔 Monthly journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Amonthly)
+  - [Finish Monthly Review](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6aa517f607a3ba2e0339b7bd%3A6a268ea18f081f1de80eaeb5)
+
+#### quarterly: {'keep': 12, 'retitle': 7, 'create': 12, 'delete': 40, 'reopen': 0}
+C - [Run the Monthly Review first](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Amonthly)
+  - [Quarterly Review • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Aquarterly)
+  - [Money](kmtrigger://macro=2DC599C6-CDDC-4AE7-8989-731118A89254)
+R   - [Check how much money you made this quarter](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+R   - [YNAB: Review Categories](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+D     - Review Categories
+D     - Clear and approve all transactions
+D     - Reconcile all accounts
+D     - Move available money to Ready to assign
+D     - Spend time in insights view
+D     - Adjust next month targets
+D     - Assign money to next month
+C   - Review recurring charges and subscriptions
+C   - Sweep bank statements and bills for non-monthly expenses
+R   - [Numbers: compare with the same quarter last year](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+D     - Add Income 
+D     - Add Expenses 
+D     - Check Progress 
+D     - Compare forecast to reality
+D     - Compare to YNAB 
+R - Work
+C   - Pricing review
+C   - Portfolio refresh: swap in the best recent pieces
+C   - Effective hourly rate over the last ten pieces
+C   - Where new clients came from this quarter
+D   - [Update CRM](kmtrigger://macro=62AC623E-751E-41B9-ACC9-A684139AA2D2) 
+D     - Add any new entries 
+D     - Adjust any old entries 
+D     - Cross compare with Eagle
+D   - [Update Content PL](kmtrigger://macro=FE82B637-9B78-42F0-B217-FB2AC87E0909) 
+D     - Pick material to edit 
+D     - Adjust any edited, posted entries 
+D     - Look for candidates for editing in raw
+D     - Cross compare with Eagle
+D   - [Update Drawing PL](kmtrigger://macro=C7EE88C3-4027-4524-8878-B5A7D8FB44EA) 
+D     - Pick one idea to draw 
+D     - Adjust any drawn ideas 
+D     - Cross compare with Eagle
+R - TickTick
+R   - [Check OKRs](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrquarterly)
+      - [Adjust OKRs if needed](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokrcarry)
+R   - [Check last quarter and next quarter](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+C   - System pass
+C     - Audit recurring tasks
+C     - Delete dead tags
+C     - [Archive dropped habits](ticktick://habit)
+C     - Back up TickTick data
+D   - MindSweep
+D   - Check active projects 
+D   - Review status filter 
+D   - Skim through lists 
+D     - Assign proper statuses 
+D   - Schedule next week using OKRs and status filter 
+D   - Check stale status 
+D   - Check [inbox](ticktick:///webapp/#p/inbox/tasks) for mindsweep triggers and act on them
+D   - [Journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aquarterly) 
+D   - Set Quarterly goal 
+  - [📔 Quarterly journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Aquarterly)
+  - [Finish Quarterly Review](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6aa520b28f084b1907ea08e2%3A6a268ea18f081f1de80eaeb5)
+D - [Process my digital inboxes](kmtrigger://macro=9476B133-2F11-4405-BADA-4E58E314C1D0)
+D   - [Email](kmtrigger://macro=4E7D2C37-C0C3-4B4B-9CCE-952D68E16BE3)
+D   - [Eagle](kmtrigger://macro=97F027F1-84D8-4F4B-A48C-118DE70D4EA3)
+D   - [TickTick](ticktick:///webapp/#p/inbox/tasks)
+D   - [Anybox](kmtrigger://macro=BD28D179-1B91-4F26-9E26-98B388E42335)
+
+(dry run; --apply to write)

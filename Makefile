@@ -75,6 +75,7 @@ test:
 	@$(PYTHON) tests/test_meal_screens.py
 	@$(PYTHON) tests/test_mela_cal.py
 	@$(PYTHON) tests/test_row_display.py
+	@$(PYTHON) tests/test_review_rebuild.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:
