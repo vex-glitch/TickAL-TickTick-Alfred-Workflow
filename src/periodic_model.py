@@ -2770,6 +2770,45 @@ def highlight_body(text):
     return [ln if ln.startswith("- ") else f"- {mdtext.flatten_links(ln)}" for ln in lines]
 
 
+def journal_whole_answers(body_lines):
+    """{n: the WHOLE answer} for every answered question in a journal body
+    (journal_answer_text at each A line): journal_pairs keeps the A line
+    alone, which is the first paragraph of a boxed answer."""
+    out = {}
+    for n, _q, a, a_idx in journal_pairs(body_lines):
+        if a:
+            out[n] = journal_answer_text(body_lines, a_idx) or a
+    return out
+
+
+def chain_recap(chains, question, answered):
+    """What a chain step must show before it can be answered: the answers
+    to the chain's EARLIER steps, numbered. '' for a step one, a question
+    that is no chain step, or a chain with nothing answered yet.
+
+    `chains` are the pool's (periodic_journal.load_pool(slot)["chains"]),
+    `answered` is [(question, answer)] for everything answered so far, note
+    order (the note's A lines plus this run's boxes). A dialog box has no
+    memory: Vex 2026-09-25 answered "CANNOT SEE THE LIST" to five steps of
+    the worry sort, whose step one had asked for the list."""
+    for c in chains or ():
+        steps = list(c.get("prompts") or [])
+        k = next((i for i, s in enumerate(steps) if same_question(s, question)), None)
+        if k is None:
+            continue
+        if k == 0:
+            return ""
+        lines = []
+        for j, step in enumerate(steps[:k]):
+            a = next((ans for q, ans in answered if same_question(q, step) and ans), "")
+            a = " ".join((a or "").split())
+            lines.append(f"{j + 1}. {a if a else '(not answered)'}")
+        if not any(not ln.endswith("(not answered)") for ln in lines):
+            return ""
+        return "Your answers so far:\n" + "\n".join(lines)
+    return ""
+
+
 def same_question(a, b):
     """Two question texts are the same question: equal once TickTick's escapes
     are dropped, or the same FIXED key (a dynamic question's text follows the

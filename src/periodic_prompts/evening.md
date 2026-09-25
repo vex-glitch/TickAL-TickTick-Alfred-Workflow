@@ -45,12 +45,12 @@
 - What tends to make you lose your cool?
 ### chain: worry sort
 1. List everything on your mind right now, worry by worry, with no sorting yet.
-2. From that list, circle only the items that are entirely up to your own choices and actions.
-3. From that list, underline the items that depend on other people, chance, or an outcome you can't decide alone.
-4. Pick one underlined item. Write the one thing about it that is still yours to choose: your response.
+2. From that list (shown below), name only the items that are entirely up to your own choices and actions.
+3. From that list, name the items that depend on other people, chance, or an outcome you can't decide alone.
+4. Pick one item from your answer to 3. Write the one thing about it that is still yours to choose: your response.
 5. For the item that worries you most, write what you are actually afraid will happen if you let it go.
-6. Rewrite your worry list sorted into two columns: mine to act on, mine only to accept.
-7. What would it look like to act fully on the circled items and simply note the underlined ones without acting on them?
+6. Rewrite your worry list sorted into two groups: mine to act on, mine only to accept.
+7. What would it look like to act fully on the items from 2 and simply note the items from 3 without acting on them?
 
 ## virtue
 - Temperance: What did I resist today that I usually give in to?

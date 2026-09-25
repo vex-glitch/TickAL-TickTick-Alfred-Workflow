@@ -414,7 +414,7 @@ class _JPE:
 _rt, _rpn = xact._run_trigger, xact._pn
 xact._run_trigger = lambda name, arg=None: subprocess.CompletedProcess([], 0, stdout="ok\n", stderr="")
 xact._pn = lambda: _JPE()
-xact._ask = lambda q, title="", multiline=False: None
+xact._ask = lambda q, title="", multiline=False, detail="": None
 with contextlib.redirect_stdout(io.StringIO()):
     xact.pn_journal("evening@2026-09-24")
 xact._run_trigger, xact._pn = _rt, _rpn
@@ -490,7 +490,7 @@ xact._wait_for_pick = lambda tag, *a, **k: WAITED.append(tag) or "pick"
 _rt2, _rpn2 = xact._run_trigger, xact._pn
 xact._run_trigger = lambda name, arg=None: subprocess.CompletedProcess([], 0, stdout="", stderr="")
 xact._pn = lambda: _JPE()
-xact._ask = lambda q, title="", multiline=False: None
+xact._ask = lambda q, title="", multiline=False, detail="": None
 os.environ["TICKAL_DETACHED"] = "1"
 try:
     with contextlib.redirect_stdout(io.StringIO()):

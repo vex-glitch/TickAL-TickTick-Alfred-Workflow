@@ -1228,7 +1228,7 @@ def _osa_dialog(body):
 _ASK_LAST = {}          # how the last _ask went: via box|osa, and any error
 
 
-def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False):
+def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False, detail=""):
     """Module-level dialog helper. Returns None on Cancel, "" on
     empty-OK - the journal flow assigns those OPPOSITE meanings (cancel =
     stop + save partial; empty = skip this prompt), so the two must be
@@ -1238,7 +1238,9 @@ def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False):
     invites prose, because `display dialog`'s field is one line: it does not
     wrap, you cannot see what you wrote, and Return submits. It falls back
     here wherever PyObjC is missing, and is never used with `hidden` (a
-    password wants the one-line secure field).
+    password wants the one-line secure field). `detail` is text shown under
+    the prompt (a chain step's earlier answers); the one-line dialog gets it
+    appended to the prompt.
 
     _ASK_LAST records which box answered and why one failed, for the journal
     log (a journal that "exits" is otherwise impossible to tell apart from
@@ -1249,10 +1251,12 @@ def _ask(prompt, title="TickAL", hidden=False, default="", multiline=False):
             import ask_box
             if ask_box.available():
                 _ASK_LAST["via"] = "box"
-                return ask_box.ask(prompt, title, default)
+                return ask_box.ask(prompt, title, default, detail=detail)
         except Exception as e:
             _ASK_LAST["box_err"] = f"{type(e).__name__}: {e}"[:160]
     _ASK_LAST["via"] = "osa"
+    if (detail or "").strip():
+        prompt = f"{prompt}\n\n{detail}"
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace('"', '\\"')
     osa = ('text returned of (display dialog "{}" default answer "{}" '
@@ -7614,7 +7618,7 @@ def pn_journal(slot):
     pe = _pn()
     import re as _re
     import goal_handoff as gh
-    keys, pairs, jper = pe.journal_seed(slot, day=pin_day)
+    keys, pairs, jper, jbody = pe.journal_seed(slot, day=pin_day, want_body=True)
     if pairs is None:
         _jlog(f"{slot}@{pin}", "no journal section")
         print("💫 No journal section in the note (header renamed?)")
@@ -7646,6 +7650,26 @@ def pn_journal(slot):
     skipped = []
     bridge_said = ""
     handoff = None             # "set" | "changed": stop here for the picker
+    # a chain step shows the chain's earlier answers under the question
+    # (Vex 2026-09-25: "I CANNOT SEE IT", five steps of the worry sort
+    # answered to a list the box never showed): the note's whole answers
+    # first, this run's boxes over them
+    try:
+        import periodic_journal as _pj
+        chains = _pj.load_pool(slot).get("chains") or []
+    except Exception:
+        chains = []
+    whole = pm.journal_whole_answers(jbody) if chains else {}
+    q_of = {n: q for n, q, _a, _i in pairs}
+
+    def _recap(q):
+        if not chains:
+            return ""
+        known = {n: whole.get(n) or a for n, _q, a, _i in pairs if a}
+        known.update(answers)
+        seen = [(q_of.get(n, ""), t) for n, t in sorted(known.items())]
+        return pm.chain_recap(chains, q, seen)
+
     for n, q in open_pairs:
         key = keys.get(n, "free")
         if key == "tgoal":
@@ -7671,10 +7695,13 @@ def pn_journal(slot):
         # mood / money / rating are parsed out of ONE short line; the rest
         # are prose, and prose gets the big box (Vex 2026-09-16).
         t0 = time.time()
+        recap = _recap(q) if key == "free" else ""
         a = _ask(q, title=f"{label} journal · {n}/{total}",
-                 multiline=key not in ("mood", "money", "rating", "wrating"))
+                 multiline=key not in ("mood", "money", "rating", "wrating"),
+                 detail=recap)
         outcome = "cancel" if a is None else ("skip" if not a.strip() else "answered")
-        _jlog(tag, f"q{n}/{total} {key} -> {outcome} {time.time() - t0:.0f}s{_ask_trail()}")
+        _jlog(tag, f"q{n}/{total} {key} -> {outcome} {time.time() - t0:.0f}s{_ask_trail()}"
+                   + (" +recap" if recap else ""))
         if a is None:                     # Cancel: stop, keep what we have
             cancelled = True
             break

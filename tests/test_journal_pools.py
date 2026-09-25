@@ -701,6 +701,26 @@ try:
 finally:
     pe._today, pe._bridge_text = _real_today, _real_bridge
 
+# ── 16. a chain step shows the earlier answers (Vex 2026-09-25: "I CANNOT SEE IT") ──
+ev_chains = pj.load_pool("evening")["chains"]
+worry = next(c for c in ev_chains if c["name"].lower() == "worry sort")
+check("16.worry-nothing-to-circle", not any(w in s.lower() for s in worry["prompts"] for w in ("circle", "underline")))
+check("16.worry-refers-by-number", "shown below" in worry["prompts"][1] and "your answer to 3" in worry["prompts"][3]
+      and "items from 2" in worry["prompts"][6] and len(worry["prompts"]) == 7)
+CH = [{"category": "review", "name": "t", "prompts": ["List A.", "From that list, name B.", "Pick one from 2."]}]
+seen = [("List A.", "rent, the car, mum"), ("From that list, name B.", "the car")]
+r = pm.chain_recap(CH, "Pick one from 2.", seen)
+check("16.recap-shows-earlier-answers", r == "Your answers so far:\n1. rent, the car, mum\n2. the car", repr(r))
+check("16.recap-step-one-empty", pm.chain_recap(CH, "List A.", seen) == "")
+check("16.recap-not-a-chain-step", pm.chain_recap(CH, "What is on your mind?", seen) == "")
+check("16.recap-skipped-step-named", pm.chain_recap(CH, "Pick one from 2.", [("List A.", "rent")]) == "Your answers so far:\n1. rent\n2. (not answered)")
+check("16.recap-nothing-answered-yet", pm.chain_recap(CH, "Pick one from 2.", []) == "")
+check("16.recap-whole-answer-one-line", pm.chain_recap(CH, "From that list, name B.", [("List A.", "rent\nthe car\n\nmum")]) == "Your answers so far:\n1. rent the car mum")
+WB = ["\t- *Q1 · List A.*", "\t\t- A: rent, the car", "\t\t\t- and mum", "\t- *Q2 · From that list, name B.*", "\t\t- A: ", "\t- *Q3 · Pick one from 2.*", "\t\t- A: the car"]
+wa = pm.journal_whole_answers(WB)
+check("16.whole-answers", wa == {1: "rent, the car and mum", 3: "the car"}, repr(wa))
+check("16.recap-escaped-question", pm.chain_recap(CH, "Pick one from 2\\.", seen).startswith("Your answers so far:"))
+
 print(f"journal pools: {PASS} passed, {FAIL} failed")
 for f in FAILURES:
     print("  FAIL", f)

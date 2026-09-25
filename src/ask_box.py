@@ -28,8 +28,12 @@ def available():
         return False
 
 
-def ask(prompt, title="TickAL", default=""):
+def ask(prompt, title="TickAL", default="", detail=""):
     """A multi-line answer, "" for empty-OK, None for cancel.
+
+    `detail` is body text shown under the prompt, regular weight and wrapped
+    (the alert's informative text): a chain step's earlier answers, which
+    the question refers to and the box otherwise cannot show.
 
     Raises nothing: an AppKit that will not draw must fall back to the
     AppleScript dialog, so the caller catches and retries there.
@@ -44,7 +48,8 @@ def ask(prompt, title="TickAL", default=""):
 
     alert = NSAlert.alloc().init()
     alert.setMessageText_(prompt or "")
-    alert.setInformativeText_(f"{title}  ·  {HINT}" if title else HINT)
+    hint = f"{title}  ·  {HINT}" if title else HINT
+    alert.setInformativeText_(f"{detail}\n\n{hint}" if (detail or "").strip() else hint)
     ok = alert.addButtonWithTitle_("Save")
     cancel = alert.addButtonWithTitle_("Cancel")
     # Return types a newline in the text view, so Save answers to ⌘⏎ instead.

@@ -3605,7 +3605,7 @@ def _journal_target(slot, day=None):
     return pm.period_for("daily", day or _today())
 
 
-def journal_seed(slot, day=None):
+def journal_seed(slot, day=None, want_body=False):
     """RMW#1: seed Q/A pairs iff the section has none; unanswered fixed Qs
     get their dynamic text refreshed, and a journal seeded before a fixed
     question existed gets that question (insert=True). Returns
@@ -3614,7 +3614,9 @@ def journal_seed(slot, day=None):
     answers so the dialogs skip what's done; period PINS the note for the
     whole dialog run (a run that crosses midnight must keep writing the day it
     started on - `day` carries that pin into a journal resumed after the goal
-    picker)."""
+    picker). want_body=True adds the section's body lines as a fourth item:
+    the dialog run reads the WHOLE earlier answers off it for a chain step
+    (pm.chain_recap), where pairs carry the A line alone."""
     sec_name = _JOURNAL_SECTIONS[slot]
     p = _journal_target(slot, day)
     task, _ = ensure_note(p)
@@ -3626,9 +3628,13 @@ def journal_seed(slot, day=None):
         if sec is None:
             return None
         _seed_slot(doc, sec_name, slot, p.start, ctx, insert=True)
-        return pm.journal_pairs(ps.find(doc, sec_name).body)
-    pairs, _doc = _pn_rmw(pid, tid, mutate)
+        body = list(ps.find(doc, sec_name).body)
+        return pm.journal_pairs(body), body
+    got, _doc = _pn_rmw(pid, tid, mutate)
+    pairs, body = got if got else (None, [])
     keys = pm.journal_keys(pairs) if pairs else {}
+    if want_body:
+        return keys, pairs, p, body
     return keys, pairs, p
 
 

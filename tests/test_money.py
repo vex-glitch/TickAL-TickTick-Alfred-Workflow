@@ -57,12 +57,12 @@ def _install(content):
         return r, doc
     pe._pn_rmw = rmw
 
-    def seed(slot, day=None):
+    def seed(slot, day=None, want_body=False):
         STATE["seeded"] += 1
         if "How much money" not in STATE["content"]:
             STATE["content"] = STATE["content"].replace(
                 "- 🌙 Evening journal", "- 🌙 Evening journal\n" + Q)
-        return {}, [], None
+        return ({}, [], None, []) if want_body else ({}, [], None)
     pe.journal_seed = seed
 
 

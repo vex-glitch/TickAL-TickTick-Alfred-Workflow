@@ -349,9 +349,11 @@ class FakePE:
         self.pairs, self.goal = pairs, goal
         self.merged, self.goal_calls, self.answers = {}, [], []
 
-    def journal_seed(self, slot, day=None):
+    def journal_seed(self, slot, day=None, want_body=False):
         class P:
             start = date(2026, 9, 15)
+        if want_body:
+            return pm.journal_keys(self.pairs), self.pairs, P(), []
         return pm.journal_keys(self.pairs), self.pairs, P()
 
     def journal_merge(self, slot, answers, period=None, questions=None):
@@ -385,7 +387,7 @@ def run(slot, pairs, answers=None, button="", goal=""):
     fake = FakePE(pairs, goal)
     xact._pn = lambda: fake
     queue = list(answers or [])
-    xact._ask = lambda q, title="", multiline=False: calls["ask"].append(q) or (queue.pop(0) if queue else None)
+    xact._ask = lambda q, title="", multiline=False, detail="": calls["ask"].append(q) or (queue.pop(0) if queue else None)
     xact._dialog = lambda prompt, buttons, default: calls["dialog"].append(prompt) or button
     saved = []
     orig = gh.save
@@ -432,7 +434,7 @@ for v in calls.values():
     v.clear()
 fake2 = FakePE(EV_PAIRS)
 xact._pn = lambda: fake2
-xact._ask = lambda q, title="", multiline=False: calls["ask"].append(q) or ""
+xact._ask = lambda q, title="", multiline=False, detail="": calls["ask"].append(q) or ""
 _saved2 = []
 _o = gh.save
 gh.save = lambda s_, d, mode="set", now=None: _saved2.append(s_)
@@ -530,7 +532,7 @@ def _answer_tgoal(slot, key, text, day):
 
 fake.journal_answer_key = _answer_tgoal
 xact._pn = lambda: fake
-xact._ask = lambda q, title="", multiline=False: calls["ask"].append(q) or None
+xact._ask = lambda q, title="", multiline=False, detail="": calls["ask"].append(q) or None
 xact.JOURNAL_LOG = os.path.join(tmp, "journal.log")
 gh.save("evening", date(2026, 9, 15))
 spec = {"kind": "daily", "text": "", "pid": "P", "tid": "T1", "title": "Write the brief",
@@ -557,15 +559,15 @@ seen = {}
 
 
 class _PinPE(FakePE):
-    def journal_seed(self, slot, day=None):
+    def journal_seed(self, slot, day=None, want_body=False):
         seen["day"] = day
-        return FakePE.journal_seed(self, slot, day)
+        return FakePE.journal_seed(self, slot, day, want_body=want_body)
 
 
 _ro = xact._before_day_rollover
 xact._before_day_rollover = lambda now=None: True
 xact._pn = lambda: _PinPE(pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])))
-xact._ask = lambda q, title="", multiline=False: None
+xact._ask = lambda q, title="", multiline=False, detail="": None
 xact.pn_journal("evening")
 check("an evening journal started after midnight writes the day that is ending",
       seen.get("day") == date.today() - __import__("datetime").timedelta(days=1), seen)
