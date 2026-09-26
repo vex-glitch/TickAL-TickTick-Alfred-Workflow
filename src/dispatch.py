@@ -412,6 +412,33 @@ def _cached_task(tid):
     return cache_store.find_task(tid)
 
 
+def _commute_follow(api, posted, tid, pid, fields, prev=None, fresh=False):
+    """🚗 After a date write: when the task is a CRM booking, its commutes
+    follow the new span (moved, or made when it had none - a dormant
+    booking scheduled from crmsched; removed when the new date has no
+    time). `posted` is update_task's reply (the live-merged object) or a
+    create's task; when the write was skipped ({}), the cache row plus the
+    fields written stand in for the gate. `prev` is the cache row read
+    BEFORE the write (its old span picks the right leg when a copied one
+    exists); `fresh` marks a brand-new task (duplicate), whose legs may
+    be made even when the commute list cannot be read. Best effort,
+    returns the toast line ('' when nothing to say)."""
+    try:
+        import commute
+        b = dict(posted or {})
+        if not b:
+            b = dict(prev or _cached_task(tid) or {})
+            b.update(fields or {})
+        b.setdefault("id", tid)
+        b.setdefault("projectId", b.get("_projectId") or pid)
+        if not commute.is_booking(b):
+            return ""
+        line, _made, _moved, _rm = commute.sync(api, b, prev=prev, fresh_booking=fresh)
+        return f"\n{line}" if line else ""
+    except Exception as e:
+        return f"\n🚗 commute failed · {type(e).__name__}"
+
+
 def _split_reminders(raw):
     """Pull a trailing ';R:tok1,tok2' off an attr arg → (raw_without, [tokens])."""
     if ";R:" in raw:
@@ -609,12 +636,14 @@ def main():
             # and lays these fields over it, the reminders merged on the LIVE
             # list (review 2026-09-24)
             fields = {"startDate": due, "dueDate": due}
+            _prev_row = dict(_cached_task(tid) or {})   # 🚗 the span before the write
             derive = ((lambda b: {"reminders": _merge_reminders(api, pid, tid, b, rem_tokens)[0]})
                       if rem_tokens else None)
             posted = api.update_task(tid, pid, current=_cached_task(tid), derive=derive, **fields) or {}
             if rem_tokens:
                 fields["reminders"] = posted.get("reminders") or []
             _patch_task_cache(tid, **fields)
+            commute_line = _commute_follow(api, posted, tid, pid, fields, prev=_prev_row)
 
             task_title = md_links_display(os.environ.get("task_title", "Task"))
             verb = "Rescheduled" if had_date else "Scheduled"
@@ -622,9 +651,9 @@ def main():
             new_display = utc_to_long_display(due)
             if had_date and old_due:
                 old_display = utc_to_long_display(old_due)
-                print(f"{verb} · {task_title}\n🟢 {new_display}\n🔴 {old_display}{rem_line}")
+                print(f"{verb} · {task_title}\n🟢 {new_display}\n🔴 {old_display}{rem_line}{commute_line}")
             else:
-                print(f"{verb} · {task_title}\n{new_display}{rem_line}")
+                print(f"{verb} · {task_title}\n{new_display}{rem_line}{commute_line}")
 
         elif arg.startswith("attr_span:"):
             # attr_span:projectId:taskId:startIso|endIso[;R:tok,tok]  → schedule with duration
@@ -637,12 +666,14 @@ def main():
             had_date = os.environ.get("has_date", "0") == "1"
             api = TickTickAPI(cfg.get_token())
             fields = {"startDate": start_iso, "dueDate": end_iso}
+            _prev_row = dict(_cached_task(tid) or {})   # 🚗 the span before the write
             derive = ((lambda b: {"reminders": _merge_reminders(api, pid, tid, b, rem_tokens)[0]})
                       if rem_tokens else None)
             posted = api.update_task(tid, pid, current=_cached_task(tid), derive=derive, **fields) or {}
             if rem_tokens:
                 fields["reminders"] = posted.get("reminders") or []
             _patch_task_cache(tid, **fields)
+            commute_line = _commute_follow(api, posted, tid, pid, fields, prev=_prev_row)
 
             task_title = md_links_display(os.environ.get("task_title", "Task"))
             verb = "Rescheduled" if had_date else "Scheduled"
@@ -655,7 +686,7 @@ def main():
             mins = int((e - s).total_seconds() // 60)
             h, m = divmod(mins, 60)
             dur = (f"{h}h {m}m" if h and m else f"{h}h" if h else f"{m}m")
-            print(f"{verb} · {task_title}\n🟢 {start_disp} → {end_disp}  ({dur})")
+            print(f"{verb} · {task_title}\n🟢 {start_disp} → {end_disp}  ({dur}){commute_line}")
 
         elif arg.startswith(("dup_date:", "dup_span:")):
             # dup_date:pid:tid:iso[;R:..] / dup_span:pid:tid:start|end[;R:..]
@@ -672,22 +703,34 @@ def main():
             new_root, kids, problems = duplicate.run(
                 api, api_v2.TickTickV2(), pid, tid, start_iso, end_iso, extra)
             _cache_new_tasks([new_root] + kids)
+            commute_line = _commute_follow(api, new_root, new_root.get("id"), pid, {}, fresh=True)
             task_title = md_links_display(new_root.get("title") or os.environ.get("task_title", "Task"))
             when_disp = utc_to_long_display(new_root.get("startDate") or new_root.get("dueDate") or start_iso)
             n = len(kids)
             kid_note = f" · {n} subtask{'' if n == 1 else 's'}" if n else ""
             warn = f"\n⚠️ {problems[0]}" if problems else ""
-            print(f"📑 Duplicated · {task_title}\n🟢 {when_disp}{kid_note}{warn}")
+            print(f"📑 Duplicated · {task_title}\n🟢 {when_disp}{kid_note}{warn}{commute_line}")
 
         elif arg.startswith("attr_cleardate:"):
             # attr_cleardate:projectId:taskId
             raw = arg[15:]
             pid, tid = raw.split(":", 1)
             api = TickTickAPI(cfg.get_token())
-            api.update_task(tid, pid, current=_cached_task(tid), startDate=None, dueDate=None)
+            _prev_row = dict(_cached_task(tid) or {})   # 🚗 the span before the write
+            posted = api.update_task(tid, pid, current=_cached_task(tid), startDate=None, dueDate=None) or {}
             _patch_task_cache(tid, startDate=None, dueDate=None)
+            # 🚗 a booking off the calendar has nothing to commute to: its
+            # OPEN linked commutes go to TickTick Trash (src/commute.py)
+            commute_line = ""
+            try:
+                import commute
+                if commute.is_booking(posted or _prev_row):
+                    _cn, _n = commute.drop(api, tid, ref=_prev_row)
+                    commute_line = f"\n{_cn}" if _cn else ""
+            except Exception:
+                pass
             task_title = md_links_display(os.environ.get("task_title", "Task"))
-            print(f"{task_title} · Unscheduled")
+            print(f"{task_title} · Unscheduled{commute_line}")
 
         elif arg.startswith("attr_priority:"):
             # attr_priority:projectId:taskId:priorityInt
@@ -845,7 +888,17 @@ def main():
             pid, tid = parts[0], parts[1]
             title = parts[2] if len(parts) > 2 else "Task"
             api = TickTickAPI(cfg.get_token())
+            _row = dict(_cached_task(tid) or {})   # 🚗 read before the purge
             api.delete_task(pid, tid)
+            # 🚗 a deleted booking's open commutes go with it (src/commute.py)
+            commute_line = ""
+            try:
+                import commute
+                if commute.is_booking(_row):
+                    _cn, _n = commute.drop(api, tid, ref=_row)
+                    commute_line = f"\n{_cn}" if _cn else ""
+            except Exception:
+                pass
             try:
                 # all_notes too - the CRM records pickers read it, and a
                 # deleted customer/logbook otherwise haunts them until the
@@ -858,7 +911,7 @@ def main():
                 _patch_project_data(tid, pid_old=pid, remove=True)
             except Exception:
                 cache_store.invalidate("all_tasks")
-            print(f"{md_links_display(title)} deleted")
+            print(f"{md_links_display(title)} deleted{commute_line}")
 
         elif arg.startswith("create_project_meta:"):
             # create_project_meta:<base64 {name, tag, emoji}>
@@ -1100,6 +1153,27 @@ def main():
             # bookings keep the follow-up.
             _s = re.search(r"^S(\d+)\s|\bS(\d+)\s*$", title or "")
             _continuation = bool(_s and int(_s.group(1) or _s.group(2)) >= 2)
+            # 🚗 Commutes (Vex 2026-09-26): EVERY booking - S1, S5, a
+            # consult - gets its two legs in 📅Calendar scheduling before
+            # the Prepare window opens (src/commute.py owns the rules; the
+            # payload's stamps are the canonical UTC form, the response's
+            # the fallback). Best-effort: a commute failure never costs the
+            # booking, the toast says which leg failed.
+            commute_note = ""
+            if (CRM_ID and proj_id == CRM_ID and result and result.get("id")
+                    and (tags_lc & BOOKING_TAGS)):
+                try:
+                    import commute
+                    _bk = dict(result)
+                    _bk["projectId"] = result.get("projectId") or proj_id
+                    _bk["title"] = title
+                    _bk["tags"] = sorted(tags_lc)
+                    _bk["startDate"] = payload.get("startDate") or result.get("startDate")
+                    _bk["dueDate"] = payload.get("dueDate") or result.get("dueDate")
+                    _cn, _made, _moved, _rm = commute.sync(api, _bk, fresh_booking=True)
+                    commute_note = f"\n{_cn}" if _cn else ""
+                except Exception as e:
+                    commute_note = f"\n🚗 commute failed · {type(e).__name__}"
             if (CRM_ID and proj_id == CRM_ID and result and result.get("id")
                     and (tags_lc & BOOKING_TAGS) and not _continuation):
                 # Link-bearing titles (records S1/Consult bookings) must NOT
@@ -1112,7 +1186,7 @@ def main():
                     f"Prepare for {_ref} *")   # ' *' = open on the date picker
 
             notif = payload.get("_notif_text") or f"Task added to {payload.get('listName') or 'Inbox'}"
-            print(notif + kid_note + attach_note)
+            print(notif + kid_note + attach_note + commute_note)
 
             # Post-create chaining (the / menu's +stage / +focus rows; the
             # preview row's ⌘/⇧⌘ chords add _post_fstart): stage

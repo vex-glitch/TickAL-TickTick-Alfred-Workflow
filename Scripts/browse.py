@@ -3699,8 +3699,14 @@ def render_crmcal(query):
         uid="crmcal-new", title="➕ New entry",
         subtitle="Tattoo · consultation · customer · lead",
         arg="xact:crmbrowse:ctx:manage:crm", mods=_picker_mods())
+    # 🚗 the manual commute road (HANDOFF_CRM §11): bookings ahead get
+    # their legs, strays go. Manual by rule - no background automation.
+    commutes = alfred.item(
+        uid="crmcal-commute", title="🚗 Sync commutes",
+        subtitle="Legs for every booking ahead · strays go",
+        arg="xact:commute_sync", mods=_picker_mods())
     return _crmlist_drill("crmcal", "📅", "Calendar", _areas.CRM_ID,
-                          "ca", query, extra=(week, new))
+                          "ca", query, extra=(week, new, commutes))
 
 
 def render_crmcusts(query):

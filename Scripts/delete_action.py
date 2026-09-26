@@ -65,11 +65,19 @@ if tid == "BUFFER":
         import xact
         api = TickTickAPI(cfg.get_token())
         done = 0
+        legs = 0
         for ln in xact.buffer_ids():
             bpid, btid = ln.split(":", 1)
+            _row = dict(cache_store.find_task(btid) or {})   # 🚗 before the purge
             try:
                 api.delete_task(bpid, btid)
                 done += 1
+                try:                      # 🚗 a booking's open legs go too
+                    import commute
+                    if commute.is_booking(_row):
+                        legs += commute.drop(api, btid, ref=_row)[1]
+                except Exception:
+                    pass
                 cached = cache_store.get("all_tasks")
                 if cached is not None:
                     cache_store.set("all_tasks",
@@ -78,7 +86,8 @@ if tid == "BUFFER":
             except Exception:
                 pass
         open(run_path("tickal_buffer.txt"), "w").close()
-        print(f"🅿️ {done} tasks deleted · they're in TickTick's Trash")
+        print(f"🅿️ {done} tasks deleted · they're in TickTick's Trash"
+              + (f" · 🚗 {legs} commute{'s' if legs != 1 else ''}" if legs else ""))
     except Exception as e:
         print(f"Delete failed: {e}")
         sys.exit(1)
@@ -125,7 +134,17 @@ if not pid or not tid:
 
 try:
     api = TickTickAPI(cfg.get_token())
+    _row = dict(cache_store.find_task(tid) or {})   # 🚗 read before the purge
     api.delete_task(pid, tid)
+    # 🚗 a deleted booking's open commutes go with it (src/commute.py)
+    commute_line = ""
+    try:
+        import commute
+        if commute.is_booking(_row):
+            _cn, _n = commute.drop(api, tid, ref=_row)
+            commute_line = f"\n{_cn}" if _cn else ""
+    except Exception:
+        pass
 
     cached = cache_store.get("all_tasks")
     if cached is not None:
@@ -134,7 +153,7 @@ try:
         cache_store.invalidate("all_tasks")
     _patch_project_data(tid, pid_old=pid, remove=True)
 
-    print(f"{task_title} deleted")
+    print(f"{task_title} deleted{commute_line}")
 
 except Exception as e:
     print(f"Delete failed: {e}")

@@ -76,6 +76,7 @@ test:
 	@$(PYTHON) tests/test_mela_cal.py
 	@$(PYTHON) tests/test_row_display.py
 	@$(PYTHON) tests/test_review_rebuild.py
+	@$(PYTHON) tests/test_commute.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:

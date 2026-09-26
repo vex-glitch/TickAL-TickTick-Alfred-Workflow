@@ -26,7 +26,18 @@ dispatch._order_children lesson).
 """
 from datetime import datetime, timedelta
 
+import re
 import focus_subtasks as fsub
+
+# 🚗 a commute's "to/from [booking](…/tasks/<tid>)" line marks it as that
+# booking's leg (src/commute.py); a copy made from it must not inherit
+# the claim, or the booking's cancel would trash the copied trip
+_LEG_LINE = re.compile(r"^\s*🚗\s+(?:to|from)\s+\[[^\]]*\]\(https?://ticktick\.com/"
+                       r"webapp/#p/[^)]*/tasks/[^)]*\)\s*$", re.M)
+
+
+def _copy_content(content):
+    return _LEG_LINE.sub("", content or "").strip() or None
 
 _FMT = "%Y-%m-%dT%H:%M:%S"
 
@@ -80,7 +91,7 @@ def plan(root, open_desc, start_iso, end_iso=None, extra_reminders=()):
         "fields": {k: v for k, v in {
             "title": root.get("title") or "Task",
             "project_id": root.get("projectId"),
-            "content": root.get("content") or None,
+            "content": _copy_content(root.get("content")),
             "priority": root.get("priority") or 0,
             "tags": root.get("tags") or None,
             "column_id": root.get("columnId") or None,
@@ -94,7 +105,7 @@ def plan(root, open_desc, start_iso, end_iso=None, extra_reminders=()):
         f = {
             "title": t.get("title") or "Task",
             "project_id": t.get("projectId") or root.get("projectId"),
-            "content": t.get("content") or None,
+            "content": _copy_content(t.get("content")),
             "priority": t.get("priority") or 0,
             "tags": t.get("tags") or None,
             "kind": t.get("kind") or None,

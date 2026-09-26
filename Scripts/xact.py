@@ -1991,13 +1991,25 @@ def sessiondone(pid, tid, when=None):
         except Exception as e:
             _crm_say(f"Complete failed: {type(e).__name__}: {e}")
             return
+        # 🚗 a cancelled booking has nothing to commute to - its OPEN linked
+        # commutes go to Trash. A no-show keeps them: he travelled, the
+        # legs happened (src/commute.py).
+        commute_bit = ""
+        if kind_word == "cancelled":
+            try:
+                import commute
+                _cn, _n = commute.drop(_api(), tid,
+                                       ref=cache_store.find_task(tid) or {})
+                commute_bit = f" · {_cn}" if _cn else ""
+            except Exception:
+                pass
         try:
             text = f"{marker} {kind_word}." + (f" {note.strip()}" if note.strip() else "")
             content, money, n, live_title = cr.append_session(
                 log_pid, log_tid, kind_word, charged=kept, text=text, when=when)
             lb_title = live_title or lb_title
         except Exception as e:
-            _crm_say(f"Logged FAILED: {type(e).__name__}: {e}")
+            _crm_say(f"Logged FAILED: {type(e).__name__}: {e}{commute_bit}")
             return
         # S<n> stays reserved (non-S entry) - offer the rebook straight away.
         label = f"Rebook {marker}"
@@ -2008,7 +2020,7 @@ def sessiondone(pid, tid, when=None):
         elif pick == "Open logbook":
             subprocess.run(["open", lb_deeplink], check=False)
         _crm_say(f"{'👻' if kind_word == 'no-show' else '🚫'} {marker} "
-                 f"{kind_word} logged · {money} / {n} total")
+                 f"{kind_word} logged · {money} / {n} total{commute_bit}")
         return
 
     # ✅ Happened - Esc aborts before anything is completed or written.
@@ -2520,6 +2532,20 @@ def crmsched(pid, tid):
     _run_trigger("attributeScheduling")
 
 
+def commute_sync():
+    """🚗 Sync commutes (CRM > 📅 Calendar row): every booking ahead gets
+    its legs, strays go - the manual road for anything changed inside the
+    TickTick app and for the bookings older than the feature
+    (src/commute.py sweep). Manual by rule: no background automation."""
+    import commute
+    try:
+        line = commute.sweep(_api())
+    except Exception as e:
+        _crm_say(f"🚗 Sync failed: {type(e).__name__}: {e}")
+        return
+    _crm_say(line)
+
+
 def crmprep(pid, tid):
     """🔥 Prepare for an existing booking: open the Add window prefilled with
     the proven Prepare query (same shape as the booking auto-flow and the ⌘
@@ -2656,11 +2682,20 @@ def crm_trash(tid, why=""):
     n_cal = sum(len(v) for v in cal.values())
     n_fid = sum(1 for lb in lbs
                 if cr.eagle_folder_of(lb.get("content") or "")[0])
+    try:                                  # 🚗 the legs the trail takes along
+        import commute
+        _cpool = commute.cached_pool()
+        n_com = sum(len(commute.linked(_cpool, ct["id"]))
+                    for lb in lbs for ct in (cal.get(lb["id"]) or []))
+    except Exception:
+        n_com = 0
     also = []
     if is_person and lbs:
         also.append(f"{len(lbs)} logbook{'s' if len(lbs) > 1 else ''}")
     if n_cal:
         also.append(f"{n_cal} calendar task{'s' if n_cal > 1 else ''}")
+    if n_com:
+        also.append(f"{n_com} commute{'s' if n_com > 1 else ''}")
     if n_fid:
         also.append("Eagle items → Eagle Trash")
     tail = (" Takes along: " + " · ".join(also) + ".") if also else ""
@@ -2671,6 +2706,7 @@ def crm_trash(tid, why=""):
         return
     api = cr._api()
     killed_cal, done_notes, eagle_bits = 0, 0, []
+    killed_commute = 0
 
     def _gone():
         """Mid-cascade abort must not hide what ALREADY went (review
@@ -2698,7 +2734,12 @@ def crm_trash(tid, why=""):
                 cr.purge_cache(ct["id"], ct_pid)
                 killed_cal += 1
             except Exception:
-                pass                      # toast shows killed/planned
+                continue                  # toast shows killed/planned
+            try:                          # 🚗 its open commutes go too
+                import commute
+                killed_commute += commute.drop(api, ct["id"], ref=ct)[1]
+            except Exception:
+                pass
         if not is_person:
             cr.drop_customer_bullet(lb)   # cascade kills the whole note
         bit = _eagle_trash_folder(lb)
@@ -2716,6 +2757,8 @@ def crm_trash(tid, why=""):
     if n_cal:
         bits.append(f"{killed_cal}/{n_cal} tasks" if killed_cal < n_cal
                     else f"{killed_cal} task{'s' if killed_cal > 1 else ''}")
+    if killed_commute:
+        bits.append(f"🚗 {killed_commute} commute{'s' if killed_commute > 1 else ''}")
     bits += eagle_bits
     _crm_say(" · ".join(bits))
 
@@ -12898,6 +12941,8 @@ def main():
         elif verb == "crmsched":
             pid, tid = rest.split(":", 1)
             crmsched(pid, tid)
+        elif verb == "commute_sync":
+            commute_sync()
         elif verb == "crmprep":
             pid, tid = rest.split(":", 1)
             crmprep(pid, tid)
