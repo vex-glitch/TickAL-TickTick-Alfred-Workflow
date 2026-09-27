@@ -28,6 +28,8 @@ install: bundle
 # Tests never start background follow-ups against the real account (the
 # daily note catch-up, the repeat settle). The suites that run a completion
 # road set it themselves too, for standalone runs.
+# The last line, test_harness, names any test file that would break the
+# all-in-one run (python3 -m unittest discover -s tests): tests/harness.py.
 test: export TICKAL_NO_SETTLE := 1
 test:
 	@$(PYTHON) tests/test_periodic.py
@@ -82,6 +84,7 @@ test:
 	@$(PYTHON) tests/test_row_display.py
 	@$(PYTHON) tests/test_review_rebuild.py
 	@$(PYTHON) tests/test_commute.py
+	@$(PYTHON) tests/test_harness.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────
 test-api:
