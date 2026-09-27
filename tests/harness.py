@@ -43,7 +43,10 @@ already, so its two fixture rows replaced all_tasks in the LIVE
 
    For as long as that module's tests run, the variables are set, areas is
    read again under them and the copies follow; afterwards all of it is put
-   back. The suite is then green whatever ran before it.
+   back. The suite is then green whatever ran before it. What a file does
+   under `if __name__ == "__main__":` is its own business, since run on its
+   own the process is its own: tests/test_photos_roads.py moves HOME to a
+   scratch dir there, before it imports the product.
 
 KNOWN_RED names the script suites that are red on their OWN, each with the
 reason. Discover reports them as expected failures, so the run stays green
@@ -71,14 +74,10 @@ ENV0 = dict(os.environ)
 os.environ.setdefault("TICKAL_NO_SETTLE", "1")
 
 TIMEOUT = 600          # seconds one script suite may take
-KNOWN_RED = {
-    "test_review_20260924":
-        "red on its own since 93b0dd9: xact.pn_journal asks journal_seed for "
-        "want_body=True and this file's fake _JPE.journal_seed does not take "
-        "it, so the run dies with a TypeError in its R13 block (54 of 54 pass "
-        "once the fake takes the keyword). It is a review work order, never "
-        "edited to pass, and not part of `make test`.",
-}
+# {"test_x": "why it is red on its own, and since when"}. Empty since
+# 2026-09-27: test_review_20260924 was the one entry (its fake journal_seed
+# did not take want_body) until the yearly round, efc288e, taught it.
+KNOWN_RED = {}
 # Modules that read os.environ at IMPORT (the Configure panel).
 ENV_READERS = ("areas",)
 
