@@ -1027,8 +1027,12 @@ def refresh_period(p, index=None, force=False):
             # guard left alone - harmless on a new one, which has no such
             # section and whose 💰 Income _fill_monthly just wrote
             _fill_rollup_money(doc, p, index)
-        else:
-            _fill_rollup_money(doc, p, index)
+        # NO else: a daily and a weekly have no roll-up. When the early OKR
+        # fill split this chain in two (3d91ace, 2026-09-24) they fell into
+        # the yearly's branch, and a refresh wrote the year's four quarter
+        # lines over any section of theirs named 💰 Money: the day's own
+        # money entries in a daily of the layout before 2026-09-12
+        # (review 2026-09-27)
         # 🥅 OKRs, every tier, LIVE window only (a sealed note keeps the plan
         # it had). Last, so it reads the goals the fillers above just
         # mirrored. Never allowed to cost the rest of the refresh: it reads
@@ -3137,6 +3141,8 @@ def _fill_rollup_money(doc, p, index):
     """Monthly/quarterly/yearly 💰 (v3.0 scope). Missing-history rule: a span
     with ZERO daily notes keeps its existing lines (deleted dailies must not
     rot old roll-ups to 0)."""
+    if p.kind not in ("monthly", "quarterly", "yearly"):
+        return                          # a day and a week have no roll-up
     day_sums = _day_sums(index)
     if not any(p.start <= d <= p.end for d in day_sums):
         return

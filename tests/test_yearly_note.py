@@ -495,11 +495,17 @@ seeded = pm.journal_pairs(ps.find(y1, pm.SEC_YR_JNL).body)
 check("8.a fresh note seeds the set block and the ten", len(seeded) == len(pm.journal_fixed("yearly", pe.journal_ctx("yearly", y1, Y.start))) + 10, len(seeded))
 
 # ── 9. the relayout of the live 2026 note ───────────────────────────────────
-try:
-    import relayout_yearly as ry
-except Exception as e:                                   # noqa: BLE001
-    ry = None
-    check("9.tools/pnrepair/relayout_yearly.py imports", False, repr(e))
+# tools/pnrepair is local to the maintainer's machine (/tools/ is ignored):
+# a checkout without it skips this section, a tool that is there and does
+# not import is a red
+ry = None
+if os.path.exists(os.path.join(ROOT, "tools", "pnrepair", "relayout_yearly.py")):
+    try:
+        import relayout_yearly as ry
+    except Exception as e:                               # noqa: BLE001
+        check("9.tools/pnrepair/relayout_yearly.py imports", False, repr(e))
+else:
+    print("  9. skipped (tools/pnrepair is local to the maintainer's machine)")
 if ry:
     typed = OLD.replace("##### 📝 Year in one paragraph\n", "##### 📝 Year in one paragraph\nThe year I built the system.\n")
     o = ps.parse_sections(typed)
