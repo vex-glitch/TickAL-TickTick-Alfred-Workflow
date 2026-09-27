@@ -29,6 +29,14 @@ import periodic_model as pm
 import periodic_engine as pe
 import tempfile
 pe.LOG_FILE = os.path.join(tempfile.mkdtemp(), "periodic.log")   # never the real log (review 2026-09-24)
+# today is PINNED to the day these checks were written for: the fillers only
+# fill a period that is running, so without the pin this file went red the
+# day after its month or quarter closed (found 2026-09-27, the yearly round)
+pe._today = lambda: date(2026, 9, 17)
+# ...and with the period running for good, the fillers' Tier-2 half (focus,
+# habits, birthdays, dates: the v2 API with his session token) is OFF here:
+# none of these checks reads it (review 2026-09-27)
+pe._tier2 = lambda: None
 import periodic_journal as pj
 
 P = F = 0

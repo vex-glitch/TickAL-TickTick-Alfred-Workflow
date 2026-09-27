@@ -101,7 +101,7 @@ Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆
 	- 🔑 Goals wf
 ```
 
-The daily shows all five periods, the weekly four, the monthly three, the quarterly two, the yearly one. It is the plan only: the goals you pick stay in 🏆 Goals below. The yearly note's 🎯 Goals scorecard lists every objective with its progress bar and span. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
+The daily shows all five periods, the weekly four, the monthly three, the quarterly two, the yearly one. It is the plan only: the goals you pick stay in 🏆 Goals below (the yearly's too, under 🎉 Yearly goal, since 2026-09-27). The yearly note's 🎯 Goals scorecard lists every objective with its progress bar and span. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
 
 **Aligned work (weekly note):** the weekly note's 📊 Stats carries
 

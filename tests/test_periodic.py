@@ -720,15 +720,16 @@ check("22.stars-refuse", pm.answer_stars("0") == "" and pm.answer_stars("x") == 
       and pm.answer_stars("") == "" and pm.answer_stars(None) == "")
 check("22.stars-cap", pm.answer_stars("9") == "")
 check("22.money-no-longer-seeded-daily",
-      pm.SEC_MONEY not in pm.WRITER_ANCHORS["daily"]
-      and pm.SEC_MONEY in pm.WRITER_ANCHORS["yearly"])
+      pm.SEC_MONEY not in pm.WRITER_ANCHORS["daily"])
 # the monthly and the quarterly call it 💰 Income under 💿 Data since Vex's
-# 2026-09-17 layouts, the weekly's name one tier up - 💰 Money is the yearly
-# roll-up, and the only tier still shaped the old way
+# 2026-09-17 layouts, the weekly's name one tier up - and the yearly since
+# its own relayout (2026-09-27): no tier seeds a 💰 Money section any more,
+# and the roll-up only still writes one into a note minted under the old
+# skeleton
 check("22.money-is-income-from-the-weekly-up",
       all(pm.SEC_INCOME in pm.WRITER_ANCHORS[k]
           and pm.SEC_MONEY not in pm.WRITER_ANCHORS[k]
-          for k in ("weekly", "monthly", "quarterly")))
+          for k in ("weekly", "monthly", "quarterly", "yearly")))
 
 # ── 23. append_body into a BULLET block (Vex 2026-09-12: "I tried adding a
 # win, it did nothing") - a Block's .body is a COPY, so the old in-place

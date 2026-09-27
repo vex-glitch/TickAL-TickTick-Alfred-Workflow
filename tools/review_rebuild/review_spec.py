@@ -1,5 +1,7 @@
 """The three ♻️ review trees as agreed on 2026-09-25 (the Review Trees page, v2;
-tools/stoic_library/review_proposal.md holds Vex's rulings verbatim).
+tools/stoic_library/review_proposal.md holds Vex's rulings verbatim), the two
+daily routines (same night), and the 🎉 Yearly Review (2026-09-27, the Yearly
+Note Round page; tools/stoic_library/yearly_proposal.md).
 
 Pure data. A node is (title, children): `title` is the exact TickTick title to
 write, markdown links included; `children` a list of nodes. Lines that keep an
@@ -28,18 +30,23 @@ PARENT = {"weekly":    "6aa4eaad7c035e06a3686a2f",
           "monthly":   "6aa517f607a3ba2e0339b7bd",
           "quarterly": "6aa520b28f084b1907ea08e2",
           "startup":   "6a9faa51635ed1022425af34",   # the two daily routines,
-          "shutdown":  "6a268ea28f081f1de80eb10b"}   # reviewed 2026-09-25 late
+          "shutdown":  "6a268ea28f081f1de80eb10b",   # reviewed 2026-09-25 late
+          "yearly":    "6ab90aa78f086a6e16acfa9c"}   # made 2026-09-27
 # the parents' own kanban column: new subtasks are born beside their parent
 COLUMN = {"weekly":    "6aa4f1337c035e06a3687ff7",
           "monthly":   "6aa517bd07a3ba2e0339b7b5",
           "quarterly": "6aa51eac07a3ba2e0339cdce",
           "startup":   "6a268ea18f081f1de80eadd5",
-          "shutdown":  "6a268ea18f081f1de80eadd4"}
+          "shutdown":  "6a268ea18f081f1de80eadd4",
+          "yearly":    "6ab90a9e8f087177095cc85a"}   # made 2026-09-27
 
 # last day of the month: probe-verified 2026-09-25 on a throwaway task
 # (30 Sep completed -> 31 Oct -> 30 Nov), so February gets its 28th or 29th
 REPEAT = {"monthly":   "RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=-1",
-          "quarterly": "RRULE:FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=-1"}
+          "quarterly": "RRULE:FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=-1",
+          # the same rule with a longer stride, from 31 December: the last
+          # day of the year, the monthly's and the quarterly's day
+          "yearly":    "RRULE:FREQ=MONTHLY;INTERVAL=12;BYMONTHDAY=-1"}
 
 KM = {"inboxes":  "9476B133-2F11-4405-BADA-4E58E314C1D0",   # Process Inboxes
       "spark":    "4E7D2C37-C0C3-4B4B-9CCE-952D68E16BE3",
@@ -78,6 +85,12 @@ def tag_url(name):
 
 def filter_url(key):
     return f"ticktick:///webapp/#f/{FILTER[key]}/tasks"
+
+
+def task_url(tid, pid=None):
+    """A task opened in the TickTick app: the router the inbox link proved,
+    the shape the Shutdown routine's own url step uses."""
+    return f"ticktick:///webapp/#p/{pid or LIST}/tasks/{tid}"
 
 
 def L(text, url):
@@ -256,6 +269,52 @@ def quarterly():
     ]
 
 
+def yearly():
+    """Vex 2026-09-27 (🟢 on the Yearly Note Round page): the quarterly's
+    shape one tier up. The quarterly runs FIRST: on 31 December the monthly,
+    the quarterly and the yearly are all due, and each Start quits and
+    relaunches TickTick and takes the focus timer, so they run one after
+    the other, never inside each other. Line one therefore OPENS the
+    quarterly's task and starts nothing: its own first line is "Run the
+    Monthly Review first" and its second its Start, the order he already
+    walks on a quarter end. A routine:quarterly link here would start the
+    quarterly, and the monthly would then be started from inside a running
+    quarterly session: the timer clash of 2026-09-25 (review 2026-09-27).
+    Then only the year's own layer. No inboxes (the monthly's), no hourly
+    rate (the quarterly's), no client archiving (struck 2026-09-25), no
+    audits (parked).
+
+    The portfolio, pricing, client-source, website, tax and backup lines
+    have no door: none of them is one place a link can open. Check OKRs
+    opens the 🥅 hub, where the 🏔️ and 🥅 lines live (📈 Pace has no year
+    period)."""
+    tid, pid = PARENT["yearly"], LIST
+    return [
+        N(L("Run the Quarterly Review first", task_url(PARENT["quarterly"]))),
+        N(A("Yearly Review • Start", "routine", "yearly")),
+        N(L("Money", km("money")),
+          N(A("Check how much money you made this year", "moneysticky")),
+          N(L("Numbers: compare with last year", km("numbers"))),
+          N(L("Numbers: write next year's forecast", km("numbers"))),
+          N(L("YNAB: the year's spending by category, then next year's targets", km("ynab"))),
+          N("Gather the year's documents for the tax return")),
+        N("Work",
+          N("Portfolio: the year's best pieces"),
+          N("Pricing for next year"),
+          N("Where the year's clients came from"),
+          N("Website: the yearly refresh (about, prices, portfolio)")),
+        N("TickTick",
+          N(A("Check OKRs: the year's objectives", "view", "okr"),
+            N(A("Set next year's OKRs", "view", "okr"))),
+          N(A("Check this year and next year", "view", "calendar")),
+          N("Year-end system pass",
+            N(L("Archive the year's finished projects", filter_url("projects"))),
+            N("Back up TickTick, Obsidian, Eagle and Keyboard Maestro"))),
+        N(A("📔 Yearly journal", "journal", "yearly")),
+        N(A("Finish Yearly Review", "done", tid, pid)),
+    ]
+
+
 def startup():
     """Vex 2026-09-25 (🟢 on the review): the YNAB link by UID (two macros
     are called YNAB), "alligns" spelled right. Everything else as it was."""
@@ -316,7 +375,7 @@ def shutdown():
 
 
 TREES = {"weekly": weekly, "monthly": monthly, "quarterly": quarterly,
-         "startup": startup, "shutdown": shutdown}
+         "startup": startup, "shutdown": shutdown, "yearly": yearly}
 
 # a reworded line -> the live title(s) it replaces (flattened, casefolded)
 ALIASES = {

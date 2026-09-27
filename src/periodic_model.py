@@ -152,6 +152,16 @@ SEC_QBARS      = "Monthly Completed"      # per-month bars
 SEC_LAST_QTR   = "⏪ Last quarter"
 SEC_QTR_JNL    = "📔 Quarterly journal"
 SEC_QREVIEW    = "♻️ Quarterly Review"
+# yearly - the quarterly's shape one tier up, counted by QUARTER (Vex
+# 2026-09-27, 🟢 on the Yearly Note Round page). The top of the pyramid: no
+# mirror bullet, only his own goal; the 🎯 Goals scorecard stays as the
+# plan's section. The old skeleton's names (further down) are kept for the
+# relayout tool and for a note minted under it.
+SEC_YR_GOAL    = "🎉 Yearly goal"          # THIS year's own (the quarterly mirrors it)
+SEC_YBARS      = "Quarterly Completed"    # per-quarter bars
+SEC_LAST_YEAR  = "⏪ Last year"
+SEC_YR_JNL     = "📔 Yearly journal"
+SEC_YREVIEW    = "♻️ Yearly Review"
 SEC_MONTH_GOAL = "🎯 Month goal"          # what monthly notes called it before
 SEC_SPARKS     = "📊 Sparklines"
 SEC_TOP_WINS   = "🏆 Top wins"
@@ -184,7 +194,9 @@ GOAL_SECTION = {
     "weekly":    SEC_WK_WEEK,       # the bullet, not the whole section
     "monthly":   SEC_MTH_MONTH,
     "quarterly": SEC_QTR_QTR,
-    "yearly":    SEC_SCORECARD,
+    # the bullet under 🏆 Goals since 2026-09-27; before it the yearly goals
+    # shared the 🎯 Goals scorecard with the plan's lines (GOAL_SECTION_ALT)
+    "yearly":    SEC_YR_GOAL,
 }
 
 
@@ -192,7 +204,8 @@ GOAL_SECTION = {
 # current name first and these after it, so a note minted under an older
 # template still answers (and is never silently written twice).
 GOAL_SECTION_ALT = {"monthly": [SEC_MONTH_GOAL],
-                    "quarterly": [SEC_OKR_REVIEW]}
+                    "quarterly": [SEC_OKR_REVIEW],
+                    "yearly": [SEC_SCORECARD]}
 
 
 # ⏭ in a goal screen's query = that screen aimed at the NEXT period, by hand
@@ -264,7 +277,12 @@ WRITER_ANCHORS = {
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
                   SEC_MDATES, SEC_PEOPLE, SEC_LAST_QTR, SEC_QTR_JNL,
                   SEC_QREVIEW],
-    "yearly":    [SEC_OKR, SEC_MONEY],
+    "yearly":    [SEC_OKR, SEC_YR_GOAL, SEC_SCORECARD, SEC_HIGHLIGHT,
+                  SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
+                  SEC_YBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
+                  SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
+                  SEC_MDATES, SEC_PEOPLE, SEC_LAST_YEAR, SEC_YR_JNL,
+                  SEC_YREVIEW],
 }
 
 # Which GROUP header an anchor lives under, per tier. A weekly note now
@@ -303,6 +321,19 @@ SECTION_SCOPE = {
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_QBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
+        SEC_HABIT_WEEK: SEC_WK_STATS,
+        SEC_HL_WEEK: SEC_WK_DATA,
+        SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
+        SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
+        SEC_MDATES: SEC_WK_DATA,
+    },
+    # and once more for the year: the same groups, the same bullet names,
+    # counted by quarter
+    "yearly": {
+        SEC_YR_GOAL: SEC_GOALS,
+        SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
+        SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
+        SEC_YBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
         SEC_HABIT_WEEK: SEC_WK_STATS,
         SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
@@ -1783,7 +1814,7 @@ JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)
 # 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
 # live day-goal / weekly-goals text baked into the prompt.
 JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5,
-                    "monthly": 5, "quarterly": 5}   # the legacy draw: a plain {'random'} dict, or a date before a tier's epoch
+                    "monthly": 5, "quarterly": 5, "yearly": 5}   # the legacy draw: a plain {'random'} dict, or a date before a tier's epoch
 
 # The daily random block (Vex 2026-09-24): SIX prompts, two per category.
 # The morning draws its three categories every day; the evening draws three
@@ -1815,6 +1846,12 @@ MONTH_EPOCH = date(2026, 10, 1)
 # journal was reseeded clean (it was all unanswered).
 QUARTERLY_CATEGORIES = ("lookback", "lessons", "decisions", "direction", "system")
 QUARTER_EPOCH = date(2026, 7, 1)
+# The yearly random block (Vex 2026-09-27, the categories ruled on the page):
+# TEN prompts, two from every category, cycling per category by YEAR, from a
+# pool of thirty (six a category: each prompt is asked once in three years).
+# YEAR_EPOCH is the first year seeded: 2026, whose note never had a journal.
+YEARLY_CATEGORIES = ("lookback", "lessons", "people", "letting go", "direction")
+YEAR_EPOCH = date(2026, 1, 1)
 
 
 def _clip(s, n=140):
@@ -1906,6 +1943,8 @@ def journal_fixed(slot, ctx=None):
         return out
     if slot == "quarterly":
         return _quarterly_fixed(ctx)
+    if slot == "yearly":
+        return _yearly_fixed(ctx)
     if slot == "monthly":
         word = "month"
         # the weekly's two, one tier up. No picker handoff: next month's goal
@@ -2104,6 +2143,90 @@ def _quarterly_fixed(ctx):
     return out
 
 
+def _yearly_fixed(ctx):
+    """The yearly set block (Vex 2026-09-27, 🟢 on the Yearly Note Round
+    page): the quarterly's one tier up, every line quoting what the note
+    already knows, plus the four questions the old skeleton's empty sections
+    were trying to ask (the year in one paragraph, best of, next year's
+    theme, the anti-goals). The year is the top of the pyramid, so the
+    quarterly's "the year's goal with the quarters it has left" becomes this
+    year against last year. Order: look back (three highlights with the
+    quarters' ✨ and the 🟢 wins, three lowlights with the 🔴 nags and the
+    moods), score (his goals, objective by objective + the bar, this year
+    against last with last year's own wish echoed), the lines (habits,
+    income + an expense to cut, effort with the focus hours, passionate or
+    bored), the four from the note, his two forward ones (top three
+    priorities, the pace and where in 12 months), "What is on your mind?"
+    the border before the ten drawn prompts. The 🧪 December test is OUT: it
+    asks about a plan that only exists once the goal editor has run, and the
+    editor opens after the journal.
+
+    Keys: a question whose wording the quarterly already owns keeps the
+    quarterly's key (qlowlights, qeffort, qenergy, qpriorities, qforecast,
+    the way "habits" is shared by three tiers): one rule, one key, and no
+    rule order to get wrong. Two tiers' questions never meet in one note.
+    Conditional lines skip when the note has nothing to quote."""
+    def _s(k):
+        return (ctx.get(k) or "").strip()
+
+    def _q(label, text):
+        return f" {label}: {text}" + ("" if text[-1] in ".!?" else ".")
+    goals, quarters, wins = _s("goals"), _s("quarters"), _s("wins")
+    nags, moods = _s("nags"), _s("moods")
+    out = [
+        ("yhighlight", "✨ What are the three biggest highlights of the year?"
+                       + (_q("Your quarters", quarters) if quarters else "")
+                       + (_q("Your wins", wins) if wins else "")),
+        ("qlowlights", "🔴 What are the three biggest lowlights?"
+                       + (_q("Your nags", nags) if nags else "")
+                       + (_q("Moods", moods) if moods else "")),
+        ("ygoals", (f"Did you achieve your yearly goals, {goals}? "
+                    "Describe success/fail factors on each."
+                    if goals else
+                    "Did you achieve your yearly goals? "
+                    "Describe success/fail factors on each.")),
+    ]
+    objs = _s("objectives")
+    if objs:
+        out.append(("yobjectives", f"🏔️ Objective by objective, {objs}: hit, partial or miss, "
+                                   "and the factor that decided it? Was the bar set too high "
+                                   "or too low?"))
+    compare, wanted = _s("compare"), _s("wanted")
+    if compare or wanted:
+        out.append(("ycompare", "⏪ How does this year compare to last year?"
+                                + (f" {compare}." if compare else "")
+                                + (_q("Last year you wanted", wanted) + " Did you get there?"
+                                   if wanted else "")))
+    habits = _s("habits")
+    if habits:
+        out.append(("habits", f"🔄 Habit consistency this year: {habits}. Which held, "
+                              "which broke, and which habits do you want to build next "
+                              "year?"))
+    money = _s("money")
+    if money:
+        out.append(("ymoney", f"💰 Income this year: {money}. Does this align with your "
+                              "forecast? What could you do to improve it? Can you cut down "
+                              "on any expense category?"))
+    focus = _s("focus")
+    out += [
+        ("qeffort", "⏱ What effort is not worth your time, what are you spending your time "
+                    "on that is not leading towards the desired outcome?"
+                    + (_q("Your focus", focus) if focus else "")),
+        ("qenergy", "🔥 When did you feel most passionate this year, and why then? "
+                    "When did you feel bored or resentful, and why?"),
+        ("ystory", "📝 Tell the year in one paragraph."),
+        ("ybest", "⭐ Best of the year: book, trip, purchase, meal, day."),
+        ("ytheme", "🧭 What is next year's theme, in a few words?"),
+        ("yanti", "🚫 What will you NOT do next year?"),
+        ("qpriorities", "🧭 What are your top three priorities for next year, and why do "
+                        "they matter?"),
+        ("qforecast", "🔮 If you continue at this pace, where will you be in a year? "
+                      "Where do you want to be in 12 months? What do you want to achieve?"),
+        ("free", "What is on your mind?"),
+    ]
+    return out
+
+
 # Which fixed question a seeded Q line IS, by its wording. Every question
 # journal_fixed has ever seeded must match its rule (older wordings too), and
 # no rule may match another key's question or a pool prompt.
@@ -2146,6 +2269,17 @@ JOURNAL_KEY_RULES = (
     ("qenergy", re.compile(r"^🔥 When did you feel most passionate\b")),
     ("qpriorities", re.compile(r"^🧭 What are your top three priorities\b")),
     ("qforecast", re.compile(r"^🔮 If you continue at this pace\b")),
+    # the yearly's own (2026-09-27). Its other questions carry the
+    # quarterly's keys above, whose stems they share (qlowlights, qeffort,
+    # qenergy, qpriorities, qforecast). 🏔 and ⭐ with or without VS16; the
+    # apostrophe as typed or as a phone curls it
+    ("yobjectives", re.compile(r"^🏔\ufe0f? Objective by objective\b")),
+    ("ycompare", re.compile(r"^⏪ How does this year compare\b")),
+    ("ymoney", re.compile(r"^💰 Income this year\b")),
+    ("ystory", re.compile(r"^📝 Tell the year in one paragraph\b")),
+    ("ybest", re.compile(r"^⭐\ufe0f? Best of the year\b")),
+    ("ytheme", re.compile(r"^🧭 What is next year.s theme\b")),
+    ("yanti", re.compile(r"^🚫 What will you NOT do next year\?")),
     # the monthly's OKR checkpoint and money line (2026-09-24, late)
     ("mobjectives", re.compile(r"^🥅 Objective by objective\b")),
     ("qcheck", re.compile(r"^🌓 The quarter's objectives\b")),
@@ -2171,6 +2305,9 @@ JOURNAL_KEY_RULES = (
     # the quarter's: the old single-highlight stem and the three-highlights one
     ("qhighlight", re.compile(r"^(?:✨ )?What (?:was the highlight|are the three biggest highlights) of the quarter\?")),
     ("qgoals", re.compile(r"^Did you achieve your quarterly goals\b")),
+    # the year's
+    ("yhighlight", re.compile(r"^✨ What are the three biggest highlights of the year\?")),
+    ("ygoals", re.compile(r"^Did you achieve your yearly goals\b")),
 )
 
 
@@ -2378,8 +2515,8 @@ def select_prompts(pool, d, which, k=None):
     chain night returns one chain's steps in order (chains rotate by chain
     night, the file's order). The weekly pool: two from EVERY
     WEEKLY_CATEGORIES category, cycling by week index from WEEK_EPOCH; the
-    monthly and the quarterly the same by month / quarter index from their
-    epochs. Everything else - a plain {'random': [...]} dict and any date
+    monthly, the quarterly and the yearly the same by month / quarter / year
+    index from their epochs. Everything else - a plain {'random': [...]} dict and any date
     before the epochs - keeps the old k seeded-random picks from 'random'.
     Fixed prompts live in journal_fixed, not the pool."""
     if k == 0:
@@ -2433,6 +2570,15 @@ def select_prompts(pool, d, which, k=None):
         for c in QUARTERLY_CATEGORIES:
             lst = list(cats.get(c) or [])
             out += _draw(lst, f"quarterly:{c}", qi * JOURNAL_PER_CATEGORY, min(JOURNAL_PER_CATEGORY, len(lst)))
+        return out
+    # the yearly: every category, two each, cycling by year (any day of the
+    # year gives its picks: the note is pinned to its first day)
+    if which == "yearly" and any(c in cats for c in YEARLY_CATEGORIES) and d >= YEAR_EPOCH:
+        yi = year_index(d)
+        out = []
+        for c in YEARLY_CATEGORIES:
+            lst = list(cats.get(c) or [])
+            out += _draw(lst, f"yearly:{c}", yi * JOURNAL_PER_CATEGORY, min(JOURNAL_PER_CATEGORY, len(lst)))
         return out
     rnd_pool = list(pool.get("random", []))
     k = JOURNAL_RANDOM_K.get(which, 3) if k is None else k
@@ -2493,12 +2639,14 @@ _PLAN_GLYPHS = {"🔑", "✅", "🥅", "🏔"}          # okr_notes' item glyphs
 # fixed questions that only exist while the note plans something: dropped
 # again while unanswered when the plan goes (periodic_engine._refresh_fixed_q)
 CONDITIONAL_KEYS = ("kr", "objectives", "habits", "mobjectives", "qcheck", "mmoney",
-                    "qobjectives", "ycheck", "qcompare", "qmoney")
+                    "qobjectives", "ycheck", "qcompare", "qmoney",
+                    "yobjectives", "ycompare", "ymoney")
 # fixed questions that QUOTE free text (a forecast, a KR title): the needle
 # readers and writers skip them, or "rate the day" inside a forecast would
 # catch the stars (review 2026-09-24)
 QUOTING_KEYS = ("fcheck", "kr", "objectives", "habits", "wfcheck", "mobjectives", "qcheck", "mmoney",
-                "qobjectives", "ycheck", "qcompare", "qmoney", "qeffort", "qlowlights", "qhighlight")
+                "qobjectives", "ycheck", "qcompare", "qmoney", "qeffort", "qlowlights", "qhighlight",
+                "yobjectives", "ycompare", "ymoney", "yhighlight")
 
 
 def months_left_in_quarter(d):
@@ -2510,6 +2658,11 @@ def months_left_in_quarter(d):
 def quarters_left_in_year(d):
     """Quarters of d's year AFTER d's quarter: 3, 2, 1 or 0 (the last)."""
     return 4 - ((d.month - 1) // 3 + 1)
+
+
+def year_index(d):
+    """Years from YEAR_EPOCH's to d's (0 in the epoch's)."""
+    return d.year - YEAR_EPOCH.year
 
 
 def quarter_index(d):
@@ -2698,6 +2851,42 @@ def okr_tier_items(body_lines, tier, keep_state=False):
     return [x for x in items if x]
 
 
+# the count is the LAST d/n on the line that the separator, a late chip or
+# the line's end follows: a name may carry one of its own ("Read 12/24
+# books", "24/7 support"), and the bar sits right before the real one
+_SCORE_BAR_RE = re.compile(r"\s*[▰▱]{2,}(?=\s+\d+/\d+)")
+_SCORE_DN_RE = re.compile(r"^(?P<name>.*\S)\s+(?P<dn>\d+/\d+)(?=\s*(?:\u2022|🔴|$))")
+
+
+def scorecard_objectives(body_lines):
+    """The year's objectives off the 🎯 Goals scorecard, names with their
+    d/n ("Onboard TickTicks 0/5"), one top line at a time: each 🏔️ gives
+    its 🥅 lines, or itself when it has none under it (a year planned
+    without a 🏔️ is scored on its top-level 🥅 objectives the same way).
+    Plan lines only (is_plan_line): the goals that once shared this section
+    are not objectives. Links, the bar, the dates and the late chip are
+    dropped."""
+    groups = []                       # [top item, [its 🥅 items]]
+    for ln in body_lines or []:
+        if not is_plan_line(ln):
+            continue
+        s = unescape_md(ln.strip())[2:]
+        _glyph, _, rest = s.partition(" ")
+        rest = _SCORE_BAR_RE.sub("", _MDLINK_RE.sub(r"\1", rest))
+        m = _SCORE_DN_RE.match(re.sub(r"\s+", " ", rest).strip())
+        if not m:
+            continue
+        item = f"{m.group('name')} {m.group('dn')}"
+        if ln[:1] in ("\t", " ") and groups:
+            groups[-1][1].append(item)
+        else:
+            groups.append([item, []])
+    out = []
+    for top, kids in groups:
+        out += kids or [top]
+    return out
+
+
 def seed_journal_lines(prompts):
     lines = []
     for i, q in enumerate(prompts, 1):
@@ -2729,12 +2918,14 @@ def journal_pairs(body_lines):
     return out
 
 
-def journal_answer_text(body_lines, a_idx):
+def journal_answer_text(body_lines, a_idx, sep=" "):
     """The WHOLE answer whose A line is body_lines[a_idx]: the A-line text
     plus the continuation bullets under it (the dialog's multiline box lands
     every further paragraph as a sibling bullet under the A line), joined
-    with a space, bullets and italics stripped. Stops at the next Q line, a
-    divider, or a line no deeper than the Q line. '' when unanswered."""
+    with a space (or `sep`: the year lists a quarter's three highlights and
+    a run-on reads as one), bullets and italics stripped. Stops at the next
+    Q line, a divider, or a line no deeper than the Q line. '' when
+    unanswered."""
     if not (0 < a_idx < len(body_lines)):
         return ""
     m = JOURNAL_A_RE.match(body_lines[a_idx])
@@ -2756,7 +2947,7 @@ def journal_answer_text(body_lines, a_idx):
         t = t.strip().strip("*").strip()
         if t:
             parts.append(t)
-    return " ".join(x for x in parts if x)
+    return sep.join(x for x in parts if x)
 
 
 def highlight_body(text):

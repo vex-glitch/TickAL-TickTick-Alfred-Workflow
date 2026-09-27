@@ -1,0 +1,53 @@
+== review rebuild 2026-09-27 14:24:06 tiers=['yearly'] apply=True
+
+#### yearly: {'keep': 0, 'retitle': 0, 'create': 22, 'delete': 0, 'reopen': 0}
+C - [Run the Quarterly Review first](ticktick:///webapp/#p/6a268ea18f081f1de80eaeb5/tasks/6aa520b28f084b1907ea08e2)
+C - [Yearly Review • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Ayearly)
+C - [Money](kmtrigger://macro=2DC599C6-CDDC-4AE7-8989-731118A89254)
+C   - [Check how much money you made this year](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+C   - [Numbers: compare with last year](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+C   - [Numbers: write next year's forecast](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+C   - [YNAB: the year's spending by category, then next year's targets](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+C   - Gather the year's documents for the tax return
+C - Work
+C   - Portfolio: the year's best pieces
+C   - Pricing for next year
+C   - Where the year's clients came from
+C   - Website: the yearly refresh (about, prices, portfolio)
+C - TickTick
+C   - [Check OKRs: the year's objectives](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokr)
+C     - [Set next year's OKRs](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokr)
+C   - [Check this year and next year](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+C   - Year-end system pass
+C     - [Archive the year's finished projects](ticktick:///webapp/#f/69fedd25018d510d8510c4c2/tasks)
+C     - Back up TickTick, Obsidian, Eagle and Keyboard Maestro
+C - [📔 Yearly journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Ayearly)
+C - [Finish Yearly Review](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6ab90aa78f086a6e16acfa9c%3A6a268ea18f081f1de80eaeb5)
+
+>> applying yearly
+   created 6ab90ae98f086a6e16ad00b1  [Run the Quarterly Review first](ticktick:///webapp/#p/6a268ea18f081f1de80eaeb5/tasks/6aa520b28f084b1907ea08e2)
+   created 6ab90aea8f087177095ccf3a  [Yearly Review • Start](alfred://runtrigger/com.vex.tickal/Link/?argument=routine%3Ayearly)
+   created 6ab90aeb8f087177095ccf47  [Money](kmtrigger://macro=2DC599C6-CDDC-4AE7-8989-731118A89254)
+   created 6ab90aeb8f08d994cf84f5d4  [Check how much money you made this year](alfred://runtrigger/com.vex.tickal/Link/?argument=moneysticky)
+   created 6ab90aec8f087177095ccf7c  [Numbers: compare with last year](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+   created 6ab90aed8f08ffc3120b3126  [Numbers: write next year's forecast](kmtrigger://macro=6B50A0AB-A585-4A97-BF48-0A55530890AF)
+   created 6ab90aee8f08d994cf84f620  [YNAB: the year's spending by category, then next year's targets](kmtrigger://macro=5C82A18F-47A0-4768-8D10-78AC43514CB6)
+   created 6ab90aef8f08d994cf84f633  Gather the year's documents for the tax return
+   created 6ab90af08f08d994cf84f642  Work
+   created 6ab90af18f08d994cf84f64d  Portfolio: the year's best pieces
+   created 6ab90af28f08f1c96f727368  Pricing for next year
+   created 6ab90af38f08d994cf84f66f  Where the year's clients came from
+   created 6ab90af48f08ffc3120b3196  Website: the yearly refresh (about, prices, portfolio)
+   created 6ab90af48f08ffc3120b31ae  TickTick
+   created 6ab90af58f086a6e16ad01d6  [Check OKRs: the year's objectives](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokr)
+   created 6ab90af68f08d994cf84f6ab  [Set next year's OKRs](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Aokr)
+   created 6ab90af78f08d994cf84f6b2  [Check this year and next year](alfred://runtrigger/com.vex.tickal/Link/?argument=view%3Acalendar)
+   created 6ab90af88f087177095cd07e  Year-end system pass
+   created 6ab90af98f086a6e16ad0215  [Archive the year's finished projects](ticktick:///webapp/#f/69fedd25018d510d8510c4c2/tasks)
+   created 6ab90afa8f086a6e16ad022d  Back up TickTick, Obsidian, Eagle and Keyboard Maestro
+   created 6ab90afb8f087177095cd0ae  [📔 Yearly journal](alfred://runtrigger/com.vex.tickal/Link/?argument=journal%3Ayearly)
+   created 6ab90afc8f08d994cf84f709  [Finish Yearly Review](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A6ab90aa78f086a6e16acfa9c%3A6a268ea18f081f1de80eaeb5)
+   batch: 22 bodies (order 22, retitle 0, reopen 0)
+   verify yearly: CLEAN
+   cache all_tasks invalidated
+== done, clean

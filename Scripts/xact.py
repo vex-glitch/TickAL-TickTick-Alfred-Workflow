@@ -209,7 +209,7 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     answer (plain "485 label"; legacy notes
                                     with a 💰 section keep using it)
     xact:pn_journal:<slot>[@<date>] morning|evening|weekly|monthly|
-                                   quarterly - dialog per
+                                   quarterly|yearly - dialog per
                                     unanswered prompt, partial-save,
                                     phone-wins merge (weekly ends in the
                                     three-things picker into next week; the
@@ -7088,6 +7088,12 @@ _OSA_HIDE = """on run argv
 end run"""
 
 
+# the periodic note a routine's default step list opens beside it
+_ROUTINE_SPEC = {"weekly": "weekly", "monthly": "monthly",
+                 "quarterly": "quarterly", "yearly": "yearly",
+                 "meal": "weekly"}
+
+
 def _routine_steps(r):
     """(steps, source) for a routine: the user's routines.json when it holds a
     list for this key, else routine_runner.default_steps. A list that fails
@@ -7096,8 +7102,7 @@ def _routine_steps(r):
     """
     import json as _json
     import routine_runner as rr
-    spec = {"weekly": "weekly", "monthly": "monthly",
-            "quarterly": "quarterly", "meal": "weekly"}.get(r["key"], "daily")
+    spec = _ROUTINE_SPEC.get(r["key"], "daily")
     # "reset": False in the registry = its children are minted per
     # occurrence (🥘 Meal Prep), never reopened (routine_runner.default_steps)
     steps, src = rr.default_steps(spec, reset=r.get("reset", True)), "built-in default"
@@ -7727,7 +7732,13 @@ def _wait_for_pick(tag, sleep=time.sleep, clock=time.time, limit=None):
 
 _JOURNAL_UI = {"morning": ("🌅", "Morning"), "evening": ("🌙", "Evening"),
                "weekly": ("📔", "Weekly"), "monthly": ("📔", "Monthly"),
-               "quarterly": ("📔", "Quarterly")}
+               "quarterly": ("📔", "Quarterly"), "yearly": ("📔", "Yearly")}
+# a tier's ✨ highlight answer -> the tier whose note carries the section
+_HL_TIER = {"mhighlight": "monthly", "qhighlight": "quarterly",
+            "yhighlight": "yearly"}
+# the journals whose run ends in the OPEN-ENDED goal editor, aimed at the
+# next period (the weekly's is its own three-things picker)
+_OPEN_GOAL_SLOTS = ("monthly", "quarterly", "yearly")
 _GOALSEQ = run_path("tickal_pn_goalseq.json")
 
 
@@ -7926,11 +7937,11 @@ def pn_journal(slot):
             # the week's stars: the answer is the record (the next weekly
             # refresh mirrors it into ⏪ Last week)
             a = pm.stars_answer(a) or a
-        elif key in ("mhighlight", "qhighlight"):
-            # the month's and the quarter's ✨, same rule as the week's: the
-            # ANSWER is the record, and the section is only written where one
-            # exists
-            tier = "monthly" if key == "mhighlight" else "quarterly"
+        elif key in _HL_TIER:
+            # the month's, the quarter's and the year's ✨, same rule as the
+            # week's: the ANSWER is the record, and the section is only
+            # written where one exists
+            tier = _HL_TIER[key]
             if pe.has_highlight(tier, day0):
                 routed.append(pe.set_highlight(a, day=day0, kind=tier))
         elif key == "highlight":
@@ -7999,12 +8010,31 @@ def pn_journal(slot):
     # three things; the month and the quarter are open-ended - Vex adds as
     # many as he wants and Escs (2026-09-17: "both monthly and quarterly
     # journals must have question to set goals for the period like weekly").
+    # A journal pinned to a period that has CLOSED (a review run late, the
+    # 📔 door's pin): "the next one" is the period running now, so the
+    # screen opens plain and no handoff aims it a period too far.
+    import dayroll
+    late = _journal_is_late(slot, jper, dayroll.today())
+    if late:
+        _goalseq_save(0, slot)
     if slot == "weekly":
-        _goalseq_save(3)
+        if not late:
+            _goalseq_save(3)
         _run_trigger("Search", "pn goal ")
-    elif slot in ("monthly", "quarterly"):
-        _goalseq_save(None, slot)
+    elif slot in _OPEN_GOAL_SLOTS:
+        if not late:
+            _goalseq_save(None, slot)
         _run_trigger("Search", f"pn goals {slot} ")
+
+
+def _journal_is_late(slot, jper, today):
+    """Did this journal run for a period that is over? Only the review
+    journals can (weekly and up); the daily pair is pinned by its own
+    rules."""
+    import periodic_model as pm
+    if slot not in ("weekly",) + _OPEN_GOAL_SLOTS or jper is None:
+        return False
+    return jper != pm.period_for(slot, today)
 
 
 def _goal_seq_step(toast, kind="weekly"):

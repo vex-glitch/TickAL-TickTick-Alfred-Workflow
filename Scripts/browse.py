@@ -4783,7 +4783,11 @@ def render_rconfirm(ids, query):
         valid=True))
     rows.append(alfred.item(
         uid="rc-prev",
-        title=(f"✅ Last one · {when(prev)}{done_at}" if prev
+        # the rule's slot before the next one is only an occurrence when the
+        # task existed by then: a routine made in September whose rule says
+        # "the last day of the year" never ran on 31 December the year before
+        title=(f"✅ Last one · {when(prev)}{done_at}"
+               if prev and not _before_birth(t, prev)
                else "✅ No earlier occurrence"),
         subtitle=f"Open {name} in TickTick  |  ⏎↗️  ⌃🔙",
         arg=f"open:ticktick:///webapp/#p/{t.get('projectId') or r['pid']}/tasks/{r['tid']}",
@@ -4791,6 +4795,14 @@ def render_rconfirm(ids, query):
         variables={"task_id": r["tid"], "task_list_id": t.get("projectId") or r["pid"],
                    "task_title": name, "item_type": "task"}))
     return add_back(rows, "ctx:routines")
+
+
+def _before_birth(task, day):
+    """Is `day` earlier than the day this task was created? False when the
+    task carries no creation stamp (nothing is claimed either way)."""
+    import routines as _rt
+    born = _rt.local_date((task or {}).get("createdTime"))
+    return bool(born and day and day < born)
 
 
 def render_rtrack(ids, query):

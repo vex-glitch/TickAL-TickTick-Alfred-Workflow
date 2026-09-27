@@ -399,9 +399,11 @@ class _JPE:
         pairs = pm.journal_pairs(pm.seed_journal_lines([q for _k, q in pm.journal_fixed("evening", {})]))
         self.pairs = [(n, q, ("x" if n <= 2 else a), i) for n, q, a, i in pairs]
 
-    def journal_seed(self, slot, day=None):
+    def journal_seed(self, slot, day=None, want_body=False):
         class P:
             start = date(2026, 9, 24)
+        if want_body:          # the chain recap's fourth item (2026-09-25)
+            return pm.journal_keys(self.pairs), self.pairs, P(), []
         return pm.journal_keys(self.pairs), self.pairs, P()
 
     def journal_merge(self, slot, answers, period=None, questions=None):

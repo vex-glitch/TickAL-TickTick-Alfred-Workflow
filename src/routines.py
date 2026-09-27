@@ -42,6 +42,13 @@ ROUTINES = (
      "tid": "6aa520b28f084b1907ea08e2", "pid": ROUTINES_LIST,
      "macro": "28115256-AF19-42FC-A6DA-5CAF2F18D6C6",
      "habit": "6a271c1c30a9d158ed6ab8ad"},          # Quarterly Retreat (90d)
+    # 🎉 Yearly Review (the last day of the year, made 2026-09-27): born
+    # after the routines went native, so it never had a KM macro; its step
+    # list is the routines.json entry, else routine_runner's default
+    {"key": "yearly", "label": "🎉 Yearly Review",
+     "tid": "6ab90aa78f086a6e16acfa9c", "pid": ROUTINES_LIST,
+     "macro": "",
+     "habit": "6ab90ab28f087177095cca05"},          # Yearly Review (365d)
     # 🥘 Meal Prep (Sun 19:00): no KM macro - its workspace is the 🥘 hub
     # (ctx:meal). "reset": False on purpose: its children are the week's
     # THREE meal pointers, minted fresh by every plan commit (src/meal_write),
@@ -242,6 +249,34 @@ def finish_verdict(task, done_days=(), today=None):
     # (review 2026-09-24: a Finish after ● asked instead of refusing)
     resolved = st["prev"] == today or today in set(done_days or ())
     return ("done" if resolved else "early"), st["date"]
+
+
+REVIEW_SLOTS = ("weekly", "monthly", "quarterly", "yearly")
+
+
+def journal_pin(slot, task, today=None):
+    """"@2026-12-31" when the review this journal belongs to runs LATE, else
+    "". A review finished a day late still closes the occurrence it is for
+    (the Finish guard), and its journal has to file into THAT period's note:
+    the yearly review done on 1 January is about the year that ended, and
+    the journal asked for "this year's" note, the new one (review
+    2026-09-27; the quarterly on 1 October and the monthly on the 1st had
+    the same hole). `task` is the routine's live task; the pin is the day of
+    its OPEN occurrence, given only when that day lies in an earlier period
+    of the slot than today. The day rolls at 04:00, so a journal at 00:30 is
+    not late."""
+    if slot not in REVIEW_SLOTS or not task:
+        return ""
+    if today is None:
+        import dayroll
+        today = dayroll.today()
+    st = due_state(task, today)
+    if st["state"] != "overdue" or not st["date"]:
+        return ""
+    import periodic_model as pm
+    if pm.period_for(slot, st["date"]) == pm.period_for(slot, today):
+        return ""
+    return "@" + st["date"].isoformat()
 
 
 def due_state(task, today=None):

@@ -312,13 +312,29 @@ def _week_goals_of(wdoc):
     return [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])], sec
 
 
+def _goal_names(doc, kind):
+    """The names a tier's goals may answer to IN THIS NOTE. The yearly's old
+    home, the 🎯 Goals scorecard, is only a goal home in a note minted under
+    the old skeleton: the new layout ships the scorecard too (as the plan's
+    own section), so there the 🎉 Yearly goal bullet is the one home, and a
+    note whose bullet Vex deleted or renamed has none. Without this, the
+    kill switch every other tier has was broken for the year: the goal went
+    into the scorecard and every reader followed it there (review
+    2026-09-27). The layout is told by the 🏆 Goals header, exact."""
+    if kind == "yearly":
+        g = ps.find(doc, pm.SEC_GOALS)
+        if isinstance(g, ps.Section) and g.name == pm.SEC_GOALS:
+            return [pm.SEC_YR_GOAL]
+    return pm.goal_section_names(kind)
+
+
 def _goal_sec_of(doc, kind):
     """Where a tier's goals live in THIS note, under any name that tier has
     used. The weekly's live in a bullet inside 🏆 Goals since the tiered
     layout; every other tier's are a section or a bullet of their own."""
     if kind == "weekly":
         return _week_goals_of(doc)[1]
-    for nm in pm.goal_section_names(kind):
+    for nm in _goal_names(doc, kind):
         sec = ps.find(doc, nm, pm.SEC_GOALS) or ps.find(doc, nm)
         if sec is not None:
             return sec
@@ -473,7 +489,7 @@ def _mirror_goal(doc, anchor, kind, index, day, hint):
         return
     pdoc = ps.parse_sections(par.get("content") or "")
     sec = next((x for x in (ps.find(pdoc, nm)
-                            for nm in pm.goal_section_names(kind))
+                            for nm in _goal_names(pdoc, kind))
                 if x is not None), None)
     lines = pm.unescape_md_lines(
         [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])])
@@ -896,7 +912,8 @@ def _complete_many(pairs):
 _SWEEP_SECTIONS = {"daily": (pm.SEC_TODAY, pm.SEC_TOMORROW),
                    "weekly": (pm.SEC_REVIEW,),
                    "monthly": (pm.SEC_MREVIEW,),
-                   "quarterly": (pm.SEC_QREVIEW,)}
+                   "quarterly": (pm.SEC_QREVIEW,),
+                   "yearly": (pm.SEC_YREVIEW,)}
 
 
 def refresh_period(p, index=None, force=False):
@@ -999,6 +1016,11 @@ def refresh_period(p, index=None, force=False):
         if p.kind == "quarterly":
             _fill_quarterly(doc, p, index)
             _fill_rollup_money(doc, p, index)     # the old 💰 Money section
+        elif p.kind == "yearly":
+            _fill_yearly(doc, p, index)
+            # a note still on the old skeleton keeps its 💰 Money roll-up;
+            # the new layout has no such section and nothing is written
+            _fill_rollup_money(doc, p, index)
         elif p.kind == "monthly":
             _fill_monthly(doc, p, index)
             # the old skeleton's 💰 Money section, for a note the layout
@@ -1081,10 +1103,11 @@ def _mood_of_doc(doc):
 
 # _JOURNAL_SECTIONS is defined further down; the highlight reader only uses
 # it at call time, never at import
-_HL_KEY = {"weekly": "highlight", "monthly": "mhighlight", "quarterly": "qhighlight"}
+_HL_KEY = {"weekly": "highlight", "monthly": "mhighlight", "quarterly": "qhighlight",
+           "yearly": "yhighlight"}
 
 
-def _answer_by_key(doc, sec_name, key):
+def _answer_by_key(doc, sec_name, key, sep=" "):
     """The answer to the journal question whose route KEY is `key`, or ''.
     A key match is exact wording, so unlike _answer_in it reads QUOTING
     questions too (the quarterly's highlight quotes the wins into itself)."""
@@ -1093,15 +1116,17 @@ def _answer_by_key(doc, sec_name, key):
         return ""
     for _n, q, a, i in pm.journal_pairs(sec.body):
         if a and pm.journal_key(q) == key:
-            return pm.journal_answer_text(sec.body, i)     # the WHOLE answer
+            return pm.journal_answer_text(sec.body, i, sep)     # the WHOLE answer
     return ""
 
 
-def _tier_highlight_of(doc, kind="weekly"):
+def _tier_highlight_of(doc, kind="weekly", sep=" "):
     """A note's ✨ highlight: the section where one survives, else that tier's
     journal ANSWER (which is the record since 2026-09-17 - the section was
     only ever its copy), found by its route key. '' when neither says
-    anything."""
+    anything. `sep` joins its lines: the quarter's are THREE highlights, one
+    a line, and the year that lists them passes " / " (review 2026-09-27: a
+    space ran them together)."""
     hsec = ps.find(doc, pm.SEC_HIGHLIGHT)
     if hsec is not None:
         # a divider can sit in the last section's body (decor only migrates
@@ -1109,11 +1134,11 @@ def _tier_highlight_of(doc, kind="weekly"):
         parts = [ln.strip().lstrip("-").strip() for ln in hsec.body
                  if ln.strip() and not ps.DECOR_RE.match(ln.strip())
                  and not pm.PENDING_RE.match(ln.strip())]
-        hit = " ".join(x for x in parts if x)
+        hit = sep.join(x for x in parts if x)
         if hit:
             return hit
     return _answer_by_key(doc, _JOURNAL_SECTIONS.get(kind, pm.SEC_WEEKLY_JNL),
-                          _HL_KEY.get(kind, "highlight"))
+                          _HL_KEY.get(kind, "highlight"), sep)
 
 
 def _weekly_highlight_of(wdoc):
@@ -2232,45 +2257,58 @@ def _partial(known, spans, word):
             if len(known) < len(spans) else "")
 
 
-def _month_stats_of(index, mp, drop_names=()):
-    """What a month contributed, read off its own monthly note - the pyramid's
-    next storey. Simpler than a week's: a month never straddles a quarter, so
-    there is nothing to clip, and the note's own headline IS the bar.
+_OF_MONTHS_RE = re.compile(r"\b(\d+) of (\d+) months\b")
+
+
+def _span_stats_of(index, p, kind, drop_names=()):
+    """What a month (or a quarter) contributed, read off its own note - the
+    pyramid's upper storeys. Simpler than a week's: a month never straddles a
+    quarter and a quarter never straddles a year, so there is nothing to
+    clip, and the note's own headline IS the bar.
 
     None when there is no note, or when it has no Completed headline to read -
-    an unfilled note is not a quarter-month of zero (the week's rule)."""
-    t = lookup(index, mp)
+    an unfilled note is not a span of zero (the week's rule).
+
+    `done_part` / `created_part`: (n, of) when that headline was itself
+    summed out of SOME of its months ("680 · 1 of 3 months"), else None. The
+    year needs it: a quarter that read one month of three is not a whole
+    quarter, whatever the count of quarters says."""
+    t = lookup(index, p)
     if not t:
         return None
     doc = ps.parse_sections(t.get("content") or "")
 
     def headed(anchor, *legacy):
-        sec = ps.find_prefix(doc, anchor, pm.scope_of("monthly", anchor))
+        sec = ps.find_prefix(doc, anchor, pm.scope_of(kind, anchor))
         for nm in legacy:
             if sec is not None:
                 break
             sec = ps.find_prefix(doc, nm)
         if sec is None or ":" not in sec.name:
-            return None, []
+            return None, [], None
         head = pm.unescape_md(sec.name.split(":", 1)[1]).strip()
         m = re.match(r"^\s*(\d+)", head)
-        return (int(m.group(1)) if m else None), sec.body
+        part = _OF_MONTHS_RE.search(head)
+        return ((int(m.group(1)) if m else None), sec.body,
+                (int(part.group(1)), int(part.group(2))) if part else None)
 
-    done, done_body = headed(pm.SEC_COMPLETED, "✅ Completed")
+    done, done_body, done_part = headed(pm.SEC_COMPLETED, "✅ Completed")
     if done is None:
         return None
-    created, created_body = headed(pm.SEC_CREATED, "➕ Created")
+    created, created_body, created_part = headed(pm.SEC_CREATED, "➕ Created")
     # created stays None when that note has no Created number to read: a 0
-    # would make the quarter's header a confident undercount
+    # would make the parent's header a confident undercount
 
     def keep(mp_):
         return {k: v for k, v in mp_.items() if k not in drop_names}
 
     def body(anchor):
-        sec = ps.find_prefix(doc, anchor, pm.scope_of("monthly", anchor))
+        sec = ps.find_prefix(doc, anchor, pm.scope_of(kind, anchor))
         return sec.body if sec is not None else []
 
     return {"done": done, "created": created,
+            "done_part": done_part, "created_part": created_part,
+            "partial": done_part is not None,
             "by_proj": keep(pm.parse_proj_lines(done_body)),
             "created_by_proj": pm.parse_proj_lines(created_body),
             "top_lists": keep(pm.parse_top_list_lines(body(pm.SEC_TOP_LIST))),
@@ -2279,11 +2317,43 @@ def _month_stats_of(index, mp, drop_names=()):
                 _stats_ignored_tasks())}
 
 
+def _month_stats_of(index, mp, drop_names=()):
+    """A month, off its monthly note (see _span_stats_of)."""
+    return _span_stats_of(index, mp, "monthly", drop_names)
+
+
+def _quarter_stats_of(index, qp, drop_names=()):
+    """A quarter, off its quarterly note: the year's storey (2026-09-27)."""
+    return _span_stats_of(index, qp, "quarterly", drop_names)
+
+
 def _quarter_month_data(index, period, projects):
     """{month start: stats | None} for the three months of a quarter."""
     drop = _ignored_names(projects)
     return {cp.start: _month_stats_of(index, cp, drop)
             for _n, cp, _a, _b in pm.child_spans(period)}
+
+
+def _year_quarter_data(index, period, projects):
+    """{quarter start: stats | None} for the four quarters of a year."""
+    drop = _ignored_names(projects)
+    return {cp.start: _quarter_stats_of(index, cp, drop)
+            for _n, cp, _a, _b in pm.child_spans(period)}
+
+
+def _year_partial(known, spans, key="done_part"):
+    """' · 1 of 4 quarters' when a year could not read every quarter; when a
+    quarter it DID read was itself summed out of some of its months, the
+    count is kept in months instead (' · 7 of 12 months': a quarter that
+    read one month of three is not one quarter of four). '' when the year
+    is whole."""
+    if not known:
+        return ""
+    inner = [st.get(key) for st in known]
+    if not any(inner):
+        return _partial(known, spans, "quarter")
+    got = sum(x[0] if x else 3 for x in inner)
+    return f" · {got} of {len(spans) * 3} months"
 
 
 def _week_stats_live(wp, today, projects, clip_start=None):
@@ -2818,6 +2888,251 @@ def _quarter_words(pdoc):
     return [f"- 🔮 Wanted: {mdtext.flatten_links(want).strip()}"]
 
 
+def _fill_yearly(doc, p, index):
+    """The yearly note (Vex 2026-09-27, 🟢 on the Yearly Note Round page): the
+    quarterly's shape counted by QUARTER. Completions and creations come off
+    the QUARTERLY notes (see _span_stats_of); everything else is recomputed.
+    The top of the pyramid: nothing is mirrored in, 🎉 Yearly goal is his.
+
+    A note minted under the old skeleton (📊 Dashboard ... 🧪 December test)
+    is left alone; tools/pnrepair/relayout_yearly.py rebuilds it.
+    """
+    today = _today()
+    if not (p.start <= today <= p.end + timedelta(days=1)):
+        return
+
+    def _in(anchor):
+        return pm.scope_of("yearly", anchor)
+
+    scoped = [a for a in pm.WRITER_ANCHORS["yearly"] if _in(a)]
+    if not any(ps.find_prefix(doc, a, _in(a)) is not None for a in scoped):
+        _log(f"yearly {pm.title(p)} predates the 2026-09-27 layout - left "
+             f"alone (tools/pnrepair/relayout_yearly.py rebuilds it)")
+        return
+
+    t2 = _tier2()
+    prev = pm.prev_period(p)
+    live_end = min(p.end, today)
+    spans = pm.child_spans(p)
+    projects = {pr.get("id"): pr.get("name")
+                for pr in (cache_store.get("projects") or [])}
+    data = _year_quarter_data(index, p, projects)
+    prev_data = _year_quarter_data(index, prev, projects)
+    known = [st for st in data.values() if st]
+    known_prev = [st for st in prev_data.values() if st]
+
+    # ── Top lists / Top tasks - summed from the quarters that could be read
+    tl = pm.count_list_lines(pm.merge_pairs([st["top_lists"] for st in known]))
+    if tl:
+        ps.set_body(doc, pm.SEC_TOP_LIST, tl, _in(pm.SEC_TOP_LIST))
+    tt = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"] for st in known]))
+    if tt:
+        ps.set_body(doc, pm.SEC_TOP_TASKS, tt, _in(pm.SEC_TOP_TASKS))
+
+    # ── Created / Completed + the per-quarter bars, all off the quarterly notes
+    # last year's marker is ⏪ Last year's too, whether or not THIS year has
+    # a quarter to read yet (the 2027 note on 1 January has none)
+    part_prev = _year_partial(known_prev, pm.child_spans(prev))
+    if known:
+        # the quarterly's rule one storey up: a roll-up summed out of SOME of
+        # its parts says so, and a chip is only drawn when both years are
+        # whole - down to the month
+        part = _year_partial(known, spans)
+        whole = not part and not part_prev
+        cre_known = [st for st in known if st["created"] is not None]
+        if cre_known:
+            cre = sum(st["created"] for st in cre_known)
+            cre_prev = [st for st in known_prev if st["created"] is not None]
+            cre_part = _year_partial(cre_known, spans, "created_part")
+            ch = (pm.chip(cre, sum(st["created"] for st in cre_prev) or None)
+                  if whole and cre_prev and not cre_part
+                  and not _year_partial(cre_prev, pm.child_spans(prev), "created_part")
+                  else None)
+            _set_headed(doc, pm.SEC_CREATED,
+                        str(cre) + (f" · {ch}" if ch else "") + cre_part,
+                        pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
+                            pm.merge_counts(*[st["created_by_proj"]
+                                              for st in known]))]),
+                        _in(pm.SEC_CREATED))
+        done = sum(st["done"] for st in known)
+        ch = (pm.chip(done, sum(st["done"] for st in known_prev))
+              if whole and known_prev else None)
+        _set_headed(doc, pm.SEC_COMPLETED,
+                    str(done) + (f" · {ch}" if ch else "") + part,
+                    pm.ind([f"- 🗂 {nm} · {c}" for nm, c in pm.top_n(
+                        pm.merge_counts(*[st["by_proj"] for st in known]))]),
+                    _in(pm.SEC_COMPLETED))
+        rows, notes = [], []
+        for n, cp, a, b in spans:
+            if a > today:
+                break
+            st = data.get(cp.start)
+            # "no note" and "no numbers" are different facts, and the head
+            # two lines above LINKS the note it would be denying
+            why = "no note" if lookup(index, cp) is None else "no numbers"
+            rows.append((pm.span_label("yearly", n, a, b),
+                         None if not st else st["done"], why))
+            dp = st["done_part"] if st else None
+            notes.append(f" · {dp[0]} of {dp[1]} months" if dp else "")
+        bars = [ln + nt for ln, nt in zip(pm.done_span_lines(rows)[:-1], notes)]
+        ps.set_body(doc, pm.SEC_YBARS, pm.ind(bars), _in(pm.SEC_YBARS))
+
+    # ── Focus - recomputed per quarter, with the quarter's own top task.
+    # Read quarter by quarter, NEWEST first, and summed: the timeline is
+    # paged back 40 pages a call at most, a year of timer records is more
+    # than that, and one call for the whole year stopped short of January
+    # while the calls after it read on (review 2026-09-27). A quarter needs
+    # about twelve pages, and every call goes on from where the last stopped.
+    fspan = getattr(t2, "focus_by_span", lambda a, b: None)
+    fmin = getattr(t2, "focus_minutes", lambda a, b: None)
+    recs = {}
+    for n, _cp, a, b in reversed(spans):
+        if a > today or not t2:
+            continue
+        recs[n] = fspan(a, min(b, today))
+    prev_min = None
+    if recs and all(r is not None for r in recs.values()):
+        total = sum(r[0] for r in recs.values())
+        pq = [fmin(a, b) for _n, _cp, a, b in reversed(pm.child_spans(prev))]
+        prev_min = sum(pq) if pq and all(x is not None for x in pq) else None
+        # no chip against a last year that reads as nothing: that is what a
+        # year the timeline does not reach looks like from here
+        ch = pm.chip(total, prev_min, "duration") if prev_min else None
+        lines = []
+        for n, _cp, a, b in spans:
+            rec = recs.get(n)
+            if rec and rec[0]:
+                ln = f"- {pm.span_label('yearly', n, a, b)} · {pm.fmt_hm(rec[0])}"
+                if rec[1]:
+                    ln += f" · {mdtext.flatten_links(rec[1])[:40]}"
+                lines.append(ln)
+        _set_headed(doc, pm.SEC_FOCUS_WEEK,
+                    pm.fmt_hm(total) + (f" · {ch}" if ch else ""),
+                    pm.ind(lines)
+                    + [f"{pm.T3}- **Total = {pm.fmt_hm(total)}**"],
+                    _in(pm.SEC_FOCUS_WEEK))
+
+    # ── Habit consistency - each habit against the year SO FAR
+    hb = getattr(t2, "habit_lines_weekly", lambda a, b: None)(p.start,
+                                                              live_end) \
+        if t2 else None
+    if hb is not None:
+        ps.set_body(doc, pm.SEC_HABIT_WEEK, pm.ind(hb), _in(pm.SEC_HABIT_WEEK))
+
+    # ── ✨ Highlights - each QUARTER's, newest first
+    hl_rows = []
+    for n, cp, a, b in spans:
+        qt = lookup(index, cp)
+        if not qt:
+            continue
+        # a quarter's highlight is THREE, one a line: " / " keeps them apart
+        hl = _tier_highlight_of(ps.parse_sections(qt.get("content") or ""),
+                                "quarterly", sep=" / ")
+        if hl and hl.strip():
+            hl_rows.append(f"- {pm.span_label('yearly', n, a, b)} · "
+                           f"{mdtext.flatten_links(hl).strip()}")
+    if hl_rows:
+        ps.set_body(doc, pm.SEC_HL_WEEK, pm.ind(list(reversed(hl_rows))),
+                    _in(pm.SEC_HL_WEEK))
+
+    # ── 📨 Entries - five a kind, one per QUARTER then the newest of the rest
+    items = _entries_between(index, p.start, live_end)
+    if any(it[2] in pm.GROUP_ORDER for it in items):
+        ps.set_body(doc, pm.SEC_ENTRIES,
+                    pm.entries_grouped(pm.top_entries(
+                        items, lambda d: (d.month - 1) // 3), dated=True),
+                    _in(pm.SEC_ENTRIES))
+
+    # ── 😊 Moods - the year average in the header, one line per quarter
+    moods = _mood_by_day(index, p.start, live_end)
+    if moods:
+        avg = sum(m[0] for _d, m in moods) / len(moods)
+        pavg = _mood_avg(index, prev.start, prev.end)
+        ch = pm.chip(round(avg, 1),
+                     round(pavg, 1) if pavg is not None else None, "avg")
+        rows = []
+        for n, _cp, a, b in spans:
+            mm = [m[0] for d, m in moods if a <= d <= b]
+            rows.append((pm.span_label("yearly", n, a, b),
+                         sum(mm) / len(mm) if mm else None))
+        _set_headed(doc, pm.SEC_MOODS,
+                    f"Average {avg:.1f}" + (f" · {ch}" if ch else ""),
+                    pm.mood_span_lines(rows), _in(pm.SEC_MOODS))
+
+    # ── 💰 Income - quarter lines, year total, both off the daily notes
+    day_sums = _day_sums(index)
+    inc_cur = pm.sum_in_period(day_sums, p)
+    ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
+          if any(prev.start <= d <= prev.end for d in day_sums) else None)
+    _set_headed(doc, pm.SEC_INCOME,
+                pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
+                pm.ind(_span_money_lines(day_sums, spans, "yearly", today))
+                + [pm.money_total_line(inc_cur, 3)],
+                _in(pm.SEC_INCOME))
+
+    # ── 👽 People + ⏳ Dates. The block the quarterly carries (his ruling):
+    # the birthdays of the next three months and the stale cards. The whole
+    # year's birthdays are ⏳ Dates, right under it.
+    _fill_people(doc, t2, days=92, within=_in(pm.SEC_PEOPLE))
+    dl = getattr(t2, "dates_in_span", lambda a, b: None)(p.start, p.end) \
+        if t2 else None
+    if dl is not None:
+        ps.set_body(doc, pm.SEC_MDATES, pm.ind(dl), _in(pm.SEC_MDATES))
+
+    # ── ⏪ Last year - the same composite, off last year's quarters
+    if known_prev:
+        prev_spans = pm.child_spans(prev)
+        cre_prev = [st for st in known_prev if st["created"] is not None]
+        ly = [f"- Completed: {sum(st['done'] for st in known_prev)}{part_prev}"]
+        if cre_prev:
+            ly.append(f"- Created: {sum(st['created'] for st in cre_prev)}"
+                      f"{_year_partial(cre_prev, prev_spans, 'created_part')}")
+        if prev_min:
+            ly.append(f"- Focus: {pm.fmt_hm(prev_min)}")
+        pmood = _mood_avg(index, prev.start, prev.end)
+        if pmood is not None:
+            ly.append(f"- Mood: {pmood:.1f} avg")
+        ly.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        # last year's own words: where it wanted to be by now (the yearly
+        # journal's compare question quotes it back)
+        pt = lookup(index, prev)
+        if pt:
+            ly += _year_words(ps.parse_sections(pt.get("content") or ""))
+        top_tasks = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
+                                                          for st in known_prev]))
+        top_lists = [f"{pm.T1}- 🗂 {nm} · {c}" for nm, c in pm.top_n(
+            pm.merge_counts(*[st["by_proj"] for st in known_prev]))]
+        if top_tasks or top_lists:
+            ly.append("")
+        if top_tasks:
+            ly += ["- Top Tasks:"] + top_tasks
+        if top_lists:
+            ly += ["- Top Lists"] + top_lists
+        ps.set_body(doc, pm.SEC_LAST_YEAR, ly)
+    else:
+        # no quarter of last year could be read, but its journal may still
+        # have said where it wanted to be
+        pt = lookup(index, prev)
+        words = _year_words(ps.parse_sections(pt.get("content") or "")) if pt else []
+        if words:
+            ps.set_body(doc, pm.SEC_LAST_YEAR, words)
+
+    # ── 📔 Yearly journal + ♻️ Yearly Review
+    _seed_slot(doc, pm.SEC_YR_JNL, "yearly", p.start,
+               journal_ctx("yearly", doc, p.start))
+    _fill_review(doc, pm.SEC_YREVIEW, cfg.get_yearly_review_id())
+
+
+def _year_words(pdoc):
+    """The ⏪ Last year lines that carry last year's OWN words: its answer to
+    "Where do you want to be in 12 months?" as "- 🔮 Wanted: ...", links
+    flattened. [] when it never answered."""
+    want = pm.unescape_md(_answer_by_key(pdoc, pm.SEC_YR_JNL, "qforecast"))
+    if not want:
+        return []
+    return [f"- 🔮 Wanted: {mdtext.flatten_links(want).strip()}"]
+
+
 def _fill_rollup_money(doc, p, index):
     """Monthly/quarterly/yearly 💰 (v3.0 scope). Missing-history rule: a span
     with ZERO daily notes keeps its existing lines (deleted dailies must not
@@ -2851,8 +3166,15 @@ def _fill_rollup_money(doc, p, index):
             qp = pm.period_for("quarterly", date(p.start.year, qm, 1))
             lines.append(f"- {pm.title(qp)} • "
                          f"{pm.fmt_amount(pm.sum_in_period(day_sums, qp))}")
-    ps.set_body(doc, pm.SEC_MONEY,
-                pm.rollup_money_lines(lines, pm.sum_in_period(day_sums, p)))
+    # its OWN section only, by its exact name: ps.find's normalized passes
+    # hand back any lone bullet that reads "money" (a highlight line, a line
+    # of a journal answer), and the roll-up was written under it on every
+    # refresh of a note in the new layouts (review 2026-09-27)
+    sec = ps.find(doc, pm.SEC_MONEY)
+    if not isinstance(sec, ps.Section) or sec.name != pm.SEC_MONEY:
+        return
+    ps.set_sec_body(doc, sec,
+                    pm.rollup_money_lines(lines, pm.sum_in_period(day_sums, p)))
 
 
 # ── 🥅 OKRs (HANDOFF_OKR phase 4) ────────────────────────────────────────────
@@ -3198,8 +3520,7 @@ def set_highlight(text, day=None, kind="weekly"):
     ok, _doc = _pn_rmw(pid, tid, mutate)
     if ok:
         return "✨ Highlight saved"
-    hkey = {"monthly": "mhighlight", "quarterly": "qhighlight"}.get(kind,
-                                                                    "highlight")
+    hkey = _HL_KEY.get(kind, "highlight")
     if journal_answer_key(kind, hkey, text, p.start):
         return f"✨ Highlight saved to the {kind} journal"
     return f"💫 Nowhere to save the highlight · the {kind} note has no ✨ " \
@@ -3366,10 +3687,12 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
             if sec_name is None:                 # ♻️ Weekly deleted
                 return False
         else:                            # …and a note minted under an older
-            for nm in pm.goal_section_names(kind):   # name still answers
+            for nm in _goal_names(doc, kind):        # name still answers
                 if ps.find(doc, nm) is not None:
                     sec_name = nm
                     break
+            else:
+                return False             # no home in this note: the kill switch
         if ps.find(doc, sec_name) is None:
             return False
         if kind == "daily":
@@ -3596,11 +3919,12 @@ def append_income(amount, label="", day=None, replace=False):
 _JOURNAL_SECTIONS = {"morning": pm.SEC_MORNING, "evening": pm.SEC_EVENING,
                      "weekly": pm.SEC_WEEKLY_JNL,
                      "monthly": pm.SEC_MONTHLY_JNL,
-                     "quarterly": pm.SEC_QTR_JNL}
+                     "quarterly": pm.SEC_QTR_JNL,
+                     "yearly": pm.SEC_YR_JNL}
 
 
 def _journal_target(slot, day=None):
-    if slot in ("weekly", "monthly", "quarterly"):
+    if slot in ("weekly", "monthly", "quarterly", "yearly"):
         return pm.period_for(slot, day or _today())
     return pm.period_for("daily", day or _today())
 
@@ -3686,14 +4010,16 @@ def journal_ctx(slot, doc, day=None):
                 if s.startswith("- 🔮 Forecast:"):
                     ctx["wforecast"] = s[len("- 🔮 Forecast:"):].strip()
                     break
-    elif slot in ("monthly", "quarterly"):
+    elif slot in ("monthly", "quarterly", "yearly"):
         sec = next((x for x in (ps.find(doc, nm, pm.SEC_GOALS)
                                 or ps.find(doc, nm)
-                                for nm in pm.goal_section_names(slot))
+                                for nm in _goal_names(doc, slot))
                     if x is not None), None)
         ctx["goals"] = "; ".join(pm.goal_titles(sec.body)[:5]) if sec else ""
         if slot == "quarterly":
             _quarterly_ctx(doc, day, ctx)
+        if slot == "yearly":
+            _yearly_ctx(doc, day, ctx)
         if slot == "monthly":
             # the OKR checkpoint (Vex 2026-09-24, late): the month's and the
             # quarter's objectives off 🥅 OKRs (EXACT name, the kill switch),
@@ -3730,7 +4056,15 @@ def _quarterly_ctx(doc, day, ctx):
         ctx["year"] = " · ".join(pm.okr_tier_items(osec.body, "yearly"))
     if day is not None:
         ctx["quarters_left"] = pm.quarters_left_in_year(day)
+    _rollup_ctx(doc, ctx, "months", pm.SEC_LAST_QTR)
 
+
+def _rollup_ctx(doc, ctx, children_key, last_sec):
+    """The quotes the quarterly and the yearly set blocks share, off the
+    note's own 📊 Stats, 💿 Data and ⏪ section: the habit line, the focus
+    line, the children's ✨ highlights (ctx[children_key]: the months of a
+    quarter, the quarters of a year), the wins, the nags, the moods, the
+    income, this period against the last, and the last one's 🔮 Wanted."""
     def headed(body, label):
         head = pm.bullet_head(body, label)
         kids = [k for k in pm.bullet_children(body, label) if not k.startswith("**")]
@@ -3745,8 +4079,8 @@ def _quarterly_ctx(doc, day, ctx):
         this["Focus"] = pm.bullet_head(st.body, "Focus")
     dt = ps.find(doc, pm.SEC_WK_DATA)
     if dt is not None:
-        ctx["months"] = pm.days_summary([c.rstrip(".").strip()
-                                         for c in pm.bullet_children(dt.body, pm.SEC_HL_WEEK)])
+        ctx[children_key] = pm.days_summary([c.rstrip(".").strip()
+                                             for c in pm.bullet_children(dt.body, pm.SEC_HL_WEEK)])
         ctx["wins"] = pm.entries_summary(pm.entry_children(dt.body, pm.SEC_ENTRIES, "🟢 Wins"))
         ctx["nags"] = pm.entries_summary(pm.entry_children(dt.body, pm.SEC_ENTRIES, "🔴 Nags"))
         mh, mk = pm.bullet_head(dt.body, pm.SEC_MOODS), pm.bullet_children(dt.body, pm.SEC_MOODS)
@@ -3754,7 +4088,7 @@ def _quarterly_ctx(doc, day, ctx):
         ctx["money"] = headed(dt.body, pm.SEC_INCOME)
         this["Mood"] = mh
         this["Income"] = pm.bullet_head(dt.body, pm.SEC_INCOME)
-    lq = ps.find(doc, pm.SEC_LAST_QTR)
+    lq = ps.find(doc, last_sec)
     if lq is not None:
         last = {k: pm.bullet_head(lq.body, k) for k in ("Completed", "Focus", "Mood", "Income")}
         ctx["compare"] = pm.quarter_compare(this, last)
@@ -3763,6 +4097,22 @@ def _quarterly_ctx(doc, day, ctx):
             if s.startswith("- 🔮 Wanted:"):
                 ctx["wanted"] = s[len("- 🔮 Wanted:"):].strip()
                 break
+
+
+def _yearly_ctx(doc, day, ctx):
+    """The yearly set block's quotes (Vex 2026-09-27), each off the note's
+    own sections and '' when a section is gone (the kill switch). The
+    objectives come off the 🎯 Goals scorecard (the year's 🥅 lines with
+    their d/n), else off the year line of 🥅 OKRs; with no 🥅 OKRs section
+    (EXACT name) there is no plan output at all, the scorecard included, so
+    nothing is quoted from a scorecard nobody refreshes any more."""
+    osec = ps.find(doc, pm.SEC_OKR)
+    if osec is not None and osec.name == pm.SEC_OKR:
+        card = ps.find(doc, pm.SEC_SCORECARD)
+        objs = (pm.scorecard_objectives(card.body)
+                if card is not None and card.name == pm.SEC_SCORECARD else [])
+        ctx["objectives"] = " · ".join(objs or pm.okr_tier_items(osec.body, "yearly"))
+    _rollup_ctx(doc, ctx, "quarters", pm.SEC_LAST_YEAR)
 
 
 def _when(day):

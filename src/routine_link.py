@@ -98,7 +98,7 @@ def _routine_keys():
 
 
 SLOT_VERBS = {"journal": ("morning", "evening", "weekly", "monthly",
-                          "quarterly"),
+                          "quarterly", "yearly"),
               "routine": _routine_keys(),
               "view": ("calendar", "countdowns", "crmcal", "okr", "okrdaily",
                        "okrweekly", "okrmonthly", "okrquarterly", "okrcarry",
@@ -291,7 +291,10 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
                   f"[🖥 Monthly journal]({url('journal', 'monthly')})"),
                  ("quarterly_journal", "📔 Quarterly journal",
                   "Journal + next goals",
-                  f"[🖥 Quarterly journal]({url('journal', 'quarterly')})")]
+                  f"[🖥 Quarterly journal]({url('journal', 'quarterly')})"),
+                 ("yearly_journal", "📔 Yearly journal",
+                  "Journal + next goals",
+                  f"[🖥 Yearly journal]({url('journal', 'yearly')})")]
     return rows
 
 

@@ -196,5 +196,69 @@ check("4.prev-last-day", rt.prev_occurrence(_dt.date(2026, 11, 30), M) == _dt.da
 check("4.prev-30th-unchanged", rt.prev_occurrence(_dt.date(2026, 10, 30), "RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=30")
       == _dt.date(2026, 9, 30))
 
+# ── 6. the 🎉 Yearly Review (Vex 2026-09-27, 🟢 on the Yearly Note Round page) ──
+check("6.yearly-ids-known", all(re.fullmatch(r"[0-9a-f]{24}", spec.PARENT.get("yearly", "")) and
+                                re.fullmatch(r"[0-9a-f]{24}", spec.COLUMN.get("yearly", "")) for _ in (0,)),
+      f"{spec.PARENT.get('yearly')!r} {spec.COLUMN.get('yearly')!r}")
+try:
+    ytree = spec.TREES["yearly"]()
+except Exception as e:                                   # noqa: BLE001
+    ytree = []
+    check("6.yearly-tree-builds", False, repr(e))
+yt = [x for _, x in flat(ytree)]
+ylinks = [m.group(2) for x in yt for m in _MD.finditer(x)]
+ybad = []
+for u in ylinks:
+    if u.startswith("alfred://"):
+        from urllib.parse import unquote as _unq
+        try:
+            rl.parse(_unq(u.split("argument=", 1)[1]))
+        except Exception as e:                           # noqa: BLE001
+            ybad.append((u, str(e)))
+check("6.yearly-count", len(yt) == 22 and len(ytree) == 7, str((len(yt), len(ytree))))
+check("6.yearly-no-dashes", all("\u2013" not in x and "\u2014" not in x for x in yt))
+check("6.yearly-links-parse", bool(ylinks) and not ybad, str(ybad))
+check("6.yearly-km-by-uid", all(re.fullmatch(r"kmtrigger://macro=[0-9A-F-]{36}", u) for u in ylinks if u.startswith("kmtrigger"))
+      and len([u for u in ylinks if u.startswith("kmtrigger")]) == 4)
+# line one OPENS the quarterly's checklist and starts nothing (its own line
+# one is the monthly): a routine:quarterly link here would start the monthly
+# from inside a running quarterly session (review 2026-09-27)
+check("6.yearly-quarterly-first", len(yt) > 1 and rb.norm(yt[0]) == "run the quarterly review first"
+      and f"](ticktick:///webapp/#p/{spec.LIST}/tasks/{spec.PARENT['quarterly']})" in yt[0]
+      and "routine%3A" not in yt[0]
+      and "argument=routine%3Ayearly" in yt[1] and rb.norm(yt[1]) == "yearly review • start", yt[:2])
+check("6.the-quarterly-still-starts-with-the-monthly", "argument=routine%3Amonthly" in titles["quarterly"][0]
+      and "argument=routine%3Aquarterly" in titles["quarterly"][1])
+check("6.yearly-journal-once-late", sum(1 for x in yt if "journal" in rb.norm(x)) == 1 and len(ytree) > 1
+      and "journal%3Ayearly" in ytree[-2][0])
+check("6.yearly-finish-last", bool(ytree) and rb.norm(ytree[-1][0]) == "finish yearly review"
+      and f"done%3A{spec.PARENT.get('yearly')}%3A{spec.LIST}" in ytree[-1][0])
+yn = [rb.norm(x) for x in yt]
+check("6.yearly-his-marks", all(k in yn for k in (
+    "ynab: the year's spending by category, then next year's targets", "gather the year's documents for the tax return",
+    "website: the yearly refresh (about, prices, portfolio)", "check okrs: the year's objectives", "set next year's okrs",
+    "check this year and next year", "archive the year's finished projects",
+    "back up ticktick, obsidian, eagle and keyboard maestro")), str(yn))
+check("6.yearly-built-on-the-green", all(k in yn for k in (
+    "money", "check how much money you made this year", "numbers: compare with last year",
+    "numbers: write next year's forecast", "work", "portfolio: the year's best pieces", "pricing for next year",
+    "where the year's clients came from", "ticktick", "year-end system pass")), str(yn))
+check("6.yearly-only-its-own-layer", not any(k in yn for k in (
+    "process my digital inboxes", "mindsweep", "update crm", "effective hourly rate over the last ten pieces",
+    "ynab: review categories", "audit recurring tasks")) and not any("archive" in x and "client" in x for x in yn))
+check("6.yearly-unique-siblings", all(len({rb.norm(k[0]) for k in kids}) == len(kids)
+                                      for _t, kids in [("", ytree)] + [(t, k) for t, k in ytree] + [(t2, k2) for _t, k in ytree for t2, k2 in k]))
+_tk = next((n for n in ytree if n[0] == "TickTick"), ("", []))
+check("6.yearly-okr-door-is-the-hub", any("argument=view%3Aokr)" in k[0] for k in _tk[1])
+      and any("#f/" + spec.FILTER["projects"] in x for x in yt))
+Yr = spec.REPEAT.get("yearly", "")
+check("6.yearly-repeat", Yr == "RRULE:FREQ=MONTHLY;INTERVAL=12;BYMONTHDAY=-1" and rt.rule_text(Yr) == "the last day, every 12 months", rt.rule_text(Yr) if Yr else "")
+check("6.yearly-prev", bool(Yr) and rt.prev_occurrence(_dt.date(2027, 12, 31), Yr) == _dt.date(2026, 12, 31)
+      and rt.prev_occurrence(_dt.date(2028, 12, 31), Yr) == _dt.date(2027, 12, 31))
+# the planner, against an EMPTY parent: every line is created, nothing deleted
+if ytree:
+    yp = rb.plan_tier("yearly", [task("Y", "🎉 Yearly Review", None, 0)], desired=ytree, root="Y")
+    check("6.yearly-plan-creates-all", len(yp.create) == 22 and not yp.delete and not yp.keep, str(yp.counts() if hasattr(yp, "counts") else (len(yp.create), len(yp.delete))))
+
 print(f"\n{len(FAILS)} failures" if FAILS else "\nall green")
 sys.exit(1 if FAILS else 0)

@@ -189,6 +189,14 @@ def get_quarterly_review_id():
     return load().get("quarterly_review_id", "")
 
 
+def get_yearly_review_id():
+    """♻️ Yearly-review source (Vex 2026-09-27). config.json, like the
+    monthly's and the quarterly's."""
+    if "yearly_review_id" in os.environ:
+        return os.environ["yearly_review_id"]
+    return load().get("yearly_review_id", "")
+
+
 def get_folders():
     """{groupId: folderName} - v2 auto-names (the folder_groups cache, filled
     at sync when an Attachment-Login token exists) overlaid by manual names

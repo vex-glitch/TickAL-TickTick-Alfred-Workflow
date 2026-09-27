@@ -322,15 +322,15 @@ for kind in pm.KINDS:
         continue
     i = names_.index(pm.SEC_OKR)
     nxt = names_[i + 1] if i + 1 < len(names_) else None
-    hashes = "#####" if kind == "yearly" else "####"
-    check(f"9.{kind}-header", sec.header == f"{hashes} {pm.SEC_OKR}", sec.header)
+    # the yearly took the other tiers' shape on 2026-09-27 (the yearly
+    # round): a #### header like theirs, 🏆 Goals right under it
+    check(f"9.{kind}-header", sec.header == f"#### {pm.SEC_OKR}", sec.header)
     check(f"9.{kind}-body", sec.body == ["- _(pending)_"], sec.body)
     check(f"9.{kind}-divider-after", doc.sections[i + 1].pre == ["---"])
+    check(f"9.{kind}-above-goals", nxt == pm.SEC_GOALS, names_)
     if kind == "yearly":
-        check("9.yearly-first-above-dashboard",
-              i == 0 and nxt == pm.SEC_DASHBOARD and doc.lead[-1] == "---", names_)
-    else:
-        check(f"9.{kind}-above-goals", nxt == pm.SEC_GOALS, names_)
+        check("9.yearly-first", i == 0 and doc.lead[-1] == "---", names_)
+        check("9.yearly-scorecard-under-goals", names_[2] == pm.SEC_SCORECARD, names_)
     if kind == "daily":
         check("9.daily-after-bridge-and-highlight",
               names_[:3] == [pm.SEC_YBRIDGE, pm.SEC_HIGHLIGHT, pm.SEC_OKR], names_)
@@ -410,17 +410,19 @@ for label, plan_ in (("off", ("", [])), ("no-plan", (LIST, []))):
     check(f"10.{label}-untouched", ps.serialize_sections(odoc) == ob)
 pe._okr_plan = lambda: (LIST, ITEMS)
 
-# the yearly note: section + scorecard, and the yearly goal survives both
+# the yearly note: section + scorecard. Since 2026-09-27 the yearly goal has
+# a home of its own (🎉 Yearly goal under 🏆 Goals) and the scorecard is the
+# plan's alone
 ydoc = ps.parse_sections(IDX[("yearly", "2026")]["content"])
 pe._fill_okr(ydoc, yr, IDX)
 card = ps.find(ydoc, pm.SEC_SCORECARD)
-check("10.scorecard-plan-then-goal",
-      flat(card.body)[:6] == sl and card.body[6] == GOALS["yearly"][0].lstrip("\t"),
-      card.body)
+check("10.scorecard-is-the-plan", [x for x in flat(card.body) if x.strip()] == sl, card.body)
 check("10.scorecard-gap-kept", card.body[-1] == "", card.body)
+check("10.scorecard-holds-no-goal", not [ln for ln in card.body if pm.goal_titles([ln])], card.body)
 check("10.yearly-goal-reader-sees-only-the-goal",
-      [ln for ln in card.body if pm.goal_titles([ln])] == [GOALS["yearly"][0].lstrip("\t")],
-      card.body)
+      pe._goal_sec_of(ydoc, "yearly").name == pm.SEC_YR_GOAL
+      and [ln.strip() for ln in pe._goal_sec_of(ydoc, "yearly").body if pm.goal_titles([ln])]
+      == [GOALS["yearly"][0].strip()], pe._goal_sec_of(ydoc, "yearly").body)
 check("10.year-block-plan-only-its-goal-is-in-the-scorecard-below",
       flat(ps.find(ydoc, pm.SEC_OKR).body)
       == [f"- 🎉 2026 {B} 0/41 KRs {B} 🔴 1d"] + YEAR_OS,
@@ -428,14 +430,29 @@ check("10.year-block-plan-only-its-goal-is-in-the-scorecard-below",
 yb = ps.serialize_sections(ydoc)
 pe._fill_okr(ydoc, yr, IDX)
 check("10.yearly-idempotent", ps.serialize_sections(ydoc) == yb)
-# a yearly goal set AFTER the scorecard was filled lands after it and stays
-pe._goal_append(ydoc, pm.SEC_SCORECARD, "\t- [ ] Second goal")
+# a yearly goal set AFTER the scorecard was filled lands in its own home
+pe._goal_append(ydoc, pm.SEC_YR_GOAL, "\t- [ ] Second goal")
 pe._fill_okr(ydoc, yr, IDX)
 check("10.new-yearly-goal-kept",
-      [ln for ln in ps.find(ydoc, pm.SEC_SCORECARD).body if pm.goal_titles([ln])][-1]
-      == "- [ ] Second goal"
-      and len([ln for ln in ps.find(ydoc, pm.SEC_SCORECARD).body if pm.goal_titles([ln])]) == 2,
-      ps.find(ydoc, pm.SEC_SCORECARD).body)
+      [ln.strip() for ln in pe._goal_sec_of(ydoc, "yearly").body if pm.goal_titles([ln])]
+      == [GOALS["yearly"][0].strip(), "- [ ] Second goal"]
+      and [x for x in flat(ps.find(ydoc, pm.SEC_SCORECARD).body) if x.strip()] == sl,
+      pe._goal_sec_of(ydoc, "yearly").body)
+# a note minted under the OLD skeleton keeps its goals in the scorecard, and
+# the fill still keeps every one of them after the plan
+OLDY = ps.parse_sections("C\n---\n##### 🥅 OKRs\n- _(pending)_\n---\n##### 📊 Dashboard\n_(pending)_\n\n"
+                         "##### 🎯 Goals scorecard\n_(pending)_\n" + GOALS["yearly"][0] + "\n\n##### 💰 Money\n**Total = 0**\n")
+pe._fill_okr(OLDY, yr, IDX)
+ocard = ps.find(OLDY, pm.SEC_SCORECARD)
+check("10.old-skeleton-plan-then-goal", flat(ocard.body)[:6] == sl and ocard.body[6] == GOALS["yearly"][0].lstrip("\t"), ocard.body)
+check("10.old-skeleton-goal-reader", pe._goal_sec_of(OLDY, "yearly").name == pm.SEC_SCORECARD
+      and [ln for ln in ocard.body if pm.goal_titles([ln])] == [GOALS["yearly"][0].lstrip("\t")], ocard.body)
+oqdoc = ps.parse_sections(IDX[("quarterly", "2026-Q3")]["content"])
+oidx = dict(IDX)
+oidx[("yearly", "2026")] = {"id": "y", "content": ps.serialize_sections(OLDY)}
+pe._mirror_goal(oqdoc, pm.SEC_QTR_YEAR, "yearly", oidx, TODAY, "- _(x)_")
+omir = ps.find(oqdoc, pm.SEC_QTR_YEAR, pm.SEC_GOALS).body
+check("10.old-skeleton-mirror-no-plan-lines", not any(pm.is_plan_line(x) for x in omir) and len(omir) == 1, omir)
 # the quarterly note's 🎉 Yearly goal mirror copies the goals, never the plan
 qidx = dict(IDX)
 qidx[("yearly", "2026")] = {"id": "y", "content": ps.serialize_sections(ydoc)}
@@ -487,10 +504,10 @@ def fake_rmw(pid, tid, mutate):
 
 saved = {n: getattr(pe, n) for n in (
     "_pn_rmw", "_fill_daily", "_fill_weekly", "_fill_monthly", "_fill_quarterly",
-    "_fill_rollup_money", "_compose_lead", "_swept_load", "_sweep_due")}
+    "_fill_yearly", "_fill_rollup_money", "_compose_lead", "_swept_load", "_sweep_due")}
 pe._pn_rmw = fake_rmw
 for n in ("_fill_daily", "_fill_weekly", "_fill_monthly", "_fill_quarterly",
-          "_fill_rollup_money", "_compose_lead"):
+          "_fill_yearly", "_fill_rollup_money", "_compose_lead"):
     setattr(pe, n, lambda *a, **k: None)
 pe._swept_load = lambda: {}
 pe._sweep_due = lambda pairs, line_day: ([], [])

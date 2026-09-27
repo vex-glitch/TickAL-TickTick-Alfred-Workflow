@@ -67,7 +67,9 @@ check("journal weekly url round trip",
 check("journal monthly opens", rl.parse("journal:monthly") == ("journal", "monthly", ""))
 check("journal quarterly opens",
       rl.parse("journal:quarterly") == ("journal", "quarterly", ""))
-check("journal yearly refused", refused("journal:yearly") is not None)
+# the yearly journal exists since 2026-09-27 (the yearly round)
+check("journal yearly opens", rl.parse("journal:yearly") == ("journal", "yearly", ""))
+check("journal decade refused", refused("journal:decade") is not None)
 check("journal without slot", refused("journal") is not None)
 check("journal extra field", refused("journal:morning:x") is not None)
 check("empty", refused("") == "empty link")
@@ -143,7 +145,8 @@ check("full list order", keys == ["focus", "sticky", "window", "focuswindow",
                                   "quarterly", "quarterly_sticky", "quarterly_window",
                                   "yearly", "yearly_sticky", "yearly_window",
                                   "morning", "evening", "weekly_journal",
-                                  "monthly_journal", "quarterly_journal"], keys)
+                                  "monthly_journal", "quarterly_journal",
+                                  "yearly_journal"], keys)
 check("no item → destinations + journals only",
       [r[0] for r in rl.internal_links()] == keys[5:])
 check("periodic off drops daily + journals",
@@ -254,8 +257,11 @@ check("sticky_target = sticky_step's frame", ST([], [S1]) == (10, 10, 400, 900) 
 # ── the routine registry (src/routines.py) ─────────────────────────────────
 import routines as rt  # noqa: E402
 
-N_ROUTINES = 6          # five workspace routines + 🥘 Meal Prep (no macro)
-check("six routines", len(rt.ROUTINES) == N_ROUTINES, len(rt.ROUTINES))
+N_ROUTINES = 7          # five workspace routines + 🎉 Yearly Review and 🥘 Meal Prep (no macro)
+check("seven routines", len(rt.ROUTINES) == N_ROUTINES, len(rt.ROUTINES))
+check("the yearly review: no macro, its steps reset like the other reviews",
+      rt.by_key("yearly") is not None and not rt.by_key("yearly")["macro"]
+      and rt.by_key("yearly").get("reset", True) is True)
 check("keys unique", len({r["key"] for r in rt.ROUTINES}) == N_ROUTINES)
 check("task ids unique", len({r["tid"] for r in rt.ROUTINES}) == N_ROUTINES)
 check("every routine is complete (a macro is optional)",

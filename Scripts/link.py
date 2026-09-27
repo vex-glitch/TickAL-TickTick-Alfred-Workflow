@@ -494,6 +494,24 @@ def _money(xact, as_sticky=False, as_window=False):
     return f"💰 {why} · opened {(target.get('title') or '')[:30]}"
 
 
+def _journal_pin(xact, slot):
+    """"@<day>" for a review journal whose review is running late (the
+    routine of that slot is overdue from an earlier period), "" otherwise
+    and whenever the routine's task cannot be read: no pin is today's note,
+    which is what the door always opened. The task is read LIVE: a cached
+    due date one Finish behind would pin last week's note on an on-time
+    run."""
+    try:
+        import routines as rt
+        r = rt.by_key(slot)
+        if not r or slot not in rt.REVIEW_SLOTS:
+            return ""
+        t = xact._api().get_task(r["pid"], r["tid"])
+        return rt.journal_pin(slot, t)
+    except Exception:
+        return ""
+
+
 def run(verb, tid, pid_hint):
     """→ (toast, acted). acted=False = refused before touching anything,
     so main() lets an immediate retry through."""
@@ -512,7 +530,7 @@ def run(verb, tid, pid_hint):
     if verb == "journal":                # tid carries the (allowlisted) slot
         # DETACHED: the dialog run can last minutes and must never hold
         # this sequential node (a focus/pause click would queue behind it)
-        xact._pn_bg(f"xact:pn_journal:{tid}")
+        xact._pn_bg(f"xact:pn_journal:{tid}{_journal_pin(xact, tid)}")
         return "", True
     if verb == "note":                   # the CURRENT period's note: resolve /
         return _quiet(xact.pn_open, tid), True    # lazy-mint, open, bg refresh

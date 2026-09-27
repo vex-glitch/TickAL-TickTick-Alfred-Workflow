@@ -2,33 +2,49 @@
 ---
 {{quarterlinks}}
 ---
-##### 🥅 OKRs
+#### 🥅 OKRs
 - _(pending)_
 ---
-##### 📊 Dashboard
+#### 🏆 Goals
+- 🎉 Yearly goal
+
+#### 🎯 Goals scorecard
 _(pending)_
 
-##### 🏆 Top 10 wins
+#### ✨ Highlight
+---
+##### 📊 Stats
+- Top lists:
 
-##### 🎯 Goals scorecard
-_(pending)_
+- Top tasks:
 
-##### 📝 Year in one paragraph
+- Created
 
-##### ⭐ Best of
-- Best book:
-- Best trip:
-- Best purchase:
-- Best meal:
-- Best day:
+- Completed
 
-##### 🧭 Theme of the year
+- Quarterly Completed
 
-##### 🚫 Anti-goals
-_(what you will NOT do)_
+- Focus
 
-##### 🧪 December test
-Would December-you be proud of this plan?
+- Habit consistency
+---
+##### 💿 Data
+- ✨ Highlights
 
-##### 💰 Money
-**Total = 0**
+- 📨 Entries
+
+- 😊 Moods
+
+- 💰 Income
+
+- 👽 People
+
+- ⏳ Dates
+---
+##### ⏪ Last year
+	_(pending)_
+---
+##### 📔 Yearly journal
+---
+##### ♻️ Yearly Review
+	_(set "yearly_review_id" in ~/.ticktick_alfred/config.json to mirror your review here)_
