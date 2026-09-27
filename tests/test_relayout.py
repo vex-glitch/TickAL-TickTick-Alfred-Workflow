@@ -312,6 +312,11 @@ else:
         held("1.a heading typed in the highlight", hl, "## Big day", "The flat", keep=True)
         held("3.text in the highlight's header", OLD + "\n##### ✨ Highlight: the flat\nand the keys\n", "##### ✨ Highlight: the flat", "and the keys", keep=True)
         held("two highlight sections", hl + "\n##### ✨ Highlight\nThe second one\n", "The flat", "The second one", keep=True)
+        got = held("an empty box and a rule of his own in the highlight", hl.replace("The flat\n", "The flat\n- [ ]\n\t- under the box\n--- the second half\n---- cut here\n"),
+                   "- under the box", "--- the second half", "---- cut here", keep=True)
+        fam = rc.Tier.family(ps.find(got["new"], pm.SEC_HIGHLIGHT).body)
+        check(f"{T}an empty box in the highlight is one he typed, and what is under it stays under it", ("- [ ]", "- under the box") in fam, fam)
+        held("a rule of his own in a section of his", OLD + "\n##### 🧪 Experiments\n- Cold showers\n--- and then\n- Sauna\n", "--- and then", "- Sauna", keep=True)
         joined = hl + "\n##### ✨ Highlight\n\t- Keys handed over on Friday\n\t\t- by Ana\n"
         got = held("two highlight sections, the second one indented", joined, "The flat", "- Keys handed over on Friday", "- by Ana", keep=True)
         fam = rc.Tier.family(ps.find(got["new"], pm.SEC_HIGHLIGHT).body)
@@ -587,6 +592,7 @@ else:
                         ("##### ⏪ Last week\n", "\t- W36 (31-06 Sep) • 100")):
         check(f"weekly.the fixture has {where.strip()}", where in OLD_WEEKLY)
         wheld(f"another filler's line in {where.strip()[6:]}", OLD_WEEKLY.replace(where, where + line + "\n", 1), line, keep=False)
+    wheld("the week's total typed into 📈 Stats", OLD_WEEKLY.replace("\t- Fri 0\n", "\t- Fri 0\n**Week: 79**\n"), "**Week: 79**", keep=False)
     wheld("a goal named like the tier bullet, one level in", OLD_WEEKLY.replace("\t- [ ] Ship the weekly", "\t- [ ] Ship the weekly\n\t- ♻️ Weekly"),
           "- [ ] Ship the weekly", "- ♻️ Weekly", keep=True)
     wheld("a heading as the last line of the journal", OLD_WEEKLY.replace("\t- *Q4 · What would you tell a friend in your place?*\n\t\t- A: \n",
@@ -630,9 +636,15 @@ else:
     lines[i], lines[j] = lines[j], lines[i]
     probs = rw.verify(od, ps.parse_sections("\n".join(lines)))
     check("weekly.verify names answer lines that changed places", any("out of order" in x for x in probs), probs)
+    # three tabs in, the journal's canon leaves an answer whole (since
+    # 2026-09-27); beside the answer it still reads such a line as a
+    # question of its own and moves it, and that is refused and named
     for mine in ("\t\t\t- *Q9 · is what I keep asking myself*", "\t\t\tA: she said yes, the lease is ours"):
-        wheld(f"a line under an answer that the engine reads as one of its own ({mine.strip()[:12]})",
-              OLD_WEEKLY.replace("\t\t- A: The keyboard\n", "\t\t- A: The keyboard\n" + mine + "\n"), mine, keep=False)
+        wheld(f"a line under an answer that reads like the engine's ({mine.strip()[:12]})",
+              OLD_WEEKLY.replace("\t\t- A: The keyboard\n", "\t\t- A: The keyboard\n" + mine + "\n"), mine, keep=True)
+    wheld("a line beside an answer that reads like a question", OLD_WEEKLY.replace("\t\t- A: The keyboard\n",
+          "\t\t- A: The keyboard\n\t\t- and the pan\n\t\t\t- for the eggs\n\t\t- *Q9 · is what I keep asking myself*\n"),
+          "- *Q9 · is what I keep asking myself*")
     starred = OLD_WEEKLY.replace("\t- [ ] Ship the weekly", "\t- [ ] Read *Deep Work*\n\t- [ ] Sleep before midnight").replace(
         "\t- *Q2 · Did you achieve your weekly goals?*", "\t- *Q2 · Did you achieve your weekly goals, Read *Deep Work*? Describe success/fail factors on each.*")
     got = rw.plan(ps.parse_sections(starred), p, {})
@@ -747,7 +759,30 @@ else:
           and rq.his("The one decision: raise prices") and rm.his("_(pending review with Ana)_") and rw.his("## Big day") and not rw.his("---")
           and not rw.his("# 📌 This Week") and rw.his("# 📌 This Week, the hard one"))
     S = rc.SHAPES
+    check("the week's total is no filler's line: none ever wrote it into 📈 Stats", "bar_total" not in S)
     for shape, yes, no in (
+            ("last_income", "- Income: 250", "- Income: the deposit from Ana is still missing"),
+            ("last_income", "- Income: 99.50", "- Income: lots"),
+            ("last_mood", "- Mood: 3.2 avg", "- Mood: rough, we moved house"),
+            ("last_top", "- 🔥 Top list: 📌CTA · 40 done · 12 added", "- 🔥 Top list: the studio list, really"),
+            ("last_count", "- Created: 120", "- Completed: the move to the new studio"),
+            ("focus_total", "- **Total = 17h 41m**", "- **Total = a long week**"),
+            ("head_focus", "17h 41m · 🔴 2h 05m behind last week (" + MINUS + "11%)", "17h 41m of painting, mostly"),
+            ("head_focus", "58m", "most of the week"),
+            ("head_top", "📌CTA · 13 done · 14 added", "the studio list, really"),
+            ("head_count", "79 · ⚪ level with last week", "79 · and I am proud of every one"),
+            ("head_count", "214 · 🟢 12 tasks ahead of last week (+6%)", "214 · 🟢 12 tasks ahead of my plan"),
+            ("head_amount", "100 · 🟢 40 ahead of last week (+66%)", "100 · 🟢 and rising"),
+            ("mood_avg", "- Average: 2.7", "- Average: fine, all things considered"),
+            ("money_month", "- 2026-08 August • 0", "- 2026-07 July was slow"),
+            ("money_month", "- 2026-07 July • -40.25", "- 2026-07 July • lots"),
+            ("money_day", "- Tue 15 Sep 2026 • 0", "- Mon 14 Sep 2026 • 100 from Ana"),
+            ("money_week", "- W40 (28-04 Oct) • 12.50", "- W36 (31-06 Sep) • lots"),
+            ("entry", "- Finished the note · Thu 11:56", "- Finished the note · Thu evening"),
+            ("habit", "- Weekly Review · 0/1 · 0%", "- Weekly Review · most weeks"),
+            ("birthday", "- 🎂 Mum · today 🎉", "- 🎂 Mum · in a week or so"),
+            ("stale", "- 🕸 Ana · never logged", "- 🕸️ Ana · 41 days, call her"),
+            ("day_bar", "- Fri 0", "- Fri ▇▇ a lot"),
             ("breakdown", "- 🗂 📌CTA · 14", "- 🗂 sort the flash sheets"),
             ("day_bar", "- Wed ▇▇▇ 60", "- Wed was the worst"),
             ("day_focus", "- Mon · 7h 43m · Paint it", "- Mon · dentist"),

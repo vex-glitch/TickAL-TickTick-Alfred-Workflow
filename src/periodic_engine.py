@@ -1610,21 +1610,40 @@ def _refresh_fixed_q(sec, fixed):
 def _canon_journal_indent(sec):
     """Normalize journal nesting: every Q line at T1, every A line at
     T2 - answers keep their text, only the leading whitespace converges (old
-    flat-seeded notes + phone-typed answers drift otherwise)."""
+    flat-seeded notes + phone-typed answers drift otherwise).
+
+    A line that sits DEEPER than the answer line above it, and deeper than
+    any answer line is meant to sit (three tabs or more), is part of that
+    answer, whatever it reads like: "- *Q9 · is what I keep asking myself*"
+    or "A: she said yes" typed under an answer used to be pulled out from
+    under it and stood as a question of its own (review 2026-09-27). Up
+    to two tabs a line that reads like a question or an answer is aligned
+    as it always was: that is where the drift lives."""
     out, changed = [], False
+    under = None                        # how deep the answer line above sat, as typed
     for ln in sec.body:
+        depth = len(ln) - len(ln.lstrip("\t"))
+        if ln.strip() and under is not None and depth > max(under, 2):
+            out.append(ln)              # his answer goes on
+            continue
         q = pm.JOURNAL_Q_RE.match(ln)
         if q:
+            under = None
             want = pm.journal_q_line(int(q.group("n")), q.group("q"))
             changed |= (want != ln)
             out.append(want)
             continue
         a = pm.JOURNAL_A_RE.match(ln)
         if a and ln.strip().startswith("A:"):
+            under = depth
             want = f"{pm.T2}A: " + a.group("a")
             changed |= (want != ln)
             out.append(want)
             continue
+        if a:
+            under = depth               # "- A: ..." is left as typed, and lines go under it
+        elif ln.strip():
+            under = under if under is not None and depth >= under else None
         out.append(ln)
     if changed:
         sec.body = out
