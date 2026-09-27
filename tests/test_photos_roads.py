@@ -7,9 +7,9 @@ each road wording its own verdict and next step (the STAGE to send to
 again), and one import at a time. Photos is stubbed at osascript
 (the real bridge runs over a fake library) or at the bridge's verb;
 Eagle, TickTick and the clipboard are tripwires that RAISE: no
-Photos, no Eagle, no network. HOME is a scratch dir before any repo
-import and every temp dir the roads make lands inside the test's
-own: ~/.ticktick_alfred and the real temp dir stay untouched.
+Photos, no Eagle, no network. Run on its own, HOME is a scratch dir
+before any repo import; every temp dir the roads make lands inside the
+test's own: ~/.ticktick_alfred and the real temp dir stay untouched.
 Run: python3 tests/test_photos_roads.py   (or unittest discover)
 """
 import atexit
@@ -21,28 +21,36 @@ import sys
 import tempfile
 import unittest
 
-_REAL_HOME = os.environ.get("HOME")
-_SCRATCH = tempfile.mkdtemp(prefix="tickal_prhome_")
-os.environ["HOME"] = _SCRATCH              # before ANY repo import
-os.environ["TICKAL_NO_SETTLE"] = "1"       # no background follow-ups
-atexit.register(shutil.rmtree, _SCRATCH, True)
+if __name__ == "__main__":                 # on its own the process is this
+    _REAL_HOME = os.environ.get("HOME")    # suite's: HOME is a scratch dir
+    _SCRATCH = tempfile.mkdtemp(prefix="tickal_prhome_")
+    os.environ["HOME"] = _SCRATCH          # before ANY repo import
+    atexit.register(shutil.rmtree, _SCRATCH, True)
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
 for _p in (_HERE, os.path.join(_ROOT, "src"), os.path.join(_ROOT, "Scripts")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
-os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
-os.environ.setdefault("crm_records_tags",
-                      "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
+import harness  # noqa: E402
 import clipboard  # noqa: E402
 import crm_records  # noqa: E402
 import eagle  # noqa: E402
 import photos_bridge as pb  # noqa: E402
 import xact  # noqa: E402
 
-if _REAL_HOME is not None:                 # the suites after this one
-    os.environ["HOME"] = _REAL_HOME
+if __name__ == "__main__":
+    if _REAL_HOME is not None:             # the roads run as they did: what
+        os.environ["HOME"] = _REAL_HOME    # was imported stays on the scratch
+
+# The Configure panel this suite is written against, set for as long as its
+# tests run and put back after them (tests/harness.py). Under unittest
+# discover the process is shared, so nothing here touches os.environ at
+# import; there the roads are kept off ~/.ticktick_alfred by Base.setUp.
+setUpModule, tearDownModule = harness.configured(
+    TICKAL_NO_SETTLE="1",  # no background follow-ups
+    crm_records_list_id="6a4e50e9842a1194a7c681e1",
+    crm_records_tags="🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
 UA = "AAAAAAAA-0000-4000-8000-00000000000A"
 UB = "BBBBBBBB-0000-4000-8000-00000000000B"
