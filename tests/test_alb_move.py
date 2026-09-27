@@ -11,7 +11,6 @@ Run: python3 tests/test_alb_move.py   (or unittest discover)
 """
 import json
 import os
-os.environ["TICKAL_NO_SETTLE"] = "1"   # no background follow-ups (note catch-up, settle)
 import sys
 import unittest
 
@@ -20,15 +19,20 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_HERE, os.path.join(_ROOT, "src"), os.path.join(_ROOT, "Scripts")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
-os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
-os.environ.setdefault("crm_archive_list_id", "ARCHIVE")
-os.environ.setdefault("crm_records_tags",
-                      "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
+import harness  # noqa: E402
 import test_albums as ta  # noqa: E402  (fixture library, FakeEagle, FakeAPI)
 import albums  # noqa: E402
 import cache  # noqa: E402
 import crm_records as cr  # noqa: E402
 import xact  # noqa: E402
+
+# The Configure panel this suite is written against, set for as long as its
+# tests run and put back after them (tests/harness.py).
+setUpModule, tearDownModule = harness.configured(
+    TICKAL_NO_SETTLE="1",  # no background follow-ups (note catch-up, settle)
+    crm_records_list_id="6a4e50e9842a1194a7c681e1",
+    crm_archive_list_id="ARCHIVE",
+    crm_records_tags="🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
 REC, TV_PID = ta.REC, ta.TV_PID
 CUST_A = "[👤 Phillip](https://ticktick.com/webapp/#p/%s/tasks/ca)" % REC

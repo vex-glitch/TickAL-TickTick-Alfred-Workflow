@@ -2,12 +2,17 @@
 the note locator's fallback order."""
 import os, sys, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
-os.environ.setdefault("crm_archive_list_id", "ARCHIVE")
-os.environ.setdefault("crm_records_tags",
-                      "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import harness
 import areas
 import crm_records as cr
+
+# The Configure panel this suite is written against, set for as long as its
+# tests run and put back after them (tests/harness.py).
+setUpModule, tearDownModule = harness.configured(
+    crm_records_list_id="6a4e50e9842a1194a7c681e1",
+    crm_archive_list_id="ARCHIVE",
+    crm_records_tags="🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
 REC, ARC = "6a4e50e9842a1194a7c681e1", "ARCHIVE"
 

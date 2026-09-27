@@ -11,295 +11,299 @@ No network: ensure_note, _pn_rmw and journal_seed are stubbed, and the day
 strip reads a fake note list.
 Run: python3 tests/test_money.py
 """
-import os
-import sys
-from datetime import date
+if __name__ != "__main__":      # imported by unittest: tests/harness.py
+    import harness
+    load_tests = harness.script_suite(__file__)
+else:
+    import os
+    import sys
+    from datetime import date
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "src"))
-sys.path.insert(0, os.path.join(ROOT, "Scripts"))
+    ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.insert(0, os.path.join(ROOT, "src"))
+    sys.path.insert(0, os.path.join(ROOT, "Scripts"))
 
-import periodic_sections as ps      # noqa: E402
-import periodic_model as pm         # noqa: E402
-import periodic_engine as pe        # noqa: E402
-import periodic_rows as prows       # noqa: E402
+    import periodic_sections as ps      # noqa: E402
+    import periodic_model as pm         # noqa: E402
+    import periodic_engine as pe        # noqa: E402
+    import periodic_rows as prows       # noqa: E402
 
-FAILS, COUNT = [], [0]
-
-
-def check(name, cond, detail=""):
-    COUNT[0] += 1
-    if cond:
-        print(f"  ok  {name}")
-    else:
-        print(f"FAIL  {name}  {detail}")
-        FAILS.append(name)
+    FAILS, COUNT = [], [0]
 
 
-Q = "\t- *Q1 · How much money did you earn today?*\n\t\tA: "
-EVENING = "#### 📓 Journals\n- 🌅 Morning journal\n\n- 🌙 Evening journal\n" + Q + "%s\n"
-BARE = "#### 📓 Journals\n- 🌅 Morning journal\n\n- 🌙 Evening journal\n"
-LEGACY = ("#### 📓 Journals\n- 🌙 Evening journal\n" + Q + "\n"
-          "#### 💰 Money\n- 120 · old client\n**Total = 120**\n")
-DAY = date(2026, 9, 15)                      # a Tuesday
-STATE = {}
+    def check(name, cond, detail=""):
+        COUNT[0] += 1
+        if cond:
+            print(f"  ok  {name}")
+        else:
+            print(f"FAIL  {name}  {detail}")
+            FAILS.append(name)
 
 
-def _install(content):
-    STATE["content"], STATE["seeded"] = content, 0
-    pe.ensure_note = lambda p, index=None: ({"id": "t1", "projectId": "p1"}, False)
+    Q = "\t- *Q1 · How much money did you earn today?*\n\t\tA: "
+    EVENING = "#### 📓 Journals\n- 🌅 Morning journal\n\n- 🌙 Evening journal\n" + Q + "%s\n"
+    BARE = "#### 📓 Journals\n- 🌅 Morning journal\n\n- 🌙 Evening journal\n"
+    LEGACY = ("#### 📓 Journals\n- 🌙 Evening journal\n" + Q + "\n"
+              "#### 💰 Money\n- 120 · old client\n**Total = 120**\n")
+    DAY = date(2026, 9, 15)                      # a Tuesday
+    STATE = {}
 
-    def rmw(pid, tid, mutate):
+
+    def _install(content):
+        STATE["content"], STATE["seeded"] = content, 0
+        pe.ensure_note = lambda p, index=None: ({"id": "t1", "projectId": "p1"}, False)
+
+        def rmw(pid, tid, mutate):
+            doc = ps.parse_sections(STATE["content"])
+            r = mutate(doc, {})
+            if r:
+                STATE["content"] = ps.serialize_sections(doc)
+            return r, doc
+        pe._pn_rmw = rmw
+
+        def seed(slot, day=None, want_body=False):
+            STATE["seeded"] += 1
+            if "How much money" not in STATE["content"]:
+                STATE["content"] = STATE["content"].replace(
+                    "- 🌙 Evening journal", "- 🌙 Evening journal\n" + Q)
+            return ({}, [], None, []) if want_body else ({}, [], None)
+        pe.journal_seed = seed
+
+
+    def log(content, amount=485, label="tattoo", **kw):
+        _install(content)
+        msg = pe.append_income(amount, label, day=DAY, **kw)
         doc = ps.parse_sections(STATE["content"])
-        r = mutate(doc, {})
-        if r:
-            STATE["content"] = ps.serialize_sections(doc)
-        return r, doc
-    pe._pn_rmw = rmw
-
-    def seed(slot, day=None, want_body=False):
-        STATE["seeded"] += 1
-        if "How much money" not in STATE["content"]:
-            STATE["content"] = STATE["content"].replace(
-                "- 🌙 Evening journal", "- 🌙 Evening journal\n" + Q)
-        return ({}, [], None, []) if want_body else ({}, [], None)
-    pe.journal_seed = seed
+        return msg, pe._answer_in(doc, pm.SEC_EVENING, "money did you earn"), doc
 
 
-def log(content, amount=485, label="tattoo", **kw):
-    _install(content)
-    msg = pe.append_income(amount, label, day=DAY, **kw)
-    doc = ps.parse_sections(STATE["content"])
-    return msg, pe._answer_in(doc, pm.SEC_EVENING, "money did you earn"), doc
+    # ── where the number lands ───────────────────────────────────────────────────
+    msg, ans, _d = log(EVENING % "")
+    check("fresh answer", ans == "485 · tattoo", ans)
+    check("toast names the DAY, never 'today'", msg == "💰 Tue 15 Sep · 485 · tattoo", msg)
+
+    msg, ans, _d = log(EVENING % "100 · deposit")
+    check("sums into what is there", ans == "585 · deposit, tattoo", ans)
+    check("toast shows the arithmetic", msg == "💰 Tue 15 Sep · 100 + 485 = 585", msg)
+
+    msg, ans, _d = log(EVENING % "100 · deposit", replace=True)
+    check("replace swaps the number", ans == "485 · tattoo", ans)
+    check("replace toast says what it was",
+          msg == "💰 Tue 15 Sep · 485 (was 100)", msg)
+
+    msg, ans, _d = log(EVENING % "500 for the sleeve, 2 sessions")
+    check("a hand-typed answer survives a sum",
+          ans == "985 · 500 for the sleeve, 2 sessions, tattoo", ans)
+
+    # Vex's literal case: the evening journal was never run, so that note has no
+    # money QUESTION - and a back-minted one has none either, because create_note
+    # renders the template and the questions are planted on refresh.
+    msg, ans, _d = log(BARE)
+    check("a skipped journal is seeded, then answered", ans == "485 · tattoo", ans)
+    check("seeded exactly once", STATE["seeded"] == 1, STATE["seeded"])
+
+    msg, ans, doc = log(LEGACY)
+    msec = ps.find(doc, pm.SEC_MONEY)
+    body = [l.strip() for l in (msec.body if msec else []) if l.strip()]
+    check("a legacy 💰 section keeps its history",
+          body[:2] == ["- 120 · old client", "- 485 · tattoo"], body)
+    check("and its total is recomputed", "605" in " ".join(body), body)
+    check("the answer is left alone on a legacy note", ans == "", repr(ans))
+
+    # ── reading a day back (the fail-safe's source) ──────────────────────────────
+    def note(day, content):
+        return {"projectId": pe.areas.PERIODIC_LIST_ID,
+                "title": f"{day.isoformat()} · Tue", "content": content}
 
 
-# ── where the number lands ───────────────────────────────────────────────────
-msg, ans, _d = log(EVENING % "")
-check("fresh answer", ans == "485 · tattoo", ans)
-check("toast names the DAY, never 'today'", msg == "💰 Tue 15 Sep · 485 · tattoo", msg)
+    rows = [note(DAY, EVENING % "100 · deposit")]
+    check("answered reads its amount",
+          pe.day_money_state(DAY, rows)[:2] == ("answered", 100.0),
+          pe.day_money_state(DAY, rows))
+    check("blank is NOT the same as answered",
+          pe.day_money_state(DAY, [note(DAY, EVENING % "")])[:2] == ("blank", None))
+    check("a note with no money question reads unasked",
+          pe.day_money_state(DAY, [note(DAY, BARE)])[:2] == ("unasked", None))
+    check("no note at all reads unasked",
+          pe.day_money_state(DAY, [])[:2] == ("unasked", None))
+    check("answered with words but no number keeps the state",
+          pe.day_money_state(DAY, [note(DAY, EVENING % "nothing today")])[:2]
+          == ("answered", None))
+    check("a note in another list is not this day's",
+          pe.day_money_state(DAY, [dict(note(DAY, EVENING % "100"),
+                                        projectId="somewhere-else")])[0] == "unasked")
 
-msg, ans, _d = log(EVENING % "100 · deposit")
-check("sums into what is there", ans == "585 · deposit, tattoo", ans)
-check("toast shows the arithmetic", msg == "💰 Tue 15 Sep · 100 + 485 = 585", msg)
-
-msg, ans, _d = log(EVENING % "100 · deposit", replace=True)
-check("replace swaps the number", ans == "485 · tattoo", ans)
-check("replace toast says what it was",
-      msg == "💰 Tue 15 Sep · 485 (was 100)", msg)
-
-msg, ans, _d = log(EVENING % "500 for the sleeve, 2 sessions")
-check("a hand-typed answer survives a sum",
-      ans == "985 · 500 for the sleeve, 2 sessions, tattoo", ans)
-
-# Vex's literal case: the evening journal was never run, so that note has no
-# money QUESTION - and a back-minted one has none either, because create_note
-# renders the template and the questions are planted on refresh.
-msg, ans, _d = log(BARE)
-check("a skipped journal is seeded, then answered", ans == "485 · tattoo", ans)
-check("seeded exactly once", STATE["seeded"] == 1, STATE["seeded"])
-
-msg, ans, doc = log(LEGACY)
-msec = ps.find(doc, pm.SEC_MONEY)
-body = [l.strip() for l in (msec.body if msec else []) if l.strip()]
-check("a legacy 💰 section keeps its history",
-      body[:2] == ["- 120 · old client", "- 485 · tattoo"], body)
-check("and its total is recomputed", "605" in " ".join(body), body)
-check("the answer is left alone on a legacy note", ans == "", repr(ans))
-
-# ── reading a day back (the fail-safe's source) ──────────────────────────────
-def note(day, content):
-    return {"projectId": pe.areas.PERIODIC_LIST_ID,
-            "title": f"{day.isoformat()} · Tue", "content": content}
-
-
-rows = [note(DAY, EVENING % "100 · deposit")]
-check("answered reads its amount",
-      pe.day_money_state(DAY, rows)[:2] == ("answered", 100.0),
-      pe.day_money_state(DAY, rows))
-check("blank is NOT the same as answered",
-      pe.day_money_state(DAY, [note(DAY, EVENING % "")])[:2] == ("blank", None))
-check("a note with no money question reads unasked",
-      pe.day_money_state(DAY, [note(DAY, BARE)])[:2] == ("unasked", None))
-check("no note at all reads unasked",
-      pe.day_money_state(DAY, [])[:2] == ("unasked", None))
-check("answered with words but no number keeps the state",
-      pe.day_money_state(DAY, [note(DAY, EVENING % "nothing today")])[:2]
-      == ("answered", None))
-check("a note in another list is not this day's",
-      pe.day_money_state(DAY, [dict(note(DAY, EVENING % "100"),
-                                    projectId="somewhere-else")])[0] == "unasked")
-
-# ── the rows ─────────────────────────────────────────────────────────────────
-WEEK = {date(2026, 9, 17): ("blank", None, ""),
-        date(2026, 9, 16): ("blank", None, ""),
-        date(2026, 9, 15): ("answered", 100.0, "100"),
-        date(2026, 9, 14): ("blank", None, "")}
-class _FakeEngine:
-    """The strip and the confirm screen both read the engine, and the confirm
+    # ── the rows ─────────────────────────────────────────────────────────────────
+    WEEK = {date(2026, 9, 17): ("blank", None, ""),
+            date(2026, 9, 16): ("blank", None, ""),
+            date(2026, 9, 15): ("answered", 100.0, "100"),
+            date(2026, 9, 14): ("blank", None, "")}
+    class _FakeEngine:
+        """The strip and the confirm screen both read the engine, and the confirm
     screen re-reads the day LIVE rather than trusting the strip it came from,
     so the stub has to cover both roads."""
-    @staticmethod
-    def day_money_state(day, notes=None):
-        return WEEK.get(day, ("unasked", None, ""))
+        @staticmethod
+        def day_money_state(day, notes=None):
+            return WEEK.get(day, ("unasked", None, ""))
 
-    @staticmethod
-    def week_answer_states(slot, needle, monday=None, today=None, money=False):
-        return [(d, ) + WEEK[d] for d in sorted(WEEK, reverse=True)]
+        @staticmethod
+        def week_answer_states(slot, needle, monday=None, today=None, money=False):
+            return [(d, ) + WEEK[d] for d in sorted(WEEK, reverse=True)]
 
-    @staticmethod
-    def day_answer_state(day, slot, needle, notes=None):
-        st, _v, txt = WEEK.get(day, ("unasked", None, ""))
-        return st, txt
-
-
-prows._pe = lambda: _FakeEngine
-TODAY = date(2026, 9, 17)
-_real_date = prows.date
+        @staticmethod
+        def day_answer_state(day, slot, needle, notes=None):
+            st, _v, txt = WEEK.get(day, ("unasked", None, ""))
+            return st, txt
 
 
-class _FakeDate(date):
-    @classmethod
-    def today(cls):
-        return TODAY
+    prows._pe = lambda: _FakeEngine
+    TODAY = date(2026, 9, 17)
+    _real_date = prows.date
 
 
-prows.date = _FakeDate
-# pm.past_day (the *mon road) reads ITS OWN date.today(): unpinned, a typed
-# day word resolved against the real calendar and the week of 14 Sep
-# answered '💰 Not this week' on any later Monday (2026-09-21)
-pm.date = _FakeDate
-# ...and past_day's clock is _dayroll_today (the 04:00 day roll), not
-# pm.date: unpinned, '*mon' resolved against the real week again on
-# 2026-09-23 and the check read '💰 Not this week' once more
-pm._dayroll_today = lambda: TODAY
-
-r = prows.income_rows("")
-check("idle strip prompts then lists the week",
-      r[0]["title"].startswith("💰 Type the amount")
-      and len(r) == 5 and not any(x.get("valid") for x in r), [x["title"] for x in r])
-check("junk instead of an amount says so",
-      prows.income_rows("abc")[0]["subtitle"] == "Numbers first")
-
-r = prows.income_rows("485 tattoo")
-check("today is the first row, so plain ⏎ is today",
-      r[0]["title"].startswith("☀️ Today") and r[0]["valid"] is True, r[0]["title"])
-check("a day with nothing writes straight away",
-      r[0]["arg"].startswith("xact:pn_backlog:") and "autocomplete" not in r[0],
-      r[0].get("arg", "")[:30])
-day_with = next(x for x in r if "15 Sep" in x["title"])
-check("a day that ALREADY has money cannot be written by accident",
-      day_with.get("valid") is False
-      and day_with["autocomplete"] == "pn $ !2026-09-15 485 tattoo",
-      day_with)
-check("and it says what it holds", "Has 100" in day_with["subtitle"], day_with["subtitle"])
-
-r = prows.income_rows("485 tattoo *mon")
-check("a typed day targets one day",
-      len(r) == 1 and "14 Sep" in r[0]["title"], [x["title"] for x in r])
-
-r = prows.income_rows("!2026-09-15 485 tattoo")
-check("the confirm screen leads with what is there",
-      r[0]["title"] == "💰 Tue 15 Sep · 100 + 485 = 585", r[0]["title"])
-check("⏎ on it adds", r[0]["valid"] is True and "Add it" in r[0]["subtitle"])
-check("changing the number is a SECOND row",
-      r[1]["title"] == "✏️ Tue 15 Sep · 100 → 485"
-      and "Replace" in r[1]["subtitle"], r[1]["title"])
-check("and there is a way back", r[2]["autocomplete"] == "pn $ 485 tattoo")
-import base64 as _b64mod
-import json as _json
-pay = _json.loads(_b64mod.b64decode(r[1]["arg"].split(":", 2)[2]))
-check("the replace row really means replace",
-      pay == {"amount": 485.0, "label": "tattoo", "kind": "$",
-              "day": "2026-09-15", "replace": True}, pay)
-
-# ── the entry legend ─────────────────────────────────────────────────────────
-legend = prows.entry_rows("")
-check("💰 Money is back under ➕ Entry",
-      any(x["title"] == "💰 Money" for x in legend),
-      [x["title"] for x in legend])
-check("and it leads to the same one screen",
-      next(x for x in legend if x["title"] == "💰 Money")["autocomplete"] == "pn + $ ")
-check("pn + $ renders the money screen",
-      prows.entry_rows("$ 485 tattoo")[0]["title"].startswith("☀️ Today"))
-# `pn + $ 485` used to log a THOUGHT called "$ 485", valid and unwarned
-bad = prows.entry_rows("m 485")
-check("an unknown kind letter never logs a thought",
-      bad[0]["valid"] is False and "No entry kind" in bad[0]["title"], bad[0])
-check("plain text is still a thought",
-      prows.entry_rows("shipped the thing")[0]["title"].startswith("💭 Thought"))
-
-prows.date = _real_date
-print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
-if FAILS:
-    raise AssertionError(f"{len(FAILS)} failed: {FAILS}")
-
-# ── the review round, 2026-09-17: six real bugs in the machine as first built ─
-HL = {"letter": "h", "emoji": "✨", "label": "Highlight", "key": "dhighlight",
-      "slot": "evening", "needle": "highlight of the day",
-      "hint": "x", "prompt": "Type the highlight…",
-      "parse": prows._parse_text, "bad": "Words, not a number"}
-
-r = prows.day_strip_rows(HL, "Shipped the thing *finally", "pn + b h ")
-check("a trailing *word that is not a day stays in the text",
-      all("Shipped the thing *finally" in x.get("subtitle", "")
-          for x in r if x.get("valid")), [x.get("subtitle") for x in r])
-r = prows.day_strip_rows(HL, "Shipped it *mon", "pn + b h ")
-check("a trailing *day still targets a day",
-      len(r) == 1 and "14 Sep" in r[0]["title"], [x["title"] for x in r])
-
-check("the mood separator the hint teaches is shaved",
-      prows._parse_scale("4 · slept badly")[1] == {"score": 4, "note": "slept badly"},
-      prows._parse_scale("4 · slept badly"))
-check("and a note with no separator still works",
-      prows._parse_scale("4 slept badly")[1]["note"] == "slept badly")
-check("a scale value must be 1 to 5",
-      prows._parse_scale("7") is None and prows._parse_scale("x") is None
-      and prows._parse_scale("42") is None)
-
-check("the day rating does not wear the week highlight's glyph",
-      prows._BY_LETTER["r"]["emoji"] != "⭐️"
-      and "⭐️ Highlight" in dict(prows._KIND_LEGEND).get("h", "⭐️ Highlight"))
-
-r = prows.day_strip_rows(HL, "!2026-09-15 A highlight", "pn + b h ")
-keep = r[0]
-check("the Leave it row keeps what you typed in the bar",
-      keep["autocomplete"] == "pn + b h A highlight", keep.get("autocomplete"))
-check("and replacing is the second row",
-      "Replace" in r[1]["subtitle"] and r[1]["valid"] is True, r[1])
-
-check("a day you have not had yet is refused",
-      "Not a day you have had yet" in
-      prows.day_strip_rows(HL, "!2099-01-01 x", "pn + b h ")[0]["title"])
+    class _FakeDate(date):
+        @classmethod
+        def today(cls):
+            return TODAY
 
 
-class _Broken:
-    @staticmethod
-    def week_answer_states(*a, **k):
-        raise RuntimeError("cache is gone")
+    prows.date = _FakeDate
+    # pm.past_day (the *mon road) reads ITS OWN date.today(): unpinned, a typed
+    # day word resolved against the real calendar and the week of 14 Sep
+    # answered '💰 Not this week' on any later Monday (2026-09-21)
+    pm.date = _FakeDate
+    # ...and past_day's clock is _dayroll_today (the 04:00 day roll), not
+    # pm.date: unpinned, '*mon' resolved against the real week again on
+    # 2026-09-23 and the check read '💰 Not this week' once more
+    pm._dayroll_today = lambda: TODAY
 
-    @staticmethod
-    def day_answer_state(*a, **k):
-        raise RuntimeError("cache is gone")
+    r = prows.income_rows("")
+    check("idle strip prompts then lists the week",
+          r[0]["title"].startswith("💰 Type the amount")
+          and len(r) == 5 and not any(x.get("valid") for x in r), [x["title"] for x in r])
+    check("junk instead of an amount says so",
+          prows.income_rows("abc")[0]["subtitle"] == "Numbers first")
+
+    r = prows.income_rows("485 tattoo")
+    check("today is the first row, so plain ⏎ is today",
+          r[0]["title"].startswith("☀️ Today") and r[0]["valid"] is True, r[0]["title"])
+    check("a day with nothing writes straight away",
+          r[0]["arg"].startswith("xact:pn_backlog:") and "autocomplete" not in r[0],
+          r[0].get("arg", "")[:30])
+    day_with = next(x for x in r if "15 Sep" in x["title"])
+    check("a day that ALREADY has money cannot be written by accident",
+          day_with.get("valid") is False
+          and day_with["autocomplete"] == "pn $ !2026-09-15 485 tattoo",
+          day_with)
+    check("and it says what it holds", "Has 100" in day_with["subtitle"], day_with["subtitle"])
+
+    r = prows.income_rows("485 tattoo *mon")
+    check("a typed day targets one day",
+          len(r) == 1 and "14 Sep" in r[0]["title"], [x["title"] for x in r])
+
+    r = prows.income_rows("!2026-09-15 485 tattoo")
+    check("the confirm screen leads with what is there",
+          r[0]["title"] == "💰 Tue 15 Sep · 100 + 485 = 585", r[0]["title"])
+    check("⏎ on it adds", r[0]["valid"] is True and "Add it" in r[0]["subtitle"])
+    check("changing the number is a SECOND row",
+          r[1]["title"] == "✏️ Tue 15 Sep · 100 → 485"
+          and "Replace" in r[1]["subtitle"], r[1]["title"])
+    check("and there is a way back", r[2]["autocomplete"] == "pn $ 485 tattoo")
+    import base64 as _b64mod
+    import json as _json
+    pay = _json.loads(_b64mod.b64decode(r[1]["arg"].split(":", 2)[2]))
+    check("the replace row really means replace",
+          pay == {"amount": 485.0, "label": "tattoo", "kind": "$",
+                  "day": "2026-09-15", "replace": True}, pay)
+
+    # ── the entry legend ─────────────────────────────────────────────────────────
+    legend = prows.entry_rows("")
+    check("💰 Money is back under ➕ Entry",
+          any(x["title"] == "💰 Money" for x in legend),
+          [x["title"] for x in legend])
+    check("and it leads to the same one screen",
+          next(x for x in legend if x["title"] == "💰 Money")["autocomplete"] == "pn + $ ")
+    check("pn + $ renders the money screen",
+          prows.entry_rows("$ 485 tattoo")[0]["title"].startswith("☀️ Today"))
+    # `pn + $ 485` used to log a THOUGHT called "$ 485", valid and unwarned
+    bad = prows.entry_rows("m 485")
+    check("an unknown kind letter never logs a thought",
+          bad[0]["valid"] is False and "No entry kind" in bad[0]["title"], bad[0])
+    check("plain text is still a thought",
+          prows.entry_rows("shipped the thing")[0]["title"].startswith("💭 Thought"))
+
+    prows.date = _real_date
+    print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
+    if FAILS:
+        raise AssertionError(f"{len(FAILS)} failed: {FAILS}")
+
+    # ── the review round, 2026-09-17: six real bugs in the machine as first built ─
+    HL = {"letter": "h", "emoji": "✨", "label": "Highlight", "key": "dhighlight",
+          "slot": "evening", "needle": "highlight of the day",
+          "hint": "x", "prompt": "Type the highlight…",
+          "parse": prows._parse_text, "bad": "Words, not a number"}
+
+    r = prows.day_strip_rows(HL, "Shipped the thing *finally", "pn + b h ")
+    check("a trailing *word that is not a day stays in the text",
+          all("Shipped the thing *finally" in x.get("subtitle", "")
+              for x in r if x.get("valid")), [x.get("subtitle") for x in r])
+    r = prows.day_strip_rows(HL, "Shipped it *mon", "pn + b h ")
+    check("a trailing *day still targets a day",
+          len(r) == 1 and "14 Sep" in r[0]["title"], [x["title"] for x in r])
+
+    check("the mood separator the hint teaches is shaved",
+          prows._parse_scale("4 · slept badly")[1] == {"score": 4, "note": "slept badly"},
+          prows._parse_scale("4 · slept badly"))
+    check("and a note with no separator still works",
+          prows._parse_scale("4 slept badly")[1]["note"] == "slept badly")
+    check("a scale value must be 1 to 5",
+          prows._parse_scale("7") is None and prows._parse_scale("x") is None
+          and prows._parse_scale("42") is None)
+
+    check("the day rating does not wear the week highlight's glyph",
+          prows._BY_LETTER["r"]["emoji"] != "⭐️"
+          and "⭐️ Highlight" in dict(prows._KIND_LEGEND).get("h", "⭐️ Highlight"))
+
+    r = prows.day_strip_rows(HL, "!2026-09-15 A highlight", "pn + b h ")
+    keep = r[0]
+    check("the Leave it row keeps what you typed in the bar",
+          keep["autocomplete"] == "pn + b h A highlight", keep.get("autocomplete"))
+    check("and replacing is the second row",
+          "Replace" in r[1]["subtitle"] and r[1]["valid"] is True, r[1])
+
+    check("a day you have not had yet is refused",
+          "Not a day you have had yet" in
+          prows.day_strip_rows(HL, "!2099-01-01 x", "pn + b h ")[0]["title"])
 
 
-_ok_pe = prows._pe
-prows._pe = lambda: _Broken
-r = prows.day_strip_rows(HL, "A highlight", "pn + b h ")
-check("an unreadable cache never becomes a one-keystroke overwrite",
-      not any(x.get("valid") for x in r)
-      and all("Cannot read" in x["subtitle"] for x in r),
-      [(x["subtitle"], x.get("valid")) for x in r])
-prows._pe = _ok_pe
+    class _Broken:
+        @staticmethod
+        def week_answer_states(*a, **k):
+            raise RuntimeError("cache is gone")
 
-check("a date in another year says so",
-      pm.day_label(date(2025, 9, 15), date(2026, 9, 17)) == "Mon 15 Sep 2025"
-      and pm.day_label(date(2026, 9, 15), date(2026, 9, 17)) == "Tue 15 Sep")
+        @staticmethod
+        def day_answer_state(*a, **k):
+            raise RuntimeError("cache is gone")
 
-_doc = ps.parse_sections(
-    "- 🌙 Evening journal\n\t- *Q1 · ✨ What was the highlight of the day?*\n"
-    "\t\t- A: \n#### ✨ Highlight\n- ✨ yesterday's leftover\n")
-pe._fill_day_highlight(_doc)
-check("emptying the answer clears the ✨ mirror",
-      [l for l in (ps.find(_doc, pm.SEC_HIGHLIGHT) or ps.Section("", "")).body
-       if l.strip()] == [],
-      (ps.find(_doc, pm.SEC_HIGHLIGHT) or ps.Section("", "")).body)
+
+    _ok_pe = prows._pe
+    prows._pe = lambda: _Broken
+    r = prows.day_strip_rows(HL, "A highlight", "pn + b h ")
+    check("an unreadable cache never becomes a one-keystroke overwrite",
+          not any(x.get("valid") for x in r)
+          and all("Cannot read" in x["subtitle"] for x in r),
+          [(x["subtitle"], x.get("valid")) for x in r])
+    prows._pe = _ok_pe
+
+    check("a date in another year says so",
+          pm.day_label(date(2025, 9, 15), date(2026, 9, 17)) == "Mon 15 Sep 2025"
+          and pm.day_label(date(2026, 9, 15), date(2026, 9, 17)) == "Tue 15 Sep")
+
+    _doc = ps.parse_sections(
+        "- 🌙 Evening journal\n\t- *Q1 · ✨ What was the highlight of the day?*\n"
+        "\t\t- A: \n#### ✨ Highlight\n- ✨ yesterday's leftover\n")
+    pe._fill_day_highlight(_doc)
+    check("emptying the answer clears the ✨ mirror",
+          [l for l in (ps.find(_doc, pm.SEC_HIGHLIGHT) or ps.Section("", "")).body
+           if l.strip()] == [],
+          (ps.find(_doc, pm.SEC_HIGHLIGHT) or ps.Section("", "")).body)

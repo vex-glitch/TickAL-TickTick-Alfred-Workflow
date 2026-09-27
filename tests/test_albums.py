@@ -19,14 +19,19 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "src"))
 # the picker + ⌘ Actions tests import browse / actions (Scripts) lazily
 sys.path.insert(0, os.path.join(_ROOT, "Scripts"))
-os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
-os.environ.setdefault("crm_archive_list_id", "ARCHIVE")
-os.environ.setdefault("crm_records_tags",
-                      "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
+sys.path.insert(0, os.path.join(_ROOT, "tests"))
+import harness  # noqa: E402
 import eagle as real_eagle  # noqa: E402
 import cache  # noqa: E402
 import albums  # noqa: E402
 import crm_records as cr  # noqa: E402
+
+# The Configure panel this suite is written against, set for as long as its
+# tests run and put back after them (tests/harness.py).
+setUpModule, tearDownModule = harness.configured(
+    crm_records_list_id="6a4e50e9842a1194a7c681e1",
+    crm_archive_list_id="ARCHIVE",
+    crm_records_tags="🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
 REC = "6a4e50e9842a1194a7c681e1"
 TV_PID = "6a268ea28f081f1de80eaedd"
@@ -224,12 +229,20 @@ class Base(unittest.TestCase):
         albums.PACE = 0
         self._cache_dir = cache.CACHE_DIR
         cache.CACHE_DIR = os.path.join(self.tmp, "cache")
+        # memoised per process by the product, and filled here from THIS
+        # test's library and cache: both go back to what they were
+        self._counts = dict(real_eagle._SUBTREE_COUNT_MEMO)
+        self._labels = getattr(sys.modules.get("display"), "_TAG_LABELS", None)
 
     def tearDown(self):
         albums.eagle = self._eagle
         albums.LEDGER_PATH, albums.STASH_PATH, albums.PACE = (
             self._ledger, self._stash, self._pace)
         cache.CACHE_DIR = self._cache_dir
+        real_eagle._SUBTREE_COUNT_MEMO.clear()
+        real_eagle._SUBTREE_COUNT_MEMO.update(self._counts)
+        if "display" in sys.modules:
+            sys.modules["display"]._TAG_LABELS = self._labels
         shutil.rmtree(self.tmp, ignore_errors=True)
 
 

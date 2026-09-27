@@ -1,8 +1,14 @@
 """Session-task title shape: marker suffix, forecast tail (2026-09-08)."""
 import os, sys, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import harness
 import crm_records as cr
+
+# The Configure panel this suite is written against, set for as long as its
+# tests run and put back after them (tests/harness.py).
+setUpModule, tearDownModule = harness.configured(
+    crm_records_list_id="6a4e50e9842a1194a7c681e1")
 
 LINK = "[🎨 Marko • Sleeve](https://ticktick.com/webapp/#p/6a4e50e9842a1194a7c681e1/tasks/6a5f18fd8f0846c75ce1d09c)"
 

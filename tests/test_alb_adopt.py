@@ -18,17 +18,21 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "Scripts"))
 sys.path.insert(0, HERE)
-os.environ.setdefault("crm_list_id", "CRMLIST")
-os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
-os.environ.setdefault("crm_archive_list_id", "ARCHIVE")
-os.environ.setdefault("crm_records_tags",
-                      "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
+import harness  # noqa: E402
 from test_albums import Base, REC, TV_PID, _cust, real_eagle  # noqa: E402
 import albums  # noqa: E402
 import cache  # noqa: E402
 import crm_records as cr  # noqa: E402
 import xact  # noqa: E402
+
+# The Configure panel this suite is written against, set for as long as its
+# tests run and put back after them (tests/harness.py).
+setUpModule, tearDownModule = harness.configured(
+    crm_list_id="CRMLIST",
+    crm_records_list_id="6a4e50e9842a1194a7c681e1",
+    crm_archive_list_id="ARCHIVE",
+    crm_records_tags="🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
 ARC = "ARCHIVE"
 EAGLE_LINE_B1 = "🦅 [Eagle folder](eagle://folder/B1) · TV\n🎬 TV"

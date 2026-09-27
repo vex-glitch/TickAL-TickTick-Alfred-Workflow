@@ -17,11 +17,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "src"))
-os.environ.setdefault("crm_records_list_id", "6a4e50e9842a1194a7c681e1")
-os.environ.setdefault("crm_archive_list_id", "ARCHIVE")
-os.environ.setdefault("crm_list_id", "CRM")
-os.environ.setdefault("crm_records_tags",
-                      "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
+import harness  # noqa: E402
 import test_albums as ta  # noqa: E402  (fixture library, FakeEagle, FakeAPI, notes)
 import areas  # noqa: E402
 import albums  # noqa: E402
@@ -41,6 +37,14 @@ def _load_xact():
 
 
 xact = _load_xact()
+
+# The Configure panel this suite is written against, set for as long as its
+# tests run and put back after them (tests/harness.py).
+setUpModule, tearDownModule = harness.configured(
+    crm_records_list_id="6a4e50e9842a1194a7c681e1",
+    crm_archive_list_id="ARCHIVE",
+    crm_list_id="CRM",
+    crm_records_tags="🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive")
 
 REC, TV_PID = ta.REC, ta.TV_PID
 A_TITLE, B_TITLE = "🎨 Phillip • Samurai", "🎨 Zeus • Zeus"
