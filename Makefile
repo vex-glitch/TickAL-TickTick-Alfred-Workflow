@@ -48,6 +48,8 @@ test:
 	@$(PYTHON) tests/test_okr_stats.py
 	@$(PYTHON) tests/test_people.py
 	@$(PYTHON) tests/test_eagle.py
+	@$(PYTHON) tests/test_photos_bridge.py
+	@$(PYTHON) tests/test_photos_roads.py
 	@$(PYTHON) tests/test_routine_link.py
 	@$(PYTHON) tests/test_routine_runner.py
 	@$(PYTHON) tests/test_subtask_line.py

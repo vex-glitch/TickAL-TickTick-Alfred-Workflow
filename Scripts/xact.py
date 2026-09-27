@@ -2043,7 +2043,8 @@ def sessiondone(pid, tid, when=None):
             _crm_say("Cancelled · task untouched")
             return
         if pick == "Import":
-            if not session_photos(log_tid, "" if is_s else "consult"):
+            if not session_photos(log_tid, "" if is_s else "consult",
+                                  again="run Session done again"):
                 _crm_say("📸 Import failed · task untouched - fix and "
                          "re-run Session done")
                 return
@@ -3328,7 +3329,7 @@ def _stage_spec(stage, lb, log_tid):
     return "04 Sessions", f"S{n}", ["session", f"s{n}"]
 
 
-def session_photos(log_tid, stage=""):
+def session_photos(log_tid, stage="", again=None):
     """📸 THE import action (Vex unification 2026-07-26: 'one action
     for everything, edge cases inside'). Source: Photos selection when
     one exists, else a clipboard image (content-hash named, so
@@ -3339,8 +3340,17 @@ def session_photos(log_tid, stage=""):
     guard, never duplicated); ✅ album for Photos sources only.
     Photos road = the DIRECT-DISK snapshot (2026-09-08): metadata in
     one osascript, originals linked off the library (Alfred has FDA),
-    chunked export only for iCloud stragglers. Every surface rides
-    THIS verb."""
+    one export per iCloud straggler, each waiting by its bytes, with
+    ONE 'downloading' banner before the first (2026-09-27: a batch of
+    16 died on AppleScript's 120 s deadline, -1712). All or nothing:
+    a shot still in iCloud stops the import with nothing filed, and
+    the toast names the stage to send to again. ONE import at a time
+    across Alfred's script nodes (_photos_lock): a run takes minutes
+    now, and two at once both pass the ph: guard and file every shot
+    twice. `again` = the caller's own retry words for the failure
+    toast (Session done: the task is untouched, running IT again is
+    the step); without it the toast says 'send again' and names the
+    stage. Every surface rides THIS verb."""
     if not _records_ready():
         return False
     import shutil
@@ -3353,7 +3363,26 @@ def session_photos(log_tid, stage=""):
         return False
     import eagle
     import photos_bridge as pb
+    # the retry names the STAGE: ⏎ on 📸 Send session photos files into
+    # the current session, a consult or an older session must be picked
+    if not again:
+        again = "send again"
+        if stage and stage != "s":
+            try:
+                again = ("send again as "
+                         + _stage_spec(stage, lb, log_tid)[1])
+            except Exception:
+                pass
+    lock = _photos_lock()
+    if lock is None:
+        # _say_now: the import that holds the lock may sit on the very
+        # node _crm_say would queue behind
+        _say_now("📸 Nothing imported · another import running · "
+                 f"{again} after its toast")
+        return False
     tmp = tempfile.mkdtemp(prefix="tickal_tph_")
+    pb._sweep_stale(tmp)       # whatever the source: kept dirs go here
+    keep_tmp = copying = False
     try:
         src = "photos"
         shots = []
@@ -3361,11 +3390,12 @@ def session_photos(log_tid, stage=""):
             # ONE osascript reads the selection (no separate count
             # peek); an empty selection falls through to Finder/clip
             try:
-                shots = pb.selection_snapshot_export(tmp)
+                shots = pb.selection_snapshot_export(
+                    tmp, notice=_photos_wait_banner)
             except pb.NoSelection:
                 shots = []
             except pb.PhotosError as e:
-                _crm_say(f"📸 {e}")
+                _crm_say("📸 " + _photos_trouble(e, again=again))
                 return False
         if not shots:
             try:
@@ -3444,12 +3474,18 @@ def session_photos(log_tid, stage=""):
                       "tags": tags, "annotation": _mark(s)}
                      for i, s in enumerate(new_shots)]
             if specs:
+                copying = True
                 ids = eagle.add_items(specs, folder_id=sub_id)
                 # background copy MUST finish before the tmp links and
                 # exports die (a link unlinks the tmp name only - the
                 # Photos original is never touched)
                 eagle.wait_imported(ids)
         except eagle.EagleError as e:
+            # once Eagle was handed the shots it may still be copying:
+            # the links and exports stay, a later run's sweep drops
+            # them (photos_bridge STALE). Trouble BEFORE that keeps
+            # nothing.
+            keep_tmp = copying
             _crm_say(f"📸 Eagle trouble: {e} · shots safe in Photos")
             return False
         heroes, why = _pick_heroes(shots)
@@ -3500,6 +3536,8 @@ def session_photos(log_tid, stage=""):
         alb = ""
         if src == "photos":
             try:
+                if not pb.photos_running():     # a tell would launch it
+                    raise pb.PhotosFatal("Photos quit mid-way")
                 pb.file_to_album([s["id"] for s in shots])
                 alb = " · ✅ album"
             except pb.PhotosError:
@@ -3513,21 +3551,130 @@ def session_photos(log_tid, stage=""):
         _crm_say(f"{head}{att}{alb}")
         return True
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        if not keep_tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+        lock.close()
+
+
+def _say_now(msg):
+    """A banner that shows WHILE a long verb runs. Straight to ET End
+    (its sync click, then the notification): `_crm_say` rides ET
+    XAct, whose script node runs ONE at a time, and on the ⌘ Actions
+    and ⌥⇧ roads the import itself sits on that node - the banner
+    would arrive after the final toast. Capped at 10 s and silent on
+    any trouble: a banner never holds the import. The name 'End' is
+    hardcoded here: renaming that ET needs this string too."""
+    try:
+        subprocess.run(
+            ["osascript", "-e",
+             ('on run argv\n'
+              'tell application id "com.runningwithcrayons.Alfred" to '
+              'run trigger "End" in workflow "com.vex.tickal" '
+              'with argument (item 1 of argv)\nend run'),
+             (msg or "").replace("\\", "").replace('"', "'")],
+            capture_output=True, timeout=10, check=False)
+    except Exception:
+        pass
+
+
+def _photos_lock():
+    """ONE Photos import at a time, across Alfred's script nodes (the
+    ⏎ road and the ⌘ Actions road run on different ones). The open
+    file holding the lock, or None when another import holds it. The
+    kernel frees it when the process ends, however it ends."""
+    import fcntl
+    try:
+        f = open(run_path("tickal_photos_import.lock"), "a+")
+    except OSError:
+        return open(os.devnull)          # no run dir: never block on it
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    return f
+
+
+def _photos_wait_banner(n, nbytes, seconds):
+    """The ONE banner before originals come down from iCloud: the
+    import is silent until its last line and a big pull takes minutes
+    (photos_bridge calls this once, before the first export)."""
+    import photos_bridge as pb
+    size = pb.fmt_size(nbytes)
+    _say_now(f"📸 {n} from iCloud" + (f" · {size}" if size else "")
+             + " · downloading")
+
+
+def _photos_trouble(e, done="imported", again="send again"):
+    """Toast body for a PhotosError: verdict, count, next step, then
+    the rest - a banner shows two lines. photos_bridge states the
+    facts (`.missing`, `.head`, `.tail`, `.waiting`), the ROAD names
+    the step, because only the road knows what is safe to run again:
+    Backlog, Log past session and New tattoo wrote their records
+    BEFORE the import (running THEM again writes those twice, so
+    they say 'send again', 📸 Send session photos, with the stage),
+    Session done left its task untouched and passes its own words.
+    Trouble that is no set and no stall ('no ♥ in selection') passes
+    as it is."""
+    import photos_bridge as pb
+    part = bool(getattr(e, "missing", None))
+    stall = isinstance(e, pb.PhotosTimeout) or getattr(e, "waiting", False)
+    fatal = isinstance(e, pb.PhotosFatal)
+    if not (part or stall or fatal):
+        return str(e)
+    head = e.head if part else str(e)
+    parts = [f"Nothing {done}", head]
+    if fatal:
+        parts.append(f"open Photos · {again}" if "quit" in head else again)
+    else:
+        parts.append(f"{again} in a few min" if stall else again)
+    if part and e.tail:
+        parts.append(e.tail)
+    return " · ".join(parts)
+
+
+def _hero_items(items):
+    """The attach road's narrowing, decided on METADATA so nothing is
+    downloaded for a shot that will not be attached: the ♥ stills, or
+    the single selected shot. Same rule and same words as
+    _pick_heroes."""
+    import photos_bridge as pb
+    favs = [i for i in items if i.get("favorite")]
+    if not favs and len(items) == 1:
+        favs = list(items)
+    if not favs:
+        raise pb.PhotosError("no ♥ in selection")
+    stills = [i for i in favs
+              if os.path.splitext(i.get("filename") or "")[1]
+              .lstrip(".").lower() not in ("mov", "mp4", "m4v")]
+    if not stills:
+        raise pb.PhotosError("♥ all videos - images only")
+    return stills
 
 
 def photo_attach(pid, tid):
     """📎 Independent attach: ♥ (or single selection) from Photos →
-    attachment on ANY task. Eagle not involved."""
+    attachment on ANY task. Eagle not involved. Only the ♥ shots are
+    fetched (2026-09-27: the whole selection used to come down from
+    iCloud to attach one hero)."""
     import shutil
     import tempfile
     import photos_bridge as pb
+    if not pb.photos_running():             # a tell would launch it
+        _crm_say("📎 Photos is not running · open it · select · ♥")
+        return
+    lock = _photos_lock()
+    if lock is None:
+        _say_now("📎 Nothing attached · another import running · "
+                 "attach again after its toast")
+        return
     tmp = tempfile.mkdtemp(prefix="tickal_att_")
     try:
         try:
-            shots = pb.selection_snapshot_export(tmp)
+            shots = pb.selection_snapshot_export(
+                tmp, notice=_photos_wait_banner, only=_hero_items)
         except pb.PhotosError as e:
-            _crm_say(f"📎 {e}")
+            _crm_say("📎 " + _photos_trouble(e, "attached", "attach again"))
             return
         heroes, why = _pick_heroes(shots)
         if not heroes:
@@ -3572,6 +3719,7 @@ def photo_attach(pid, tid):
             _crm_say(f"📎 Attach failed: {why}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+        lock.close()
 
 
 def eagle_triage(rest):
