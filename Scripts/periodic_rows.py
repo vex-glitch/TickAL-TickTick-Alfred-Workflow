@@ -110,6 +110,17 @@ def _goalseq_active(kind=None):
         return None
 
 
+def _journal_waits():
+    """The goal handoff of a morning or evening journal paused at its goal
+    question (goal_handoff: slot, note_day, for_day, mode) | None. Never
+    raises: a screen must render whether or not a journal is waiting."""
+    try:
+        import goal_handoff
+        return goal_handoff.load()
+    except Exception:
+        return None
+
+
 def idle_rows(frag):
     today = date.today()
     items = []
@@ -865,7 +876,13 @@ _FAMILIES = {
 def family_rows(key, frag):
     label, members = _FAMILIES[key]
     items = []
+    # ☀️ Daily serves a waiting journal's goal question (rows()), and the row
+    # that leads there says which day that is
+    waits = _journal_waits() if key == "goals" else None
     for uid, title, sub, arg, autoc in members:
+        if waits and uid == "pn-goal-daily":
+            sub = ("The one thing for tomorrow" if waits["slot"] == "evening"
+                   else "The one thing for today") + " · journal waits"
         it = alfred.item(uid=uid, title=title, subtitle=sub,
                          arg=arg or "", valid=bool(arg), mods=_mods())
         if autoc:
@@ -1227,6 +1244,20 @@ def rows(query):
                 rows = tier_goal_rows("daily", sub, jnl=state)
                 # once per handoff, for the journal log: the picker WAS shown
                 goal_handoff.mark_rendered(state, rows=len(rows))
+                return rows
+            sub = _after(rest, "daily")
+            state = _journal_waits() if sub is not None else None
+            if state:
+                # ☀️ Daily reached BY HAND while a journal waits at its goal
+                # question IS that journal's screen (Vex 2026-09-28: the
+                # evening journal asked for tomorrow's goal, he typed it on
+                # this screen, and it replaced TODAY's goal while the journal
+                # waited on a pick that could not come). Same rows as the
+                # journal's own picker, so the pick lands on the day the
+                # question is about, answers it and reopens the journal.
+                rows = tier_goal_rows("daily", sub, jnl=state)
+                import goal_handoff
+                goal_handoff.mark_rendered(state, rows=len(rows), road="daily")
                 return rows
             for tier in _GOAL_TIERS:
                 sub = _after(rest, tier)

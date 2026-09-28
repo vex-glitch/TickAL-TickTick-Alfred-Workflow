@@ -7713,13 +7713,31 @@ def _yield_activation():
 PICK_WAIT_MAX = 20 * 60        # a detached run outlives its picker this long at most
 
 
-def _wait_for_pick(tag, sleep=time.sleep, clock=time.time, limit=None):
+def _idle(seconds):
+    """One wait between two looks at the handoff. A run that drew a box is
+    an app to macOS, and an app asleep in time.sleep stops answering the
+    window server: the rainbow wheel over anything of it still on screen
+    (Vex 2026-09-28, the evening journal's last box while the run waited on
+    the pick). Such a run waits inside its event loop (ask_box.pump); one
+    that never loaded AppKit has nothing to answer for and sleeps."""
+    if sys.modules.get("AppKit") is not None:
+        try:
+            import ask_box
+            ask_box.pump(seconds)
+            return
+        except Exception:
+            pass
+    time.sleep(seconds)
+
+
+def _wait_for_pick(tag, sleep=None, clock=time.time, limit=None):
     """A DETACHED journal run stays alive, idle, until the goal handoff it
     opened is consumed (the pick or ⏭ clears it) or PICK_WAIT_MAX passes,
     so its exit can never coincide with Alfred's picker being up (the
     proven failure of 2026-09-24). Returns "pick" | "wait". Logged."""
     import goal_handoff as gh
     limit = PICK_WAIT_MAX if limit is None else limit
+    sleep = sleep or _idle
     t0 = clock()
     while gh.load() is not None:
         if clock() - t0 >= limit:

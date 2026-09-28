@@ -343,6 +343,80 @@ else:
     chg = pr.tier_goal_rows("daily", "", jnl=dict(jnl, slot="morning", mode="changed", for_day=date(2026, 9, 16)))
     check("after Change… the way out keeps the goal", chg[-1]["title"] == "↩️ Keep the current goal", chg[-1])
 
+    # ☀️ Daily reached BY HAND while a journal waits at its goal question (Vex
+    # 2026-09-28: the evening journal asked for tomorrow's goal, the goal was
+    # typed on 🏆 Goals > ☀️ Daily, and it replaced TODAY's goal while the
+    # journal waited on a pick that could not come)
+    import time as _time  # noqa: E402
+
+    gh._SEEN = os.path.join(tmp, "seen_hand.txt")
+    gh.LOG_PATH = os.path.join(tmp, "screen_hand.log")
+    gh.save("evening", date(2026, 9, 15))
+    WANT_JNL = {"slot": "evening", "mode": "set", "note_day": "2026-09-15", "for_day": "2026-09-16"}
+    hand = pr.rows("goals daily Ship it")
+    h0 = payload(hand[0]["arg"])
+    check("☀️ Daily while the evening journal waits is aimed at TOMORROW",
+          "Tomorrow (Wed 16 Sep)" in hand[0]["title"] and h0["text"] == "Ship it", hand[0]["title"])
+    check("typed text that is no task carries the journal's handoff",
+          h0.get("jnl") == WANT_JNL and "tid" not in h0, h0)
+    check("its way out is the journal's ⏭, not 🔙 Back",
+          hand[-1]["arg"].startswith("xact:pn_goal_skip:") and payload(hand[-1]["arg"]) == WANT_JNL, hand[-1])
+    picks = [payload(r["arg"]) for r in pr.rows("goals daily brief")
+             if (r.get("arg") or "").startswith("xact:pn_setgoal:")]
+    check("and so does every other pick on it, a task included",
+          len(picks) == 2 and all(p.get("jnl") == WANT_JNL for p in picks)
+          and [p.get("tid") for p in picks] == [None, "T1"], picks)
+    pr.rows("goals daily Ship it again")
+    HL = open(gh.LOG_PATH).read()
+    check("the journal log says ONCE that the screen was reached by hand",
+          HL.count("screen rendered by hand (daily)") == 1 and "evening@2026-09-15" in HL, HL)
+    pr.rows("goals journal Ship it")
+    pr.rows("goals daily Ship it")
+    pr.rows("goals journal Ship it")
+    HL = open(gh.LOG_PATH).read()
+    check("and the journal's own picker logs its own line once, in any order of the two",
+          HL.count("screen rendered by hand (daily)") == 1 and HL.count("screen rendered rows=") == 1, HL)
+    fam = {r.get("uid"): r for r in pr.rows("goals")}
+    check("the 🏆 Goals row that leads there says which day",
+          fam["pn-goal-daily"]["subtitle"] == "The one thing for tomorrow · journal waits"
+          and fam["pn-goal-weekly"]["subtitle"] == "Goals for this week", fam["pn-goal-daily"])
+    wk = [payload(r["arg"]) for r in pr.rows("goals weekly Ship it")
+          if (r.get("arg") or "").startswith("xact:pn_setgoal:")]
+    check("every other tier is its own screen while a journal waits",
+          wk and all("jnl" not in p and p["kind"] == "weekly" for p in wk), wk)
+    gh.save("morning", date(2026, 9, 16), mode="changed")
+    mh = pr.rows("goals daily Ship it")
+    check("a waiting MORNING journal's ☀️ Daily is today's, and keeps the goal on the way out",
+          "Today (Wed 16 Sep)" in mh[0]["title"] and mh[-1]["title"] == "↩️ Keep the current goal"
+          and payload(mh[0]["arg"])["jnl"]["mode"] == "changed", (mh[0]["title"], mh[-1]["title"]))
+    check("and its 🏆 Goals row says today",
+          {r.get("uid"): r for r in pr.rows("goals")}["pn-goal-daily"]["subtitle"]
+          == "The one thing for today · journal waits")
+    gh.clear()
+    free = pr.rows("goals daily Ship it")
+    check("with no journal waiting ☀️ Daily is today's own screen, as before",
+          free[-1]["title"] == "🔙 Back" and "jnl" not in payload(free[0]["arg"])
+          and "☀️ Daily" in free[0]["title"], (free[0]["title"], free[-1]["title"]))
+    check("and its 🏆 Goals row reads as before",
+          {r.get("uid"): r for r in pr.rows("goals")}["pn-goal-daily"]["subtitle"] == "The one thing for today")
+    gh.save("evening", date(2026, 9, 15), now=_time.time() - gh.TTL - 5)
+    old = pr.rows("goals daily Ship it")
+    check("an EXPIRED handoff leaves ☀️ Daily alone: today's screen, never a dead row",
+          old[-1]["title"] == "🔙 Back" and old[0]["valid"] is True and "jnl" not in payload(old[0]["arg"]), old[0])
+    gh.clear()
+    _real_load = gh.load
+
+    def _boom(now=None):
+        raise RuntimeError("unreadable")
+
+    gh.load = _boom
+    try:
+        broke = pr.rows("goals daily Ship it")
+    finally:
+        gh.load = _real_load
+    check("a handoff that cannot be read never costs the screen",
+          broke[-1]["title"] == "🔙 Back" and "jnl" not in payload(broke[0]["arg"]), broke[0])
+
     # ── 8. the journal run itself, with the dialogs faked ─────────────────────────
     import xact  # noqa: E402
     xact.JOURNAL_LOG = os.path.join(tmp, "journal.log")       # never the real trail
@@ -579,6 +653,44 @@ else:
     xact.pn_journal("morning")
     check("the morning journal is never shifted", seen.get("day") is None, seen)
     xact._before_day_rollover = _ro
+
+    # ── 10. the wait on the pick never goes deaf (Vex 2026-09-28) ─────────────────
+    # a run that drew a box is an app to macOS: asleep in time.sleep it stops
+    # answering, and the pointer turns into the wheel over anything of it
+    import types  # noqa: E402
+    import ask_box  # noqa: E402
+
+    naps, pumped = [], []
+    _sleep, _pump = _time.sleep, ask_box.pump
+    _had = sys.modules.pop("AppKit", None)
+    _time.sleep = naps.append
+    ask_box.pump = lambda seconds=0.0, app=None: pumped.append(seconds)
+    try:
+        xact._idle(0.5)
+        check("a run that never drew a box just sleeps", naps == [0.5] and not pumped, (naps, pumped))
+        sys.modules["AppKit"] = types.SimpleNamespace()
+        xact._idle(0.5)
+        check("a run that drew one waits inside its event loop", pumped == [0.5] and naps == [0.5],
+              (naps, pumped))
+
+        def _no_loop(seconds=0.0, app=None):
+            raise RuntimeError("no loop")
+
+        ask_box.pump = _no_loop
+        xact._idle(0.25)
+        check("and still waits when the loop will not run", naps == [0.5, 0.25], naps)
+        gh._PATH = os.path.join(tmp, "goaljnl_idle.json")
+        gh.save("evening", date(2026, 9, 15))
+        ask_box.pump = lambda seconds=0.0, app=None: (pumped.append(seconds), gh.clear())
+        del pumped[:]
+        res = xact._wait_for_pick("evening@2026-09-15", clock=lambda: 0.0)
+        check("the wait on the pick is that wait, by default", res == "pick" and pumped == [0.5], (res, pumped))
+    finally:
+        _time.sleep, ask_box.pump = _sleep, _pump
+        sys.modules.pop("AppKit", None)
+        if _had is not None:
+            sys.modules["AppKit"] = _had
+        gh.clear()
 
     print(f"journal goal: {PASS} passed, {FAIL} failed")
     for f in FAILURES:

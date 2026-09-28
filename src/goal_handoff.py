@@ -171,24 +171,33 @@ def _seen_path():
     return _SEEN
 
 
-def mark_rendered(state, rows=None):
+def mark_rendered(state, rows=None, road=""):
     """The paused journal's goal screen was served by Alfred: log "screen
     rendered" ONCE for this handoff (keyed on its ts). -> True when it
-    logged, False when this handoff was already marked or on any error."""
+    logged, False when this handoff was already marked or on any error.
+
+    `road` names a screen other than the journal's own picker that served
+    the handoff ("daily": ☀️ Daily, reached by hand). Each road is logged
+    once per handoff, so the log says which screen a pick was made on
+    (2026-09-28: the trail could not tell, and the answer took an evening)."""
     try:
-        key = str(state.get("ts", ""))
+        ts = str(state.get("ts", ""))
+        key = f"{ts} {road}".strip()
         try:
             with open(_seen_path()) as f:
-                if f.read().strip() == key:
-                    return False
+                seen = [ln.strip() for ln in f.read().splitlines() if ln.strip()]
         except OSError:
-            pass
+            seen = []
+        seen = [k for k in seen if k.split(" ")[0] == ts]      # this handoff's
+        if key in seen:
+            return False
         with open(_seen_path(), "w") as f:
-            f.write(key)
+            f.write("\n".join(seen + [key]))
         nd = state.get("note_day")
         nd = nd.isoformat() if hasattr(nd, "isoformat") else str(nd)
         jlog(f"{state.get('slot')}@{nd}",
-             "screen rendered" + (f" rows={rows}" if rows is not None else ""))
+             "screen rendered" + (f" by hand ({road})" if road else "")
+             + (f" rows={rows}" if rows is not None else ""))
         return True
     except Exception:
         return False

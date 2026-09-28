@@ -59,6 +59,73 @@ else:
     check("a box wider than the screen still starts on it",
           ask_box._origin(WIDE, WIDE, (5000, 478))[0] == 0)
 
+    # ── an answered box leaves the screen (Vex 2026-09-28: the evening
+    # journal's last box stayed drawn, frozen, while the run waited on the
+    # goal pick). The window itself is measured on screen by a probe
+    # (tools/journal/box_on_screen.py, HANDOFF_ROUTINES section 24); here,
+    # the order of the calls.
+    import inspect  # noqa: E402
+    import time  # noqa: E402
+
+
+    class _Win:
+        def __init__(self):
+            self.out = 0
+
+        def orderOut_(self, _sender):
+            self.out += 1
+
+
+    class _Stuck:
+        def orderOut_(self, _sender):
+            raise RuntimeError("will not close")
+
+
+    class _App:
+        def __init__(self, events=()):
+            self.events, self.sent, self.asked = list(events), [], 0
+
+        def nextEventMatchingMask_untilDate_inMode_dequeue_(self, mask, until, mode, dequeue):
+            self.asked += 1
+            return self.events.pop(0) if self.events else None
+
+        def sendEvent_(self, ev):
+            self.sent.append(ev)
+
+
+    src = inspect.getsource(ask_box.ask)
+    check("ask() reads the answer, THEN closes the box, THEN returns",
+          0 < src.find("alert.runModal()") < src.find("text = str(view.string())")
+          < src.find("close(win, app)") < src.find("return None") < src.find("return _tidy(text)"),
+          src[-400:])
+    if ask_box.available():
+        w, a = _Win(), _App(["e1", "e2"])
+        check("close orders the box out and gives the event loop a turn",
+              ask_box.close(w, a) is None and w.out == 1 and a.sent == ["e1", "e2"] and a.asked == 3,
+              (w.out, a.sent, a.asked))
+        a = _App()
+        check("a box that will not close never costs the answer",
+              ask_box.close(_Stuck(), a) is None and a.asked == 1, a.asked)
+        a = _App(["e1"])
+        ask_box.pump(0.0, a)
+        check("pump delivers what is queued and stops when the loop runs dry",
+              a.sent == ["e1"] and a.asked == 2, (a.sent, a.asked))
+
+
+        class _Dead:
+            def nextEventMatchingMask_untilDate_inMode_dequeue_(self, *a):
+                raise RuntimeError("no window server")
+
+
+        naps, _sleep = [], time.sleep
+        time.sleep = naps.append
+        try:
+            ask_box.pump(0.25, _Dead())
+        finally:
+            time.sleep = _sleep
+        check("a loop that cannot run falls back to a plain wait of the same length",
+              naps == [0.25], naps)
+
     print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
     if FAILS:
         raise AssertionError(f"{len(FAILS)} checks failed: {FAILS}")

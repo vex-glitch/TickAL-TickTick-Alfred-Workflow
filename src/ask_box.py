@@ -82,9 +82,59 @@ def ask(prompt, title="TickAL", default="", detail=""):
     view.setSelectedRange_((len(view.string()), 0))
 
     clicked = alert.runModal()
+    text = str(view.string())
+    close(win, app)
     if clicked != 1000:                                 # NSAlertFirstButtonReturn
         return None
-    return _tidy(str(view.string()))
+    return _tidy(text)
+
+
+def close(win, app=None):
+    """Take an answered box off the screen NOW.
+
+    Vex 2026-09-28: "the old AppleScript asking me about the highlight of the
+    day is there and when I hover over it, I get the loading rainbow circle.
+    Frozen". runModal hands back the answer and leaves the panel to the app's
+    event loop to take down, and this run has none: between two questions the
+    next box's modal loop did it, so nobody saw it, but the LAST box before
+    the goal handoff stayed drawn for as long as the run waited on the pick
+    (measured: 592x478, on screen in every sample until the process exited).
+    Ordered out and one turn of the loop given, it is gone before the answer
+    is returned. Never raises: a box that will not close must not cost the
+    answer."""
+    try:
+        win.orderOut_(None)
+    except Exception:
+        pass
+    pump(CLOSE_PUMP, app)
+
+
+CLOSE_PUMP = 0.05
+
+
+def pump(seconds=0.0, app=None):
+    """Hand AppKit its event loop for `seconds`: queued events are delivered
+    and the window server gets its answers.
+
+    A run that drew a box IS an app to macOS from then on. One that then
+    waits in time.sleep stops answering, and the pointer turns into the
+    rainbow wheel over anything of it still on screen. The journal's wait on
+    the goal picker (xact._wait_for_pick) waits in here instead. Never
+    raises; without AppKit it sleeps."""
+    try:
+        from AppKit import NSApplication, NSDefaultRunLoopMode, NSEventMaskAny
+        from Foundation import NSDate
+        app = app or NSApplication.sharedApplication()
+        until = NSDate.dateWithTimeIntervalSinceNow_(max(0.0, seconds))
+        while True:
+            ev = app.nextEventMatchingMask_untilDate_inMode_dequeue_(
+                NSEventMaskAny, until, NSDefaultRunLoopMode, True)
+            if ev is None:
+                return
+            app.sendEvent_(ev)
+    except Exception:
+        import time
+        time.sleep(max(0.0, seconds))
 
 
 def place(win):
