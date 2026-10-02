@@ -44,6 +44,7 @@ test:
 	@$(PYTHON) tests/test_yearly_note.py
 	@$(PYTHON) tests/test_relayout.py
 	@$(PYTHON) tests/test_money_rollup_scope.py
+	@$(PYTHON) tests/test_money_periods.py
 	@$(PYTHON) tests/test_journal_canon.py
 	@$(PYTHON) tests/test_task_window.py
 	@$(PYTHON) tests/test_okr.py

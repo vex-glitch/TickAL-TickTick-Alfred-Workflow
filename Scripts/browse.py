@@ -1431,16 +1431,94 @@ def render_crmbook(log_tid, query):
     return add_back(rows, back)
 
 
+def _quarter_bounds(y, q):
+    """(first day, last day) of quarter q (1-4) of year y."""
+    from datetime import date as _date, timedelta as _td
+    a = _date(y, (q - 1) * 3 + 1, 1)
+    b = (_date(y + 1, 1, 1) if q == 4 else _date(y, q * 3 + 1, 1)) - _td(days=1)
+    return a, b
+
+
+def _month_bounds(y, m):
+    """(first day, last day) of month m of year y."""
+    from datetime import date as _date, timedelta as _td
+    a = _date(y, m, 1)
+    b = (_date(y + 1, 1, 1) if m == 12 else _date(y, m + 1, 1)) - _td(days=1)
+    return a, b
+
+
 def render_crmmoney(sub, query):
-    """💰 Vex's money screen: all-time totals first, customers second,
-    open logbooks below; archived behind one row (typing searches them too).
-    Sub-screens: periods (week/month/quarter/year sums) · cust (totals per
-    customer, richest first) · arch (archived logbooks)."""
+    """💰 Vex's money screen: all-time totals first, then the year, the
+    quarter, the month and the week, customers and tattoos below.
+    Sub-screens: periods (the All-time ledger: week/month/quarter/year sums,
+    this one and the last one each) · yr:<YYYY> (a year, month by month,
+    oldest first) · qts:<YYYY> (every quarter of a year so far) ·
+    qt:<YYYY>-Q<n> (a quarter: the All-quarters row, then its months) ·
+    mw:<YYYY-MM> (a month, week by week) · wk:<monday> (a week, session by
+    session) · cust (totals per customer, richest first) · lbs / lb:<tid>
+    (tattoos) · arch (archived logbooks).
+
+    Vex 2026-10-02: pricing needs the money per hour over a year and a
+    quarter, and the ledger only knew weeks and months. The same period
+    row everywhere: money · 🫵 cut · sessions · hours · ~€/h, ⏎ drills
+    one tier down (year → months → weeks → sessions) and always lands
+    with a clean bar (every drill is an xact:crmbrowse trampoline)."""
     gate = _records_gate()
     if gate:
         return add_back(gate, "ctx:crmhub")
     import crm_records as cr
     from datetime import date as _date, timedelta as _td
+
+    def _period_row(e, uid, label, a, b, ctx=None, hint=None):
+        """ONE shape for every money period row: label · money · 🫵 cut ·
+        n sessions · hours · ~rate/h (+ 🫵 rate). a/b inclusive dates,
+        None = unbounded. With a ctx the row drills on ⏎."""
+        money, n, hours, raw = cr.sum_entries(e, a and a.isoformat(),
+                                              b and b.isoformat())
+        extra = ""
+        if hours:
+            extra = f" · {hours:g}h"
+            if raw:
+                sym2 = re.sub(r"[-\d.,\s]", "", money) or "€"
+                rr = raw / hours
+                extra += (f" · ~{int(rr)}{sym2}/h"
+                          + cr.cut_rate_chip(rr, sym2))
+        if hint is None:
+            hint = (f"{a.isoformat() if a else '…'} → "
+                    f"{b.isoformat() if b else 'today'}")
+        kw = (dict(arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
+              if ctx else dict(valid=False))
+        return alfred.item(
+            uid=uid, title=f"{label} · {money}{cr.cut_chip(raw, money)}"
+                           f" · {n} session{'s' if n != 1 else ''}{extra}",
+            subtitle=hint + ("  |  ⏎⤵️" if ctx else ""), **kw)
+
+    def _month_row(e, y, m, today):
+        a, b = _month_bounds(y, m)
+        return _period_row(e, f"ym-{a.strftime('%Y-%m')}",
+                           f"📅 {a.strftime('%b %Y')}", a, b,
+                           f"ctx:crmmoney:mw:{a.strftime('%Y-%m')}",
+                           "Week by week")
+
+    def _quarter_row(e, y, q, today):
+        a, b = _quarter_bounds(y, q)
+        return _period_row(e, f"yq-{y}-Q{q}",
+                           f"📅 Q{q} {y} · {a.strftime('%b')}-{b.strftime('%b')}",
+                           a, b, f"ctx:crmmoney:qt:{y}-Q{q}",
+                           "Month by month")
+
+    def _year_row(e, uid, label, y, today):
+        a, b = _date(y, 1, 1), _date(y, 12, 31)
+        return _period_row(e, uid, label, a, b, f"ctx:crmmoney:yr:{y}",
+                           "Month by month")
+
+    def _done(rows, empty="Nothing in that period"):
+        if query:
+            rows = fuzz.filter_and_score(query, rows,
+                                         key_fn=lambda x: x["title"]) or rows
+        if not rows:
+            rows = [alfred.item(title=empty, valid=False)]
+        return add_back(rows, "ctx:crmmoney")
 
     if sub == "periods":
         e = cr.all_entries()
@@ -1448,27 +1526,12 @@ def render_crmmoney(sub, query):
         monday = today - _td(days=today.weekday())
         m0 = today.replace(day=1)
         lm_end = m0 - _td(days=1)
-        q0 = _date(today.year, ((today.month - 1) // 3) * 3 + 1, 1)
-        y0 = _date(today.year, 1, 1)
-        def row(uid, label, a, b, ctx=None):
-            money, n, hours, raw = cr.sum_entries(e, a and a.isoformat(),
-                                                  b and b.isoformat())
-            extra = ""
-            if hours:
-                extra = f" · {hours:g}h"
-                if raw:
-                    sym2 = re.sub(r"[-\d.,\s]", "", money) or "€"
-                    rr = raw / hours
-                    extra += (f" · ~{int(rr)}{sym2}/h"
-                              + cr.cut_rate_chip(rr, sym2))
-            span = (f"{a.isoformat() if a else '…'} → "
-                    f"{b.isoformat() if b else 'today'}")
-            kw = (dict(arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
-                  if ctx else dict(valid=False))
-            return alfred.item(
-                uid=uid, title=f"{label} · {money}{cr.cut_chip(raw, money)}"
-                               f" · {n} session{'s' if n != 1 else ''}{extra}",
-                subtitle=span + ("  |  ⏎⤵️" if ctx else ""), **kw)
+        cq = (today.month - 1) // 3 + 1
+        q0, _qe = _quarter_bounds(today.year, cq)
+        lq_end = q0 - _td(days=1)
+        lqy, lqn = lq_end.year, (lq_end.month - 1) // 3 + 1
+        lq0, _ = _quarter_bounds(lqy, lqn)
+        row = lambda uid, label, a, b, ctx=None: _period_row(e, uid, label, a, b, ctx)
         lm0 = lm_end.replace(day=1)
         rows = [
             row("mo-w",  "📆 This week",    monday, None,
@@ -1480,15 +1543,63 @@ def render_crmmoney(sub, query):
                 f"ctx:crmmoney:mw:{m0.strftime('%Y-%m')}"),
             row("mo-lm", "📆 Last month",   lm0, lm_end,
                 f"ctx:crmmoney:mw:{lm0.strftime('%Y-%m')}"),
-            row("mo-q",  "📆 This quarter", q0, None),
-            row("mo-y",  "📆 This year",    y0, None),
+            row("mo-q",  "📆 This quarter", q0, None,
+                f"ctx:crmmoney:qt:{today.year}-Q{cq}"),
+            row("mo-lq", "📆 Last quarter", lq0, lq_end,
+                f"ctx:crmmoney:qt:{lqy}-Q{lqn}"),
+            row("mo-y",  "📆 This year",    _date(today.year, 1, 1), None,
+                f"ctx:crmmoney:yr:{today.year}"),
             row("mo-ly", "📆 Last year",    _date(today.year - 1, 1, 1),
-                _date(today.year - 1, 12, 31)),
+                _date(today.year - 1, 12, 31),
+                f"ctx:crmmoney:yr:{today.year - 1}"),
         ]
-        if query:
-            rows = fuzz.filter_and_score(query, rows,
-                                         key_fn=lambda x: x["title"]) or rows
-        return add_back(rows, "ctx:crmmoney")
+        return _done(rows)
+
+    if sub.startswith("yr:"):   # one year, month by month, Jan first
+        try:
+            y = int(sub[3:])
+            _date(y, 1, 1)
+        except ValueError:
+            return add_back([alfred.item(title="Bad year", valid=False)],
+                            "ctx:crmmoney")
+        e = cr.all_entries()
+        today = _date.today()
+        last_m = today.month if y == today.year else 12
+        rows = ([] if y > today.year
+                else [_month_row(e, y, m, today) for m in range(1, last_m + 1)])
+        return _done(rows, "Nothing that year")
+
+    if sub.startswith("qts:"):   # every quarter of a year so far, Q1 first
+        try:
+            y = int(sub[4:])
+            _date(y, 1, 1)
+        except ValueError:
+            return add_back([alfred.item(title="Bad year", valid=False)],
+                            "ctx:crmmoney")
+        e = cr.all_entries()
+        today = _date.today()
+        last_q = (today.month - 1) // 3 + 1 if y == today.year else 4
+        rows = ([] if y > today.year
+                else [_quarter_row(e, y, q, today) for q in range(1, last_q + 1)])
+        return _done(rows, "Nothing that year")
+
+    if sub.startswith("qt:"):   # one quarter: All quarters first, then its months
+        m = re.fullmatch(r"(\d{4})-Q([1-4])", sub[3:])
+        if not m:
+            return add_back([alfred.item(title="Bad quarter", valid=False)],
+                            "ctx:crmmoney")
+        y, q = int(m.group(1)), int(m.group(2))
+        e = cr.all_entries()
+        today = _date.today()
+        a, b = _quarter_bounds(y, q)
+        last_m = (min(b.month, today.month) if y == today.year
+                  else (b.month if y < today.year else 0))
+        rows = [_period_row(e, f"yqs-{y}", f"📅 All quarters {y}",
+                            _date(y, 1, 1), _date(y, 12, 31),
+                            f"ctx:crmmoney:qts:{y}",
+                            "Every quarter of the year so far")]
+        rows += [_month_row(e, y, mm, today) for mm in range(a.month, last_m + 1)]
+        return _done(rows)
 
     if sub == "cust":
         pool = (cr.records_notes(_areas.CUSTOMER_TAG)
@@ -1717,6 +1828,8 @@ def render_crmmoney(sub, query):
             subtitle=hint, arg=f"xact:crmbrowse:{ctx}",
             mods=_picker_mods())
 
+    cq = (today.month - 1) // 3 + 1
+    q0, _qe = _quarter_bounds(today.year, cq)
     pinned = [
         alfred.item(uid="mo-total",
                     title=f"💰 All time · {money}{cr.cut_chip(raw, money)}"
@@ -1724,6 +1837,12 @@ def render_crmmoney(sub, query):
                     subtitle="Weekly · monthly · quarterly · yearly  |  ⏎⤵️",
                     arg="xact:crmbrowse:ctx:crmmoney:periods",
                     mods=_picker_mods()),
+        _sumrow("mo-year", "📅", "This year", _date(today.year, 1, 1),
+                f"ctx:crmmoney:yr:{today.year}",
+                "Month by month  |  ⏎⤵️"),
+        _sumrow("mo-quarter", "📅", f"This quarter · Q{cq}", q0,
+                f"ctx:crmmoney:qt:{today.year}-Q{cq}",
+                "All quarters · month by month  |  ⏎⤵️"),
         _sumrow("mo-month", "📅", "This month", m0,
                 f"ctx:crmmoney:mw:{m0.strftime('%Y-%m')}",
                 "Week by week  |  ⏎⤵️"),
