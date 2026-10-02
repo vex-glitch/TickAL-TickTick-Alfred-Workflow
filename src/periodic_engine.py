@@ -3899,16 +3899,22 @@ def journal_seed(slot, day=None, want_body=False):
     answers so the dialogs skip what's done; period PINS the note for the
     whole dialog run (a run that crosses midnight must keep writing the day it
     started on - `day` carries that pin into a journal resumed after the goal
-    picker). want_body=True adds the section's body lines as a fourth item:
-    the dialog run reads the WHOLE earlier answers off it for a chain step
-    (pm.chain_recap), where pairs carry the A line alone."""
+    picker). want_body=True adds the section's body lines as a fourth item and
+    the journal_ctx the seed read off the note as a fifth: the dialog run
+    reads the WHOLE earlier answers off the body for a chain step
+    (pm.chain_recap), where pairs carry the A line alone, and shows the
+    goals, objectives, key results and habits a question names off the ctx
+    (pm.prompt_refs), the same text the fixed questions quote."""
     sec_name = _JOURNAL_SECTIONS[slot]
     p = _journal_target(slot, day)
     task, _ = ensure_note(p)
     pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
+    ctx_seen = {}              # the last mutate's ctx (an RMW retry reads again)
 
     def mutate(doc, live):
         ctx = journal_ctx(slot, doc, p.start)
+        ctx_seen.clear()
+        ctx_seen.update(ctx)
         sec = ps.find(doc, sec_name)
         if sec is None:
             return None
@@ -3919,7 +3925,7 @@ def journal_seed(slot, day=None, want_body=False):
     pairs, body = got if got else (None, [])
     keys = pm.journal_keys(pairs) if pairs else {}
     if want_body:
-        return keys, pairs, p, body
+        return keys, pairs, p, body, dict(ctx_seen)
     return keys, pairs, p
 
 

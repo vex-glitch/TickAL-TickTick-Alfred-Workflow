@@ -2945,6 +2945,92 @@ def same_question(a, b):
     return ka != "free" and ka == journal_key(ub)
 
 
+# What a question can NAME without quoting, per journal, and the words that
+# name it. A pool prompt is a verbatim source line ("the chosen goal(s)",
+# "this OKR Set", "the objective", "one habit from this week") and the box
+# that asks it has no note behind it. Vex 2026-10-02, the Q3 quarterly: two
+# of its ten drawn prompts asked about goals while the quarter's goal section
+# was empty and 🥅 OKRs held two objectives, and both got "what goals?" for
+# an answer ("when I am asked about something that should be written on the
+# screen ... show the goal beneath the writing prompt"). prompt_refs shows what
+# the note holds under such a question. Rows: (the kinds of word that reach
+# the row, journal_ctx's key, the label). The keys are the ones the set block
+# quotes, so the box and a fixed question never disagree about a thing. Goal
+# words reach every goal AND plan row (in his OKR world the objectives are
+# the goals); objective / OKR / key result words reach the plan rows only;
+# habit words the habit line.
+_REF_WORDS = (
+    (re.compile(r"\bgoals?\b", re.I), ("goal",)),
+    (re.compile(r"\bobjectives?\b|\bOKRs?\b|\bkey results?\b|\bKRs?\b", re.I), ("okr",)),
+    (re.compile(r"\bhabits?\b", re.I), ("habit",)),
+)
+PROMPT_REFS = {
+    "morning":   ((("goal",), "goal", "🎯 Today's goal"),),
+    "evening":   ((("goal",), "goal", "🎯 Today's goal"),
+                  (("goal", "okr"), "kr", "🔑 Today's key results"),
+                  (("goal", "okr"), "objectives", "🥅 This month's objectives")),
+    "weekly":    ((("goal",), "goals", "🎯 Your weekly goals"),
+                  (("goal", "okr"), "objectives", "🥅 This month's objectives"),
+                  (("goal", "okr"), "kr", "🔑 This week's key results"),
+                  (("habit",), "habits", "🔄 Habit consistency")),
+    "monthly":   ((("goal",), "goals", "🎯 Your monthly goals"),
+                  (("goal", "okr"), "objectives", "🥅 This month's objectives"),
+                  (("goal", "okr"), "quarter", "🌓 This quarter's objectives"),
+                  (("habit",), "habits", "🔄 Habit consistency")),
+    "quarterly": ((("goal",), "goals", "🎯 Your quarterly goals"),
+                  (("goal", "okr"), "objectives", "🥅 This quarter's objectives"),
+                  (("goal", "okr"), "year", "🎉 The year's objectives"),
+                  (("habit",), "habits", "🔄 Habit consistency")),
+    "yearly":    ((("goal",), "goals", "🎯 Your yearly goals"),
+                  (("goal", "okr"), "objectives", "🥅 This year's objectives"),
+                  (("habit",), "habits", "🔄 Habit consistency")),
+}
+REF_NONE = "none in the note"
+REF_CLIP = 500
+
+
+def prompt_refs(slot, question, ctx):
+    """What the box shows under a question that names the note's goals,
+    objectives, key results or habits without quoting them: one line per
+    row the question's words reach (PROMPT_REFS, _REF_WORDS), "label: text",
+    in the table's order. "none in the note" when the note carries the key
+    and it is empty: that IS the answer to "what goals?". Nothing for a key
+    the note does not carry (a 🥅 OKRs section deleted on purpose is the
+    kill switch, and the box must not speak for it). A kind of word the
+    question already quotes a thing of is self-contained (the set block
+    bakes the note's text into its wording, whole or clipped): the goals
+    under "Did you achieve your quarterly goals, A; B?" would be the
+    question twice, and the objectives next to them are the next question's.
+    '' when nothing applies, so a mood line or a prompt about nothing of the
+    note stays bare. The ctx is journal_ctx's, read off the note at the
+    start of the run."""
+    q = " ".join(unescape_md(question or "").split())
+    kinds = set()
+    for rx, ks in _REF_WORDS:
+        if rx.search(q):
+            kinds.update(ks)
+    if not kinds or not ctx:
+        return ""
+    rows = [(ks, key, label) for ks, key, label in PROMPT_REFS.get(slot, ())
+            if key in ctx]
+
+    def text_of(key):
+        return " ".join(str(ctx.get(key) or "").split())
+
+    def quoted(text):
+        return bool(text) and (text in q or (len(text) > 40 and text[:40] in q))
+
+    kinds = {k for k in kinds
+             if not any(k in ks and quoted(text_of(key)) for ks, key, _l in rows)}
+    lines = []
+    for ks, key, label in rows:
+        if kinds.isdisjoint(ks):
+            continue
+        text = text_of(key)
+        lines.append(f"{label}: {_clip(text, REF_CLIP) if text else REF_NONE}")
+    return "\n".join(lines)
+
+
 def merge_journal_answers(body_lines, answers, questions=None):
     """answers = {n: text}. Fill ONLY still-empty A-lines (phone wins). The
     A-line's own indentation survives. Returns (new_body, filled_count).

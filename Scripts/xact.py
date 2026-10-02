@@ -7936,6 +7936,10 @@ def pn_journal(slot):
     ☀️ check stop the dialogs, open the picker aimed at that day, and the pick
     answers the question and reopens this journal (goal_handoff). The weekly
     journal still ends in the three-things picker into NEXT week's 🎯 Goals.
+    A question that names the note's goals, objectives, key results or
+    habits without quoting them shows them under itself (pm.prompt_refs off
+    the seed's ctx, the box's informative text; Vex 2026-10-02: "What chosen
+    goals?" to a quarterly prompt while the OKR plan sat in the note).
 
     slot may carry the note's day, "evening@2026-09-15": a journal reopened
     after the picker keeps writing the note it started in, midnight or not."""
@@ -7962,7 +7966,7 @@ def pn_journal(slot):
     pe = _pn()
     import re as _re
     import goal_handoff as gh
-    keys, pairs, jper, jbody = pe.journal_seed(slot, day=pin_day, want_body=True)
+    keys, pairs, jper, jbody, jctx = pe.journal_seed(slot, day=pin_day, want_body=True)
     if pairs is None:
         _jlog(f"{slot}@{pin}", "no journal section")
         print("💫 No journal section in the note (header renamed?)")
@@ -8045,12 +8049,15 @@ def pn_journal(slot):
         # prose, and prose gets the big box (Vex 2026-09-16).
         t0 = time.time()
         recap = _recap(q) if key == "free" else ""
+        # what the question names without quoting (the quarter's goals, the
+        # objectives, the habit line) sits under it, a chain's recap after
+        refs = pm.prompt_refs(slot, q, jctx)
         a = _ask(q, title=f"{label} journal · {n}/{total}",
                  multiline=key not in ("mood", "rating", "wrating"),
-                 detail=recap)
+                 detail="\n\n".join(x for x in (refs, recap) if x))
         outcome = "cancel" if a is None else ("skip" if not a.strip() else "answered")
         _jlog(tag, f"q{n}/{total} {key} -> {outcome} {time.time() - t0:.0f}s{_ask_trail()}"
-                   + (" +recap" if recap else ""))
+                   + (" +refs" if refs else "") + (" +recap" if recap else ""))
         if a is None:                     # Cancel: stop, keep what we have
             cancelled = True
             break

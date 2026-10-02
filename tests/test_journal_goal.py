@@ -423,15 +423,15 @@ else:
 
 
     class FakePE:
-        def __init__(self, pairs, goal=""):
-            self.pairs, self.goal = pairs, goal
+        def __init__(self, pairs, goal="", ctx=None):
+            self.pairs, self.goal, self.ctx = pairs, goal, dict(ctx or {})
             self.merged, self.goal_calls, self.answers = {}, [], []
 
         def journal_seed(self, slot, day=None, want_body=False):
             class P:
                 start = date(2026, 9, 15)
             if want_body:
-                return pm.journal_keys(self.pairs), self.pairs, P(), []
+                return pm.journal_keys(self.pairs), self.pairs, P(), [], dict(self.ctx)
             return pm.journal_keys(self.pairs), self.pairs, P()
 
         def journal_merge(self, slot, answers, period=None, questions=None):
@@ -691,6 +691,34 @@ else:
         if _had is not None:
             sys.modules["AppKit"] = _had
         gh.clear()
+
+    # ── 11. a question that names the note's goals shows them under itself (Vex 2026-10-02) ──
+    # the Q3 quarterly's "Was enough time spent on the objective?" got "On what
+    # objective?" while 🥅 OKRs held two objectives: the run hands the seed's ctx
+    # (the text the set block quotes) to pm.prompt_refs, and the box shows the
+    # lines under the question as its detail, the chain recap's slot
+    details = []
+    _gs, _log = xact._goalseq_save, xact.JOURNAL_LOG
+    xact._goalseq_save = lambda remaining, kind="weekly": None      # a late run's editor hint: not Vex's run dir
+    reflog = xact.JOURNAL_LOG = os.path.join(tmp, "jnl_refs.log")
+    try:
+        fake = FakePE(pm.journal_pairs(pm.seed_journal_lines(["Was enough time spent on the objective?",
+                                                               "What can you not afford to mess up?"])),
+                      ctx={"goals": "", "objectives": "Onboard TickTicks 2/5 · TickAL 1/6",
+                           "year": "Productivity System 3/41"})
+        xact._pn = lambda: fake
+        xact._ask = lambda q, title="", multiline=False, detail="": details.append(detail) or "an answer"
+        xact.pn_journal("quarterly")
+    finally:
+        xact._goalseq_save, xact.JOURNAL_LOG = _gs, _log
+    check("the objective question carries the quarter's and the year's plan under it",
+          details[:1] == ["🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🎉 The year's objectives: Productivity System 3/41"], details)
+    check("a question about nothing of the note is asked bare", details[1:] == [""], details)
+    check("both answers were saved", fake.merged == {1: "an answer", 2: "an answer"}, fake.merged)
+    with open(reflog) as f:
+        trail = f.read()
+    check("the log marks the box that carried refs", "q1/2 free -> answered" in trail and "+refs" in trail.split("q1/2")[1].split("\n")[0]
+          and "+refs" not in trail.split("q2/2")[1].split("\n")[0], trail)
 
     print(f"journal goal: {PASS} passed, {FAIL} failed")
     for f in FAILURES:

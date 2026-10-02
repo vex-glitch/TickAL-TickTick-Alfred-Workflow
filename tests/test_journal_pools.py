@@ -726,6 +726,63 @@ else:
     check("16.whole-answers", wa == {1: "rent, the car and mum", 3: "the car"}, repr(wa))
     check("16.recap-escaped-question", pm.chain_recap(CH, "Pick one from 2\\.", seen).startswith("Your answers so far:"))
 
+    # ── 17. a question that names the note's goals shows them (Vex 2026-10-02: "What chosen goals?") ──
+    # the Q3 2026 quarterly: the 🌓 Quarterly goal section empty, 🥅 OKRs holding two
+    # objectives, and two drawn prompts asked about "the objective" and "the chosen
+    # goal(s)" with nothing under them
+    QC = {"goals": "", "objectives": "Onboard TickTicks 2/5 · TickAL 1/6", "year": "Productivity System 3/41",
+          "habits": "Weekly Review 2/3 · Call mum 7/3", "quarters_left": 1, "months": "", "wins": ""}
+    r = pm.prompt_refs("quarterly", "Is 12 weeks a realistic time frame for the chosen goal(s)?", QC)
+    check("17.goal-words-show-the-goals-and-the-plan",
+          r == "🎯 Your quarterly goals: none in the note\n🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🎉 The year's objectives: Productivity System 3/41", repr(r))
+    r = pm.prompt_refs("quarterly", "Was enough time spent on the objective?", QC)
+    check("17.objective-words-show-the-plan-only",
+          r == "🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🎉 The year's objectives: Productivity System 3/41", repr(r))
+    check("17.okr-set-and-key-results-are-plan-words",
+          pm.prompt_refs("quarterly", "What does your gut tell you, did you really achieve the change you were after with this OKR Set?", QC).startswith("🥅 This quarter's objectives")
+          and pm.prompt_refs("quarterly", "Were stalled Key Results addressed before Week 10?", QC).startswith("🥅 This quarter's objectives"))
+    check("17.habit-words-show-the-habit-line",
+          pm.prompt_refs("quarterly", "One habit to subtract; one practice to deepen.", QC) == "🔄 Habit consistency: Weekly Review 2/3 · Call mum 7/3")
+    check("17.a-question-about-nothing-of-the-note-stays-bare",
+          pm.prompt_refs("quarterly", "What can you not afford to mess up?", QC) == ""
+          and pm.prompt_refs("quarterly", "Mood 1-5 (1 😢 · 3 😐 · 5 😁), optional note after ·", QC) == "")
+    # the set block quotes what it asks about: a thing already in the question is not shown
+    # twice, and its siblings are the next question's
+    QG = dict(QC, goals="Open the studio; Draw daily")
+    fixed = dict(pm.journal_fixed("quarterly", QG))
+    check("17.quoted-goals-are-not-shown-twice", pm.prompt_refs("quarterly", fixed["qgoals"], QG) == "", repr(pm.prompt_refs("quarterly", fixed["qgoals"], QG)))
+    check("17.quoted-plan-lines-are-not-shown-twice",
+          pm.prompt_refs("quarterly", fixed["qobjectives"], QG) == "" and pm.prompt_refs("quarterly", fixed["ycheck"], QG) == ""
+          and pm.prompt_refs("quarterly", fixed["habits"], QG) == "", [pm.prompt_refs("quarterly", fixed[k], QG) for k in ("qobjectives", "ycheck", "habits")])
+    fixed0 = dict(pm.journal_fixed("quarterly", QC))
+    check("17.an-empty-goal-section-says-so-under-the-goals-question",
+          pm.prompt_refs("quarterly", fixed0["qgoals"], QC).startswith("🎯 Your quarterly goals: none in the note\n🥅 This quarter's objectives"), repr(pm.prompt_refs("quarterly", fixed0["qgoals"], QC)))
+    check("17.a-missing-key-is-the-kill-switch",
+          pm.prompt_refs("quarterly", "Was enough time spent on the objective?", {"goals": ""}) == ""
+          and pm.prompt_refs("quarterly", "Is 12 weeks a realistic time frame for the chosen goal(s)?", {}) == "")
+    check("17.an-escaped-question-still-reads", pm.prompt_refs("quarterly", "Is 12 weeks a realistic time frame for the chosen goal\\(s\\)?", QC).startswith("🎯 Your quarterly goals"))
+    check("17.a-quote-clipped-into-the-question-still-counts-as-quoted",
+          pm.prompt_refs("morning", "☀️ Does your goal for today still align with: " + pm._clip("x" * 150, 100) + "?", {"goal": "x" * 150}) == "")
+    check("17.the-day-goal-shows-under-a-goal-word",
+          pm.prompt_refs("evening", "Did you achieve your daily goal? Describe success/failure factors.", {"goal": ""}) == "🎯 Today's goal: none in the note")
+    check("17.a-long-line-is-clipped", pm.prompt_refs("weekly", "big life goals?", {"goals": "g" * 900}).endswith("…") and len(pm.prompt_refs("weekly", "big life goals?", {"goals": "g" * 900})) < 560)
+    # every pool prompt of every journal that names a thing its table has gets its line from a full ctx
+    FULL = {k: f"⟦{k}⟧" for k in ("goal", "goals", "objectives", "kr", "quarter", "year", "habits")}
+    missed = []
+    for slot in ("morning", "evening", "weekly", "monthly", "quarterly", "yearly"):
+        pool = pj.load_pool(slot)
+        prompts = [p for lst in (pool.get("categories") or {}).values() for p in lst] + list(pool.get("random") or [])
+        for c in pool.get("chains") or []:
+            prompts += list(c.get("prompts") or [])
+        rows = {k for ks, _key, _l in pm.PROMPT_REFS[slot] for k in ks}
+        for p in prompts:
+            kinds = {k for rx, ks in pm._REF_WORDS if rx.search(p) for k in ks}
+            if kinds & rows and not pm.prompt_refs(slot, p, FULL):
+                missed.append((slot, p))
+    check("17.every-pool-prompt-naming-a-thing-gets-it", not missed, missed)
+    check("17.a-habit-word-on-a-daily-prompt-has-no-line-to-show", pm.prompt_refs("evening", "What bad habit did I curb today?", FULL) == "")
+    check("17.the-table-covers-every-journal", set(pm.PROMPT_REFS) == {"morning", "evening", "weekly", "monthly", "quarterly", "yearly"})
+
     print(f"journal pools: {PASS} passed, {FAIL} failed")
     for f in FAILURES:
         print("  FAIL", f)
