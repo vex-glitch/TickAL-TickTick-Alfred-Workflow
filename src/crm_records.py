@@ -449,12 +449,13 @@ def _amount_of(segs):
     """(amount_float_or_None, sym, pre) from an entry's charged segment."""
     if len(segs) < 4:
         return None, "", False
-    v = _num(segs[3])
+    seg = (segs[3] or "").replace("\u2212", "-")    # "−100": a refund, not a symbol
+    v = _num(seg)
     if v is None:
         return None, "", False
     m = re.fullmatch(
         r"\s*([^\d\s.,\-]{1,3})?\s*-?[\d.,]+\s*([^\d\s.,\-]{1,3})?\s*",
-        segs[3])
+        seg)
     if m and (m.group(1) or m.group(2)):
         return v, (m.group(1) or m.group(2)), bool(m.group(1))
     return v, "", False

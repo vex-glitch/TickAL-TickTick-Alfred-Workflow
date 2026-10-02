@@ -981,10 +981,6 @@ def parse_money_entry(line):
     return (amt, "") if amt is not None else None
 
 
-def money_entry_line(amount, label):
-    return f"- {fmt_amount(amount)} · {label}" if label else f"- {fmt_amount(amount)}"
-
-
 def day_label(d, today=None):
     """"Mon 14 Sep", and "Mon 14 Sep 2025" when it is not this year.
 

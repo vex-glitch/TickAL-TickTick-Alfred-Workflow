@@ -84,6 +84,7 @@ else:
     import crm_records as cr            # noqa: E402
     areas.records_configured = lambda: True
     cr.all_entries = lambda: list(LEDGER)
+    crm_money._cache_present = lambda: True
 
     sums = crm_money.day_sums()
     check("1.a day sums every priced entry dated on it", sums[date(2026, 9, 15)] == 400.0, sums)
@@ -107,6 +108,17 @@ else:
     check("1.a reader that fails → None too", crm_money.day_sums() is None)
     cr.all_entries = lambda: []
     check("1.a CRM that holds nothing → {} (readable, empty)", crm_money.day_sums() == {})
+    crm_money._cache_present = lambda: False
+    cr.all_entries = lambda: list(LEDGER)
+    check("1.no notes cache on disk → None (unreadable), never an empty CRM", crm_money.day_sums() is None)
+    crm_money._cache_present = lambda: True
+    CALLS = [0]
+    def _counted():
+        CALLS[0] += 1
+        return list(LEDGER)
+    cr.all_entries = _counted
+    crm_money.day_sums(); crm_money.day_sum(date(2026, 9, 15)); crm_money.period_sum(date(2026, 9, 1), date(2026, 9, 30))
+    check("1.one refresh parses the cache once (three reads, one parse)", CALLS[0] == 1, CALLS[0])
     cr.all_entries = lambda: list(LEDGER)
 
     # ── 2. the engine reads it, and only it ────────────────────────────
@@ -130,8 +142,13 @@ else:
     check("2.a span with sessions carries its sum", any("• 650" in l for l in lines), lines)
     check("2.a span whose only sessions were free reads 0, not 'no sessions'", any("1st-6th" in l and l.endswith("• 0") for l in lines), lines)
     check("2.a span not yet started is not listed", len(lines) == 3, lines)
-    check("2.the week's day lines are the CRM's by date",
-          pm.money_day_line(date(2026, 9, 15), ds.get(date(2026, 9, 15), 0)) == "- Tue 15 Sep 2026 • 400")
+    yspans = [(1, None, date(2026, 1, 1), date(2026, 3, 31)), (2, None, date(2026, 4, 1), date(2026, 6, 30)),
+              (3, None, date(2026, 7, 1), date(2026, 9, 30)), (4, None, date(2026, 10, 1), date(2026, 12, 31))]
+    ylines = pe._span_money_lines({date(2026, 5, 18): 300.0, date(2026, 8, 2): 100.0}, yspans, "yearly", date(2026, 10, 2))
+    check("2.a span that ended before the CRM's first entry reads 'before the CRM', not 'no sessions'",
+          ylines[0].endswith("• before the CRM"), ylines)
+    check("2.the span the CRM starts inside says from which day it counts", ylines[1].endswith("• 300 · from 18 May"), ylines)
+    check("2.a later span is a plain sum", ylines[2].endswith("• 100") and len(ylines) == 4 and ylines[3].endswith("• no sessions"), ylines)
 
     # the summary: Money is ALWAYS a line, 0 without a session, the arrow only
     # when both days hold one
@@ -156,6 +173,12 @@ else:
     areas.records_configured = lambda: False
     rec = pe._recap_lines(date(2026, 9, 16), None, doc, pm.T2, pday=date(2026, 9, 15), pdoc=doc)
     check("3.a CRM that cannot be read writes NO Money line (never a 0 that lies)", not any("Money" in l for l in rec), rec)
+    rec = pe._recap_lines(date(2026, 9, 16), None, doc, pm.T2, pday=date(2026, 9, 15), pdoc=doc,
+                          money_keep=pm.T2 + "- Money: 300  🟢 ▲ 50")
+    check("3.and carries the Money line the note already holds, verbatim", pm.T2 + "- Money: 300  🟢 ▲ 50" in rec, rec)
+    sdoc = ps.parse_sections("#### 🔎 Summaries\n- Today\n\t\t- Mood: 🙂\n\t\t- Money: 300\n\t\t- Completed: 4\n")
+    check("3._old_line finds the line as it stands", pe._old_line(sdoc, pm.SEC_DAY_SUM, "- Money:") == "\t\t- Money: 300"
+          and pe._old_line(sdoc, pm.SEC_DAY_SUM, "- Focus:") is None, pe._old_line(sdoc, pm.SEC_DAY_SUM, "- Money:"))
     areas.records_configured = lambda: True
 
     # the legacy 💰 Money roll-up (old-layout monthly) reads the CRM too
@@ -168,6 +191,20 @@ else:
     before = ps.serialize_sections(odoc)
     pe._fill_rollup_money(odoc, pm.period_for("monthly", date(2026, 1, 15)), {})
     check("4.a month before the CRM keeps its lines (never rots to 0)", ps.serialize_sections(odoc) == before)
+    # the CRM's first entry is 15 Sep here: W36 and W37 ended before it
+    _ds0 = pe._day_sums
+    pe._day_sums = lambda index: {date(2026, 9, 15): 400.0, date(2026, 9, 16): 250.0}
+    pdoc = ps.parse_sections("C\n---\n### 💰 Money\n- W36 (31-06 Sep) • 120\n**Total = 120**\n")
+    pe._fill_rollup_money(pdoc, pm.period_for("monthly", date(2026, 9, 15)), {})
+    pe._day_sums = _ds0
+    pbody = [l.strip() for l in ps.find(pdoc, pm.SEC_MONEY).body if l.strip()]
+    check("4.inside a month the CRM starts in, a week before its first entry keeps its old line",
+          "- W36 (31-06 Sep) • 120" in pbody, pbody)
+    check("4.…a pre-CRM week with no old line says so, a later empty week reads 0",
+          any(l.startswith("- W37") and l.endswith("• before the CRM") for l in pbody)
+          and any(l.startswith("- W39") and l.endswith("• 0") for l in pbody)
+          and any(l.startswith("- W38") and l.endswith("• 650") for l in pbody), pbody)
+    check("4.and the kept amount counts into the Total", any("Total = 770" in l for l in pbody), pbody)
 
     # ── 4b. the 04:30 agent: no Alfred environment. With the CRM unreadable
     # every money writer leaves its section alone; with the config.json copy
@@ -191,8 +228,10 @@ else:
     def weekly_doc():
         d = ps.parse_sections(pm.render_template(tpl, {"breadcrumbs": "C", "daylinks": "- d"}))
         ps.set_body(d, pm.SEC_INCOME, ["\t- Tue 22 Sep 2026 • 400", "\t\t\t- **Total = 400**"], pm.scope_of("weekly", pm.SEC_INCOME))
+        ps.set_body(d, pm.SEC_LAST_WEEK, ["- Completed: 10", "- Income: 100"])
         return d
-    cr.all_entries = lambda: [("2026-09-22", True, 400.0, "€", False, 180), ("2026-09-24", True, 250.0, "€", False, 120)]
+    cr.all_entries = lambda: [("2026-09-15", True, 300.0, "€", False, 60),
+                              ("2026-09-22", True, 400.0, "€", False, 180), ("2026-09-24", True, 250.0, "€", False, 120)]
     areas.records_configured = lambda: False       # the agent, before the copy existed
     d = weekly_doc()
     before = ps.serialize_sections(d)
@@ -201,13 +240,15 @@ else:
     check("4b.CRM unreadable: the closing pass leaves 💰 Income exactly as it was, no 0 sealed",
           [l for l in inc.body if l.strip()] == ["\t- Tue 22 Sep 2026 • 400", "\t\t\t- **Total = 400**"], inc.body)
     lw = ps.find(d, pm.SEC_LAST_WEEK)
-    check("4b.and writes no Income line into ⏪ Last week", lw is None or not any("Income" in l for l in lw.body), lw.body if lw else None)
+    check("4b.and ⏪ Last week keeps the Income line it had", lw is not None and any(l.strip() == "- Income: 100" for l in lw.body), lw.body if lw else None)
     areas.records_configured = lambda: True        # the copy in config.json
     d = weekly_doc()
     pe._fill_weekly(d, wk, {})
     inc = ps.find_prefix(d, pm.SEC_INCOME, pm.scope_of("weekly", pm.SEC_INCOME))
-    check("4b.CRM readable: the week reads 650 off the CRM, day by day",
-          inc.name.startswith("💰 Income: 650") and any(l.strip() == "- Thu 24 Sep 2026 • 250" for l in inc.body) and any("Total = 650" in l for l in inc.body), (inc.name, inc.body))
+    check("4b.CRM readable: the week reads 650 off the CRM, day by day, with its chip against last week",
+          inc.name.startswith("💰 Income: 650 · 🟢 ▲ 350") and any(l.strip() == "- Thu 24 Sep 2026 • 250" for l in inc.body) and any("Total = 650" in l for l in inc.body), (inc.name, inc.body))
+    lw = ps.find(d, pm.SEC_LAST_WEEK)
+    check("4b.and ⏪ Last week's Income is the CRM's previous week", lw is not None and any(l.strip() == "- Income: 300" for l in lw.body), lw.body if lw else None)
     # the copy itself: areas reads config.json when the env var is absent, and
     # _persist_id writes the three CRM fields there under Alfred
     import config as cfg_mod
@@ -257,11 +298,18 @@ else:
     qs = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(sec.body)]
     check("5.an UNANSWERED money question is dropped from the note on its next seed, the rest renumbered",
           qs == ["bridge", "rating", "free"] and [n for n, *_ in pm.journal_pairs(sec.body)] == [1, 2, 3], sec.body)
-    sec = _Sec([l if l != "\t\t- A: " or OLD.index(l) != 3 else "\t\t- A: 120" for l in OLD])
+    sec = _Sec(OLD)
     sec.body[3] = "\t\t- A: 120"
     pe._refresh_fixed_q(sec, ev)
     pairs = pm.journal_pairs(sec.body)
-    check("5.an ANSWERED one is history and stays", any(pm.journal_key(q) == "money" and a == "120" for _n, q, a, _i in pairs), sec.body)
+    check("5.an ANSWERED one is history and stays", any(pm.journal_key(q) == "money" and a == "120" for _n, q, a, _i in pairs)
+          and [pm.journal_key(q) for _n, q, _a, _i in pairs] == ["bridge", "money", "rating", "free"], sec.body)
+    sec = _Sec(OLD[:4] + ["\t- *Q3 · How much money did you earn today?*", "\t\t- A: 90"] + OLD[4:])
+    pe._refresh_fixed_q(sec, ev)
+    pairs = pm.journal_pairs(sec.body)
+    check("5.both an answered and a blank money question: the blank one goes, the answered one stays, the rest renumber",
+          [(pm.journal_key(q), a) for _n, q, a, _i in pairs] == [("bridge", "b"), ("money", "90"), ("rating", ""), ("free", "")]
+          and [n for n, *_ in pairs] == [1, 2, 3, 4], sec.body)
     # the phone's shape: an empty A line with the answer typed as a bullet under it
     sec = _Sec(OLD[:4] + ["\t\t\t- 485 guest spot"] + OLD[4:])
     pe._refresh_fixed_q(sec, ev)
@@ -273,6 +321,10 @@ else:
     pe._seed_slot(doc, pm.SEC_EVENING, "evening", date(2026, 9, 17), {"goal": ""}, insert=True)
     qs = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(ps.find(doc, pm.SEC_EVENING).body)]
     check("5.the seed never plants it and drops the blank one", "money" not in qs and "rating" in qs, qs)
+    doc = ps.parse_sections("#### 📓 Journals\n- 🌅 Morning journal\n\n- 🌙 Evening journal\n" + "\n".join(OLD) + "\n")
+    pe._seed_slot(doc, pm.SEC_EVENING, "evening", date(2026, 9, 17), {"goal": ""})      # a refresh, not a run
+    qs = [pm.journal_key(q) for _n, q, _a, _i in pm.journal_pairs(ps.find(doc, pm.SEC_EVENING).body)]
+    check("5.a plain refresh (no insert) drops it too", "money" not in qs and qs == ["bridge", "rating", "free"], qs)
 
     # ── 6. the `$` road and the backlog ────────────────────────────────
     import periodic_rows as prows       # noqa: E402
@@ -285,8 +337,12 @@ else:
           and "CRM" in r[0]["title"] + r[0]["subtitle"], r)
     check("6.its chords are dead except ⌃ back", r[0]["mods"]["shift"]["valid"] is False and r[0]["mods"]["alt"]["valid"] is False
           and r[0]["mods"]["ctrl"]["valid"] is True)
-    r2 = prows.money_rows()
-    check("6.`$` typed bare is the same row (the tmo keyword lands here)", r2[0]["uid"] == r[0]["uid"] == "pn-money")
+    areas.periodic_configured = lambda: True
+    r2 = prows.rows("$ ")
+    check("6.the scope road the tmo keyword lands on (`pn $ `) is the same row", len(r2) == 1 and r2[0]["uid"] == "pn-money"
+          and r2[0]["arg"] == "xact:crmbrowse:ctx:crmmoney", r2)
+    r2 = prows.rows("$485 tattoo")
+    check("6.`$485 tattoo` on the scope road too", len(r2) == 1 and r2[0]["uid"] == "pn-money", r2)
     b = prows.backlog_rows("$ 100")
     check("6.`+ b $` is the same pointer", b[0]["uid"] == "pn-money" and b[0]["arg"] == "xact:crmbrowse:ctx:crmmoney", b)
     r3 = prows.entry_rows("$485 tattoo")

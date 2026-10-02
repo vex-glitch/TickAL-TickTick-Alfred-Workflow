@@ -1259,7 +1259,22 @@ def _journal_person(day):
         return ""
 
 
-def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
+def _old_line(doc, sec_name, prefix):
+    """The line of `sec_name` whose text starts with `prefix`, as it stands
+    in the note (indent included), or None: what a writer carries over when
+    its source cannot be read right now (review 2026-10-02: a composite is
+    written whole, so a missing source used to delete the line)."""
+    sec = ps.find(doc, sec_name)
+    if sec is None:
+        return None
+    for ln in sec.body:
+        if ln.strip().startswith(prefix):
+            return ln
+    return None
+
+
+def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None,
+                 money_keep=None):
     """Day · Mood · Money · Focus · Completed, in Vex's order (2026-09-12),
     each carrying a compact ▲/▼ against the day before it (Vex, same day:
     "small indicator compared to the day before?").
@@ -1273,7 +1288,8 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
     compare with - so a blank yesterday costs you the arrow, never the line.
 
     `nday` is the day's parsed note; `pday`/`pdoc` are the comparison day and
-    its note.
+    its note. `money_keep` is the Money line the note holds already, written
+    back verbatim when the CRM cannot be read right now.
     """
     def dc(cur, prev, kind="count"):
         c = pm.delta_chip(cur, prev, kind)
@@ -1303,6 +1319,8 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
             lines.append(f"{tab}- Money: {pm.fmt_amount(money or 0)}"
                          + (dc(money, pmoney, "money")
                             if money is not None and pmoney is not None else ""))
+    elif money_keep:
+        lines.append(money_keep)
     fm = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
     if fm:
         pfm = (getattr(t2, "focus_minutes", lambda a, b: None)(pday, pday)
@@ -1499,7 +1517,8 @@ def _fill_daily(doc, p, index, is_today):
         yextra = ([f"{pm.T2}- Won't do: {len(wd)}"]
                   if wd is not None and len(wd) else [])
         lines = _recap_lines(yd, t2, ydoc, pm.T2, pday=yd2, pdoc=y2doc,
-                             extra=yextra)
+                             extra=yextra,
+                             money_keep=_old_line(doc, pm.SEC_YESTERDAY, "- Money:"))
         ps.set_body(doc, pm.SEC_YESTERDAY, lines or [f"{pm.T1}_(no data)_"])
 
         # ✅ Tasks merge (sweep already ran in step 0)
@@ -1546,7 +1565,8 @@ def _fill_daily(doc, p, index, is_today):
             detail = " · ".join(f"{n} {g}" for g, n in counts.items())
             textra.append(f"{pm.T2}- Entries: {len(entries)} ({detail})")
         sums = _recap_lines(day, t2, doc, pm.T2, pday=yd, pdoc=ydoc,
-                            extra=textra)
+                            extra=textra,
+                            money_keep=_old_line(doc, pm.SEC_DAY_SUM, "- Money:"))
         ps.set_body(doc, pm.SEC_DAY_SUM, sums or [f"{pm.T1}_(no data)_"])
 
         # 🌅/🌙 journal Q lines seed at refresh (never-empty sections,
@@ -2004,6 +2024,8 @@ def _fill_weekly(doc, p, index):
             lw.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
             lw.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        elif _old_line(doc, pm.SEC_LAST_WEEK, "- Income:"):
+            lw.append(_old_line(doc, pm.SEC_LAST_WEEK, "- Income:").strip())
         # last week's own words: the 🔮 intention it set for THIS week (the
         # weekly journal's check quotes it back) and the stars it gave itself
         pt = lookup(index, prev)
@@ -2277,18 +2299,29 @@ def _has_entries(day_sums, a, b):
 
 
 def _span_money_lines(day_sums, spans, kind, today):
-    """Money by child span: the amount where the CRM holds a priced entry,
-    an honest word ("no sessions") where it holds none, and nothing at all
-    for a span that has not happened yet."""
+    """Money by child span: the amount where the CRM holds a session or a
+    priced entry, an honest word where it holds none, and nothing at all for
+    a span that has not happened yet. A span that ended before the CRM's
+    first entry reads "before the CRM" rather than "no sessions" (that is
+    not a fact about his money), and the span the CRM starts inside says
+    from which day it counts (review 2026-10-02: a partial sum read as a
+    whole one)."""
+    first = min(day_sums) if day_sums else None
     out = []
     for n, _cp, a, b in spans:
         if a > today:
             break
         label = pm.span_label(kind, n, a, b)
+        if first is not None and b < first:
+            out.append(f"- {label} • before the CRM")
+            continue
         if not _has_entries(day_sums, a, b):
             out.append(f"- {label} • no sessions")
             continue
-        out.append(f"- {label} • {pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))}")
+        amt = pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))
+        tail = (f" · from {first.day} {pm.MONTH_ABBR[first.month]}"
+                if first is not None and a < first <= b else "")
+        out.append(f"- {label} • {amt}{tail}")
     return out
 
 
@@ -2679,6 +2712,8 @@ def _fill_monthly(doc, p, index):
             lm.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
             lm.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        elif _old_line(doc, pm.SEC_LAST_MONTH, "- Income:"):
+            lm.append(_old_line(doc, pm.SEC_LAST_MONTH, "- Income:").strip())
         top_tasks = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
                                                           for st in rank_prev]))
         top_lists = [f"{pm.T1}- 🗂 {nm} · {c}" for nm, c in pm.top_n(
@@ -2904,6 +2939,8 @@ def _fill_quarterly(doc, p, index):
             lq.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
             lq.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        elif _old_line(doc, pm.SEC_LAST_QTR, "- Income:"):
+            lq.append(_old_line(doc, pm.SEC_LAST_QTR, "- Income:").strip())
         # last quarter's own words: where it wanted to be by now (the
         # quarterly journal's compare question quotes it back)
         pt = lookup(index, prev)
@@ -3145,6 +3182,8 @@ def _fill_yearly(doc, p, index):
             ly.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
             ly.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        elif _old_line(doc, pm.SEC_LAST_YEAR, "- Income:"):
+            ly.append(_old_line(doc, pm.SEC_LAST_YEAR, "- Income:").strip())
         # last year's own words: where it wanted to be by now (the yearly
         # journal's compare question quotes it back)
         pt = lookup(index, prev)
@@ -3187,40 +3226,16 @@ def _year_words(pdoc):
 
 def _fill_rollup_money(doc, p, index):
     """Monthly/quarterly/yearly 💰 Money (the layout before 2026-09-12), off
-    the CRM like 💰 Income. Missing-history rule: a period with NO priced
-    CRM entry keeps its existing lines (a month before the CRM existed must
-    not rot to 0)."""
+    the CRM like 💰 Income. Missing-history rule: a period with NO CRM entry
+    keeps its existing lines, and inside a period that has some, a child
+    span that ended before the CRM's first entry keeps ITS old line (its
+    amount stays in the Total) or reads "before the CRM" - a month before
+    the CRM existed must not rot to 0 (review 2026-10-02)."""
     if p.kind not in ("monthly", "quarterly", "yearly"):
         return                          # a day and a week have no roll-up
     day_sums = _day_sums(index)
     if not day_sums or not any(p.start <= d <= p.end for d in day_sums):
         return
-    lines = []
-    if p.kind == "monthly":
-        weeks, seen = [], set()
-        d = p.start
-        while d <= p.end:
-            wk = pm.period_for("weekly", d)
-            if wk.start not in seen:
-                seen.add(wk.start)
-                weeks.append(wk)
-            d += timedelta(days=7 - d.weekday())
-        for wk in weeks:
-            iso = wk.start.isocalendar()
-            rng = (f"{wk.start.day:02d}-{wk.end.day:02d} "
-                   f"{pm.MONTH_ABBR[wk.end.month]}")
-            lines.append(f"- W{iso[1]:02d} ({rng}) • "
-                         f"{pm.fmt_amount(pm.sum_in_period(day_sums, wk))}")
-    elif p.kind == "quarterly":
-        for m in range(3):
-            mp = pm.period_for("monthly", date(p.start.year, p.start.month + m, 1))
-            lines.append(f"- {pm.title(mp)} • "
-                         f"{pm.fmt_amount(pm.sum_in_period(day_sums, mp))}")
-    else:   # yearly
-        for qm in (1, 4, 7, 10):
-            qp = pm.period_for("quarterly", date(p.start.year, qm, 1))
-            lines.append(f"- {pm.title(qp)} • "
-                         f"{pm.fmt_amount(pm.sum_in_period(day_sums, qp))}")
     # its OWN section only, by its exact name: ps.find's normalized passes
     # hand back any lone bullet that reads "money" (a highlight line, a line
     # of a journal answer), and the roll-up was written under it on every
@@ -3228,8 +3243,46 @@ def _fill_rollup_money(doc, p, index):
     sec = ps.find(doc, pm.SEC_MONEY)
     if not isinstance(sec, ps.Section) or sec.name != pm.SEC_MONEY:
         return
+    first = min(day_sums)
+    old = {}
+    for ln in sec.body:
+        t = ln.strip()
+        if " • " in t and not pm.MONEY_TOTAL_RE.match(t):
+            old[t.split(" • ", 1)[0]] = t
+    children = []                       # (label, start, end)
+    if p.kind == "monthly":
+        seen = set()
+        d = p.start
+        while d <= p.end:
+            wk = pm.period_for("weekly", d)
+            if wk.start not in seen:
+                seen.add(wk.start)
+                iso = wk.start.isocalendar()
+                rng = (f"{wk.start.day:02d}-{wk.end.day:02d} "
+                       f"{pm.MONTH_ABBR[wk.end.month]}")
+                children.append((f"- W{iso[1]:02d} ({rng})", wk.start, wk.end))
+            d += timedelta(days=7 - d.weekday())
+    elif p.kind == "quarterly":
+        for m in range(3):
+            mp = pm.period_for("monthly", date(p.start.year, p.start.month + m, 1))
+            children.append((f"- {pm.title(mp)}", mp.start, mp.end))
+    else:   # yearly
+        for qm in (1, 4, 7, 10):
+            qp = pm.period_for("quarterly", date(p.start.year, qm, 1))
+            children.append((f"- {pm.title(qp)}", qp.start, qp.end))
+    lines, kept = [], 0.0
+    for label, a, b in children:
+        if b < first:
+            keep = old.get(label)
+            if keep:
+                lines.append(keep)
+                kept += pm.parse_amount(keep.split(" • ", 1)[1]) or 0.0
+            else:
+                lines.append(f"{label} • before the CRM")
+            continue
+        lines.append(f"{label} • {pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))}")
     ps.set_sec_body(doc, sec,
-                    pm.rollup_money_lines(lines, pm.sum_in_period(day_sums, p)))
+                    pm.rollup_money_lines(lines, pm.sum_in_period(day_sums, p) + kept))
 
 
 # ── 🥅 OKRs (HANDOFF_OKR phase 4) ────────────────────────────────────────────

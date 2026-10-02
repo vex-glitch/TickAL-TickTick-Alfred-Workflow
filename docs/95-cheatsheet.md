@@ -132,7 +132,7 @@ Via the `tse` keyword (grammar: `tse [scope] query`). `/` opens the scope menu.
 | `f` | Filters |
 | `fo` | Folders |
 | `la` | Last added (newest first) |
-| `pn` | 💫 Periodic notes - open daily…yearly, `+` entry, `$` income, `day` / `goal` pickers, `today` / `tmrw` scheduling, journals ([docs](48-periodic.md)) |
+| `pn` | 💫 Periodic notes - open daily…yearly, `+` entry, `$` points at CRM > 💰 Money, `day` / `goal` pickers, `today` / `tmrw` scheduling, journals ([docs](48-periodic.md)) |
 | `n` | Note titles |
 | `nc` | Note bodies |
 

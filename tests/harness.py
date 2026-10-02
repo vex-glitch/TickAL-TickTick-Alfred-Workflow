@@ -102,7 +102,11 @@ def script_suite(path):
     name = os.path.splitext(os.path.basename(path))[0]
 
     def test_script(self):
-        env = dict(ENV0, TICKAL_NO_SETTLE="1")
+        env = dict(ENV0, TICKAL_NO_SETTLE="1",
+                   # present-but-blank = OFF: never Vex's real config.json
+                   # copy of the CRM fields (areas._env_or_cfg, 2026-10-02)
+                   crm_records_list_id="", crm_records_tags="",
+                   crm_archive_list_id="")
         try:
             run = subprocess.run([sys.executable, path], cwd=ROOT, env=env,
                                  stdin=subprocess.DEVNULL,

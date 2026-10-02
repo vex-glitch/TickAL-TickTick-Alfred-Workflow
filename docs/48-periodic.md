@@ -57,13 +57,15 @@ Entry kinds, each with a one-letter prefix: 🟢 `w` win · 🔴 `n` nag · 💭
 
 ### 📋 Backlog, fill in a day you missed
 
-Skipped shutdown? `+ b` lists what a day can hold: ✨ its highlight, 😊 mood, ⭐️ the day rating. Pick one, type the value, and the same day strip appears: this week Monday to today, today first, each day showing what it already holds.
+Skipped shutdown? `+ b` lists what a day can hold: ✨ its highlight, 😊 mood, ⭐️ the day rating. Pick one, type the value, and a day strip appears: this week Monday to today, today first, each day showing what it already holds.
 
-Every one of these is a single answer in that day's journal, so they all ride one screen rather than four. A day you skipped entirely has no questions in it at all yet - they get planted the moment you fill one in, and planting them on an old day gives that day exactly the questions it would have had, nothing of today's.
+Every one of these is a single answer in that day's journal, so they all ride one screen rather than three. A day you skipped entirely has no questions in it at all yet - they get planted the moment you fill one in, and planting them on an old day gives that day exactly the questions it would have had, nothing of today's.
 
 A day that already has an answer never takes a stray ⏎. It stops on a screen showing what's there: **Keep it** first, **Replace it** as a second row you have to choose.
 
 `*mon`, `*yesterday`, `*-2`, `*9` skip the picking. Day words look backwards here - you're filling in a day you have already lived.
+
+The same moves work from a task's **⌘ Actions** menu: ☀️ Add to today, 🌙 Add to tomorrow, ☀️ Make day goal. The add window's `/` menu has ☀️ Today and 🌙 Tomorrow shortcuts too.
 
 The daily note's ✨ line and the weekly's ✨ Highlights and 😊 Moods read those same answers, so filling a day in reaches every one of them. You can also just type the answer into the note by hand on your phone: the weekly picks it up on its next refresh either way. Money is not filled in here: it is the CRM's, see [Money](#money---from-the-crm).
 
@@ -77,7 +79,7 @@ Every pn row also has its own keyword, so you can jump straight in without openi
 | `tdn` / `twn` / `tmn` / `tqn` / `tyn` | open today / week / month / quarter / year note |
 | `tmj` / `tej` | morning / evening journal |
 | `tde` | log an entry to today |
-| `tmo` | opens CRM > 💰 Money (money is logged there, as sessions) |
+| `tmo` | lands on one row; ⏎ opens CRM > 💰 Money (money is logged there, as sessions) |
 | `tdg` | set today's one thing |
 | `tat` | schedule a task today |
 
@@ -132,7 +134,7 @@ A goal line you edit in the TickTick app comes back with its markdown escaped; e
 
 ## Money - from the CRM
 
-Nothing asks you for money any more. A day's money is what you logged in the CRM for that day: every Session done, deposit or refund dated it, the same figures CRM > 💰 Money shows. The daily note carries it as the Money line of its 📊 Today and ⏪ Yesterday summaries, with an arrow against the day before; the weekly's 💰 Income lists one line per day - `- Sat 11 Jul 2026 • 485` - with the total; monthly shows week sums; quarterly shows months; yearly shows quarters (💰 Income under 💿 Data from the weekly up). Every tier sums the CRM's entries by date, so a week straddling two months never double-counts. A span the CRM holds nothing for reads `no sessions`, never 0, and a period from before the CRM keeps whatever its note already says. Logging a session refreshes today's note within half a minute, like any other completion; a month you worked without the Mac is filled in from CRM > 💰 Money > 🕰 Backfill a month. The `$` entry kind and the `tmo` keyword only point at CRM > 💰 Money now.
+Nothing asks you for money any more. A day's money is what you logged in the CRM for that day: every Session done, deposit or refund dated it, the same figures CRM > 💰 Money shows. It needs the CRM records list set up; without it no money line is written at all. The daily note carries it as the Money line of its 📊 Today and ⏪ Yesterday summaries, with an arrow against the day before; the weekly's 💰 Income lists one line per day - `- Sat 11 Jul 2026 • 485`, a day without a session reads `• 0` - with the total; monthly shows week sums; quarterly shows months; yearly shows quarters (💰 Income under 💿 Data from the weekly up). Every tier sums the CRM's entries by date, so a week straddling two months never double-counts. A week, month or quarter the CRM holds nothing for reads `no sessions`; one that ended before your first CRM entry reads `before the CRM`, and the one the CRM starts inside says from which day it counts. Logging a session refreshes today's note within half a minute, like any other completion. One limit worth knowing: a week, month or quarter that has already closed keeps the numbers it was sealed with, so a session logged late, or a month filled in from CRM > 💰 Money > 🕰 Backfill a month, reaches the live notes and the CRM screens, never a sealed note. The `$` entry kind and the `tmo` keyword only point at CRM > 💰 Money now.
 
 ## The weekly note
 

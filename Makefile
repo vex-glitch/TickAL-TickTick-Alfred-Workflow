@@ -31,6 +31,12 @@ install: bundle
 # The last line, test_harness, names any test file that would break the
 # all-in-one run (python3 -m unittest discover -s tests): tests/harness.py.
 test: export TICKAL_NO_SETTLE := 1
+# present-but-blank = OFF: no suite reads Vex's real config.json copy of the
+# CRM fields by accident (areas._env_or_cfg, 2026-10-02); a suite that needs
+# the CRM sets the variables itself before importing areas
+test: export crm_records_list_id :=
+test: export crm_records_tags :=
+test: export crm_archive_list_id :=
 test:
 	@$(PYTHON) tests/test_periodic.py
 	@$(PYTHON) tests/test_focus_blocks.py
@@ -38,6 +44,7 @@ test:
 	@$(PYTHON) tests/test_on_this_day.py
 	@$(PYTHON) tests/test_recap_order.py
 	@$(PYTHON) tests/test_money_source.py
+	@$(PYTHON) tests/test_backlog_strip.py
 	@$(PYTHON) tests/test_weekly_note.py
 	@$(PYTHON) tests/test_monthly_note.py
 	@$(PYTHON) tests/test_quarterly_note.py

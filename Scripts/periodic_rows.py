@@ -142,9 +142,10 @@ def idle_rows(frag):
     # journals and the schedule-it verbs each open their own little screen
     # instead of spending five lines on the idle one.
     # Everything you WRITE into a note lives behind ➕ Entry (Vex 2026-09-12:
-    # ➕ Add was the entry list's ☑️ Task by another road, 💰 Income and
-    # 😊 Mood are journal answers now, and ⭐️ Highlight belongs with the rest
-    # of the writing verbs). What stays out here is navigation and the refresh.
+    # ➕ Add was the entry list's ☑️ Task by another road, 😊 Mood is a journal
+    # answer, 💰 money is the CRM's since 2026-10-02, and ⭐️ Highlight belongs
+    # with the rest of the writing verbs). What stays out here is navigation
+    # and the refresh.
     extras = [
         ("pn-entry",     "➕ Entry",         "Write into today's note",
          None, "pn + "),

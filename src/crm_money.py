@@ -25,7 +25,12 @@ list id comes from config.json (areas._env_or_cfg); review 2026-10-02
 found the 04:30 agent would otherwise have sealed every closing week and
 month at 0.
 """
+import os
+import time
 from datetime import date
+
+MEMO_TTL = 2.0                  # one refresh parses the notes cache ONCE: six
+_MEMO = {"fn": None, "at": 0.0, "rows": None}   # readers, 1.5 MB of JSON each
 
 
 def available():
@@ -36,14 +41,33 @@ def available():
         return False
 
 
+def _cache_present():
+    """Is there a notes cache to read at all? None on disk = UNREADABLE, not
+    an empty CRM (review 2026-10-02: records_notes reads a missing cache as
+    [], which would have written 0 over every money section)."""
+    try:
+        import cache as cache_store
+        return os.path.exists(cache_store._path("all_notes"))
+    except Exception:
+        return False
+
+
 def _entries():
     """[(date, is_session, amount|None, sym, pre, minutes)] off the cache;
-    None when the CRM is not set up here or cannot be read."""
-    if not available():
+    None when the CRM is not set up here, the cache is missing, or the read
+    fails. Memoised for MEMO_TTL seconds per reader function: a daily
+    refresh asks six times in a row."""
+    if not available() or not _cache_present():
         return None
     try:
         import crm_records as cr
-        return list(cr.all_entries())
+        fn = cr.all_entries
+        now = time.time()
+        if _MEMO["fn"] is fn and _MEMO["rows"] is not None and now - _MEMO["at"] < MEMO_TTL:
+            return _MEMO["rows"]
+        rows = list(fn())
+        _MEMO.update(fn=fn, at=now, rows=rows)
+        return rows
     except Exception:
         return None
 
