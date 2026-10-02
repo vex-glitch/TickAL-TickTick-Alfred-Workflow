@@ -2361,6 +2361,100 @@ def crmimport():
         session_photos(lb["id"])
 
 
+def moneybackfill(ym):
+    """🕰 Backfill a month the CRM never saw (CRM > 💰 Money > 🕰 Backfill a
+    month > the month). Two questions - the month's total (prefilled from
+    the 💰 money-tracking note when one exists) and the hourly rate it was
+    made at - then ONE archived logbook "🏛️ Guest spot • <Month YYYY>"
+    under the Guest spot customer: an entry per day from the note when its
+    days add up to the total, else one entry on the month's last day.
+    Hours per entry = amount / rate to the quarter hour, so the month reads
+    that rate. A month already backfilled is refused (money would double).
+    Vex 2026-10-02, the August guest spot without the Mac."""
+    if not _records_ready():
+        return
+    import re as _re
+    from datetime import date as _date
+    import areas
+    import crm_records as cr
+    import money_backfill as mb
+    import routine_link as rl
+    m = _re.fullmatch(r"(\d{4})-(\d{2})", (ym or "").strip())
+    if not m:
+        _crm_say("🕰 Bad month")
+        return
+    year, month = int(m.group(1)), int(m.group(2))
+    if not 1 <= month <= 12:
+        _crm_say("🕰 Bad month")
+        return
+    today = _date.today()
+    if (year, month) > (today.year, today.month):
+        _crm_say("🕰 That month has not happened yet")
+        return
+    label = mb.month_label(year, month)
+    want = mb.logbook_title(year, month).lower()
+    for lb in cr.records_notes():
+        t = (lb.get("title") or "").strip()
+        if _re.sub(r"^(?:🎨|🏛️)\s*", "", t).strip().lower() == want:
+            _crm_say(f"🕰 {label} already backfilled · {t}")
+            return
+    # the month's money note: cache first, then a live read of the list
+    pid = rl.MONEY_LIST
+    pool = [t for k in ("all_tasks", "all_notes")
+            for t in (cache_store.get(k) or []) if t.get("projectId") == pid]
+    note, _newest = rl.money_note(pool, year, month)
+    if not note and pid:
+        try:
+            live = cr._api().get_project_data(pid).get("tasks") or []
+            note, _newest = rl.money_note(live, year, month)
+        except Exception:
+            note = None
+    days, hint = {}, None
+    if note:
+        days = mb.parse_day_amounts(note.get("content") or "", year, month)
+        hint = mb.note_total(note.get("title"), note.get("content") or "") \
+            or (sum(days.values()) if days else None)
+    raw = _ask(f"{label} · total money made?"
+               + (f" (OK = {hint:g} from the money note)" if hint else ""),
+               default=f"{hint:g}" if hint else "")
+    if raw is None:
+        _crm_say("Cancelled")
+        return
+    total = mb.parse_amount(raw) if raw.strip() else hint
+    if not total or total <= 0:
+        _crm_say("Cancelled · no total")
+        return
+    raw = _ask(f"{label} · about how much per hour? (OK = {mb.DEFAULT_RATE})",
+               default=str(mb.DEFAULT_RATE))
+    if raw is None:
+        _crm_say("Cancelled")
+        return
+    rate = mb.parse_amount(raw) if raw.strip() else mb.DEFAULT_RATE
+    if not rate or rate <= 0:
+        rate = mb.DEFAULT_RATE
+    entries, hours, mode = mb.plan_entries(year, month, total, rate,
+                                           days=days, today=today)
+    cust = next((c for c in cr.records_notes(areas.CUSTOMER_TAG)
+                 if (c.get("title") or "").strip() == f"👤 {mb.CUSTOMER_NAME}"),
+                None) or cr.create_customer(mb.CUSTOMER_NAME)
+    lb = cr.create_logbook(cust, f"{mb.MONTHS[month - 1]} {year}",
+                           started=entries[0][0])
+    content = cr.set_content_dest(lb.get("content") or "", "-")
+    cr._api().update_task(lb["id"], areas.RECORDS_ID, current=lb, content=content)
+    cr._patch_cache(lb["id"], content=content)
+    first = (f"Backfilled from the 💰 money note, hours set at ~{rate:g}€/h."
+             if mode == "days" else
+             f"Backfilled as one entry, hours set at ~{rate:g}€/h.")
+    for i, (day, marker, dur, amt) in enumerate(entries):
+        cr.append_session(areas.RECORDS_ID, lb["id"], marker, duration=dur,
+                          charged=amt, text=first if i == 0 else "", when=day)
+    cr.finish_logbook(areas.RECORDS_ID, lb["id"], when=entries[-1][0])
+    _crm_say(f"🕰 {label} backfilled · {total:g}€ · "
+             + (f"{len(entries)} days from the money note" if mode == "days"
+                else "one entry")
+             + f" · {hours:g}h · ~{rate:g}€/h")
+
+
 def _media_selected():
     """True when Photos (running) has a selection or the Finder selection
     holds media files - the honest 'there is something to import' gate
@@ -13370,6 +13464,8 @@ def main():
             crmsummary(rest)
         elif verb == "crmcsv":
             crmcsv()
+        elif verb == "moneybackfill":
+            moneybackfill(rest)
         elif verb == "notify":
             # pass-through: stdout → the End notification. Lets headless
             # scripts (sync.py) post banners with Alfred's

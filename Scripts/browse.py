@@ -1456,7 +1456,8 @@ def render_crmmoney(sub, query):
     qt:<YYYY>-Q<n> (a quarter: the All-quarters row, then its months) ·
     mw:<YYYY-MM> (a month, week by week) · wk:<monday> (a week, session by
     session) · cust (totals per customer, richest first) · lbs / lb:<tid>
-    (tattoos) · arch (archived logbooks).
+    (tattoos) · arch (archived logbooks) · backfill (🕰 month picker →
+    xact:moneybackfill:<YYYY-MM>, two questions, one logbook).
 
     Vex 2026-10-02: pricing needs the money per hour over a year and a
     quarter, and the ledger only knew weeks and months. The same period
@@ -1599,6 +1600,31 @@ def render_crmmoney(sub, query):
                             f"ctx:crmmoney:qts:{y}",
                             "Every quarter of the year so far")]
         rows += [_month_row(e, y, mm, today) for mm in range(a.month, last_m + 1)]
+        return _done(rows)
+
+    if sub == "backfill":   # 🕰 which month to backfill (newest first)
+        import money_backfill as mb
+        e = cr.all_entries()
+        today = _date.today()
+        done = set()
+        for lb in cr.records_notes():
+            t = re.sub(r"^(?:🎨|🏛️)\s*", "", (lb.get("title") or "").strip())
+            done.add(t.strip().lower())
+        rows = []
+        for y, mo_ in mb.month_choices(today):
+            a, b = _month_bounds(y, mo_)
+            money, n, hours, raw = cr.sum_entries(e, a.isoformat(), b.isoformat())
+            have = mb.logbook_title(y, mo_).lower() in done
+            rows.append(alfred.item(
+                uid=f"bf-{a.strftime('%Y-%m')}",
+                title=f"📅 {a.strftime('%b %Y')} · {money}"
+                      f" · {n} session{'s' if n != 1 else ''}"
+                      + (f" · {hours:g}h" if hours else "")
+                      + (" · ✅ backfilled" if have else ""),
+                subtitle=("Already has a backfill logbook" if have else
+                          "⏎ total → hourly rate → one archived logbook"),
+                arg=f"xact:moneybackfill:{a.strftime('%Y-%m')}",
+                valid=not have, mods=_picker_mods()))
         return _done(rows)
 
     if sub == "cust":
@@ -1862,6 +1888,11 @@ def render_crmmoney(sub, query):
                     subtitle="Every dated charge / deposit / refund"
                              " → ~/Downloads",
                     arg="xact:crmcsv", mods=_picker_mods()),
+        alfred.item(uid="mo-backfill", title="🕰 Backfill a month",
+                    subtitle="A month the CRM never saw · pick it, total,"
+                             " hourly rate  |  ⏎⤵️",
+                    arg="xact:crmbrowse:ctx:crmmoney:backfill",
+                    mods=_picker_mods()),
     ]
     return add_back(pinned, "ctx:crmhub")
 
