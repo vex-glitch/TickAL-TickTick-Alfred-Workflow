@@ -4738,7 +4738,12 @@ def render_rconfirm(ids, query):
     Head line names today and the schedule; row 1 starts the next occurrence
     anyway, with its day spelled out; row 2 names the previous one (derived
     from the rule - the series has already rolled past it, so it needs no
-    completion record) with the real completion time when the cache has it."""
+    completion record) with the real completion time when the cache has it.
+    When the rule's previous occurrence lies before today and no completion
+    record falls on or after it, the series SKIPPED it (a calendar drag
+    taken as "only this occurrence", Vex 2026-10-02): a third row offers to
+    run that missed one, moving the series back to its day first
+    (xact routine_late re-reads live before it writes)."""
     import routines as rt
     from datetime import date as _date
     key = ids[0] if ids else ""
@@ -4763,7 +4768,9 @@ def render_rconfirm(ids, query):
     # the completion time of the previous occurrence, when the sync window
     # still holds that instance (it keeps ~200 rows, a few days)
     done_at = ""
-    for c in cache_store.get("completed_tasks") or []:
+    completed = cache_store.get("completed_tasks") or []
+    missed = rt.missed_occurrence(t, rt.finished_days(r["tid"], completed), today)
+    for c in completed:
         if c.get("repeatTaskId") == r["tid"] and c.get("completedTime"):
             day = rt.local_date(c["completedTime"])
             if day and (not prev or day >= prev):
@@ -4781,12 +4788,20 @@ def render_rconfirm(ids, query):
         subtitle=f"Runs {name} now  |  ⏎▶️  ⌃🔙",
         arg=f"xact:routine_run:{key}",
         valid=True))
+    if missed:
+        rows.append(alfred.item(
+            uid="rc-late",
+            title=f"⏪ Run the missed one · {when(missed)}",
+            subtitle=f"Series back to that day, then runs {name}  |  ⏎⏪  ⌃🔙",
+            arg=f"xact:routine_late:{key}",
+            valid=True))
     rows.append(alfred.item(
         uid="rc-prev",
         # the rule's slot before the next one is only an occurrence when the
         # task existed by then: a routine made in September whose rule says
         # "the last day of the year" never ran on 31 December the year before
-        title=(f"✅ Last one · {when(prev)}{done_at}"
+        title=(f"⚠️ Last one · {when(prev)} · not finished" if missed
+               else f"✅ Last one · {when(prev)}{done_at}"
                if prev and not _before_birth(t, prev)
                else "✅ No earlier occurrence"),
         subtitle=f"Open {name} in TickTick  |  ⏎↗️  ⌃🔙",

@@ -7358,6 +7358,66 @@ def routine_start(key):
     routine_run(key)
 
 
+def routine_late(key):
+    """⏪ Run the MISSED occurrence (the confirm screen's third row, Vex
+    2026-10-02: "add an option to execute a missed review like in this
+    case"). A calendar drag two days after the day had made TickTick roll
+    the monthly and quarterly series on to 31 Oct and 31 Dec with 30 Sep
+    never finished; the guard then only offered the next one.
+
+    Live, never the cache: the series' own dates say which occurrence is
+    open. If routines.missed_occurrence still finds one, the series is moved
+    BACK to that day (start and due shifted by whole days, clock kept, the
+    way TickTick rolled it), so the guard reads "overdue", ⌃ Start runs at
+    once, Finish reads "go" and rolls it on to the next day, and the journal
+    pins to that period's note. Then the routine runs. The series is the
+    only task written; nothing is completed here."""
+    import routines as rt
+    r = rt.by_key(key)
+    if not r:
+        print("▶️ Unknown routine")
+        return
+    try:
+        t = _api().get_task(r["pid"], r["tid"])
+    except Exception as e:
+        print(f"⏪ TickTick did not answer · {type(e).__name__}")
+        return
+    if not t or t.get("id") != r["tid"]:
+        print("⏪ Routine task not found")
+        return
+    done = rt.finished_days(r["tid"], cache_store.get("completed_tasks"))
+    day = rt.missed_occurrence(t, done)
+    st = rt.due_state(t)
+    if day is None:
+        nxt = st["date"].strftime("%a %d %b") if st.get("date") else "no date"
+        print(f"⏪ Nothing missed · {r['label']} next {nxt}")
+        return
+    delta = (day - st["date"]).days
+    fields = {}
+    for k in ("startDate", "dueDate"):
+        moved = rt.shift_iso_days(t.get(k), delta)
+        if moved:
+            fields[k] = moved
+    if "startDate" not in fields and "dueDate" not in fields:
+        print("⏪ The series has no date to move")
+        return
+    try:
+        _api().update_task(r["tid"], r["pid"], current=t, **fields)
+        back = _api().get_task(r["pid"], r["tid"])
+    except Exception as e:
+        print(f"⏪ Could not move the series · {type(e).__name__}")
+        return
+    after = rt.due_state(back)
+    with open(ROUTINE_LOG, "a") as logf:
+        logf.write(f"{_op_iso()} late {r['label']}: series {st['date']} -> "
+                   f"{after.get('date')} ({after['state']}), ran the missed {day}\n")
+    if after.get("date") != day:
+        print(f"⏪ Series did not land on {day:%a %d %b} · reads {after.get('date')}")
+        return
+    print(f"⏪ {day:%a %d %b} · ", end="")
+    routine_run(key)
+
+
 def routine_run(key):
     """🌓 Routines ⌃ and the routine:<key> link: open the whole workspace.
     DETACHED - a routine relaunches TickTick and runs 20-60 s while this node
@@ -13414,6 +13474,8 @@ def main():
             routine_run(rest)
         elif verb == "routine_start":
             routine_start(rest)
+        elif verb == "routine_late":
+            routine_late(rest)
         elif verb == "routine_exec":
             routine_exec(rest)
         elif verb == "routine_reset_after":

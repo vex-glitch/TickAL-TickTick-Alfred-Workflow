@@ -134,6 +134,61 @@ else:
           rt.prev_occurrence(_dt.date(2024, 3, 31), M30) == _dt.date(2024, 2, 29))
     check("no rule = no previous", rt.prev_occurrence(_dt.date(2026, 9, 12), "") is None)
 
+    # ── the missed occurrence (⏪ on the confirm screen, Vex 2026-10-02) ──────
+    LASTDAY = "RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=-1"
+    QLAST = "RRULE:FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=-1"
+    OCT2 = _dt.date(2026, 10, 2)
+    SEP30 = _dt.date(2026, 9, 30)
+
+
+    def TB(day, rule, born="2026-09-12"):
+        t = T(day, rule, "06:00")
+        t["dueDate"] = f"{day}T10:00:00.000+0000"
+        t["createdTime"] = f"{born}T09:14:30.000+0000"
+        return t
+
+
+    MISS = rt.missed_occurrence
+    check("the dragged monthly: series on 31 Oct, 30 Sep never finished = missed 30 Sep",
+          MISS(TB("2026-10-31", LASTDAY), (), OCT2) == SEP30)
+    check("the dragged quarterly: series on 31 Dec = missed 30 Sep",
+          MISS(TB("2026-12-31", QLAST), (), OCT2) == SEP30)
+    check("finished on its day = nothing missed",
+          MISS(TB("2026-10-31", LASTDAY), {SEP30}, OCT2) is None)
+    check("finished late, two days after = nothing missed",
+          MISS(TB("2026-10-31", LASTDAY), {_dt.date(2026, 10, 2)}, OCT2) is None)
+    check("a record BEFORE the occurrence does not count",
+          MISS(TB("2026-10-31", LASTDAY), {_dt.date(2026, 8, 31)}, OCT2) == SEP30)
+    check("due today = nothing to offer (today's run is the road)",
+          MISS(TB("2026-10-02", DAILY), (), OCT2) is None)
+    check("overdue = nothing to offer (⌃ Start runs it as it is)",
+          MISS(TB("2026-09-30", LASTDAY), (), OCT2) is None)
+    check("a daily one day ahead with no record: prev is today, not missed",
+          MISS(TB("2026-10-03", DAILY), (), OCT2) is None)
+    check("the weekly on a Friday, last Sunday unticked = missed Sunday",
+          MISS(TB("2026-10-04", SUNDAY), (), OCT2) == _dt.date(2026, 9, 27))
+    check("the weekly on a Friday, last Sunday ticked = nothing",
+          MISS(TB("2026-10-04", SUNDAY), {_dt.date(2026, 9, 27)}, OCT2) is None)
+    check("before birth is no occurrence",
+          MISS(TB("2026-12-31", "RRULE:FREQ=MONTHLY;INTERVAL=12;BYMONTHDAY=-1", born="2026-09-27"),
+               (), OCT2) is None)
+    check("a completed one-off is never missed",
+          MISS(dict(TB("2026-10-31", LASTDAY), status=2), (), OCT2) is None)
+    check("no repeat = never missed",
+          MISS({"startDate": "2026-10-31T06:00:00.000+0000"}, (), OCT2) is None)
+    check("no task is safe", MISS(None, (), OCT2) is None and MISS({}, (), OCT2) is None)
+
+    SH = rt.shift_iso_days
+    check("the series moves back with its clock kept",
+          SH("2026-10-31T06:00:00.000+0000", -31) == "2026-09-30T06:00:00.000+0000")
+    check("the quarterly moves back a quarter",
+          SH("2026-12-31T06:00:00.000+0000", (SEP30 - _dt.date(2026, 12, 31)).days)
+          == "2026-09-30T06:00:00.000+0000")
+    check("the due date keeps its own clock",
+          SH("2026-10-31T10:00:00.000+0000", -31) == "2026-09-30T10:00:00.000+0000")
+    check("a missing or odd stamp moves nothing",
+          SH(None, -1) is None and SH("", -1) is None and SH("soon", -1) is None)
+
     check("rule words: daily", rt.rule_text(DAILY) == "daily")
     check("rule words: Sundays", rt.rule_text(SUNDAY) == "Sundays")
     check("rule words: the 30th", rt.rule_text(M30) == "the 30th of every month")

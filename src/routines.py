@@ -251,6 +251,69 @@ def finish_verdict(task, done_days=(), today=None):
     return ("done" if resolved else "early"), st["date"]
 
 
+
+def before_birth(task, day):
+    """Is `day` earlier than the day this task was created? False when the
+    task carries no creation stamp (nothing is claimed either way). A rule's
+    slot before the first real one is no occurrence: a review made in
+    September whose rule says "the last day of the year" never ran the
+    December before."""
+    born = local_date((task or {}).get("createdTime"))
+    return bool(born and day and day < born)
+
+
+def missed_occurrence(task, done_days=(), today=None):
+    """The occurrence this series skipped WITHOUT being finished, or None.
+
+    Vex 2026-10-02: he dragged the monthly and quarterly reviews in the
+    calendar two days after their day. TickTick took that as "only this
+    occurrence": a dated copy without the tree, and the SERIES rolled on to
+    31 Oct and 31 Dec with 30 Sep never completed. The ⌃ Start guard then
+    read "ahead" and only offered the NEXT one, whose Finish would have eaten
+    October's review and whose journal would have filed into October's note.
+
+    Missed = the series is ahead of today, the rule's previous occurrence
+    lies before today, the task already existed by then, and no completion
+    record falls on or after that day (a late Finish a day or two after the
+    occurrence resolves it too: completing is what rolls the series). The
+    records come from the completed feed and the Finish road's own snapshot
+    (finished_days); when they are stale the row is still only an OFFER, the
+    verb re-reads live and Vex decides. Pure: today is the 04:00 day."""
+    task = task or {}
+    if task.get("status") not in (None, 0) or not task.get("repeatFlag"):
+        return None
+    if today is None:
+        import dayroll
+        today = dayroll.today()
+    st = due_state(task, today)
+    prev = st["prev"]
+    if st["state"] != "ahead" or not prev or prev >= today:
+        return None
+    if before_birth(task, prev):
+        return None
+    if any(d >= prev for d in (done_days or ()) if d):
+        return None
+    return prev
+
+
+def shift_iso_days(iso, days):
+    """A TickTick timestamp moved by whole days with its CLOCK kept as it is
+    stored ('2026-10-31T06:00:00.000+0000', -31 -> '2026-09-30T06:00:00.000+0000').
+    This is what TickTick itself does when a series rolls across a DST edge
+    (probe 2026-10-02: 30 Sep 06:00 UTC became 31 Oct 06:00 UTC), so moving
+    a series BACK the same way lands on the hours the occurrence had."""
+    if not iso or not isinstance(iso, str):
+        return None
+    m = _re.match(r"^(\d{4}-\d{2}-\d{2})(T.*)$", iso)
+    if not m:
+        return None
+    try:
+        day = _dt.date.fromisoformat(m.group(1)) + _dt.timedelta(days=int(days))
+    except (ValueError, TypeError):
+        return None
+    return f"{day.isoformat()}{m.group(2)}"
+
+
 REVIEW_SLOTS = ("weekly", "monthly", "quarterly", "yearly")
 
 
