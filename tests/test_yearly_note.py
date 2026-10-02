@@ -183,7 +183,10 @@ else:
 
     # ── 4. the filler ───────────────────────────────────────────────────────────
     y1 = fresh("yearly")
+    _ds1 = pe._day_sums
+    pe._day_sums = lambda index: {}        # a CRM that can be read and holds nothing (None = unreadable, writes nothing)
     pe._fill_yearly(y1, Y, idx)
+    pe._day_sums = _ds1
     head = ps.find_prefix(y1, pm.SEC_COMPLETED, pm.SEC_WK_STATS).name
     check("4.a partial year says so", head == "Completed: 680 · 1 of 4 quarters", head)
     check("4.and draws no chip", "▲" not in head and "▼" not in head, head)
@@ -196,7 +199,7 @@ else:
     tl = ps.find(y1, pm.SEC_TOP_LIST, pm.SEC_WK_STATS).body
     check("4.top lists come off the quarters", any("📌CTA" in l and "92 done" in l for l in tl), tl)
     inc = ps.find_prefix(y1, pm.SEC_INCOME, pm.SEC_WK_DATA)
-    check("4.income says 'no notes' where there are none", any("no notes" in l for l in inc.body), inc.body)
+    check("4.income says 'no sessions' where the CRM has none", any("no sessions" in l for l in inc.body), inc.body)
     check("4.income lines are labelled by quarter", any("Q1 · Jan-Mar" in l for l in inc.body), inc.body)
     check("4.the journal is seeded", any(pm.JOURNAL_Q_RE.match(l) for l in ps.find(y1, pm.SEC_YR_JNL).body))
     # a quarter whose note exists but has no numbers is a different fact

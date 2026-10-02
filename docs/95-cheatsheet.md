@@ -38,7 +38,7 @@ All 35 are defaults - remap any of them in Configure Workflow. Hotkey nodes ship
 | `tyn` | Open this year's note | [Periodic notes](48-periodic.md) |
 | `tmj` | Morning journal | [Periodic notes](48-periodic.md) |
 | `tej` | Evening journal | [Periodic notes](48-periodic.md) |
-| `tmo` | Log income | [Periodic notes](48-periodic.md) |
+| `tmo` | Opens CRM > 💰 Money (money is logged there, as sessions) | [Periodic notes](48-periodic.md#money---from-the-crm) |
 | `tdg` | Set today's one thing | [Periodic notes](48-periodic.md) |
 | `tde` | Log an entry to today | [Periodic notes](48-periodic.md) |
 | `tat` | Schedule a task today | [Periodic notes](48-periodic.md) |

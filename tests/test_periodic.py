@@ -192,8 +192,9 @@ else:
           # after bridge"), ahead of tgoal because tgoal hands off to the picker
           # (Vex 2026-09-24: the forecast check after the goal, money and rating
           # before "What is on your mind?", which is now the LAST set prompt)
+          # (money left the journal on 2026-10-02: the day's money is the CRM's)
           [k for k, _q in fixed_e] == ["bridge", "dhighlight", "tgoal", "goal",
-                                       "fcheck", "money", "rating", "free"]
+                                       "fcheck", "rating", "free"]
           and "Ship the thing" in fixed_e[3][1], [k for k, _q in fixed_e])
     check("14.the-two-highlights-never-cross",
           # the day's and the week's are different answers in different notes
@@ -504,45 +505,8 @@ else:
     check("19c.past-day-crosses-the-year",
           pm.past_day("30", date(2026, 1, 5)) == date(2025, 12, 30))
 
-    # ── 19d. the money answer grammar (2026-09-17: it was losing data) ───────────
-    # A day's money IS the evening journal's answer, so both doors write this one
-    # line and neither may destroy what the other, or a human, put there.
-    check("19d.money-keeps-the-sentence",
-          pm.split_money_answer("500 for the sleeve, 2 sessions")
-          == (500.0, ["500 for the sleeve, 2 sessions"]),
-          pm.split_money_answer("500 for the sleeve, 2 sessions"))
-    check("19d.money-canonical-still-splits",
-          pm.split_money_answer("485 · tattoo, deposit") == (485.0, ["tattoo", "deposit"]))
-    check("19d.money-bare-number-has-no-label",
-          pm.split_money_answer("0") == (0.0, [])
-          and pm.split_money_answer("-50") == (-50.0, []))
-    check("19d.money-amount-is-never-a-label",
-          # "cash - 200" used to read as (200, ['200']) and re-emit its own amount
-          pm.split_money_answer("cash - 200") == (200.0, ["cash - 200"]),
-          pm.split_money_answer("cash - 200"))
-    check("19d.money-refund-keeps-its-sign",
-          pm.parse_money_answer("-50") == -50.0
-          and pm.parse_money_answer("−5") == -5.0, "a refund read back as income")
-    check("19d.money-unescapes-the-app",
-          pm.parse_money_answer("1250\\.50") == 1250.5,
-          pm.parse_money_answer("1250\\.50"))
-    check("19d.money-bump-keeps-prose",
-          pm.money_answer_update("500 for the sleeve, 2 sessions", 100, "deposit")[0]
-          == "600 · 500 for the sleeve, 2 sessions, deposit")
-    check("19d.money-bump-canonical",
-          pm.money_answer_update("100 · tattoo", 100, "deposit")[0] == "200 · tattoo, deposit")
-    check("19d.money-bump-from-nothing",
-          pm.money_answer_update("", 100, "deposit") == ("100 · deposit", None))
-    check("19d.money-replace",
-          pm.money_answer_update("100 · tattoo", 485, "client", replace=True)
-          == ("485 · client", 100.0))
-    _acc = ""
-    for _amt, _lab in [(100, "a"), (200, "b"), (50, "c"), (25, "a"), (10, "")]:
-        _acc, _ = pm.money_answer_update(_acc, _amt, _lab)
-    check("19d.money-labels-do-not-pile-up", _acc == "385 · a, b, c", _acc)
-    check("19d.money-label-cap",
-          pm.money_answer_line(1, [f"l{i}" for i in range(20)]).count(",")
-          == pm.MONEY_LABEL_CAP - 1)
+    # 19d (the money answer grammar) retired 2026-10-02 with the evening
+    # journal's money question: a day's money is the CRM's (crm_money.py)
     check("19.goal-titles", pm.goal_titles(
         ["- [ ] [Ship](https://x)", "- plain goal", "_(pending)_", ""])
         == ["Ship", "plain goal"])

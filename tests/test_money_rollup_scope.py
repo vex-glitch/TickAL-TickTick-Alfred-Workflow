@@ -70,6 +70,9 @@ else:
             print("  FAIL", n, d)
 
     MINE = ["- 🟢 Ana, deposit · 120", "- 🟢 Flash sheet · 50"]
+    # the roll-up's source is the CRM (2026-10-02): the day holds 170 there
+    import crm_money                    # noqa: E402
+    crm_money.day_sums = lambda start=None, end=None: {date(2026, 9, 15): 170.0}
 
     def note(kind, day, body):
         p = pm.period_for(kind, day)
@@ -86,7 +89,7 @@ else:
     day = note("daily", date(2026, 9, 15), ["C", "---", "### 💰 Money"] + MINE + ["\t\t- **Total = 170**", ""])
     idx = index_of(day)
     sums = pe._day_sums(idx)
-    check("the fixture is a day with money in it", any(v for v in sums.values()), sums)
+    check("the CRM holds the day's money", sums == {date(2026, 9, 15): 170.0}, sums)
     for kind, d in (("daily", date(2026, 9, 15)), ("weekly", date(2026, 9, 15))):
         p = pm.period_for(kind, d)
         doc = ps.parse_sections("\n".join(["C", "---", "### 💰 Money"] + MINE + [""]))

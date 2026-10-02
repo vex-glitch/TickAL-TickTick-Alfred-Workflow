@@ -231,14 +231,17 @@ else:
                                       {"breadcrumbs": "C", "weeklinks": "- x"})}
     qdoc3 = ps.parse_sections(pm.render_template(
         pe._load_template("quarterly"), {"breadcrumbs": "C", "monthlinks": "- x"}))
+    _ds3 = pe._day_sums
+    pe._day_sums = lambda index: {}        # a CRM that can be read and holds nothing (None = unreadable, writes nothing)
     pe._fill_quarterly(qdoc3, Q3, noneidx)
+    pe._day_sums = _ds3
     bars3 = ps.find(qdoc3, pm.SEC_QBARS, pm.SEC_WK_STATS).body
     check("a note with no numbers is not a missing note",
           any("M1 · July · no numbers" in l for l in bars3), bars3)
-    # money never invents a zero for a span with no daily notes
+    # money never invents a zero for a span the CRM holds nothing for
     inc = ps.find_prefix(qdoc3, pm.SEC_INCOME, pm.SEC_WK_DATA)
-    check("income says 'no notes' where there are none",
-          any("no notes" in l for l in inc.body), inc.body)
+    check("income says 'no sessions' where the CRM has none",
+          any("no sessions" in l for l in inc.body), inc.body)
     # the layout guard
     oldq = ps.parse_sections("C\n---\n##### 🎯 OKR review\n_(score)_\n"
                              "##### 📈 Stats\n_(pending)_\n")

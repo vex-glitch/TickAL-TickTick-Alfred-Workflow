@@ -205,9 +205,10 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     never overwritten by IP guessing)
     xact:pn_entry:<b64|plain>       📓 entry into today's daily ({"kind","text"}
                                     or plain "w Shipped it"; kinds w/n/t/r/k/l/m)
-    xact:pn_income:<b64|plain>      💰 sums into the evening journal's money
-                                    answer (plain "485 label"; legacy notes
-                                    with a 💰 section keep using it)
+    xact:pn_income[:<anything>]     💰 since 2026-10-02 money is the CRM's:
+                                    says so and opens CRM > 💰 Money (kept
+                                    for any stale arg; the `pn $` row and
+                                    the tmo keyword fire xact:crmbrowse)
     xact:pn_journal:<slot>[@<date>] morning|evening|weekly|monthly|
                                    quarterly|yearly - dialog per
                                     unanswered prompt, partial-save,
@@ -7717,11 +7718,11 @@ def pn_backlog(rest):
     """📋 Backlog - fill ONE journal answer in on ANY day (Vex 2026-09-17:
     "Make it one machinery, put it under Backlog in entries row").
 
-    Money, ✨ the day's highlight, 😊 mood and ★ the day rating are all one
-    answer on one day, so they share this verb and the screen that fires it.
-    Money keeps its own summing rule; the rest are single answers, so a
-    write there replaces, and the row that fired it has already shown Vex
-    what it is replacing.
+    ✨ the day's highlight, 😊 mood and ★ the day rating are each one answer
+    on one day, so they share this verb and the screen that fires it. A
+    write replaces, and the row that fired it has already shown Vex what it
+    is replacing. Money left this road on 2026-10-02: a day's money is the
+    CRM's session charges (src/crm_money.py), nothing is typed into a note.
     """
     if not _pn_gate():
         return
@@ -7733,10 +7734,7 @@ def pn_backlog(rest):
         day = None
     kind = (spec.get("kind") or "").lower()
     pe = _pn()
-    if kind == "$":
-        msg = pe.append_income(spec.get("amount") or 0, spec.get("label") or "",
-                               day=day, replace=bool(spec.get("replace")))
-    elif kind == "m":
+    if kind == "m":
         msg = pe.set_day_mood(int(spec.get("score") or 3),
                               spec.get("note") or "", day=day)
     elif kind == "r":
@@ -7756,42 +7754,13 @@ def pn_backlog(rest):
 
 
 def pn_income(rest):
-    if not _pn_gate():
-        return
-    spec = _pn_decode(rest)
-    if spec is None:
-        raw = rest.strip()
-        if not raw:
-            raw = _ask("Amount · label  (e.g. 485 groceries)") or ""
-            if not raw.strip():
-                print("💰 Nothing logged")
-                return
-        import periodic_model as pm
-        head, _, tail = raw.strip().partition(" ")
-        amt = pm.parse_amount(head)
-        if amt is None:
-            print("💰 Amount first · e.g. 485 groceries")
-            return
-        spec = {"amount": amt, "label": tail.strip()}
-    # `day` makes it retrospective (Vex 2026-09-17). append_income has taken a
-    # day since it was written; nothing ever passed one, so the verb could
-    # only reach today. An unparseable day falls back to today rather than
-    # refusing - the rows always send an ISO string.
-    day = None
-    if spec.get("day"):
-        import datetime as _dt
-        try:
-            day = _dt.date.fromisoformat(str(spec["day"]))
-        except ValueError:
-            day = None
-    msg = _pn().append_income(spec.get("amount") or 0, spec.get("label") or "",
-                              day=day, replace=bool(spec.get("replace")))
-    print(msg)
-    # The add-to-today route discards stdout - banner or the log is silent.
-    try:
-        _notify_banner(msg)
-    except Exception:
-        pass
+    """Since 2026-10-02 a day's money is the CRM's session charges
+    (src/crm_money.py), so this verb writes nothing: it says so and opens
+    CRM > 💰 Money through the BrowseCtx trampoline (clean bar). The `pn $`
+    row and the `tmo` keyword fire xact:crmbrowse:ctx:crmmoney directly;
+    this stays for any stale pn_income arg. The argument is ignored."""
+    print("💰 Money is the CRM's · opening 💰 Money")
+    crmbrowse("ctx:crmmoney")
 
 
 # Every journal run leaves its trail here, beside the link log (Vex
@@ -7961,8 +7930,8 @@ def _before_day_rollover(now=None):
 
 def pn_journal(slot):
     """Dialog run over UNANSWERED prompts. Fixed prompts ROUTE -
-    mood → 💬 Mood line, money → 💰 entry, rating → 💬 Day ★, highlight →
-    ✨ section - and the goal questions hand off to the ☀️ goal picker
+    mood → 💬 Mood line, rating → 💬 Day ★, highlight → ✨ section - and
+    the goal questions hand off to the ☀️ goal picker
     (Vex 2026-09-15): the evening's 🎯 tomorrow question and the morning's
     ☀️ check stop the dialogs, open the picker aimed at that day, and the pick
     answers the question and reopens this journal (goal_handoff). The weekly
@@ -8047,6 +8016,11 @@ def pn_journal(slot):
 
     for n, q in open_pairs:
         key = keys.get(n, "free")
+        if key in pm.RETIRED_KEYS:
+            # a question nobody asks any more (the money question, 2026-10-02):
+            # the seed drops it unanswered; a copy saved mid-run can still
+            # carry one, so it is passed over here too
+            continue
         if key == "tgoal":
             handoff = "set"
             break
@@ -8067,12 +8041,12 @@ def pn_journal(slot):
                 break
             cancelled = True           # Cancel / Esc on the goal check
             break
-        # mood / money / rating are parsed out of ONE short line; the rest
-        # are prose, and prose gets the big box (Vex 2026-09-16).
+        # mood / rating are parsed out of ONE short line; the rest are
+        # prose, and prose gets the big box (Vex 2026-09-16).
         t0 = time.time()
         recap = _recap(q) if key == "free" else ""
         a = _ask(q, title=f"{label} journal · {n}/{total}",
-                 multiline=key not in ("mood", "money", "rating", "wrating"),
+                 multiline=key not in ("mood", "rating", "wrating"),
                  detail=recap)
         outcome = "cancel" if a is None else ("skip" if not a.strip() else "answered")
         _jlog(tag, f"q{n}/{total} {key} -> {outcome} {time.time() - t0:.0f}s{_ask_trail()}"
@@ -8092,15 +8066,6 @@ def pn_journal(slot):
                 note = (m.group(2) or "").strip()
                 routed.append(pe.set_day_mood(int(m.group(1)), note, day=day0))
                 a = pm.mood_text(int(m.group(1)), note)       # echo "🙂 note"
-        elif key == "money":
-            # the ANSWER is the record now; append_income only still runs for
-            # a note that carries a 💰 section (pre-2026-09-12 layouts)
-            import periodic_model as pm
-            import periodic_sections as _ps
-            head, _, tail = a.partition(" ")
-            amt = pm.parse_amount(head)
-            if amt is not None and pe._daily_has_money(day0):
-                routed.append(pe.append_income(amt, tail.strip(), day=day0))
         elif key == "rating":
             m = _re.match(r"^([1-5])(?!\d)", a)
             if m:
@@ -8120,7 +8085,7 @@ def pn_journal(slot):
         elif key == "highlight":
             # the ANSWER is the record now (Vex's 2026-09-17 layout has no
             # ✨ section); set_highlight only still runs for a note that
-            # carries one, exactly like append_income and 💰 above. Calling it
+            # carries one, exactly like the ✨ tier rule above. Calling it
             # unconditionally would write this answer a second time, and the
             # merge below would then see the question as already answered and
             # under-report "saved N/M".

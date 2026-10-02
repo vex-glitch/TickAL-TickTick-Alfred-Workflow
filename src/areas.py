@@ -71,14 +71,36 @@ BOOKING_TAGS       = set(_BOOK)
 # Every CRM-scoped picker offers ONLY these.
 CRM_TAGS           = BOOKING_TAGS | {PREPARE_TAG}
 
+_CFG_COPY = None
+
+
+def _env_or_cfg(key):
+    """A Configure-panel field: the env var under Alfred, config.json's copy
+    under launchd (the 04:30 periodic agent runs with NO Alfred environment;
+    periodic_engine._persist_id mirrors these fields there on every
+    interactive refresh, the way periodic_list_id has always travelled).
+    A field PRESENT but blank under Alfred is OFF and wins over the copy.
+    Review 2026-10-02: without this the agent could not see the CRM, and
+    sealed every closing week's and month's income at 0."""
+    global _CFG_COPY
+    if key in os.environ:
+        return os.environ.get(key) or ""
+    if _CFG_COPY is None:
+        try:
+            _CFG_COPY = cfg.load() or {}
+        except Exception:
+            _CFG_COPY = {}
+    return str(_CFG_COPY.get(key) or "")
+
+
 # ── CRM Records (per-customer notes + per-tattoo logbooks) ───────────────────
-RECORDS_ID         = os.environ.get("crm_records_list_id") or ""  # 🗂️CRM • Records-style list
+RECORDS_ID         = _env_or_cfg("crm_records_list_id")  # 🗂️CRM • Records-style list
 RECORDS_LIST_NAME  = "🗂️CRM • Records"   # display fallback - live name via records_list_name()
 # Four roles: customer notes / active logbooks / leads (unscheduled
 # potential customers - a lead note converts to customer on its first
 # booking) / finished logbooks. Configure field crm_records_tags.
 _REC_DEFAULTS      = ["🔥customer", "🔥logbook", "🔥lead", "🔥archive"]
-_rec               = _split_tags(os.environ.get("crm_records_tags")) or _REC_DEFAULTS
+_rec               = _split_tags(_env_or_cfg("crm_records_tags")) or _REC_DEFAULTS
 CUSTOMER_TAG       = _role(_rec, "customer", "client") or _rec[0]
 LOGBOOK_TAG        = _role(_rec, "logbook", "book") \
     or (_rec[1] if len(_rec) > 1 else _REC_DEFAULTS[1])
@@ -333,7 +355,7 @@ def build_action(mode, pid, tid, title):
 # whose photos carry no capture date). The per-year "🗄 <year> ·
 # Logbooks" lists of the big-rock migration (2026-09-07) are LEGACY:
 # still read (a note left there stays visible) but never written.
-ARCHIVE_ID         = os.environ.get("crm_archive_list_id") or ""
+ARCHIVE_ID         = _env_or_cfg("crm_archive_list_id")
 ARCHIVE_LIST_NAME  = "📦CRM Archive"
 ARCHIVE_PARENT_TAG = (os.environ.get("crm_archive_parent_tag")
                       or "📦crmarchive").strip().lower()

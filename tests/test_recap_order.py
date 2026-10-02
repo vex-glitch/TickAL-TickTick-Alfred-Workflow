@@ -54,8 +54,12 @@ else:
 
 
     # ── stub every source; only the assembly is under test ──────────────────────
-    ANSWERS = {"rate the day": "4", "money did you earn": "200"}
+    ANSWERS = {"rate the day": "4"}
     pe._answer_in = lambda doc, sec, needle: ANSWERS.get(needle, "")
+    # money is the CRM's for the day (2026-10-02), read by date
+    MONEY = {date(2026, 9, 12): 200.0, date(2026, 9, 11): 150.0}
+    pe._day_money = lambda d: MONEY.get(d)
+    pe._money_known = lambda: True
     pe._mood_of_doc = lambda doc: (4, "good")
     pe._completed_tops = lambda d: ["one", "two", "three"]
     pe._people_logged = lambda d: [("Nesko", "asked for 700"), ("Ivona", "")]
@@ -80,11 +84,13 @@ else:
     check("a-person-with-no-text-still-shows",
           any(ln == pm.T2 + "\t- Ivona" for ln in lines), repr(lines))
 
-    # every source empty → no line at all, never an empty heading
+    # every source empty → no line at all, never an empty heading (the CRM
+    # readable but holding nothing for the day: no Money line without a note)
     pe._completed_tops = lambda d: None
     pe._people_logged = lambda d: []
     pe._answer_in = lambda doc, sec, needle: ""
     pe._mood_of_doc = lambda doc: None
+    pe._day_money = lambda d: None
     bare = pe._recap_lines(DAY, None, None, pm.T2)
     check("honest-absence", bare == [], repr(bare))
 
@@ -95,10 +101,12 @@ else:
           _labels(one) == ["Entries", "Completed"], _labels(one))
 
     # Money is ALWAYS a line (Vex 2026-09-13: "Money was not in the summary"):
-    # 0 until the evening journal answers, and still in its slot after Mood
+    # 0 until a session is logged in the CRM that day, still in its slot after Mood
     pe._completed_tops = lambda d: ["x"]
     pe._people_logged = lambda d: []
     pe._answer_in = lambda doc, sec, needle: ""
+    pe._day_money = lambda d: None
+    pe._money_known = lambda: True
     pe._mood_of_doc = lambda doc: (4, "bad thoughts")
     import periodic_sections as ps  # noqa: E402
     unans = pe._recap_lines(DAY, None, ps.parse_sections(""), pm.T2)

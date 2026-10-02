@@ -251,10 +251,9 @@ def goal_line(text="", pid=None, tid=None, title=None):
 # `### <anchor>…` header line in the shipped template (prefix anchors seed
 # bare, the engine appends `: data` on refresh).
 WRITER_ANCHORS = {
-    # no SEC_MONEY: the day's money is the EVENING JOURNAL's answer, and the
-    # summary reflects it (Vex 2026-09-12 - "it is an answer in the evening
-    # journal, that is all that should be there"). Older notes that still
-    # carry a 💰 section are still read, they just are not seeded any more.
+    # no SEC_MONEY: the day's money is the CRM's (src/crm_money.py, Vex
+    # 2026-10-02), shown by the summary's Money line. Older notes that still
+    # carry a 💰 section keep it as his history; nothing seeds or reads one.
     "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
                   SEC_YESTERDAY, SEC_YBRIDGE, SEC_HIGHLIGHT, SEC_TODAY,
                   SEC_TOMORROW, SEC_MORNING, SEC_NOTES, SEC_EVENING,
@@ -958,80 +957,6 @@ def fmt_amount(x):
     return str(int(x)) if float(x) == int(x) else f"{x:.2f}"
 
 
-# A journal money ANSWER is hand-typed prose, so only the FIRST number counts.
-# parse_amount scrapes every digit in the string, which reads "500 for the
-# sleeve, 2 sessions" as 5002 - fine for the canonical "- 485 · label" entry
-# lines it was built for, wrong for a sentence.
-# The sign is INSIDE the group: parse_amount reads a leading "-" off the raw
-# string, so leaving it outside made a refund read back as income (found
-# 2026-09-17: "-50" parsed as 50, and a bump then ADDED it).
-MONEY_ANSWER_RE = re.compile(r"(?<![\w.,])([-−]?\d[\d.,]*)")
-MONEY_SEPS = (" · ", " - ", " • ")
-MONEY_LABEL_CAP = 6
-
-
-def parse_money_answer(text):
-    """Evening-journal money answer → amount | None (first number wins).
-
-    Unescaped first: the TickTick app saves "1250\\.50", and reading that
-    without unescaping dropped the decimals."""
-    m = MONEY_ANSWER_RE.search(unescape_md(text or ""))
-    return parse_amount(m.group(1)) if m else None
-
-
-def money_answer_line(total, labels):
-    """The canonical shape the 💰 verb writes back into that answer: the
-    running total, then what it was for. Labels are de-duplicated (case
-    blind) and capped - a bump appended unconditionally, so five entries for
-    the same client listed it five times."""
-    seen, out = set(), []
-    for l in labels or []:
-        l = " ".join((l or "").split())
-        if l and l.casefold() not in seen:
-            seen.add(l.casefold())
-            out.append(l)
-    tail = ", ".join(out[:MONEY_LABEL_CAP])
-    return fmt_amount(total) + (f" · {tail}" if tail else "")
-
-
-def split_money_answer(text):
-    """An answer → (amount|None, [labels]).
-
-    The canonical "485 · tattoo, deposit" splits on its separator. ANYTHING
-    ELSE is a sentence a human typed, and it is kept WHOLE as a single label
-    rather than thrown away: bumping "500 for the sleeve, 2 sessions" used to
-    rewrite it as "600 · deposit" and the sentence was simply gone
-    (2026-09-17). Keeping the original whole is mildly redundant - its number
-    appears twice - and that is the right trade against losing what he wrote.
-    """
-    raw = unescape_md(text or "")
-    amt = parse_money_answer(raw)
-    if amt is None:
-        rest = " ".join(raw.split())
-        return None, ([rest] if rest else [])
-    m = MONEY_ANSWER_RE.search(raw)
-    tail = raw[m.end():]
-    for sep in MONEY_SEPS:
-        if tail.startswith(sep):
-            return amt, [x.strip() for x in tail[len(sep):].split(",") if x.strip()]
-    rest = " ".join(raw.split())
-    # an answer that is ONLY the number carries no words to keep, and listing
-    # "0" or "-50" as its own label is noise
-    return amt, ([rest] if rest and rest != m.group(1).strip() else [])
-
-
-def money_answer_update(prev, amount, label="", replace=False):
-    """(new answer text, the amount it had before).
-
-    ONE rule for both doors into a day's money - the 💰 row and the evening
-    journal write the same line, so they cannot drift. `replace` swaps the
-    number for the new one; the default sums into it and keeps the labels.
-    """
-    had, labels = split_money_answer(prev)
-    if replace:
-        return money_answer_line(amount, [label]), had
-    return money_answer_line((had or 0) + amount, list(labels) + [label]), had
-
 
 def parse_money_entry(line):
     """Daily-money entry → (amount, label) | None. Canonical '- 485 · label';
@@ -1310,7 +1235,7 @@ def past_day(token, today=None):
     one from three letters up · "-2" / "2d" / "2 days ago" · a day of the
     month 1-31 (this month, or last month when that day has not come round
     yet) · an ISO date. Anything else, or any day in the FUTURE, is None -
-    there is no money in a day you have not had.
+    there is nothing to fill in for a day you have not had.
     """
     today = today or _dayroll_today()
     t = " ".join((token or "").split()).casefold().lstrip("*@").strip()
@@ -1810,9 +1735,9 @@ JOURNAL_A_RE = re.compile(r"^(?P<ws>\s*)(?P<dash>- )?(?P<ital>\*?)A: ?(?P<a>.*?)
 
 
 # Fixed journal prompts - code-owned because they ROUTE: each key
-# tells the merge step where the answer lands (mood → 💬 Mood line, money →
-# 💰 entry, rating → 💬 Day line, highlight → ✨ section). ctx carries the
-# live day-goal / weekly-goals text baked into the prompt.
+# tells the merge step where the answer lands (mood → 💬 Mood line, rating →
+# 💬 Day line, highlight → ✨ section). ctx carries the live day-goal /
+# weekly-goals text baked into the prompt.
 JOURNAL_RANDOM_K = {"morning": 3, "evening": 5, "weekly": 5,
                     "monthly": 5, "quarterly": 5, "yearly": 5}   # the legacy draw: a plain {'random'} dict, or a date before a tier's epoch
 
@@ -1934,8 +1859,11 @@ def journal_fixed(slot, ctx=None):
         out.append(("fcheck", f"🔮 How did the day go compared to your morning forecast: {fc}?"
                               if fc else
                               "🔮 How did the day go compared to what you expected this morning?"))
+        # no money question (Vex 2026-10-02): the day's money is the CRM's,
+        # read by the summary and every roll-up (src/crm_money.py); the
+        # "money" rule below stays so the question in older notes still
+        # keys, and _refresh_fixed_q drops it where it was never answered
         out += [
-            ("money", "How much money did you earn today?"),
             ("rating", "Rate the day, 1-5 stars"),
             # the border: last set prompt, the random block follows
             ("free", "What is on your mind?"),
@@ -2636,6 +2564,12 @@ def fill_person(text, name):
 _MDLINK_RE = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _LATE_CHIP_RE = re.compile(r"\s*🔴\s*\d+d\b")
 _PLAN_GLYPHS = {"🔑", "✅", "🥅", "🏔"}          # okr_notes' item glyphs, VS16 dropped
+# Questions the journals no longer ask. The rule that recognises them stays
+# (an answered one in an old note is history and keys like any other), and
+# _refresh_fixed_q removes an UNANSWERED one from a note on its next seed,
+# so tonight's note does not carry a blank question nobody will answer.
+RETIRED_KEYS = ("money",)
+
 # fixed questions that only exist while the note plans something: dropped
 # again while unanswered when the plan goes (periodic_engine._refresh_fixed_q)
 CONDITIONAL_KEYS = ("kr", "objectives", "habits", "mobjectives", "qcheck", "mmoney",

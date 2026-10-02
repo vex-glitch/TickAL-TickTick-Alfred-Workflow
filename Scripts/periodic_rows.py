@@ -3,7 +3,8 @@
 
 Imported by everything_search.py AFTER its bootstrap, so src/ is already on
 sys.path. Renders: the idle action rows and the submodes - `+` entry (with
-the 😢-😁 mood faces), `$` income, `goal` / `day` task pickers, `today` /
+the 😢-😁 mood faces), `$` (the pointer to CRM > 💰 Money), `goal` / `day`
+task pickers, `today` /
 `tmrw` schedule pickers (two-screen: pick → add-or-time). All state rides
 the query - no handshake files; ⏎ always fires an xact: arg (the only shape
 search-⏎ forwards to a script). Subtitles stay plain: no syntax in
@@ -43,8 +44,11 @@ def _mods(sticky_spec=None):
     # an explicit entry the row's DEFAULT xact: arg would ride it into pbcopy.
     # ⌃ is NOT dead: the wired ⌃ edge is the universal 🔙 back-to-main-menu
     # (every other search row gets it via _output_backstamped).
+    # cmd+shift (→ the empty New Task bar) and ctrl+cmd (→ modOpen) are the
+    # search SF's two other live edges (review 2026-10-02): dead here too
     m = {k: dict(_DEAD)
-         for k in ("cmd", "shift", "alt", "alt+shift", "alt+cmd", "ctrl+alt")}
+         for k in ("cmd", "shift", "alt", "alt+shift", "alt+cmd", "ctrl+alt",
+                   "cmd+shift", "ctrl+cmd")}
     m["ctrl"] = {"valid": True, "arg": "", "subtitle": "🔙 Main menu"}
     if sticky_spec:
         m["ctrl+shift"] = {"valid": True,
@@ -169,13 +173,15 @@ def idle_rows(frag):
     return items
 
 
-# 😊 Mood and 💰 Income are gone from here: both are evening/morning journal
-# ANSWERS, and a second door to the same answer is a second place to look
-# (Vex 2026-09-12). ⭐️ Highlight moved IN, because it writes too.
+# 😊 Mood is gone from here: a morning journal ANSWER, and a second door to
+# the same answer is a second place to look (Vex 2026-09-12). ⭐️ Highlight
+# moved IN, because it writes too. 💰 Money left on 2026-10-02: the day's
+# money is the CRM's session charges, nothing is typed into a note any more
+# (`$` and the `tmo` keyword still answer, with one row that opens the CRM).
 _KIND_LEGEND = [
     ("w", "🟢 Win"), ("n", "🔴 Nag"), ("t", "💭 Thought"),
     ("r", "❗️ Reminder"), ("l", "🔗 Link"), ("k", "☑️ Task"),
-    ("h", "⭐️ Highlight"), ("$", "💰 Money"), ("b", "📋 Backlog"),
+    ("h", "⭐️ Highlight"), ("b", "📋 Backlog"),
 ]
 _KINDS = {"w": "win", "n": "nag", "t": "thought", "r": "reminder",
           "l": "link"}
@@ -187,12 +193,8 @@ _LEGEND_SUBS = {"w": "Something went well", "n": "Something nagged you",
                 "l": "Clipboard is the link, you name it",
                 "k": "Put a task on today or tomorrow",
                 "h": "The one thing this week is remembered for",
-                "$": "Money you made, any day this week",
                 "b": "Fill in a day you missed"}
-# k, h, $ and b own a whole screen rather than one text row. Money is in the
-# legend because Vex asked for it back "under entries row" (2026-09-17) and the
-# `pn $ ` keyword caller still exists; both roads enter the SAME machine, one
-# step apart, so there is one money screen and not two doors onto one answer.
+# k, h and b own a whole screen rather than one text row.
 
 
 def entry_rows(rest):
@@ -211,8 +213,8 @@ def entry_rows(rest):
         return task_rows(tail.strip())
     if letter == "h":
         return highlight_rows(tail.strip())
-    if letter == "$":                     # 💰 straight into the machine
-        return income_rows(tail.strip())
+    if letter.startswith("$"):            # 💰 the CRM's, not a note's ("$485" too:
+        return money_rows()               # a thought called "$485" was the last door)
     if letter == "b":                     # 📋 Backlog IS the machine
         return backlog_rows(tail.strip())
     if len(letter) == 1 and letter not in _KINDS:
@@ -260,32 +262,14 @@ def highlight_rows(frag):
         valid=True, mods=_mods())]
 
 
-def _pe():
-    """periodic_engine, loaded ON DEMAND. It pulls in requests through api,
-    and this module renders on every keystroke of the pn scope - only the 💰
-    screen needs the engine, so only the 💰 screen pays for it."""
-    import periodic_engine
-    return periodic_engine
-
-
 _DAY_TOKEN_RE = re.compile(r"(?<!\S)\*(\S+)\s*$")
 _PIN_RE = re.compile(r"^!(\d{4}-\d{2}-\d{2})\b\s*")
 
 
 # A parser returns (shown, payload, typed). `shown` is what a row DISPLAYS,
 # `typed` is what goes back into the bar when a row autocompletes - they are
-# not the same string, and conflating them silently dropped the money label on
-# every round trip through the confirm screen (caught by tests/test_money.py).
-def _parse_money(rest):
-    head, _, tail = rest.partition(" ")
-    amt = pm.parse_amount(head) if head else None
-    if amt is None:
-        return None
-    label = tail.strip()
-    shown = pm.fmt_amount(amt)
-    return shown, {"amount": amt, "label": label}, shown + (f" {label}" if label else "")
-
-
+# not the same string, and conflating them silently dropped part of the
+# answer on every round trip through the confirm screen (2026-09-17).
 def _parse_text(rest):
     rest = " ".join(rest.split())
     return (rest, {"text": rest}, rest) if rest else None
@@ -316,16 +300,13 @@ def _unknown_day_row(msg):
 # "Make it one machinery, put it under Backlog in entries row"). Every one of
 # these is a single JOURNAL ANSWER on a single day, which is why they can share
 # a screen: the strip, the state read and the overwrite guard are identical and
-# only the value differs.
+# only the value differs. Money is not one of them since 2026-10-02: a day's
+# money is the CRM's, logged there as a session.
 BACKLOG_KINDS = (
     {"letter": "h", "emoji": "✨", "label": "Highlight", "key": "dhighlight",
      "slot": "evening", "needle": "highlight of the day",
      "hint": "The day's one thing", "prompt": "Type the highlight…",
      "parse": _parse_text, "bad": "Words, not a number"},
-    {"letter": "$", "emoji": "💰", "label": "Money", "key": "money",
-     "slot": "evening", "needle": "money did you earn", "money": True,
-     "hint": "What you made", "prompt": "Type the amount…",
-     "parse": _parse_money, "bad": "Numbers first"},
     {"letter": "m", "emoji": "😊", "label": "Mood", "key": "mood",
      "slot": "morning", "needle": "mood 1-5",
      "hint": "1 to 5, a note after ·", "prompt": "Type 1 to 5…",
@@ -336,7 +317,6 @@ BACKLOG_KINDS = (
      "parse": _parse_scale, "bad": "1 to 5"},
 )
 _BY_LETTER = {k["letter"]: k for k in BACKLOG_KINDS}
-MONEY = _BY_LETTER["$"]
 
 
 def _pe():
@@ -349,13 +329,9 @@ def _pe():
 
 def _state(cfg, day):
     """(state, shown, raw) for one day, live off the cache. `shown` is for a
-    row, `raw` is the answer as written - the money confirm screen has to test
-    the real text to know whether adding would drop words from it."""
+    row, `raw` is the answer as written."""
     try:
         pe = _pe()
-        if cfg.get("money"):
-            st, amt, txt = pe.day_money_state(day)
-            return st, (pm.fmt_amount(amt) if amt is not None else txt), txt
         st, txt = pe.day_answer_state(day, cfg["slot"], cfg["needle"])
         return st, txt, txt
     except Exception:
@@ -366,10 +342,8 @@ def _week(cfg, today):
     """The week's state for this kind, newest day first. A broken cache costs
     the strip its values, never the screen."""
     try:
-        rows = _pe().week_answer_states(cfg["slot"], cfg["needle"],
-                                        today=today, money=bool(cfg.get("money")))
-        return [(d, st, (pm.fmt_amount(v) if cfg.get("money") and v is not None
-                         else (txt or "")), txt or "") for d, st, v, txt in rows]
+        rows = _pe().week_answer_states(cfg["slot"], cfg["needle"], today=today)
+        return [(d, st, txt or "", txt or "") for d, st, _v, txt in rows]
     except Exception:
         # "unknown", NEVER "unasked": an unreadable cache used to mark every
         # day empty, which made every row a one-keystroke blind overwrite -
@@ -386,36 +360,23 @@ def _arg(cfg, payload, day, replace=False):
 
 
 def _confirm(cfg, day, shown, payload, had, prefix, typed, shown_had=None):
-    """Vex's fail-safe (2026-09-17): "if money is entered already for the day
-    that I am trying to enter it again, it shows entered amount first row,
+    """Vex's fail-safe (2026-09-17): "if it is entered already for the day
+    that I am trying to enter it again, it shows the entered one first row,
     enter confirms or second row to adjust entry."
 
-    What is already there leads. For money ⏎ ADDS to it, because two payments
-    on one day are two payments; for everything else there is only ever one
-    answer, so ⏎ keeps what is there and changing it is the second row. Either
-    way nothing is overwritten that has not been read first.
+    What is already there leads: there is only ever one answer, so ⏎ keeps
+    what is there and changing it is the second row. Nothing is overwritten
+    that has not been read first.
     """
     when = pm.day_label(day)
     shown_had = had if shown_had is None else shown_had
-    rows = []
-    if cfg.get("money"):
-        amt, prev = payload["amount"], pm.parse_money_answer(had)
-        if prev is not None:
-            rows.append(alfred.item(
-                uid="pn-bk-add",
-                title=f"{cfg['emoji']} {when} · {pm.fmt_amount(prev)} + "
-                      f"{pm.fmt_amount(amt)} = {pm.fmt_amount(prev + amt)}",
-                subtitle="⏎ Add it" + ("" if had.strip().startswith(
-                    pm.fmt_amount(prev)) else "  ·  keeps the number, not the words"),
-                arg=_arg(cfg, payload, day), valid=True, mods=_mods()))
-    else:
-        rows.append(alfred.item(
-            uid="pn-bk-keep", title=f"{cfg['emoji']} {when} · {shown_had[:60]}",
-            subtitle="⏎ Leave it", arg="", valid=False, mods=_mods()))
-        # back to the strip WITH what he typed still in the bar: an invalid
-        # Alfred row performs its autocomplete on Return, and a bare prefix
-        # here wiped the answer he was in the middle of filing
-        rows[-1]["autocomplete"] = prefix + typed
+    rows = [alfred.item(
+        uid="pn-bk-keep", title=f"{cfg['emoji']} {when} · {shown_had[:60]}",
+        subtitle="⏎ Leave it", arg="", valid=False, mods=_mods())]
+    # back to the strip WITH what he typed still in the bar: an invalid
+    # Alfred row performs its autocomplete on Return, and a bare prefix
+    # here wiped the answer he was in the middle of filing
+    rows[-1]["autocomplete"] = prefix + typed
     rows.append(alfred.item(
         uid="pn-bk-replace",
         title=f"✏️ {when} · {shown_had[:30]} → {shown[:30]}",
@@ -444,8 +405,7 @@ def _day_row(cfg, day, state, holds, shown, payload, today, prefix, typed=""):
     if shown is None:
         return it
     if state in ("answered", "unknown"):
-        it["subtitle"] = f"{sub}  ·  ⏎ " + ("Add or fix" if cfg.get("money")
-                                            else "Keep or replace")
+        it["subtitle"] = f"{sub}  ·  ⏎ Keep or replace"
         it["autocomplete"] = f"{prefix}!{day.isoformat()} {typed}"
         return it
     it["subtitle"] = f"{sub}  ·  ⏎ Log {shown[:30]}"
@@ -519,11 +479,11 @@ def day_strip_rows(cfg, rest, prefix):
 
 
 def backlog_rows(rest):
-    """`pn + b …` - the 📋 Backlog screen: what are you filling in, and when.
-    The 💰 money road (`pn $`, the `tmo` keyword) enters the same machine one
-    step further in, so there is one screen and not two."""
+    """`pn + b …` - the 📋 Backlog screen: what are you filling in, and when."""
     rest = (rest or "").strip()
     head, _, tail = rest.partition(" ")
+    if head.startswith("$"):              # the old money kind: the CRM's now
+        return money_rows()
     cfg = _BY_LETTER.get(head.lower()) if head else None
     if cfg is not None:
         return day_strip_rows(cfg, tail.strip(), f"pn + b {cfg['letter']} ")
@@ -542,9 +502,15 @@ def backlog_rows(rest):
     return rows
 
 
-def income_rows(rest):
-    """`pn $ …` and the `tmo` keyword: straight into the machine on money."""
-    return day_strip_rows(MONEY, rest, "pn $ ")
+def money_rows():
+    """`pn $` and the `tmo` keyword since 2026-10-02: money is the CRM's, so
+    the road is one row that opens CRM > 💰 Money (xact.crmbrowse, the
+    clean-bar trampoline). Nothing is typed into a note here any more."""
+    return [alfred.item(uid="pn-money", title="💰 Money is the CRM's",
+                        subtitle="⏎ CRM > 💰 Money · log the session there, "
+                                 "the notes follow",
+                        arg="xact:crmbrowse:ctx:crmmoney", valid=True,
+                        mods=_mods())]
 
 
 def _is_bridge(t):
@@ -1219,7 +1185,7 @@ def rows(query):
     if q.startswith("+"):
         return entry_rows(q[1:].lstrip())
     if q.startswith("$"):
-        return income_rows(q[1:].lstrip())
+        return money_rows()
     for prefix, when in (("today", "today"), ("tmrw", "tomorrow"),
                          ("tomorrow", "tomorrow")):
         rest = _after(q, prefix)

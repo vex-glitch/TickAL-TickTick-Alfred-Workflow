@@ -37,7 +37,7 @@ test:
 	@$(PYTHON) tests/test_habits_model.py
 	@$(PYTHON) tests/test_on_this_day.py
 	@$(PYTHON) tests/test_recap_order.py
-	@$(PYTHON) tests/test_money.py
+	@$(PYTHON) tests/test_money_source.py
 	@$(PYTHON) tests/test_weekly_note.py
 	@$(PYTHON) tests/test_monthly_note.py
 	@$(PYTHON) tests/test_quarterly_note.py

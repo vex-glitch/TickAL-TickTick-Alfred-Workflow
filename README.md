@@ -151,7 +151,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 - Logs your mood (😊) and rates the day (★)
 - [Journals](docs/48-periodic.md#journals) ask their questions in prompt dialogs
 - Links goals down the pyramid: a daily one-thing, a weekly goal, next week's goals from the [weekly review](docs/48-periodic.md#the-weekly-note)
-- [Income log](docs/48-periodic.md#money---the-roll-up-pyramid) rolls up from day to year
+- [Money](docs/48-periodic.md#money---from-the-crm) comes from the CRM and rolls up from day to year
 - The [weekly note](docs/48-periodic.md#the-weekly-note) builds its own stats: completed vs last week, top tasks, focus by day, habit streaks
 - [Today section](docs/48-periodic.md#the-daily-note) mirrors real tasks: tick the box in the note and the task completes. 
 - Direct keywords jump straight to any note or action: `tdn` today, `twn` week, `tmj` morning journal, `tat` add to today ([full list](docs/48-periodic.md#direct-keywords))
@@ -237,7 +237,7 @@ Past what TickTick's own quick-add reaches, the same line can:
 | Core     | `tal` main menu · `tse` search · `tad` add · `tup` settings · `tca` calendar                                                   |
 | Views    | `tod` today · `tom` tomorrow · `tne` next 7 days · `tin` inbox · `tsl` smart lists · `tfi` filters · `tta` tags · `tbu` buffer |
 | More     | `tfo` focus · `tur` save browser tab · `tst` statistics · `tcr` crm · `tsy` sync · `tdo` docs                                  |
-| Periodic | `tpn` surface · `tdn`/`twn`/`tmn`/`tqn`/`tyn` day-to-year notes · `tmj`/`tej` journals · `tde` entry · `tmo` income · `tdg` day goal · `tat` add to today |
+| Periodic | `tpn` surface · `tdn`/`twn`/`tmn`/`tqn`/`tyn` day-to-year notes · `tmj`/`tej` journals · `tde` entry · `tmo` money (opens the CRM) · `tdg` day goal · `tat` add to today |
 | Native views | `tha` habits · `tpo` pomodoro · `tmx` matrix (also `tca` calendar · `tst` statistics)                                                               |
 
 All 35 keywords are re-mappable in Configure Workflow. Hotkey nodes ship unbound (Alfred clears hotkey combos on import) - bind your own on the workflow canvas. 

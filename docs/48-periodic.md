@@ -8,7 +8,7 @@ _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-che
 
 ## Why
 
-If you keep periodic notes in Obsidian, you know the concept. Now put them where the tasks already live: everything time-bound in one place, one keyword away - fully automated daily, weekly, monthly, quarterly and yearly notes inside TickTick. The notes feed each other: yearly goals surface in the quarterly, quarterly in the monthly and weekly, weekly in the daily - a pyramid that keeps the big picture in view while you pick the daily work that actually moves the needle. Journals log moods and day ratings. Every note lists the period's scheduled tasks, a recap of the period before, and what is coming. The weekly compares itself to the last one, number by number, so you can watch yourself get 1% better. A daily income log rolls up week → month → quarter → year. Thoughts, wins, nags - logged in seconds, each action one keyword away.
+If you keep periodic notes in Obsidian, you know the concept. Now put them where the tasks already live: everything time-bound in one place, one keyword away - fully automated daily, weekly, monthly, quarterly and yearly notes inside TickTick. The notes feed each other: yearly goals surface in the quarterly, quarterly in the monthly and weekly, weekly in the daily - a pyramid that keeps the big picture in view while you pick the daily work that actually moves the needle. Journals log moods and day ratings. Every note lists the period's scheduled tasks, a recap of the period before, and what is coming. The weekly compares itself to the last one, number by number, so you can watch yourself get 1% better. Your CRM's session charges roll up day → week → month → quarter → year. Thoughts, wins, nags - logged in seconds, each action one keyword away.
 
 Try it tomorrow: `tmj` fills the morning journal, `tdn` opens the daily note. Set the week's goal in the weekly note, pick the day's one thing in the daily - and today's work visibly pushes the week.
 
@@ -45,7 +45,7 @@ Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and sectio
 | Row | Does |
 |-----|------|
 | 💫 Today / ◀ Yesterday / 📆 Week / 🗓 Month / 🧭 Quarter / 📅 Year | ⏎ open instantly (refresh catches up in the background) - **⌃⇧⏎ opens as a [sticky note](44-notes-links-images.md#sticky-notes)**, **⌃⌥⏎ as a [live window](44-notes-links-images.md#live-window)** |
-| ➕ Entry | log a win, nag, thought, link, task, highlight or money - ⏎ shows the kind legend, or type straight: `+ w Shipped the thing` |
+| ➕ Entry | log a win, nag, thought, link, task or highlight - ⏎ shows the kind legend, or type straight: `+ w Shipped the thing` |
 | ☀️ Day goal | pick (or create) today's one thing - pinned + scheduled today |
 | ☀️ Add to today / 🌙 Add to tomorrow | pick any task or note → ⏎ schedules it (type `14:30` for a time) |
 | 🌅 / 🌙 / 📔 Journal | morning, evening, weekly - one macOS dialog per question |
@@ -53,31 +53,19 @@ Type `tdn`. TickTick opens on a freshly minted daily note - head, nav and sectio
 | 🗓️ Week highlight | one thing that stands out - lands in the weekly note's ✨ Highlight (and in the weekly journal's highlight answer when the section is gone) |
 | 🔄 Refresh today | complete ticked boxes + rebuild the generated sections |
 
-Entry kinds, each with a one-letter prefix: 🟢 `w` win · 🔴 `n` nag · 💭 `t` thought (also the default - plain text works) · ❗️ `r` reminder · 🔗 `l` link (empty = clipboard) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · ⭐️ `h` the week's highlight · 💰 `$` money · 📋 `b` [backlog](#-backlog-fill-in-a-day-you-missed). ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
+Entry kinds, each with a one-letter prefix: 🟢 `w` win · 🔴 `n` nag · 💭 `t` thought (also the default - plain text works) · ❗️ `r` reminder · 🔗 `l` link (empty = clipboard) · ☑️ `k` task (creates a real Inbox task, linked into ✅ Today, searchable immediately) · ⭐️ `h` the week's highlight · 📋 `b` [backlog](#-backlog-fill-in-a-day-you-missed). ⏎ on the ➕ Entry row lists the legend; picking a kind autocompletes its prefix, then type the text and ⏎ logs it.
 
 ### 📋 Backlog, fill in a day you missed
 
-Skipped shutdown? `+ b` lists what a day can hold: ✨ its highlight, 💰 money, 😊 mood, ⭐️ the day rating. Pick one, type the value, and the same day strip appears: this week Monday to today, today first, each day showing what it already holds.
+Skipped shutdown? `+ b` lists what a day can hold: ✨ its highlight, 😊 mood, ⭐️ the day rating. Pick one, type the value, and the same day strip appears: this week Monday to today, today first, each day showing what it already holds.
 
 Every one of these is a single answer in that day's journal, so they all ride one screen rather than four. A day you skipped entirely has no questions in it at all yet - they get planted the moment you fill one in, and planting them on an old day gives that day exactly the questions it would have had, nothing of today's.
 
-A day that already has an answer never takes a stray ⏎. It stops on a screen showing what's there: **Keep it** first, **Replace it** as a second row you have to choose. Money is the exception, because two payments in one day are two payments: there the first row **adds**.
+A day that already has an answer never takes a stray ⏎. It stops on a screen showing what's there: **Keep it** first, **Replace it** as a second row you have to choose.
 
 `*mon`, `*yesterday`, `*-2`, `*9` skip the picking. Day words look backwards here - you're filling in a day you have already lived.
 
-The daily note's ✨ line and the weekly's ✨ Highlights, 😊 Moods and 💰 Income all read those same answers, so filling a day in reaches every one of them. You can also just type the answer into the note by hand on your phone: the weekly picks it up on its next refresh either way.
-
-### 💰 Money, any day this week
-
-Money has its own front door, one step further into the same machine. Type the amount, pick the day. `+ $ 485 tattoo` lists this week Monday to today, today first, with what each day already holds, and ⏎ on a day logs it there. So a day you skipped the evening journal on is the same move as today, not a special mode.
-
-A day's money IS the evening journal's money answer for that day, and this row writes that same answer - there is no second record to disagree with it, and the weekly's 💰 Income sums those answers straight back up. A day that already holds a number therefore cannot be overwritten by a stray ⏎: it stops on a screen that shows you what is there, offers **Add it** first, and makes changing the number a second row you have to choose. Whatever you typed in the answer by hand survives being added to.
-
-Skip the picking with a trailing `*mon`, `*yesterday`, `*-2` or `*9` - day words look backwards here, because you are filling in a day you have already lived.
-
-One limit worth knowing: a week that has already closed keeps the numbers it was sealed with. The daily note takes your entry, but that older weekly note will not move - its totals cannot be safely recomputed once the completed-task feed has scrolled past them.
-
-The same moves work from a task's **⌘ Actions** menu: ☀️ Add to today, 🌙 Add to tomorrow, ☀️ Make day goal. The add window's `/` menu has ☀️ Today and 🌙 Tomorrow shortcuts too.
+The daily note's ✨ line and the weekly's ✨ Highlights and 😊 Moods read those same answers, so filling a day in reaches every one of them. You can also just type the answer into the note by hand on your phone: the weekly picks it up on its next refresh either way. Money is not filled in here: it is the CRM's, see [Money](#money---from-the-crm).
 
 ## Direct keywords
 
@@ -89,7 +77,7 @@ Every pn row also has its own keyword, so you can jump straight in without openi
 | `tdn` / `twn` / `tmn` / `tqn` / `tyn` | open today / week / month / quarter / year note |
 | `tmj` / `tej` | morning / evening journal |
 | `tde` | log an entry to today |
-| `tmo` | log income |
+| `tmo` | opens CRM > 💰 Money (money is logged there, as sessions) |
 | `tdg` | set today's one thing |
 | `tat` | schedule a task today |
 
@@ -99,7 +87,7 @@ Without `periodic_list_id`, every one of these shows a setup pointer instead. Op
 
 ![A daily note in TickTick](assets/shots/19-periodic-note.png)
 
-The head of the note (the breadcrumb, then the weather and the quote) is composed for you above the first section. Your mood and the day's stars live in the journals now, with the questions that ask for them. Then, grouped under `#` headers with dividers: **🌉 Yesterday's bridge** → **✨ Highlight** (the one thing the day is remembered for, asked at shutdown) → **🏆 Goals** (🗓️ Weekly mirror + ☀️ Daily one-thing) → **☀️ Today** (✅ Tasks - every task scheduled today as a checkbox link → 📓 Notes → 🔄 Habits → ⏳ Countdowns → 💰 Money) → **🔎 Summaries** (📊 Today → ⏪ Yesterday, the full list of what you completed → ⏩ Tomorrow) → 🌅 / 🌙 journals.
+The head of the note (the breadcrumb, then the weather and the quote) is composed for you above the first section. Your mood and the day's stars live in the journals now, with the questions that ask for them. Then, grouped under `#` headers with dividers: **🌉 Yesterday's bridge** → **✨ Highlight** (the one thing the day is remembered for, asked at shutdown) → **🏆 Goals** (🗓️ Weekly mirror + ☀️ Daily one-thing) → **☀️ Today** (✅ Tasks - every task scheduled today as a checkbox link → 📓 Notes → 🔄 Habits → ⏳ Countdowns) → **🔎 Summaries** (📊 Today → ⏪ Yesterday, the full list of what you completed, each with the day's money off the CRM → ⏩ Tomorrow) → 🌅 / 🌙 journals.
 
 **Tick a box in ✅ Tasks or ⏩ Tomorrow - in the app, on your phone, anywhere - and the next refresh completes the real task.** Refresh happens when you open the note through `pn` (if the last one is more than a minute old), when the agent runs, or on the 🔄 row; TickTick can't run code when a note opens, so a note opened via breadcrumbs shows its last-refreshed state.
 
@@ -110,7 +98,7 @@ The head of the note (the breadcrumb, then the weather and the quote) is compose
 All six journals seed their questions into the note at mint, so you can answer from any device by typing after `A:`. Running them from Alfred asks each **unanswered** question in a dialog - ⏎ saves and advances, empty ⏎ skips, Cancel stops and keeps what you answered. Phone answers are never overwritten.
 
 - **Morning** (up to 5 set + 6 drawn): mood (1-5), 🌉 yesterday's bridge echoed back, ☀️ *does your goal for today still align with {your goal}?* (Keep or Change through the picker), 🔮 your forecast for the day, then "What is on your mind?" as the border before the drawn prompts.
-- **Evening** (up to 10 set + 6 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, *did you achieve your daily goal - {your goal}?*, 🔑 *did you make progress on today's key result?* and 🥅 *how are this month's objectives going?* (only when your 🥅 OKRs plan has them), 🔮 how the day compared to your morning forecast, money earned, rate the day (the stars stay in the journal answer), and "What is on your mind?" last.
+- **Evening** (up to 9 set + 6 drawn): the 🌉 bridge, ✨ the highlight of the day, 🎯 tomorrow's goal, *did you achieve your daily goal - {your goal}?*, 🔑 *did you make progress on today's key result?* and 🥅 *how are this month's objectives going?* (only when your 🥅 OKRs plan has them), 🔮 how the day compared to your morning forecast, rate the day (the stars stay in the journal answer), and "What is on your mind?" last. Nothing asks about money: the day's money is the CRM's.
 - **Drawn prompts** come in categories, two per category: mornings draw prepare, people and perspective every day; evenings draw three of review, control, virtue, desire, connection and open, the window moving one step a day. Friday evening is a chain night: one guided sequence asked step by step (the worry sort, alignment, hedonic adaptation, repair); from the second step on, the box shows your earlier answers under the question, so a step that points back at your list can be answered. A people prompt names someone from your 👽 People list, family most often, never the same person two days running. Pools are `src/periodic_prompts/*.md` (one `## category` section each, `### chain:` blocks), overridable per section from `~/.ticktick_alfred/periodic_prompts/` (an override file with only a `## random` section is ignored for the daily and weekly).
 - **Weekly** (up to 6 set + 10 drawn): the week's highlight with each day's ✨ highlight listed under it (the answer IS the record, and 🕰️ On this day reads it back years later), *did you achieve your weekly goals?*, 🥅 *how are this month's objectives going?*, 🔑 *did you make progress on this week's key results?* (with their ✅ state), 🔄 the habit consistency line with *which habit earned its keep?*, 🔮 how the week went against the intention you set last Sunday, rate the week (stars), 🔮 your intention for next week, then "What is on your mind?". The ten drawn prompts come two each from retrospect, priorities, energy, people and open. Then a picker asks for **three things that would make next week a success**, written into next week's 🎯 Goals.
 - **Monthly** (up to 7 set + 10 drawn): the month's highlight with each week's highlight listed under it, *did you achieve your monthly goals?*, then the OKR checkpoint read off the note: 🥅 *objective by objective, what moved, what stalled, and why?*, 🌓 the quarter's objectives with how many months it has left (*still the right ones? what to cut, add or move in the timeline?*), 🔄 the month's habit consistency (*which held all month, which only held for a week?*), 💰 the month's income with its chip against last month (*does this align with your forecast? what could you do to improve it?*), then six fixed reflections (three things, moments or people you are grateful for; what you learned, thinking of the challenges; what to keep doing exactly as it was; what must change; what drained your energy; how you want to spend your time next month) and "What is on your mind?". Ten drawn prompts follow, two each from patterns, direction, cost, people and open. Then the goal editor opens aimed at the **next** month and stays open until you Esc.
@@ -140,9 +128,9 @@ Goals mirror downward, read-only: the quarter's appear in each month, the month'
 
 A goal line you edit in the TickTick app comes back with its markdown escaped; every refresh heals the note's own goal lines, so a link never stays as literal brackets. A goal picked from a task is written with that task's real title, or refused with a toast when the title cannot be read - never as a link that only says "Task".
 
-## Money - the roll-up pyramid
+## Money - from the CRM
 
-Log from the `pn` bar (`tpn`, or `tse pn`): type `$ 485 tattoo` → the daily gains `- 485 · tattoo` and the day **Total** recomputes (the `tmo` keyword jumps straight to the `$`). The weekly's 📌 This Week section shows one line per day - `- Sat 11 Jul 2026 • 485` - with the total; monthly shows week sums; quarterly shows months; yearly shows quarters (as 💰 Income under 💿 Data from the weekly up). Roll-ups always recompute from the daily notes, so a week straddling two months never double-counts.
+Nothing asks you for money any more. A day's money is what you logged in the CRM for that day: every Session done, deposit or refund dated it, the same figures CRM > 💰 Money shows. The daily note carries it as the Money line of its 📊 Today and ⏪ Yesterday summaries, with an arrow against the day before; the weekly's 💰 Income lists one line per day - `- Sat 11 Jul 2026 • 485` - with the total; monthly shows week sums; quarterly shows months; yearly shows quarters (💰 Income under 💿 Data from the weekly up). Every tier sums the CRM's entries by date, so a week straddling two months never double-counts. A span the CRM holds nothing for reads `no sessions`, never 0, and a period from before the CRM keeps whatever its note already says. Logging a session refreshes today's note within half a minute, like any other completion; a month you worked without the Mac is filled in from CRM > 💰 Money > 🕰 Backfill a month. The `$` entry kind and the `tmo` keyword only point at CRM > 💰 Money now.
 
 ## The weekly note
 
@@ -177,7 +165,7 @@ The weekly note's shape one tier up, counted by **week** instead of by day (Vex 
 - **♻️ Monthly Review** - the weekly's mirror with its own source, ticking both ways. It reads `monthly_review_id` from `~/.ticktick_alfred/config.json`; there is no Configure-panel field for it yet, unlike the weekly's.
 - **📨 Entries** resurfaces **five of each kind** - wins, nags, reminders, thoughts, links - each carrying its date, because over a month "Thu" names four different days. Nothing an entry carries says how big it was, so "top five" is a rule: **one per week, newest first, then fill what is left by recency**. Five wins therefore come from across the month rather than all from its last few days. A month long enough to touch six weeks has more weeks than slots, and the oldest one loses its place.
 
-**Where the numbers come from, and the one thing that limits them.** Focus, money, moods, highlights, entries, habits and people are recomputed from sources that keep, so they are exact for any month. **What you finished and what you added are not**: TickTick's completed feed reaches back about nine days, and the task cache only holds what is still open, so both come off the **weekly notes** - the same pyramid money has always used.
+**Where the numbers come from, and the one thing that limits them.** Focus, money, moods, highlights, entries, habits and people are recomputed from sources that keep, so they are exact for any month. **What you finished and what you added are not**: TickTick's completed feed reaches back about nine days, and the task cache only holds what is still open, so both come off the **weekly notes**, the pyramid's own records.
 
 That has three consequences worth knowing:
 
@@ -223,7 +211,7 @@ Every action is externally fireable - one AppleScript step:
 osascript -e 'tell application id "com.runningwithcrayons.Alfred" to run trigger "XAct" in workflow "com.vex.tickal" with argument "xact:pn_entry:w Shipped the thing"'
 ```
 
-Same shape for `xact:pn_income:485 tattoo deposit`, `xact:pn_journal:evening`, `xact:pn_open:daily`, `xact:pn_mood:4`, `xact:pn_highlight:Best week`, `xact:pn_refresh`.
+Same shape for `xact:pn_journal:evening`, `xact:pn_open:daily`, `xact:pn_mood:4`, `xact:pn_highlight:Best week`, `xact:pn_refresh`.
 
 ## Limitations
 

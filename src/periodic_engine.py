@@ -172,7 +172,12 @@ def _persist_id():
     try:
         data = cfg.load()
         dirty = False
-        for key in ("periodic_list_id", "weekly_review_id"):
+        # the CRM records fields ride along since 2026-10-02: the agent's
+        # money (src/crm_money.py) needs them, and areas._env_or_cfg reads
+        # the copy when the env var is absent
+        for key in ("periodic_list_id", "weekly_review_id",
+                    "crm_records_list_id", "crm_records_tags",
+                    "crm_archive_list_id"):
             if key not in os.environ:
                 continue                      # headless: config.json rules
             env = os.environ[key]
@@ -668,24 +673,27 @@ def _wontdo_between(d0, d1):
 
 
 def _day_sums(index):
-    """{date: money-sum} from every daily note's 💰 section in the index."""
-    sums = {}
-    for (kind, key), t in index.items():
-        if kind != "daily":
-            continue
-        d = pm.parse_daily_title(t.get("title") or "") or pm.parse_daily_title(key)
-        if not d:
-            continue
-        doc = ps.parse_sections(t.get("content") or "")
-        ans = _answer_in(doc, pm.SEC_EVENING, "money did you earn")
-        amt = pm.parse_money_answer(ans) if ans else None
-        if amt is not None:
-            sums[d] = amt
-            continue
-        sec = ps.find(doc, pm.SEC_MONEY)      # notes from before the move
-        if sec:
-            sums[d] = pm.section_money_sum(sec.body)
-    return sums
+    """{date: money} from the CRM's dated entries (src/crm_money.py) - THE
+    money source since 2026-10-02 (Vex: "CRM and sessions per day should
+    feed money in daily, weekly, monthly, quarterly, yearly notes"). The
+    index is kept for the callers' sake and not read: a note's money is
+    never a journal answer or a 💰 section again. None when the CRM cannot
+    be read here (not set up, cache unreadable): every money writer then
+    leaves its section alone - never a 0 that lies (review 2026-10-02: the
+    04:30 agent, which has no Alfred environment, would have sealed every
+    closing week and month at 0)."""
+    try:
+        import crm_money
+        return crm_money.day_sums()
+    except Exception as e:
+        _log(f"crm money: {e}")
+        return None
+
+
+def _money_known():
+    """Can the CRM be read for money right now? False = write no money
+    figure at all."""
+    return _day_sums(None) is not None
 
 
 def _dailies_between(index, d0, d1):
@@ -749,7 +757,7 @@ def _entries_between(index, d0, d1):
 
 def _fill_day_highlight(doc):
     """✨ Highlight - a MIRROR of the evening journal's answer, the same way
-    Mood, Day and Money are (Vex 2026-09-12: the answer is the record). It
+    Mood and Day are (Vex 2026-09-12: the answer is the record). It
     sits at the top because that is where he reads it (2026-09-17), not
     because anything is stored there; clearing the answer clears the line.
 
@@ -1183,21 +1191,18 @@ def _otd_memories(day, index):
     return out
 
 
-def _day_money(doc):
-    """A daily note's money for the day → float | None. The evening journal
-    answer, then a legacy 💰 section."""
-    if doc is None:
+def _day_money(day):
+    """A day's money → float | None: the CRM's priced entries dated that day
+    (src/crm_money.py), None when there is none - so a day without a
+    session draws no arrow against a day with one."""
+    if day is None:
         return None
-    ans = _answer_in(doc, pm.SEC_EVENING, "money did you earn")
-    amt = pm.parse_money_answer(ans) if ans else None
-    if amt is not None:
-        return amt
-    msec = ps.find(doc, pm.SEC_MONEY)
-    if msec is None or not any(pm.parse_money_entry(l) for l in msec.body):
-        # an EMPTY legacy section is "not answered", not "earned 0" - read as
-        # 0 it drew "Money: 0 ▼ 120" for a day the question was left blank
+    try:
+        import crm_money
+        return crm_money.day_sum(day)
+    except Exception as e:
+        _log(f"crm money: {e}")
         return None
-    return pm.section_money_sum(msec.body)
 
 
 def _people_logged(day):
@@ -1259,12 +1264,13 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
     each carrying a compact ▲/▼ against the day before it (Vex, same day:
     "small indicator compared to the day before?").
 
-    The first three are EVENING/MORNING JOURNAL answers - the rating and the
-    money are asked there, so the summary reflects them rather than keeping a
-    second copy ("it is an answer in the evening journal, that is all that
-    should be there"). Each line appears only when its data really exists, and
-    its arrow only when the day before has the same number to compare with -
-    so a blank yesterday costs you the arrow, never the line.
+    Day and Mood are EVENING/MORNING JOURNAL answers - asked there, so the
+    summary reflects them rather than keeping a second copy ("it is an answer
+    in the evening journal, that is all that should be there"). Money is the
+    CRM's for that day (src/crm_money.py, Vex 2026-10-02) - the summary is
+    where a daily note shows it. Each line appears only when its data really
+    exists, and its arrow only when the day before has the same number to
+    compare with - so a blank yesterday costs you the arrow, never the line.
 
     `nday` is the day's parsed note; `pday`/`pdoc` are the comparison day and
     its note.
@@ -1285,13 +1291,18 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None):
             pmood = _mood_of_doc(pdoc) if pdoc is not None else None
             lines.append(f"{tab}- Mood: {pm.mood_text(mood[0], mood[1])}"
                          + dc(mood[0], pmood[0] if pmood else None))
-        # ALWAYS a line, 0 until the evening journal answers (Vex 2026-09-13:
-        # "Money was not in the summary"). The arrow still needs both days.
-        money = _day_money(nday)
-        pmoney = _day_money(pdoc) if pdoc is not None else None
-        lines.append(f"{tab}- Money: {pm.fmt_amount(money or 0)}"
-                     + (dc(money, pmoney, "money")
-                        if money is not None and pmoney is not None else ""))
+    # 💰 the CRM's money for the day: ALWAYS a line while the CRM can be
+    # read, 0 until a session is logged that day (Vex 2026-09-13: "Money was
+    # not in the summary"), the arrow only when both days hold a session. A
+    # day without a note still shows its money. A CRM that cannot be read
+    # writes nothing rather than a 0 that lies.
+    if _money_known():
+        money = _day_money(day)
+        pmoney = _day_money(pday) if pday is not None else None
+        if nday is not None or money is not None:
+            lines.append(f"{tab}- Money: {pm.fmt_amount(money or 0)}"
+                         + (dc(money, pmoney, "money")
+                            if money is not None and pmoney is not None else ""))
     fm = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
     if fm:
         pfm = (getattr(t2, "focus_minutes", lambda a, b: None)(pday, pday)
@@ -1441,7 +1452,7 @@ def _fill_daily(doc, p, index, is_today):
     if btxt:
         ps.set_body(doc, pm.SEC_YBRIDGE, bridge_quote(btxt))
     # ✨ Highlight - a MIRROR of the evening journal's answer, the same way
-    # Mood, Day and Money are (Vex 2026-09-12: the answer is the record). It
+    # Mood and Day are (Vex 2026-09-12: the answer is the record). It
     # sits at the top because that is where he reads it (2026-09-17), not
     # because anything is stored there; clearing the answer clears the line.
     _fill_day_highlight(doc)
@@ -1592,13 +1603,18 @@ def _refresh_fixed_q(sec, fixed):
             body[a_idx - 1] = want
             changed = True
     # a CONDITIONAL question (today's KR, the month's objectives) whose plan
-    # is gone: dropped while UNANSWERED, so no run asks about a KR that is no
-    # longer today's (ruling 2026-09-24: skip, never ask about nothing).
-    # Answered ones are history and stay.
+    # is gone, and a RETIRED one (the money question, 2026-10-02): dropped
+    # while UNANSWERED, so no run asks about a KR that is no longer today's
+    # (ruling 2026-09-24: skip, never ask about nothing) and no note keeps a
+    # blank question nobody will answer. Answered ones are history and stay.
     kill = set()
     for _n, q, a, a_idx in pm.journal_pairs(body):
         key = pm.journal_key(q)
-        if not a and key in pm.CONDITIONAL_KEYS and key not in by_key:
+        # a bullet typed under an EMPTY A line (the phone's shape) is an
+        # answer too (review 2026-10-02): judged on the whole answer
+        answered = a or pm.journal_answer_text(body, a_idx)
+        if not answered and ((key in pm.CONDITIONAL_KEYS and key not in by_key)
+                             or key in pm.RETIRED_KEYS):
             kill.update((a_idx - 1, a_idx))
     if kill:
         body = pm.renumber_journal([ln for i, ln in enumerate(body) if i not in kill])
@@ -1946,18 +1962,20 @@ def _fill_weekly(doc, p, index):
                     f"Average {avg:.1f}" + (f" · {ch}" if ch else ""),
                     pm.mood_week_lines(moods), _in(pm.SEC_MOODS))
 
-    # ── 💰 Income - header total+chip, day lines, Total bullet
-    inc_cur = pm.sum_in_period(day_sums, p)
-    inc_prev = pm.sum_in_period(day_sums, prev)
-    head = pm.fmt_amount(inc_cur)
-    ch = pm.chip(inc_cur, inc_prev, "money") \
-        if any(prev.start <= d <= prev.end for d in day_sums) else None
-    _set_headed(doc, pm.SEC_INCOME, head + (f" · {ch}" if ch else ""),
-                pm.ind([pm.money_day_line(p.start + timedelta(days=i),
-                                          day_sums.get(p.start + timedelta(days=i), 0))
-                        for i in range(7)])
-                + [pm.money_total_line(inc_cur, 3)],
-                _in(pm.SEC_INCOME))
+    # ── 💰 Income - header total+chip, day lines off the CRM, Total bullet.
+    # A CRM that cannot be read (day_sums None) leaves the section as it is.
+    if day_sums is not None:
+        inc_cur = pm.sum_in_period(day_sums, p)
+        inc_prev = pm.sum_in_period(day_sums, prev)
+        head = pm.fmt_amount(inc_cur)
+        ch = pm.chip(inc_cur, inc_prev, "money") \
+            if any(prev.start <= d <= prev.end for d in day_sums) else None
+        _set_headed(doc, pm.SEC_INCOME, head + (f" · {ch}" if ch else ""),
+                    pm.ind([pm.money_day_line(p.start + timedelta(days=i),
+                                              day_sums.get(p.start + timedelta(days=i), 0))
+                            for i in range(7)])
+                    + [pm.money_total_line(inc_cur, 3)],
+                    _in(pm.SEC_INCOME))
 
     # ── 👽 People - birthdays inside 14d (countdowns) + stale cards
     _fill_people(doc, t2, days=14, within=_in(pm.SEC_PEOPLE))
@@ -1984,7 +2002,8 @@ def _fill_weekly(doc, p, index):
         pmood = _mood_avg(index, prev.start, prev.end)
         if pmood is not None:
             lw.append(f"- Mood: {pmood:.1f} avg")
-        lw.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        if day_sums is not None:
+            lw.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
         # last week's own words: the 🔮 intention it set for THIS week (the
         # weekly journal's check quotes it back) and the stars it gave itself
         pt = lookup(index, prev)
@@ -2249,24 +2268,25 @@ def _ignored_names(projects):
             if pid in _stats_ignored_pids()}
 
 
-def _has_dailies(day_sums, a, b):
-    """Is there ANY daily note inside [a, b]? A span with none has no money
-    story at all, and a "• 0" there reads as a month he earned nothing in
-    (the rule _fill_rollup_money has always used for a whole period)."""
+def _has_entries(day_sums, a, b):
+    """Does the CRM hold a session or a priced entry inside [a, b]? A span
+    with none has no money story at all, and a "• 0" there reads as a month
+    he earned nothing in (the rule _fill_rollup_money has always used for a
+    whole period)."""
     return any(a <= d <= b for d in day_sums)
 
 
 def _span_money_lines(day_sums, spans, kind, today):
-    """Money by child span: the amount where there are notes to read, an
-    honest word where there are not, and nothing at all for a span that has
-    not happened yet."""
+    """Money by child span: the amount where the CRM holds a priced entry,
+    an honest word ("no sessions") where it holds none, and nothing at all
+    for a span that has not happened yet."""
     out = []
     for n, _cp, a, b in spans:
         if a > today:
             break
         label = pm.span_label(kind, n, a, b)
-        if not _has_dailies(day_sums, a, b):
-            out.append(f"- {label} • no notes")
+        if not _has_entries(day_sums, a, b):
+            out.append(f"- {label} • no sessions")
             continue
         out.append(f"- {label} • {pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))}")
     return out
@@ -2618,16 +2638,18 @@ def _fill_monthly(doc, p, index):
                     f"Average {avg:.1f}" + (f" · {ch}" if ch else ""),
                     pm.mood_span_lines(rows), _in(pm.SEC_MOODS))
 
-    # ── 💰 Income - week lines, month total, both off the daily notes
+    # ── 💰 Income - week lines, month total, both off the CRM (None = the
+    # CRM cannot be read: the section stays as it is)
     day_sums = _day_sums(index)
-    inc_cur = pm.sum_in_period(day_sums, p)
-    ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
-          if any(prev.start <= d <= prev.end for d in day_sums) else None)
-    _set_headed(doc, pm.SEC_INCOME,
-                pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                pm.ind(_span_money_lines(day_sums, spans, "monthly", today))
-                + [pm.money_total_line(inc_cur, 3)],
-                _in(pm.SEC_INCOME))
+    if day_sums is not None:
+        inc_cur = pm.sum_in_period(day_sums, p)
+        ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
+              if any(prev.start <= d <= prev.end for d in day_sums) else None)
+        _set_headed(doc, pm.SEC_INCOME,
+                    pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
+                    pm.ind(_span_money_lines(day_sums, spans, "monthly", today))
+                    + [pm.money_total_line(inc_cur, 3)],
+                    _in(pm.SEC_INCOME))
 
     # ── 👽 People
     _fill_people(doc, t2, days=31, within=_in(pm.SEC_PEOPLE))
@@ -2655,7 +2677,8 @@ def _fill_monthly(doc, p, index):
         pmood = _mood_avg(index, prev.start, prev.end)
         if pmood is not None:
             lm.append(f"- Mood: {pmood:.1f} avg")
-        lm.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        if day_sums is not None:
+            lm.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
         top_tasks = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
                                                           for st in rank_prev]))
         top_lists = [f"{pm.T1}- 🗂 {nm} · {c}" for nm, c in pm.top_n(
@@ -2840,16 +2863,18 @@ def _fill_quarterly(doc, p, index):
                     f"Average {avg:.1f}" + (f" · {ch}" if ch else ""),
                     pm.mood_span_lines(rows), _in(pm.SEC_MOODS))
 
-    # ── 💰 Income - month lines, quarter total, both off the daily notes
+    # ── 💰 Income - month lines, quarter total, both off the CRM (None = the
+    # CRM cannot be read: the section stays as it is)
     day_sums = _day_sums(index)
-    inc_cur = pm.sum_in_period(day_sums, p)
-    ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
-          if any(prev.start <= d <= prev.end for d in day_sums) else None)
-    _set_headed(doc, pm.SEC_INCOME,
-                pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                pm.ind(_span_money_lines(day_sums, spans, "quarterly", today))
-                + [pm.money_total_line(inc_cur, 3)],
-                _in(pm.SEC_INCOME))
+    if day_sums is not None:
+        inc_cur = pm.sum_in_period(day_sums, p)
+        ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
+              if any(prev.start <= d <= prev.end for d in day_sums) else None)
+        _set_headed(doc, pm.SEC_INCOME,
+                    pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
+                    pm.ind(_span_money_lines(day_sums, spans, "quarterly", today))
+                    + [pm.money_total_line(inc_cur, 3)],
+                    _in(pm.SEC_INCOME))
 
     # ── 👽 People + ⏳ Dates
     _fill_people(doc, t2, days=92, within=_in(pm.SEC_PEOPLE))
@@ -2877,7 +2902,8 @@ def _fill_quarterly(doc, p, index):
         pmood = _mood_avg(index, prev.start, prev.end)
         if pmood is not None:
             lq.append(f"- Mood: {pmood:.1f} avg")
-        lq.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        if day_sums is not None:
+            lq.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
         # last quarter's own words: where it wanted to be by now (the
         # quarterly journal's compare question quotes it back)
         pt = lookup(index, prev)
@@ -3082,16 +3108,18 @@ def _fill_yearly(doc, p, index):
                     f"Average {avg:.1f}" + (f" · {ch}" if ch else ""),
                     pm.mood_span_lines(rows), _in(pm.SEC_MOODS))
 
-    # ── 💰 Income - quarter lines, year total, both off the daily notes
+    # ── 💰 Income - quarter lines, year total, both off the CRM (None = the
+    # CRM cannot be read: the section stays as it is)
     day_sums = _day_sums(index)
-    inc_cur = pm.sum_in_period(day_sums, p)
-    ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
-          if any(prev.start <= d <= prev.end for d in day_sums) else None)
-    _set_headed(doc, pm.SEC_INCOME,
-                pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                pm.ind(_span_money_lines(day_sums, spans, "yearly", today))
-                + [pm.money_total_line(inc_cur, 3)],
-                _in(pm.SEC_INCOME))
+    if day_sums is not None:
+        inc_cur = pm.sum_in_period(day_sums, p)
+        ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
+              if any(prev.start <= d <= prev.end for d in day_sums) else None)
+        _set_headed(doc, pm.SEC_INCOME,
+                    pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
+                    pm.ind(_span_money_lines(day_sums, spans, "yearly", today))
+                    + [pm.money_total_line(inc_cur, 3)],
+                    _in(pm.SEC_INCOME))
 
     # ── 👽 People + ⏳ Dates. The block the quarterly carries (his ruling):
     # the birthdays of the next three months and the stale cards. The whole
@@ -3115,7 +3143,8 @@ def _fill_yearly(doc, p, index):
         pmood = _mood_avg(index, prev.start, prev.end)
         if pmood is not None:
             ly.append(f"- Mood: {pmood:.1f} avg")
-        ly.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+        if day_sums is not None:
+            ly.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
         # last year's own words: where it wanted to be by now (the yearly
         # journal's compare question quotes it back)
         pt = lookup(index, prev)
@@ -3157,13 +3186,14 @@ def _year_words(pdoc):
 
 
 def _fill_rollup_money(doc, p, index):
-    """Monthly/quarterly/yearly 💰 (v3.0 scope). Missing-history rule: a span
-    with ZERO daily notes keeps its existing lines (deleted dailies must not
-    rot old roll-ups to 0)."""
+    """Monthly/quarterly/yearly 💰 Money (the layout before 2026-09-12), off
+    the CRM like 💰 Income. Missing-history rule: a period with NO priced
+    CRM entry keeps its existing lines (a month before the CRM existed must
+    not rot to 0)."""
     if p.kind not in ("monthly", "quarterly", "yearly"):
         return                          # a day and a week have no roll-up
     day_sums = _day_sums(index)
-    if not any(p.start <= d <= p.end for d in day_sums):
+    if not day_sums or not any(p.start <= d <= p.end for d in day_sums):
         return
     lines = []
     if p.kind == "monthly":
@@ -3470,8 +3500,9 @@ def _journal_answer(slot, needle, text, day=None):
             m = pm.JOURNAL_A_RE.match(body[idx])
             ws, dash = m.group("ws"), m.group("dash") or ""
             ital = m.group("ital")
-            # callable = read-modify-write (the 💰 verb sums into whatever is
-            # already answered there)
+            # callable = read-modify-write over what is already answered
+            # (no caller passes one since the money verb left, 2026-10-02;
+            # the shape is kept for the next verb that needs it)
             val = text(a or "") if callable(text) else text
             body[idx] = f"{ws}{dash}{ital}A: {val}{ital}"
             ps.set_sec_body(doc, sec, body)
@@ -3515,10 +3546,10 @@ def has_highlight(kind="weekly", day=None):
 
 
 def weekly_has_highlight(day=None):
-    """Does this week's note still carry an ✨ Highlight section? Twin of
-    _daily_has_money: Vex's 2026-09-17 layout dropped it, so the highlight
-    lives as the weekly journal's first ANSWER and the section is written
-    only where one survives."""
+    """Does this week's note still carry an ✨ Highlight section? Vex's
+    2026-09-17 layout dropped it, so the highlight lives as the weekly
+    journal's first ANSWER and the section is written only where one
+    survives."""
     task = lookup(build_index(), pm.period_for("weekly", day or _today()))
     if not task:
         return False
@@ -3794,18 +3825,6 @@ def _mirror_week_goals(wdoc):
             dtask.get("id"), mirror)
 
 
-def _daily_has_money(day=None):
-    """True when that day's note still carries a 💰 section (older layouts)."""
-    t = lookup(build_index(), pm.period_for("daily", day or _today()))
-    if not t:
-        return False
-    return ps.find(ps.parse_sections(t.get("content") or ""),
-                   pm.SEC_MONEY) is not None
-
-
-MONEY_NEEDLE = "money did you earn"
-
-
 def _daily_note(day, notes=None):
     """That day's daily note out of the CACHE, or None. No API call: the rows
     that use this render on every keystroke."""
@@ -3825,9 +3844,9 @@ def day_answer_state(day, slot, needle, notes=None):
         "blank"     the question is there, unanswered
         "unasked"   that day has no such question, or no note at all
 
-    The three must stay apart. A reader that collapses them (_day_money does,
-    into None-or-0) is fine for a sum and useless for a row that offers to
-    overwrite: "nothing yet" and "he answered 0" cannot look the same there.
+    The three must stay apart. A reader that collapses them is fine for a
+    sum and useless for a row that offers to overwrite: "nothing yet" and
+    "he answered 0" cannot look the same there.
     """
     t = _daily_note(day, notes)
     if t is None:
@@ -3843,21 +3862,7 @@ def day_answer_state(day, slot, needle, notes=None):
     return "unasked", ""
 
 
-def day_money_state(day, notes=None):
-    """(state, amount, text) - day_answer_state plus the number, and plus the
-    legacy 💰 section that older notes still keep their history in."""
-    st, txt = day_answer_state(day, "evening", MONEY_NEEDLE, notes)
-    if st == "answered":
-        return "answered", pm.parse_money_answer(txt), txt
-    t = _daily_note(day, notes)
-    if t is not None:
-        msec = ps.find(ps.parse_sections(t.get("content") or ""), pm.SEC_MONEY)
-        if msec is not None and any(pm.parse_money_entry(l) for l in msec.body):
-            return "answered", pm.section_money_sum(msec.body), ""
-    return st, None, txt
-
-
-def week_answer_states(slot, needle, monday=None, today=None, money=False):
+def week_answer_states(slot, needle, monday=None, today=None):
     """[(date, state, value, text)] for Monday..today, NEWEST first - the day
     strip's whole data source, one cache read for the week."""
     today = today or _today()
@@ -3866,81 +3871,10 @@ def week_answer_states(slot, needle, monday=None, today=None, money=False):
     out = []
     d = monday
     while d <= today:
-        if money:
-            out.append((d, ) + day_money_state(d, notes))
-        else:
-            st, txt = day_answer_state(d, slot, needle, notes)
-            out.append((d, st, txt, txt))
+        st, txt = day_answer_state(d, slot, needle, notes)
+        out.append((d, st, txt, txt))
         d += timedelta(days=1)
     return list(reversed(out))
-
-
-def week_money_states(monday=None, today=None):
-    return week_answer_states("evening", MONEY_NEEDLE, monday, today, money=True)
-
-
-def append_income(amount, label="", day=None, replace=False):
-    # a taught-separator answer like "500 · client" splits into head+tail
-    # leaving "· client" - shave leading separators, never double them
-    """Log money to a day. Sums into whatever is there; `replace` swaps it.
-
-    Money has ONE home since Vex moved it into the evening journal ("it is an
-    answer in the evening journal, that is all that should be there",
-    2026-09-12), so this verb and the journal write the SAME line and cannot
-    diverge. `day` makes it retrospective (2026-09-17: "add money entries
-    retrospectively to chosen day of the week ... like if I skip evening
-    journal"), and every message names the day it hit - a toast saying
-    "today" over a write into Tuesday reads as a failure.
-
-    Ordering matters. A note old enough to carry a 💰 SECTION with entries in
-    it keeps using that section, because that is where its history is and
-    because _day_money only falls back to a section while no answer exists -
-    writing the answer on such a note would hide its whole history behind one
-    number. Every other note takes the answer, seeding the evening journal
-    first when that day has no money question at all (a back-minted note has
-    none: create_note renders the template and the questions are planted on
-    refresh, which skips a past day).
-    """
-    # a taught-separator answer like "500 · client" splits into head+tail
-    # leaving "· client" - shave leading separators, never double them
-    label = (label or "").strip().lstrip("·-•").strip()
-    d = day or _today()
-    when = pm.day_label(d)
-    p = pm.period_for("daily", d)
-    task, _ = ensure_note(p)
-    pid, tid = task.get("projectId") or areas.PERIODIC_LIST_ID, task.get("id")
-
-    def legacy(doc, live):
-        sec = ps.find(doc, pm.SEC_MONEY)
-        if sec is None or not any(pm.parse_money_entry(l) for l in sec.body):
-            return False
-        body = [] if replace else [l for l in sec.body if l.strip()]
-        ps.set_body(doc, pm.SEC_MONEY,
-                    pm.recompute_money_body(
-                        body + [pm.money_entry_line(amount, label)]))
-        return True
-
-    ok, _doc = _pn_rmw(pid, tid, legacy)
-    seen = {}
-    if not ok:
-        def write(prev):
-            new, had = pm.money_answer_update(prev, amount, label, replace)
-            seen["had"], seen["now"] = had, pm.parse_money_answer(new)
-            return new
-        ok = _journal_answer("evening", MONEY_NEEDLE, write, day=d)
-        if not ok:
-            journal_seed("evening", day=d)       # mints the note AND the Qs
-            ok = _journal_answer("evening", MONEY_NEEDLE, write, day=d)
-    if not ok:
-        return f"💫 {when} · no money question in that note"
-    had, now = seen.get("had"), seen.get("now")
-    if had is not None and now is not None:
-        return (f"💰 {when} · {pm.fmt_amount(now)} (was {pm.fmt_amount(had)})"
-                if replace else
-                f"💰 {when} · {pm.fmt_amount(had)} + {pm.fmt_amount(amount)}"
-                f" = {pm.fmt_amount(now)}")
-    return (f"💰 {when} · {pm.fmt_amount(amount)}"
-            + (f" · {label}" if label else ""))
 
 
 _JOURNAL_SECTIONS = {"morning": pm.SEC_MORNING, "evening": pm.SEC_EVENING,

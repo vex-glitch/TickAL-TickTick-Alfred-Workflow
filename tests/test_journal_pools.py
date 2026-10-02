@@ -2,7 +2,7 @@
 
 Set prompts: morning mood, bridge echo, goal check, FORECAST, mind; evening
 bridge, highlight, tomorrow's goal, daily goal, KR (when planned), monthly
-objectives (when any), forecast check, money, rating, mind.
+objectives (when any), forecast check, rating, mind (money left 2026-10-02).
 Random block: six prompts, two per category; morning = prepare, people,
 perspective every day; evening = three of six categories, looping one step a
 day; Friday evening = one chain, in order. [person] filled from the People
@@ -200,13 +200,13 @@ else:
           and "Forecast the best scenario" in mo[3][1], mo[3])
     ev = pm.journal_fixed("evening", {"goal": "Ship it"})
     check("5.evening-order-plain", [k for k, _ in ev] == ["bridge", "dhighlight", "tgoal", "goal", "fcheck",
-                                                          "money", "rating", "free"], [k for k, _ in ev])
+                                                          "rating", "free"], [k for k, _ in ev])
     check("5.fcheck-no-forecast", ev[4][1] == "🔮 How did the day go compared to what you expected this morning?", ev[4])
     ev2 = pm.journal_fixed("evening", {"goal": "Ship it", "kr": "Finish periodic notes",
                                        "objectives": "Onboard TickTicks 0/5 · TickAL 1/6",
                                        "forecast": "A calm build day, tests green by six"})
     check("5.evening-order-full", [k for k, _ in ev2] == ["bridge", "dhighlight", "tgoal", "goal", "kr", "objectives",
-                                                          "fcheck", "money", "rating", "free"], [k for k, _ in ev2])
+                                                          "fcheck", "rating", "free"], [k for k, _ in ev2])
     check("5.kr-wording", ev2[4][1] == "🔑 Did you achieve or make progress on today's key result, Finish periodic notes?", ev2[4])
     check("5.kr-plural", "key results, A · B?" in pm.journal_fixed("evening", {"kr": "A · B"})[4][1])
     check("5.objectives-wording", ev2[5][1] == "🥅 How are you progressing on this month's objectives, Onboard TickTicks 0/5 · TickAL 1/6?", ev2[5])
@@ -695,7 +695,8 @@ else:
         # Fri 25 Sep is a chain night: the evening block is the chain's seven steps, the date's own draw either way
         ev_n = len(pm.select_prompts(pj.load_pool("evening"), date(2026, 9, 25), "evening"))
         check("15.tomorrow-gets-both-journals", mk[:4] == ["mood", "ybridge", "gcheck", "forecast"] and len(mk) == 5 + 6
-              and ek[:4] == ["bridge", "dhighlight", "tgoal", "goal"] and len(ek) == 8 + ev_n and ev_n == 7, (mk, ek, ev_n))
+              # the evening set is seven since money left it (2026-10-02)
+              and ek[:4] == ["bridge", "dhighlight", "tgoal", "goal"] and len(ek) == 7 + ev_n and ev_n == 7, (mk, ek, ev_n))
         check("15.bridge-echo-in-the-morning-question", any("Yesterday's bridge: Finished OKRs and debugged Periodics." in q for _n, q, _a, _i in pm.journal_pairs(mj.body)))
         check("15.numbers-stay-pending", any("_(pending)_" in ln for ln in ps.find(d25, pm.SEC_HABITS).body), ps.find(d25, pm.SEC_HABITS).body)
         p26, d26 = shell(date(2026, 9, 26))

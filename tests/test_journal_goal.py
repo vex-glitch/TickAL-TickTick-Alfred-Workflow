@@ -53,9 +53,9 @@ else:
 
     # ── 1. the fixed heads ────────────────────────────────────────────────────────
     ev = pm.journal_fixed("evening", {"goal": "Ship it"})
-    check("evening order: bridge, ✨ highlight, tomorrow's goal, review, forecast check, money, rating, mind",
+    check("evening order: bridge, ✨ highlight, tomorrow's goal, review, forecast check, rating, mind",
           [k for k, _ in ev] == ["bridge", "dhighlight", "tgoal", "goal", "fcheck",
-                                 "money", "rating", "free"], ev)
+                                 "rating", "free"], ev)
     mo = pm.journal_fixed("morning", {"ybridge": "Call Anna", "goal": "Ship it"})
     check("morning order: mood, bridge, goal check, forecast, mind",
           [k for k, _ in mo] == ["mood", "ybridge", "gcheck", "forecast", "free"], mo)
