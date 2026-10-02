@@ -80,19 +80,22 @@ def emit_error(msg):
     emit([{"uid": "err", "title": "TickTick Error", "subtitle": msg, "valid": False}])
 
 
-def wait_for_network(host="api.ticktick.com", timeout=120, step=5):
-    """Block until `host` resolves, up to `timeout` s - for HEADLESS agent runs
-    only. launchd fires a missed 04:30 mint and the hourly sync at login, and
-    on 2026-09-23 both ran 20 s after a reboot, before the Mullvad tunnel and
-    its local resolver were up: two "FAILED" banners over nothing. A DNS probe
-    costs no API call. True when the host resolves, False on timeout - the
-    caller then fails exactly as before."""
+def wait_for_network(host="api.ticktick.com", timeout=120, step=5, port=443):
+    """Block until `host` ANSWERS on `port`, up to `timeout` s - for HEADLESS
+    agent runs only. launchd fires a missed 04:30 mint and the hourly sync at
+    login, and on 2026-09-23 both ran 20 s after a reboot, before the Mullvad
+    tunnel and its local resolver were up: two "FAILED" banners over nothing.
+    2026-09-28: the name resolved and the servers stayed silent (one relay
+    could not reach TickTick for 27 minutes), so resolving proves nothing:
+    the probe opens a TCP connection, 3 s per address, and closes it. Still
+    no API call. True when an address answers, False on timeout - the caller
+    then fails as before, within api.TIMEOUT."""
     import socket
     import time
     deadline = time.monotonic() + timeout
     while True:
         try:
-            socket.getaddrinfo(host, 443)
+            socket.create_connection((host, port), timeout=3).close()
             return True
         except OSError:
             if time.monotonic() >= deadline:

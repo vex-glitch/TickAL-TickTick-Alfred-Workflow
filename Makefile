@@ -85,6 +85,7 @@ test:
 	@$(PYTHON) tests/test_row_display.py
 	@$(PYTHON) tests/test_review_rebuild.py
 	@$(PYTHON) tests/test_commute.py
+	@$(PYTHON) tests/test_unreachable.py
 	@$(PYTHON) tests/test_harness.py
 
 # ── Smoke tests (need a logged-in setup) ──────────────────────────────────

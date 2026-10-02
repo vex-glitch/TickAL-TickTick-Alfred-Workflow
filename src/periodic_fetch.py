@@ -26,7 +26,7 @@ import config as cfg                                # noqa: E402
 import habits_model as hm                           # noqa: E402
 
 _TIMEOUT = 3          # external HTTP
-_V2_TIMEOUT = 8
+_V2_TIMEOUT = (4, 8)  # (connect per address, read): src/api.py TIMEOUT
 
 
 # ── v2 plumbing ──────────────────────────────────────────────────────────────

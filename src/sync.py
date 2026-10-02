@@ -11,7 +11,14 @@ sys.path.insert(0, os.path.join(SCRIPT_DIR, "lib"))
 
 import config as cfg
 import cache as cache_store
-from api import TickTickAPI
+from api import TickTickAPI, Unreachable, NoAnswer
+
+# The line died (api.Unreachable / api.NoAnswer): one list that fails is
+# skipped and counted, a dead line is not - every list after it would fail
+# the same way, each after api.TIMEOUT, and all_tasks would be written with
+# only the lists read before it. The sync stops and the caches stay as they
+# were (2026-09-28).
+DEAD_LINE = (Unreachable, NoAnswer)
 
 
 def do_sync():
@@ -35,6 +42,8 @@ def do_sync():
             t["_projectId"]   = "inbox"
             t["_columnName"]  = ""
         all_tasks.extend(inbox_tasks)
+    except DEAD_LINE:
+        raise
     except Exception:
         pass  # inbox unavailable, non-fatal
 
@@ -53,6 +62,8 @@ def do_sync():
                 t["_columnName"]  = col_map.get(t.get("columnId") or "", "")
             all_tasks.extend(tasks)
             cache_store.set(f"project_data_{p['id']}", pdata)
+        except DEAD_LINE:
+            raise
         except Exception:
             errors += 1
 
@@ -76,6 +87,8 @@ def do_sync():
                 n["_projectId"]   = p["id"]
                 seen_note_ids.add(n["id"])
             all_notes.extend(notes)
+        except DEAD_LINE:
+            raise
         except Exception:
             pass
 
@@ -107,6 +120,8 @@ def do_sync():
                 try:
                     full = api.get_task(npid, nid)
                     n = {**n, "content": full.get("content") or ""}
+                except DEAD_LINE:
+                    raise
                 except Exception:
                     pass
         enriched.append(n)
@@ -327,6 +342,10 @@ def main():
         summary = do_sync()
         if headless:
             _notify(summary or "Synced")
+    except DEAD_LINE as e:
+        print(f"⚠️ {e}")                 # the sentence is the toast
+        if headless:
+            _notify(str(e), title="TickAL sync ⚠️")
     except Exception as e:
         print(f"Sync error: {e}")
         if headless:

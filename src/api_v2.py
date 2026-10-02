@@ -49,6 +49,15 @@ X_DEVICE_TMPL = ('{{"platform":"web","os":"macOS","device":"Chrome","name":"",'
 USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36")
 
+# (connect, read): the connect wait is per ADDRESS and the hosts have two, so
+# a bare timeout=15 was 30 s of nothing per call while TickTick's servers
+# stayed silent (2026-09-28, the story is at src/api.py TIMEOUT).
+CONNECT = 4
+
+
+def _t(read):
+    return (CONNECT, read)
+
 
 def _device_id():
     did = cfg.load().get("v2_device_id", "")
@@ -138,7 +147,7 @@ class TickTickV2:
                               "or paste one via Settings → Attachment Token")
         r = requests.post(SIGNON_URL, json={"username": user, "password": pw},
                           headers={**_base_headers(), "content-type": "application/json"},
-                          timeout=20)
+                          timeout=_t(20))
         token = (r.json().get("token") if r.text.strip() else None) if r.ok else None
         if not token:
             # Surface TickTick's message (e.g. wrong password / locked out) plainly.
@@ -161,7 +170,7 @@ class TickTickV2:
                      "referer": "https://ticktick.com/", "accept": "*/*"},
             cookies={"t": self.token},
             files={"file": (file_name, file_bytes, mime)},
-            timeout=30,
+            timeout=_t(30),
         )
         if r.status_code in (401, 403):
             raise V2AuthError("token expired")
@@ -182,7 +191,7 @@ class TickTickV2:
             params={"from": (now - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00"),
                     "to": now.strftime("%Y-%m-%d 23:59:59"),
                     "limit": limit},
-            cookies={"t": self.token}, headers=_base_headers(), timeout=20)
+            cookies={"t": self.token}, headers=_base_headers(), timeout=_t(20))
         if r.status_code in (401, 403):
             raise V2AuthError("token expired")
         r.raise_for_status()
@@ -208,7 +217,7 @@ class TickTickV2:
                 f"https://api.ticktick.com/api/v2/project/{project_id}/completed/",
                 params={"from": (now - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00"),
                         "to": now.strftime("%Y-%m-%d 23:59:59"), "limit": limit},
-                cookies={"t": self.token}, headers=_base_headers(), timeout=20)
+                cookies={"t": self.token}, headers=_base_headers(), timeout=_t(20))
             if not r.ok:
                 return None
             d = r.json() if r.text.strip() else []
@@ -243,7 +252,7 @@ class TickTickV2:
                 headers={**_base_headers(), "cookie": f"t={self.token}",
                          "content-type": "application/json"},
                 json={"add": [], "update": bodies, "delete": []},
-                timeout=25)
+                timeout=_t(25))
             return bool(r.ok) and not (r.json().get("id2error") or {})
         except Exception:
             return False
@@ -264,7 +273,7 @@ class TickTickV2:
                 params={"from": (now - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00"),
                         "to": now.strftime("%Y-%m-%d 23:59:59"),
                         "status": "Abandoned", "limit": limit},
-                cookies={"t": self.token}, headers=_base_headers(), timeout=20)
+                cookies={"t": self.token}, headers=_base_headers(), timeout=_t(20))
             if not r.ok:
                 return None
             d = r.json() if r.text.strip() else []
@@ -293,7 +302,7 @@ class TickTickV2:
                 headers={**_base_headers(), "cookie": f"t={self.token}",
                          "content-type": "application/json"},
                 json={"add": [], "update": [body], "delete": []},
-                timeout=15)
+                timeout=_t(15))
             return bool(r.ok) and not (r.json().get("id2error") or {})
         except Exception:
             return False
@@ -308,7 +317,7 @@ class TickTickV2:
         try:
             r = requests.get("https://api.ticktick.com/api/v2/tags",
                              headers={**_base_headers(), "cookie": f"t={self.token}"},
-                             timeout=15)
+                             timeout=_t(15))
             if not r.ok:
                 return None
             d = r.json()
@@ -330,7 +339,7 @@ class TickTickV2:
         try:
             r = requests.get("https://api.ticktick.com/api/v2/batch/check/0",
                              headers={**_base_headers(), "cookie": f"t={self.token}"},
-                             timeout=20)
+                             timeout=_t(20))
             if not r.ok:
                 return None
             d = r.json()
@@ -371,7 +380,7 @@ class TickTickV2:
                                "sortType": "project",
                                "parent": (parent or "").lower().lstrip("#") or None}],
                       "update": []},
-                timeout=15)
+                timeout=_t(15))
             return bool(r.ok) and not (r.json().get("id2error") or {})
         except Exception:
             return False
@@ -389,7 +398,7 @@ class TickTickV2:
                 "https://api.ticktick.com/api/v2/batch/taskParent",
                 headers={**_base_headers(), "cookie": f"t={self.token}",
                          "content-type": "application/json"},
-                json=ops, timeout=15)
+                json=ops, timeout=_t(15))
             return bool(r.ok) and not (r.json().get("id2error") or {})
         except Exception:
             return False
@@ -407,7 +416,7 @@ class TickTickV2:
             r = requests.put("https://api.ticktick.com/api/v2/tag/rename",
                              headers={**_base_headers(), "cookie": f"t={self.token}",
                                       "content-type": "application/json"},
-                             json={"name": name, "newName": new_name}, timeout=15)
+                             json={"name": name, "newName": new_name}, timeout=_t(15))
             return bool(r.ok)
         except Exception:
             return False
@@ -421,7 +430,7 @@ class TickTickV2:
         try:
             r = requests.delete("https://api.ticktick.com/api/v2/tag",
                                 headers={**_base_headers(), "cookie": f"t={self.token}"},
-                                params={"name": name}, timeout=15)
+                                params={"name": name}, timeout=_t(15))
             return bool(r.ok)
         except Exception:
             return False
@@ -437,7 +446,7 @@ class TickTickV2:
             r = requests.get("https://api.ticktick.com/api/v2/countdown/list",
                              headers={**_base_headers(),
                                       "cookie": f"t={self.token}"},
-                             timeout=15)
+                             timeout=_t(15))
             if not r.ok:
                 return None
             j = r.json()
@@ -460,7 +469,7 @@ class TickTickV2:
                          "content-type": "application/json"},
                 json={"add": add or [], "update": update or [],
                       "delete": delete or []},
-                timeout=15)
+                timeout=_t(15))
             return bool(r.ok) and not (r.json().get("id2error") or {})
         except Exception:
             return False
@@ -475,7 +484,7 @@ class TickTickV2:
         try:
             kw = {"headers": {**_base_headers(), "cookie": f"t={self.token}",
                               "content-type": "application/json"},
-                  "timeout": 15}
+                  "timeout": _t(15)}
             url = f"https://api.ticktick.com/api/v2/{path}"
             r = (requests.post(url, json=body or {}, **kw) if method == "post"
                  else requests.get(url, **kw))
@@ -494,7 +503,7 @@ class TickTickV2:
                          "content-type": "application/json"},
                 json={"add": add or [], "update": update or [],
                       "delete": delete or []},
-                timeout=15)
+                timeout=_t(15))
             return bool(r.ok) and not (r.json().get("id2error") or {})
         except Exception:
             return False

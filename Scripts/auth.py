@@ -145,6 +145,7 @@ def main():
             "redirect_uri": REDIRECT_URI,
         },
         auth=(client_id, client_secret),
+        timeout=(4, 20),
     )
 
     if resp.status_code != 200:

@@ -5,22 +5,109 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib
 
 import requests  # noqa: E402
 from requests.adapters import HTTPAdapter  # noqa: E402
+from urllib3.exceptions import (  # noqa: E402
+    ConnectTimeoutError, MaxRetryError, NameResolutionError, NewConnectionError)
 from urllib3.util.retry import Retry  # noqa: E402
 
 BASE_URL = "https://api.ticktick.com/open/v1"
+
+# EVERY request is bounded: (connect, read) seconds, connect per ADDRESS and
+# api.ticktick.com has two. Vex 2026-09-28: one VPN relay could not reach
+# TickTick's servers for 27 minutes while the rest of the net worked (the
+# TickTick app timed out on the same hosts). With no timeout a connect waited
+# the kernel's 75 s per address, two addresses, four tries: an add and a
+# manual sync hung ten minutes each and said nothing, and the add pressed
+# twice in the meantime landed twice when the line came back.
+TIMEOUT = (4, 30)
+
+
+class _Retry(Retry):
+    """The retry rules plus one: a server that stays SILENT is not asked
+    again. A refused connection or a name that does not resolve fails in
+    milliseconds, so retrying those rides out a tunnel that is still coming
+    up after a wake; a connect timeout has already waited TIMEOUT[0] on every
+    address, and three more rounds of that is the hang TIMEOUT ends.
+    (urllib3 makes NewConnectionError and NameResolutionError subclasses of
+    ConnectTimeoutError, hence the second test.)"""
+
+    def increment(self, method=None, url=None, response=None, error=None,
+                  _pool=None, _stacktrace=None):
+        if (isinstance(error, ConnectTimeoutError)
+                and not isinstance(error, NewConnectionError)):
+            raise MaxRetryError(_pool, url, error) from error
+        return super().increment(method, url, response, error, _pool, _stacktrace)
+
 
 # Retry only genuine transient gateway errors with a short backoff.
 # NOT 500: TickTick returns HTTP 500 for its rate limit (300 requests / 5 min,
 # errorCode "exceed_query_limit"). Retrying that just spends more of the budget
 # and deepens the lockout - _check() below turns it into a clear RateLimitError
 # instead. Idempotent methods only - retrying POST could create duplicates.
-_RETRY = Retry(
+# read=1: a reply that timed out once is asked for once more, not three times.
+_RETRY = _Retry(
     total=3,
+    read=1,
     backoff_factor=0.5,  # 0.5s, 1s, 2s
     status_forcelist=[502, 503, 504],
     allowed_methods=["GET", "DELETE"],
     raise_on_status=False,
 )
+
+
+class Unreachable(requests.exceptions.ConnectTimeout):
+    """No connection to TickTick stood: the request never left this Mac, so
+    nothing changed over there. Still a requests ConnectionError AND a
+    Timeout, so every handler written for those keeps catching it. str() is
+    the toast."""
+
+
+class NoAnswer(requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError):
+    """Connected and sent, then TickTick went quiet or the line dropped. A
+    write MAY have landed, so the toast says to look before trying again."""
+
+
+def _never_connected(e):
+    """True when the transport failed BEFORE a connection stood (silent,
+    refused, no DNS): urllib3 hands those over as MaxRetryError with the
+    cause in .reason."""
+    inner = e.args[0] if e.args else None
+    return isinstance(getattr(inner, "reason", None), ConnectTimeoutError)
+
+
+def _why(e):
+    reason = getattr(e.args[0] if e.args else None, "reason", None)
+    if isinstance(reason, NameResolutionError):
+        return "no DNS, offline?"
+    if isinstance(reason, NewConnectionError):
+        return "no route"
+    return "server silent"
+
+
+class _Adapter(HTTPAdapter):
+    """The transport every request of the client leaves through: TIMEOUT on
+    every call that names none, the retry rules above, and transport failures
+    raised as the two classes above. An adapter and not a Session subclass,
+    so the client's session stays a plain requests.Session() (the seam the
+    suites put their fake server in)."""
+
+    def __init__(self, **kw):
+        kw.setdefault("max_retries", _RETRY)
+        super().__init__(**kw)
+
+    def send(self, request, **kw):
+        if kw.get("timeout") is None:
+            kw["timeout"] = TIMEOUT
+        try:
+            return super().send(request, **kw)
+        except requests.exceptions.SSLError as e:
+            raise NoAnswer("TickTick TLS failed · check before retrying") from e
+        except requests.exceptions.ConnectionError as e:
+            if _never_connected(e):
+                raise Unreachable(
+                    f"TickTick unreachable ({_why(e)}) · nothing changed") from e
+            raise NoAnswer("TickTick gave no answer · check before retrying") from e
+        except requests.exceptions.Timeout as e:
+            raise NoAnswer("TickTick gave no answer · check before retrying") from e
 
 
 # ── read provenance (the no-revert rule, Meal Prep bug 2026-09-24) ──────────
@@ -106,8 +193,9 @@ class TickTickAPI:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         })
-        adapter = HTTPAdapter(max_retries=_RETRY)
+        adapter = _Adapter()
         self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)    # no road around the bounds
 
     def create_project(self, name, group_id=None):
         payload = {"name": name, "kind": "TASK"}

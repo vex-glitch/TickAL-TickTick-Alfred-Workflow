@@ -19,7 +19,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "lib"))
 
 import config as cfg
-from api import TickTickAPI, RateLimitError
+from api import TickTickAPI, RateLimitError, Unreachable, NoAnswer
 import cache as cache_store
 import areas
 import reminders as rem
@@ -1264,6 +1264,8 @@ def main():
 
     except RateLimitError as e:
         print(f"⏳ {e}")
+    except (Unreachable, NoAnswer) as e:
+        print(f"⚠️ {e}")          # the sentence is the toast (api._Adapter)
     except Exception as e:
         print(f"Error: {e}")
 
