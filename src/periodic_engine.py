@@ -3343,14 +3343,16 @@ def mint_ahead(force=False):
 
 
 # ── verbs' engine halves ─────────────────────────────────────────────────────
-def resolve(spec):
-    """spec → (Period, task | None, minted). 'yesterday' never back-mints."""
+def resolve(spec, day=None):
+    """spec → (Period, task | None, minted). 'yesterday' never back-mints.
+    `day` pins the period: a late review opens the note of the period its
+    occurrence belongs to, not today's (routines.late_day, 2026-10-02)."""
     today = _today()
     if spec == "yesterday":
         p = pm.period_for("daily", today - timedelta(days=1))
         return p, lookup(build_index(), p), False
     kind = "daily" if spec == "daily" else spec
-    p = pm.period_for(kind, today)
+    p = pm.period_for(kind, day or today)
     task, minted = ensure_note(p)
     return p, task, minted
 

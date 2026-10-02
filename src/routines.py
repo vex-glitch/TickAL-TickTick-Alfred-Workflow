@@ -317,6 +317,29 @@ def shift_iso_days(iso, days):
 REVIEW_SLOTS = ("weekly", "monthly", "quarterly", "yearly")
 
 
+def late_day(slot, task, today=None):
+    """The day of a review routine's OPEN occurrence when that review runs
+    LATE, else None: the task is overdue and its day lies in an earlier
+    period of the slot than today. The one fact behind every "which period"
+    question on a late review: the journal pins to that period's note
+    (journal_pin), the note openers and the Start step's note window open
+    that period's note, the money door opens that month's note (Vex
+    2026-10-02: the September monthly review, run on 2 Oct, opened OCTOBER's
+    note). The day rolls at 04:00, so a run at 00:30 is not late."""
+    if slot not in REVIEW_SLOTS or not task:
+        return None
+    if today is None:
+        import dayroll
+        today = dayroll.today()
+    st = due_state(task, today)
+    if st["state"] != "overdue" or not st["date"]:
+        return None
+    import periodic_model as pm
+    if pm.period_for(slot, st["date"]) == pm.period_for(slot, today):
+        return None
+    return st["date"]
+
+
 def journal_pin(slot, task, today=None):
     """"@2026-12-31" when the review this journal belongs to runs LATE, else
     "". A review finished a day late still closes the occurrence it is for
@@ -326,20 +349,9 @@ def journal_pin(slot, task, today=None):
     2026-09-27; the quarterly on 1 October and the monthly on the 1st had
     the same hole). `task` is the routine's live task; the pin is the day of
     its OPEN occurrence, given only when that day lies in an earlier period
-    of the slot than today. The day rolls at 04:00, so a journal at 00:30 is
-    not late."""
-    if slot not in REVIEW_SLOTS or not task:
-        return ""
-    if today is None:
-        import dayroll
-        today = dayroll.today()
-    st = due_state(task, today)
-    if st["state"] != "overdue" or not st["date"]:
-        return ""
-    import periodic_model as pm
-    if pm.period_for(slot, st["date"]) == pm.period_for(slot, today):
-        return ""
-    return "@" + st["date"].isoformat()
+    of the slot than today (late_day)."""
+    day = late_day(slot, task, today)
+    return "@" + day.isoformat() if day else ""
 
 
 def due_state(task, today=None):

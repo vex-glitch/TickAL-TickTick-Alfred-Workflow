@@ -178,6 +178,25 @@ else:
           MISS({"startDate": "2026-10-31T06:00:00.000+0000"}, (), OCT2) is None)
     check("no task is safe", MISS(None, (), OCT2) is None and MISS({}, (), OCT2) is None)
 
+    # ── which period does a LATE review belong to (late_day, 2026-10-02) ──────
+    LD = rt.late_day
+    check("the September monthly run on 2 Oct belongs to September",
+          LD("monthly", TB("2026-09-30", LASTDAY), OCT2) == SEP30)
+    check("the Q3 quarterly run on 2 Oct belongs to Q3",
+          LD("quarterly", TB("2026-09-30", QLAST), OCT2) == SEP30)
+    check("on its day it is not late", LD("monthly", TB("2026-09-30", LASTDAY), SEP30) is None)
+    check("a weekly run on the Monday after belongs to the week that ended",
+          LD("weekly", TB("2026-09-27", SUNDAY), _dt.date(2026, 9, 28)) == _dt.date(2026, 9, 27))
+    check("overdue inside the same period is not late (a monthly two days late, same month)",
+          LD("monthly", TB("2026-10-29", "RRULE:FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=29"),
+             _dt.date(2026, 10, 31)) is None)
+    check("ahead is never late", LD("monthly", TB("2026-10-31", LASTDAY), OCT2) is None)
+    check("not a review slot = never late", LD("startup", TB("2026-09-30", DAILY), OCT2) is None)
+    check("no task = never late", LD("monthly", None, OCT2) is None)
+    check("journal_pin is late_day as a string",
+          rt.journal_pin("monthly", TB("2026-09-30", LASTDAY), OCT2) == "@2026-09-30"
+          and rt.journal_pin("monthly", TB("2026-10-31", LASTDAY), OCT2) == "")
+
     SH = rt.shift_iso_days
     check("the series moves back with its clock kept",
           SH("2026-10-31T06:00:00.000+0000", -31) == "2026-09-30T06:00:00.000+0000")

@@ -459,7 +459,7 @@ def _money(xact, as_sticky=False, as_window=False):
     as_sticky = the same note as a desktop sticky (no row-click retry);
     as_window = the same note in its live floating window."""
     import dayroll
-    today = dayroll.today()
+    today = _late_month(xact) or dayroll.today()   # a late review: ITS month
     pid, cs = rl.MONEY_LIST, xact.cache_store
     pool = [t for k in ("all_tasks", "all_notes") for t in (cs.get(k) or [])
             if t.get("projectId") == pid]
@@ -494,22 +494,41 @@ def _money(xact, as_sticky=False, as_window=False):
     return f"💰 {why} · opened {(target.get('title') or '')[:30]}"
 
 
-def _journal_pin(xact, slot):
-    """"@<day>" for a review journal whose review is running late (the
-    routine of that slot is overdue from an earlier period), "" otherwise
-    and whenever the routine's task cannot be read: no pin is today's note,
-    which is what the door always opened. The task is read LIVE: a cached
-    due date one Finish behind would pin last week's note on an on-time
-    run."""
+def _late_day(xact, slot):
+    """The day of a review's open occurrence when that review runs LATE (the
+    routine of that slot is overdue from an earlier period), None otherwise
+    and whenever the routine's task cannot be read: no day is today's
+    period, which is what every door always opened. The task is read LIVE: a
+    cached due date one Finish behind would pin last week's note on an
+    on-time run. routines.late_day holds the rule."""
     try:
         import routines as rt
         r = rt.by_key(slot)
         if not r or slot not in rt.REVIEW_SLOTS:
-            return ""
+            return None
         t = xact._api().get_task(r["pid"], r["tid"])
-        return rt.journal_pin(slot, t)
+        return rt.late_day(slot, t)
     except Exception:
-        return ""
+        return None
+
+
+def _journal_pin(xact, slot):
+    """"@<day>" for a review journal whose review is running late, "" else
+    (routines.journal_pin's string, from the same live read)."""
+    day = _late_day(xact, slot)
+    return "@" + day.isoformat() if day else ""
+
+
+def _late_month(xact):
+    """The (year, month) a money door should open while a monthly or
+    quarterly review runs late, else None. Vex 2026-10-02: the September
+    review on 2 Oct opened October's note; its "how much money this month"
+    is September's. The monthly outranks the quarterly (it runs first)."""
+    for slot in ("monthly", "quarterly"):
+        day = _late_day(xact, slot)
+        if day:
+            return day
+    return None
 
 
 def run(verb, tid, pid_hint):
@@ -533,15 +552,19 @@ def run(verb, tid, pid_hint):
         xact._pn_bg(f"xact:pn_journal:{tid}{_journal_pin(xact, tid)}")
         return "", True
     if verb == "note":                   # the CURRENT period's note: resolve /
-        return _quiet(xact.pn_open, tid), True    # lazy-mint, open, bg refresh
+        # lazy-mint, open, bg refresh - or, while that slot's review runs
+        # LATE, the note of the period the review is for (_late_day)
+        return _quiet(xact.pn_open, tid, day=_late_day(xact, tid)), True
     if verb == "notesticky":             # same note as a sticky, no row-click retry
         if not _tt_ready(xact):
             return "🗒️ TickTick not up · no sticky", False
-        return _sticky_call(lambda: _quiet(xact.pn_sticky, tid, assist=False)), True
+        return _sticky_call(lambda: _quiet(xact.pn_sticky, tid, assist=False,
+                                           day=_late_day(xact, tid))), True
     if verb == "notewindow":             # same note, LIVE - none of the
         if not _tt_ready(xact):          # snapshot machinery: a window is
             return "🪟 TickTick not up · no window", False   # found by NAME
-        return _window_call(lambda: _quiet(xact.pn_window, tid)), True
+        return _window_call(lambda: _quiet(xact.pn_window, tid,
+                                           day=_late_day(xact, tid))), True
     if verb == "view":                   # no ticktick:// route for these
         if tid == "calendar":
             xact._run_trigger("OpenCalendar")                 # its List-menu flow

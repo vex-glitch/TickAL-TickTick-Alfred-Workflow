@@ -7486,22 +7486,22 @@ def _pn_bg(arg):
         return None
 
 
-def pn_open(spec):
+def pn_open(spec, day=None):
     if not _pn_gate():
         return
     if spec not in _PN_SPECS:
         print(f"💫 Unknown period {spec!r}")
         return
     pe = _pn()
-    p, task, minted = pe.resolve(spec)
+    p, task, minted = pe.resolve(spec, day)
     if not task:
         print(f"💫 No note for {spec} yet")
         return
     # open FIRST, refresh in the background - the app-sync nudge redraws the
     # open note a few seconds later
     subprocess.run(["open", pe.open_link(task)], check=False)
-    if minted or not pe._refresh_fresh(p):
-        _pn_bg(f"xact:pn_refresh:{spec}")
+    if not day and (minted or not pe._refresh_fresh(p)):
+        _pn_bg(f"xact:pn_refresh:{spec}")   # refreshes the CURRENT period only
     import periodic_model as pm
     print(f"💫 {pm.title(p)} {'minted' if minted else 'open'}")
 
@@ -7527,7 +7527,7 @@ def pn_setloc(rest=""):
     print(f"🌦 Weather: {label}" + (f" · {line}" if line else ""))
 
 
-def pn_sticky(spec, assist=True):
+def pn_sticky(spec, assist=True, day=None):
     """assist=False (the link road) skips sticky()'s row-click retry."""
     if not _pn_gate():
         return
@@ -7535,18 +7535,18 @@ def pn_sticky(spec, assist=True):
         print(f"💫 Unknown period {spec!r}")
         return
     pe = _pn()
-    p, task, minted = pe.resolve(spec)
+    p, task, minted = pe.resolve(spec, day)
     if not task:
         print(f"💫 No note for {spec} yet")
         return
-    if minted or not pe._refresh_fresh(p):
+    if not day and (minted or not pe._refresh_fresh(p)):
         _pn_bg(f"xact:pn_refresh:{spec}")     # sticky opens NOW, note catches up
     pid = task.get("projectId") or task.get("_projectId") or ""
     os.environ["task_title"] = task.get("title") or "Note"
     sticky(pid, task.get("id"), assist=assist)
 
 
-def pn_window(spec):
+def pn_window(spec, day=None):
     """The period's note in a floating window: the live twin of pn_sticky,
     and the one that shows what we write while it is open."""
     if not _pn_gate():
@@ -7555,12 +7555,13 @@ def pn_window(spec):
         print(f"💫 Unknown period {spec!r}")
         return
     pe = _pn()
-    p, task, minted = pe.resolve(spec)
+    p, task, minted = pe.resolve(spec, day)
     if not task:
         print(f"💫 No note for {spec} yet")
         return
-    if minted or not pe._refresh_fresh(p):
+    if not day and (minted or not pe._refresh_fresh(p)):
         _pn_bg(f"xact:pn_refresh:{spec}")     # window opens NOW, note catches up
+        # (the current period's; a pinned past period is left as it is)
     pid = task.get("projectId") or task.get("_projectId") or ""
     os.environ["task_title"] = task.get("title") or "Note"
     task_window(pid, task.get("id"))
