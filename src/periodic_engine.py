@@ -1918,11 +1918,6 @@ def _fill_weekly(doc, p, index):
         ps.set_body(doc, pm.SEC_WBARS,
                     pm.ind(pm.done_week_lines(per_day)[:-1]), _in(pm.SEC_WBARS))
 
-    # ── 🥅 Aligned - the week's done work that served an objective, and each
-    # objective's done count + focus (HANDOFF_OKR phase 5, okr_stats)
-    lw_aligned = _fill_aligned(doc, p, live_end, comp_cur, comp_prev, t2,
-                               _in(pm.SEC_ALIGNED))
-
     # ── Focus - header total+chip, by-day body, Total bullet
     fbd = getattr(t2, "focus_by_day", lambda a, b: None)(p.start, live_end) if t2 else None
     if fbd is not None:
@@ -2017,8 +2012,6 @@ def _fill_weekly(doc, p, index):
         pf = getattr(t2, "focus_minutes", lambda a, b: None)(prev.start, prev.end) if t2 else None
         if pf:
             lw.append(f"- Focus: {pm.fmt_hm(pf)}")
-        if lw_aligned:
-            lw.append(lw_aligned)
         pmood = _mood_avg(index, prev.start, prev.end)
         if pmood is not None:
             lw.append(f"- Mood: {pmood:.1f} avg")
@@ -2049,107 +2042,6 @@ def _fill_weekly(doc, p, index):
         if top_lists:
             lw += ["- Top Lists"] + top_lists
         ps.set_body(doc, pm.SEC_LAST_WEEK, lw)
-
-
-def _okr_work(rows, plan_pid):
-    """The completed rows that count as WORK for 🥅 Aligned: ticked (the
-    feed carries won't-do rows too), the routine lists and small repeats
-    out (_drop_ignored, the rankings' rule - a Startup ticked seven times a
-    week serves no objective and would bury the ratio), the plan's own
-    copies and the periodic notes out."""
-    skip = {plan_pid, areas.PERIODIC_LIST_ID} - {"", None}
-    return [t for t in _drop_ignored(rows or [])
-            if t.get("status", 2) == 2
-            and (t.get("projectId") or t.get("_projectId") or "") not in skip]
-
-
-def _okr_rows_known():
-    """Every real task row the aligned join can walk for parent chains and
-    CTA titles: the open caches, this run's completed feed, the cached one."""
-    rows = []
-    for key in ("all_tasks", "all_notes", "completed_tasks"):
-        v = cache_store.get(key)
-        if isinstance(v, list):
-            rows += [t for t in v if isinstance(t, dict)]
-    rows += [t for _d, t in (_completed_batch() or [])]
-    return rows
-
-
-OKR_CTA_KEY = "okr_cta_lists"     # {CTA task id: [list ids]} - okr_stats
-
-
-def _fill_aligned(doc, p, live_end, comp_cur, comp_prev, t2, within):
-    """- 🥅 Aligned: 68% • 17/25 • 🟢 ▲ 7 pts, one line per objective under
-    it (its done count and focus). The plan from the CACHE (_okr_plan, like
-    🥅 OKRs); the join is okr_stats.Aligned - links only, so a plan whose
-    items link nothing says "no linked OKR items" instead of a 0% that
-    would lie. -> the ⏪ Last week line, or None.
-
-    The bullet missing = Vex deleted it = nothing written and nothing read
-    (checked before the focus timeline is paged)."""
-    lid, items = _okr_plan()
-    if not lid or not items or comp_cur is None:
-        return None
-    if ps.find_prefix(doc, pm.SEC_ALIGNED, within) is None:
-        return None
-    try:
-        import okr
-        import okr_notes
-        import okr_stats
-        rows = _okr_rows_known()
-        cta = ""
-        try:
-            import okr_write
-            cta = okr_write._cta_pid()
-        except Exception:
-            pass
-        # the CTA titles seen so far, kept: an O links the CTA it was
-        # imported with, and a completed CTA drops out of every cache
-        seen = cache_store.get(OKR_CTA_KEY)
-        seen = seen if isinstance(seen, dict) else {}
-        merged = {**seen, **okr_stats.cta_list_map(rows, cta)}
-        if merged != seen:
-            cache_store.set(OKR_CTA_KEY, merged)
-        al = okr_stats.Aligned(items, rows, lid, cta=cta, cta_lists=merged)
-        if not al.any():
-            _set_headed(doc, pm.SEC_ALIGNED, "no linked OKR items", [], within)
-            return None
-        served, total, per = okr_stats.aligned_counts(_okr_work(comp_cur, lid), al)
-        prev_line, prev_pct = None, None
-        if comp_prev is not None:
-            ps_, pt_, _per = okr_stats.aligned_counts(_okr_work(comp_prev, lid), al)
-            prev_pct = okr_stats.pct(ps_, pt_)
-            if pt_:
-                prev_line = f"- 🥅 Aligned: {prev_pct}%{okr_notes.SEP}{ps_}/{pt_}"
-        recs = getattr(t2, "focus_records", lambda a, b: None)(p.start, live_end) if t2 else None
-        focus = okr_stats.focus_per_owner(recs, al) if recs is not None else {}
-        cur_pct = okr_stats.pct(served, total)
-        head = (f"{cur_pct}%{okr_notes.SEP}{served}/{total}" if total
-                else "nothing done yet")
-        ch = okr_stats.pts_chip(cur_pct, prev_pct)
-        by = okr.index(items)
-        body = []
-        # a full order - ties in set order would flip between runs and
-        # rewrite an unchanged note (review 2026-09-19)
-        for oid in sorted(set(per) | set(focus),
-                          key=lambda o: (-per.get(o, 0), -focus.get(o, 0),
-                                         okr._order(by[o]) if o in by else
-                                         (True, date.max, ""), o)):
-            it = by.get(oid)
-            if it is None:
-                continue
-            ln = (f"- {okr_notes.GLYPH.get(it.kind, '▫️')} {it.name}"
-                  f"{okr_notes.SEP}{per.get(oid, 0)} done")
-            if focus.get(oid):
-                ln += f"{okr_notes.SEP}{pm.fmt_hm(focus[oid])}"
-            body.append(ln)
-        _set_headed(doc, pm.SEC_ALIGNED,
-                    head + (f"{okr_notes.SEP}{ch}" if ch else ""),
-                    pm.ind(body[:8]), within)
-        return prev_line
-    except Exception as e:
-        _log(f"aligned: {type(e).__name__}: {e}")
-        return None
 
 
 def _fill_review(doc, sec_name=None, rid=None):
@@ -3285,20 +3177,21 @@ def _fill_rollup_money(doc, p, index):
                     pm.rollup_money_lines(lines, pm.sum_in_period(day_sums, p) + kept))
 
 
-# ── 🥅 OKRs (HANDOFF_OKR phase 4) ────────────────────────────────────────────
-# Vex 2026-09-19: "We should also then have the OKRs section in periodic
-# notes. All of them. With all levels." The lines are built in src/okr_notes.py
-# (pure); this is only the plumbing: the plan from the CACHE, the goals from
-# each tier's own note, one write per section.
-_OKR_PLAN = [0.0, None, []]       # [read at, list id, items] - one read per run
-OKR_PLAN_TTL = 60
+# ── 🥅 OKRs (HANDOFF_OKR section 8, the board) ───────────────────────────────
+# Vex 2026-10-03: "our notes and journals should somehow mimic these OKRs
+# now." The lines are built in src/okr_notes.py (pure) off the board
+# src/okr_board.py reads; this is only the plumbing: the board from the
+# CACHE, one write per section.
+_OKR_BOARD = [0.0, None, None]       # [read at, list id, board] - one read per run
+OKR_BOARD_TTL = 60
 
 
-def _okr_plan():
-    """(list id, [okr.Item]) from the caches only (okr_write.cached_plan) -
-    never the network: a refresh runs on every note open and at 04:30, and
-    the plan's live read belongs to the hub and the hourly sync. OKRs off
-    (a blank okr_list_id) or nothing cached = ("", []) / (id, []), and the
+def _okr_board():
+    """(list id, okr_board.Board | None) from the caches only
+    (okr_board.cached) - never the network: a refresh runs on every note
+    open and at 04:30, and the board's live read belongs to the hub and the
+    hourly sync (which keeps okr_done, the completed cards). OKRs off (a
+    blank okr_list_id) or nothing cached = ("", None) / (id, None), and the
     section stays as it is. Held for a minute, so the 04:30 run's five
     refreshes read the caches once."""
     try:
@@ -3306,33 +3199,33 @@ def _okr_plan():
     except Exception:
         lid = ""
     if not lid:
-        return "", []
+        return "", None
     now = time.time()
-    if _OKR_PLAN[1] == lid and now - _OKR_PLAN[0] < OKR_PLAN_TTL:
-        return lid, _OKR_PLAN[2]
+    if _OKR_BOARD[1] == lid and now - _OKR_BOARD[0] < OKR_BOARD_TTL:
+        return lid, _OKR_BOARD[2]
     try:
-        import okr_write
-        items = okr_write.cached_plan(lid)
+        import okr_board
+        board = okr_board.cached(lid)
     except Exception as e:
-        _log(f"okr plan: {e}")
-        items = []
-    _OKR_PLAN[:] = [now, lid, items]
-    return lid, items
+        _log(f"okr board: {e}")
+        board = None
+    _OKR_BOARD[:] = [now, lid, board]
+    return lid, board
 
 
 def _fill_okr(doc, p, index):
     """🥅 OKRs on every tier, plus the yearly 🎯 Goals scorecard.
 
     LIVE notes only - refresh_period calls this inside its live window; a
-    sealed note keeps the plan it had while it was running, the way it keeps
-    its numbers. The section missing = Vex deleted it = the kill switch, and
-    nothing is written. The plan only: the goals he picks stay in 🏆 Goals
-    below and are not repeated here (Vex 2026-09-19, "Please remove those")."""
+    sealed note keeps the board it had while it was running, the way it
+    keeps its numbers. The section missing = Vex deleted it = the kill
+    switch, and nothing is written. The board only: the goals he picks stay
+    in 🏆 Goals below and are not repeated here (Vex 2026-09-19)."""
     import okr_notes
     sec = ps.find(doc, pm.SEC_OKR)
     # EXACT hits only: ps.find's normalized pass would hand back any bullet
     # that normalizes to "okrs" ("- OKRs" under 📓 Notes) once the section is
-    # deleted, and the plan would overwrite what Vex wrote under it
+    # deleted, and the board would overwrite what Vex wrote under it
     if sec is not None and sec.name != pm.SEC_OKR:
         sec = None
     if sec is None:
@@ -3341,17 +3234,15 @@ def _fill_okr(doc, p, index):
         # would also delete the yearly goals, which live there)
         return
     card = ps.find(doc, pm.SEC_SCORECARD) if p.kind == "yearly" else None
-    lid, items = _okr_plan()
-    if not items:
+    lid, board = _okr_board()
+    if board is None:
         return
-    today = _today()
     if card is not None:
         # the plan half only: the scorecard is also where the yearly goals
         # live (pm.GOAL_SECTION), and merge_scorecard keeps every one of them
         ps.set_sec_body(doc, card, okr_notes.merge_scorecard(
-            card.body, okr_notes.scorecard_lines(p, items, today, lid)))
-    ps.set_sec_body(doc, sec, okr_notes.okr_section_lines(
-        p.kind, p, items, today, lid))
+            card.body, okr_notes.scorecard_lines(p, board, lid)))
+    ps.set_sec_body(doc, sec, okr_notes.okr_section_lines(p.kind, p, board, lid))
 
 
 # ── the 04:30 run ────────────────────────────────────────────────────────────

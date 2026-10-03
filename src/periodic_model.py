@@ -115,8 +115,6 @@ SEC_CREATED    = "Created"                # prefix - header carries the data
 SEC_COMPLETED  = "Completed"              # prefix
 SEC_WBARS      = "Daily Completed"        # per-day bars
 SEC_FOCUS_WEEK = "Focus"                  # prefix
-SEC_ALIGNED    = "🥅 Aligned"             # prefix - the week's work that served an
-                                          # objective (HANDOFF_OKR phase 5)
 SEC_ENTRIES    = "📨 Entries"
 SEC_MOODS      = "😊 Moods"               # prefix - header carries the average
 SEC_LAST_WEEK  = "⏪ Last week"
@@ -263,7 +261,7 @@ WRITER_ANCHORS = {
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK,
                   SEC_WEEKLY_JNL, SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME,
-                  SEC_PEOPLE, SEC_ALIGNED],
+                  SEC_PEOPLE],
     "monthly":   [SEC_OKR, SEC_MTH_QTR, SEC_MTH_MONTH, SEC_HIGHLIGHT,
                   SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
                   SEC_MBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
@@ -295,7 +293,7 @@ SECTION_SCOPE = {
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_WBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
-        SEC_HABIT_WEEK: SEC_WK_STATS, SEC_ALIGNED: SEC_WK_STATS,
+        SEC_HABIT_WEEK: SEC_WK_STATS,
         SEC_HL_WEEK: SEC_WK_DATA,
         SEC_ENTRIES: SEC_WK_DATA, SEC_MOODS: SEC_WK_DATA,
         SEC_INCOME: SEC_WK_DATA, SEC_PEOPLE: SEC_WK_DATA,
@@ -1838,7 +1836,7 @@ def journal_fixed(slot, ctx=None):
                       "if done, makes the day a success?"),
             ("goal", goal_q),
         ]
-        # 🔑 today's key result and 🥅 the month's objectives (Vex 2026-09-24:
+        # 🔑 the month's key results and 🥅 its objectives (Vex 2026-09-24:
         # "Currently we only ask about goal"), each only when the note's
         # 🥅 OKRs section plans one (ruling: skip, never ask about nothing).
         # Then 🔮 the morning forecast quoted back, always. ctx text comes
@@ -1846,7 +1844,7 @@ def journal_fixed(slot, ctx=None):
         kr = (ctx.get("kr") or "").strip()
         if kr:
             word = "key results" if " · " in kr else "key result"
-            out.append(("kr", f"🔑 Did you achieve or make progress on today's {word}, {kr}?"))
+            out.append(("kr", f"🔑 Did you achieve or make progress on this month's {word}, {kr}?"))
         objs = (ctx.get("objectives") or "").strip()
         if objs:
             word = "objectives" if " · " in objs else "objective"
@@ -1908,7 +1906,7 @@ def journal_fixed(slot, ctx=None):
                 when = (f"with {left} month{'s' if left != 1 else ''} left" if left
                         else "with the quarter still running")
                 q = (f"🌓 The quarter's objectives, {quarter}, {when}: still the right "
-                     "ones? What to cut, add or move in the timeline?")
+                     "ones? What to cut, add or move on the board?")
             out.append(("qcheck", q))
         habits = (ctx.get("habits") or "").strip()
         if habits:
@@ -1951,7 +1949,7 @@ def journal_fixed(slot, ctx=None):
                       + (f" Your days: {days}" if days else "")),
         ("wgoals", goals_q),
     ]
-    # 🥅 the month's objectives BEFORE 🔑 the week's key results (ruling),
+    # 🥅 the month's objectives BEFORE 🔑 its key results (ruling),
     # then 🔄 the habit line off 📊 Stats; each only when the note has it.
     # "What is on your mind?" is the border before the ten drawn prompts; the
     # three-things picker still follows the whole run.
@@ -1962,7 +1960,7 @@ def journal_fixed(slot, ctx=None):
     kr = (ctx.get("kr") or "").strip()
     if kr:
         word = "key results" if " · " in kr else "key result"
-        out.append(("kr", f"🔑 Did you achieve or make progress on this week's {word}, {kr}?"))
+        out.append(("kr", f"🔑 Did you achieve or make progress on this month's {word}, {kr}?"))
     habits = (ctx.get("habits") or "").strip()
     if habits:
         out.append(("habits", f"🔄 Habit consistency this week: {habits}. "
@@ -2741,44 +2739,146 @@ def days_summary(children):
     return "; ".join(c for c in children if c)
 
 
-def okr_journal_ctx(body_lines, kr_tier="daily", keep_state=False):
-    """(the `kr_tier` bullet's KR titles, this month's objectives with their
-    d/n), each " · "-joined: okr_tier_items twice."""
-    return (" · ".join(okr_tier_items(body_lines, kr_tier, keep_state)),
-            " · ".join(okr_tier_items(body_lines, "monthly")))
+_OKR_SEP = " \u2022 "
+_OKR_DN_RE = re.compile(r"^(?P<name>.*\S)\s+(?P<dn>\d+/\d+)(?:\s*\u2022.*)?$")
+_OKR_NO_OBJ_RE = re.compile(r"\s*\u2022\s*no objectives yet.*$")
+OKR_KR_QUOTE_CAP = 8      # key results a journal question quotes before "+N more"
+
+
+def _okr_bullets(body_lines):
+    """[(depth, text)] for the bullets of a 🥅 OKRs body. Depth is RELATIVE:
+    the distinct indent widths seen, ranked - so the engine's tabs and a
+    phone's spaces both read, whatever the unit."""
+    rows = []
+    for ln in body_lines or []:
+        s = unescape_md((ln or "").rstrip())
+        stripped = s.lstrip()
+        if not stripped.startswith("- "):
+            continue
+        lead = s[:len(s) - len(stripped)]
+        rows.append((lead.count("\t") * 4 + lead.count(" "), stripped[2:].strip()))
+    widths = sorted({w for w, _t in rows})
+    return [(widths.index(w), t) for w, t in rows]
+
+
+_TIER_GLYPHS = {e.replace("\ufe0f", "") for e in TIER_EMOJI.values()}
+
+
+def _old_shape(label):
+    """A 2026-09 bullet: "🎉 2026", "🌓 Q3", "🗓️ Sep", "♻️ W38", "☀️ Sat 19" -
+    its plan items sit one level under it. Closed notes keep that shape
+    (a sealed note is never rewritten), and a late journal still reads
+    them."""
+    head = (label.split(" ", 1)[0] if label else "").replace("\ufe0f", "")
+    return head in _TIER_GLYPHS
+
+
+def _okr_item(text):
+    """"🥅 [Name](url) 3/5 \u2022 chips" -> (name, "3/5" | None, glyph): the
+    plan glyph taken off, the link flattened, a 🔴 Nd late chip (the old
+    shape's) dropped, the count read as the LAST d/n before the chips (a
+    name may carry one of its own, and a name may carry the separator:
+    "Audits \u2022 Execute & Establish")."""
+    head, _, rest = text.partition(" ")
+    state = ""
+    if head.replace("\ufe0f", "") in _PLAN_GLYPHS:
+        state, text = head, rest.strip()
+    text = re.sub(r"\s+", " ", _LATE_CHIP_RE.sub("", _MDLINK_RE.sub(r"\1", text))).strip()
+    m = _OKR_DN_RE.match(text)
+    if m:
+        return m.group("name"), m.group("dn"), state
+    return _OKR_NO_OBJ_RE.sub("", text).strip(), None, state
+
+
+def okr_board_ctx(body_lines):
+    """The 🥅 OKRs section read back (okr_notes.okr_section_lines' shape,
+    HANDOFF_OKR section 8): one entry per top bullet - a month ("🔟
+    October") or a year's goals ("🏔️ 2027 Goals") - with its objectives
+    (depth 2 under the area bullets; the goals bullet's goals) and its key
+    results (depth 3), each (name, "d/n" | None, glyph). "+N more" lines
+    are skipped."""
+    out, cur = [], None
+    for depth, text in _okr_bullets(body_lines):
+        if depth == 0:
+            label = text.split(_OKR_SEP)[0].strip()
+            cur = {"kind": "goals" if re.search(r"\bGoals\b", label) else "month",
+                   "label": label, "old": _old_shape(label), "items": [], "krs": []}
+            out.append(cur)
+        elif cur is None or text.startswith("+"):
+            continue
+        elif cur["old"]:
+            # the 2026-09 shape: the plan items one level under the bullet
+            if depth == 1:
+                cur["items"].append(_okr_item(text))
+        elif depth == 1:
+            continue                                    # an area
+        elif depth == 2:
+            cur["items"].append(_okr_item(text))
+        else:
+            cur["krs"].append(_okr_item(text))
+    return out
+
+
+def _okr_named(items):
+    return [f"{n} {dn}" if dn else n for n, dn, _g in items if n]
 
 
 def okr_tier_items(body_lines, tier, keep_state=False):
-    """The `tier` bullet's plan items (names with their d/n) off a 🥅 OKRs
-    section body (okr_notes.okr_section_lines shape: a tier bullet, its plan
-    indented under it), [] when the tier has no plan. Done items keep their
-    name (the question is about progress); keep_state=True keeps their
-    ✅/🔑 glyph too (the weekly asks about the week's whole list). Lines are
-    unescaped first: the app backslashes the link brackets."""
-    def kids(emoji):
-        base = emoji.replace("️", "")
-        out, on = [], False
-        for ln in body_lines or []:
-            s = unescape_md(ln.strip())
-            if not s.startswith("- "):
-                continue
-            indented = ln[:1] in ("\t", " ")
-            if not indented:
-                on = s[2:].replace("️", "").startswith(base)
-                continue
-            if on and not s[2:].startswith("+"):
-                out.append(s[2:])
+    """What a journal question quotes off a 🥅 OKRs body, by `tier`:
+      monthly    the FIRST month bullet's objectives, "name d/n"
+      quarterly  the objectives of EVERY month bullet the note shows (the
+                 monthly note carries its quarter's months, the quarterly
+                 its three), one per name
+      yearly     the year's goals (the 🏔️ Goals bullet), with the roll-up
+                 count when a month plans the goal
+      daily / weekly  the first month's key results by name (a done one
+                 too: the question is about progress), each with its ✅/🔑
+                 glyph when keep_state is True (the weekly's list)
+    A note of the 2026-09 shape (tier bullets: 🎉 🌓 🗓️ ♻️ ☀️) reads as it
+    did: the bullet of the tier's own emoji, its items one level under it.
+    [] when the note has no such bullet."""
+    ctx = okr_board_ctx(body_lines)
+    emoji = TIER_EMOJI.get(tier, TIER_EMOJI["daily"]).replace("\ufe0f", "")
+    old = next((c for c in ctx if c["old"] and c["label"].replace("\ufe0f", "").startswith(emoji)), None)
+    if old is not None or any(c["old"] for c in ctx):
+        items = old["items"] if old is not None else []
+        if tier in ("daily", "weekly"):
+            return ([f"{g} {n}".strip() for n, _dn, g in items if n] if keep_state
+                    else [n for n, _dn, _g in items if n])
+        return _okr_named(items)
+    months = [c for c in ctx if c["kind"] == "month"]
+    goals = [c for c in ctx if c["kind"] == "goals"]
+    if tier == "monthly":
+        return _okr_named(months[0]["items"]) if months else []
+    if tier == "quarterly":
+        out, seen = [], set()
+        for c in months:
+            for n, dn, _g in c["items"]:
+                if n and n.casefold() not in seen:
+                    seen.add(n.casefold())
+                    out.append(f"{n} {dn}" if dn else n)
         return out
+    if tier == "yearly":
+        return _okr_named(goals[0]["items"]) if goals else []
+    if not months:
+        return []
+    krs = months[0]["krs"]
+    if keep_state:
+        return [f"{g} {n}".strip() for n, _dn, g in krs if n]
+    # done ones keep their name: the question is about progress (ruling
+    # 2026-09-24), and a won't-do one is never written into the section
+    return [n for n, _dn, _g in krs if n]
 
-    def name(item, state=False):
-        s = re.sub(r"\s+", " ", _LATE_CHIP_RE.sub("", _MDLINK_RE.sub(r"\1", item))).strip()
-        head, _, rest = s.partition(" ")
-        if head.replace("️", "") in _PLAN_GLYPHS:     # only a glyph is stripped
-            return f"{head} {rest.strip()}" if state else rest.strip()
-        return s
 
-    items = [name(x, keep_state) for x in kids(TIER_EMOJI.get(tier, TIER_EMOJI["daily"]))]
-    return [x for x in items if x]
+def okr_journal_ctx(body_lines, kr_tier="daily", keep_state=False):
+    """(this month's key results, this month's objectives with their d/n),
+    each " · "-joined - the evening's and the weekly's set questions. The
+    key results are capped (OKR_KR_QUOTE_CAP, then "+N more"): October 2026
+    alone planned 21, and a question is read, not scrolled."""
+    krs = okr_tier_items(body_lines, kr_tier, keep_state)
+    if len(krs) > OKR_KR_QUOTE_CAP:
+        krs = krs[:OKR_KR_QUOTE_CAP] + [f"+{len(krs) - OKR_KR_QUOTE_CAP} more"]
+    return (" · ".join(krs), " · ".join(okr_tier_items(body_lines, "monthly")))
 
 
 # the count is the LAST d/n on the line that the separator, a late chip or
@@ -2802,11 +2902,16 @@ def scorecard_objectives(body_lines):
             continue
         s = unescape_md(ln.strip())[2:]
         _glyph, _, rest = s.partition(" ")
-        rest = _SCORE_BAR_RE.sub("", _MDLINK_RE.sub(r"\1", rest))
-        m = _SCORE_DN_RE.match(re.sub(r"\s+", " ", rest).strip())
-        if not m:
-            continue
-        item = f"{m.group('name')} {m.group('dn')}"
+        rest = re.sub(r"\s+", " ", _SCORE_BAR_RE.sub("", _MDLINK_RE.sub(r"\1", rest))).strip()
+        m = _SCORE_DN_RE.match(rest)
+        if m:
+            item = f"{m.group('name')} {m.group('dn')}"
+        else:
+            # a year goal no month plans for ("Post • no objectives yet •
+            # Work 1️⃣", okr_notes.scorecard_lines): its name alone
+            item = rest.split(" \u2022 ")[0].strip()
+            if not item:
+                continue
         if ln[:1] in ("\t", " ") and groups:
             groups[-1][1].append(item)
         else:
@@ -2963,11 +3068,11 @@ _REF_WORDS = (
 PROMPT_REFS = {
     "morning":   ((("goal",), "goal", "🎯 Today's goal"),),
     "evening":   ((("goal",), "goal", "🎯 Today's goal"),
-                  (("goal", "okr"), "kr", "🔑 Today's key results"),
+                  (("goal", "okr"), "kr", "🔑 This month's key results"),
                   (("goal", "okr"), "objectives", "🥅 This month's objectives")),
     "weekly":    ((("goal",), "goals", "🎯 Your weekly goals"),
                   (("goal", "okr"), "objectives", "🥅 This month's objectives"),
-                  (("goal", "okr"), "kr", "🔑 This week's key results"),
+                  (("goal", "okr"), "kr", "🔑 This month's key results"),
                   (("habit",), "habits", "🔄 Habit consistency")),
     "monthly":   ((("goal",), "goals", "🎯 Your monthly goals"),
                   (("goal", "okr"), "objectives", "🥅 This month's objectives"),
@@ -2975,7 +3080,7 @@ PROMPT_REFS = {
                   (("habit",), "habits", "🔄 Habit consistency")),
     "quarterly": ((("goal",), "goals", "🎯 Your quarterly goals"),
                   (("goal", "okr"), "objectives", "🥅 This quarter's objectives"),
-                  (("goal", "okr"), "year", "🎉 The year's objectives"),
+                  (("goal", "okr"), "year", "🏔️ The year's goals"),
                   (("habit",), "habits", "🔄 Habit consistency")),
     "yearly":    ((("goal",), "goals", "🎯 Your yearly goals"),
                   (("goal", "okr"), "objectives", "🥅 This year's objectives"),
@@ -3168,9 +3273,11 @@ def strip_md_links(s):
 # beside the plan, in the quarterly note's 🎉 Yearly goal mirror, and as
 # removable rows in the yearly goal editor. The shape is narrow on purpose:
 # a bullet with NO checkbox, a 🏔️ or 🥅 straight after the dash, a d/n
-# count - a picked goal is always "- [ ] …" (goal_line).
+# count or the scorecard's "• no objectives yet" chip (a year goal no month
+# plans an objective for, okr_notes.scorecard_lines) - a picked goal is
+# always "- [ ] …" (goal_line).
 PLAN_LINE_RE = re.compile(
-    r"^\s*- (?:\U0001F3D4\ufe0f?|\U0001F945\ufe0f?) .*\b\d+/\d+\b")
+    r"^\s*- (?:\U0001F3D4\ufe0f?|\U0001F945\ufe0f?) .*(?:\b\d+/\d+\b|\u2022 no objectives yet\b)")
 
 
 def is_plan_line(line):

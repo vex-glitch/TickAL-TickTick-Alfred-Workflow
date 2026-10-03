@@ -1,4 +1,12 @@
-# HANDOFF_OKR - the goals (OKR) workflow
+# HANDOFF_OKR - the OKRs workflow
+
+**READ THIS FIRST (2026-10-03).** Section 8 is the current world: the 🔑OKRs
+list is a KANBAN BOARD of month columns that Vex schedules by hand, and
+TickAL only READS it (src/okr_board.py, the hub screens, the notes). Sections
+1 to 7 describe the 2026-09 copy model (planning copies, pace, ripple,
+auto-tick, countdowns, import) that was deleted that day; they are kept for
+the reasoning and the traps, nothing in them is live.
+
 
 Started 2026-09-18. Source of truth for every phase of the OKR workflow: Vex's
 model, his decisions, the defaults he did not object to, the data rules, and
@@ -521,3 +529,152 @@ Then the quarterly journal, shipped 2026-09-24 on top of it (HANDOFF_ROUTINES se
   O drop out of a month it still has KRs in. The hub Y/O rows also took the
   📈 Pace rows' words ("d/n KRs · N due · behind Nd", the ⏳ elapsed chip
   dropped) - Vex: "pace should be in top list just as is in pace row".
+
+## 8. 2026-10-03 - THE BOARD (the copy model deleted, rewritten from scratch)
+
+Vex, after rescheduling his OKRs by hand: "we need to change it drastically
+... I think we need to rewrite it from scratch. Mistake I made is that I
+tried planning my current timeline of work and called it OKRs. What I will
+be doing instead is using OKRs only as a inspo board kind of." Then: "The
+only thing I think our workflow needs is rows where I can quickly read my
+OKRs. Like current month should be up top and rest of the months should be
+below. Enter would lead to list of objectives and krs. Use emojis I
+provided. In lists, use areas as separators just like they are in kanban
+boards. Imitate them in lists. Second thing is that our notes and journals
+should somehow mimic these OKRs now." The proposal of that afternoon was
+approved whole ("All good"), with its recommendations.
+
+### The board (his, read as laid out)
+
+- The list is still `okr_list_id` (default `6aac1b808f089e43641f5e90`, now
+  named 🔑OKRs), viewMode kanban. Columns: `<YYYY> Goals` and twelve month
+  columns per year named with keycaps - `1️⃣ 2027` ... `9️⃣ 2027`, `🔟 2027`,
+  `1️⃣1️⃣ 2027`, `1️⃣2️⃣ 2027` (2026 from October). Any other column ("Not
+  Sectioned") is not part of the board (its cards count on the hub's last
+  row).
+- Month column: the CARD is an area `🏔️ <Name> <N>️⃣` (the keycap at the end
+  is the area number, 1 Work ... 6 Manager), its subtasks are `🥅`
+  objectives, theirs `🔑` key results. Goals column: the area's children are
+  `🏔️` year goals. Titles may be markdown links (Eagle folders, TickTick
+  tasks); the link is kept.
+- A subtask mostly sits in "Not Sectioned" on the server: a card's month is
+  its TOP card's column. Dates are never read. Same-named area cards in a
+  column fold into one area, same-named objectives under an area into one
+  objective (he builds months by pasting blocks; March 2028 held nine
+  Learning cards before his tidy).
+- Progress = ticked KRs over all KRs, a won't-do one out of both. A year
+  goal rolls up the same-named monthly objectives of its year (by casefold
+  name; "Edit" and "Post" do not meet, and he knows: "a roll-up would be
+  partial" was in the proposal he approved).
+- The old naming (`🏔️ Y •`, `🥅 O •`, `🔑 KR • name - CODE`) is parsed
+  tolerantly; the October to December 2026 cards were renamed to the bare
+  style the same day, through the TickTick MCP, together with the tidy he
+  approved (four strays reparented, three empty subtasks and one duplicate
+  card deleted, eleven subtasks' columns normalized, 🏔️ Productivity System
+  put under a new 🏔️ VexOS 4️⃣ card in 2026 Goals).
+
+### What ships (zero canvas)
+
+- `src/okr_board.py` - the model + loader. PURE `build(list_id, name,
+  columns, tasks)`; `load()` = v1 project data (open cards + columns) + v2
+  project_completed, both cached (`project_data_<id>`, `okr_done`);
+  `cached()` = the caches only (the notes' road); `refresh_done()` = what
+  the hourly sync calls (a read; nothing is written to TickTick);
+  `home_columns(board, today)` = the hub root's order; `month_for(kind,
+  p)` = which month a note reads (a week: its Thursday's month);
+  `goal_choices` lives in okr_notes. `python3 src/okr_board.py` (through
+  py.sh) prints the board.
+- Hub (browse.py `render_okr`): `ctx:okr` root = head row (⏎ the board in
+  TickTick), this month, this year's Goals, the months ahead with each later
+  year's Goals before its January, LAST the earlier months still holding an
+  open KR; a typed bar searches every card. `ctx:okr:m:<YYYY-MM>` /
+  `ctx:okr:m:now` = the column as the board shows it (areas as DEAD
+  separator rows, objectives as task rows, KRs indented six spaces, loose
+  KRs after the objectives, strays under "🏔️ Unsorted"); `ctx:okr:g:<YYYY>`
+  = the Goals column with roll-ups. Chords: month rows ride the BrowseCtx
+  trampoline (`xact:crmbrowse:ctx:okr:…`, ⌥ the same hop as a variable);
+  card rows ⏎ `open:` the card, ⌘ Actions (full task vars), ⌥⌘ copy link,
+  ⌥ the linked TickTick task's subtasks or the linked list; ⇧ on a KR =
+  `complete:` / `uncomplete:` / `xact:wontdo_undo:` (the ONLY write).
+  `_okr_seal` still enforces six chords on every row and ⌘ dead on non-task
+  rows. The live read is reused for 45 s (okr_done's mtime); a typed bar
+  never reads the network.
+- Notes (`src/okr_notes.py`, engine `_okr_board` + `_fill_okr`): the 🥅
+  OKRs section = one bullet per column (`- 🔟 October • 4/25 KRs`), areas
+  under it (`\t- 🏔️ VexOS 4️⃣ • 4/25 KRs`), objectives (`\t\t- 🥅 [name](card
+  link) 3/5`), KRs (`\t\t\t- ✅ / 🔑 [name](link)`, KR_CAP 8 then "+N
+  more"). Daily and weekly = this month whole; monthly = its month whole +
+  the quarter's other months objectives only; quarterly = the year's Goals
+  bullet (`- 🏔️ 2026 Goals • 1 goal`, areas, goals with roll-up) + its three
+  months objectives only; yearly = the Goals bullet + its planned months.
+  The yearly 🎯 Goals scorecard gets FLAT goal lines (`- 🏔️ [Draw](link)
+  ▱▱▱▱▱ 0/12 • 12 months • Work 1️⃣`, or `• no objectives yet • Work 1️⃣`;
+  pm.PLAN_LINE_RE learned that chip) and merge_scorecard keeps his goals as
+  before. Kill switch unchanged: no 🥅 OKRs section (EXACT name) = nothing
+  written, the scorecard included.
+- Readers (`pm.okr_board_ctx`, `okr_tier_items`, `okr_journal_ctx`): depth
+  is RELATIVE (the distinct indent widths ranked, so tabs and a phone's
+  spaces both read); the 2026-09 shape (tier-emoji bullets, items one level
+  under) still reads as it did, because closed notes keep it and a late
+  journal still quotes them. monthly = the first month bullet's objectives;
+  quarterly = every month bullet's objectives, one per name; yearly = the
+  Goals bullet; daily/weekly = the first month's KRs (done ones named too,
+  the question is about progress; keep_state keeps ✅/🔑), capped at
+  OKR_KR_QUOTE_CAP 8. The evening and weekly questions now say "this
+  month's key results"; the labels under a question: "🔑 This month's key
+  results", "🏔️ The year's goals"; the monthly's qcheck says "on the board".
+- Pickers (`periodic_rows.plan_goal_rows`): okr_notes.goal_choices over
+  okr_board.cached: a day's and a week's picker = this month's open KRs
+  then open objectives, a month's = objectives then KRs, a quarter's = its
+  months' objectives (one per name), a year's = the year goals. A TEXT goal
+  with the card's name - or, when the card links a TickTick task, THAT
+  task (`_plan_original`, never the card). Subtitle "🔟 October · the
+  board".
+- ⌘ Actions (actions.py): a card of the OKR list is a GENERIC task minus
+  the rows that would date or place it (Add to today / tomorrow, day goal,
+  Schedule…, Reminder, Create CTA, Add to focus). The OKR entity rows
+  (Link, Tag, Add KRs, Done, Add to OKRs) are gone.
+- Routine links (link.py VIEW_CTX): `okrdaily` / `okrweekly` / `okrmonthly`
+  → `ctx:okr:m:now`, `okrquarterly` / `okrcarry` → `ctx:okr`. The slot
+  names never change (pasted links).
+- The hourly sync calls `okr_board.refresh_done()` where it called the
+  upkeep (a cache read, HANDOFF trap: "No background automation" is about
+  writes and features; this keeps a cache the notes need).
+
+### Deleted (2026-10-03)
+
+`src/okr.py`, `src/okr_write.py`, `src/okr_stats.py` (and from the live
+copy), the six tests of theirs (replaced by tests/test_okr_board.py 86,
+test_okr_notes.py 48, test_okr_screens.py 70, test_okr_pickers.py 17),
+tools/pnrepair/okr_section.py + aligned_bullet.py, the screens okrpace /
+okrcarry / okraddkr / okrlink / okrtag / okrimport, the verbs okr_add /
+okr_addkr / okr_link / okr_tag / okr_carry / okr_upkeep (okr_setlist
+stays), the ⌘ Actions OKR rows and "🥅 Add to OKRs", the weekly 🥅 Aligned
+stat (pm.SEC_ALIGNED, engine `_fill_aligned`; the W40 bullet was removed
+from the live note by hand), the three ⏳ countdowns the automation minted
+(archived, not deleted: 🥅 TickAL, 🥅 Onboard TickTicks, 🏔️ Productivity
+System; `~/.ticktick_alfred/okr_countdowns.json` is now dead data),
+pace, capacity, the carry-over, auto-tick, codes, the import.
+
+### Traps
+
+- The board's own column names are the grammar: a column renamed to
+  anything but `<keycaps> <YYYY>` or `<YYYY> Goals` drops out of the board
+  silently (its cards then count on the hub's last row). Keep
+  `parse_column` tolerant of a missing VS16; never require the 2026 names.
+- A row's indentation in Alfred is six spaces in the title (the KR rows).
+  If Alfred ever trims leading spaces, the 🔑 glyph still tells a KR from
+  an objective; do not switch to a ↳ glyph without asking (Vex: "Use emojis
+  I provided").
+- `plain python3` is 3.9 on this Mac: run the board and the suites through
+  `bash Scripts/py.sh` or `make test`, or the live read "fails" with the
+  `|` TypeError and the cache answers.
+- The notes' `_okr_board()` holds the cached board for 60 s per process:
+  a refresh right after a hub read sees the new cache (the hub writes
+  project_data and okr_done), a test that patches `pe._okr_board` must
+  patch, not write the cache.
+- A card title with no glyph is placed by depth (card = area, child =
+  objective or goal, grandchild = KR), so a plain subtask he types without
+  the emoji still reads; a `🔑` directly under an area is a "loose" KR
+  listed after the objectives.
+

@@ -207,7 +207,7 @@ else:
                                        "forecast": "A calm build day, tests green by six"})
     check("5.evening-order-full", [k for k, _ in ev2] == ["bridge", "dhighlight", "tgoal", "goal", "kr", "objectives",
                                                           "fcheck", "rating", "free"], [k for k, _ in ev2])
-    check("5.kr-wording", ev2[4][1] == "🔑 Did you achieve or make progress on today's key result, Finish periodic notes?", ev2[4])
+    check("5.kr-wording", ev2[4][1] == "🔑 Did you achieve or make progress on this month's key result, Finish periodic notes?", ev2[4])
     check("5.kr-plural", "key results, A · B?" in pm.journal_fixed("evening", {"kr": "A · B"})[4][1])
     check("5.objectives-wording", ev2[5][1] == "🥅 How are you progressing on this month's objectives, Onboard TickTicks 0/5 · TickAL 1/6?", ev2[5])
     check("5.objective-singular", "this month's objective, TickAL 1/6?" in pm.journal_fixed("evening", {"objectives": "TickAL 1/6"})[4][1])
@@ -219,7 +219,7 @@ else:
     check("5.every-key-recognised", not wrong, wrong)
     check("5.keys-distinct", pm.journal_key("🔮 What is the intention for today? x") == "forecast"
           and pm.journal_key("🔮 How did the day go compared to your morning forecast: x?") == "fcheck"
-          and pm.journal_key("🔑 Did you achieve or make progress on today's key result, x?") == "kr"
+          and pm.journal_key("🔑 Did you achieve or make progress on this month's key result, x?") == "kr"
           and pm.journal_key("🥅 How are you progressing on this month's objectives, x?") == "objectives")
     # an old evening note gets the forecast check right after the goal question, and only that
     OLD = ["\t- *Q1 · 🌉 Daily bridge - what should tomorrow-you know? (saves to the Bridges board + tomorrow's note)*", "\t\t- A: b",
@@ -424,10 +424,10 @@ else:
     check("12.highlight-shows-the-days", W1[0][1].startswith("What was the highlight of the week? Think of one thing that stands out.")
           and "Your days: Mon · tattooing; Wed · Meal I prepped yesterday" in W1[0][1], W1[0])
     check("12.objectives-wording", W1[2][1] == "🥅 How are you progressing on this month's objectives, Onboard TickTicks 0/5 · TickAL 1/6?", W1[2])
-    check("12.kr-wording", W1[3][1] == "🔑 Did you achieve or make progress on this week's key results, ✅ Goals wf · 🔑 Finish periodic notes · 🔑 Curriculums?", W1[3])
+    check("12.kr-wording", W1[3][1] == "🔑 Did you achieve or make progress on this month's key results, ✅ Goals wf · 🔑 Finish periodic notes · 🔑 Curriculums?", W1[3])
     check("12.habits-wording", W1[4][1] == "🔄 Habit consistency this week: Weekly Review 0/1 · Call mum 0/1 · 🌅 Startup 3/7 · 🌆 Shutdown 2/7. Which habit earned its keep, which did not, and why?", W1[4])
     check("12.weekly-keys-recognised", all(pm.journal_key(q) == k for k, q in W1), [(k, pm.journal_key(q)) for k, q in W1])
-    check("12.weekly-kr-singular", "this week's key result, 🔑 A?" in pm.journal_fixed("weekly", {"kr": "🔑 A"})[2][1])
+    check("12.weekly-kr-singular", "this month's key result, 🔑 A?" in pm.journal_fixed("weekly", {"kr": "🔑 A"})[2][1])
     # the OKR reader on the WEEK bullet keeps the ✅/🔑 state
     wkr, wobj = pm.okr_journal_ctx(OKR_BODY, kr_tier="weekly", keep_state=True)
     check("12.week-krs-with-state", wkr == "✅ Goals wf · 🔑 Finish periodic notes" and wobj == "Onboard TickTicks 0/5 · TickAL 1/6", (wkr, wobj))
@@ -487,7 +487,7 @@ else:
     check("13.objectives-wording", M1[2][1] == "🥅 Objective by objective, Onboard TickTicks 0/5 · TickAL 1/6: what moved, what stalled, and why?", M1[2])
     check("13.quarter-last-month", M1[3][1] == "🌓 The quarter's objectives, Onboard TickTicks 0/5 · TickAL 1/6: this was its last month. Which carry into next quarter, and which stop here?", M1[3])
     check("13.quarter-months-left", pm.journal_fixed("monthly", {"quarter": "A 0/1", "months_left": 2})[2][1]
-          == "🌓 The quarter's objectives, A 0/1, with 2 months left: still the right ones? What to cut, add or move in the timeline?"
+          == "🌓 The quarter's objectives, A 0/1, with 2 months left: still the right ones? What to cut, add or move on the board?"
           and "with 1 month left" in pm.journal_fixed("monthly", {"quarter": "A 0/1", "months_left": 1})[2][1]
           and "with the quarter still running" in pm.journal_fixed("monthly", {"quarter": "A 0/1"})[2][1])
     check("13.habits-wording", M1[4][1] == "🔄 Habit consistency this month: 🌅 Startup 12/13 · 🌆 Shutdown 10/13. Which held all month, which only held for a week?", M1[4])
@@ -734,10 +734,10 @@ else:
           "habits": "Weekly Review 2/3 · Call mum 7/3", "quarters_left": 1, "months": "", "wins": ""}
     r = pm.prompt_refs("quarterly", "Is 12 weeks a realistic time frame for the chosen goal(s)?", QC)
     check("17.goal-words-show-the-goals-and-the-plan",
-          r == "🎯 Your quarterly goals: none in the note\n🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🎉 The year's objectives: Productivity System 3/41", repr(r))
+          r == "🎯 Your quarterly goals: none in the note\n🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🏔️ The year's goals: Productivity System 3/41", repr(r))
     r = pm.prompt_refs("quarterly", "Was enough time spent on the objective?", QC)
     check("17.objective-words-show-the-plan-only",
-          r == "🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🎉 The year's objectives: Productivity System 3/41", repr(r))
+          r == "🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🏔️ The year's goals: Productivity System 3/41", repr(r))
     check("17.okr-set-and-key-results-are-plan-words",
           pm.prompt_refs("quarterly", "What does your gut tell you, did you really achieve the change you were after with this OKR Set?", QC).startswith("🥅 This quarter's objectives")
           and pm.prompt_refs("quarterly", "Were stalled Key Results addressed before Week 10?", QC).startswith("🥅 This quarter's objectives"))

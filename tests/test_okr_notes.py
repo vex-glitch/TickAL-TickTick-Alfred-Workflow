@@ -1,19 +1,9 @@
 #!/usr/bin/env python3
-"""The 🥅 OKRs section of the periodic notes and the yearly scorecard
-(HANDOFF_OKR phase 4, src/okr_notes.py + periodic_engine._fill_okr).
-
-Vex 2026-09-19: "We should also then have the OKRs section in periodic notes.
-All of them. With all levels. ... hand picked goals ... should appear in the
-same line as the forecasted goal for that period". The fixture is his
-🏆Goals Planning list as the cache held it on 2026-09-19 (six O's, 41 KRs,
-nothing done, no Y yet), trimmed to what the lines read, plus small made-up
-plans for what the live list has no example of (a Y, a done KR, a won't-do
-one, caps).
-
-No network, no TickTick: the plan is handed in, the index is fake, and the
-note write (_pn_rmw) runs its mutate on an in-memory doc.
-
-    python3 tests/test_okr_notes.py
+"""🥅 The board in the periodic notes (src/okr_notes.py, HANDOFF_OKR section
+8): the 🥅 OKRs section per tier, the yearly scorecard and its merge, the
+goal pickers' choices, and the readers in periodic_model that quote the
+section back for the journals - the new shape and the 2026-09 shape both.
+Run: python3 tests/test_okr_notes.py
 """
 if __name__ != "__main__":      # imported by unittest: tests/harness.py
     import harness
@@ -21,577 +11,161 @@ if __name__ != "__main__":      # imported by unittest: tests/harness.py
 else:
     import os
     import sys
-    from datetime import date, timedelta
+    from datetime import date
 
     ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(ROOT, "src"))
     sys.path.insert(0, os.path.join(ROOT, "Scripts"))
 
-    import mdtext  # noqa: E402
-    import okr  # noqa: E402
-    import okr_notes as on  # noqa: E402
-    import periodic_engine as pe  # noqa: E402
-    import periodic_model as pm  # noqa: E402
-    import periodic_sections as ps  # noqa: E402
+    import okr_board as ob              # noqa: E402
+    import okr_notes as on              # noqa: E402
+    import periodic_model as pm         # noqa: E402
 
-    PASS = FAIL = 0
-    FAILURES = []
-
+    FAILS, COUNT = [], [0]
 
     def check(name, cond, detail=""):
-        global PASS, FAIL
-        if cond:
-            PASS += 1
-        else:
-            FAIL += 1
-            FAILURES.append(f"{name}: {detail}")
+        COUNT[0] += 1
+        if not cond:
+            FAILS.append(f"{name}: {detail}")
+            print(f"  FAIL {name} {detail}")
 
+    LID = "a" * 24
+    URL = f"ticktick:///webapp/#p/{LID}/tasks/"
 
-    LIST = "6aac1b808f089e43641f5e90"
-    CTA = "6a3413e02522110c0d06e678"
-    TODAY = date(2026, 9, 19)                   # a Saturday, ISO week 38
+    def t(i, title, col, parent=None, status=0, sort=0):
+        return {"id": i, "projectId": LID, "title": title, "columnId": col,
+                "parentId": parent, "status": status, "sortOrder": sort}
 
+    COLS = [{"id": "g26", "name": "2026 Goals"}, {"id": "oct", "name": "🔟 2026"},
+            {"id": "nov", "name": "1️⃣1️⃣ 2026"}, {"id": "dec", "name": "1️⃣2️⃣ 2026"},
+            {"id": "sep", "name": "9️⃣ 2026"}, {"id": "g27", "name": "2027 Goals"},
+            {"id": "jan", "name": "1️⃣ 2027"}]
+    TASKS = [
+        t("ga", "🏔️ VexOS 4️⃣", "g26"), t("gps", "🏔️ Productivity System", "g26", "ga"),
+        t("a1", "🏔️ VexOS 4️⃣", "oct", sort=1),
+        t("o1", "🥅 [Onboard TickTicks](https://ticktick.com/webapp/#p/" + "b" * 24 + "/tasks/" + "c" * 24 + ")", "oct", "a1", sort=1),
+        t("k1", "🔑 Finish periodic notes", "oct", "o1", status=2, sort=1),
+        t("k2", "🔑 Audits", "oct", "o1", sort=2),
+        t("k3", "🔑 Dropped", "oct", "o1", status=-1, sort=3),
+        t("o2", "🥅 Shortcuts", "oct", "a1", sort=2),
+    ] + [t(f"s{i}", f"🔑 App {i}", "oct", "o2", sort=i) for i in range(1, 12)] + [
+        t("o3", "🥅 Audits • Execute & Establish", "oct", "a1", sort=3),
+        t("k4", "🔑 AnyBox", "oct", "o3"),
+        t("a2", "🏔️ Work 1️⃣", "nov", sort=1), t("o4", "🥅 Draw", "nov", "a2"), t("k5", "🔑 Flash 1", "nov", "o4"),
+        t("a3", "🏔️ Work 1️⃣", "sep"), t("o5", "🥅 Old", "sep", "a3"), t("k6", "🔑 Left open", "sep", "o5"),
+        t("ga7", "🏔️ Work 1️⃣", "g27", sort=1), t("gpost", "🏔️ Post", "g27", "ga7", sort=1), t("gdraw", "🏔️ Draw", "g27", "ga7", sort=2),
+        t("a4", "🏔️ Work 1️⃣", "jan"), t("o6", "🥅 Draw", "jan", "a4"), t("k7", "🔑 Flash 2", "jan", "o6", status=2),
+    ]
+    B = ob.build(LID, "🔑OKRs", COLS, TASKS)
 
-    def d(m, day, y=2026):
-        return date(y, m, day)
+    # ── 1. the daily / weekly section: this month, whole ──────────────────
+    p = pm.period_for("daily", date(2026, 10, 3))
+    lines = on.okr_section_lines("daily", p, B)
+    check("1.a month bullet with the count (won't-do out)", lines[0] == "- 🔟 October • 1/14 KRs", lines[0])
+    check("1.b area line", lines[1] == "\t- 🏔️ VexOS 4️⃣ • 1/14 KRs", lines[1])
+    check("1.c objective line links the card and counts", lines[2] == f"\t\t- 🥅 [Onboard TickTicks]({URL}o1) 1/2", lines[2])
+    check("1.d done KR reads ✅, open 🔑, won't-do gone",
+          lines[3] == f"\t\t\t- ✅ [Finish periodic notes]({URL}k1)" and lines[4] == f"\t\t\t- 🔑 [Audits]({URL}k2)"
+          and not any("Dropped" in l for l in lines), lines[3:6])
+    shortcuts = lines.index(f"\t\t- 🥅 [Shortcuts]({URL}o2) 0/11")
+    check("1.e key results capped at 8 then +N more", lines[shortcuts + 9] == "\t\t\t- +3 more"
+          and lines[shortcuts + 1] == f"\t\t\t- 🔑 [App 1]({URL}s1)", lines[shortcuts:shortcuts + 11])
+    check("1.f a name with the separator in it survives", any(l == f"\t\t- 🥅 [Audits • Execute & Establish]({URL}o3) 1/1".replace("1/1", "0/1") for l in lines), [l for l in lines if "Audits •" in l])
+    wk = pm.period_for("weekly", date(2026, 11, 2))         # Mon 2 Nov: Thursday is 5 Nov
+    wl = on.okr_section_lines("weekly", wk, B)
+    check("1.g a week reads its Thursday's month", wl[0] == "- 1️⃣1️⃣ November • 0/1 KRs" and wl[2] == f"\t\t- 🥅 [Draw]({URL}o4) 0/1", wl)
+    wk2 = pm.period_for("weekly", date(2026, 10, 26))       # Mon 26 Oct: Thursday is 29 Oct
+    check("1.h ... even when the week ends in November", on.okr_section_lines("weekly", wk2, B)[0].startswith("- 🔟 October"))
+    dl = on.okr_section_lines("daily", pm.period_for("daily", date(2026, 12, 5)), B)
+    check("1.i an empty month says so", dl == ["- 1️⃣2️⃣ December • nothing planned"], dl)
+    dl = on.okr_section_lines("daily", pm.period_for("daily", date(2027, 3, 5)), B)
+    check("1.j a missing column says so", dl == ["- 3️⃣ March • no column on the board"], dl)
+    check("1.k no board = nothing to write", on.okr_section_lines("daily", p, None) == [])
 
+    # ── 2. the monthly: its month whole, the quarter's other months objectives only ──
+    ml = on.okr_section_lines("monthly", pm.period_for("monthly", date(2026, 10, 1)), B)
+    tops = [l for l in ml if not l.startswith("\t")]
+    check("2.a three month bullets, its own first", tops == ["- 🔟 October • 1/14 KRs", "- 1️⃣1️⃣ November • 0/1 KRs", "- 1️⃣2️⃣ December • nothing planned"], tops)
+    nov_at = ml.index("- 1️⃣1️⃣ November • 0/1 KRs")
+    check("2.b the other months carry objectives, no key results", ml[nov_at + 2] == f"\t\t- 🥅 [Draw]({URL}o4) 0/1" and not any(l.startswith("\t\t\t") for l in ml[nov_at:]), ml[nov_at:])
+    check("2.c its own month carries the key results", any(l.startswith("\t\t\t- 🔑 [Audits]") for l in ml[:nov_at]))
 
-    def D(tid, title, s=None, e=None, parent=None, status=0):
-        """A raw plan task from INCLUSIVE dates, the way okr writes a span."""
-        st = du = None
-        if s is not None:
-            st, du = okr.span_raw(s, e or s)
-        return {"id": tid, "projectId": LIST, "title": title, "startDate": st,
-                "dueDate": du, "timeZone": "", "isAllDay": True, "status": status,
-                "parentId": parent, "childIds": [], "tags": []}
+    # ── 3. the quarterly and the yearly: the goals bullet, then the months ──
+    ql = on.okr_section_lines("quarterly", pm.period_for("quarterly", date(2026, 11, 1)), B)
+    check("3.a goals bullet first, with the area and the goal", ql[:3] == ["- 🏔️ 2026 Goals • 1 goal", "\t- 🏔️ VexOS 4️⃣", f"\t\t- 🏔️ [Productivity System]({URL}gps)"], ql[:3])
+    check("3.b then the three months", [l for l in ql if not l.startswith("\t")][1:] == ["- 🔟 October • 1/14 KRs", "- 1️⃣1️⃣ November • 0/1 KRs", "- 1️⃣2️⃣ December • nothing planned"], ql)
+    check("3.c objectives only", not any(l.startswith("\t\t\t") for l in ql))
+    yl = on.okr_section_lines("yearly", pm.period_for("yearly", date(2027, 6, 1)), B)
+    check("3.d the year's goals with the roll-up of same-named objectives",
+          yl[:4] == ["- 🏔️ 2027 Goals • 2 goals", "\t- 🏔️ Work 1️⃣", f"\t\t- 🏔️ [Post]({URL}gpost)", f"\t\t- 🏔️ [Draw]({URL}gdraw) 1/1 • 1 month"], yl[:4])
+    check("3.e only the planned months follow", [l for l in yl if not l.startswith("\t")][1:] == ["- 1️⃣ January • 1/1 KRs"], yl)
+    y26 = on.okr_section_lines("yearly", pm.period_for("yearly", date(2026, 1, 1)), B)
+    check("3.f a past month with a key result still open is listed (September)", any(l.startswith("- 9️⃣ September") for l in y26), y26)
+    gl = on.goals_lines(B, 2028, LID)
+    check("3.g a year without a Goals column", gl == ["- 🏔️ 2028 Goals • no column on the board"], gl)
 
+    # ── 4. the scorecard: flat lines, the bar, the area chip, merge keeps his ──
+    sc = on.scorecard_lines(pm.period_for("yearly", date(2027, 1, 1)), B)
+    check("4.a a goal with objectives: bar, count, months, area",
+          sc[1] == f"- 🏔️ [Draw]({URL}gdraw) ▰▰▰▰▰ 1/1 • 1 month • Work 1️⃣", sc)
+    check("4.b a goal without: the chip", sc[0] == f"- 🏔️ [Post]({URL}gpost) • no objectives yet • Work 1️⃣", sc)
+    check("4.c both are plan lines", all(pm.is_plan_line(l) for l in sc))
+    check("4.d the bar", (on.bar(0, 5), on.bar(1, 2), on.bar(4, 5), on.bar(5, 5), on.bar(3, 3)) == ("▱▱▱▱▱", "▰▰▰▱▱", "▰▰▰▰▱", "▰▰▰▰▰", "▰▰▰▰▰"))
+    body = ["- 🏔️ [Old](u) ▱▱▱▱▱ 0/3 • Jan 5 - Dec 20", "- [ ] Earn 50k", "\t- [ ] Weekly check", "_(pending)_"]
+    merged = on.merge_scorecard(body, sc)
+    check("4.e merge: ours regenerated, his goals kept after, pending gone",
+          merged == sc + ["- [ ] Earn 50k", "\t- [ ] Weekly check"], merged)
+    check("4.f merge with no plan: his lines, or pending", on.merge_scorecard(body, []) == ["- [ ] Earn 50k", "\t- [ ] Weekly check"]
+          and on.merge_scorecard(["_(pending)_"], []) == ["_(pending)_"])
+    check("4.g no Goals column = no scorecard lines", on.scorecard_lines(pm.period_for("yearly", date(2028, 1, 1)), B) == [])
+    check("4.h the scorecard reader quotes both kinds of line",
+          pm.scorecard_objectives(sc) == ["Post", "Draw 1/1"], pm.scorecard_objectives(sc))
 
-    def live_plan():
-        """The live list on 2026-09-19, the parts the five notes read."""
-        rows = [
-            D("o_ot", "🥅 O • Onboard TickTicks", d(9, 18), d(9, 28)),
-            D("o_ta", "🥅 O • TickAL", d(9, 19), d(10, 14)),   # the bar as Vex drew it
-            D("o_kc", "🥅 O • KeyCue/MIAs/Shared actions", d(10, 15), d(11, 13)),
-            D("o_au", "🥅 O • Audits • Execute & Establish (Naming Conventions)",
-              d(11, 14), d(11, 25)),
-            D("o_wf", "🥅 O • Workflows", d(11, 26), d(12, 24)),
-            D("o_ot2", "🥅 O • Other things", d(12, 25), d(12, 25)),
-            D("k1", "🔑 KR • Finish periodic notes - TT", d(9, 18), d(9, 18), "o_ot"),
-            D("k2", "🔑 KR • Goals wf - TA", d(9, 19), d(9, 21), "o_ta"),
-            D("k3", "🔑 KR • Reschedule Goals (used to be OKRs) - TT", d(9, 22), d(9, 22), "o_ot"),
-            D("k4", "🔑 KR • Audits - TT", d(9, 23), d(9, 24), "o_ot"),
-            D("k5", "🔑 KR • Curriculums - TT", d(9, 25), d(9, 25), "o_ot"),
-            D("k6", "🔑 KR • Review - TT", d(9, 26), d(9, 28), "o_ot"),
-            D("k7", "🔑 KR • Review/test content pl wf - TA", d(9, 29), d(10, 3), "o_ta"),
-            D("k8", "🔑 KR • Figure out bridges wf - TA", d(10, 4), d(10, 5), "o_ta"),
-            D("k9", "🔑 KR • Run codebase review skill - TA", d(10, 6), d(10, 8), "o_ta"),
-            D("k10", "🔑 KR • ReReadmeadme - TA", d(10, 9), d(10, 11), "o_ta"),
-            D("k11", "🔑 KR • Publish - TA", d(10, 12), d(10, 14), "o_ta"),
-        ]
-        # the rest of the year: 16 + 6 + 7 + 1 KRs, two days each, laid end to end
-        day = d(10, 15)
-        for oid, code, n in (("o_kc", "Shortcuts", 16), ("o_au", "Audit", 6),
-                             ("o_wf", "WF", 7), ("o_ot2", "OT", 1)):
-            o = next(r for r in rows if r["id"] == oid)
-            s0, e0 = okr.span(o)
-            day = s0
-            for i in range(n):
-                e = min(day + timedelta(days=1), e0)
-                rows.append(D(f"{oid}_{i}", f"🔑 KR • {oid} step {i} - {code}", day, e, oid))
-                day = min(e + timedelta(days=1), e0)
-        return okr.items_from(rows)
+    # ── 5. the readers: the new shape round-trips ──────────────────────────
+    kr, objs = pm.okr_journal_ctx(lines)
+    check("5.a evening: the month's key results off the note (done ones too, won't-do never), capped",
+          kr == "Finish periodic notes · Audits · App 1 · App 2 · App 3 · App 4 · App 5 · App 6 · +3 more", kr)
+    check("5.b evening: the month's objectives with their counts",
+          objs == "Onboard TickTicks 1/2 · Shortcuts 0/11 · Audits • Execute & Establish 0/1", objs)
+    wkr, _o = pm.okr_journal_ctx(wl, kr_tier="weekly", keep_state=True)
+    check("5.c weekly: the glyphs kept", wkr == "🔑 Flash 1", wkr)
+    check("5.d monthly: the first month's objectives, the quarter's every month's (one per name)",
+          pm.okr_tier_items(ml, "monthly") == ["Onboard TickTicks 1/2", "Shortcuts 0/11", "Audits • Execute & Establish 0/1"]
+          and pm.okr_tier_items(ml, "quarterly") == ["Onboard TickTicks 1/2", "Shortcuts 0/11", "Audits • Execute & Establish 0/1", "Draw 0/1"],
+          pm.okr_tier_items(ml, "quarterly"))
+    check("5.e yearly: the goals bullet, with the roll-up count", pm.okr_tier_items(yl, "yearly") == ["Post", "Draw 1/1"], pm.okr_tier_items(yl, "yearly"))
+    check("5.f quarterly note: year goals off the goals bullet", pm.okr_tier_items(ql, "yearly") == ["Productivity System"], pm.okr_tier_items(ql, "yearly"))
+    check("5.g an empty month quotes nothing", pm.okr_journal_ctx(["- 1️⃣2️⃣ December • nothing planned"]) == ("", ""))
+    check("5.h a phone's spaces read like tabs", pm.okr_tier_items([l.replace("\t", "    ") for l in ml], "monthly") == pm.okr_tier_items(ml, "monthly"))
+    check("5.i the app's escapes read", pm.okr_tier_items([l.replace("(", "\\(").replace(")", "\\)") for l in ml], "monthly")[0] == "Onboard TickTicks 1/2")
 
+    # ── 6. the readers: the 2026-09 shape (closed notes) reads as it did ──
+    OLD = ["- 🎉 2026 • 1/41 KRs", "\t- 🏔️ [Productivity System](u) 1/41",
+           "- 🌓 Q3 • 1/7 KRs", "\t- 🥅 [Onboard TickTicks](u) 0/5", "\t- 🥅 [TickAL](u) 1/6 🔴 3d",
+           "- 🗓️ Sep • 1/7 KRs", "\t- 🥅 [Onboard TickTicks](u) 0/5", "\t- 🥅 [TickAL](u) 1/6",
+           "- ♻️ W39 • 1/5 KRs", "\t- ✅ [Goals wf](u)", "\t- 🔑 [Finish periodic notes](u)",
+           "- ☀️ Thu 24 • 0/1 KRs", "\t- 🔑 [Finish periodic notes](u) 🔴 1d"]
+    check("6.a old day + month", pm.okr_journal_ctx(OLD) == ("Finish periodic notes", "Onboard TickTicks 0/5 · TickAL 1/6"), pm.okr_journal_ctx(OLD))
+    check("6.b old week with state", pm.okr_journal_ctx(OLD, "weekly", True)[0] == "✅ Goals wf · 🔑 Finish periodic notes")
+    check("6.c old quarter and year", pm.okr_tier_items(OLD, "quarterly") == ["Onboard TickTicks 0/5", "TickAL 1/6"] and pm.okr_tier_items(OLD, "yearly") == ["Productivity System 1/41"])
+    check("6.d an old note without the tier quotes nothing", pm.okr_tier_items(OLD[:2], "monthly") == [])
 
-    ITEMS = live_plan()
-    BY = okr.index(ITEMS)
-    P_DAY = pm.period_for("daily", TODAY)
+    # ── 7. the goal pickers' choices ───────────────────────────────────────
+    names = lambda picks: [getattr(x, "name", None) for _c, x in picks]
+    d = on.goal_choices("daily", p, B)
+    check("7.a a day: the month's open key results, then its open objectives",
+          names(d)[:3] == ["Audits", "App 1", "App 2"] and names(d)[-3:] == ["Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish"]
+          and "Finish periodic notes" not in names(d) and "Dropped" not in names(d), names(d))
+    check("7.b each choice names its column", {c.title for c, _x in d} == {"🔟 2026"})
+    m = on.goal_choices("monthly", pm.period_for("monthly", date(2026, 10, 1)), B)
+    check("7.c a month: objectives first", names(m)[:3] == ["Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish"], names(m))
+    q = on.goal_choices("quarterly", pm.period_for("quarterly", date(2026, 10, 1)), B)
+    check("7.d a quarter: its months' objectives, one per name", names(q) == ["Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish", "Draw"], names(q))
+    y = on.goal_choices("yearly", pm.period_for("yearly", date(2027, 1, 1)), B)
+    check("7.e a year: its goals", names(y) == ["Post", "Draw"] and all(x.kind == "goal" for _c, x in y), names(y))
+    check("7.f no column, no board = nothing", on.goal_choices("daily", pm.period_for("daily", date(2027, 3, 1)), B) == []
+          and on.goal_choices("daily", p, None) == [])
 
-
-    def flat(lines):
-        return [mdtext.flatten_links(ln) for ln in lines]
-
-
-    # ── 1. labels: a period's name, true after it is over ────────────────────────
-    labels = {k: on.tier_label(k, pm.period_for(k, TODAY)) for k in pm.KINDS}
-    check("1.labels", labels == {"yearly": "🎉 2026", "quarterly": "🌓 Q3",
-                                 "monthly": "🗓️ Sep", "weekly": "♻️ W38",
-                                 "daily": "☀️ Sat 19"}, labels)
-    check("1.never-today", "Today" not in on.tier_label("daily", P_DAY))
-    check("1.week-two-digits",
-          on.tier_label("weekly", pm.period_for("weekly", d(1, 5))) == "♻️ W02")
-    check("1.tiers-down", on.tiers_down_to("daily") == on.TIERS
-          and on.tiers_down_to("yearly") == ("yearly",)
-          and on.tiers_down_to("monthly") == ("yearly", "quarterly", "monthly"))
-
-    # ── 2. the fixture reads like the live list ──────────────────────────────────
-    check("2.fixture-41-krs", sum(1 for i in ITEMS if i.kind == "KR") == 41)
-    check("2.fixture-6-os", sum(1 for i in ITEMS if i.kind == "O") == 6)
-
-    # ── 3. the approved mock, daily 2026-09-19 ───────────────────────────────────
-    GOALS = {
-        "yearly": ["\t- [ ] [💼 P • Productivity System 🔗](https://ticktick.com/webapp/#p/"
-                   f"{CTA}/tasks/6a46057d8f083bb8ddf4bea1)"],
-        "quarterly": [],
-        "monthly": [f"\t- [ ] [💼 P • TickAL • WF 🔗](https://ticktick.com/webapp/#p/{CTA}"
-                    "/tasks/6aa31448522fd18314a75e98)"],
-        # the app escapes a line edited there (the live W38 note has one)
-        "weekly": ["\t" + r"- [ ] \[💼 P • Onboard TickTick 🔗\]\(https://ticktick.com/webapp/"
-                   f"#p/{CTA}/tasks/6aa5b80c355d7a6c949ea48a\\)"],
-        "daily": [f"\t- [ ] [💼 P • Onboard TickTick 🔗](https://ticktick.com/webapp/#p/{CTA}"
-                  "/tasks/6aad98528f0859df697a4978)"],
-    }
-    lines = on.okr_section_lines("daily", P_DAY, ITEMS, TODAY, LIST)
-    B = "\u2022"
-    YEAR_OS = ["\t- 🥅 Onboard TickTicks 0/5 🔴 1d", "\t- 🥅 TickAL 0/6",
-               "\t- 🥅 KeyCue/MIAs/Shared actions 0/16",
-               "\t- 🥅 Audits • Execute & Establish (Naming Conventions) 0/6",
-               "\t- 🥅 Workflows 0/7", "\t- 🥅 Other things 0/1"]
-    # Vex 2026-09-19: "too crammed ... Make them like I did W38 ... indented
-    # bullet points below that periods bullet point" - his hand edit, every tier
-    want = (
-        [f"- 🎉 2026 {B} 0/41 KRs {B} 🔴 1d"] + YEAR_OS
-        + [f"- 🌓 Q3 {B} 0/7 KRs {B} 🔴 1d", "\t- 🥅 Onboard TickTicks 0/5 🔴 1d",
-           "\t- 🥅 TickAL 0/6"]
-        + [f"- 🗓️ Sep {B} 0/7 KRs {B} 🔴 1d", "\t- 🥅 Onboard TickTicks 0/5 🔴 1d",
-           "\t- 🥅 TickAL 0/6"]
-        + [f"- ♻️ W38 {B} 0/2 KRs {B} 🔴 1d", "\t- 🔑 Finish periodic notes 🔴 1d",
-           "\t- 🔑 Goals wf"]
-        + [f"- ☀️ Sat 19 {B} 0/1 KRs", "\t- 🔑 Goals wf"])
-    check("3.mock", flat(lines) == want, "\n" + "\n".join(flat(lines)))
-    check("3.never-the-middle-dot", not any("\u00b7" in ln for ln in lines), lines)
-    check("3.plan-names-link-the-planning-copy",
-          any(f"[Goals wf]({okr.task_link(LIST, 'k2')})" in ln for ln in lines)
-          and any(f"[TickAL]({okr.task_link(LIST, 'o_ta')})" in ln for ln in lines), lines)
-    # the goals he picks live in 🏆 Goals below and are NOT repeated here
-    # (Vex 2026-09-19: "we still have 🎯 Productivity system and 🎯 none and
-    # 🎯 TickAL ... Please remove those")
-    check("3.no-goal-line-anywhere", not any("🎯" in ln for ln in lines), lines)
-    check("3.o-read-on-its-own-bar",
-          # TickAL's bar is 19 Sep - 14 Oct (heal off: the bar Vex drew is what
-          # every period reads, okr.overlapping on stored spans)
-          "\t- 🥅 TickAL 0/6" in flat(lines)[9:13])
-
-
-    def blocks(ls):
-        """[[a period's bullet + its children], ...]"""
-        out = []
-        for ln in ls:
-            if ln.startswith("- "):
-                out.append([ln])
-            else:
-                out[-1].append(ln)
-        return out
-
-
-    for kind, n in (("weekly", 4), ("monthly", 3), ("quarterly", 2), ("yearly", 1)):
-        got = on.okr_section_lines(kind, pm.period_for(kind, TODAY), ITEMS, TODAY, LIST)
-        check(f"3.{kind}-has-{n}-periods", blocks(got) == blocks(lines)[:n], flat(got))
-
-    # ── 4. every rule the mock does not show ─────────────────────────────────────
-    # parents DATED over their KRs, as Vex drags them (heal off since 2026-09-23:
-    # an undated or off parent is in no period until he does)
-    Y = [D("y1", "🏔️ Y • Productivity System", d(9, 1), d(9, 17)),
-         D("y2", "🏔️ Y • Health", d(9, 19), d(9, 19)),
-         D("y3", "🏔️ Y • Money", d(9, 14), d(9, 20)),
-         D("y4", "🏔️ Y • Learning", d(9, 16), d(9, 20)),
-         D("o1", "🥅 O • TickAL", d(9, 1), d(9, 17), "y1"),
-         D("o2", "🥅 O • Gym", d(9, 19), d(9, 19), "y2"),
-         D("o3", "🥅 O • Budget", d(9, 14), d(9, 20), "y3"),
-         D("o4", "🥅 O • Books", d(9, 16), d(9, 20), "y4"),
-         D("r1", "🔑 KR • Ship - TA", d(9, 1), d(9, 5), "o1", status=2),
-         D("r2", "🔑 KR • Docs - TA", d(9, 10), d(9, 17), "o1"),
-         D("r3", "🔑 KR • Squat - GY", d(9, 19), d(9, 19), "o2"),
-         D("r4", "🔑 KR • Plan - BU", d(9, 14), d(9, 20), "o3"),
-         D("r5", "🔑 KR • Read - BK", d(9, 16), d(9, 16), "o4", status=2),
-         D("r6", "🔑 KR • Dropped - BK", d(9, 16), d(9, 18), "o4", status=-1),
-         D("r7", "🔑 KR • Later - BK", d(9, 18), d(9, 18), "o4"),
-         D("r8", "🔑 KR • Undated - BK", parent="o4"),
-         D("r9", "🔑 KR • Extra - BK", d(9, 19), d(9, 20), "o4")]
-    YI = okr.items_from(Y)
-    yl = blocks(flat(on.okr_section_lines("daily", P_DAY, YI, TODAY, LIST)))
-    check("4.year-lists-the-ys-with-their-pace", yl[0] == [
-        f"- 🎉 2026 {B} 2/7 KRs {B} 🔴 2d",
-        "\t- 🏔️ Productivity System 1/2 🔴 2d", "\t- 🏔️ Money 0/1",
-        "\t- 🏔️ Learning 1/4 🔴 1d", "\t- 🏔️ Health 0/1"], yl[0])
-    check("4.won't-do-counts-nowhere", "\t- 🏔️ Learning 1/4 🔴 1d" in yl[0], yl[0])
-    check("4.quarter-os-in-plan-order", yl[1] == [
-        f"- 🌓 Q3 {B} 2/7 KRs {B} 🔴 2d", "\t- 🥅 TickAL 1/2 🔴 2d", "\t- 🥅 Budget 0/1",
-        "\t- 🥅 Books 1/4 🔴 1d", "\t- 🥅 Gym 0/1"], yl[1])
-    check("4.cap-folds-the-rest", on._capped(list("abcdefghij"), 8)
-          == list("abcdefgh") + ["+2 more"])
-    check("4.week-done-and-late", yl[3] == [
-        f"- ♻️ W38 {B} 1/6 KRs {B} 🔴 2d", "\t- 🔑 Docs 🔴 2d", "\t- 🔑 Plan",
-        "\t- ✅ Read", "\t- 🔑 Later 🔴 1d", "\t- 🔑 Extra", "\t- 🔑 Squat",
-        ], yl[3])
-    check("4.dropped-kr-not-in-the-week", not any("Dropped" in x for x in yl[3]), yl[3])
-    check("4.undated-kr-in-no-period",
-          not any("Undated" in x for blk in yl for x in blk), yl)
-    check("4.day", yl[4] == [f"- ☀️ Sat 19 {B} 0/3 KRs", "\t- 🔑 Plan", "\t- 🔑 Extra",
-                             "\t- 🔑 Squat"], yl[4])
-    empty = blocks(flat(on.okr_section_lines("daily", pm.period_for("daily", d(3, 3)),
-                                             ITEMS, TODAY, LIST)))
-    check("4.no-plan", all(blk == [blk[0]] and blk[0].endswith(f"{B} no plan")
-                           for blk in empty[1:]), empty)
-    check("4.year-no-y", blocks(flat(on.okr_section_lines(
-        "yearly", pm.period_for("yearly", TODAY), ITEMS, TODAY, LIST)))[0]
-        == [f"- 🎉 2026 {B} 0/41 KRs {B} 🔴 1d"] + YEAR_OS)
-    # a month with only KRs (no O overlaps) still counts them on its bullet
-    lone = okr.items_from([D("x1", "🔑 KR • Loose - XX", d(9, 3), d(9, 3))])
-    check("4.month-krs-only", blocks(flat(on.okr_section_lines(
-        "monthly", pm.period_for("monthly", TODAY), lone, TODAY, LIST)))[2]
-        == [f"- 🗓️ Sep {B} 0/1 KRs {B} 🔴 16d"])
-
-    # ── 5. no goal plumbing left in the section builder ──────────────────────────
-    U = f"https://ticktick.com/webapp/#p/{CTA}/tasks/6aa31448522fd18314a75e98"
-    check("5.no-goal-helpers", not hasattr(on, "goal_label") and not hasattr(on, "goal_lines"))
-
-    # ── 6. goal_choices: what the 🔮 rows offer (the pickers import this) ────────
-    def names(xs):
-        return [x.name for x in xs]
-
-
-    wk = pm.period_for("weekly", TODAY)
-    check("6.daily-krs-open", names(on.goal_choices("daily", TODAY, TODAY, YI, TODAY))
-          == ["Plan", "Extra", "Squat"])
-    check("6.weekly-krs-no-done-no-dropped",
-          names(on.goal_choices("weekly", wk.start, wk.end, YI, TODAY))
-          == ["Docs", "Plan", "Later", "Extra", "Squat"])
-    mo = pm.period_for("monthly", TODAY)
-    check("6.monthly-os-then-krs",
-          [x.kind for x in on.goal_choices("monthly", mo.start, mo.end, YI)]
-          == ["O"] * 4 + ["KR"] * 5)
-    q = pm.period_for("quarterly", TODAY)
-    check("6.quarterly-os", {x.kind for x in on.goal_choices("quarterly", q.start, q.end, YI)}
-          == {"O"})
-    yr = pm.period_for("yearly", TODAY)
-    yc = on.goal_choices("yearly", yr.start, yr.end, YI)
-    check("6.yearly-ys-then-os", [x.kind for x in yc] == ["Y"] * 4 + ["O"] * 4,
-          [x.kind for x in yc])
-    check("6.returns-items", all(isinstance(x, okr.Item) for x in yc))
-    check("6.live-daily", names(on.goal_choices("daily", TODAY, TODAY, ITEMS, TODAY))
-          == ["Goals wf"])
-    check("6.same-plan-as-the-note", names(on.plan_for("weekly", wk.start, wk.end, ITEMS))
-          == ["Finish periodic notes", "Goals wf"])
-
-    # ── 7. the scorecard ─────────────────────────────────────────────────────────
-    check("7.bar", [on.bar(*x) for x in ((0, 5), (1, 5), (4, 5), (5, 5), (1, 41), (40, 41), (0, 0))]
-          == ["▱▱▱▱▱", "▰▱▱▱▱", "▰▰▰▰▱", "▰▰▰▰▰", "▰▱▱▱▱", "▰▰▰▰▱", "▱▱▱▱▱"])
-    sc = flat(on.scorecard_lines(yr, YI, TODAY, LIST))
-    check("7.y-then-its-os", sc[:2] == [
-        "- 🏔️ Productivity System ▰▰▰▱▱ 1/2 • Sep 1 - Sep 17 • 🔴 2d",
-        "\t- 🥅 TickAL 1/2 • Sep 1 - Sep 17"], sc)
-    check("7.no-behind-when-on-pace", "- 🏔️ Health ▱▱▱▱▱ 0/1 • Sep 19" in sc, sc)
-    check("7.y-count", sum(1 for s in sc if s.startswith("- 🏔️")) == 4, sc)
-    sl = flat(on.scorecard_lines(yr, ITEMS, TODAY, LIST))
-    check("7.no-y-os-on-top", len(sl) == 6 and sl[0]
-          == "- 🥅 Onboard TickTicks ▱▱▱▱▱ 0/5 • Sep 18 - Sep 28 • 🔴 1d", sl)
-    check("7.stored-span", "- 🥅 TickAL ▱▱▱▱▱ 0/6 • Sep 19 - Oct 14" in sl, sl)
-    check("7.every-line-is-a-plan-line",
-          all(pm.is_plan_line(x) for x in on.scorecard_lines(yr, YI, TODAY, LIST)
-              + on.scorecard_lines(yr, ITEMS, TODAY, LIST)))
-    check("7.empty-year", on.scorecard_lines(pm.period_for("yearly", d(1, 1, 2030)),
-                                             ITEMS, TODAY, LIST) == [])
-    GOAL = f"\t- [ ] [💼 P • Productivity System 🔗]({U})"
-    plan = on.scorecard_lines(yr, ITEMS, TODAY, LIST)
-    m1 = on.merge_scorecard([GOAL], plan)
-    check("7.merge-keeps-the-goal-after-the-plan",
-          m1 == plan + [GOAL.lstrip("\t")], m1)
-    check("7.merge-idempotent", on.merge_scorecard(m1, plan) == m1)
-    check("7.merge-replaces-old-plan", on.merge_scorecard(
-        ["- 🥅 [Gone](x) ▱▱▱▱▱ 0/3 • Jan 1"] + m1, plan) == m1)
-    check("7.merge-eats-pending", on.merge_scorecard(["_(pending)_"], plan) == plan)
-    check("7.merge-nothing-left-pending", on.merge_scorecard(plan, []) == ["_(pending)_"])
-    check("7.merge-no-plan-keeps-goal", on.merge_scorecard([GOAL], []) == [GOAL])
-    check("7.merge-keeps-hand-text", "Vex wrote this" in on.merge_scorecard(
-        ["Vex wrote this"] + plan, plan)[-1])
-
-    # ── 8. the goal readers never mistake the plan for a goal ────────────────────
-    check("8.goal-titles-skip-plan", pm.goal_titles(m1) == ["💼 P • Productivity System 🔗"],
-          pm.goal_titles(m1))
-    check("8.checkbox-goal-with-glyph-is-a-goal",
-          pm.goal_titles(["- [ ] 🥅 Win 1/2 races"]) == ["🥅 Win 1/2 races"])
-    check("8.plain-bullet-without-count-is-a-goal",
-          pm.goal_titles(["- 🥅 Get fit"]) == ["🥅 Get fit"])
-    check("8.escaped-plan-line", pm.is_plan_line(r"- 🏔️ \[Y\]\(u\) ▰▱▱▱▱ 1/5 · Jan 1"))
-
-    # ── 9. templates: the section where Vex picked it ────────────────────────────
-    for kind in pm.KINDS:
-        tpl = open(os.path.join(ROOT, "src", "periodic_templates", f"{kind}.md"),
-                   encoding="utf-8").read()
-        doc = ps.parse_sections(tpl)
-        names_ = [s.name for s in doc.sections]
-        sec = ps.find(doc, pm.SEC_OKR)
-        check(f"9.{kind}-has-section", isinstance(sec, ps.Section), names_)
-        if not isinstance(sec, ps.Section):
-            continue
-        i = names_.index(pm.SEC_OKR)
-        nxt = names_[i + 1] if i + 1 < len(names_) else None
-        # the yearly took the other tiers' shape on 2026-09-27 (the yearly
-        # round): a #### header like theirs, 🏆 Goals right under it
-        check(f"9.{kind}-header", sec.header == f"#### {pm.SEC_OKR}", sec.header)
-        check(f"9.{kind}-body", sec.body == ["- _(pending)_"], sec.body)
-        check(f"9.{kind}-divider-after", doc.sections[i + 1].pre == ["---"])
-        check(f"9.{kind}-above-goals", nxt == pm.SEC_GOALS, names_)
-        if kind == "yearly":
-            check("9.yearly-first", i == 0 and doc.lead[-1] == "---", names_)
-            check("9.yearly-scorecard-under-goals", names_[2] == pm.SEC_SCORECARD, names_)
-        if kind == "daily":
-            check("9.daily-after-bridge-and-highlight",
-                  names_[:3] == [pm.SEC_YBRIDGE, pm.SEC_HIGHLIGHT, pm.SEC_OKR], names_)
-
-    # ── 10. the engine hook on an in-memory note ─────────────────────────────────
-    def note(kind, p, goals=None, strip=False):
-        """A rendered template for p, goals appended the way the setter writes
-    them; strip=True drops the 🥅 OKRs block (a note minted before today)."""
-        # the REPO template, never ~/.ticktick_alfred's override (_load_template
-        # would prefer one): this suite tests what ships
-        tpl = open(os.path.join(ROOT, "src", "periodic_templates", f"{kind}.md"),
-                   encoding="utf-8").read()
-        doc = ps.parse_sections(pm.render_template(tpl, {"breadcrumbs": "C"}))
-        if strip:
-            i = next(j for j, s in enumerate(doc.sections) if s.name == pm.SEC_OKR)
-            doc.sections[i + 1].pre = doc.sections[i].pre
-            del doc.sections[i]
-        for ln in goals or []:
-            if kind == "daily":
-                ps.set_body(doc, pm.SEC_DAY_GOAL, [ln])
-            elif kind == "weekly":
-                pe._goal_append(doc, pe._week_goal_home(doc), ln)
-            else:
-                nm = next(n for n in pm.goal_section_names(kind) if ps.find(doc, n))
-                pe._goal_append(doc, nm, ln)
-        return {"id": f"n_{kind}", "projectId": "PN", "content": ps.serialize_sections(doc)}
-
-
-    def index_for(day, goals, skip=()):
-        idx = {}
-        for kind in pm.KINDS:
-            if kind in skip:
-                continue
-            p = pm.period_for(kind, day)
-            idx[(kind, pm.title_key(p))] = note(kind, p, goals.get(kind))
-        return idx
-
-
-    _real_today, _real_plan = pe._today, pe._okr_plan
-    pe._today = lambda: TODAY
-    pe._okr_plan = lambda: (LIST, ITEMS)
-    IDX = index_for(TODAY, GOALS)
-
-    ddoc = ps.parse_sections(IDX[("daily", TODAY.isoformat())]["content"])
-    pe._fill_okr(ddoc, P_DAY, IDX)
-    check("10.daily-filled-plan-only",
-          flat(ps.find(ddoc, pm.SEC_OKR).body) == want, flat(ps.find(ddoc, pm.SEC_OKR).body))
-    check("10.roundtrip", ps.serialize_sections(ps.parse_sections(ps.serialize_sections(ddoc)))
-          == ps.serialize_sections(ddoc))
-    before = ps.serialize_sections(ddoc)
-    pe._fill_okr(ddoc, P_DAY, IDX)
-    check("10.idempotent", ps.serialize_sections(ddoc) == before)
-    text = ps.serialize_sections(ddoc)
-    check("10.divider-kept", f"#### {pm.SEC_OKR}\n- 🎉 2026" in text
-          and "\n---\n#### 🏆 Goals" in text, text[:600])
-
-    # a missing tier note changes nothing: the section is the plan only
-    idx2 = index_for(TODAY, GOALS, skip=("quarterly",))
-    wdoc = ps.parse_sections(idx2[("weekly", "2026-W38")]["content"])
-    pe._fill_okr(wdoc, pm.period_for("weekly", TODAY), idx2)
-    wl = blocks(flat(ps.find(wdoc, pm.SEC_OKR).body))
-    check("10.weekly-four-periods", len(wl) == 4 and wl[3][0].startswith("- ♻️ W38"), wl)
-    check("10.weekly-no-goal-lines", not any("🎯" in x for blk in wl for x in blk), wl)
-
-    # kill switch: the section deleted -> nothing written anywhere
-    kdoc = ps.parse_sections(note("daily", P_DAY, strip=True)["content"])
-    kb = ps.serialize_sections(kdoc)
-    pe._fill_okr(kdoc, P_DAY, IDX)
-    check("10.kill-switch", ps.serialize_sections(kdoc) == kb)
-
-    # OKRs off, or nothing cached -> the section stays as it is
-    for label, plan_ in (("off", ("", [])), ("no-plan", (LIST, []))):
-        pe._okr_plan = lambda plan_=plan_: plan_
-        odoc = ps.parse_sections(IDX[("daily", TODAY.isoformat())]["content"])
-        ob = ps.serialize_sections(odoc)
-        pe._fill_okr(odoc, P_DAY, IDX)
-        check(f"10.{label}-untouched", ps.serialize_sections(odoc) == ob)
-    pe._okr_plan = lambda: (LIST, ITEMS)
-
-    # the yearly note: section + scorecard. Since 2026-09-27 the yearly goal has
-    # a home of its own (🎉 Yearly goal under 🏆 Goals) and the scorecard is the
-    # plan's alone
-    ydoc = ps.parse_sections(IDX[("yearly", "2026")]["content"])
-    pe._fill_okr(ydoc, yr, IDX)
-    card = ps.find(ydoc, pm.SEC_SCORECARD)
-    check("10.scorecard-is-the-plan", [x for x in flat(card.body) if x.strip()] == sl, card.body)
-    check("10.scorecard-gap-kept", card.body[-1] == "", card.body)
-    check("10.scorecard-holds-no-goal", not [ln for ln in card.body if pm.goal_titles([ln])], card.body)
-    check("10.yearly-goal-reader-sees-only-the-goal",
-          pe._goal_sec_of(ydoc, "yearly").name == pm.SEC_YR_GOAL
-          and [ln.strip() for ln in pe._goal_sec_of(ydoc, "yearly").body if pm.goal_titles([ln])]
-          == [GOALS["yearly"][0].strip()], pe._goal_sec_of(ydoc, "yearly").body)
-    check("10.year-block-plan-only-its-goal-is-in-the-scorecard-below",
-          flat(ps.find(ydoc, pm.SEC_OKR).body)
-          == [f"- 🎉 2026 {B} 0/41 KRs {B} 🔴 1d"] + YEAR_OS,
-          flat(ps.find(ydoc, pm.SEC_OKR).body))
-    yb = ps.serialize_sections(ydoc)
-    pe._fill_okr(ydoc, yr, IDX)
-    check("10.yearly-idempotent", ps.serialize_sections(ydoc) == yb)
-    # a yearly goal set AFTER the scorecard was filled lands in its own home
-    pe._goal_append(ydoc, pm.SEC_YR_GOAL, "\t- [ ] Second goal")
-    pe._fill_okr(ydoc, yr, IDX)
-    check("10.new-yearly-goal-kept",
-          [ln.strip() for ln in pe._goal_sec_of(ydoc, "yearly").body if pm.goal_titles([ln])]
-          == [GOALS["yearly"][0].strip(), "- [ ] Second goal"]
-          and [x for x in flat(ps.find(ydoc, pm.SEC_SCORECARD).body) if x.strip()] == sl,
-          pe._goal_sec_of(ydoc, "yearly").body)
-    # a note minted under the OLD skeleton keeps its goals in the scorecard, and
-    # the fill still keeps every one of them after the plan
-    OLDY = ps.parse_sections("C\n---\n##### 🥅 OKRs\n- _(pending)_\n---\n##### 📊 Dashboard\n_(pending)_\n\n"
-                             "##### 🎯 Goals scorecard\n_(pending)_\n" + GOALS["yearly"][0] + "\n\n##### 💰 Money\n**Total = 0**\n")
-    pe._fill_okr(OLDY, yr, IDX)
-    ocard = ps.find(OLDY, pm.SEC_SCORECARD)
-    check("10.old-skeleton-plan-then-goal", flat(ocard.body)[:6] == sl and ocard.body[6] == GOALS["yearly"][0].lstrip("\t"), ocard.body)
-    check("10.old-skeleton-goal-reader", pe._goal_sec_of(OLDY, "yearly").name == pm.SEC_SCORECARD
-          and [ln for ln in ocard.body if pm.goal_titles([ln])] == [GOALS["yearly"][0].lstrip("\t")], ocard.body)
-    oqdoc = ps.parse_sections(IDX[("quarterly", "2026-Q3")]["content"])
-    oidx = dict(IDX)
-    oidx[("yearly", "2026")] = {"id": "y", "content": ps.serialize_sections(OLDY)}
-    pe._mirror_goal(oqdoc, pm.SEC_QTR_YEAR, "yearly", oidx, TODAY, "- _(x)_")
-    omir = ps.find(oqdoc, pm.SEC_QTR_YEAR, pm.SEC_GOALS).body
-    check("10.old-skeleton-mirror-no-plan-lines", not any(pm.is_plan_line(x) for x in omir) and len(omir) == 1, omir)
-    # the quarterly note's 🎉 Yearly goal mirror copies the goals, never the plan
-    qidx = dict(IDX)
-    qidx[("yearly", "2026")] = {"id": "y", "content": ps.serialize_sections(ydoc)}
-    qdoc = ps.parse_sections(IDX[("quarterly", "2026-Q3")]["content"])
-    pe._mirror_goal(qdoc, pm.SEC_QTR_YEAR, "yearly", qidx, TODAY, "- _(x)_")
-    mir = ps.find(qdoc, pm.SEC_QTR_YEAR, pm.SEC_GOALS).body
-    check("10.quarterly-mirror-no-plan-lines",
-          not any(pm.is_plan_line(x) for x in mir) and len(mir) == 2, mir)
-
-    # ── 10b. the Workbench is the agenda: OKR copies stay out (Vex 2026-09-19) ──
-    _real_get = pe.cache_store.get
-    _env = os.environ.get("okr_list_id")
-    try:
-        os.environ["okr_list_id"] = "okrplan00000000000000000"
-        day_iso = TODAY.isoformat()
-        rows = [{"id": "real1", "projectId": "work0000000000000000000", "title": "Real work",
-                 "startDate": f"{day_iso}T08:00:00+0000", "isAllDay": False, "status": 0},
-                {"id": "kr1", "projectId": "okrplan00000000000000000", "title": "🔑 KR • Plan - TA",
-                 "startDate": f"{day_iso}T00:00:00+0000", "isAllDay": True, "status": 0}]
-        pe.cache_store.get = lambda k: rows if k == "all_tasks" else _real_get(k)
-        got = [r[1] for r in pe._scheduled_today(TODAY)]
-        check("10b.workbench-skips-okr-copies", got == ["real1"], got)
-        os.environ["okr_list_id"] = ""
-        got = [r[1] for r in pe._scheduled_today(TODAY)]
-        check("10b.okrs-off-the-list-is-just-a-list", sorted(got) == ["kr1", "real1"], got)
-        body = ["\t- [ ] [🔑 KR • Plan - TA](https://ticktick.com/webapp/#p/okrplan00000000000000000/tasks/aaaaaaaaaaaaaaaaaaaaaaa1) ",
-                "\t- [x] [🔑 KR • Done - TA](https://ticktick.com/webapp/#p/okrplan00000000000000000/tasks/aaaaaaaaaaaaaaaaaaaaaaa2) ",
-                "\t- [ ] [Real work](https://ticktick.com/webapp/#p/work0000000000000000000/tasks/bbbbbbbbbbbbbbbbbbbbbbb1) "]
-        kept = pm.drop_checkbox_lines(body, (), {"okrplan00000000000000000"})
-        check("10b.old-copy-lines-leave-ticked-ones-stay", kept == body[1:], kept)
-    finally:
-        pe.cache_store.get = _real_get
-        if _env is None:
-            os.environ.pop("okr_list_id", None)
-        else:
-            os.environ["okr_list_id"] = _env
-
-    # ── 11. refresh_period: LIVE window only, for every tier ─────────────────────
-    pe._log = lambda msg: None      # never the real /tmp/tickal_periodic.log
-    STORE = {}
-
-
-    def fake_rmw(pid, tid, mutate):
-        doc = ps.parse_sections(STORE[tid])
-        res = mutate(doc, {"id": tid, "content": STORE[tid]})
-        STORE[tid] = ps.serialize_sections(doc)
-        return res, doc
-
-
-    saved = {n: getattr(pe, n) for n in (
-        "_pn_rmw", "_fill_daily", "_fill_weekly", "_fill_monthly", "_fill_quarterly",
-        "_fill_yearly", "_fill_rollup_money", "_compose_lead", "_swept_load", "_sweep_due")}
-    pe._pn_rmw = fake_rmw
-    for n in ("_fill_daily", "_fill_weekly", "_fill_monthly", "_fill_quarterly",
-              "_fill_yearly", "_fill_rollup_money", "_compose_lead"):
-        setattr(pe, n, lambda *a, **k: None)
-    pe._swept_load = lambda: {}
-    pe._sweep_due = lambda pairs, line_day: ([], [])
-    try:
-        for kind in pm.KINDS:
-            p = pm.period_for(kind, TODAY)
-            t = IDX[(kind, pm.title_key(p))]
-            STORE[t["id"]] = t["content"]
-            pe.refresh_period(p, IDX)
-            body = ps.find(ps.parse_sections(STORE[t["id"]]), pm.SEC_OKR).body
-            check(f"11.refresh-fills-{kind}", body and body[0].startswith("- 🎉 2026 \u2022 "), body)
-        # the grace day: yesterday's daily still gets its closing pass
-        yp = pm.period_for("daily", TODAY - timedelta(days=1))
-        yt = note("daily", yp)
-        yt["id"] = "n_yday"
-        STORE["n_yday"] = yt["content"]
-        idx3 = dict(IDX)
-        idx3[("daily", yp.start.isoformat())] = yt
-        pe.refresh_period(yp, idx3)
-        check("11.grace-day-fills", any(ln.startswith("- ☀️ Fri 18") for ln in ps.find(
-            ps.parse_sections(STORE["n_yday"]), pm.SEC_OKR).body))
-        # a SEALED note keeps the plan it had
-        sp = pm.period_for("daily", TODAY - timedelta(days=3))
-        st = note("daily", sp)
-        st["id"] = "n_sealed"
-        STORE["n_sealed"] = st["content"]
-        idx3[("daily", sp.start.isoformat())] = st
-        pe.refresh_period(sp, idx3)
-        check("11.sealed-untouched", ps.find(ps.parse_sections(STORE["n_sealed"]),
-                                             pm.SEC_OKR).body == ["- _(pending)_"])
-        # the kill switch: 🥅 OKRs deleted + an unrelated "- OKRs" bullet of
-        # Vex's under 📓 Notes = nothing written (ps.find's normalized pass
-        # would hand that bullet back - review 2026-09-19)
-        kp = pm.period_for("daily", TODAY)
-        kt = IDX[("daily", TODAY.isoformat())]
-        kdoc = ps.parse_sections(kt["content"])
-        kdoc.sections = [s for s in kdoc.sections if s.name != pm.SEC_OKR]
-        nsec = ps.find(kdoc, pm.SEC_NOTES)
-        if nsec is not None:
-            ps.set_sec_body(kdoc, nsec, list(nsec.body) + ["\t- OKRs", "\t\t- review them on Sunday"])
-        before = ps.serialize_sections(kdoc)
-        STORE[kt["id"]] = before
-        pe.refresh_period(kp, IDX)
-        check("11.kill-switch-exact: a deleted section + a '- OKRs' bullet elsewhere = untouched",
-              nsec is None or STORE[kt["id"]] == before,
-              [l for l in STORE[kt["id"]].splitlines() if "🎉" in l or "Sunday" in l])
-        # an OKR failure never costs the rest of the refresh
-        pe._okr_plan = lambda: (_ for _ in ()).throw(RuntimeError("cache torn"))
-        STORE[IDX[("daily", TODAY.isoformat())]["id"]] = IDX[("daily", TODAY.isoformat())]["content"]
-        res = pe.refresh_period(P_DAY, IDX)
-        check("11.okr-failure-is-contained", res.startswith("refreshed"), res)
-    finally:
-        for n, f in saved.items():
-            setattr(pe, n, f)
-        pe._today, pe._okr_plan = _real_today, _real_plan
-
-    # ── 12. the plan read: cache only, OKRs off = nothing ────────────────────────
-    import config  # noqa: E402
-    import okr_write  # noqa: E402
-    _env = os.environ.get("okr_list_id")
-    _cp = okr_write.cached_plan
-    calls = []
-    okr_write.cached_plan = lambda lid: calls.append(lid) or ITEMS
-    try:
-        os.environ["okr_list_id"] = ""
-        pe._OKR_PLAN[:] = [0.0, None, []]
-        check("12.off", pe._okr_plan() == ("", []) and not calls)
-        os.environ["okr_list_id"] = LIST
-        check("12.cached", pe._okr_plan() == (LIST, ITEMS) and calls == [LIST])
-        pe._okr_plan()
-        check("12.held-for-the-run", calls == [LIST], calls)
-    finally:
-        okr_write.cached_plan = _cp
-        pe._OKR_PLAN[:] = [0.0, None, []]
-        if _env is None:
-            os.environ.pop("okr_list_id", None)
-        else:
-            os.environ["okr_list_id"] = _env
-
-    print(f"okr notes: {PASS} passed, {FAIL} failed")
-    for f in FAILURES:
-        print("  FAIL", f)
-    sys.exit(1 if FAIL else 0)
+    print(f"{COUNT[0] - len(FAILS)}/{COUNT[0]} checks passed")
+    if FAILS:
+        sys.exit(1)

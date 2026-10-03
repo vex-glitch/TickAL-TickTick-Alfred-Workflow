@@ -485,13 +485,17 @@ else:
         check(f"{T}verify names a line the plan section lost", named("- my own note on the plan", probs), probs)
         # the refresh's plan writer, the plan on: it rewrites the FIRST
         # section of the name whole, which is why his is not carried into it
-        import okr as _okr
-        real_plan = pe._okr_plan
-        pe._okr_plan = lambda: ("L" * 24, [_okr.Item(id="o" * 24, pid="L" * 24, kind="O", name="Ship TickAL",
-                                                      start=date(2026, 9, 1), end=date(2026, 9, 30))])
+        import okr_board as _ob
+        _cols = [{"id": f"c{m}", "name": f"{_ob.keycap(m)} {DAY.year}"} for m in range(1, 13)]
+        _rows = [r for m in range(1, 13) for r in (
+            {"id": f"a{m:02d}" + "a" * 21, "projectId": "L" * 24, "title": "🏔️ VexOS 4️⃣", "columnId": f"c{m}", "status": 0, "sortOrder": 1},
+            {"id": f"o{m:02d}" + "o" * 21, "projectId": "L" * 24, "title": "🥅 Ship TickAL", "columnId": f"c{m}",
+             "parentId": f"a{m:02d}" + "a" * 21, "status": 0, "sortOrder": 1})]
+        real_board = pe._okr_board
+        pe._okr_board = lambda: ("L" * 24, _ob.build("L" * 24, "🔑OKRs", _cols, _rows))
         again = ps.parse_sections(ps.serialize_sections(got["new"]))
         pe._fill_okr(again, p, {})
-        pe._okr_plan = real_plan
+        pe._okr_board = real_board
         plans = [s for s in again.sections if s.name == pm.SEC_OKR]
         check(f"{T}the plan writer fills the template's section and leaves his alone", len(plans) == 2
               and any("Ship TickAL" in l for l in plans[0].body) and [l.strip() for l in plans[1].body if l.strip()] == ["- my own note on the plan"],

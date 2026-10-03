@@ -295,24 +295,7 @@ else:
         with_v2(body)
 
 
-    # V4 okr_write._write: v2 refuses a stale raw, the v1 fallback reads live
-    def v4():
-        import okr_write
-
-        def body(rec):
-            s = Session()
-            c = client(s)
-            item = SimpleNamespace(id=T, pid=P, raw=dict(CACHED))
-            snap = SimpleNamespace(list_id=P)
-            written, failed = okr_write._write(snap, [(item, {"tags": ["okr"]})], c, api_v2.TickTickV2())
-            check("V4 _write: v2 sent nothing stale", rec.calls == [], rec.calls)
-            check("V4 _write: v1 fallback posted the live parent",
-                  s.posts and s.posts[0].get("parentId") == NEW and s.posts[0].get("tags") == ["okr"], s.posts)
-            check("V4 _write: reported written", written == [T] and failed == [], (written, failed))
-        with_v2(body)
-
-
-
+    # (V4, okr_write._write, went with the OKR copy model on 2026-10-03)
 
     # ── the second cut (review of the first, 2026-09-24 evening) ─────────────────
     sys.path.insert(0, os.path.join(REPO, "Scripts"))
@@ -541,7 +524,7 @@ else:
 
     for n, f in [("R1", r1), ("R2", r2), ("R3", r3), ("R4", r4), ("R5", r5), ("R6", r6),
                  ("R6b", r6b), ("R7", r7), ("R7b", r7b), ("R8", r8), ("R9", r9),
-                 ("V1", v1), ("V2", v2), ("V3", v3), ("V4", v4),
+                 ("V1", v1), ("V2", v2), ("V3", v3),
                  ("R10", r10), ("R11", r11), ("L1", l1), ("B1", b1), ("D1", d1), ("V5", v5)]:
         run(n, f)
 

@@ -45,10 +45,10 @@ passthrough, never echo link text back. Add a verb here AND in link.py.
                           link for: calendar = ET OpenCalendar's List-menu
                           flow, countdowns = the Alfred ⏳ hub, crmcal = the
                           Alfred CRM calendar (what CRM > Calendar opens),
-                          okr = the 🥅 OKRs hub, okrdaily | okrweekly |
-                          okrmonthly | okrquarterly = that 📈 Pace period's
-                          plan, okrcarry = the quarter carry-over (the OKR
-                          steps in the routines, HANDOFF_OKR phase 5). A
+                          okr = the 🔑 OKRs hub, okrdaily | okrweekly |
+                          okrmonthly = this month's column of the board,
+                          okrquarterly | okrcarry = the hub root (the OKR
+                          steps in the routines; HANDOFF_OKR section 8). A
                           slot never holds a colon: link.py VIEW_CTX maps
                           each to its full ctx
     money                 THIS month's money-tracking note, found by its
@@ -260,7 +260,7 @@ def internal_links(title="", tid="", pid="", periodic=True, money=False):
         ("inbox", "📥 Inbox", "App inbox", f"[📥 Inbox]({APP_LINKS['inbox']})"),
         ("crmcal", "📅 CRM calendar", "Alfred, like CRM > Calendar",
          f"[🖥 CRM calendar]({url('view', 'crmcal')})"),
-        ("okr", "🥅 OKRs", "Alfred hub, the plan",
+        ("okr", "🔑 OKRs", "Alfred hub, the board",
          f"[🖥 OKRs]({url('view', 'okr')})"),
     ]
     if money:

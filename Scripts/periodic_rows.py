@@ -879,7 +879,7 @@ _GOAL_TIERS = {"daily": "☀️ Daily", "weekly": "♻️ Weekly",
 # like: 'Pick a goal' and open goal picker as is."
 #
 # The plan is a FORECAST and the goal is the pick; these rows only make the
-# forecast one ⏎ away. They read the CACHE (okr_write.cached_plan), never the
+# forecast one ⏎ away. They read the CACHE (okr_board.cached), never the
 # network, and only on an empty bar - the screen renders on every keystroke.
 _GOAL_URL_RE = re.compile(r"#p/(?P<pid>\w+)/tasks/(?P<tid>\w+)")
 
@@ -892,9 +892,9 @@ def _goal_keys(lines, clean=None):
     """(task ids, names) of the goals a note already holds, so a plan item
     that is already the goal is not offered a second time. A task goal is
     known by its link's id; a text goal by its words (and each side of the
-    "text · task" shape, which pm.goal_titles hands back joined). `clean`
-    (okr_write._clean_name) reads a goal the way an import named its plan
-    item - no "💼 P • " lead, no trailing 🔗 - so both sides compare alike."""
+    "text · task" shape, which pm.goal_titles hands back joined). `clean`,
+    when given, normalizes a goal the way the caller names its items, so
+    both sides compare alike."""
     tids, names = set(), set()
     for ln in lines or ():
         for m in _GOAL_URL_RE.finditer(pm.unescape_md(ln or "")):
@@ -931,22 +931,19 @@ def _day_goal_lines(day):
     return []
 
 
-def _plan_original(it, list_id, by_id):
-    """The task a 🔮 row sets as the goal: the LINKED ORIGINAL, never the
-    planning copy. HANDOFF_OKR section 4's trap: a daily goal set from a
-    task MOVES that task onto the day (set_period_goal -> _goal_task_to_day),
-    so a goal aimed at the copy would drag the KR into a time block and
-    break the timeline Vex drags by hand.
-
-    None = set a TEXT goal with the item's name: a text-only item, an O that
-    links a list, a foreign URL, and - defensively - a link that points back
-    into the plan list itself (a copy of a copy is still a copy)."""
-    tg = it.target
+def _plan_original(card, list_id, by_id):
+    """The task a 🔮 row sets as the goal when the card LINKS a TickTick
+    task: that task, never the card (HANDOFF_OKR's oldest trap: a daily
+    goal set from a task MOVES that task onto the day, and a card dragged
+    into a time block leaves its month column). None = set a TEXT goal
+    with the card's name: a card with no link, an Eagle or web link, a
+    list link, or a link back into the board itself."""
+    tg = card.target
     if not tg or tg[0] != "task":
         return None
     _k, pid, tid = tg
     closed = {list_id, areas.PERIODIC_LIST_ID} - {"", None}
-    if not tid or tid == it.id or pid in closed:
+    if not tid or tid == card.id or pid in closed:
         return None
     t = by_id.get(tid) or {}
     if (t.get("projectId") or t.get("_projectId")) in closed:
@@ -955,63 +952,68 @@ def _plan_original(it, list_id, by_id):
     # a task moved to another list since the link was pasted lives THERE
     return {"id": tid,
             "projectId": t.get("projectId") or t.get("_projectId") or pid,
-            "title": t.get("title") or it.name}
+            "title": t.get("title") or card.name}
 
 
 def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None):
-    """🔮 one row per OPEN plan item of period `p`, then 📋 Pick a goal.
+    """🔮 one row per OPEN board item of period `p`, then 📋 Pick a goal.
 
-    `kind` is the tier the plan is read for (the journal's day screen is
+    `kind` is the tier the board is read for (the journal's day screen is
     "daily"), `p` the period the goal lands in - the screen's own rule
     (a journal's for_day, the next period while a handoff runs ahead, else
     today's). `arg(text, t)` is the screen's EXISTING payload builder, so a
     🔮 pick goes down exactly the road a picked task or typed text does.
-    The plan selection is okr_notes.goal_choices, the same one the notes'
-    🥅 OKRs lines read, so a note and its picker never disagree.
+    The selection is okr_notes.goal_choices, the same one the notes'
+    🥅 OKRs lines read (HANDOFF_OKR section 8): a day's and a week's picker
+    offer this month's open key results then its objectives, a month's its
+    objectives then key results, a quarter's its months' objectives, a
+    year's the year goals - each as a TEXT goal with the card's name, or,
+    when the card links a TickTick task, that task (_plan_original).
 
     [] - and the screen is exactly what it was - when OKRs are off, nothing
     is cached, nothing is planned for the period, or anything at all fails:
-    the plan is a convenience here, never a reason the picker cannot open."""
+    the board is a convenience here, never a reason the picker cannot open."""
     today = today or date.today()
     try:
         import config
-        import okr
-        import okr_write
-        from okr_notes import goal_choices
+        import okr_board as ob
+        import okr_notes
         list_id = config.get_okr_list_id()
         if not list_id:
             return []
-        items = okr_write.cached_plan(list_id)
-        if not items:
+        board = ob.cached(list_id)
+        if board is None:
             return []
-        picks = goal_choices(kind, p.start, p.end, items, today) or []
+        picks = okr_notes.goal_choices(kind, p, board) or []
     except Exception:
         return []
-    tids, names = _goal_keys(have_lines, getattr(okr_write, "_clean_name", None))
+    tids, names = _goal_keys(have_lines)
     by_id = {t.get("id"): t for t in cache_store.get("all_tasks") or []
              if isinstance(t, dict) and t.get("id")}
     done_ids = {t.get("id") for t in cache_store.get("completed_tasks") or []
                 if isinstance(t, dict)} - set(by_id)
     rows, seen = [], set()
-    for it in picks:
-        if it.history or not (it.name or "").strip() or it.id in seen:
+    for col, it in picks:
+        card = getattr(it, "card", it)              # an Objective's first card, or the KR card
+        glyph = (ob.GLYPH_GOAL if getattr(it, "kind", "") == "goal"
+                 else ob.GLYPH_O if hasattr(it, "krs") else ob.GLYPH_KR)
+        if card.closed or not (card.name or "").strip() or card.id in seen:
             continue
-        seen.add(it.id)
-        t = _plan_original(it, list_id, by_id)
+        seen.add(card.id)
+        t = _plan_original(card, list_id, by_id)
         if t is not None and (t["id"] in tids or t["id"] in done_ids):
             continue                      # already the goal, or already done
-        if _norm(it.name) in names or (
+        if _norm(card.name) in names or (
                 t is not None and _norm(pm.strip_md_links(t["title"])) in names):
             continue                      # already the goal, as text or by title
-        when = okr.span_txt(it.start, it.end, today)      # the stored span, his
         rows.append(alfred.item(
-            uid=f"pn-goal-plan-{kind}-{it.id}",
-            title=f"🔮 {okr_write.GLYPH.get(it.kind, '▫️')} {it.name[:60]}",
-            subtitle=f"{when} · the plan  |  ⏎ The {label} goal",
-            arg=arg("" if t is not None else it.name, t),
+            uid=f"pn-goal-plan-{kind}-{card.id}",
+            title=f"🔮 {glyph} {card.name[:60]}",
+            subtitle=f"{col.bullet} · the board  |  ⏎ The {label} goal",
+            arg=arg("" if t is not None else card.name, t),
             valid=True, mods=_mods()))
     if rows:
-        # the divider between the forecast and the picker as it always was;
+        # the divider between the board and the picker as it always was;
         # with no 🔮 row there is nothing to divide, and the screen stays
         # exactly the one Vex already knows
         rows.append(alfred.item(

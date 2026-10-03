@@ -252,18 +252,15 @@ def do_sync():
     nudged = _people_nudge(api, all_tasks)
     if nudged:
         summary += f" · 🫂 {nudged} reach-out" + ("s" if nudged > 1 else "")
-    # 🥅 OKR upkeep - auto-tick + the ⏳ countdowns, "on the hourly sync"
-    # (HANDOFF_OKR section 4; no heal since 2026-09-23, OKR dates are
-    # TickTick's). AFTER _people_nudge on purpose: it re-sets all_tasks from
-    # its own local list, which would erase the ticks' cache patches. upkeep
-    # refuses unless the read is live and complete, and never raises; the
-    # headless banner below rides XAct → End, which clicks Sync - so no
-    # click here.
+    # 🔑 the OKR board's completed cards (HANDOFF_OKR section 8): v1 project
+    # data above holds the open cards and the columns, v2 alone returns the
+    # ticked key results, and the periodic notes read the board from the
+    # cache only - so the sync keeps okr_done beside project_data. A READ,
+    # nothing is written to TickTick (the 2026-09 auto-tick and countdown
+    # upkeep that ran here are gone with the copy model). Never raises.
     try:
-        import okr_write
-        _okr = okr_write.upkeep(api=api)
-        if _okr.chip:
-            summary += f" · {_okr.chip}"
+        import okr_board
+        okr_board.refresh_done()
     except Exception:
         pass
     # 🥘 Meal Prep rides NO sync: Vex 2026-09-21, "this python script that

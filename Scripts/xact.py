@@ -243,36 +243,12 @@ Periodic notes 💫 (src/periodic_engine; all gated on periodic_list_id):
                                     DETACHED (a routine macro runs 10-20 s and
                                     this node is sequential); 🌓 Routines ⌃
 
-🥅 OKRs (HANDOFF_OKR phase 2; writes in src/okr_write.py, screens browse.py
-ctx:okr*; b64 JSON payloads, each may carry "back": a ctx reopened after the
-write through BrowseCtx - clean bar):
-    xact:okr_add:<b64>              ➕ {"kind":Y|O|KR,"parent":id|null,
-                                    "names":[...],"code":str|null,"link":
-                                    {"to":task|list,"pid","tid"}|null,
-                                    "then":"tag"|null} new planning copies
-                                    (phase 3 import + typed adds): stamped,
-                                    coded, a KR tagged like its O; a thing
-                                    already planned reopens THAT item, a new
-                                    Y / O with then:tag its tag picker
-    xact:okr_addkr:<b64>            🔑 {"oid","names":[...],"code":str|null}
-                                    KRs under an O, coded + tagged like it
-                                    (a new code lands as its 🏷️ line);
-                                    okr_add with kind KR since phase 3
-    xact:okr_link:<b64>             🔗 {"id","to":task|list,"pid","tid"} the
-                                    copy's title links the real thing
-    xact:okr_tag:<b64>              🏷 {"id","tag"} swap the OKR-pool tag; an
-                                    O takes its open KRs along
-    xact:okr_upkeep                 detached auto-tick + the ⏳ countdowns
-                                    (the hub spawns it on open, debounced;
-                                    hourly sync too). No heal since
-                                    2026-09-23: OKR dates are TickTick's
-    xact:okr_carry:<b64>            ↪️ {"id","action":wontdo|someday} one
-                                    quarter carry-over decision (phase 5):
-                                    wontdo = v2 status -1, someday = undated;
-                                    carrying it forward is a DRAG in TickTick
-                                    (2026-09-23: TickAL moves no OKR dates)
+🔑 OKRs (HANDOFF_OKR section 8, the board; screens browse.py ctx:okr*). The
+board is READ: no verb writes it except ⇧ on a key result, the ordinary
+complete road. The 2026-09 writers (okr_add, okr_addkr, okr_link, okr_tag,
+okr_carry, okr_upkeep) are gone with the copy model.
     xact:okr_setlist                ⚙️ Settings → OKR List dialog (blank = off,
-                                    no kanban flip: a timeline list)
+                                    the list's view mode never touched)
     xact:meal_sync:<b64 {back}>     🔄 Sync with Mela: new recipes in,
                                     descriptions filled, the cook week's
                                     meals from the Mela calendar mirrored
@@ -12758,392 +12734,40 @@ def focus_done():
     print("✅ No task-linked session running")
 
 
-# ── 🥅 OKRs (HANDOFF_OKR phase 2) ────────────────────────────────────────────
-# The writes live in src/okr_write.py (the hourly sync heals too, and it
-# cannot import Scripts/); these are the thin wrappers. Every road that fires
-# them ends at ET End - the browse ⏎ (modOpen → End), ⌥⇧ and the ⌘ Actions
-# ^xact leg (XAct → End) - so the toast is a PRINT, once. A refusal is caught
-# here: left to escape, main()'s catch-all prints AND banners it.
+# ── 🔑 OKRs (HANDOFF_OKR section 8) ──────────────────────────────────────────
+# The board is read by src/okr_board.py and shown by browse.py; nothing here
+# writes it. The one verb left is the Settings dialog.
 
-def _okr_run(rest, fn):
-    """Decode the b64 payload, run the writer, print its one toast, then
-    reopen the screen it came from: "back" is a ctx the BrowseCtx trampoline
-    turns into the browse_ctx VARIABLE, so the bar lands clean (iron rule 8).
-    The screen reopens after a refusal too - the plan is unchanged and the
-    next try starts from where he was. A writer may name ANOTHER landing:
-    an okr_write.Outcome's reopen (a new Y / O goes on to its tag picker) or
-    a Refusal's (an "Already in the plan" goes to the item that plans it).
-    Either rides the same BrowseCtx road, so the bar stays clean."""
-    import okr_write as ow
-    spec = _pn_decode(rest) if rest else None
-    if not isinstance(spec, dict):
-        print("🥅 Bad payload · nothing written")
-        return
-    reopen = None
-    try:
-        msg = fn(spec)
-    except ow.Refusal as e:
-        msg, reopen = str(e), getattr(e, "reopen", None)
-    except Exception as e:
-        msg = f"🥅 Not written · {type(e).__name__}: {e}"
-    if isinstance(msg, ow.Outcome):
-        msg, reopen = msg.msg, msg.reopen
-    back = reopen if isinstance(reopen, str) and reopen.startswith("ctx:") else spec.get("back")
-    if isinstance(back, str) and back.startswith("ctx:"):
-        try:
-            _run_trigger("BrowseCtx", back)
-        except Exception:
-            pass
-    if msg:
-        print(msg)
+_OKR_LIST_ID_RE = re.compile(r"^[0-9a-f]{24}$")
 
 
-# ── 🥘 Meal Prep verbs (HANDOFF_MEAL.md) - thin wrappers over src/meal_write ──
-def _meal_run(rest, fn):
-    """_okr_run for the meal verbs: decode, run the writer, print its one
-    toast, reopen the payload's back (or the Outcome's) through BrowseCtx
-    so the bar lands clean. A dry run prints the writer's plan text."""
-    import meal_write as mw
-    spec = _pn_decode(rest) if rest else None
-    spec = spec if isinstance(spec, dict) else {}
-    reopen = None
-    try:
-        msg = fn(spec)
-    except mw.Refusal as e:
-        msg, reopen = str(e), getattr(e, "reopen", None)
-    except Exception as e:
-        msg = f"🥘 Not written · {type(e).__name__}: {e}"
-    if isinstance(msg, mw.Outcome):
-        msg, reopen = msg.msg, msg.reopen
-    back = reopen if isinstance(reopen, str) and reopen.startswith("ctx:") else spec.get("back")
-    if isinstance(back, str) and back.startswith("ctx:") and not _dry_meal(spec):
-        try:
-            _run_trigger("BrowseCtx", back)
-        except Exception:
-            pass
-    if msg:
-        print(msg)
-
-
-def _dry_meal(spec):
-    return bool((spec or {}).get("dry")) or os.environ.get("TICKAL_MEAL_DRY") == "1"
-
-
-def meal_sync(rest):
-    """🔄 Sync with Mela (meal_write.sync): recipes in, descriptions filled,
-    the cook week's meals read from the Mela calendar and mirrored onto the
-    routine's pointers + 🛒 groceries + the weekly note. The ONE meal verb -
-    Vex 2026-09-21: "a row that says sync TickTick with Mela, that would do
-    that manually". {"dry": true} or TICKAL_MEAL_DRY=1 prints the plan and
-    writes nothing."""
-    import meal_write as mw
-    _meal_run(rest, lambda spec: mw.sync(dry=_dry_meal(spec)))
-
-
-def meal_setlist():
-    """⚙️ Settings → 🥘 Meal Prep list: paste the library list's id (⌘ Copy
-    id on any list row mints it). Saves config meal_list_id. PRINTED, not
-    _crm_say'd: its Settings road ends at ET End already (okr_setlist)."""
-    import re as _re
-    cur = cfg.get_meal_list_id()
-    a = _ask("🥘 Meal Prep list id (⌘ Copy id on any list · Esc cancels)", default=cur)
-    if a is None:
-        print("🥘 Cancelled")
-        return
-    a = a.strip()
-    if not _re.fullmatch(r"[0-9a-fA-F]{24}", a or ""):
-        print("🥘 That does not look like a list id · nothing saved")
-        return
-    data = cfg.load()
-    data["meal_list_id"] = a
-    cfg.save(data)
-    print(f"🥘 Meal Prep list set · {_list_name_of(a) or a}")
-
-
-def _meal_name(tid):
-    """The recipe's name off the cached library task (meal.parse_title), for
-    a dialog's first line; 'this recipe' when the cache does not hold it."""
-    import meal
-    try:
-        parsed = meal.parse_title((cache_store.find_task(tid) or {}).get("title") or "")
-    except Exception:
-        parsed = None
-    return parsed[0] if parsed else "this recipe"
-
-
-def meal_cooked(rest):
-    """👨‍🍳 Cooked (meal_write.mark_cooked): the 👨‍🍳cooked tag on the
-    library recipe and ONE note for next time, asked in one dialog (Esc or
-    an empty box = no note) - Vex 2026-09-21: "I would like to be able to
-    mark meal cooked via modifier", "know which meals I have cooked before,
-    so I am thinking a tag", "retrospectively I also should be able to add
-    a comment, like add less salt next time". Payload {"pid","tid"[,"back"]}:
-    ⌥⇧ on any meal row that resolves to a library task (the one chord
-    besides ⏎ that runs a row's xact arg) and the ⌘ Actions row, which
-    carries no back (toast only). The dialog is asked INSIDE the writer
-    call so a dry run and a Refusal still ride _meal_run."""
-    import meal_write as mw
-
-    def run(spec):
-        name = _meal_name(spec.get("tid"))
-        note = _ask(f"👨‍🍳 {name} cooked · a note for next time? (Esc = none)",
-                    multiline=True)
-        return mw.mark_cooked(pid=spec.get("pid"), tid=spec.get("tid"),
-                              comment=note or None, dry=_dry_meal(spec))
-    _meal_run(rest, run)
-
-
-def meal_rate(rest):
-    """⭐️ Rate (meal_write.rate): the stars line right under the link header
-    of the recipe's description ("a rating should be quote first liner
-    below links in recipe, stars"), 1 to 5, 0 clears. Payload
-    {"pid","tid","stars"[,"back"]} - the count is picked on the row, so no
-    dialog; a bad count is the writer's refusal."""
-    import meal_write as mw
-    _meal_run(rest, lambda spec: mw.rate(pid=spec.get("pid"), tid=spec.get("tid"),
-                                         stars=spec.get("stars"), dry=_dry_meal(spec)))
-
-
-def meal_comment(rest):
-    """💬 Comment (meal_write.comment): one quote line under the stars
-    ("comment should go below that also as quote"), appended after the
-    earlier ones - "add less salt next time", written after eating. Payload
-    {"pid","tid"[,"back"]}; the text is asked here, Esc cancels with
-    nothing written (an empty box is the writer's refusal)."""
-    import meal_write as mw
-
-    def run(spec):
-        name = _meal_name(spec.get("tid"))
-        text = _ask(f"💬 {name} · note (Esc cancels)", multiline=True)
-        if text is None:
-            return "💬 Cancelled"
-        return mw.comment(pid=spec.get("pid"), tid=spec.get("tid"), text=text,
-                          dry=_dry_meal(spec))
-    _meal_run(rest, run)
-
-
-def meal_portions(rest):
-    """🔢 Portions (meal_write.set_portions): how many portions of each meal
-    this week, ONE dialog per 🛒 list with the count it is cut for now as
-    the default, then that checklist re-cut with its ticks kept - Vex
-    2026-09-22: "can we have a row that would ask me how many portions of
-    each meal I would like to cook this week and then adjust groceries
-    accordingly? Like separate action. Maybe on groceries row for that
-    list under some modifier?" ("We can keep those calculations as are in
-    general", so the sync's own cut stays 7). Payload (meal.portions_payload)
-    {"pid","tid"[,"back"]} = one list (⌥⇧ on a ctx:mealgroc row) or
-    {"all": true[, "back"]} = every open list of the upcoming 🛒 Groceries
-    task (⌥⇧ on the hub's 🛒 Groceries row, meal_write.week_lists). Esc or
-    an empty box skips that list, never the rest; the answers land in ONE
-    toast. The dialogs are asked INSIDE the writer call so a dry run and a
-    Refusal still ride _meal_run."""
-    import meal
-    import meal_scale
-    import meal_write as mw
-    lo, hi = meal_scale.SANE
-
-    def run(spec):
-        if spec.get("tid"):
-            rows = [cache_store.find_task(spec["tid"])
-                    or {"id": spec["tid"], "projectId": spec.get("pid"), "title": ""}]
-        else:
-            rows = mw.week_lists()
-        if not rows:
-            return "🛒 No grocery lists this week · 🔄 Sync with Mela first"
-        results = []
-        for row in rows:
-            parsed = meal.parse_title(row.get("title") or "")
-            name = (parsed[0] if parsed else "") or "this list"
-            cur = mw._portions_of(row)
-            # the first lists were saved without their note: the count is
-            # unknown, not "unscaled" (the sync cut them to 7 all the same)
-            now = f"now {cur}" if cur else f"count unknown · default {meal.PORTIONS}"
-            ans = _ask(f"🛒 {name} · portions? ({now})", default=str(cur or meal.PORTIONS))
-            if ans is None or not ans.strip():
-                results.append(f"{name} skipped")
-                continue
-            try:
-                n = int(ans.strip())
-            except ValueError:
-                results.append(f"{name} skipped (not a number)")
-                continue
-            if n < lo or n > hi:
-                results.append(f"{name} skipped ({lo} to {hi})")
-                continue
-            try:
-                msg = mw.set_portions(pid=row.get("projectId") or row.get("_projectId")
-                                      or spec.get("pid"),
-                                      tid=row.get("id"), portions=n, dry=_dry_meal(spec)).msg
-            except mw.Refusal as e:
-                msg = str(e)
-            except Exception as e:
-                if mw._rate_limited(e):      # retrying inside the window deepens the lockout
-                    results.append(f"{name} · TickTick rate limit · the rest skipped")
-                    break
-                msg = f"{name} · not written · {type(e).__name__}: {e}"
-            results.append(msg[2:] if msg.startswith("🛒 ") else msg)
-        return "🔢 Portions · " + " · ".join(results)
-    _meal_run(rest, run)
-
-
-def meal_prices(rest):
-    """🏷 Prices (meal_write.refresh_prices): the week's ingredient keys
-    priced from knuspr.de into the book and every 🛒 list re-priced in
-    place, suffixes and cost line - Vex 2026-09-22: "how feasible is the
-    idea of price speculations? Like how much will each ingredient cost
-    and total per meal?", "Could we not scrape prices of that site, write
-    them in the pricebook and use that?", "Speculation is all I need."
-    One of the two roads to the network (the other: a book row's ⌥⇧ search term), and only when this row is pressed (⌥⇧
-    on the hub's 🏷 row): never a hitchhiker, never a LaunchAgent. Payload
-    {"back"}; {"dry": true} or TICKAL_MEAL_DRY=1 names the keys and
-    fetches nothing."""
-    import meal_write as mw
-    _meal_run(rest, lambda spec: mw.refresh_prices(dry=_dry_meal(spec)))
-
-
-def _price_default(entry):
-    """The dialog's default for a key the book already prices: the entry's
-    own "<price> / <pack amount> <pack unit>" ("3.19 / 10 pc"), so Return
-    keeps what it had; "" when the entry lacks one of the three."""
-    e = entry or {}
-    try:
-        if e.get("price") is None or e.get("pack_amount") is None or not e.get("pack_unit"):
-            return ""
-        return f"{float(e['price']):g} / {float(e['pack_amount']):g} {e['pack_unit']}"
-    except (TypeError, ValueError):
+def _okr_list_answer(answer):
+    """The Settings dialog's answer -> the value to save: "" = OFF (a blank
+    okr_list_id means off, HANDOFF_OKR section 5), a 24-hex list id as
+    typed, None = not a list id (nothing saved)."""
+    a = (answer or "").strip()
+    if not a:
         return ""
-
-
-def meal_price_set(rest):
-    """✍️ A price by hand (meal_write.set_price): ⏎ on a ctx:mealprice
-    row asks "price / amount unit" in ONE dialog ("2.99 / 10 pc", "1.49 /
-    100 g", "7.97 / 1 l"), the entry's own pack as the default when the
-    book has one; Esc or an empty box cancels with nothing written, and
-    a text the writer cannot read is its refusal. A manual price wins
-    over knuspr's for good (the refresh never touches it). The same box
-    takes "pantry" / "not pantry" (D27, Vex 2026-09-23: "Let's do what
-    you pay at the till please."): the writer flips the entry's pantry
-    flag instead of parsing a price, so a staple the till should report
-    apart needs no second dialog. Payload {"key","back"}. Asked INSIDE
-    the writer call so a Refusal still rides _meal_run; a dry run never
-    opens the dialog."""
-    import meal_price as mp
-    import meal_write as mw
-
-    def run(spec):
-        key = (spec.get("key") or "").strip()
-        if not key:
-            return "🏷 No ingredient"
-        if _dry_meal(spec):
-            return f"🥘 Dry run · would ask a price for {key}"
-        entry = ((mp.load_book().get("entries") or {}).get(key))
-        ans = _ask(f"🏷 {key} · price? (e.g. 2.99 / 10 pc, 1.49 / 100 g · or: pantry / not pantry)",
-                   default=_price_default(entry if isinstance(entry, dict) else None))
-        if ans is None or not ans.strip():
-            return "🏷 Cancelled"
-        return mw.set_price(key, ans.strip())
-    _meal_run(rest, run)
-
-
-def meal_price_search(rest):
-    """🔍 A search term by hand (meal_write.set_search): ⌥⇧ on a
-    ctx:mealprice row asks what to type into knuspr.de, the term the
-    refresh would use as the default (meal_price.search_term: the entry's
-    own, else the English-to-German table, else the key), then that ONE
-    key is looked up at once - the second and last road to the network,
-    one call. Esc or an empty box cancels with nothing written. Payload
-    {"key","back"}; a dry run never asks and never fetches."""
-    import meal_price as mp
-    import meal_write as mw
-
-    def run(spec):
-        key = (spec.get("key") or "").strip()
-        if not key:
-            return "🏷 No ingredient"
-        if _dry_meal(spec):
-            return f"🥘 Dry run · would ask a search term for {key}"
-        ans = _ask(f"🏷 {key} · search term on knuspr.de",
-                   default=mp.search_term(key, mp.load_book()))
-        if ans is None or not ans.strip():
-            return "🏷 Cancelled"
-        return mw.set_search(key, ans.strip())
-    _meal_run(rest, run)
-
-
-def okr_add(rest):
-    """🥅 new 🏔️ Y / 🥅 O / 🔑 KR planning copies (HANDOFF_OKR phase 3):
-    typed text (the pipe = siblings) or ONE imported task, note or list
-    with its link. Stamped, coded and tagged by okr_write.add_items; a
-    thing the plan already holds lands on that item instead, and a new
-    Y / O with then:"tag" lands on its tag picker."""
-    import okr_write as ow
-    _okr_run(rest, ow.add_items)
-
-
-def okr_addkr(rest):
-    """🔑 several KRs under an O from one piped line, coded + tagged
-    (phase 2's rows; add_items with kind KR since phase 3)."""
-    import okr_write as ow
-    _okr_run(rest, ow.add_krs)
-
-
-def okr_link(rest):
-    """🔗 the copy's title links the real task, note or list."""
-    import okr_write as ow
-    _okr_run(rest, ow.link)
-
-
-def okr_tag(rest):
-    """🏷 swap the OKR-pool tag (an O takes its open KRs along)."""
-    import okr_write as ow
-    _okr_run(rest, ow.retag)
-
-
-def okr_carry(rest):
-    """↪️ one quarter carry-over decision (HANDOFF_OKR phase 5): won't do,
-    or someday (undated) - from a writable live read, parents healed, the
-    countdowns in step. Lands back on the carry-over list. Carrying an item
-    INTO the next quarter is a drag in TickTick (2026-09-23)."""
-    import okr_write as ow
-    _okr_run(rest, ow.carry)
-
-
-def okr_upkeep():
-    """The detached pass the hub spawns on open (okr_write.spawn_upkeep,
-    debounced): the ⏳ countdowns kept in step, every KR whose linked
-    original is done ticked. Refuses silently unless the read is writable. Run
-    DETACHED, stdout is the log (/tmp/tickal_okr.log), so it banners only
-    when something changed (_crm_say rides XAct → End, whose own Sync click
-    is the nudge - no second click here). Run on an Alfred road instead,
-    the print is the toast, and an empty stdout shows none."""
-    import okr_write as ow
-    r = ow.upkeep()
-    if os.environ.get("TICKAL_DETACHED"):
-        print(f"{datetime.now():%Y-%m-%d %H:%M:%S} okr_upkeep: {r.note}")
-        if r.chip:
-            _crm_say(r.chip)
-    elif r.chip:
-        print(r.chip)
+    return a if _OKR_LIST_ID_RE.fullmatch(a) else None
 
 
 def okr_setlist():
     """⚙️ Settings → 🥅 OKR List: paste the plan list's id (⌘ Copy id on
     any list row mints it). people_setlist's shape with two differences:
-    the list is NOT flipped to kanban - it is a TIMELINE Vex drags by hand
-    (HANDOFF_OKR section 1) - and a blank answer saves "" = OKRs OFF (a
+    the list's view mode is never touched - it is HIS kanban board
+    (HANDOFF_OKR section 8) - and a blank answer saves "" = OKRs OFF (a
     present-but-blank okr_list_id means off; the built-in default applies
     only while the key is absent, config.get_okr_list_id). The outcome is
     PRINTED, never _crm_say'd: its Settings road already ends at ET End,
     and a banner rides XAct → End again - two Ends, two unclaimed Sync
     clicks (the 2026-09-12 wedge)."""
-    import okr_write as ow
     cur = cfg.get_okr_list_id()
     a = _ask("🥅 OKR list id (⌘ Copy id on any list · blank = off · Esc cancels)",
              default=cur)
     if a is None:
         print("🥅 Cancelled")
         return
-    val = ow.parse_list_answer(a)
+    val = _okr_list_answer(a)
     if val is None:
         print("🥅 That does not look like a list id · nothing saved")
         return
@@ -13370,18 +12994,6 @@ def main():
             person_setup()
         elif verb == "people_setlist":
             people_setlist()
-        elif verb == "okr_add":
-            okr_add(rest)
-        elif verb == "okr_addkr":
-            okr_addkr(rest)
-        elif verb == "okr_link":
-            okr_link(rest)
-        elif verb == "okr_tag":
-            okr_tag(rest)
-        elif verb == "okr_upkeep":
-            okr_upkeep()
-        elif verb == "okr_carry":
-            okr_carry(rest)
         elif verb == "okr_setlist":
             okr_setlist()
         elif verb == "meal_sync":

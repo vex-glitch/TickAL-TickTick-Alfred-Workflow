@@ -379,16 +379,16 @@ else:
               banners == [("TickAL sync ⚠️", QUIET)], banners)
 
         # a list that fails for a reason of its own is still skipped and counted
-        import okr_write    # noqa: E402
-        real_upkeep = okr_write.upkeep
-        okr_write.upkeep = lambda api=None: SimpleNamespace(chip="")
+        import okr_board    # noqa: E402
+        real_refresh = okr_board.refresh_done
+        okr_board.refresh_done = lambda *a, **k: None
         store = Store(all_tasks=["BEFORE"], all_notes=[])
         fake = Lists(die=3, err=ValueError("one odd list"))
         sync.cache_store, sync.TickTickAPI = store, lambda token: fake
         try:
             out = said(sync.do_sync, ["sync.py", "sync"])
         finally:
-            okr_write.upkeep = real_upkeep
+            okr_board.refresh_done = real_refresh
         check("one odd list: skipped and counted, the sync goes on",
               "(1 list(s) failed)" in out and fake.read == 3, out)
         check("one odd list: the other lists' tasks are written",

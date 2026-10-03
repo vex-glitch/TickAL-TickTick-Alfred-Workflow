@@ -55,12 +55,10 @@ test:
 	@$(PYTHON) tests/test_money_backfill.py
 	@$(PYTHON) tests/test_journal_canon.py
 	@$(PYTHON) tests/test_task_window.py
-	@$(PYTHON) tests/test_okr.py
-	@$(PYTHON) tests/test_okr_screens.py
-	@$(PYTHON) tests/test_okr_write.py
-	@$(PYTHON) tests/test_okr_pickers.py
+	@$(PYTHON) tests/test_okr_board.py
 	@$(PYTHON) tests/test_okr_notes.py
-	@$(PYTHON) tests/test_okr_stats.py
+	@$(PYTHON) tests/test_okr_screens.py
+	@$(PYTHON) tests/test_okr_pickers.py
 	@$(PYTHON) tests/test_people.py
 	@$(PYTHON) tests/test_eagle.py
 	@$(PYTHON) tests/test_photos_bridge.py

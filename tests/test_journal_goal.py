@@ -712,7 +712,7 @@ else:
     finally:
         xact._goalseq_save, xact.JOURNAL_LOG = _gs, _log
     check("the objective question carries the quarter's and the year's plan under it",
-          details[:1] == ["🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🎉 The year's objectives: Productivity System 3/41"], details)
+          details[:1] == ["🥅 This quarter's objectives: Onboard TickTicks 2/5 · TickAL 1/6\n🏔️ The year's goals: Productivity System 3/41"], details)
     check("a question about nothing of the note is asked bare", details[1:] == [""], details)
     check("both answers were saved", fake.merged == {1: "an answer", 2: "an answer"}, fake.merged)
     with open(reflog) as f:

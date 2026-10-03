@@ -1,162 +1,135 @@
-# 🥅 OKRs
+# 🔑 OKRs
 
 _TickAL docs: [Home](00-index.md) · [Setup](30-setup.md) · [Cheatsheet](95-cheatsheet.md)_
 
-> A guiding-star plan of your goals inside TickTick: year objectives, objectives and key results on a timeline, with pace and progress.
+> Your OKR board, read back the way you laid it out: the months as rows, this month on top, each month's areas, objectives and key results under it, and the same board mirrored into your periodic notes and journals.
 
 **Keyword:** `tok` · **Hotkey:** (set in canvas) - or the **🥅 OKRs** row in the main menu (`tal`).
 
 ## Why
 
-A plan is a forecast, and reality drifts from it. OKRs here are not a daily to-do list: they are the plan you set once a year (or whenever), review every quarter and month, and keep in view while the real work happens in your normal lists. Every OKR item is an all-day entry with no time, so it sits on top of your calendar, outside your time blocks: you see what the ideal plan says for today, and you adjust.
+OKRs are an inspiration board, not a plan of your working weeks. You set them once (or whenever), look at them every day, and review them every month, quarter and year. TickTick's kanban is the board; TickAL reads it and shows it back wherever you need to see it: a hub in Alfred, the 🥅 OKRs section of every periodic note, and the journal questions that ask about your objectives. TickAL never writes a date, never moves a card, and never adds one. The only thing it can change on the board is a key result's tick.
 
-The plan lives in ONE TickTick list you schedule by hand in the **timeline view** - drag an item, stretch it, slide it. TickAL never replaces that. It reads the plan and keeps its arithmetic right: progress and pace. It never writes a date, not even a parent's.
+## The board
 
-> [!IMPORTANT]
-> OKRs are a workflow, not a single action - a list, three levels, a naming convention and a few automations. Give this page a full read before first use.
+One TickTick list in **kanban view**, pointed at by `⚙️ Settings → OKR List` (a blank answer turns OKRs off). Its columns are months and years' goals, named like this:
 
-## The moving parts
+| Column | Holds |
+|---|---|
+| `1️⃣ 2027` … `9️⃣ 2027`, `🔟 2027`, `1️⃣1️⃣ 2027`, `1️⃣2️⃣ 2027` | The month's cards |
+| `2027 Goals` | The year's goals |
 
-| Part | What it is | Who makes it |
-|---|---|---|
-| **The plan list** | One TickTick list in timeline view holds every OKR item (`⚙️ Settings → OKR List`) | You, once |
-| **🏔️ Y • Year objective** | The top level, one per area of your life - a step above objectives | You |
-| **🥅 O • Objective** | Something you want to achieve - mostly a project | You, or ⌘⏎ → 🥅 Add to OKRs |
-| **🔑 KR • Key result - CODE** | A deliverable that gets the objective there - a task or subtask, never a number | You, or 🥅 Add to OKRs |
-| **The code** | A short suffix per objective (TickAL → `TA`), stamped on every KR under it | The automation - proposed, you can override |
-| **Area tags** | The lanes of the timeline: the subtags of your `0️⃣Area` tag (plus the tags your Y/O items carry) | You, once |
-| **Auto-tick** | A KR whose linked task is done gets ticked | The automation - on hub open and on the hourly sync |
-| **Countdowns** | One TickTick countdown per started objective, to its end | The automation - the same passes |
+In a **month column** the card is an **area** (`🏔️ Work 1️⃣`, `🏔️ Personal 2️⃣`, … `🏔️ Manager 6️⃣`), its subtasks are **🥅 objectives**, and theirs are **🔑 key results**. In a **Goals column** the area's children are the **🏔️ year goals**. A title may carry a link (`🔑 [Grim Reaper](eagle://…)`, `🥅 [Onboard TickTicks](https://ticktick.com/…/tasks/…)`); the link is kept and shown with a 🔗.
 
-## Planning copies
+Rules TickAL reads by:
 
-Everything in the plan list is a **copy that links to the real thing**:
-
-- an objective links to its project's 📌CTA task (see [Projects](49-projects.md)), or to a list;
-- a key result links to a task, a subtask or a note;
-- a text-only item is fine too - link it later with **🔗 Link…**.
-
-Moving a copy never moves the real task. The copy is the plan, the original is reality, and the gap between them is the point. When the real task is completed, its key result ticks itself.
-
-## Set it up once
-
-1. **Create the plan list** in TickTick and switch it to **timeline view**. Group it by tag if you want lanes.
-2. **Point TickAL at it:** copy its id (`tse l <name>` → ⌘⏎ → **🆔 Copy id**), then `tal` → ⚙️ **Settings → OKR List** and paste. A blank answer turns OKRs off.
-3. **Area tags:** OKRs use the subtags of your `0️⃣Area` tag as lanes. Nothing to register - they arrive with the next sync.
+- **The column is the schedule.** A card's month is the column of its top card, however you drag the subtasks. Dates on a card mean nothing to TickAL.
+- **Same-named cards fold.** Two `🏔️ Learning 3️⃣` cards in one month read as one area; two `🥅 Learn Drawing` under it as one objective with every key result of both.
+- **Progress is the only number**: ticked key results over all of them. A won't-do key result leaves both sides.
+- **A year goal rolls up** the same-named monthly objectives of its year (`🏔️ Draw` over every month that has a `🥅 Draw`). A goal no month plans for reads plain.
+- A `🥅` or `🔑` left at card level shows under an **Unsorted** separator; a card in a column that is not a month or a Goals column is counted on the hub's last row. Drag them where they belong in TickTick.
 
 ## The hub
 
-Open it from the main menu or its keyword. The root shows your year objectives, then loose objectives, each with its span, progress and pace:
+Open it from the main menu or its keyword. The root lists the board's columns as rows, this month on top:
 
 ```
-🥅 TickAL        Sep 19 - Oct 14 · 2/6 KRs · behind 2d · 40%
+🔑OKRs · 23 months planned      Oct 2026 to Oct 2028 · board in TickTick
+🔟 2026                          October 2026 · 3 objectives · 4/25 KRs
+2026 Goals                       1 goal · VexOS
+1️⃣1️⃣ 2026                       November 2026 · 2 objectives · 0/13 KRs
+…
+9️⃣ 2026                         September 2026 · 1 objective · 0/1 KRs · 1 open left
 ```
 
-| Key | On a 🏔️ / 🥅 row | On a 🔑 row |
-|---|---|---|
-| ⏎ | Inside (its children) | Open the copy in TickTick |
-| ⌥ | Inside | The real task in Alfred (its subtasks, or its list) |
-| ⇧ | - | ✅ Done / ↩️ Reopen |
-| ⌘ | Actions | Actions |
-| ⌃ | Back | Back |
+After this month come this year's Goals, the months ahead, and each later year's Goals before its January. Earlier months appear last, only while they still hold an open key result. Empty columns are left out.
 
-**📈 Pace** opens four rows - 🌓 Quarter, 🗓️ Month, ♻️ Week, ☀️ Day - each counting the key results the plan puts in that period, how many are done, and how far behind the late ones are. ⏎ on a row shows that period's plan.
+⏎ on a month shows the column the way the board does: each area as a separator, its objectives as rows, their key results indented under them.
 
-The last row is **⚖️ Capacity**: the key results your plan puts due in the next four weeks against the ones you ticked in the last four, per week (`plan 1.8/wk · done 0.5/wk`), with ⚠️ when two or more are due and the plan asks for more than half again what you finish. The week's plan (♻️ Week) shows it too, since that is where the weekly review plans the next week.
+```
+🏔️ VexOS 4️⃣                     4/25 KRs
+🥅 Onboard TickTicks 🔗          3/5 KRs
+      ✅ Finish periodic notes
+      🔑 Audits
+      🔑 Review
+🥅 KeyCue/MIAs/Shared actions 🔗 0/16 KRs
+      🔑 TickTick
+```
 
-**↪️ Carry-over** shows up under 📈 Pace while a quarter leaves key results open - see [The quarter carry-over](#the-quarter-carry-over).
+| Key | Month or Goals row | Objective or goal row | Key result row |
+|---|---|---|---|
+| ⏎ | Its screen | The card in TickTick | The card in TickTick |
+| ⌥ | Its screen | The task it links, in Alfred (when it links one) | The task or list it links |
+| ⇧ | - | - | ✅ Done / ↩️ Reopen |
+| ⌘ | - | Actions | Actions |
+| ⌥⌘ | - | Copy the card's link | Copy the card's link |
+| ⌃ | Back | Back | Back |
 
-**Typing** in the hub searches every item. With no match (or below the matches), ➕ rows add what you typed: **➕ New objective / year objective** on the root, **➕ New objective** on a year objective, **➕ New KR** on an objective. A pipe adds several: `Draft spec | Review | Publish`. `=XY` sets a new objective's code.
+⏎ on a Goals row lists the year's goals under their areas, each with its roll-up (`0/12 KRs · 12 months`) or `no objectives yet`.
 
-## Scheduling
+**Typing** on the root searches every objective and key result of the board; each hit names its month, area and objective. Typing on a month or Goals screen filters that column.
 
-All of it happens in TickTick's timeline: drag an item, stretch it, slide it. TickAL moves no dates on its own, and nothing you drag moves anything else, parents included: an objective's bar is yours too, and it is what every screen and note reads. When a bar no longer covers its open key results, the hub says so on its row (`⚠️ KRs outside`) and leaves the dragging to you. A done key result outside the bar is your call and is not flagged.
-
-## Adding to the plan
-
-**⌘⏎ → 🥅 Add to OKRs** on any task, note or list opens one screen:
-
-- **🔑 KR under 🥅 (an objective)** - one row per open objective, the current ones first;
-- **🥅 New objective** - on its own, or under a year objective;
-- **🏔️ New year objective**.
-
-The copy is made undated (drag it into place), named with the prefix and code, and a new objective or year objective goes straight to the tag picker. A key result takes its objective's tag. Importing a project list links its 📌CTA task when it has one. Something already in the plan says so and opens the existing copy instead of making a second one.
-
-## Actions on an OKR item
-
-⌘⏎ on any item in the plan shows its own rows first - **🔗 Link…**, **🏷 Tag…**, **🔑 Add KRs** (objectives), **✔️ Done** (key results) - and drops the generic ones that would drag a planning copy into a time block (add to today, day goal, timed schedule, reminders, focus).
-
-**🏷 Tag…** offers only plan tags (the area subtags and the tags your year objectives and objectives carry). It replaces the plan tag and keeps any other tag; on an objective, its open key results follow.
+The head row of every screen opens the board in TickTick. The hub reads the board live when you open it (once every 45 seconds at most); a typed search reads the last read.
 
 ## In your periodic notes
 
-Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆 Goals: one bullet per period, from the year down to the note's own, with that period's key results done and how far behind it runs, and the plan items under it, one per line:
+Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆 Goals. It mirrors the board: one bullet per column, the areas under it, the objectives under their area, the key results under their objective.
 
 ```
-- 🗓️ Sep • 0/7 KRs • 🔴 1d
-	- 🥅 Onboard TickTicks 0/5 🔴 1d
-	- 🥅 TickAL 0/6
-- ♻️ W38 • 0/2 KRs • 🔴 1d
-	- 🔑 Finish periodic notes 🔴 1d
-	- 🔑 Goals wf
+#### 🥅 OKRs
+- 🔟 October • 4/25 KRs
+	- 🏔️ VexOS 4️⃣ • 4/25 KRs
+		- 🥅 Onboard TickTicks 3/5
+			- ✅ Finish periodic notes
+			- 🔑 Audits
+			- 🔑 Review
+		- 🥅 KeyCue/MIAs/Shared actions 0/16
+			- 🔑 TickTick
+			- +8 more
 ```
 
-The daily shows all five periods, the weekly four, the monthly three, the quarterly two, the yearly one. It is the plan only: the goals you pick stay in 🏆 Goals below (the yearly's too, under 🎉 Yearly goal, since 2026-09-27). The yearly note's 🎯 Goals scorecard lists every objective with its progress bar and span. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
-
-**Aligned work (weekly note):** the weekly note's 📊 Stats carries
-
-```
-- 🥅 Aligned: 68% • 17/25 • 🟢 ▲ 7 pts
-	- 🥅 TickAL • 12 done • 4h 10m
-	- 🥅 Onboard TickTicks • 5 done • 1h 05m
-```
-
-Of the tasks you finished this week (routine lists, the plan's own copies and won't-dos left out), how many served an objective, the change against last week in points, and one line per objective: its done count and the focus time that went into it. A task serves an objective when it is the real thing a plan item links, a subtask of one at any depth, or in a list an item links. An objective linked to its project's 📌CTA covers the whole project list, and the CTA's focus counts even after the CTA is re-made. Links are the only join: until your plan items link something, the line says `no linked OKR items`. Delete the bullet and it stays gone.
-
-**Setting goals from the plan:** every goal picker opens with 🔮 rows, the plan for that period. ⏎ on one makes it the goal - aimed at the real task the key result links, never at the planning copy. Then **📋 Pick a goal**, and the usual search below it (which never offers planning copies).
-
-## The quarter carry-over
-
-When a quarter ends, every key result it leaves open gets one decision, so nothing leaks silently into the next one. During a quarter's last two weeks (and after it ends, while its leftovers are still open) the hub shows **↪️ Carry-over · Q3 · 5 open**. It lists every open, dated key result that ends by the quarter's last day, earlier quarters' leftovers included. ⏎ on one opens its choices:
-
-| Choice | Does |
+| Note | Shows |
 |---|---|
-| 📆 Move it in TickTick | Opens the copy so you drag it into the next quarter. Nothing else moves. |
-| 🚫 Won't do | TickTick's won't do: out of progress and pace. Undo it from 🚫 Won't Do. |
-| 💤 Someday | Takes its dates away: off the timeline, still in the plan and in its objective's count. |
+| ☀️ Daily, ♻️ Weekly | This month, whole (a week belongs to the month its Thursday is in) |
+| 🗓️ Monthly | Its month whole, then the other months of its quarter, objectives only |
+| 🌓 Quarterly | The year's Goals column, then its three months, objectives only |
+| 🎉 Yearly | The year's Goals column, then its planned months, objectives only |
 
-On the list, ⇧ still ticks a key result done. After each decision the list reopens with the next leftover on top. The 🌓 Quarterly Review's checklist opens this screen (see below).
+Every name links to its card on the board. A won't-do key result is left out. Up to eight key results are listed per objective, then `+N more`; the hub holds them all. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
 
-## Countdowns
+The yearly note's **🎯 Goals scorecard** gets one line per year goal: a bar and the roll-up of its monthly objectives (`▰▰▱▱▱ 5/12 • 12 months • Work 1️⃣`), or `no objectives yet`. The goals you set for the year stay in the same section.
 
-Every objective and year objective that has **started** gets a TickTick countdown to its end, named like the plan item (`🥅 TickAL`). It follows the bar's end when you move it, and it is archived when the objective is done, won't do, deleted or loses its dates. Archive or delete one yourself and it is never made again. The countdowns show in TickTick's countdown view, the ⏳ hub and the daily note's ⏳ Countdowns. They need the v2 token.
+**Journals.** The evening and weekly journals ask about this month's key results and objectives, the monthly about its objectives and the quarter's, the quarterly about its objectives and the year's goals, the yearly about the year's goals, each quoting the note's 🥅 OKRs section. A drawn prompt that names "the objective" or "the chosen goals" shows them under itself.
 
-## OKR steps in your routines
+**Goal pickers.** Every goal picker opens with 🔮 rows: a day's and a week's offer this month's open key results then its objectives, a month's its objectives then key results, a quarter's the objectives of its months, a year's the year goals. ⏎ sets the goal by name; a card that links a TickTick task sets that task instead, never the card, so nothing on the board moves. Then **📋 Pick a goal** and the usual search.
+
+## Actions on a card
+
+⌘⏎ on a card of the board shows the ordinary task rows (complete, won't do, note, rename, move, tags, subtasks). The rows that would put a date or a place on it are left out: add to today or tomorrow, the day goal, schedule, reminder, create a CTA, add to focus. Moving a card to another month is a drag in TickTick.
+
+## Routine steps
 
 Each routine checklist can open an OKR screen with a Link verb (`alfred://runtrigger/com.vex.tickal/Link/?argument=view%3A<slot>`):
 
 | Slot | Opens |
 |---|---|
 | `okr` | The hub |
-| `okrdaily` · `okrweekly` · `okrmonthly` · `okrquarterly` | That 📈 Pace period's plan |
-| `okrcarry` | The quarter carry-over |
+| `okrdaily` · `okrweekly` · `okrmonthly` | This month's column |
+| `okrquarterly` · `okrcarry` | The hub (the months ahead, and the earlier months with something still open) |
 
-⌘⏎ → ☑️ TickTick Internals → **🥅 OKRs** copies the hub's link.
+⌘⏎ → ☑️ TickTick Internals → **🔑 OKRs** copies the hub's link.
 
-## Automations
+## Sync
 
-- **Auto-tick:** a key result that links a single task is ticked when that task is completed.
-- **Countdowns:** kept in step with the started objectives (above).
-
-Both run when you open the hub (at most every five minutes) and with the optional hourly sync ([Settings & sync](90-settings-sync.md)). Writes only happen from a complete live read of the list; anything less and the automation waits.
+The hourly sync keeps the board's completed cards cached beside its open ones, so the notes (which never read the network while they refresh) and the 04:30 run see the same board the hub shows. Nothing is written to TickTick by it.
 
 ## Limitations
 
-- Key results are deliverables. There are no numeric key results; the only number is progress (ticked key results over all of them).
-- TickAL writes no dates: scheduling, pushing later items along when one slips, and keeping a parent's bar over its key results are all done by hand in the timeline. An undated objective is in no period's plan until you date it.
+- Key results are deliverables, ticked or not. There are no numeric key results.
+- TickAL writes no dates and moves no cards. An objective is in a month because its card is in that column, and nowhere else.
+- A year goal rolls up by name: `🏔️ Draw` finds `🥅 Draw`, not `🥅 Drawing`.
 
 ## Related
 
-- [Projects](49-projects.md) - the 📌CTA tasks objectives link to
-- [Periodic notes](48-periodic.md) - the notes the plan feeds
-- [Settings & sync](90-settings-sync.md) - the hourly sync that runs the auto-tick and the countdowns
+- [Periodic notes](48-periodic.md) - the notes the board feeds
+- [Settings & sync](90-settings-sync.md) - the hourly sync that caches the board's completed cards

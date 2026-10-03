@@ -130,50 +130,6 @@ def section_name(task):
     return ""
 
 
-def okr_import_row(kind, pid, tid):
-    """(title, subtitle, arg) of the ONE ⌘ Actions row that imports a task,
-    note or list into the OKR plan (HANDOFF_OKR section 4, Import; Vex
-    2026-09-19: "a row add OKRs which would then open list"). Not planned:
-    "🥅 Add to OKRs" → ctx:okrimport, where the level and the parent are
-    picked. Already planned: "🥅 In the OKRs · <name>" → that item's screen.
-    Refused (not cached, no complete read to check it against): the Add
-    row with the reason as its subtitle, still opening the import screen,
-    which says the same on a dead row. One smart row, never a road to a
-    second copy.
-
-    Every answer is okr_write.import_plan's and nothing else: the SAME call
-    the import screen makes (browse._okr_import_plan), over the same cached
-    plan, and add_items asks planned() the same question inside its lock -
-    so this row, that screen and the verb never disagree. It is pure over
-    the caches (never the network: this is the hottest render in the
-    workflow; only a refusal looks up the v2 token, to word itself);
-    okr_write is ~22 ms with okr. A writer layer that cannot
-    answer shows the plain Add row: the import screen and the verb still
-    decide. The caller gates it (the plan list and the periodic list get
-    no row)."""
-    add = ("🥅 Add to OKRs", "As 🏔️ Y · 🥅 O · 🔑 KR",
-           f"xact:crmbrowse:ctx:okrimport:{kind}:{pid}:{tid or '-'}")
-    try:
-        import okr_write
-        plan = okr_write.import_plan(kind, pid, tid)
-    except Exception:
-        return add
-    if not isinstance(plan, dict):
-        return add
-    hit = plan.get("hit")
-    if hit is not None:
-        screen = plan.get("screen") or "ctx:okr"
-        kind_of = getattr(hit, "kind", None)
-        glyph = {"Y": "🏔️", "O": "🥅", "KR": "🔑"}.get(kind_of, "▫️")
-        done = " · done" if getattr(hit, "history", False) else ""
-        return (f"🥅 In the OKRs · {getattr(hit, 'name', '')}",
-                f"{glyph} {kind_of or 'Item'}{done} · open it",
-                f"xact:crmbrowse:{screen}")
-    if plan.get("blocked"):
-        return (add[0], str(plan["blocked"]), add[2])
-    return add
-
-
 # ☑️ TickTick Internals sub-list sentinel: the parent row autocompletes the
 # bar to this and the SF re-runs with it (alfredfiltersresults is off).
 INTERNALS_Q = "☑️ "
@@ -479,11 +435,18 @@ def main():
             for s in (cache_store.get("all_tasks") or []))
         add_sub = "Add a subtask" if is_task_like else f"Add a task to this {itype}"
 
+        try:
+            import config as _okcfg
+            _okr_pid = _okcfg.get_okr_list_id()
+        except Exception:
+            _okr_pid = ""
+        _on_okr_board = bool(_okr_pid) and pid == _okr_pid and is_task_like and not is_note
         # 📌 Create CTA / 🔥 Add Prepare - one dynamic row (lists + task-like).
         # areas.classify picks the mode from the item; build_action supplies the
-        # label + preview so the row reads correctly before you commit.
+        # label + preview so the row reads correctly before you commit. Never
+        # for a card of the OKR board (it would point a project at the plan).
         cta_row, cta_vars = None, vars_
-        if itype == "list" or is_task_like:
+        if (itype == "list" or is_task_like) and not _on_okr_board:
             try:
                 _mode = areas.classify(pid, tid, itype, task)
                 # CTA rows need a configured 📌CTA list; Prepare rows only need
@@ -631,48 +594,15 @@ def main():
                     _content_flib = _eg.lib_of_folder(_content_fid, prefer=_content_lib) or _content_lib
                 except Exception:
                     _content_flib = _content_lib
-        # 🥅 OKR items (HANDOFF_OKR): a task of the OKR list whose title
-        # carries a 🏔️ Y / 🥅 O / 🔑 KR prefix is a PLANNING COPY, and its
-        # dates are the plan. The generic verbs that move dates or pin the
-        # task somewhere are pruned: ☀️ day goal / Add to today MOVE the task
-        # onto the day (the copy lands in a time block and breaks the
-        # timeline), the time Schedule… never ripples, and a 📌 CTA made
-        # from a copy points at the plan instead of the work. Cheap gate
-        # first: `import okr` is ~28 ms on the hottest render in the workflow.
-        _okr_kind = None
-        try:
-            import config as _okcfg
-            _okr_pid = _okcfg.get_okr_list_id()
-        except Exception:
-            _okr_pid = ""
-        if _okr_pid and pid == _okr_pid and is_task_like and not is_note and bool(tid):
-            try:
-                import okr as _okr
-                _okr_kind = _okr.parse_title(name)[0]      # "Y" | "O" | "KR" | None
-            except Exception:
-                _okr_kind = None
-        _is_okr = _okr_kind is not None
-        # a done item is not in the open cache: it is history, it never moves
-        _okr_hist = _is_okr and (not task or task.get("status") in (2, -1))
-        if _okr_kind in ("Y", "O"):
-            browse_ctxs["⤵️ Browse subtasks"] = f"ctx:okr:{_okr_kind.lower()}:{tid}"
-        # 🥅 Add to OKRs: any OPEN task, note or list outside the plan list
-        # and the periodic list (a planning copy of a planning copy, or of a
-        # dated note, plans nothing). Entities too: "any task". A failure
-        # here costs the row, never the menu.
-        _okr_imp = None
-        if _okr_pid:
-            try:
-                _skip = {_okr_pid, areas.PERIODIC_LIST_ID} - {""}
-                if itype == "list" and pid and pid not in _skip:
-                    _okr_imp = okr_import_row("list", pid, None)
-                elif is_task_like and tid and task:
-                    _rp = task.get("projectId") or task.get("_projectId") or pid
-                    if _rp and _rp not in _skip:
-                        _okr_imp = okr_import_row("note" if is_note else "task", _rp, tid)
-            except Exception:
-                _okr_imp = None
-        _oi_t, _oi_s, _oi_a = _okr_imp or ("", "", "")
+        # 🔑 OKR cards (HANDOFF_OKR section 8): a task of the OKR board is a
+        # card on an inspo board whose month column is its schedule. It keeps
+        # the generic verbs - complete, won't do, note, rename, move, tags -
+        # and loses the ones that would put a DATE or a place on it: ☀️ Add
+        # to today / tomorrow, ☀️ day goal and Schedule… land it on a day
+        # (and in his calendar), 🔔 a reminder times it, 📌 Create CTA would
+        # point a project at the board instead of the work, 🎯 Add to focus
+        # moves it under the focus task. Cheap gate: a list-id compare.
+        _is_okr = bool(_okr_pid) and pid == _okr_pid and is_task_like and not is_note and bool(tid)
         # 🥘 a recipe (HANDOFF_MEAL): a LIBRARY task, title
         # "[Name](mela://recipe/<UUID>)" and nothing before the bracket - a
         # 🍳 pointer under the routine or a 🛒 list is NOT one, the
@@ -692,7 +622,7 @@ def main():
                 _is_recipe = bool(_meal.is_library_title(name))
             except Exception:
                 _is_recipe, _meal = False, None
-        _entity = _is_logbook or _is_customer or _sess_done or _is_content or _is_okr
+        _entity = _is_logbook or _is_customer or _sess_done or _is_content
         _generic = not _entity
 
         entity_rows = []
@@ -778,29 +708,6 @@ def main():
                  f"xact:crmbrowse:ctx:crmbook:{_content_log}", "logbook hub crm", bool(_content_log)),
                 ("➖ Retire", "Row done · logbook 🎬 → ➖ · photos stay",
                  f"xact:cretire:{tid}", "retire remove content", True),
-            ]
-        elif _is_okr:
-            # every drill lands on the hub's own screens (browse ctx:okr*);
-            # their ⌃ and the verb's landing is the screen that lists it. No
-            # 📅 Schedule: OKR dates are TickTick's (Vex 2026-09-23), a drag
-            # in the timeline
-            entity_rows = [
-                ("🔗 Link…", "Task · note · list",
-                 f"xact:crmbrowse:ctx:okrlink:{tid}",
-                 "link task note list original real", True),
-                ("🏷 Tag…", (fmt_tags((task or {}).get("tags")) or "No tag")
-                 + (" · KRs follow" if _okr_kind == "O" else ""),
-                 f"xact:crmbrowse:ctx:okrtag:{tid}",
-                 "tag tags area project", True),
-                ("🔑 Add KRs", "Pipe for more · code kept",
-                 f"xact:crmbrowse:ctx:okraddkr:{tid}",
-                 "add key result kr krs subtask", _okr_kind == "O" and not _okr_hist),
-                # the Y's own screen adds them: a typed name = its ➕ row
-                ("🥅 Add objectives", "Type names · | for more",
-                 f"xact:crmbrowse:ctx:okr:y:{tid}",
-                 "add objective objectives goal", _okr_kind == "Y" and not _okr_hist),
-                ("✔️ Done", "Tick KR", f"complete:{pid}:{tid}:{title}",
-                 "complete done tick", _okr_kind == "KR" and not _okr_hist),
             ]
         elif _is_recipe:
             # The verdict rows, first: 👨‍🍳 Cooked is the ⌥⇧ chord of every
@@ -925,7 +832,7 @@ def main():
              f"xact:crmlink:{pid}:{tid}", "link logbook customer records crm", _link_row),
             # on a 🏔️ Y / 🥅 O it opens the hub's own screen (browse_ctxs),
             # which lists done KRs too - so it shows with no open child
-            ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and (has_kids or _okr_kind in ("Y", "O"))),
+            ("⤵️ Browse subtasks", "Drill into subtasks",  "browse",        "browse subtasks",   is_task_like and has_kids),
             ("⤵️ Browse sections", "Drill into sections",  "browse",        "browse sections drill", itype == "list"),
             ("🏷️ Browse tags",     "Drill into this list's tags", "browse", "browse tags drill", itype == "list"),
             ("🌉 New bridge here", "Today's handoff note for this list",
@@ -954,11 +861,6 @@ def main():
             (f"✉️ Mail · {_p_mail}", "From the card",
              f"open:mailto:{_p_mail}", "mail email person people",
              _is_person_card and bool(_p_mail)),
-            # ONE drill row (Vex 2026-09-10: ⌘ Actions is crowded enough):
-            # the level, the parent and the tag are picked on its screen
-            (_oi_t, _oi_s, _oi_a,
-             "okr okrs goal goals objective key result kr plan import add",
-             bool(_okr_imp)),
             ("👽 Attach to person", "Becomes a CTA under a card",
              f"xact:crmbrowse:ctx:people:attach:{pid}:{tid}",
              "person people attach cta assign",
@@ -969,22 +871,21 @@ def main():
              "gift idea person people present",
              is_task_like and _people_ok and not _is_person_card and _generic),
             ("⤵️ Browse tasks",    "Drill into tasks",     "browse",        "browse tasks drill", itype == "section"),
-            (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like and (_generic or _sess_done)),
+            (sched,                "Schedule…",            "schedule",      "schedule date when", is_task_like and (_generic or _sess_done) and not _is_okr),
             # 📑 carry a task forward (Vex 2026-09-13): the SAME schedule
             # picker, told by sched_for/dup_tid to copy instead of move
             ("📑 Duplicate…",      "Same task, another day", "schedule",
              "duplicate copy clone again tomorrow carry forward",
              is_task_like and not is_note and bool(tid) and bool(task) and _generic),
             ("☀️ Add to today",    "Land it on today",     f"xact:pn_sched:today|{pid}|{tid}",
-             "today add schedule now day", is_task_like and bool(tid) and bool(task) and _generic),
+             "today add schedule now day", is_task_like and bool(tid) and bool(task) and _generic and not _is_okr),
             ("🌙 Add to tomorrow", "Land it on tomorrow",  f"xact:pn_sched:tomorrow|{pid}|{tid}",
-             "tomorrow add schedule next day", is_task_like and bool(tid) and bool(task) and _generic),
+             "tomorrow add schedule next day", is_task_like and bool(tid) and bool(task) and _generic and not _is_okr),
             ("☀️ Make day goal",   "Today's one thing · pinned in 💫",
              f"xact:pn_day_goal:{pid}:{tid}", "day goal one thing periodic pin",
-             is_task_like and bool(tid) and bool(task) and _pn_on and _generic),
-            ("🔔 Reminder",        "Set a reminder…",      "reminder",      "reminder remind alert", is_task_like and _generic),
-            # an OKR item tags from the CLOSED pool (🏷 Tag… above) instead
-            (tags,                 "Tags…",                "tags",          "tags tag",          is_task_like and not _is_okr),
+             is_task_like and bool(tid) and bool(task) and _pn_on and _generic and not _is_okr),
+            ("🔔 Reminder",        "Set a reminder…",      "reminder",      "reminder remind alert", is_task_like and _generic and not _is_okr),
+            (tags,                 "Tags…",                "tags",          "tags tag",          is_task_like),
             (prio,                 "Priority…",            "priority",      "priority",          is_task_like and not is_note and _generic),
             (crumb,                "Move…",                "move",          "move list section", is_task_like),
             ("➕ Add task",        add_sub,                "add",           "add new task",      _generic),
@@ -1007,8 +908,7 @@ def main():
             ("📂 Go to list",      f"Open {lname or 'this list'} in TickTick",
              f"open:{list_link}",  "go to list open project folder",        is_task_like and bool(pid)),
             ("🌐 Open link",       open_link_sub,          open_link_arg, "link url web open", has_links),
-            # OKR items keep it: an O's code lives in its description (🏷️ TA)
-            ("📝 Note",            note_sub,               "note",          "note description body edit", is_task_like and (_generic or _is_okr)),
+            ("📝 Note",            note_sub,               "note",          "note description body edit", is_task_like and _generic),
             ("🖼️ Add image",       "Clipboard link → description", "attach", "attach add image clipboard screenshot link", is_task_like and _generic),
             # One dynamic row - whatever the item is, offer the other
             # kind. Gated on a CACHED (= open) item: completed rows carry a
@@ -1036,8 +936,8 @@ def main():
              f"xact:buffer_add:{pid}:{tid}", "buffer collect batch", is_task_like and bool(tid) and _generic),
             # Focus staging (subtasks): direct add when a task-bound session
             # runs; the stage screen (both directions) always; live-link only
-            # while a session runs unattributed. Never on an OKR copy: the
-            # add MOVES it under the focus task, out of the plan.
+            # while a session runs unattributed. Never on an OKR card: the
+            # add MOVES it under the focus task, off the board.
             (f"🎯 Add to focus ({(md_links_display(_sess[3])[:24] if _sess and _sess[0] == 'task' else '')})",
              "→ subtask of the focus task (moves under it)",
              f"xact:fx_add:{pid}:{tid}", "focus add stage checkbox now",
@@ -1052,9 +952,7 @@ def main():
              and not _is_okr),
             ("✔️ Complete",        "Mark this done",       f"complete:{pid}:{tid}:{title}", "complete done", is_task_like and not is_note and _generic),
             # TickTick's third status - off the lists, kept on record
-            # a won't-do KR leaves its O's total (okr.progress) - a real
-            # OKR verb, so it stays on OKR items
-            ("🚫 Won't do",        "Abandon task",         f"xact:wontdo:{pid}:{tid}", "wont do abandon skip cancel", is_task_like and not is_note and bool(tid) and (_generic or (_is_okr and not _okr_hist))),
+            ("🚫 Won't do",        "Abandon task",         f"xact:wontdo:{pid}:{tid}", "wont do abandon skip cancel", is_task_like and not is_note and bool(tid) and _generic),
             (md_links_display(name) if is_task_like else (lname or "Rename"),
                                    "Rename…",              "rename",        "rename title name",
              (is_task_like and not (_is_logbook or _is_customer)) or itype == "list"),

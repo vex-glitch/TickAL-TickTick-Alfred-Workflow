@@ -210,7 +210,7 @@ else:
     # every money writer leaves its section alone; with the config.json copy
     # (areas._env_or_cfg + _persist_id) it reads the CRM like Alfred does
     from datetime import timedelta
-    _REAL = {name: getattr(pe, name) for name in ("_mirror_goal", "_fill_people", "_seed_slot", "_fill_review", "_fill_aligned")}
+    _REAL = {name: getattr(pe, name) for name in ("_mirror_goal", "_fill_people", "_seed_slot", "_fill_review")}
     for name in _REAL:
         setattr(pe, name, lambda *a, **k: None)
     pe._tier2 = lambda: None

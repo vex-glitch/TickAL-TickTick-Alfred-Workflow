@@ -193,10 +193,11 @@ else:
     for _v in sorted(set(rl.TASK_VERBS) | set(rl.BARE_VERBS) | set(rl.SLOT_VERBS)):
         check(f"run() handles {_v}", f'"{_v}"' in _run_src, _v)
 
-    # ── 🥅 the OKR steps (HANDOFF_OKR phase 5): colon-free view slots ────────────
-    _OKR_VIEWS = {"okr": "ctx:okr", "okrdaily": "ctx:okrpace:daily",
-                  "okrweekly": "ctx:okrpace:weekly", "okrmonthly": "ctx:okrpace:monthly",
-                  "okrquarterly": "ctx:okrpace:quarterly", "okrcarry": "ctx:okrcarry"}
+    # ── 🔑 the OKR steps (HANDOFF_OKR section 8): colon-free view slots, the
+    # names baked into pasted links, the destinations the board's screens
+    _OKR_VIEWS = {"okr": "ctx:okr", "okrdaily": "ctx:okr:m:now",
+                  "okrweekly": "ctx:okr:m:now", "okrmonthly": "ctx:okr:m:now",
+                  "okrquarterly": "ctx:okr", "okrcarry": "ctx:okr"}
     for _slot, _ctx in _OKR_VIEWS.items():
         check(f"view {_slot} parses", rl.parse(f"view:{_slot}") == ("view", _slot, ""))
     check("view okrpace:weekly refused (a slot never holds a colon)",
@@ -210,7 +211,7 @@ else:
             check(f"VIEW_CTX maps {_slot}", f'"{_slot}":' in _vc, _slot)
     for _slot, _ctx in _OKR_VIEWS.items():
         check(f"VIEW_CTX {_slot} -> {_ctx}", f'"{_slot}": "{_ctx}"' in _vc, _vc)
-    check("☑️ row: 🥅 OKRs opens the hub",
+    check("☑️ row: 🔑 OKRs opens the hub",
           dict((r[0], r[3]) for r in il)["okr"].endswith("?argument=view%3Aokr)"))
 
     # ── money + crmcal + inbox ──────────────────────────────────────────────────

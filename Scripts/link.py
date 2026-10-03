@@ -441,13 +441,18 @@ def _bar_call(xact, call):
 # view:<slot> → the Alfred screen BrowseCtx opens (calendar rides OpenCalendar)
 VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
             "crmcal": "ctx:crmcal",           # exactly what CRM home > Calendar opens
-            # 🥅 the OKR steps in the routines' checklists (HANDOFF_OKR phase 5)
+            # 🔑 the OKR steps in the routines' checklists (HANDOFF_OKR section
+            # 8, the board): a day's, a week's and a month's check open THIS
+            # month's column, the quarter's and the carry-over the hub root
+            # (the months ahead, and the earlier months with a key result
+            # still open, sit there). The slot names are baked into pasted
+            # links and never change.
             "okr": "ctx:okr",
-            "okrdaily": "ctx:okrpace:daily",
-            "okrweekly": "ctx:okrpace:weekly",
-            "okrmonthly": "ctx:okrpace:monthly",
-            "okrquarterly": "ctx:okrpace:quarterly",
-            "okrcarry": "ctx:okrcarry",
+            "okrdaily": "ctx:okr:m:now",
+            "okrweekly": "ctx:okr:m:now",
+            "okrmonthly": "ctx:okr:m:now",
+            "okrquarterly": "ctx:okr",
+            "okrcarry": "ctx:okr",
             # 🥘 the meal-prep hub (a routine step "[Plan the week]" can carry it)
             "meal": "ctx:meal"}
 
