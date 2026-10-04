@@ -37,6 +37,10 @@ test: export TICKAL_NO_SETTLE := 1
 test: export crm_records_list_id :=
 test: export crm_records_tags :=
 test: export crm_archive_list_id :=
+# every runtime-state file (goal handoffs, journal log, locks) goes to a
+# scratch dir: a suite ran pn_goaldone against the REAL run dir and deleted
+# Vex's live weekly handoff mid-review (2026-10-04)
+test: export TICKAL_RUN_DIR := $(shell mktemp -d /tmp/tickal-test-run.XXXXXX)
 test:
 	@$(PYTHON) tests/test_periodic.py
 	@$(PYTHON) tests/test_focus_blocks.py

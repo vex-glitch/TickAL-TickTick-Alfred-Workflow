@@ -976,7 +976,13 @@ else:
     check("nothing reached the network", NET == [], NET[:3])
     check("the run-state path is the stub, and the engine took its sweep file from it",
           script_base.run_path("x") == os.path.join(_TMP, "x") and pe.SWEPT_FILE == os.path.join(_TMP, "tickal_pn_swept.json"), pe.SWEPT_FILE)
-    check("every path the engine writes to is under the temp home", all(str(v).startswith(_TMP) for v in (pe.LOG_FILE, pe.SWEPT_FILE, script_base.RUN_DIR)),
+    # the run dir is under the temp home, or it is the gate's own scratch dir
+    # (TICKAL_RUN_DIR, Makefile `test` / tests/harness.py): either way never
+    # Vex's ~/.ticktick_alfred/run
+    _run_ok = (str(script_base.RUN_DIR).startswith(_TMP)
+               or script_base.RUN_DIR == (os.environ.get("TICKAL_RUN_DIR") or "").strip())
+    check("every path the engine writes to is under the temp home (the run dir: that or the gate's scratch)",
+          all(str(v).startswith(_TMP) for v in (pe.LOG_FILE, pe.SWEPT_FILE)) and _run_ok,
           (pe.LOG_FILE, pe.SWEPT_FILE, script_base.RUN_DIR))
     print(f"relayout: {P} passed, {F} failed")
     sys.exit(1 if F else 0)

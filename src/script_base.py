@@ -40,7 +40,12 @@ LIB_DIR      = os.path.join(SRC_DIR, "lib")
 
 # Runtime state (buffer, focus session, bar position, …) lives per-user with
 # 0700 perms - a shared /tmp would let any local account read or pre-create it.
-RUN_DIR = os.path.join(os.path.expanduser("~"), ".ticktick_alfred", "run")
+# TICKAL_RUN_DIR moves it: the test gate points every suite at a scratch
+# directory (Makefile `test`, tests/harness.py), after a run of the suites
+# deleted Vex's live weekly goal handoff mid-review (2026-10-04). Alfred and
+# the agents never set it.
+RUN_DIR = (os.environ.get("TICKAL_RUN_DIR") or "").strip() \
+    or os.path.join(os.path.expanduser("~"), ".ticktick_alfred", "run")
 
 
 def run_path(name):

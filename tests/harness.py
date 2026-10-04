@@ -72,6 +72,11 @@ ENV0 = dict(os.environ)
 # The switch `make test` exports for the whole run: no background
 # follow-ups against the real account (the note catch-up, the repeat settle).
 os.environ.setdefault("TICKAL_NO_SETTLE", "1")
+# every runtime-state file (goal handoffs, the journal log, locks) in a
+# scratch dir, never Vex's ~/.ticktick_alfred/run (a suite deleted his live
+# weekly goal handoff mid-review, 2026-10-04); script_base reads it at import
+import tempfile
+os.environ.setdefault("TICKAL_RUN_DIR", tempfile.mkdtemp(prefix="tickal-test-run."))
 
 TIMEOUT = 600          # seconds one script suite may take
 # {"test_x": "why it is red on its own, and since when"}. Empty since
@@ -102,7 +107,7 @@ def script_suite(path):
     name = os.path.splitext(os.path.basename(path))[0]
 
     def test_script(self):
-        env = dict(ENV0, TICKAL_NO_SETTLE="1",
+        env = dict(ENV0, TICKAL_NO_SETTLE="1", TICKAL_RUN_DIR=os.environ["TICKAL_RUN_DIR"],
                    # present-but-blank = OFF: never Vex's real config.json
                    # copy of the CRM fields (areas._env_or_cfg, 2026-10-02)
                    crm_records_list_id="", crm_records_tags="",
