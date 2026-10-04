@@ -546,9 +546,17 @@ def _fill_goal_mirrors(doc, p, index):
         # convention, pm.parents). Vex 2026-10-04, after setting Q4's goal:
         # this week's note still said "set it there"
         thu = day + timedelta(days=3)
-        _mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", index, thu, pm.HINT_YEAR)
-        _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, thu, pm.HINT_WK_QTR)
-        _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, thu, pm.HINT_WK_MONTH)
+
+        def src(kind):
+            # the Thursday's parent once its note exists (mint_ahead mints a
+            # month, quarter or year on its 1st at 04:30); until then the
+            # Monday's - the month the week is still in, the one the goal
+            # screens write to - so Mon to Wed of a straddling week never read
+            # "set it there" while that month has goals (review 2026-10-04)
+            return thu if lookup(index, pm.period_for(kind, thu)) else day
+        _mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", index, src("yearly"), pm.HINT_YEAR)
+        _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, src("quarterly"), pm.HINT_WK_QTR)
+        _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, src("monthly"), pm.HINT_WK_MONTH)
     elif p.kind == "monthly":
         _mirror_goal(doc, pm.SEC_MTH_YEAR, "yearly", index, day, pm.HINT_YEAR)
         _mirror_goal(doc, pm.SEC_MTH_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
@@ -688,6 +696,53 @@ def ensure_note(p, index=None):
         if hit:
             return hit, False
         return create_note(p, index), True
+
+
+def fill_minted(p):
+    """A write just minted note p (or wrote into one that has not started):
+    fill what a note minted ahead can have - the board, the goal mirrors,
+    tonight's bridge, its journals - so it is never a shell until its 04:30
+    (Vex 2026-09-24 on tomorrow's daily, 2026-10-04 on next week's weekly:
+    "_(pending)_" under 🥅 OKRs all Sunday). Every road that can mint calls
+    this AFTER its own write, so the refresh reads the line it wrote. Never
+    raises."""
+    try:
+        refresh_period(p)
+        _stamp_refresh(p)
+    except Exception as e:
+        _log(f"ahead refresh {pm.title(p)}: {e}")
+
+
+_AHEAD_KEY = "pn_refresh_ahead"
+
+
+def _refresh_ahead(p):
+    """Opening or refreshing the RUNNING daily or weekly also refreshes the
+    next one when its note already exists: next week's note is minted at
+    04:30 on Sunday and read all Sunday while Vex lays the board out, and
+    tomorrow's daily is minted at the evening journal. Never mints, never
+    raises, once per REFRESH_TTL (its own stamp, so it does not steal the
+    running note's). Review 2026-10-04: the Sunday mint filled W41 once and
+    nothing refreshed it again before Monday."""
+    if p.kind not in ("daily", "weekly"):
+        return False
+    today = _today()
+    if not (p.start <= today <= p.end):
+        return False
+    nxt = pm.next_period(p)
+    key = f"{nxt.kind}:{pm.title_key(nxt)}"
+    try:
+        st = cache_store.get(_AHEAD_KEY) or {}
+        if st.get("key") == key and time.time() - st.get("ts", 0) < REFRESH_TTL:
+            return False
+        if not lookup(build_index(), nxt):
+            return False
+        refresh_period(nxt)
+        cache_store.set(_AHEAD_KEY, {"key": key, "ts": time.time()})
+        return True
+    except Exception as e:
+        _log(f"refresh ahead {pm.title(nxt)}: {e}")
+        return False
 
 
 # ── data sources ─────────────────────────────────────────────────────────────
@@ -3393,8 +3448,12 @@ def mint_ahead(force=False):
         refresh_period(pm.period_for(kind, today), index=index)
     if today.weekday() == 6:
         # the week ahead, minted above: its board and goal mirrors fill now,
-        # not on Monday (Vex 2026-10-04: "_(pending)_" under 🥅 OKRs all Sunday)
-        refresh_period(pm.period_for("weekly", today + timedelta(days=1)), index=index)
+        # not on Monday (Vex 2026-10-04: "_(pending)_" under 🥅 OKRs all
+        # Sunday). Guarded: a failure here must not cost the stamp below
+        try:
+            refresh_period(pm.period_for("weekly", today + timedelta(days=1)), index=index)
+        except Exception as e:
+            _log(f"week-ahead refresh: {e}")
     try:
         with open(STAMP_FILE, "w") as f:
             f.write(today.isoformat())
@@ -3439,6 +3498,7 @@ def open_period(spec, refresh=True):
     if minted or (refresh and not _refresh_fresh(p)):
         refresh_period(p)
         _stamp_refresh(p)
+        _refresh_ahead(p)
     verb = "minted" if minted else "open"
     return open_link(task), f"💫 {pm.title(p)} {verb}"
 
@@ -3452,6 +3512,7 @@ def refresh_spec(spec):
         return f"💫 No note for {spec} yet"
     summary = refresh_period(p)
     _stamp_refresh(p)
+    _refresh_ahead(p)
     return f"🔄 {pm.title(p)} {summary}"
 
 
@@ -3816,16 +3877,10 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
     task["content"] = ps.serialize_sections(doc_out)
     if kind == "weekly" and not ahead:      # only THIS week mirrors into today
         _mirror_week_goals(doc_out)
-    if minted or (kind == "daily" and target_day == _today() + timedelta(days=1)):
-        # the note this pick may have just minted - tomorrow's daily, next
-        # week's weekly: fill what a note minted ahead can have (the board,
-        # the goal mirrors, tonight's bridge, its journals) so it is not a
-        # shell until 04:30 (Vex 2026-09-24, 2026-10-04)
-        try:
-            refresh_period(p)
-            _stamp_refresh(p)
-        except Exception as e:
-            _log(f"ahead refresh {pm.title(p)}: {e}")
+    if minted or ahead or (kind == "daily" and target_day == _today() + timedelta(days=1)):
+        # the note this pick may have just minted, or the period ahead it
+        # wrote into - tomorrow's daily, next week's weekly: fill_minted
+        fill_minted(p)
     shown = text or title or ""
     when = " (next)" if ahead else ""
     if kind == "daily" and target_day != _today():
@@ -4228,7 +4283,7 @@ def set_goal(pid_or_text, tid=None, title=None, week="current"):
     journal's three-things picker writes there."""
     anchor = _today() if week == "current" else _today() + timedelta(days=7)
     wkp = pm.period_for("weekly", anchor)
-    wtask, _ = ensure_note(wkp)
+    wtask, minted = ensure_note(wkp)
     wpid = wtask.get("projectId") or areas.PERIODIC_LIST_ID
     if tid:
         title = _linked_title(pid_or_text, tid, title)
@@ -4245,6 +4300,10 @@ def set_goal(pid_or_text, tid=None, title=None, week="current"):
     if not ok:
         return "💫 No 🎯 Goals section in the weekly note"
     wtask["content"] = ps.serialize_sections(wdoc_out)
+    if minted or week != "current":
+        # the note this pick minted (a 📋 or ➕ row of the three-things
+        # screen mints next week's) or wrote into ahead: fill it now
+        fill_minted(wkp)
     if week != "current":
         return "🎯 Goal set for next week"
     # re-mirror today's daily from the fresh weekly body

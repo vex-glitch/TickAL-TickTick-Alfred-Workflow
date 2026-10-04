@@ -648,13 +648,15 @@ def _write_note(meals, sunday):
         if not areas.periodic_configured():
             return False
         p = pm.period_for("weekly", meal.note_day(sunday))
-        task, _ = pe.ensure_note(p)
+        task, minted = pe.ensure_note(p)
         pid = task.get("projectId") or areas.PERIODIC_LIST_ID
         lines = note_lines(meals)
 
         def mutate(doc, live):
             return meal_notes.write_block(doc, lines, live=live)
         ok, _doc = pe._pn_rmw(pid, task["id"], mutate)
+        if minted:
+            pe.fill_minted(p)        # a week minted for its meals is a real note
         return bool(ok) or meal_notes.read_block(_doc) == lines
     except Exception:
         return False

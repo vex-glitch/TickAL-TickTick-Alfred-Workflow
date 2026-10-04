@@ -24,8 +24,14 @@ if __name__ != "__main__":      # imported by unittest: tests/harness.py
 else:
     import os
     import sys
+    import tempfile
     from datetime import date
 
+    # HOME to a scratch dir BEFORE the engine imports: its lock, stamp and
+    # cache paths hang off it, and the gate must never touch the live
+    # ~/.ticktick_alfred (8f247db; review 2026-10-04 caught 4d taking the
+    # live periodic.lock)
+    os.environ["HOME"] = tempfile.mkdtemp(prefix="tickal-weekly-")
     ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(ROOT, "src"))
     import periodic_sections as ps, periodic_model as pm, periodic_engine as pe
@@ -147,6 +153,24 @@ else:
           any("October goal" in l for l in mb40) and "September" not in "".join(mb40), mb40)
     check("and its Thursday's quarter (W40 -> Q4)",
           any("Q4 goal" in l for l in qb40) and "Q3" not in "".join(qb40), qb40)
+    # …but only once that note exists: mint_ahead mints October and Q4 on the 1st,
+    # so on Mon 28 Sep the week still shows the goals of the month it is in
+    # (September, Q3) - never "set it there" while they have goals (review 2026-10-04)
+    oct_key = ("monthly", pm.title_key(pm.period_for("monthly", date(2026, 10, 1))))
+    q4_key = ("quarterly", pm.title_key(pm.period_for("quarterly", date(2026, 10, 1))))
+    oct_note, q4_note = idx.pop(oct_key), idx.pop(q4_key)
+    w40b = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
+    pe._fill_goal_mirrors(w40b, pm.period_for("weekly", date(2026, 9, 28)), idx)
+    mb40b = ps.find(w40b, pm.SEC_WK_MONTH, pm.SEC_GOALS).body
+    qb40b = ps.find(w40b, pm.SEC_WK_QTR, pm.SEC_GOALS).body
+    check("before October's note exists W40 mirrors September (the Monday's month)",
+          any("September goal" in l for l in mb40b), mb40b)
+    check("…and Q3", any("Q3 goal" in l for l in qb40b), qb40b)
+    idx[oct_key], idx[q4_key] = oct_note, q4_note
+    pe._fill_goal_mirrors(w40b, pm.period_for("weekly", date(2026, 9, 28)), idx)
+    check("and switches to October and Q4 the moment their notes exist",
+          any("October goal" in l for l in ps.find(w40b, pm.SEC_WK_MONTH, pm.SEC_GOALS).body)
+          and any("Q4 goal" in l for l in ps.find(w40b, pm.SEC_WK_QTR, pm.SEC_GOALS).body))
     w38 = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
     pe._fill_goal_mirrors(w38, pm.period_for("weekly", date(2026, 9, 14)), idx)
     check("a week inside one month mirrors that month (W38 -> September)",
@@ -159,7 +183,13 @@ else:
     yb1 = ps.find(w1, pm.SEC_WK_YEAR, pm.SEC_GOALS).body
     check("a week straddling the year mirrors its Thursday's year (W1 2026 -> 2026)",
           any("2026 goal" in l for l in yb1) and "2025" not in "".join(yb1), yb1)
-    parent("monthly", ["\t- [ ]"])          # back to the state section 5 expects
+    y26_key = ("yearly", pm.title_key(pm.period_for("yearly", date(2026, 6, 1))))
+    y26 = idx.pop(y26_key)
+    w1b = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
+    pe._fill_goal_mirrors(w1b, pm.period_for("weekly", date(2025, 12, 29)), idx)
+    check("…and 2025's until the 2026 note is minted on 1 Jan",
+          any("2025 goal" in l for l in ps.find(w1b, pm.SEC_WK_YEAR, pm.SEC_GOALS).body))
+    idx[y26_key] = y26
 
     # 4d. the BOARD fills into a note whose period has not started (Vex 2026-10-04,
     # Sunday: "Why are OKRs now pending?" - W41, minted that morning, read
@@ -168,16 +198,16 @@ else:
     # refreshes the week ahead on Sunday. refresh_period is driven with its I/O
     # stubbed, the way tests/test_pn_sync.py drives it.
     import okr_board as ob
-    import tempfile
     LID = "a" * 24
     BOARD = ob.build(LID, "🔑OKRs", [{"id": "oct", "name": "🔟 2026"}], [
         {"id": "ar", "projectId": LID, "title": "🏔️ VexOS 4️⃣", "columnId": "oct", "parentId": None, "status": 0, "sortOrder": 1},
         {"id": "ob1", "projectId": LID, "title": "🥅 KeyCue", "columnId": "oct", "parentId": "ar", "status": 0, "sortOrder": 1},
         {"id": "kr1", "projectId": LID, "title": "🔑 TickTick", "columnId": "oct", "parentId": "ob1", "status": 0, "sortOrder": 1}])
-    saved = {n: getattr(pe, n) for n in ("_today", "_api", "_pn_rmw", "_compose_lead", "_fill_weekly",
-                                          "_heal_own_goals", "_okr_board", "_completed_between",
-                                          "_swept_load", "_swept_add", "LOG_FILE", "SWEPT_FILE")}
+    # every stub below is undone by the importlib.reload(pe) that closes 4d
+    import contextlib
     tmpd = tempfile.mkdtemp()
+    pe._flock = contextlib.nullcontext              # never the live periodic.lock
+    pe.LOCK_FILE = os.path.join(tmpd, "periodic.lock")
     pe.LOG_FILE = os.path.join(tmpd, "periodic.log")
     pe.SWEPT_FILE = os.path.join(tmpd, "swept.json")
     pe._today = lambda: date(2026, 10, 4)                 # Sunday, W40's last day
@@ -213,7 +243,6 @@ else:
           any("_(pending)_" in l for l in ps.find(DOCS["W38"], pm.SEC_OKR).body))
     # mint_ahead on a Sunday refreshes the coming week's note as well as today's periods
     seen = []
-    saved2 = {n: getattr(pe, n) for n in ("refresh_period", "build_index", "create_note", "_read_stamp", "STAMP_FILE")}
     pe.refresh_period = lambda p, index=None, force=False: seen.append(pm.title_key(p))
     pe.build_index = lambda force=False: {("x", "y"): {}}
     pe.create_note = lambda p, index: None
@@ -229,6 +258,50 @@ else:
     pe.mint_ahead(force=True)
     check("on a Saturday only the running week is refreshed",
           pm.title_key(pm.period_for("weekly", date(2026, 10, 5))) not in seen, seen)
+    # opening or refreshing the RUNNING week on Sunday refreshes next week's note too
+    # (review 2026-10-04: the 04:30 mint filled W41 once; board edits made during the
+    # Sunday review never reached it before Monday). Never mints; once per TTL.
+    class Store:
+        def __init__(self): self.d = {}
+        def get(self, k): return self.d.get(k)
+        def set(self, k, v): self.d[k] = v
+    pe.cache_store = Store()
+    pe._today = lambda: date(2026, 10, 4)                 # Sunday
+    W40P, W41P = pm.period_for("weekly", date(2026, 10, 4)), pm.period_for("weekly", date(2026, 10, 5))
+    have = {("weekly", pm.title_key(W40P)): {"id": "W40", "projectId": "P"},
+            ("weekly", pm.title_key(W41P)): {"id": "W41", "projectId": "P"}}
+    pe.build_index = lambda force=False: have
+    pe.lookup = lambda index, p: index.get((p.kind, pm.title_key(p)))
+    pe.resolve = lambda spec, day=None: (W40P, have[("weekly", pm.title_key(W40P))], False)
+    seen.clear()
+    pe.refresh_spec("weekly")
+    check("Sunday's refresh of this week also refreshes next week's note",
+          seen == [pm.title_key(W40P), pm.title_key(W41P)], seen)
+    seen.clear()
+    pe.refresh_spec("weekly")
+    check("…once per TTL (the ahead refresh has its own stamp)", seen == [pm.title_key(W40P)], seen)
+    del have[("weekly", pm.title_key(W41P))]
+    pe.cache_store = Store()
+    seen.clear()
+    pe.refresh_spec("weekly")
+    check("a missing next week is never minted by it", seen == [pm.title_key(W40P)], seen)
+    pe._today = lambda: date(2026, 10, 7)                 # Wednesday of W41: no note ahead
+    have[("weekly", pm.title_key(W41P))] = {"id": "W41", "projectId": "P"}
+    pe.resolve = lambda spec, day=None: (W41P, have[("weekly", pm.title_key(W41P))], False)
+    pe.cache_store = Store()
+    seen.clear()
+    pe.refresh_spec("weekly")
+    check("midweek only the running week refreshes (W42 does not exist)", seen == [pm.title_key(W41P)], seen)
+    # the same for a daily when tomorrow's note exists (minted at the evening journal)
+    D7, D8 = pm.period_for("daily", date(2026, 10, 7)), pm.period_for("daily", date(2026, 10, 8))
+    have[("daily", pm.title_key(D7))] = {"id": "D7", "projectId": "P"}
+    have[("daily", pm.title_key(D8))] = {"id": "D8", "projectId": "P"}
+    pe.resolve = lambda spec, day=None: (D7, have[("daily", pm.title_key(D7))], False)
+    seen.clear()
+    pe.refresh_spec("daily")
+    check("today's refresh also refreshes tomorrow's minted note",
+          seen == [pm.title_key(D7), pm.title_key(D8)], seen)
+    # a goal picked into next week's EXISTING note fills it (ahead=True)
     import importlib
     pe = importlib.reload(pe)
 

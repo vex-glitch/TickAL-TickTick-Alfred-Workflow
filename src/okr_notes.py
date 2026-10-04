@@ -277,7 +277,9 @@ def goal_choices(kind, p, board):
     them anywhere. Done ones are gone: a goal is something still to do."""
     if board is None:
         return []
-    gcol = board.goals(p.start.year)
+    # the year of a week is its Thursday's (ISO), the same rule as its month:
+    # W1 2026 starts on 29 Dec 2025 and offers 2026's goals
+    gcol = board.goals(ob.month_for(kind, p)[0])
     goals = [(gcol, o) for o in gcol.objectives if not o.closed] if gcol is not None else []
     out = []
     if kind in ("daily", "weekly", "monthly"):
