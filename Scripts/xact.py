@@ -7858,16 +7858,22 @@ _HL_TIER = {"mhighlight": "monthly", "qhighlight": "quarterly",
 # next period (the weekly's is its own three-things picker)
 _OPEN_GOAL_SLOTS = ("monthly", "quarterly", "yearly")
 _GOALSEQ = run_path("tickal_pn_goalseq.json")
+# a handoff lives this long without a pick (goal_handoff.TTL's three hours,
+# not the ten minutes it had: Vex's Sunday review expired it while he was
+# still reading, and his next pick would have landed in THIS week)
+GOALSEQ_TTL = 3 * 3600
 
 
 def _goalseq_load(kind=None):
     """Active goal handoff | None. The weekly's counts down from three; the
     month's and the quarter's are OPEN-ENDED (remaining None) - Vex keeps
-    adding and Escs when he is done, the subtask-adding shape."""
+    adding and Escs when he is done, the subtask-adding shape. Expires after
+    GOALSEQ_TTL without a pick; every render of its screen re-stamps it
+    (periodic_rows._goalseq_touch)."""
     try:
         with open(_GOALSEQ) as f:
             d = json.load(f)
-        if time.time() - d.get("ts", 0) >= 600:
+        if time.time() - d.get("ts", 0) >= GOALSEQ_TTL:
             return None
         left = d.get("remaining")
         if left is not None and left <= 0:
@@ -8245,6 +8251,24 @@ def _journal_is_late(slot, jper, today):
     return jper != pm.period_for(slot, today)
 
 
+def _glog(kind, event):
+    """A goal pick is logged like a journal step - `goals@<kind>` in the
+    journal log: what was picked, where it landed, and whether its screen
+    came back (the reopen trigger's rc). Vex 2026-10-04: a pick that lands
+    but whose screen never returns left no trace anywhere."""
+    try:
+        _jlog(f"goals@{kind}", event)
+    except Exception:
+        pass
+
+
+def _reopen_goal_screen(kind, query):
+    """Fire the goal screen again after a pick and log that it was fired."""
+    r = _run_trigger("Search", query)
+    _glog(kind, f"reopen '{query.strip()}' rc={getattr(r, 'returncode', '?')}")
+    return r
+
+
 def _goal_seq_step(toast, kind="weekly"):
     """Handoff bookkeeping: after each pick, re-arm the picker - until 3 are
     in for the weekly, and until Esc for the open-ended month and quarter
@@ -8256,13 +8280,15 @@ def _goal_seq_step(toast, kind="weekly"):
     if seq.get("remaining") is None:            # open-ended
         _goalseq_save(None, kind)
         print(f"🎯 {toast[2:] if toast.startswith('🎯 ') else toast} · add another or Esc")
-        _run_trigger("Search", f"pn goals {kind} ")
+        _glog(kind, f"handoff open-ended: {toast}")
+        _reopen_goal_screen(kind, f"pn goals {kind} ")
         return "next"
     remaining = seq.get("remaining", 0) - 1
     _goalseq_save(remaining, kind)
+    _glog(kind, f"handoff {3 - remaining} of 3: {toast}")
     if remaining > 0:
         print(f"🎯 {3 - remaining} of 3 · pick the next")
-        _run_trigger("Search", "pn goal ")
+        _reopen_goal_screen(kind, "pn goal ")
     else:
         print("🎯 3 of 3 · next week is set")
     return "next"
@@ -8277,6 +8303,7 @@ def pn_goal(pid, tid, nxt=False):
     week = "next" if (nxt or _goalseq_load()) else "current"
     title = _task_title(tid, default="Task", pid=pid)
     toast = _pn().set_goal(pid, tid, title, week=week)
+    _glog("weekly", f"pick task '{title}' ({pid}:{tid}) week={week} -> {toast}")
     if week == "next":
         _goal_seq_step(toast)
     else:
@@ -8302,6 +8329,8 @@ def pn_setgoal(rest):
     ahead = bool(spec.get("ahead")) or bool(_goalseq_load(kind))
     toast = _pn().set_period_goal(kind, spec.get("text") or "", pid, tid,
                                   title, ahead=ahead)
+    _glog(kind, f"pick '{spec.get('text') or title or ''}'"
+                + (f" ({pid}:{tid})" if tid else "") + f" ahead={ahead} -> {toast}")
     if _goalseq_load(kind):
         _goal_seq_step(toast, kind)
     elif kind == "daily":
@@ -8311,7 +8340,7 @@ def pn_setgoal(rest):
         # or Esc - the add-a-subtask shape (Vex 2026-09-17) - in the mode it
         # was in: a pick in ⏭ Next week lands back in ⏭ Next week
         print(toast)
-        _run_trigger("Search", _goal_screen(kind, ahead))
+        _reopen_goal_screen(kind, _goal_screen(kind, ahead))
 
 
 def pn_goaldel(rest):
@@ -8325,8 +8354,10 @@ def pn_goaldel(rest):
         print(f"💫 {kind or 'that tier'} has no goal list")
         return
     ahead = bool(spec.get("ahead"))
-    print(_pn().remove_period_goal(kind, spec.get("line") or "", ahead=ahead))
-    _run_trigger("Search", _goal_screen(kind, ahead and not _goalseq_load(kind)))
+    toast = _pn().remove_period_goal(kind, spec.get("line") or "", ahead=ahead)
+    print(toast)
+    _glog(kind, f"remove '{(spec.get('line') or '').strip()[:60]}' ahead={ahead} -> {toast}")
+    _reopen_goal_screen(kind, _goal_screen(kind, ahead and not _goalseq_load(kind)))
 
 
 def pn_goaldone(rest):
@@ -8339,6 +8370,7 @@ def pn_goaldone(rest):
     if not _pn_gate():
         return
     n = len(_pn().period_goals(kind, ahead=ahead))
+    _glog(kind, f"done: {n} set ahead={ahead}")
     print(f"🎯 {n} goal{'s' if n != 1 else ''} set" + (" · next" if ahead else ""))
 
 
@@ -8458,6 +8490,7 @@ def pn_goal_text(rest):
         return
     week = "next" if (spec.get("next") or _goalseq_load()) else "current"
     toast = _pn().set_goal(text, week=week)
+    _glog("weekly", f"pick text '{text}' week={week} -> {toast}")
     if week == "next":
         _goal_seq_step(toast)
     else:

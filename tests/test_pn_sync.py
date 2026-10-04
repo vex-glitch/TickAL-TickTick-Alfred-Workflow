@@ -312,8 +312,8 @@ else:
           tk and all(json.loads(base64.b64decode(r["arg"][len("xact:pn_setgoal:"):])).get("ahead") for r in tk))
     pe.period_goals = lambda kind, ahead=False, day=None: ([("Next thing", "\t- [ ] Next thing")] if ahead else [])
     rows = pr.tier_goal_rows("weekly", f"{MARK} ")
-    dele = next(r for r in rows if r["title"] == "🎯 Next thing")
-    done = next(r for r in rows if r["title"] == "✅ Done")
+    dele = next(r for r in rows if r["title"] == "✅ Next thing")
+    done = next(r for r in rows if r["title"] == "🏁 Done")
     check("next-week mode lists NEXT week's goals, remove and ✅ Done aimed there",
           json.loads(base64.b64decode(dele["arg"].split(":", 2)[2])).get("ahead") is True
           and json.loads(base64.b64decode(done["arg"].split(":", 2)[2])).get("ahead") is True)

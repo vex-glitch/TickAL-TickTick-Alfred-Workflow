@@ -101,8 +101,19 @@ else:
         check("the board rows are capped", len(crows) == pr.PLAN_ROWS_CAP + 1 and crows[-1]["title"] == "📋 Pick a goal", len(crows))
         cache.set(f"project_data_{PID}", {"project": {"id": PID, "name": "🔑OKRs"}, "tasks": OPEN, "columns": COLS})
         by = {r["title"]: r for r in rows}
-        check("a linked card sets the REAL task, where the cache says it lives now",
-              by["🔮 🔑 Goals wf"]["arg"] == f"ARG:|{REALT}" and any(t and t["projectId"] == REALP for _x, t in CALLS), CALLS)
+        check("a linked card sets its NAME anchored to the real task, where the cache says it lives now",
+              by["🔮 🔑 Goals wf"]["arg"] == f"ARG:Goals wf|{REALT}" and any(t and t["projectId"] == REALP for _x, t in CALLS), CALLS)
+        # the weekly three-things screen (the journal's) finds a board card by name
+        wk = pr.goal_rows("revi")
+        check("the week picker's typed bar finds the board card first",
+              [r["title"] for r in wk][:2] == ["🔮 🔑 Review", "🔮 🔑 Copy of review"], [r["title"] for r in wk][:4])
+        check("a board pick on the week picker is a weekly pn_setgoal payload",
+              wk[0]["arg"].startswith("xact:pn_setgoal:") and pr._b64 and __import__("json").loads(__import__("base64").b64decode(wk[0]["arg"][len("xact:pn_setgoal:"):]).decode())["kind"] == "weekly", wk[0]["arg"][:40])
+        wk0 = pr.goal_rows("")
+        check("the week picker's blank bar: the board first, then the task pool",
+              wk0[0]["title"].startswith("⏭ Next week") and wk0[1]["title"].startswith("🔮 "), [r["title"] for r in wk0][:3])
+        check("a typed bar that matches nothing on the board keeps the ➕ text row",
+              pr.goal_rows("zzzz")[-1]["title"].startswith("➕ Goal:"), pr.goal_rows("zzzz")[-1]["title"])
         check("a text card sets a text goal with its name", by["🔮 🔑 Review"]["arg"] == "ARG:Review|")
         check("a link to a task the cache does not know still sets that task", by["🔮 🔑 Lost thing"]["arg"] == f"ARG:|{MISST}")
         check("a link back into the board is a text goal (a copy of a copy)", by["🔮 🔑 Copy of review"]["arg"] == "ARG:Copy of review|")

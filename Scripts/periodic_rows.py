@@ -96,6 +96,9 @@ def _period_of(spec, today):
     return pm.period_for("daily" if spec == "daily" else spec, today)
 
 
+GOALSEQ_TTL = 3 * 3600      # keep in step with xact.GOALSEQ_TTL
+
+
 def _goalseq_active(kind=None):
     """The journal's goal handoff (xact writes the file): the weekly's
     three-things sequence, or the open-ended month/quarter one, which runs
@@ -103,7 +106,7 @@ def _goalseq_active(kind=None):
     try:
         with open(run_path("tickal_pn_goalseq.json")) as f:
             d = json.load(f)
-        if time.time() - d.get("ts", 0) >= 600:
+        if time.time() - d.get("ts", 0) >= GOALSEQ_TTL:
             return None
         left = d.get("remaining")
         if left is not None and left <= 0:
@@ -612,7 +615,18 @@ def _week_switch_row(uid, manual_next, back_to, ahead_to):
 
 
 def goal_rows(frag):
+    """The week goal picker - the weekly journal's three-things screen too
+    (its handoff file live: every pick counts one of the three down and the
+    screen comes back). Vex 2026-10-04, typing KeyCue to pick the objective
+    card "🥅 KeyCue/MIAs/Shared actions": the board rows were shown on a
+    blank bar only and the board's list is never in the task pool, so the
+    card could not be found by name. Now the 🔮 rows ride the typed bar,
+    filtered by it, FIRST (the board is the plan); then the tasks; the ➕
+    text row last. The goals already set for the week show at the top,
+    each removable, so three picks read as three."""
     seq = _goalseq_active()
+    if seq:
+        _goalseq_touch()
     # the mark is stripped ALWAYS (typed under a live handoff it became goal
     # text, review 2026-09-24); it only turns the screen when no handoff owns it
     manual, frag = _split_next(frag)
@@ -632,29 +646,37 @@ def goal_rows(frag):
             valid=True, mods=_mods())
     items = _picker_rows(frag, _task_pool(goals=True), row,
                          "Type to pick a goal task…")
-    if not frag.strip():
-        # 🔮 the weekly journal's three-things screen is a goal picker too
-        # (HANDOFF_OKR section 4: every one of them). Its OWN verbs, so a
-        # plan pick counts down the three exactly like a picked task.
-        def arg(text, t=None):
-            if t is not None:
-                return f"xact:pn_goal:{t['projectId']}:{t['id']}{flag}"
-            return f"xact:pn_goal_text:{_b64(_text_payload(text))}"
-        gp = pm.period_for("weekly", _pn_today())
+
+    # 🔮 the board for the week the goal lands in. Its pick is pn_setgoal's
+    # (the card's name, anchored to the task it links), which counts the
+    # three down under the handoff exactly like a picked task does.
+    def arg(text, t=None):
+        payload = {"kind": "weekly", "text": text}
         if nxt:
-            gp = pm.next_period(gp)
-        try:
-            held = [raw for _s, raw in _pe().period_goals("weekly", ahead=nxt)]
-        except Exception:
-            held = []
-        plan = plan_goal_rows("weekly", gp, "♻️ Weekly" + (" · next" if nxt else ""),
-                              arg, held)
-        if plan and items and items[0].get("valid") is False:
-            items = []                    # the "Type to pick…" hint: the 📋 row says it
-        items = plan + items
+            payload["ahead"] = True
+        if t is not None:
+            payload.update({"pid": t.get("projectId") or t.get("_projectId", ""),
+                            "tid": t["id"], "title": t.get("title") or ""})
+        return "xact:pn_setgoal:" + _b64(payload)
+    gp = pm.period_for("weekly", _pn_today())
+    if nxt:
+        gp = pm.next_period(gp)
+    try:
+        have = _pe().period_goals("weekly", ahead=nxt)
+    except Exception:
+        have = []
+    held = [raw for _s, raw in have]
+    plan = plan_goal_rows("weekly", gp, "♻️ Weekly" + (" · next" if nxt else ""),
+                          arg, held, query=frag)
+    if plan and items and items[0].get("valid") is False:
+        items = []                    # the "Type to pick…" hint: the 📋 row says it
+    items = plan + items
+    if not frag.strip():
+        head = _set_goal_rows("weekly", have, nxt)
         if not seq:
-            items.insert(0, _week_switch_row("pn-goal-weekswitch", manual, "pn goal ",
-                                             f"pn goal {pm.GOAL_NEXT_MARK} "))
+            head.append(_week_switch_row("pn-goal-weekswitch", manual, "pn goal ",
+                                         f"pn goal {pm.GOAL_NEXT_MARK} "))
+        items = head + items
     if frag.strip():
         items.append(alfred.item(
             title=f'➕ Goal: "{frag.strip()[:50]}"',
@@ -662,6 +684,42 @@ def goal_rows(frag):
             arg=f"xact:pn_goal_text:{_b64(_text_payload(frag.strip()))}",
             valid=True, mods=_mods()))
     return items
+
+
+def _set_goal_rows(kind, have, ahead):
+    """The goals a tier already has, each a row that REMOVES it on ⏎, then
+    🏁 Done - the tag picker's shape (Vex 2026-10-04: "same way as adding
+    or changing tags"): what is set reads ✅, a pick adds one and the screen
+    comes back, a ✅ row takes one away."""
+    rows = []
+    for i, (shown, raw) in enumerate(have or ()):
+        rows.append(alfred.item(
+            uid=f"pn-goal-have-{kind}-{i}", title=f"✅ {shown[:60]}",
+            subtitle="Set  |  ⏎ Remove it",
+            arg="xact:pn_goaldel:" + _b64({"kind": kind, "line": raw, "ahead": ahead}),
+            valid=True, mods=_mods()))
+    if rows:
+        rows.append(alfred.item(
+            uid=f"pn-goal-done-{kind}", title="🏁 Done",
+            subtitle=f"{len(rows)} goal{'s' if len(rows) > 1 else ''} set · pick more or ⏎",
+            arg="xact:pn_goaldone:" + _b64({"kind": kind, "ahead": ahead}),
+            valid=True, mods=_mods()))
+    return rows
+
+
+def _goalseq_touch():
+    """A live handoff stays live while its screen is being looked at: the
+    file's clock restarts on every render (its expiry, GOALSEQ_TTL, is for
+    a screen nobody came back to, not for a slow pick)."""
+    try:
+        path = run_path("tickal_pn_goalseq.json")
+        with open(path) as f:
+            d = json.load(f)
+        d["ts"] = time.time()
+        with open(path, "w") as f:
+            json.dump(d, f)
+    except Exception:
+        pass
 
 
 def _text_payload_for(manual):
@@ -1024,11 +1082,17 @@ def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None, query=""):
         if _norm(card.name) in names or (
                 t is not None and _norm(pm.strip_md_links(t["title"])) in names):
             continue                      # already the goal, as text or by title
+        # the goal line reads the CARD's name - anchored to the task the card
+        # links when it links one (Vex 2026-10-04: he picked "KeyCue/MIAs/
+        # Shared actions"; a line reading only the CTA it links, "💼 P •
+        # Shortcuts", is not what he picked), the task alone when the names
+        # are one and the same
+        same = t is not None and _norm(card.name) == _norm(pm.strip_md_links(t["title"]))
         rows.append(alfred.item(
             uid=f"pn-goal-plan-{kind}-{card.id}",
             title=f"🔮 {glyph} {card.name[:60]}",
             subtitle=f"{col.bullet} · the board  |  ⏎ The {label} goal",
-            arg=arg("" if t is not None else card.name, t),
+            arg=arg("" if same else card.name, t),
             valid=True, mods=_mods()))
     if rows:
         # the divider between the board and the picker as it always was;
@@ -1063,6 +1127,8 @@ def tier_goal_rows(kind, rest, jnl=None):
     # week). The mark is read on every tier so a reopened screen never shows
     # it as typed text; the ⏭ ROW is offered on the weekly screen only.
     seq = bool(not jnl and kind != "daily" and _goalseq_active(kind))
+    if seq:
+        _goalseq_touch()
     manual_next = False
     if not jnl and kind != "daily":
         manual_next, rest = _split_next(rest)      # stripped even under a handoff
@@ -1104,19 +1170,7 @@ def tier_goal_rows(kind, rest, jnl=None):
             have = _pe.period_goals(kind, ahead=ahead)
         except Exception:
             have = []
-        for i, (shown, raw) in enumerate(have):
-            items.append(alfred.item(
-                uid=f"pn-goal-have-{kind}-{i}", title=f"🎯 {shown[:60]}",
-                subtitle="⏎ Remove it",
-                arg="xact:pn_goaldel:" + _b64({"kind": kind, "line": raw,
-                                               "ahead": ahead}),
-                valid=True, mods=_mods()))
-        if have:
-            items.append(alfred.item(
-                uid=f"pn-goal-done-{kind}", title="✅ Done",
-                subtitle=f"{len(have)} goal{'s' if len(have) > 1 else ''} set",
-                arg="xact:pn_goaldone:" + _b64({"kind": kind, "ahead": ahead}),
-                valid=True, mods=_mods()))
+        items.extend(_set_goal_rows(kind, have, ahead))
         if kind == "weekly" and not seq:
             items.append(_week_switch_row(
                 "pn-goal-weekly-switch", manual_next, "pn goals weekly ",
