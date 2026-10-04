@@ -101,7 +101,7 @@ The yearly note's **🎯 Goals scorecard** gets one line per year goal: a bar an
 
 **Journals.** The evening and weekly journals ask about this month's key results and objectives, the monthly about its objectives and the quarter's, the quarterly about its objectives and the year's goals, the yearly about the year's goals, each quoting the note's 🥅 OKRs section. A drawn prompt that names "the objective" or "the chosen goals" shows them under itself.
 
-**Goal pickers.** Every goal picker opens with 🔮 rows: a day's and a week's offer this month's open key results then its objectives, a month's its objectives then key results, a quarter's the objectives of its months, a year's the year goals. ⏎ sets the goal by name; a card that links a TickTick task sets that task instead, never the card, so nothing on the board moves. Then **📋 Pick a goal** and the usual search.
+**Goal pickers.** Every goal picker opens with 🔮 rows: a day's and a week's offer this month's open key results then its objectives, a month's its objectives then key results, a quarter's the year's goals then the objectives of its months, a year's the year goals; the year's goals close every list, and typing a glyph (🏔️, 🥅, 🔑) lists that kind. ⏎ makes the card the goal: a link to it on the board, labelled as the board shows it. A daily goal picked from the board is never moved onto the day. Then **📋 Pick a goal** and the usual search.
 
 ## Actions on a card
 

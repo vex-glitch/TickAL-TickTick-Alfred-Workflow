@@ -113,8 +113,12 @@ else:
         check("the board rows are capped", len(crows) == pr.PLAN_ROWS_CAP + 1 and crows[-1]["title"] == "📋 Pick a goal", len(crows))
         cache.set(f"project_data_{PID}", {"project": {"id": PID, "name": "🔑OKRs"}, "tasks": OPEN, "columns": COLS})
         by = {r["title"]: r for r in rows}
-        check("a linked card sets its NAME anchored to the real task, where the cache says it lives now",
-              by["🔮 🔑 Goals wf"]["arg"] == f"ARG:Goals wf|{REALT}" and any(t and t["projectId"] == REALP for _x, t in CALLS), CALLS)
+        # the pick IS the card: a link to it on the board, whatever the card itself links
+        # (Vex 2026-10-04: "why are the entries in the note not links ... like they were")
+        check("a card linking a task is still the goal itself, on the board",
+              by["🔮 🔑 Goals wf"]["arg"] == "ARG:|klink" and all(t is None or t["projectId"] == PID for _x, t in CALLS), CALLS)
+        check("the goal line is labelled as the board shows the card",
+              any(t and t["id"] == "klink" and t["title"] == "🔑 Goals wf" for _x, t in CALLS), CALLS)
         # the weekly three-things screen (the journal's) finds a board card by name
         wk = pr.goal_rows("revi")
         check("the week picker's typed bar finds the board card first",
@@ -126,27 +130,27 @@ else:
               wk0[0]["title"].startswith("⏭ Next week") and wk0[1]["title"].startswith("🔮 "), [r["title"] for r in wk0][:3])
         check("a typed bar that matches nothing on the board keeps the ➕ text row",
               pr.goal_rows("zzzz")[-1]["title"].startswith("➕ Goal:"), pr.goal_rows("zzzz")[-1]["title"])
-        check("a text card sets a text goal with its name", by["🔮 🔑 Review"]["arg"] == "ARG:Review|")
-        check("a link to a task the cache does not know still sets that task", by["🔮 🔑 Lost thing"]["arg"] == f"ARG:|{MISST}")
-        check("a link back into the board is a text goal (a copy of a copy)", by["🔮 🔑 Copy of review"]["arg"] == "ARG:Copy of review|")
-        check("an Eagle link is a text goal", by["🔮 🔑 Grim Reaper"]["arg"] == "ARG:Grim Reaper|")
-        check("an objective linking a list is a text goal", by["🔮 🥅 Onboard"]["arg"] == "ARG:Onboard|")
+        check("a plain card is the goal, linked on the board", by["🔮 🔑 Review"]["arg"] == "ARG:|ktext")
+        check("a card linking an unknown task is the card too", by["🔮 🔑 Lost thing"]["arg"] == "ARG:|kgone")
+        check("a card linking another card is itself", by["🔮 🔑 Copy of review"]["arg"] == "ARG:|kcopy")
+        check("an Eagle-linked card is the card", by["🔮 🔑 Grim Reaper"]["arg"] == "ARG:|keagle")
+        check("an objective is the goal by its first card", by["🔮 🥅 Onboard"]["arg"] == "ARG:|o2")
         check("every row names its column and the board",
               all(r["subtitle"].startswith((f"{ob.keycap(M)} {ob.MONTH_NAMES[M]} · the board", f"🏔️ {Y} Goals · the board")) for r in rows[:-1]), [r["subtitle"] for r in rows])
         check("the divider is dead", rows[-1]["valid"] is False)
         check("every row carries its mods", all("mods" in r for r in rows))
 
-        # already the goal: by the real task's link, or by its words
-        have = [f"- [ ] [Goals workflow (the real one)]({link(REALP, REALT)})", "- [ ] Review"]
+        # already the goal: by the card's own link, or by its words
+        have = [f"- [ ] [🔑 Goals wf]({link(PID, 'klink')})", "- [ ] Review"]
         rows = pr.plan_goal_rows("daily", p, "☀️ Daily", arg, have_lines=have)
         titles = [r["title"] for r in rows]
-        check("a card whose task or words are the goal already is not offered again",
+        check("a card that is the goal already (by link or by words) is not offered again",
               "🔮 🔑 Goals wf" not in titles and "🔮 🔑 Review" not in titles and "🔮 🔑 Lost thing" in titles, titles)
 
         mrows = pr.plan_goal_rows("monthly", pm.period_for("monthly", TODAY), "🗓️ Monthly", arg)
         check("a month: objectives first", [r["title"] for r in mrows][:2] == ["🔮 🥅 TickAL", "🔮 🥅 Onboard"], [r["title"] for r in mrows])
         yrows = pr.plan_goal_rows("yearly", pm.period_for("yearly", TODAY), "🎉 Yearly", arg)
-        check("a year: the year goals", [r["title"] for r in yrows] == ["🔮 🏔️ Draw", "📋 Pick a goal"] and yrows[0]["arg"] == "ARG:Draw|", [r["title"] for r in yrows])
+        check("a year: the year goals, each the card", [r["title"] for r in yrows] == ["🔮 🏔️ Draw", "📋 Pick a goal"] and yrows[0]["arg"] == "ARG:|gdraw", [r["title"] for r in yrows])
         qr = pr.plan_goal_rows("quarterly", pm.period_for("quarterly", TODAY), "🌓 Quarterly", arg)
         check("a quarter: the year goals first", [r["title"] for r in qr][:2] == ["🔮 🏔️ Draw", "🔮 🥅 TickAL"], [r["title"] for r in qr][:3])
         ny = date(Y + 1, 1, 15)

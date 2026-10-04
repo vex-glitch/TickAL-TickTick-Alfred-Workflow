@@ -3715,6 +3715,14 @@ def _goal_task_to_day(pid, tid, day, title=None):
     return out
 
 
+def _on_board(pid):
+    """Is this list the 🔑 OKRs board (config okr_list_id)?"""
+    try:
+        return bool(pid) and pid == (cfg.get_okr_list_id() or "").strip()
+    except Exception:
+        return False
+
+
 def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
                     day=None):
     """Set a goal on ANY tier (Vex 2026-09-12: "There should be goal setting
@@ -3743,9 +3751,14 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
         return "🎯 Nothing to set"
     target_day = day or _today()
     moved, merge, label = "", True, title or "Task"
-    if kind == "daily" and tid:
+    if kind == "daily" and tid and not _on_board(pid):
+        # a real task moves onto the day; a card of the OKR board never does
+        # (its column is its schedule, the goal is a link to it) and it is
+        # not merged into ✅ Tasks either - it is not scheduled today
         info = _goal_task_to_day(pid, tid, target_day, title)
         moved, merge, label = info["suffix"], info["merge"], info["label"]
+    elif kind == "daily" and tid:
+        merge = False
 
     p = pm.period_for(kind, target_day if kind == "daily" else _today())
     if ahead:                       # the weekly journal's three-things pass

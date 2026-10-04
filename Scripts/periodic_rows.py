@@ -1000,30 +1000,6 @@ def _day_goal_lines(day):
     return []
 
 
-def _plan_original(card, list_id, by_id):
-    """The task a 🔮 row sets as the goal when the card LINKS a TickTick
-    task: that task, never the card (HANDOFF_OKR's oldest trap: a daily
-    goal set from a task MOVES that task onto the day, and a card dragged
-    into a time block leaves its month column). None = set a TEXT goal
-    with the card's name: a card with no link, an Eagle or web link, a
-    list link, or a link back into the board itself."""
-    tg = card.target
-    if not tg or tg[0] != "task":
-        return None
-    _k, pid, tid = tg
-    closed = {list_id, areas.PERIODIC_LIST_ID} - {"", None}
-    if not tid or tid == card.id or pid in closed:
-        return None
-    t = by_id.get(tid) or {}
-    if (t.get("projectId") or t.get("_projectId")) in closed:
-        return None
-    # the cache's list over the link's when it knows the task: same id, and
-    # a task moved to another list since the link was pasted lives THERE
-    return {"id": tid,
-            "projectId": t.get("projectId") or t.get("_projectId") or pid,
-            "title": t.get("title") or card.name}
-
-
 PLAN_ROWS_CAP = 8      # 🔮 rows a goal screen shows: October alone held 24 open items
 
 
@@ -1043,8 +1019,8 @@ def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None, query=""):
     🥅 OKRs lines read (HANDOFF_OKR section 8): a day's and a week's picker
     offer this month's open key results then its objectives, a month's its
     objectives then key results, a quarter's its months' objectives, a
-    year's the year goals - each as a TEXT goal with the card's name, or,
-    when the card links a TickTick task, that task (_plan_original).
+    year's the year goals - each a LINK to the card on the board, labelled
+    as the board shows it.
 
     [] - and the screen is exactly what it was - when OKRs are off, nothing
     is cached, nothing is planned for the period, or anything at all fails:
@@ -1094,23 +1070,19 @@ def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None, query=""):
         if card.closed or not (card.name or "").strip() or card.id in seen:
             continue
         seen.add(card.id)
-        t = _plan_original(card, list_id, by_id)
-        if t is not None and (t["id"] in tids or t["id"] in done_ids):
-            continue                      # already the goal, or already done
-        if _norm(card.name) in names or (
-                t is not None and _norm(pm.strip_md_links(t["title"])) in names):
-            continue                      # already the goal, as text or by title
-        # the goal line reads the CARD's name - anchored to the task the card
-        # links when it links one (Vex 2026-10-04: he picked "KeyCue/MIAs/
-        # Shared actions"; a line reading only the CTA it links, "💼 P •
-        # Shortcuts", is not what he picked), the task alone when the names
-        # are one and the same
-        same = t is not None and _norm(card.name) == _norm(pm.strip_md_links(t["title"]))
+        if card.id in tids or _norm(card.name) in names:
+            continue                      # already the goal
+        # the goal IS the card: a link to it on the board, labelled as the
+        # board shows it (Vex 2026-10-04: "why are the entries in the note
+        # not links to those lists, tasks like they were up until now?").
+        # A daily goal from a card is never moved onto the day
+        # (set_period_goal): the column is its schedule.
+        t = {"id": card.id, "projectId": card.pid or list_id, "title": f"{glyph} {card.name}"}
         rows.append(alfred.item(
             uid=f"pn-goal-plan-{kind}-{card.id}",
             title=f"🔮 {glyph} {card.name[:60]}",
             subtitle=f"{col.bullet} · the board  |  ⏎ The {label} goal",
-            arg=arg("" if same else card.name, t),
+            arg=arg("", t),
             valid=True, mods=_mods()))
     if rows:
         # the divider between the board and the picker as it always was;
