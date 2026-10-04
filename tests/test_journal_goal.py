@@ -720,6 +720,89 @@ else:
     check("the log marks the box that carried refs", "q1/2 free -> answered" in trail and "+refs" in trail.split("q1/2")[1].split("\n")[0]
           and "+refs" not in trail.split("q2/2")[1].split("\n")[0], trail)
 
+    # ── 12. the review journals' goal screen survives the run's exit (Vex 2026-10-04) ──
+    # "I am afraid the weekly goal step is missed in automation": the W39 weekly,
+    # the September monthly and the Q3 quarterly ran detached, ended "saved
+    # N/N" and fired their goal screen on the way out - the run exited, the
+    # screen went with it (the 2026-09-24 failure, cured only on the
+    # goal-question path), and W40, October and Q4 had no goal set
+    import time as _tm
+    _late, _gsave, _gload, _yield, _wait, _sleep2 = (xact._journal_is_late, xact._goalseq_save, xact._goalseq_load,
+                                                     xact._yield_activation, xact._wait_for_goal_screen, _tm.sleep)
+    seqs, waits, naps2 = [], [], []
+    xact._goalseq_save = lambda remaining, kind="weekly": seqs.append((remaining, kind))
+    xact._goalseq_load = lambda kind=None: None
+    xact._yield_activation = lambda: "prohibited"
+    xact._wait_for_goal_screen = lambda tag, kind, late, **kw: waits.append((kind, late))
+    _tm.sleep = lambda s_: naps2.append(s_)
+    reflog2 = xact.JOURNAL_LOG = os.path.join(tmp, "jnl_screen.log")
+    _had_det = os.environ.pop("TICKAL_DETACHED", None)
+    try:
+        xact._journal_is_late = lambda slot, jper, today: False
+        os.environ["TICKAL_DETACHED"] = "1"
+        run("weekly", pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])), ["an answer"])
+        check("a detached weekly run arms three picks, yields, fires the picker and WAITS on it",
+              seqs == [(3, "weekly")] and ("Search", "pn goal ") in calls["trigger"] and waits == [("weekly", False)]
+              and naps2 == [], (seqs, calls["trigger"], waits, naps2))
+        with open(reflog2) as f:
+            trail = f.read()
+        check("the trigger is logged, yielded", "goal screen (weekly) trigger rc=? yielded=prohibited" in trail, trail)
+        seqs.clear(); waits.clear()
+        run("monthly", pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])), ["an answer"])
+        check("a detached monthly run arms the open-ended editor and waits", seqs == [(None, "monthly")]
+              and ("Search", "pn goals monthly ") in calls["trigger"] and waits == [("monthly", False)], (seqs, waits))
+        seqs.clear(); waits.clear()
+        xact._journal_is_late = lambda slot, jper, today: True
+        run("quarterly", pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])), ["an answer"])
+        check("a LATE run clears the state, opens the screen plain and waits the late way",
+              seqs == [(0, "quarterly")] and waits == [("quarterly", True)], (seqs, waits))
+        with open(reflog2) as f:
+            trail = f.read()
+        check("the late trigger is logged as late", "goal screen (quarterly, late) trigger" in trail, trail)
+        os.environ.pop("TICKAL_DETACHED", None)
+        seqs.clear(); waits.clear()
+        xact._journal_is_late = lambda slot, jper, today: False
+        run("weekly", pm.journal_pairs(pm.seed_journal_lines(["What is on your mind?"])), ["an answer"])
+        check("the hotkey road cannot wait: it gives Alfred a moment", waits == [] and naps2 == [1.0], (waits, naps2))
+    finally:
+        xact._journal_is_late, xact._goalseq_save, xact._goalseq_load = _late, _gsave, _gload
+        xact._yield_activation, xact._wait_for_goal_screen, _tm.sleep = _yield, _wait, _sleep2
+        if _had_det is not None:
+            os.environ["TICKAL_DETACHED"] = _had_det
+        else:
+            os.environ.pop("TICKAL_DETACHED", None)
+    # the wait itself
+    xact.JOURNAL_LOG = os.path.join(tmp, "jnl_wait.log")
+    ticks = []
+    states = [{"remaining": 3}, {"remaining": 2}, None]
+    xact._goalseq_load = lambda kind=None: states.pop(0)
+    res = xact._wait_for_goal_screen("weekly@x", "weekly", False, sleep=lambda s_: ticks.append(s_), clock=lambda: 0.0)
+    check("not late: the wait ends when the state file is consumed", res == "done" and ticks == [0.5, 0.5], (res, ticks))
+    xact._goalseq_load = lambda kind=None: {"remaining": 1}
+    t = [0.0]
+    def clk():
+        t[0] += 100.0
+        return t[0]
+    res = xact._wait_for_goal_screen("weekly@x", "weekly", False, sleep=lambda s_: None, clock=clk, limit=250)
+    check("... and gives up at the limit", res == "wait", res)
+    xact._goalseq_load = _gload
+    fronts = [False, True, True, False, False, False, False, False, False, False]
+    t = [0.0]
+    def clk2():
+        t[0] += 1.0
+        return t[0]
+    res = xact._wait_for_goal_screen("quarterly@x", "quarterly", True, sleep=lambda s_: None, clock=clk2,
+                                     front=lambda: fronts.pop(0) if fronts else False)
+    check("late: Alfred drew, then stayed away 3 s = done", res == "gone" and len(fronts) <= 4, (res, fronts))
+    res = xact._wait_for_goal_screen("quarterly@x", "quarterly", True, sleep=lambda s_: None, clock=clk2, front=lambda: None)
+    check("late, no AppKit: nothing to wait for", res == "gone", res)
+    t = [0.0]
+    res = xact._wait_for_goal_screen("quarterly@x", "quarterly", True, sleep=lambda s_: None, clock=clk2, front=lambda: False)
+    check("late: Alfred never drew = done after the grace", res == "gone" and t[0] >= xact.GOAL_SCREEN_GRACE, (res, t))
+    with open(xact.JOURNAL_LOG) as f:
+        trail = f.read()
+    check("the waits are logged", "exit after goal screen" in trail and "exit after wait" in trail and "no AppKit" in trail, trail)
+
     print(f"journal goal: {PASS} passed, {FAIL} failed")
     for f in FAILURES:
         print("  FAIL", f)

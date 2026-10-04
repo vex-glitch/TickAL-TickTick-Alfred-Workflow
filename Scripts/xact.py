@@ -8141,11 +8141,98 @@ def pn_journal(slot):
     if slot == "weekly":
         if not late:
             _goalseq_save(3)
-        _run_trigger("Search", "pn goal ")
+        _open_goal_screen(tag, "weekly", "pn goal ", late)
     elif slot in _OPEN_GOAL_SLOTS:
         if not late:
             _goalseq_save(None, slot)
-        _run_trigger("Search", f"pn goals {slot} ")
+        _open_goal_screen(tag, slot, f"pn goals {slot} ", late)
+
+
+GOAL_SCREEN_GRACE = 15.0      # a late run waits this long for Alfred to draw its screen
+GOAL_SCREEN_AWAY = 3.0        # ... and exits once Alfred has been gone this long
+
+
+def _open_goal_screen(tag, kind, query, late):
+    """The review journals' last act: Alfred's goal screen for the period
+    after this one - the weekly's three things, the month's and the
+    quarter's open-ended editor; a LATE run's opens plain, aimed at the
+    period running now. The 2026-09-24 lesson, applied here on 2026-10-04:
+    this run drew boxes, so it is the active app, and the screen it fires
+    vanishes the moment the run exits. The W39 weekly (27 Sep), the
+    September monthly and the Q3 quarterly (2 Oct) all ran detached from
+    their review checklists, ended "saved N/N" and fired the screen on the
+    way out - no goal screen ever showed, no trigger was logged, and W40,
+    October and Q4 had no goal set (Vex 2026-10-04: "I am afraid the
+    weekly goal step is missed in automation"). So: yield activation
+    first, log the trigger, and a detached run idles until the screen is
+    done with (_wait_for_goal_screen); the hotkey road gives Alfred a
+    moment to draw, as the goal-question handoff does."""
+    yielded = _yield_activation()
+    r = _run_trigger("Search", query)
+    rc = getattr(r, "returncode", "?")
+    err = " ".join((getattr(r, "stderr", "") or "").split())[-160:]
+    _jlog(tag, f"goal screen ({kind}{', late' if late else ''}) trigger rc={rc} yielded={yielded}"
+               + (f" err={err}" if err else ""))
+    if os.environ.get("TICKAL_DETACHED"):
+        _wait_for_goal_screen(tag, kind, late)
+    else:
+        time.sleep(1.0)
+
+
+def _alfred_front():
+    """Is Alfred the frontmost app? None when AppKit is not loaded (a run
+    that drew no box is no app to macOS and its exit pulls nothing down)."""
+    ak = sys.modules.get("AppKit")
+    if ak is None:
+        return None
+    try:
+        front = ak.NSWorkspace.sharedWorkspace().frontmostApplication()
+        if front is None:
+            return False
+        return "alfred" in (front.bundleIdentifier() or "").lower()
+    except Exception:
+        return None
+
+
+def _wait_for_goal_screen(tag, kind, late, sleep=None, clock=time.time, limit=None, front=None):
+    """A DETACHED review journal stays alive, idle, while the goal screen it
+    opened is up (_wait_for_pick's rule, for the run's end). Not late: until
+    the screen's state file is consumed - three picked, or the open-ended
+    editor's Esc expiring it (_goalseq_load, 10 min). Late (no state file):
+    until Alfred has drawn its screen and been gone for GOAL_SCREEN_AWAY -
+    a pick re-opens the screen and Alfred blinks between the two - or, when
+    it never drew within GOAL_SCREEN_GRACE, then; at once when this run
+    never loaded AppKit. PICK_WAIT_MAX caps both. -> "done" | "gone" |
+    "wait". Logged."""
+    limit = PICK_WAIT_MAX if limit is None else limit
+    sleep = sleep or _idle
+    front = front or _alfred_front
+    t0 = clock()
+    seen, away_since = False, None
+    while True:
+        now = clock()
+        if now - t0 >= limit:
+            _jlog(tag, f"exit after wait {int(now - t0)}s (goal screen up?)")
+            return "wait"
+        if not late:
+            if _goalseq_load(kind) is None:
+                _jlog(tag, f"exit after goal screen {int(now - t0)}s")
+                return "done"
+        else:
+            f = front()
+            if f is None:
+                _jlog(tag, "exit, no AppKit loaded (goal screen)")
+                return "gone"
+            if f:
+                seen, away_since = True, None
+            else:
+                away_since = now if away_since is None else away_since
+                if (seen and now - away_since >= GOAL_SCREEN_AWAY) or \
+                        (not seen and now - t0 >= GOAL_SCREEN_GRACE):
+                    _jlog(tag, f"exit after goal screen {int(now - t0)}s"
+                               + ("" if seen else " (Alfred never drew)"))
+                    return "gone"
+        sleep(0.5)
 
 
 def _journal_is_late(slot, jper, today):
