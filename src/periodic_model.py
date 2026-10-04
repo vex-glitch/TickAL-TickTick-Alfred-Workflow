@@ -74,6 +74,12 @@ def strip_tier_emoji(s):
 # refresh).
 SEC_COUNTDOWNS = "⏳ Countdowns"
 SEC_HABITS     = "🔄 Habits"
+# the daily's 🏆 Goals, top-down (Vex 2026-10-04: "make sure every goal level
+# is shown in notes"): the year's, the quarter's and the month's goals
+# mirrored in above the week's, then the day's own
+SEC_DAY_YEAR   = "🎉 Yearly"              # daily mirror of the year's goals
+SEC_DAY_QTR    = "🌓 Quarterly"            # daily mirror of the quarter's goals
+SEC_DAY_MONTH  = "🗓️ Monthly"             # daily mirror of the month's goals
 SEC_WEEK_GOALS = "🗓️ Weekly"              # daily mirror of the weekly Goals
 SEC_DAY_GOAL   = "☀️ Daily"               # the One Thing
 SEC_YESTERDAY  = "⏪ Yesterday"
@@ -96,11 +102,14 @@ SEC_GOALS      = "🏆 Goals"
 # daily mirrors this note's ♻️ Weekly; only the last one is written here.
 # Emoji are Vex's own tier set (periodic_rows._OPEN_ROWS), which is why the
 # week reads ♻️ here and 🗓️ in the daily note - his older choice, kept.
+SEC_WK_YEAR    = "🎉 Yearly"              # mirror of the year's goals (2026-10-04)
 SEC_WK_QTR     = "🌓 Quarterly"            # mirror of the quarter's goals
 SEC_WK_MONTH   = "🗓️ Monthly"             # mirror of the month's goals
 SEC_WK_WEEK    = "♻️ Weekly"              # THIS week's own goals
+HINT_YEAR      = "- _(mirrors this year's note - set it there)_"
 HINT_WK_QTR    = "- _(mirrors this quarter's note - set it there)_"
 HINT_WK_MONTH  = "- _(mirrors this month's note - set it there)_"
+HINT_WEEK      = "- _(mirrors this week's weekly note - edit goals there)_"
 # ✨ Highlight is in BOTH the weekly (the week's, set by the row or the weekly
 # journal) and the daily (the day's, asked at shutdown) - same name, different
 # notes. SEC_HL_WEEK is the weekly's by-day roll-up of the daily ones, and its
@@ -133,6 +142,7 @@ LEGACY_TODAY   = "✅ Today"
 # monthly - Vex's 2026-09-17 layout, the weekly's shape one tier up: the same
 # 📊 Stats / 💿 Data groups holding the same bullet names, counted by WEEK
 # instead of by day.
+SEC_MTH_YEAR   = "🎉 Yearly goal"          # mirror of the year's goals (2026-10-04)
 SEC_MTH_QTR    = "🌓 Quarterly goal"       # mirror of the quarter's goals
 SEC_MTH_MONTH  = "🗓️ Monthly goal"        # THIS month's own
 SEC_MBARS      = "Weekly Completed"       # per-week bars (the daily's twin)
@@ -252,17 +262,18 @@ WRITER_ANCHORS = {
     # no SEC_MONEY: the day's money is the CRM's (src/crm_money.py, Vex
     # 2026-10-02), shown by the summary's Money line. Older notes that still
     # carry a 💰 section keep it as his history; nothing seeds or reads one.
-    "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_WEEK_GOALS, SEC_DAY_GOAL,
+    "daily":     [SEC_COUNTDOWNS, SEC_HABITS, SEC_DAY_YEAR, SEC_DAY_QTR,
+                  SEC_DAY_MONTH, SEC_WEEK_GOALS, SEC_DAY_GOAL,
                   SEC_YESTERDAY, SEC_YBRIDGE, SEC_HIGHLIGHT, SEC_TODAY,
                   SEC_TOMORROW, SEC_MORNING, SEC_NOTES, SEC_EVENING,
                   SEC_DAY_SUM, SEC_OTD, SEC_OKR],
-    "weekly":    [SEC_OKR, SEC_GOALS, SEC_WK_QTR, SEC_WK_MONTH, SEC_WK_WEEK,
+    "weekly":    [SEC_OKR, SEC_GOALS, SEC_WK_YEAR, SEC_WK_QTR, SEC_WK_MONTH, SEC_WK_WEEK,
                   SEC_HIGHLIGHT, SEC_TOP_LIST, SEC_TOP_TASKS,
                   SEC_CREATED, SEC_COMPLETED, SEC_WBARS, SEC_FOCUS_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_HABIT_WEEK,
                   SEC_WEEKLY_JNL, SEC_REVIEW, SEC_LAST_WEEK, SEC_INCOME,
                   SEC_PEOPLE],
-    "monthly":   [SEC_OKR, SEC_MTH_QTR, SEC_MTH_MONTH, SEC_HIGHLIGHT,
+    "monthly":   [SEC_OKR, SEC_MTH_YEAR, SEC_MTH_QTR, SEC_MTH_MONTH, SEC_HIGHLIGHT,
                   SEC_TOP_LIST, SEC_TOP_TASKS, SEC_CREATED, SEC_COMPLETED,
                   SEC_MBARS, SEC_FOCUS_WEEK, SEC_HABIT_WEEK,
                   SEC_HL_WEEK, SEC_ENTRIES, SEC_MOODS, SEC_INCOME,
@@ -289,7 +300,8 @@ WRITER_ANCHORS = {
 # missing from here is searched document-wide, as it always was.
 SECTION_SCOPE = {
     "weekly": {
-        SEC_WK_QTR: SEC_GOALS, SEC_WK_MONTH: SEC_GOALS, SEC_WK_WEEK: SEC_GOALS,
+        SEC_WK_YEAR: SEC_GOALS, SEC_WK_QTR: SEC_GOALS, SEC_WK_MONTH: SEC_GOALS,
+        SEC_WK_WEEK: SEC_GOALS,
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_WBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,
@@ -301,7 +313,7 @@ SECTION_SCOPE = {
     },
     # same two group headers, same bullet names, one tier up
     "monthly": {
-        SEC_MTH_QTR: SEC_GOALS, SEC_MTH_MONTH: SEC_GOALS,
+        SEC_MTH_YEAR: SEC_GOALS, SEC_MTH_QTR: SEC_GOALS, SEC_MTH_MONTH: SEC_GOALS,
         SEC_TOP_LIST: SEC_WK_STATS, SEC_TOP_TASKS: SEC_WK_STATS,
         SEC_CREATED: SEC_WK_STATS, SEC_COMPLETED: SEC_WK_STATS,
         SEC_MBARS: SEC_WK_STATS, SEC_FOCUS_WEEK: SEC_WK_STATS,

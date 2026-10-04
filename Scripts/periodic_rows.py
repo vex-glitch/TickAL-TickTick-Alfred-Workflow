@@ -28,6 +28,7 @@ import areas
 import cache as cache_store
 import fuzzy as fuzz
 import periodic_model as pm
+import filtering as _filtering
 from display import md_links_display, pick_title, pick_where, search_key
 from script_base import run_path
 
@@ -538,24 +539,29 @@ def _task_pool(include_notes=False, goals=False):
     skip = {areas.PERIODIC_LIST_ID, okr_pid} - {"", None}
     pool = [t for t in (cache_store.get("all_tasks") or [])
             if t.get("status", 0) == 0
+            and (t.get("title") or "").strip()           # a nameless card is no goal
             and (include_notes or t.get("kind") != "NOTE")
             and (t.get("projectId") or t.get("_projectId")) not in skip
             and not (goals and _is_bridge(t))]
     return pool
 
 
-def _rank(frag, pool):
+def _rank(frag, pool, first=None):
     """The main search's relevance sort (fuzzy.rank), for every pn picker
     (Vex 2026-09-22: "If I type in TickAL, it will first list all the bridge
     notes etc. Unlike our search engine which shows correct items at the
     top"). Matched on the title as it READS - a link's text, never its URL,
     so "tickal" no longer finds every routine step whose link carries
     com.vex.tickal. Within a match strength: tasks before notes, top-level
-    before subtasks, higher priority first."""
+    before subtasks, higher priority first. A BLANK bar gets the same order
+    instead of the cache's (Vex 2026-10-04: the evening picker opened on
+    notes and a nameless card). `first(t)` puts a class of items ahead of
+    everything within a strength - the day's own tasks on a day picker."""
     return fuzz.rank(
         " ".join((frag or "").split()), pool,
         key_fn=lambda t: search_key(t.get("title") or ""),
-        order_fn=lambda t: (2 if t.get("kind") == "NOTE" else 1,
+        order_fn=lambda t: (0 if first is not None and first(t) else 1,
+                            2 if t.get("kind") == "NOTE" else 1,
                             1 if t.get("parentId") else 0,
                             -int(t.get("priority") or 0)))
 
@@ -955,8 +961,15 @@ def _plan_original(card, list_id, by_id):
             "title": t.get("title") or card.name}
 
 
-def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None):
+PLAN_ROWS_CAP = 8      # 🔮 rows a goal screen shows: October alone held 24 open items
+
+
+def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None, query=""):
     """🔮 one row per OPEN board item of period `p`, then 📋 Pick a goal.
+    `query` (the typed bar) keeps the board rows that match it, ranked the
+    main search's way, so a key result the hub shows can be picked by name
+    (the board's own list is never in the task pool); without it the first
+    PLAN_ROWS_CAP in board order.
 
     `kind` is the tier the board is read for (the journal's day screen is
     "daily"), `p` the period the goal lands in - the screen's own rule
@@ -992,8 +1005,13 @@ def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None):
              if isinstance(t, dict) and t.get("id")}
     done_ids = {t.get("id") for t in cache_store.get("completed_tasks") or []
                 if isinstance(t, dict)} - set(by_id)
+    if (query or "").strip():
+        picks = fuzz.rank(" ".join(query.split()), picks,
+                          key_fn=lambda ci: getattr(ci[1], "card", ci[1]).name or "")
     rows, seen = [], set()
     for col, it in picks:
+        if len(rows) >= PLAN_ROWS_CAP:
+            break
         card = getattr(it, "card", it)              # an Objective's first card, or the KR card
         glyph = (ob.GLYPH_GOAL if getattr(it, "kind", "") == "goal"
                  else ob.GLYPH_O if hasattr(it, "krs") else ob.GLYPH_KR)
@@ -1103,19 +1121,23 @@ def tier_goal_rows(kind, rest, jnl=None):
             items.append(_week_switch_row(
                 "pn-goal-weekly-switch", manual_next, "pn goals weekly ",
                 f"pn goals weekly {pm.GOAL_NEXT_MARK} "))
-    if not (rest or "").strip():
-        # 🔮 the plan for the period the goal LANDS in, then 📋 Pick a goal.
-        # The daily's goal lines are read for the skip too: the journal's
-        # Change… screen must not offer back the goal being changed.
-        if jnl:
-            gp = pm.period_for("daily", jnl["for_day"])
-        else:
-            gp = pm.period_for(kind, _pn_today())
-            if ahead:
-                gp = pm.next_period(gp)
+    # the period the goal LANDS in: the journal's day, else this period, or
+    # the next one under a handoff
+    if jnl:
+        gp = pm.period_for("daily", jnl["for_day"])
+    else:
+        gp = pm.period_for(kind, _pn_today())
+        if ahead:
+            gp = pm.next_period(gp)
+    if not combining:
+        # 🔮 the board for that period, then 📋 Pick a goal - on a blank bar
+        # the first few, on a typed one the ones the text finds (a key
+        # result lives on the board, never in the task pool). The daily's
+        # goal lines are read for the skip too: the journal's Change…
+        # screen must not offer back the goal being changed.
         held = ([raw for _shown, raw in have] if kind != "daily"
                 else _day_goal_lines(gp.start))
-        items.extend(plan_goal_rows(kind, gp, label, arg, held))
+        items.extend(plan_goal_rows(kind, gp, label, arg, held, query=text))
     if combining and text:
         items.append(alfred.item(
             uid="pn-goal-textonly", title=f'🎯 {label} · "{text[:44]}"',
@@ -1130,8 +1152,12 @@ def tier_goal_rows(kind, rest, jnl=None):
 
     pool = _task_pool(include_notes=(kind == "daily"), goals=True)
     pick = frag if combining else text
-    if pick:
-        pool = _rank(pick, pool)
+    # ranked even on a blank bar (the main search's order: tasks before
+    # notes, top-level first, priority), and on a day picker the tasks
+    # scheduled on that day come first - tomorrow's goal is usually one
+    day_iso = gp.start.isoformat() if kind == "daily" else None
+    pool = _rank(pick, pool, first=(lambda t: _filtering.task_local_date(t) == day_iso)
+                 if day_iso else None)
     for t in pool[:30]:
         items.append(alfred.item(
             uid=f"pn-goal-{kind}-{t['id']}",

@@ -6,6 +6,9 @@
 - _(pending)_
 ---
 #### 🏆 Goals
+- 🎉 Yearly goal
+	- _(mirrors this year's note - set it there)_
+
 - 🌓 Quarterly goal
 	- _(mirrors this quarter's note - set it there)_
 

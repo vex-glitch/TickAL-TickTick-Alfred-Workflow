@@ -78,6 +78,38 @@ else:
     check("cleared parent resets the mirror",
           any("mirrors this month" in l for l in mb) and "Onboard" not in "".join(mb), mb)
 
+    # 4b. every tier above mirrors in (Vex 2026-10-04: "make sure every goal
+    # level is shown in notes"): the weekly's 🎉 Yearly, the monthly's 🎉 Yearly
+    # goal, the daily's 🎉 Yearly / 🌓 Quarterly / 🗓️ Monthly - each a template
+    # bullet, filled by _mirror_goal from the parent's own goal, the pointer
+    # when the parent has none
+    parent("yearly", ["\t- [ ] Productivity System"])
+    check("weekly template carries 🎉 Yearly", ps.find(doc, pm.SEC_WK_YEAR, pm.SEC_GOALS) is not None)
+    pe._mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", idx, date(2026, 9, 14), pm.HINT_YEAR)
+    yb = ps.find(doc, pm.SEC_WK_YEAR, pm.SEC_GOALS).body
+    check("the year's goal mirrored into the weekly", any("Productivity System" in l for l in yb), yb)
+    mdoc = ps.parse_sections(pm.render_template(pe._load_template("monthly"), {"breadcrumbs": "C"}))
+    check("monthly template carries 🎉 Yearly goal above 🌓 Quarterly goal",
+          [b for b in (pm.SEC_MTH_YEAR, pm.SEC_MTH_QTR, pm.SEC_MTH_MONTH) if ps.find(mdoc, b, pm.SEC_GOALS) is not None]
+          == [pm.SEC_MTH_YEAR, pm.SEC_MTH_QTR, pm.SEC_MTH_MONTH])
+    pe._mirror_goal(mdoc, pm.SEC_MTH_YEAR, "yearly", idx, date(2026, 9, 14), pm.HINT_YEAR)
+    check("the year's goal mirrored into the monthly", any("Productivity System" in l for l in ps.find(mdoc, pm.SEC_MTH_YEAR, pm.SEC_GOALS).body))
+    ddoc = ps.parse_sections(pm.render_template(pe._load_template("daily"), {"breadcrumbs": "C"}))
+    order = [b for b in (pm.SEC_DAY_YEAR, pm.SEC_DAY_QTR, pm.SEC_DAY_MONTH, pm.SEC_WEEK_GOALS, pm.SEC_DAY_GOAL)
+             if ps.find(ddoc, b, pm.SEC_GOALS) is not None]
+    check("daily template: year, quarter, month, week, day", order == [pm.SEC_DAY_YEAR, pm.SEC_DAY_QTR, pm.SEC_DAY_MONTH, pm.SEC_WEEK_GOALS, pm.SEC_DAY_GOAL], order)
+    pe._mirror_goal(ddoc, pm.SEC_DAY_YEAR, "yearly", idx, date(2026, 9, 14), pm.HINT_YEAR)
+    pe._mirror_goal(ddoc, pm.SEC_DAY_QTR, "quarterly", idx, date(2026, 9, 14), pm.HINT_WK_QTR)
+    pe._mirror_goal(ddoc, pm.SEC_DAY_MONTH, "monthly", idx, date(2026, 9, 14), pm.HINT_WK_MONTH)
+    check("the daily mirrors the year, the quarter's pointer, the month",
+          any("Productivity System" in l for l in ps.find(ddoc, pm.SEC_DAY_YEAR, pm.SEC_GOALS).body)
+          and any("mirrors this quarter" in l for l in ps.find(ddoc, pm.SEC_DAY_QTR, pm.SEC_GOALS).body)
+          and any("mirrors this month" in l for l in ps.find(ddoc, pm.SEC_DAY_MONTH, pm.SEC_GOALS).body),
+          [ps.find(ddoc, b, pm.SEC_GOALS).body for b in (pm.SEC_DAY_YEAR, pm.SEC_DAY_QTR, pm.SEC_DAY_MONTH)])
+    check("a daily without the bullet is left alone (the kill switch)",
+          pe._mirror_goal(ps.parse_sections("#### 🏆 Goals\n- ☀️ Daily\n\t- [ ] x\n"), pm.SEC_DAY_YEAR, "yearly", idx, date(2026, 9, 14), pm.HINT_YEAR) is None)
+    check("the week's own goals are still only ♻️ Weekly's", pe._week_goals_of(doc)[0] == [])
+
     # 5. the week's own goals: appended into ♻️ Weekly, and ONLY those travel
     ps.append_body(doc, pe._week_goal_home(doc), ["\t- [ ] Ship the monthly note"])
     parent("monthly", ["\t- [ ] Onboard TickTick"])

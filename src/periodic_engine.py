@@ -1474,6 +1474,13 @@ def _fill_daily(doc, p, index, is_today):
     # sits at the top because that is where he reads it (2026-09-17), not
     # because anything is stored there; clearing the answer clears the line.
     _fill_day_highlight(doc)
+    # 🏆 Goals, top-down (Vex 2026-10-04: "make sure every goal level is
+    # shown in notes"): the year's, the quarter's and the month's goals
+    # mirrored in, each resetting to its pointer when its note has none -
+    # and silent when Vex deleted the bullet (the kill switch, _mirror_goal)
+    _mirror_goal(doc, pm.SEC_DAY_YEAR, "yearly", index, day, pm.HINT_YEAR)
+    _mirror_goal(doc, pm.SEC_DAY_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
+    _mirror_goal(doc, pm.SEC_DAY_MONTH, "monthly", index, day, pm.HINT_WK_MONTH)
     # 🎯 Week goals mirror - verbatim copy; absent/empty weekly keeps the
     # template pointer line (bootstrap window)
     wk = lookup(index, pm.period_for("weekly", day))
@@ -1854,6 +1861,8 @@ def _fill_weekly(doc, p, index):
     # … quarter goal, month goal and week goal", the daily's shape one tier
     # up). ♻️ Weekly is HIS - nothing here ever writes it. The month/quarter
     # of a week is its MONDAY's, the breadcrumb's own convention.
+    _mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", index, p.start,
+                 pm.HINT_YEAR)
     _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, p.start,
                  pm.HINT_WK_QTR)
     _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, p.start,
@@ -2406,7 +2415,9 @@ def _fill_monthly(doc, p, index):
              f"alone (tools/pnrepair/relayout_monthly.py rebuilds it)")
         return
 
-    # 🏆 Goals - the quarter mirrored in; 🗓️ Monthly goal is his
+    # 🏆 Goals - the year and the quarter mirrored in; 🗓️ Monthly goal is his
+    _mirror_goal(doc, pm.SEC_MTH_YEAR, "yearly", index, p.start,
+                 pm.HINT_YEAR)
     _mirror_goal(doc, pm.SEC_MTH_QTR, "quarterly", index, p.start,
                  pm.HINT_WK_QTR)
 

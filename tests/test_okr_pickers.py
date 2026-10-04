@@ -89,6 +89,17 @@ else:
               titles == ["🔮 🔑 Goals wf", "🔮 🔑 Review", "🔮 🔑 Lost thing", "🔮 🔑 Copy of review", "🔮 🔑 Grim Reaper",
                          "🔮 🥅 TickAL", "🔮 🥅 Onboard", "📋 Pick a goal"], titles)
         check("a day: done and won't-do key results are not offered", not any("Kickoff" in t or "Dropped" in t for t in titles))
+        # the typed bar keeps the board rows the text finds (a key result is never in the task pool)
+        frows = pr.plan_goal_rows("daily", p, "☀️ Daily", arg, query="revi")
+        check("a typed bar filters the board rows (the main search's ranking)",
+              [r["title"] for r in frows] == ["🔮 🔑 Review", "🔮 🔑 Copy of review", "📋 Pick a goal"], [r["title"] for r in frows])
+        check("a typed bar that finds nothing on the board shows no board rows", pr.plan_goal_rows("daily", p, "☀️ Daily", arg, query="zzzz") == [])
+        # the cap: October held 24 open items; a screen shows PLAN_ROWS_CAP
+        many = [T(f"k{i:02d}", f"🔑 Step {i}", "c-now", "o2", sort=i) for i in range(20)]
+        cache.set(f"project_data_{PID}", {"project": {"id": PID, "name": "🔑OKRs"}, "tasks": OPEN + many, "columns": COLS})
+        crows = pr.plan_goal_rows("daily", p, "☀️ Daily", arg)
+        check("the board rows are capped", len(crows) == pr.PLAN_ROWS_CAP + 1 and crows[-1]["title"] == "📋 Pick a goal", len(crows))
+        cache.set(f"project_data_{PID}", {"project": {"id": PID, "name": "🔑OKRs"}, "tasks": OPEN, "columns": COLS})
         by = {r["title"]: r for r in rows}
         check("a linked card sets the REAL task, where the cache says it lives now",
               by["🔮 🔑 Goals wf"]["arg"] == f"ARG:|{REALT}" and any(t and t["projectId"] == REALP for _x, t in CALLS), CALLS)
@@ -115,6 +126,29 @@ else:
         ny = date(Y + 1, 1, 15)
         check("a period the board has no column for: no rows", pr.plan_goal_rows("daily", pm.period_for("daily", ny), "☀️ Daily", arg) == [])
 
+        # the task pool behind every picker: nameless cards out, a blank bar RANKED
+        # (tomorrow's own tasks first, then tasks before notes, top-level first)
+        tmrw = (TODAY + __import__("datetime").timedelta(days=1)).isoformat()
+        cache.set("all_tasks", [
+            {"id": "n1", "projectId": REALP, "title": "A note", "kind": "NOTE", "status": 0},
+            {"id": "blank", "projectId": REALP, "title": "   ", "status": 0},
+            {"id": "sub", "projectId": REALP, "title": "A subtask", "status": 0, "parentId": "t1"},
+            {"id": "t1", "projectId": REALP, "title": "A task", "status": 0},
+            {"id": "due", "projectId": REALP, "title": "Due tomorrow", "status": 0, "startDate": f"{tmrw}T08:00:00.000+0000"},
+            {"id": "pri", "projectId": REALP, "title": "Urgent", "status": 0, "priority": 5},
+        ])
+        pool = pr._task_pool(include_notes=True, goals=True)
+        check("a nameless card is never offered", "blank" not in [t["id"] for t in pool])
+        jnl = {"slot": "evening", "mode": "set", "note_day": TODAY, "for_day": TODAY + __import__("datetime").timedelta(days=1)}
+        rows = pr.tier_goal_rows("daily", "", jnl=jnl)
+        picks = [r["title"] for r in rows if r["title"].startswith("📋 ") and r["title"] != "📋 Pick a goal"]
+        names = lambda ps_: [t[2:].split(" ⚫️")[0].split(" 🔴")[0] for t in ps_]
+        check("a blank evening picker: tomorrow's task, then tasks by priority, subtasks, notes last",
+              names(picks) == ["Due tomorrow", "Urgent", "A task", "A subtask", "A note"], picks)
+        rows = pr.tier_goal_rows("daily", "a ", jnl=jnl)
+        picks = [r["title"] for r in rows if r["title"].startswith("📋 ") and r["title"] != "📋 Pick a goal"]
+        check("a typed bar: the main search's order (word start: task, subtask, note)",
+              names(picks)[:3] == ["A task", "A subtask", "A note"], picks)
         os.environ["okr_list_id"] = ""
         check("OKRs off: no rows", pr.plan_goal_rows("daily", p, "☀️ Daily", arg) == [])
         os.environ["okr_list_id"] = PID

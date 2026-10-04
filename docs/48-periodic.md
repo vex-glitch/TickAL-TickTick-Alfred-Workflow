@@ -89,7 +89,7 @@ Without `periodic_list_id`, every one of these shows a setup pointer instead. Op
 
 ![A daily note in TickTick](assets/shots/19-periodic-note.png)
 
-The head of the note (the breadcrumb, then the weather and the quote) is composed for you above the first section. Your mood and the day's stars live in the journals now, with the questions that ask for them. Then, grouped under `#` headers with dividers: **🌉 Yesterday's bridge** → **✨ Highlight** (the one thing the day is remembered for, asked at shutdown) → **🏆 Goals** (🗓️ Weekly mirror + ☀️ Daily one-thing) → **☀️ Today** (✅ Tasks - every task scheduled today as a checkbox link → 📓 Notes → 🔄 Habits → ⏳ Countdowns) → **🔎 Summaries** (📊 Today → ⏪ Yesterday, the full list of what you completed, each with the day's money off the CRM → ⏩ Tomorrow) → 🌅 / 🌙 journals.
+The head of the note (the breadcrumb, then the weather and the quote) is composed for you above the first section. Your mood and the day's stars live in the journals now, with the questions that ask for them. Then, grouped under `#` headers with dividers: **🌉 Yesterday's bridge** → **✨ Highlight** (the one thing the day is remembered for, asked at shutdown) → **🏆 Goals** (🎉 Yearly, 🌓 Quarterly, 🗓️ Monthly and 🗓️ Weekly mirrors, then the ☀️ Daily one-thing) → **☀️ Today** (✅ Tasks - every task scheduled today as a checkbox link → 📓 Notes → 🔄 Habits → ⏳ Countdowns) → **🔎 Summaries** (📊 Today → ⏪ Yesterday, the full list of what you completed, each with the day's money off the CRM → ⏩ Tomorrow) → 🌅 / 🌙 journals.
 
 **Tick a box in ✅ Tasks or ⏩ Tomorrow - in the app, on your phone, anywhere - and the next refresh completes the real task.** Refresh happens when you open the note through `pn` (if the last one is more than a minute old), when the agent runs, or on the 🔄 row; TickTick can't run code when a note opens, so a note opened via breadcrumbs shows its last-refreshed state.
 
@@ -128,7 +128,7 @@ The weekly, monthly and quarterly journals end by opening that screen aimed at t
 
 The pickers rank the way search does: a whole-name match, then a match at the start of a word, then inside a word, and within each of those tasks before notes and top-level tasks before subtasks. A link's address never matches, only the words you see. Bridge notes never show up in a goal picker - a bridge records a session, it is not a goal.
 
-Goals mirror downward, read-only: the quarter's appear in each month, the month's in each week, the week's in each day. Setting them anywhere but their own note is not a thing - the mirror resets to a pointer the moment the parent's goal is cleared.
+Goals mirror downward, read-only: every note shows the goals of every tier above it (the daily all four, the weekly the year's, the quarter's and the month's, the monthly the year's and the quarter's, the quarterly the year's) above its own. Setting them anywhere but their own note is not a thing - the mirror resets to a pointer the moment the parent's goal is cleared.
 
 A goal line you edit in the TickTick app comes back with its markdown escaped; every refresh heals the note's own goal lines, so a link never stays as literal brackets. A goal picked from a task is written with that task's real title, or refused with a toast when the title cannot be read - never as a link that only says "Task".
 
@@ -141,7 +141,7 @@ Nothing asks you for money any more. A day's money is what you logged in the CRM
 Minted Sunday for the week ahead - and opening it midweek mints it on the spot, like every note. Top to bottom:
 
 - **The week's days** - under the breadcrumb, one line per day of that week, linked to that day's note. A day whose note does not exist yet sits there as plain text and becomes a link on the next refresh while the week is still live. A week that has already closed keeps whatever its head said when it closed, unless you run the catch-up tool below.
-- **🏆 Goals** - one bullet per tier, the daily note's shape one level up: **🌓 Quarterly** and **🗓️ Monthly** are read-only mirrors of those notes' own goals (set them there - the mirror resets to a pointer line the moment the parent's goal is cleared, so it can never show a stale one), and **♻️ Weekly** is the week's own. Only ♻️ Weekly travels: it is what the daily note mirrors and what the weekly journal means by *did you achieve your weekly goals?*. Delete a bullet and that mirror stops, like every section here.
+- **🏆 Goals** - one bullet per tier: **🎉 Yearly**, **🌓 Quarterly** and **🗓️ Monthly** are read-only mirrors of those notes' own goals (set them there - the mirror resets to a pointer line the moment the parent's goal is cleared, so it can never show a stale one), and **♻️ Weekly** is the week's own. Only ♻️ Weekly travels: it is what the daily note mirrors and what the weekly journal means by *did you achieve your weekly goals?*. Delete a bullet and that mirror stops, like every section here.
 - **✨ Highlight** - yours to write (the 🗓️ Week highlight row and the weekly journal both land in ✨).
 - **📌 This Week → 📊 Stats** - the numbers, each on its own bullet, most of them carrying the figure in the bullet itself with a vs-last-week chip in the daily note's arrow language (`- Completed: 78 · 🔴 ▼ 309 (−80%)`): Top lists · Top tasks · Created · Completed · Daily Completed (per-day bars) · Focus (by day, with the day's top task) · Habit consistency.
   - **Top lists** and **Top tasks** are the three busiest lists and the three most-completed tasks, and both skip your routines list - a thing you do seven days a week is not news. The headline counts still count everything, so they stay comparable with the weeks already written.
@@ -160,7 +160,7 @@ A note's shape is fixed when it is minted - refresh fills bodies, it never resha
 The weekly note's shape one tier up, counted by **week** instead of by day (Vex rebuilt it by hand on 2026-09-17, same as the other two).
 
 - **The month's weeks** - under the breadcrumb, one line per week, linked to that week's note. Labels are month-local and clipped to the month: `W1 · 1st-6th Sep`, `W5 · 28th-30th Sep`. Every week number in the note carries its date range, everywhere.
-- **🏆 Goals** - **🌓 Quarterly goal** mirrors the quarter's note; **🗓️ Monthly goal** is yours, and it is what the weekly notes mirror in turn.
+- **🏆 Goals** - **🎉 Yearly goal** and **🌓 Quarterly goal** mirror the year's and the quarter's notes; **🗓️ Monthly goal** is yours, and it is what the weekly and daily notes mirror in turn.
 - **✨ Highlight**, then **📊 Stats** and **💿 Data** with the weekly's own bullets: Top lists · Top tasks · Created · Completed · Weekly Completed (per-week bars) · Focus (by week, with the week's top task) · Habit consistency, then ✨ Highlights · 📨 Entries · 😊 Moods · 💰 Income · 👽 People · 🥘 Meal prep (the week's meals from Mela's calendar, written by 🔄 Sync with Mela in the [🥘 hub](51-meal-prep.md)).
 - **😊 Moods** reads the month average with its vs-last-month arrow in the bullet, and one line per week underneath.
 - **⏳ Dates** - every birthday and countdown landing in that month, by date. Days already past count: a birthday on the 3rd is still what the month held.

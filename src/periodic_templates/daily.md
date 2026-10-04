@@ -8,6 +8,15 @@
 - _(pending)_
 ---
 #### 🏆 Goals
+- 🎉 Yearly
+	- _(mirrors this year's note - set it there)_
+
+- 🌓 Quarterly
+	- _(mirrors this quarter's note - set it there)_
+
+- 🗓️ Monthly
+	- _(mirrors this month's note - set it there)_
+
 - 🗓️ Weekly
 	- _(mirrors this week's weekly note - edit goals there)_
 
