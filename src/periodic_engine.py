@@ -538,11 +538,17 @@ def _fill_goal_mirrors(doc, p, index):
             ps.set_body(doc, pm.SEC_WEEK_GOALS, goals or [pm.T1 + pm.HINT_WEEK],
                         within=pm.SEC_GOALS)
     elif p.kind == "weekly":
-        # the month/quarter of a week is its MONDAY's, the breadcrumb's own
-        # convention
-        _mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", index, day, pm.HINT_YEAR)
-        _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
-        _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, day, pm.HINT_WK_MONTH)
+        # a week's month, quarter and year are its THURSDAY's (the ISO rule,
+        # the one its 🥅 OKRs section reads the board by - okr_board.month_for):
+        # W40 2026 (28 Sep to 4 Oct) shows October's board, so it mirrors
+        # October's and Q4's goals, not September's and Q3's, which it did
+        # while this read the Monday (the breadcrumb keeps its own
+        # convention, pm.parents). Vex 2026-10-04, after setting Q4's goal:
+        # this week's note still said "set it there"
+        thu = day + timedelta(days=3)
+        _mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", index, thu, pm.HINT_YEAR)
+        _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, thu, pm.HINT_WK_QTR)
+        _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, thu, pm.HINT_WK_MONTH)
     elif p.kind == "monthly":
         _mirror_goal(doc, pm.SEC_MTH_YEAR, "yearly", index, day, pm.HINT_YEAR)
         _mirror_goal(doc, pm.SEC_MTH_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
@@ -1107,10 +1113,14 @@ def refresh_period(p, index=None, force=False):
         elif p.kind == "weekly":
             _fill_weekly(doc, p, index)
         # 🥅 OKRs FIRST as well as last: the journal seeds below quote the
-        # plan (today's KR, the week's KRs, the month's objectives), and a
-        # fresh note's section still reads "_(pending)_" until it is filled
-        # (review 2026-09-24). Idempotent; the plan is cached for a minute.
-        if p.start <= today <= p.end + timedelta(days=1):
+        # board (the month's key results and objectives), and a fresh note's
+        # section still reads "_(pending)_" until it is filled (review
+        # 2026-09-24). For a running and a FUTURE note alike, like the goal
+        # mirrors above: next week's note is minted on Sunday and read on
+        # Sunday, and it showed "_(pending)_" under 🥅 OKRs all day (Vex
+        # 2026-10-04: "Why are OKRs now pending?"). Idempotent; the board is
+        # cached for a minute.
+        if today <= p.end + timedelta(days=1):
             try:
                 _fill_okr(doc, p, index)
             except Exception as e:
@@ -1135,11 +1145,11 @@ def refresh_period(p, index=None, force=False):
         # lines over any section of theirs named 💰 Money: the day's own
         # money entries in a daily of the layout before 2026-09-12
         # (review 2026-09-27)
-        # 🥅 OKRs, every tier, LIVE window only (a sealed note keeps the plan
-        # it had). Last, so it reads the goals the fillers above just
-        # mirrored. Never allowed to cost the rest of the refresh: it reads
+        # 🥅 OKRs, every tier, for a running and a future note (a sealed note
+        # keeps the board it had). Last, so it reads what the fillers above
+        # just wrote. Never allowed to cost the rest of the refresh: it reads
         # caches that another process may be rewriting.
-        if p.start <= today <= p.end + timedelta(days=1):
+        if today <= p.end + timedelta(days=1):
             try:
                 _fill_okr(doc, p, index)
             except Exception as e:
@@ -3289,10 +3299,11 @@ def _okr_board():
 def _fill_okr(doc, p, index):
     """🥅 OKRs on every tier, plus the yearly 🎯 Goals scorecard.
 
-    LIVE notes only - refresh_period calls this inside its live window; a
-    sealed note keeps the board it had while it was running, the way it
-    keeps its numbers. The section missing = Vex deleted it = the kill
-    switch, and nothing is written. The board only: the goals he picks stay
+    Running and FUTURE notes - refresh_period calls this for every note
+    whose period has not ended (next week's note, minted on Sunday, shows
+    the board on Sunday); a sealed note keeps the board it had while it was
+    running, the way it keeps its numbers. The section missing = Vex
+    deleted it = the kill switch, and nothing is written. The board only: the goals he picks stay
     in 🏆 Goals below and are not repeated here (Vex 2026-09-19)."""
     import okr_notes
     sec = ps.find(doc, pm.SEC_OKR)
@@ -3380,6 +3391,10 @@ def mint_ahead(force=False):
     refresh_period(pm.period_for("weekly", today), index=index)
     for kind in ("monthly", "quarterly", "yearly"):
         refresh_period(pm.period_for(kind, today), index=index)
+    if today.weekday() == 6:
+        # the week ahead, minted above: its board and goal mirrors fill now,
+        # not on Monday (Vex 2026-10-04: "_(pending)_" under 🥅 OKRs all Sunday)
+        refresh_period(pm.period_for("weekly", today + timedelta(days=1)), index=index)
     try:
         with open(STAMP_FILE, "w") as f:
             f.write(today.isoformat())
@@ -3763,7 +3778,7 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
     p = pm.period_for(kind, target_day if kind == "daily" else _today())
     if ahead:                       # the weekly journal's three-things pass
         p = pm.next_period(p)
-    task, _ = ensure_note(p)
+    task, minted = ensure_note(p)
     npid = task.get("projectId") or areas.PERIODIC_LIST_ID
     sec_name = pm.GOAL_SECTION[kind]
     indent = pm.T1
@@ -3801,10 +3816,11 @@ def set_period_goal(kind, text="", pid=None, tid=None, title=None, ahead=False,
     task["content"] = ps.serialize_sections(doc_out)
     if kind == "weekly" and not ahead:      # only THIS week mirrors into today
         _mirror_week_goals(doc_out)
-    if kind == "daily" and target_day == _today() + timedelta(days=1):
-        # the note this pick may have just minted: fill what a day-early
-        # note can have (tonight's bridge, the mirrors, its journals) so it
-        # is not a shell until 04:30 (Vex 2026-09-24)
+    if minted or (kind == "daily" and target_day == _today() + timedelta(days=1)):
+        # the note this pick may have just minted - tomorrow's daily, next
+        # week's weekly: fill what a note minted ahead can have (the board,
+        # the goal mirrors, tonight's bridge, its journals) so it is not a
+        # shell until 04:30 (Vex 2026-09-24, 2026-10-04)
         try:
             refresh_period(p)
             _stamp_refresh(p)

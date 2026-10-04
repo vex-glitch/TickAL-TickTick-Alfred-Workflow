@@ -612,6 +612,13 @@ approved whole ("All good"), with its recommendations.
   pm.PLAN_LINE_RE learned that chip) and merge_scorecard keeps his goals as
   before. Kill switch unchanged: no 🥅 OKRs section (EXACT name) = nothing
   written, the scorecard included.
+  The fill runs for a RUNNING and a FUTURE note alike (`today <= p.end + 1`
+  in refresh_period, since 2026-10-04 noon: next week's note, minted on
+  Sunday, read "_(pending)_" under 🥅 OKRs all day - HANDOFF_ROUTINES 29.4);
+  a sealed note keeps the board it had. A week's month is its THURSDAY's
+  (okr_board.month_for), and since the same day the weekly's goal mirrors
+  read that month and quarter too, so the board and the goals in one note
+  agree.
 - Readers (`pm.okr_board_ctx`, `okr_tier_items`, `okr_journal_ctx`): depth
   is RELATIVE (the distinct indent widths ranked, so tabs and a phone's
   spaces both read); the 2026-09 shape (tier-emoji bullets, items one level

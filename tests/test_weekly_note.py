@@ -125,6 +125,112 @@ else:
           and any("Productivity System" in l for l in ps.find(d2, pm.SEC_DAY_YEAR, pm.SEC_GOALS).body))
     check("the dependents table covers the four tiers that mirror down",
           set(pe._MIRROR_DEPENDENTS) == {"yearly", "quarterly", "monthly", "weekly"})
+    # 4c. a week's month, quarter and year are its THURSDAY's (ISO), the rule its
+    # 🥅 OKRs section reads the board by. W40 2026 runs 28 Sep to 4 Oct: it shows
+    # October's board, so it mirrors October's and Q4's goals - not September's and
+    # Q3's, which it did while the mirrors read the Monday (Vex 2026-10-04: Q4's goal
+    # set, this week's note still said "set it there")
+    def parent_on(kind, day, body):
+        d = ps.parse_sections(pm.render_template(pe._load_template(kind), {"breadcrumbs": "C"}))
+        ps.set_body(d, pm.GOAL_SECTION[kind], body)
+        idx[(kind, pm.title_key(pm.period_for(kind, day)))] = {
+            "content": ps.serialize_sections(d), "id": "X", "projectId": "P"}
+    parent_on("monthly", date(2026, 9, 14), ["\t- [ ] September goal"])
+    parent_on("monthly", date(2026, 10, 1), ["\t- [ ] October goal"])
+    parent_on("quarterly", date(2026, 9, 14), ["\t- [ ] Q3 goal"])
+    parent_on("quarterly", date(2026, 10, 1), ["\t- [ ] Q4 goal"])
+    w40 = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
+    pe._fill_goal_mirrors(w40, pm.period_for("weekly", date(2026, 9, 28)), idx)
+    mb40 = ps.find(w40, pm.SEC_WK_MONTH, pm.SEC_GOALS).body
+    qb40 = ps.find(w40, pm.SEC_WK_QTR, pm.SEC_GOALS).body
+    check("a straddling week mirrors its Thursday's month (W40 -> October)",
+          any("October goal" in l for l in mb40) and "September" not in "".join(mb40), mb40)
+    check("and its Thursday's quarter (W40 -> Q4)",
+          any("Q4 goal" in l for l in qb40) and "Q3" not in "".join(qb40), qb40)
+    w38 = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
+    pe._fill_goal_mirrors(w38, pm.period_for("weekly", date(2026, 9, 14)), idx)
+    check("a week inside one month mirrors that month (W38 -> September)",
+          any("September goal" in l for l in ps.find(w38, pm.SEC_WK_MONTH, pm.SEC_GOALS).body))
+    # 29 Dec 2025 to 4 Jan 2026 is W1 of 2026: its year is 2026's
+    parent_on("yearly", date(2025, 6, 1), ["\t- [ ] 2025 goal"])
+    parent_on("yearly", date(2026, 6, 1), ["\t- [ ] 2026 goal"])
+    w1 = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
+    pe._fill_goal_mirrors(w1, pm.period_for("weekly", date(2025, 12, 29)), idx)
+    yb1 = ps.find(w1, pm.SEC_WK_YEAR, pm.SEC_GOALS).body
+    check("a week straddling the year mirrors its Thursday's year (W1 2026 -> 2026)",
+          any("2026 goal" in l for l in yb1) and "2025" not in "".join(yb1), yb1)
+    parent("monthly", ["\t- [ ]"])          # back to the state section 5 expects
+
+    # 4d. the BOARD fills into a note whose period has not started (Vex 2026-10-04,
+    # Sunday: "Why are OKRs now pending?" - W41, minted that morning, read
+    # "_(pending)_" under 🥅 OKRs all day because refresh_period ran _fill_okr only
+    # inside the live window); a sealed week keeps the board it had; and mint_ahead
+    # refreshes the week ahead on Sunday. refresh_period is driven with its I/O
+    # stubbed, the way tests/test_pn_sync.py drives it.
+    import okr_board as ob
+    import tempfile
+    LID = "a" * 24
+    BOARD = ob.build(LID, "🔑OKRs", [{"id": "oct", "name": "🔟 2026"}], [
+        {"id": "ar", "projectId": LID, "title": "🏔️ VexOS 4️⃣", "columnId": "oct", "parentId": None, "status": 0, "sortOrder": 1},
+        {"id": "ob1", "projectId": LID, "title": "🥅 KeyCue", "columnId": "oct", "parentId": "ar", "status": 0, "sortOrder": 1},
+        {"id": "kr1", "projectId": LID, "title": "🔑 TickTick", "columnId": "oct", "parentId": "ob1", "status": 0, "sortOrder": 1}])
+    saved = {n: getattr(pe, n) for n in ("_today", "_api", "_pn_rmw", "_compose_lead", "_fill_weekly",
+                                          "_heal_own_goals", "_okr_board", "_completed_between",
+                                          "_swept_load", "_swept_add", "LOG_FILE", "SWEPT_FILE")}
+    tmpd = tempfile.mkdtemp()
+    pe.LOG_FILE = os.path.join(tmpd, "periodic.log")
+    pe.SWEPT_FILE = os.path.join(tmpd, "swept.json")
+    pe._today = lambda: date(2026, 10, 4)                 # Sunday, W40's last day
+    pe._api = lambda: object()
+    pe._compose_lead = lambda doc, p, index, refetch: None
+    pe._fill_weekly = lambda *a, **k: None
+    pe._heal_own_goals = lambda *a, **k: None
+    pe._completed_between = lambda a, b: None
+    pe._okr_board = lambda: (LID, BOARD)
+    DOCS = {}
+    def fake_rmw(pid, tid, mutate):
+        d = DOCS[tid]
+        return mutate(d, {}), d
+    pe._pn_rmw = fake_rmw
+    def fresh_weekly():
+        return ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
+    DOCS["W41"] = fresh_weekly()
+    DOCS["W40"] = fresh_weekly()
+    DOCS["W38"] = fresh_weekly()
+    IDX = {("weekly", pm.title_key(pm.period_for("weekly", date(2026, 10, 5)))): {"id": "W41", "projectId": "P"},
+           ("weekly", pm.title_key(pm.period_for("weekly", date(2026, 9, 28)))): {"id": "W40", "projectId": "P"},
+           ("weekly", pm.title_key(pm.period_for("weekly", date(2026, 9, 14)))): {"id": "W38", "projectId": "P"}}
+    check("a fresh weekly ships 🥅 OKRs as _(pending)_",
+          any("_(pending)_" in l for l in ps.find(DOCS["W41"], pm.SEC_OKR).body))
+    pe.refresh_period(pm.period_for("weekly", date(2026, 10, 5)), index=IDX)
+    okr41 = ps.find(DOCS["W41"], pm.SEC_OKR).body
+    check("next week's note gets the board on Sunday (the fill runs before the period starts)",
+          any("KeyCue" in l for l in okr41) and not any("_(pending)_" in l for l in okr41), okr41)
+    pe.refresh_period(pm.period_for("weekly", date(2026, 9, 28)), index=IDX)
+    check("this week's note fills too", any("KeyCue" in l for l in ps.find(DOCS["W40"], pm.SEC_OKR).body))
+    pe.refresh_period(pm.period_for("weekly", date(2026, 9, 14)), index=IDX)
+    check("a sealed week keeps what it had (W38 ended 20 Sep)",
+          any("_(pending)_" in l for l in ps.find(DOCS["W38"], pm.SEC_OKR).body))
+    # mint_ahead on a Sunday refreshes the coming week's note as well as today's periods
+    seen = []
+    saved2 = {n: getattr(pe, n) for n in ("refresh_period", "build_index", "create_note", "_read_stamp", "STAMP_FILE")}
+    pe.refresh_period = lambda p, index=None, force=False: seen.append(pm.title_key(p))
+    pe.build_index = lambda force=False: {("x", "y"): {}}
+    pe.create_note = lambda p, index: None
+    pe._read_stamp = lambda: ""
+    pe.STAMP_FILE = os.path.join(tmpd, "stamp")
+    pe.lookup = (lambda _orig: (lambda index, p: {"id": "any"}))(pe.lookup)
+    pe.mint_ahead(force=True)
+    check("Sunday's mint_ahead refreshes the week ahead (W41) too",
+          pm.title_key(pm.period_for("weekly", date(2026, 10, 5))) in seen, seen)
+    check("…and still refreshes the running week", pm.title_key(pm.period_for("weekly", date(2026, 10, 4))) in seen, seen)
+    pe._today = lambda: date(2026, 10, 3)                 # a Saturday: no week-ahead refresh
+    seen.clear()
+    pe.mint_ahead(force=True)
+    check("on a Saturday only the running week is refreshed",
+          pm.title_key(pm.period_for("weekly", date(2026, 10, 5))) not in seen, seen)
+    import importlib
+    pe = importlib.reload(pe)
 
     # 5. the week's own goals: appended into ♻️ Weekly, and ONLY those travel
     ps.append_body(doc, pe._week_goal_home(doc), ["\t- [ ] Ship the monthly note"])

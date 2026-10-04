@@ -95,7 +95,7 @@ Every periodic note carries a **🥅 OKRs** section at the top, right above 🏆
 | 🌓 Quarterly | The year's Goals column, then its three months, objectives only |
 | 🎉 Yearly | The year's Goals column, then its planned months, objectives only |
 
-Every name links to its card on the board. A won't-do key result is left out. Up to eight key results are listed per objective, then `+N more`; the hub holds them all. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again.
+Every name links to its card on the board. A won't-do key result is left out. Up to eight key results are listed per objective, then `+N more`; the hub holds them all. Delete the 🥅 OKRs section from a note and nothing OKR-related is written there again. A note minted before its period starts (next week's on Sunday, tomorrow's at shutdown) shows the board the moment it exists; a note whose period has ended keeps the board it had.
 
 The yearly note's **🎯 Goals scorecard** gets one line per year goal: a bar and the roll-up of its monthly objectives (`▰▰▱▱▱ 5/12 • 12 months • Work 1️⃣`), or `no objectives yet`. The goals you set for the year stay in the same section.
 
