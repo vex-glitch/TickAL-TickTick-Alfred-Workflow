@@ -199,8 +199,9 @@ else:
     kinds = [r["title"].split(" ")[0] for r in rows[:2]]
     # 🔮 = the OKR plan's rows (HANDOFF_OKR section 4), which lead whenever the
     # month has no goal yet (or the network is out and the goals cannot be read)
+    # ✅ = a goal already set (⏎ removes it; 2026-10-04, the tag picker's shape)
     check("the editor lists before it adds",
-          "🎯" in kinds[0] or "📋" in kinds[0] or "🔮" in kinds[0], kinds)
+          "✅" in kinds[0] or "🎯" in kinds[0] or "📋" in kinds[0] or "🔮" in kinds[0], kinds)
     addrow = next((r for r in rows if r["arg"].startswith("xact:pn_setgoal:")), None)
     check("the add rows are still there", addrow is not None)
     # an aimed-ahead payload reaches the verb

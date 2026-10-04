@@ -168,7 +168,15 @@ _INDEX = None          # {(kind, title_key): task-dict-with-content}
 def _persist_id():
     """Write-through: the Alfred config fields only exist as env vars under
     Alfred - mirror them into config.json so the headless launchd agent (no
-    Alfred env) stays configured after the FIRST interactive use."""
+    Alfred env) stays configured after the FIRST interactive use.
+
+    NEVER under the test gate: TICKAL_NO_PERSIST (Makefile `test`,
+    tests/harness.py) stops it. On 2026-10-04 a suite that set a FAKE
+    periodic_list_id in its environment reached build_index, and this wrote
+    the fake id into Vex's real config.json - every headless road then saw
+    an empty periodic list."""
+    if os.environ.get("TICKAL_NO_PERSIST"):
+        return
     try:
         data = cfg.load()
         dirty = False
@@ -499,6 +507,87 @@ def _mirror_goal(doc, anchor, kind, index, day, hint):
     lines = pm.unescape_md_lines(
         [ln for ln in (sec.body if sec else []) if pm.goal_titles([ln])])
     ps.set_body(doc, anchor, lines or [pm.T1 + hint], within=pm.SEC_GOALS)
+
+
+def _fill_goal_mirrors(doc, p, index):
+    """🏆 Goals, the mirrors of every tier above this note's, top-down (Vex
+    2026-10-04: "make sure every goal level is shown in notes"): each the
+    parent note's own goal lines, the pointer line when it has none, and
+    silent when Vex deleted the bullet (the kill switch, _mirror_goal). The
+    daily's week mirror keeps its own rule (_week_goals_of: a tiered weekly's
+    ♻️ Weekly bullet alone travels). Called by refresh_period for a RUNNING
+    and a FUTURE note alike - the fills return early before a period starts,
+    which is why next week's note showed the year's goal as "set it there"
+    while the year had one - and by push_goal_mirrors the moment a goal
+    changes. A sealed note is left as its record."""
+    day = p.start
+    if p.kind == "daily":
+        _mirror_goal(doc, pm.SEC_DAY_YEAR, "yearly", index, day, pm.HINT_YEAR)
+        _mirror_goal(doc, pm.SEC_DAY_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
+        _mirror_goal(doc, pm.SEC_DAY_MONTH, "monthly", index, day, pm.HINT_WK_MONTH)
+        # 🎯 Week goals mirror - verbatim copy; absent/empty weekly keeps the
+        # template pointer line (bootstrap window)
+        wk = lookup(index, pm.period_for("weekly", day))
+        if wk and ps.find(doc, pm.SEC_WEEK_GOALS, pm.SEC_GOALS) is not None:
+            wdoc = ps.parse_sections(wk.get("content") or "")
+            goals, _gsec = _week_goals_of(wdoc)
+            goals = pm.unescape_md_lines(goals)
+            # CLEARED, or the ♻️ Weekly bullet deleted (the kill switch) → the
+            # mirror resets to its pointer: a stale goal is most misleading
+            # in exactly the deleted case (review 2026-09-17)
+            ps.set_body(doc, pm.SEC_WEEK_GOALS, goals or [pm.T1 + pm.HINT_WEEK],
+                        within=pm.SEC_GOALS)
+    elif p.kind == "weekly":
+        # the month/quarter of a week is its MONDAY's, the breadcrumb's own
+        # convention
+        _mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", index, day, pm.HINT_YEAR)
+        _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
+        _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, day, pm.HINT_WK_MONTH)
+    elif p.kind == "monthly":
+        _mirror_goal(doc, pm.SEC_MTH_YEAR, "yearly", index, day, pm.HINT_YEAR)
+        _mirror_goal(doc, pm.SEC_MTH_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
+    elif p.kind == "quarterly":
+        _mirror_goal(doc, pm.SEC_QTR_YEAR, "yearly", index, day, pm.HINT_YEAR)
+
+
+# the notes that mirror a tier's goals and may be open right now: today's
+# and tomorrow's daily, this and next week, this month, this quarter
+_MIRROR_DEPENDENTS = {
+    "yearly": ("quarterly", "monthly", "weekly", "daily"),
+    "quarterly": ("monthly", "weekly", "daily"),
+    "monthly": ("weekly", "daily"),
+    "weekly": ("daily",),
+}
+
+
+def push_goal_mirrors(kind):
+    """A goal of `kind` was set or removed: re-mirror it into every existing
+    note below it that could be on screen - today's and tomorrow's daily,
+    this and next week, this month, this quarter (Vex 2026-10-04: he set the
+    year's goal and next week's note still said "set it there"). One
+    read-modify-write per note, written only on a change. Never raises;
+    returns how many notes changed."""
+    index = build_index(force=True)
+    today = _today()
+    changed = 0
+    for dep in _MIRROR_DEPENDENTS.get(kind, ()):
+        periods = [pm.period_for(dep, today)]
+        if dep in ("daily", "weekly"):
+            periods.append(pm.next_period(periods[0]))
+        for p in periods:
+            task = lookup(index, p)
+            if not task:
+                continue
+            try:
+                before = task.get("content") or ""
+                _ok, doc = _pn_rmw(task.get("projectId") or areas.PERIODIC_LIST_ID,
+                                   task.get("id"),
+                                   lambda d, live, p=p: _fill_goal_mirrors(d, p, index) or True)
+                if ps.serialize_sections(doc) != before:
+                    changed += 1
+            except Exception as e:
+                _log(f"push mirrors {pm.title(p)}: {e}")
+    return changed
 
 
 def _compose_lead(doc, p, index, refetch):
@@ -1008,6 +1097,11 @@ def refresh_period(p, index=None, force=False):
         # cache knew it wore the "Task" fallback label. Escapes drop, the
         # label heals from the task itself, the text is never touched.
         _heal_own_goals(doc, p.kind)
+        # 🏆 the mirrors of the tiers above, for a running and a FUTURE note
+        # alike (next week's note, minted on Sunday, is read on Sunday); a
+        # sealed note keeps the mirror it had
+        if today <= p.end + timedelta(days=1):
+            _fill_goal_mirrors(doc, p, index)
         if p.kind == "daily":
             _fill_daily(doc, p, index, p.start == today)
         elif p.kind == "weekly":
@@ -1474,30 +1568,9 @@ def _fill_daily(doc, p, index, is_today):
     # sits at the top because that is where he reads it (2026-09-17), not
     # because anything is stored there; clearing the answer clears the line.
     _fill_day_highlight(doc)
-    # 🏆 Goals, top-down (Vex 2026-10-04: "make sure every goal level is
-    # shown in notes"): the year's, the quarter's and the month's goals
-    # mirrored in, each resetting to its pointer when its note has none -
-    # and silent when Vex deleted the bullet (the kill switch, _mirror_goal)
-    _mirror_goal(doc, pm.SEC_DAY_YEAR, "yearly", index, day, pm.HINT_YEAR)
-    _mirror_goal(doc, pm.SEC_DAY_QTR, "quarterly", index, day, pm.HINT_WK_QTR)
-    _mirror_goal(doc, pm.SEC_DAY_MONTH, "monthly", index, day, pm.HINT_WK_MONTH)
-    # 🎯 Week goals mirror - verbatim copy; absent/empty weekly keeps the
-    # template pointer line (bootstrap window)
-    wk = lookup(index, pm.period_for("weekly", day))
-    if wk:
-        wdoc = ps.parse_sections(wk.get("content") or "")
-        goals, gsec = _week_goals_of(wdoc)
-        goals = pm.unescape_md_lines(goals)
-        if goals:
-            ps.set_body(doc, pm.SEC_WEEK_GOALS, goals)
-        else:
-            # CLEARED, or the ♻️ Weekly bullet deleted (the kill switch) →
-            # the mirror resets to its pointer. The old `elif gsec is not
-            # None` kept the last copy alive forever in the deleted case,
-            # which is the one where a stale goal is most misleading
-            ps.set_body(doc, pm.SEC_WEEK_GOALS,
-                        [f"{pm.T1}- _(mirrors this week's weekly note - "
-                         "edit goals there)_"])
+    # 🏆 Goals: the mirrors (year, quarter, month, week) are filled by
+    # _fill_goal_mirrors from refresh_period, for a running AND a future
+    # note alike (2026-10-04)
 
     if is_today:
         t2 = _tier2()
@@ -1857,16 +1930,9 @@ def _fill_weekly(doc, p, index):
              f"alone (tools/pnrepair/relayout_weekly.py rebuilds it)")
         return
 
-    # ── 🏆 Goals - the two parents mirrored in (Vex 2026-09-17: "under goals
-    # … quarter goal, month goal and week goal", the daily's shape one tier
-    # up). ♻️ Weekly is HIS - nothing here ever writes it. The month/quarter
-    # of a week is its MONDAY's, the breadcrumb's own convention.
-    _mirror_goal(doc, pm.SEC_WK_YEAR, "yearly", index, p.start,
-                 pm.HINT_YEAR)
-    _mirror_goal(doc, pm.SEC_WK_QTR, "quarterly", index, p.start,
-                 pm.HINT_WK_QTR)
-    _mirror_goal(doc, pm.SEC_WK_MONTH, "monthly", index, p.start,
-                 pm.HINT_WK_MONTH)
+    # ── 🏆 Goals - the parents' goals are mirrored in by _fill_goal_mirrors
+    # (refresh_period, running and future notes alike). ♻️ Weekly is HIS -
+    # nothing here ever writes it.
 
     t2 = _tier2()
     prev = pm.prev_period(p)
@@ -2415,11 +2481,8 @@ def _fill_monthly(doc, p, index):
              f"alone (tools/pnrepair/relayout_monthly.py rebuilds it)")
         return
 
-    # 🏆 Goals - the year and the quarter mirrored in; 🗓️ Monthly goal is his
-    _mirror_goal(doc, pm.SEC_MTH_YEAR, "yearly", index, p.start,
-                 pm.HINT_YEAR)
-    _mirror_goal(doc, pm.SEC_MTH_QTR, "quarterly", index, p.start,
-                 pm.HINT_WK_QTR)
+    # 🏆 Goals - the year and the quarter are mirrored in by
+    # _fill_goal_mirrors (refresh_period); 🗓️ Monthly goal is his
 
     t2 = _tier2()
     prev = pm.prev_period(p)
@@ -2658,9 +2721,8 @@ def _fill_quarterly(doc, p, index):
              f"alone (tools/pnrepair/relayout_quarterly.py rebuilds it)")
         return
 
-    # 🏆 Goals - the year mirrored in; 🌓 Quarterly goal is his
-    _mirror_goal(doc, pm.SEC_QTR_YEAR, "yearly", index, p.start,
-                 "- _(mirrors this year's note - set it there)_")
+    # 🏆 Goals - the year is mirrored in by _fill_goal_mirrors
+    # (refresh_period); 🌓 Quarterly goal is his
 
     t2 = _tier2()
     prev = pm.prev_period(p)

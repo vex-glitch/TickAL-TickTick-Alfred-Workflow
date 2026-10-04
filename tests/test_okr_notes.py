@@ -153,17 +153,19 @@ else:
     # ── 7. the goal pickers' choices ───────────────────────────────────────
     names = lambda picks: [getattr(x, "name", None) for _c, x in picks]
     d = on.goal_choices("daily", p, B)
-    check("7.a a day: the month's open key results, then its open objectives",
-          names(d)[:3] == ["Audits", "App 1", "App 2"] and names(d)[-3:] == ["Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish"]
+    check("7.a a day: the month's open key results, its open objectives, the year's goals last",
+          names(d)[:3] == ["Audits", "App 1", "App 2"] and names(d)[-4:] == ["Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish", "Productivity System"]
           and "Finish periodic notes" not in names(d) and "Dropped" not in names(d), names(d))
-    check("7.b each choice names its column", {c.title for c, _x in d} == {"🔟 2026"})
+    check("7.b each choice names its column", {c.title for c, _x in d} == {"🔟 2026", "2026 Goals"})
     m = on.goal_choices("monthly", pm.period_for("monthly", date(2026, 10, 1)), B)
     check("7.c a month: objectives first", names(m)[:3] == ["Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish"], names(m))
     q = on.goal_choices("quarterly", pm.period_for("quarterly", date(2026, 10, 1)), B)
-    check("7.d a quarter: its months' objectives, one per name", names(q) == ["Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish", "Draw"], names(q))
+    check("7.d a quarter: the year's goals first, then its months' objectives, one per name",
+          names(q) == ["Productivity System", "Onboard TickTicks", "Shortcuts", "Audits • Execute & Establish", "Draw"], names(q))
     y = on.goal_choices("yearly", pm.period_for("yearly", date(2027, 1, 1)), B)
     check("7.e a year: its goals", names(y) == ["Post", "Draw"] and all(x.kind == "goal" for _c, x in y), names(y))
-    check("7.f no column, no board = nothing", on.goal_choices("daily", pm.period_for("daily", date(2027, 3, 1)), B) == []
+    check("7.f no month column: the year's goals still; no board = nothing",
+          names(on.goal_choices("daily", pm.period_for("daily", date(2027, 3, 1)), B)) == ["Post", "Draw"]
           and on.goal_choices("daily", p, None) == [])
 
     print(f"{COUNT[0] - len(FAILS)}/{COUNT[0]} checks passed")

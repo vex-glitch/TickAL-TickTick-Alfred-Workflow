@@ -8269,6 +8269,20 @@ def _reopen_goal_screen(kind, query):
     return r
 
 
+def _push_mirrors(kind):
+    """After a goal of `kind` changed: the notes below it that may be open
+    show it now, not at their next refresh (Vex 2026-10-04: the year's goal
+    set, next week's note still said "set it there"). AFTER the screen was
+    fired again, so the add-another loop never waits on these writes."""
+    if kind not in ("weekly", "monthly", "quarterly", "yearly"):
+        return
+    try:
+        n = _pn().push_goal_mirrors(kind)
+        _glog(kind, f"mirrors pushed: {n} note{'s' if n != 1 else ''} changed")
+    except Exception as e:
+        _glog(kind, f"mirrors push failed: {type(e).__name__}: {e}")
+
+
 def _goal_seq_step(toast, kind="weekly"):
     """Handoff bookkeeping: after each pick, re-arm the picker - until 3 are
     in for the weekly, and until Esc for the open-ended month and quarter
@@ -8282,6 +8296,7 @@ def _goal_seq_step(toast, kind="weekly"):
         print(f"🎯 {toast[2:] if toast.startswith('🎯 ') else toast} · add another or Esc")
         _glog(kind, f"handoff open-ended: {toast}")
         _reopen_goal_screen(kind, f"pn goals {kind} ")
+        _push_mirrors(kind)
         return "next"
     remaining = seq.get("remaining", 0) - 1
     _goalseq_save(remaining, kind)
@@ -8291,6 +8306,7 @@ def _goal_seq_step(toast, kind="weekly"):
         _reopen_goal_screen(kind, "pn goal ")
     else:
         print("🎯 3 of 3 · next week is set")
+    _push_mirrors(kind)
     return "next"
 
 
@@ -8308,6 +8324,7 @@ def pn_goal(pid, tid, nxt=False):
         _goal_seq_step(toast)
     else:
         print(toast)
+        _push_mirrors("weekly")
 
 
 def pn_setgoal(rest):
@@ -8341,6 +8358,7 @@ def pn_setgoal(rest):
         # was in: a pick in ⏭ Next week lands back in ⏭ Next week
         print(toast)
         _reopen_goal_screen(kind, _goal_screen(kind, ahead))
+        _push_mirrors(kind)
 
 
 def pn_goaldel(rest):
@@ -8358,6 +8376,7 @@ def pn_goaldel(rest):
     print(toast)
     _glog(kind, f"remove '{(spec.get('line') or '').strip()[:60]}' ahead={ahead} -> {toast}")
     _reopen_goal_screen(kind, _goal_screen(kind, ahead and not _goalseq_load(kind)))
+    _push_mirrors(kind)
 
 
 def pn_goaldone(rest):
@@ -8495,6 +8514,7 @@ def pn_goal_text(rest):
         _goal_seq_step(toast)
     else:
         print(toast)
+        _push_mirrors("weekly")
 
 
 def pn_day_goal(pid, tid):

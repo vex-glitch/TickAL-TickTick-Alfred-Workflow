@@ -271,21 +271,28 @@ def goal_choices(kind, p, board):
     """The OPEN board items a `kind` goal picker offers as 🔮 rows for
     period p -> [(Column, Objective | Card)]: a day's and a week's picker
     the month's open key results then its open objectives, a month's its
-    objectives then its key results, a quarter's the objectives of its
-    three months (one per name), a year's the year goals. Done ones are
-    gone: a goal is something still to do."""
+    objectives then its key results, a quarter's the YEAR GOALS then the
+    objectives of its three months (one per name), a year's the year goals.
+    The year goals close every other tier's list too, so typing 🏔️ finds
+    them anywhere. Done ones are gone: a goal is something still to do."""
     if board is None:
         return []
+    gcol = board.goals(p.start.year)
+    goals = [(gcol, o) for o in gcol.objectives if not o.closed] if gcol is not None else []
     out = []
     if kind in ("daily", "weekly", "monthly"):
         y, m = ob.month_for(kind, p)
         col = board.month(y, m)
-        if col is None:
-            return []
-        objs = [(col, o) for o in col.objectives if not o.closed]
-        krs = [(col, k) for k in col.open_krs]
-        out = objs + krs if kind == "monthly" else krs + objs
+        if col is not None:
+            objs = [(col, o) for o in col.objectives if not o.closed]
+            krs = [(col, k) for k in col.open_krs]
+            out = objs + krs if kind == "monthly" else krs + objs
+        # the year's goals last: a week or a month rarely takes one whole,
+        # but typing 🏔️ must find them (Vex 2026-10-04)
+        out += goals
     elif kind == "quarterly":
+        # a quarter's goal is most often one of the year's: those first
+        out = list(goals)
         seen = set()
         for y, m in ob.quarter_months(p):
             col = board.month(y, m)
@@ -294,7 +301,5 @@ def goal_choices(kind, p, board):
                     seen.add(o.key)
                     out.append((col, o))
     elif kind == "yearly":
-        col = board.goals(p.start.year)
-        if col is not None:
-            out = [(col, o) for o in col.objectives if not o.closed]
+        out = goals
     return out

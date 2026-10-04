@@ -77,6 +77,7 @@ os.environ.setdefault("TICKAL_NO_SETTLE", "1")
 # weekly goal handoff mid-review, 2026-10-04); script_base reads it at import
 import tempfile
 os.environ.setdefault("TICKAL_RUN_DIR", tempfile.mkdtemp(prefix="tickal-test-run."))
+os.environ.setdefault("TICKAL_NO_PERSIST", "1")     # never Vex's config.json (periodic_engine._persist_id)
 
 TIMEOUT = 600          # seconds one script suite may take
 # {"test_x": "why it is red on its own, and since when"}. Empty since
@@ -107,7 +108,7 @@ def script_suite(path):
     name = os.path.splitext(os.path.basename(path))[0]
 
     def test_script(self):
-        env = dict(ENV0, TICKAL_NO_SETTLE="1", TICKAL_RUN_DIR=os.environ["TICKAL_RUN_DIR"],
+        env = dict(ENV0, TICKAL_NO_SETTLE="1", TICKAL_RUN_DIR=os.environ["TICKAL_RUN_DIR"], TICKAL_NO_PERSIST="1",
                    # present-but-blank = OFF: never Vex's real config.json
                    # copy of the CRM fields (areas._env_or_cfg, 2026-10-02)
                    crm_records_list_id="", crm_records_tags="",

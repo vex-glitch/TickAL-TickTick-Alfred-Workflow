@@ -42,6 +42,12 @@ else:
     tmp = tempfile.mkdtemp(prefix="okr_pickers_")
     _env = dict(os.environ)
     try:
+        # a scratch HOME before any import: config.py and cache.py resolve
+        # ~/.ticktick_alfred at import, and this suite's FAKE periodic list
+        # id reached periodic_engine._persist_id on 2026-10-04 and was
+        # written into Vex's real config.json
+        os.environ["HOME"] = tmp
+        os.environ["TICKAL_NO_PERSIST"] = "1"
         os.environ["okr_list_id"] = PID
         os.environ["periodic_list_id"] = PNP
         import cache                                           # noqa: E402
@@ -85,9 +91,15 @@ else:
         p = pm.period_for("daily", TODAY)
         rows = pr.plan_goal_rows("daily", p, "☀️ Daily", arg)
         titles = [r["title"] for r in rows]
-        check("a day: the open key results then the objectives, then the picker divider",
+        check("a day: the open key results, the objectives, the year's goal, then the picker divider",
               titles == ["🔮 🔑 Goals wf", "🔮 🔑 Review", "🔮 🔑 Lost thing", "🔮 🔑 Copy of review", "🔮 🔑 Grim Reaper",
-                         "🔮 🥅 TickAL", "🔮 🥅 Onboard", "📋 Pick a goal"], titles)
+                         "🔮 🥅 TickAL", "🔮 🥅 Onboard", "🔮 🏔️ Draw", "📋 Pick a goal"], titles)
+        # a glyph typed alone lists that kind (Vex 2026-10-04: "When I type 🏔️, nothing shows")
+        for g, want in (("🏔️", ["🔮 🏔️ Draw"]), ("🏔", ["🔮 🏔️ Draw"]), ("🥅", ["🔮 🥅 TickAL", "🔮 🥅 Onboard"])):
+            grows = [r["title"] for r in pr.plan_goal_rows("daily", p, "☀️ Daily", arg, query=g) if r["title"].startswith("🔮")]
+            check(f"typing {g} alone lists that kind", grows == want, grows)
+        qrows = pr.tier_goal_rows("quarterly", "🏔️")
+        check("the quarterly screen finds a year goal by its glyph", [r["title"] for r in qrows][:1] == ["🔮 🏔️ Draw"], [r["title"] for r in qrows][:3])
         check("a day: done and won't-do key results are not offered", not any("Kickoff" in t or "Dropped" in t for t in titles))
         # the typed bar keeps the board rows the text finds (a key result is never in the task pool)
         frows = pr.plan_goal_rows("daily", p, "☀️ Daily", arg, query="revi")
@@ -119,7 +131,8 @@ else:
         check("a link back into the board is a text goal (a copy of a copy)", by["🔮 🔑 Copy of review"]["arg"] == "ARG:Copy of review|")
         check("an Eagle link is a text goal", by["🔮 🔑 Grim Reaper"]["arg"] == "ARG:Grim Reaper|")
         check("an objective linking a list is a text goal", by["🔮 🥅 Onboard"]["arg"] == "ARG:Onboard|")
-        check("every row names the month and the board", all(r["subtitle"].startswith(f"{ob.keycap(M)} {ob.MONTH_NAMES[M]} · the board") for r in rows[:-1]), [r["subtitle"] for r in rows])
+        check("every row names its column and the board",
+              all(r["subtitle"].startswith((f"{ob.keycap(M)} {ob.MONTH_NAMES[M]} · the board", f"🏔️ {Y} Goals · the board")) for r in rows[:-1]), [r["subtitle"] for r in rows])
         check("the divider is dead", rows[-1]["valid"] is False)
         check("every row carries its mods", all("mods" in r for r in rows))
 
@@ -134,8 +147,11 @@ else:
         check("a month: objectives first", [r["title"] for r in mrows][:2] == ["🔮 🥅 TickAL", "🔮 🥅 Onboard"], [r["title"] for r in mrows])
         yrows = pr.plan_goal_rows("yearly", pm.period_for("yearly", TODAY), "🎉 Yearly", arg)
         check("a year: the year goals", [r["title"] for r in yrows] == ["🔮 🏔️ Draw", "📋 Pick a goal"] and yrows[0]["arg"] == "ARG:Draw|", [r["title"] for r in yrows])
+        qr = pr.plan_goal_rows("quarterly", pm.period_for("quarterly", TODAY), "🌓 Quarterly", arg)
+        check("a quarter: the year goals first", [r["title"] for r in qr][:2] == ["🔮 🏔️ Draw", "🔮 🥅 TickAL"], [r["title"] for r in qr][:3])
         ny = date(Y + 1, 1, 15)
-        check("a period the board has no column for: no rows", pr.plan_goal_rows("daily", pm.period_for("daily", ny), "☀️ Daily", arg) == [])
+        check("a period the board has no column for: the year's goals alone, or nothing",
+              [r["title"] for r in pr.plan_goal_rows("daily", pm.period_for("daily", ny), "☀️ Daily", arg)] in ([], ["🔮 🏔️ Draw", "📋 Pick a goal"]))
 
         # the task pool behind every picker: nameless cards out, a blank bar RANKED
         # (tomorrow's own tasks first, then tasks before notes, top-level first)

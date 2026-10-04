@@ -109,6 +109,22 @@ else:
     check("a daily without the bullet is left alone (the kill switch)",
           pe._mirror_goal(ps.parse_sections("#### 🏆 Goals\n- ☀️ Daily\n\t- [ ] x\n"), pm.SEC_DAY_YEAR, "yearly", idx, date(2026, 9, 14), pm.HINT_YEAR) is None)
     check("the week's own goals are still only ♻️ Weekly's", pe._week_goals_of(doc)[0] == [])
+    # the shared filler fills a weekly's three mirrors in one call - for a week that has
+    # not started too (Vex 2026-10-04: next week's note said "set it there" all Sunday)
+    fdoc = ps.parse_sections(pm.render_template(TPL, {"breadcrumbs": "C", "daylinks": "- d"}))
+    pe._fill_goal_mirrors(fdoc, pm.period_for("weekly", date(2026, 9, 21)), idx)
+    check("a future week's mirrors fill: the year's goal, the month's pointer, the quarter's pointer",
+          any("Productivity System" in l for l in ps.find(fdoc, pm.SEC_WK_YEAR, pm.SEC_GOALS).body)
+          and any("mirrors this month" in l for l in ps.find(fdoc, pm.SEC_WK_MONTH, pm.SEC_GOALS).body)
+          and any("mirrors this quarter" in l for l in ps.find(fdoc, pm.SEC_WK_QTR, pm.SEC_GOALS).body),
+          [ps.find(fdoc, b, pm.SEC_GOALS).body for b in (pm.SEC_WK_YEAR, pm.SEC_WK_MONTH, pm.SEC_WK_QTR)])
+    d2 = ps.parse_sections(pm.render_template(pe._load_template("daily"), {"breadcrumbs": "C"}))
+    pe._fill_goal_mirrors(d2, pm.period_for("daily", date(2026, 9, 21)), idx)
+    check("the daily's week mirror rides the same filler, pointer when the week has none",
+          any("mirrors this week" in l for l in ps.find(d2, pm.SEC_WEEK_GOALS, pm.SEC_GOALS).body)
+          and any("Productivity System" in l for l in ps.find(d2, pm.SEC_DAY_YEAR, pm.SEC_GOALS).body))
+    check("the dependents table covers the four tiers that mirror down",
+          set(pe._MIRROR_DEPENDENTS) == {"yearly", "quarterly", "monthly", "weekly"})
 
     # 5. the week's own goals: appended into ♻️ Weekly, and ONLY those travel
     ps.append_body(doc, pe._week_goal_home(doc), ["\t- [ ] Ship the monthly note"])

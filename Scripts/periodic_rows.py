@@ -672,7 +672,7 @@ def goal_rows(frag):
         items = []                    # the "Type to pick…" hint: the 📋 row says it
     items = plan + items
     if not frag.strip():
-        head = _set_goal_rows("weekly", have, nxt)
+        head = _set_goal_rows("weekly", have, nxt, wanted=3 if seq else None)
         if not seq:
             head.append(_week_switch_row("pn-goal-weekswitch", manual, "pn goal ",
                                          f"pn goal {pm.GOAL_NEXT_MARK} "))
@@ -686,11 +686,14 @@ def goal_rows(frag):
     return items
 
 
-def _set_goal_rows(kind, have, ahead):
+def _set_goal_rows(kind, have, ahead, wanted=None):
     """The goals a tier already has, each a row that REMOVES it on ⏎, then
-    🏁 Done - the tag picker's shape (Vex 2026-10-04: "same way as adding
-    or changing tags"): what is set reads ✅, a pick adds one and the screen
-    comes back, a ✅ row takes one away."""
+    🏁 Finish - the tag picker's shape (Vex 2026-10-04: "same way as adding
+    or changing tags"): what is set reads ✅, a pick below adds one and the
+    screen comes back, a ✅ row takes one away, 🏁 ENDS the picker. Its
+    first wording, "pick more or ⏎", read as "⏎ to pick more" and ended his
+    three-things picker after one goal (09:31). `wanted` = the three of the
+    weekly handoff, so the row counts "1 of 3"."""
     rows = []
     for i, (shown, raw) in enumerate(have or ()):
         rows.append(alfred.item(
@@ -699,9 +702,11 @@ def _set_goal_rows(kind, have, ahead):
             arg="xact:pn_goaldel:" + _b64({"kind": kind, "line": raw, "ahead": ahead}),
             valid=True, mods=_mods()))
     if rows:
+        n = len(rows)
+        count = f"{n} of {wanted} set" if wanted else f"{n} goal{'s' if n > 1 else ''} set"
         rows.append(alfred.item(
-            uid=f"pn-goal-done-{kind}", title="🏁 Done",
-            subtitle=f"{len(rows)} goal{'s' if len(rows) > 1 else ''} set · pick more or ⏎",
+            uid=f"pn-goal-done-{kind}", title=f"🏁 Finish · {count}",
+            subtitle="⏎ ENDS the picker · to add another, pick a row below",
             arg="xact:pn_goaldone:" + _b64({"kind": kind, "ahead": ahead}),
             valid=True, mods=_mods()))
     return rows
@@ -1063,9 +1068,22 @@ def plan_goal_rows(kind, p, label, arg, have_lines=(), today=None, query=""):
              if isinstance(t, dict) and t.get("id")}
     done_ids = {t.get("id") for t in cache_store.get("completed_tasks") or []
                 if isinstance(t, dict)} - set(by_id)
+    def _key(ci):
+        # the glyph is part of what a row is called: typing 🏔️ lists the year
+        # goals, 🥅 the objectives, 🔑 the key results (Vex 2026-10-04: "When
+        # I type 🏔️, nothing shows")
+        it = ci[1]
+        g = (ob.GLYPH_GOAL if getattr(it, "kind", "") == "goal"
+             else ob.GLYPH_O if hasattr(it, "krs") else ob.GLYPH_KR)
+        return f"{g} {getattr(it, 'card', it).name or ''}"
     if (query or "").strip():
-        picks = fuzz.rank(" ".join(query.split()), picks,
-                          key_fn=lambda ci: getattr(ci[1], "card", ci[1]).name or "")
+        q = " ".join(query.split())
+        picks = fuzz.rank(q, picks, key_fn=_key)
+        # a glyph alone (with or without its VS16) is a kind, not letters:
+        # every row of that kind, in board order
+        bare = q.replace("\ufe0f", "")
+        if bare in {ob.GLYPH_GOAL.replace("\ufe0f", ""), ob.GLYPH_O, ob.GLYPH_KR}:
+            picks = [ci for ci in picks if _key(ci).replace("\ufe0f", "").startswith(bare)]
     rows, seen = [], set()
     for col, it in picks:
         if len(rows) >= PLAN_ROWS_CAP:

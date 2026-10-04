@@ -260,7 +260,10 @@ else:
     check("4b.no env, no config: the field is blank", areas._env_or_cfg("crm_records_list_id") == "")
     os.environ.update({"crm_records_list_id": "REC", "crm_records_tags": "🗂️Customer, 🗂️Logbook, 🗂️Lead, 🗂️Archive",
                        "crm_archive_list_id": "ARC", "periodic_list_id": "PER"})
+    _np = os.environ.pop("TICKAL_NO_PERSIST", None)   # this suite's config.json IS a temp file: the gate's guard may lift here
     pe._persist_id()
+    if _np is not None:
+        os.environ["TICKAL_NO_PERSIST"] = _np
     saved = cfg_mod.load()
     check("4b.under Alfred the CRM fields are mirrored into config.json",
           saved.get("crm_records_list_id") == "REC" and saved.get("crm_archive_list_id") == "ARC"
@@ -272,7 +275,10 @@ else:
           and areas._env_or_cfg("crm_archive_list_id") == "ARC")
     os.environ["crm_records_list_id"] = ""
     check("4b.a field present but blank under Alfred is OFF and beats the copy", areas._env_or_cfg("crm_records_list_id") == "")
+    _np = os.environ.pop("TICKAL_NO_PERSIST", None)   # this suite's config.json IS a temp file: the gate's guard may lift here
     pe._persist_id()
+    if _np is not None:
+        os.environ["TICKAL_NO_PERSIST"] = _np
     check("4b.and the blank field clears the copy", "crm_records_list_id" not in cfg_mod.load())
     os.environ.pop("crm_records_list_id", None)
     areas._CFG_COPY = None

@@ -41,6 +41,9 @@ test: export crm_archive_list_id :=
 # scratch dir: a suite ran pn_goaldone against the REAL run dir and deleted
 # Vex's live weekly handoff mid-review (2026-10-04)
 test: export TICKAL_RUN_DIR := $(shell mktemp -d /tmp/tickal-test-run.XXXXXX)
+# and no suite may write Alfred's env copies into ~/.ticktick_alfred/config.json
+# (periodic_engine._persist_id): a fake periodic_list_id landed there 2026-10-04
+test: export TICKAL_NO_PERSIST := 1
 test:
 	@$(PYTHON) tests/test_periodic.py
 	@$(PYTHON) tests/test_focus_blocks.py
