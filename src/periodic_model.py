@@ -520,12 +520,15 @@ def note_day(p):
 
 
 def note_time(p):
-    """The local time a periodic note sits at on its day (Vex 2026-09-24:
-    "Daily notes should get scheduled on the day at 4:30am and weekly or
-    monthly or quarterly on 5 am"). 04:30 is also when the agent mints the
-    day; the yearly note sits at 05:00 with the other long tiers."""
+    """The local time a periodic note sits at on its day: 04:00, every tier
+    (Vex 2026-10-05: "make them scheduled for 4 in the morning please, just
+    esthetic so they don't clash with other things on my calendar"). It was
+    04:30 for the daily and 05:00 for the longer tiers from 2026-09-24 ("on
+    the day at 4:30am and weekly or monthly or quarterly on 5 am"). 04:00 is
+    also dayroll's turn of the day, so the note sits at the first minute of
+    the workflow's day, before the 04:30 mint agent."""
     import datetime as _dt
-    return _dt.time(4, 30) if p.kind == "daily" else _dt.time(5, 0)
+    return _dt.time(4, 0)
 
 
 def period_from_title(kind, note_title):

@@ -673,8 +673,9 @@ def create_note(p, index):
     # are attached, which would collapse the kanban into one 💫Periodic
     # column. The parent exists as the tree node, never on tasks.
     # Minted ONTO its day at its hour: the period's last day (pm.note_day -
-    # Vex 2026-09-19, "Daily note should get scheduled"), the daily at 04:30
-    # and every longer tier at 05:00 (pm.note_time - Vex 2026-09-24), so
+    # Vex 2026-09-19, "Daily note should get scheduled") at 04:00 on every
+    # tier (pm.note_time - Vex 2026-10-05, aesthetic: nothing else sits on
+    # his calendar at that hour; it was 04:30 / 05:00 from 2026-09-24), so
     # TickTick's Today and calendar show the note at the top of its day.
     import day_move
     when = day_move.timed_at(pm.note_day(p), pm.note_time(p))

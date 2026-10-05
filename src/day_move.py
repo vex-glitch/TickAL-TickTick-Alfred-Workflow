@@ -78,7 +78,8 @@ def timed_at(day, clock, tz=None):
     """{startDate, dueDate, isAllDay False, timeZone}: a point in time at the
     LOCAL wall-clock `clock` on `day` (start = due), written in UTC, the
     zone named so TickTick shows it at that local time. The periodic notes
-    sit on their day this way (Vex 2026-09-24: 04:30 / 05:00)."""
+    sit on their day this way (pm.note_time: 04:00 every tier since
+    2026-10-05; 04:30 / 05:00 before)."""
     tz = tz or _local_tz()
     stamp = _out(datetime.combine(day, clock).replace(tzinfo=tz))
     out = {"startDate": stamp, "dueDate": stamp, "isAllDay": False}
