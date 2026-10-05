@@ -152,6 +152,55 @@ else:
     check("a quarter row drills qt:", q3r["arg"] == "xact:crmbrowse:ctx:crmmoney:qt:2026-Q3", q3r["arg"])
     check("a future year has no quarters", titles(render("qts:2027")) == ["Nothing that year"])
 
+    # ── every money row carries the rate (Vex 2026-10-05: the month's
+    # week-by-week screen had hours and no ~€/h; so did the week totals,
+    # the tattoo list, the customers and the backfill picker) ──────────
+    mw = render("mw:2026-10")
+    w40 = by_uid(mw, "mw-2026-09-28")
+    check("week-by-week: a week row carries hours AND rate",
+          w40 and "0.5h" in w40["title"] and "~300€/h" in w40["title"], w40 and w40["title"])
+    check("week-by-week: an empty week shows no rate chip",
+          not any("/h" in r["title"] for r in mw if r.get("uid", "").startswith("mw-") and "0 sessions" in r["title"]))
+    DET = [
+        {"date": "2026-10-01", "marker": "S1", "is_s": True, "amount": 150.0,
+         "sym": "€", "pre": False, "minutes": 30, "gratis": False,
+         "lb": {"id": "lbx", "title": "🎨 Test • Tattoo"}, "cust_tid": "", "cust_title": ""},
+        {"date": "2026-10-02", "marker": "S2", "is_s": True, "amount": None,
+         "sym": "", "pre": False, "minutes": 60, "gratis": True,
+         "lb": {"id": "lbx", "title": "🎨 Test • Tattoo"}, "cust_tid": "", "cust_title": ""},
+    ]
+    cr.entries_detailed = lambda: list(DET)
+    wk = render("wk:2026-09-28")
+    tot = by_uid(wk, "wk-sum")
+    check("week screen: the totals row carries hours and rate",
+          "0.5h" in tot["title"] and "~300€/h" in tot["title"], tot["title"])
+    s1 = by_uid(wk, "wke-lbx-2026-10-01-S1")
+    check("week screen: a charged session shows its own rate",
+          s1 and s1["subtitle"].startswith("Thu 01 Oct · 0.5h · ~300€/h"), s1 and s1["subtitle"])
+    s2 = by_uid(wk, "wke-lbx-2026-10-02-S2")
+    check("week screen: a gratis session shows hours, never a rate",
+          s2 and s2["subtitle"].startswith("Fri 02 Oct · 1h  |"), s2 and s2["subtitle"])
+    LBX = {"id": "lbx", "title": "🎨 Test • Tattoo", "tags": [],
+           "content": "👤 x · Started 2026-10-01 · Finished -\nPaid: - · 0 sessions\n\n"
+                      "## Sessions\n### 2026-10-01 · S1 · 30m · 150€\n"
+                      "### 2026-10-02 · S2 · 1h · gift\n\n## Notes\n"}
+    cr.records_notes = lambda tag=None: [LBX]
+    lb = render("lb:lbx")
+    head = by_uid(lb, "lb-head")
+    check("logbook screen: the head reads the symbol off the bare total",
+          "150€ · 2 sessions · 🖤 1 · 0.5h · ~300€/h" in head["title"], head["title"])
+    check("logbook screen: gratis minutes stay out of the rate (0.5h, not 1.5h)",
+          "1.5h" not in head["title"], head["title"])
+    check("logbook screen: entry rows carry their own rate",
+          by_uid(lb, "lbe-2026-10-01-S1")["subtitle"] == "2026-10-01 · 0.5h · ~300€/h"
+          and by_uid(lb, "lbe-2026-10-02-S2")["subtitle"] == "2026-10-02 · 1h",
+          [r["subtitle"] for r in lb])
+    lbs = render("lbs")
+    row = by_uid(lbs, "mo-l-lbx")
+    check("tattoo list: money · sessions · hours · rate, symbol clean",
+          row and row["subtitle"].startswith("150€ · 2 sessions · 🖤 1 · 0.5h · ~300€/h"), row and row["subtitle"])
+    check("chair_minutes: gratis sessions out", cr.chair_minutes(LBX["content"]) == 30)
+
     # ── typing filters, never jumps away ───────────────────────────────
     f = render("yr:2026", "jul")
     check("typing on the year screen filters its months", [x[:10] for x in titles(f)] == ["📅 Jul 2026"], titles(f))

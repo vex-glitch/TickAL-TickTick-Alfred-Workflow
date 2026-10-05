@@ -1050,6 +1050,27 @@ def lifetime_gratis(cust_tid):
                for lb in customer_logbooks(cust_tid))
 
 
+def chair_minutes(content):
+    """Minutes in the chair over a logbook's entries, gratis sessions OUT
+    (the is_gratis ruling: a free tattoo never drags the rate). The
+    per-tattoo and per-customer money rows divide by this."""
+    mins = 0
+    for segs in _entries(content):
+        if len(segs) > 3 and is_gratis(segs[3]):
+            continue
+        if len(segs) > 2:
+            mins += dur_minutes(segs[2]) or 0
+    return mins
+
+
+def lifetime_hours(cust_tid):
+    """Hours in the chair across ALL the customer's logbooks (gratis out),
+    rounded the way sum_entries rounds."""
+    mins = sum(chair_minutes(lb.get("content") or "")
+               for lb in customer_logbooks(cust_tid))
+    return round(mins / 60.0, 1)
+
+
 def _seg_sym(seg):
     """(sym, is_prefix) of a clean money segment ('$300', '250€',
     '250 EUR' - a SHORT pre/suffix), ('', False) for free text."""

@@ -1064,10 +1064,12 @@ def _open_note_arg(note_or_tid):
     return f"open:ticktick:///webapp/#p/{_note_pid(note_or_tid)}/tasks/{tid}"
 
 
-def _cust_row(cr, c, uid_prefix="crms"):
+def _cust_row(cr, c, uid_prefix="crms", rate=False):
     """Customer search row: contact + lifetime in the subtitle. ⏎ (and
     ⌥) drill into the customer hub, ⌥⇧ opens the note in TickTick -
-    inverted 2026-07-26, Vex: drilling is the frequent move."""
+    inverted 2026-07-26, Vex: drilling is the frequent move. rate=True
+    (the 💰 Customers view) adds the lifetime hours and ~€/h after the
+    money, the chip every money row carries."""
     phone, mail, _b, insta = cr.contact_of(c)
     money, k, n = cr.lifetime(c["id"])
     lead_chip = ""
@@ -1076,10 +1078,15 @@ def _cust_row(cr, c, uid_prefix="crms"):
         lead_chip = f"🎣 lead · {age}d" if age is not None else "🎣 lead"
     bd = cr.bday_next(_b)
     g = cr.lifetime_gratis(c["id"])
+    rate_chip = ""
+    if rate and money != "-":
+        rate_chip = _rate_chip(cr, cr.lifetime_hours(c["id"]),
+                               cr.lifetime_raw(c["id"]), money).lstrip(" ·")
     bits = [b for b in (
         f"📞 {phone}" if phone else (f"📸 {insta}" if insta else ""),
         f"{k} tattoo{'s' if k != 1 else ''}" if k else "",
         money if money != "-" else "",
+        rate_chip,
         f"🖤 {g}" if g else "",
         lead_chip,
         (f"🎂 {'today!' if bd == 0 else f'in {bd}d'}"
@@ -1104,10 +1111,11 @@ def _cust_row(cr, c, uid_prefix="crms"):
     )
 
 
-def _logbook_row(cr, lb, uid_prefix="crms"):
+def _logbook_row(cr, lb, uid_prefix="crms", rate=False):
     """CRM-list tattoo row - delegates to THE unified row builder (Vex
-    2026-07-28): one tattoo row, identical in every list."""
-    return _unified_logbook_row(cr, lb, uid_prefix)
+    2026-07-28): one tattoo row, identical in every list. rate=True (the
+    💰 archive view) adds hours and ~€/h to the head."""
+    return _unified_logbook_row(cr, lb, uid_prefix, rate=rate)
 
 
 def _crm_task_row(cr, t, uid_prefix="crms"):
@@ -1437,6 +1445,23 @@ def _month_bounds(y, m):
     return a, b
 
 
+def _rate_chip(cr, hours, raw, money=""):
+    """' · 3h · ~200€/h · 🫵 ~100€/h' - the hours and the money per hour,
+    ONE chip on every money row (Vex 2026-10-05: the month's week-by-week
+    screen showed hours and no rate, and so did the week totals, the
+    tattoo, customer and backfill rows). '' without hours; hours alone
+    when nothing was charged. The currency symbol is read off the
+    formatted money it follows, € when there is none."""
+    if not hours:
+        return ""
+    out = f" · {hours:g}h"
+    if raw:
+        sym = re.sub(r"[-\d.,\s]", "", money or "") or "€"
+        r = raw / hours
+        out += f" · ~{int(r)}{sym}/h" + cr.cut_rate_chip(r, sym)
+    return out
+
+
 def render_crmmoney(sub, query):
     """💰 Vex's money screen: all-time totals first, then the year, the
     quarter, the month and the week, customers and tattoos below.
@@ -1466,14 +1491,7 @@ def render_crmmoney(sub, query):
         None = unbounded. With a ctx the row drills on ⏎."""
         money, n, hours, raw = cr.sum_entries(e, a and a.isoformat(),
                                               b and b.isoformat())
-        extra = ""
-        if hours:
-            extra = f" · {hours:g}h"
-            if raw:
-                sym2 = re.sub(r"[-\d.,\s]", "", money) or "€"
-                rr = raw / hours
-                extra += (f" · ~{int(rr)}{sym2}/h"
-                          + cr.cut_rate_chip(rr, sym2))
+        extra = _rate_chip(cr, hours, raw, money)
         if hint is None:
             hint = (f"{a.isoformat() if a else '…'} → "
                     f"{b.isoformat() if b else 'today'}")
@@ -1609,7 +1627,7 @@ def render_crmmoney(sub, query):
                 uid=f"bf-{a.strftime('%Y-%m')}",
                 title=f"📅 {a.strftime('%b %Y')} · {money}"
                       f" · {n} session{'s' if n != 1 else ''}"
-                      + (f" · {hours:g}h" if hours else "")
+                      + _rate_chip(cr, hours, raw, money)
                       + (" · ✅ backfilled" if have else ""),
                 subtitle=("Already has a backfill logbook" if have else
                           "⏎ total → hourly rate → one archived logbook"),
@@ -1626,7 +1644,7 @@ def render_crmmoney(sub, query):
                 seen.add(c["id"])
                 custs.append(c)
         custs.sort(key=lambda c: -cr.lifetime_raw(c["id"]))
-        rows = [_cust_row(cr, c, uid_prefix="mo") for c in custs]
+        rows = [_cust_row(cr, c, uid_prefix="mo", rate=True) for c in custs]
         if query:
             rows = fuzz.filter_and_score(query, rows,
                                          key_fn=lambda x: x["title"])
@@ -1635,7 +1653,7 @@ def render_crmmoney(sub, query):
         return add_back(rows, "ctx:crmmoney")
 
     if sub == "arch":
-        rows = [_logbook_row(cr, lb, uid_prefix="mo")
+        rows = [_logbook_row(cr, lb, uid_prefix="mo", rate=True)
                 for lb in cr.records_notes(_areas.ARCHIVE_TAG)]
         if query:
             rows = fuzz.filter_and_score(query, rows,
@@ -1659,6 +1677,17 @@ def render_crmmoney(sub, query):
         if x["gratis"] or not x["amount"]:
             return shown
         return shown + cr.cut_chip(x["amount"], shown)
+
+    def _entry_rate(x):
+        """' · 3h · ~200€/h · 🫵 ~100€/h' for ONE session row: its hours,
+        and the money per hour when it was charged (a gratis or unpriced
+        session shows its hours and no rate)."""
+        if not x["minutes"]:
+            return ""
+        if x["gratis"] or not x["amount"]:
+            return f" · {x['minutes'] / 60:g}h"
+        return _rate_chip(cr, x["minutes"] / 60.0, x["amount"],
+                          _entry_money(x))
 
     def _hub_alt(tid):
         return {"arg": "", "valid": True, "subtitle": "Logbook hub",
@@ -1689,7 +1718,7 @@ def render_crmmoney(sub, query):
                          else f"{w.strftime('%d')}-{wend.strftime('%d %b')}")
                       + f" · {m2}{cr.cut_chip(r2, m2)}"
                       f" · {n2} session{'s' if n2 != 1 else ''}"
-                      + (f" · {h2:g}h" if h2 else ""),
+                      + _rate_chip(cr, h2, r2, m2),
                 subtitle="The week's sessions  |  ⏎⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:wk:{w.isoformat()}",
                 mods=_picker_mods()))
@@ -1719,13 +1748,13 @@ def render_crmmoney(sub, query):
         rows = []
         for x in det:
             tid = x["lb"].get("id")
-            hrs = f" · {x['minutes'] / 60:g}h" if x["minutes"] else ""
             d = _date.fromisoformat(x["date"])
             rows.append(alfred.item(
                 uid=f"wke-{tid}-{x['date']}-{x['marker']}",
                 title=f"{_entry_money_cut(x)} · {x['lb'].get('title') or ''}"
                       f" · {x['marker']}",
-                subtitle=f"{d.strftime('%a %d %b')}{hrs}  |  ⏎⤵️  ⌥⤵️",
+                subtitle=f"{d.strftime('%a %d %b')}{_entry_rate(x)}"
+                         "  |  ⏎⤵️  ⌥⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:lb:{tid}",
                 mods={**_picker_mods(), "alt": _hub_alt(tid)}))
         # totals LAST, under the entries (Vex 2026-09-08: "in the last row
@@ -1734,7 +1763,7 @@ def render_crmmoney(sub, query):
             uid="wk-sum",
             title=f"💰 {m2}{cr.cut_chip(r2, m2)}"
                   f" · {n2} session{'s' if n2 != 1 else ''}"
-                  + (f" · {h2:g}h" if h2 else ""),
+                  + _rate_chip(cr, h2, r2, m2),
             subtitle=f"Mon {w0.strftime('%d %b')} → Sun "
                      f"{wend.strftime('%d %b')}",
             valid=False))
@@ -1755,12 +1784,17 @@ def render_crmmoney(sub, query):
         rows = []
         for lb in sorted((x for x in pool if raws[x["id"]] > 0),
                          key=lambda x: -raws[x["id"]]):
-            g = cr.gratis_count(lb.get("content") or "")
+            content = lb.get("content") or ""
+            g = cr.gratis_count(content)
+            # the symbol comes off the bare total, never off paid_summary
+            # ("3490€ · 18 sessions" once read as the currency "€·sessions")
             rows.append(alfred.item(
                 uid=f"mo-l-{lb['id']}",
                 title=lb.get("title") or "Untitled",
-                subtitle=cr.paid_summary(lb.get("content") or "")
+                subtitle=cr.paid_summary(content)
                          + (f" · 🖤 {g}" if g else "")
+                         + _rate_chip(cr, cr.chair_minutes(content) / 60.0,
+                                      raws[lb["id"]], cr.totals(content)[0])
                          + "  |  ⏎⤵️  ⌥⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:lb:{lb['id']}",
                 mods={**_picker_mods(), "alt": _hub_alt(lb["id"])}))
@@ -1783,23 +1817,19 @@ def render_crmmoney(sub, query):
         det = sorted((x for x in cr.entries_detailed()
                       if x["lb"].get("id") == tid),
                      key=lambda x: x["date"])
-        mins = sum(x["minutes"] or 0 for x in det)
-        total, _n2, sym2, _pre2 = cr._totals_raw(content)
+        # gratis minutes stay out of the rate (cr.is_gratis), the rule
+        # every other money row already follows
+        mins = cr.chair_minutes(content)
+        total, _n2, _sym2, _pre2 = cr._totals_raw(content)
         g = cr.gratis_count(content)
-        head = cr.paid_summary(content) + (f" · 🖤 {g}" if g else "")
-        if mins:
-            head += f" · {mins / 60:g}h"
-            if total:
-                r = total / (mins / 60.0)
-                head += (f" · ~{int(r)}{sym2 or '€'}/h"
-                         + cr.cut_rate_chip(r, sym2 or "€"))
+        head = (cr.paid_summary(content) + (f" · 🖤 {g}" if g else "")
+                + _rate_chip(cr, mins / 60.0, total, cr.totals(content)[0]))
         rows = []
         for x in det:
-            hrs = f" · {x['minutes'] / 60:g}h" if x["minutes"] else ""
             rows.append(alfred.item(
                 uid=f"lbe-{x['date']}-{x['marker']}",
                 title=f"{x['marker']} · {_entry_money_cut(x)}",
-                subtitle=f"{x['date']}{hrs}", valid=False))
+                subtitle=f"{x['date']}{_entry_rate(x)}", valid=False))
         # totals LAST (the wk: shape); ⏎ still drills the logbook hub
         rows.append(alfred.item(
             uid="lb-head", title=f"💰 {head}",
@@ -1819,25 +1849,11 @@ def render_crmmoney(sub, query):
     today = _date.today()
     monday = today - _td(days=today.weekday())
     m0 = today.replace(day=1)
-    rate = ""
-    if hours:
-        import re as _re2
-        mnum = _re2.search(r"-?[\d.]+", money.replace(",", ""))
-        if mnum:
-            r = float(mnum.group(0)) / hours
-            symm = _re2.sub(r"[-\d.,\s]", "", money) or "€"
-            rate = (f" · {hours:g}h · ~{int(r)}{symm}/h"
-                    + cr.cut_rate_chip(r, symm))
+    rate = _rate_chip(cr, hours, raw, money)
 
     def _sumrow(uid, emoji, label, a, ctx, hint):
         m2, n2, h2, r2 = cr.sum_entries(e, a.isoformat(), None)
-        extra = ""
-        if h2:
-            extra = f" · {h2:g}h"
-            if r2:
-                sym2 = re.sub(r"[-\d.,\s]", "", m2) or "€"
-                rr = r2 / h2
-                extra += f" · ~{int(rr)}{sym2}/h" + cr.cut_rate_chip(rr, sym2)
+        extra = _rate_chip(cr, h2, r2, m2)
         return alfred.item(
             uid=uid, title=f"{emoji} {label} · {m2}{cr.cut_chip(r2, m2)}"
                            f" · {n2} session{'s' if n2 != 1 else ''}{extra}",
@@ -3138,7 +3154,8 @@ def _logbook_state(cr, lb):
     return "🟡", ""
 
 
-def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None):
+def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None,
+                         rate=False):
     """THE tattoo row - one builder for every list that shows tattoos
     (Vex unified home 2026-07-28: "one customers and logbook", the two
     worlds reachable by chord instead of by being in a different tree).
@@ -3155,8 +3172,17 @@ def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None):
     name = re.sub(r"^[🎨🏛️\s]+", "", lb.get("title") or "").strip() or base
     circle, when = _logbook_state(cr, lb)
     money, sess = cr.totals(lb.get("content") or "")
+    # rate=True (the 💰 archive view): hours and ~€/h after the sessions,
+    # the chip every money row carries; every other list stays as it was
+    rate_chip = ""
+    if rate and money and money != "-":
+        raw = cr._totals_raw(lb.get("content") or "")[0]
+        rate_chip = _rate_chip(
+            cr, cr.chair_minutes(lb.get("content") or "") / 60.0,
+            raw, money).lstrip(" ·").replace(" · ", " • ")
     head = [b for b in (money if money and money != "-" else "",
                         f"{sess} Sess" if sess else "",
+                        rate_chip,
                         when) if b]
     dest = cr.content_dest_of(lb.get("content") or "")
     dchip = {"tv": "🎬 TV", "fm": "🎬 FM", "studio": "🎬 Studio",
