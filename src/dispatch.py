@@ -478,6 +478,19 @@ def completion_snapshot(tid):
         return None
 
 
+def _drop_meal_kids():
+    """The 🥘 hub keeps its own 45 s copy of the routines list (browse
+    _meal_list, cache key meal_kids); a complete, uncomplete or delete that
+    only patches all_tasks / project_data leaves it saying "2 open" - the
+    grocery lists Vex ⇧-completed that would not close (2026-10-05, D28).
+    Every road that changes a task's open state drops it; the next render
+    reads live again."""
+    try:
+        cache_store.invalidate("meal_kids")
+    except Exception:
+        pass
+
+
 def record_completed(snap):
     """Put a completion TickTick has ACCEPTED at the head of the local
     completed-tasks log (the Open API cannot list completed tasks; the
@@ -573,6 +586,7 @@ def main():
             api = TickTickAPI(cfg.get_token())
             api.complete_task(pid, tid)
             record_completed(snap)
+            _drop_meal_kids()
             # Remove task from all_tasks in-place (no full cache wipe),
             # and from the per-list cache the browse screens read
             try:
@@ -858,6 +872,7 @@ def main():
             title = parts[2] if len(parts) > 2 else "Task"
             api = TickTickAPI(cfg.get_token())
             api.update_task(tid, pid, status=0)
+            _drop_meal_kids()
             # Remove from local completed log and restore to all_tasks in-place
             try:
                 completed = cache_store.get("completed_tasks") or []
@@ -890,6 +905,7 @@ def main():
             api = TickTickAPI(cfg.get_token())
             _row = dict(_cached_task(tid) or {})   # 🚗 read before the purge
             api.delete_task(pid, tid)
+            _drop_meal_kids()
             # 🚗 a deleted booking's open commutes go with it (src/commute.py)
             commute_line = ""
             try:

@@ -81,6 +81,7 @@ else:
     mp.BOOK_PATH = os.path.join(TMP, "meal_prices.json")
     mw.IMPORT_LEDGER = os.path.join(TMP, "meal_import.json")
     mw.GONE_LEDGER = os.path.join(TMP, "meal_gone.json")          # never the real memory of trashed ids
+    mw.BATCH_LEDGER = os.path.join(TMP, "meal_batches.json")      # nor the real batch ledger (D28)
     mw.LOCK_FILE = os.path.join(TMP, "meal.lock")
     mw.POST_GAP = 0.0
     mw.PACE = 0.0                                   # the sync's own imports + backfills
@@ -555,29 +556,44 @@ else:
     api = fresh()
     api.lists[RLIST]["prep_tue"] = T("prep_tue", "🥘 Meal Prep", pid=RLIST, startDate="2026-09-22T07:00:00.000+0000", timeZone="Europe/Berlin")
     api.lists[RLIST]["groc_tue"] = T("groc_tue", "🛒 Groceries", pid=RLIST, startDate="2026-09-22T06:00:00.000+0000", timeZone="Europe/Berlin")
+    # D28: the batch is the moved task's COOK WEEK (Sun 20 Sep), so Sunday's
+    # Pockets rides with Tuesday's Oats and Bulgogi - a Sunday plan cooked
+    # on the Tuesday is the one batch, two days late
     TUE = [P(date(2026, 9, 22), U2, "Oats"), P(date(2026, 9, 22), U1, "Beef Bulgogi")] + PLANNED
     out = mw.sync(today=TODAY, api=api, dry=True, planned=TUE, recipes=RECIPES)
-    check("dry run: the batch is the moved Tuesday task, groceries under the 🛒 task",
-          "cook Tue 22 Sep" in out and "prep_tue" in out and "under groc_tue" in out and "due 2026-09-22" in out, out.splitlines()[:6])
+    check("dry run: the batch is the moved Tuesday task's cook week, groceries under the 🛒 task",
+          "cook Tue 22 Sep · batch Sun 20 Sep" in out and "prep_tue" in out and "under groc_tue" in out
+          and "due 2026-09-22" in out and "batch Sun 20 Sep: 3 meal(s)" in out, out.splitlines()[:6])
     res = mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
     ptrs = pointers(api)
-    check("pointers under the moved copy only, dated its day in its zone",
-          sorted(t["parentId"] for t in ptrs) == ["prep_tue", "prep_tue"]
+    check("pointers under the moved copy only, dated its day in its zone (the whole cook week: 3)",
+          sorted(t["parentId"] for t in ptrs) == ["prep_tue"] * 3
           and all(t["dueDate"] == meal.api_day(date(2026, 9, 22), BER) for t in ptrs), ptrs)
     check("… created in the prep task's zone", all(t.get("timeZone") == "Europe/Berlin" for t in ptrs), ptrs)
     check("… the series' old pointer went", "p_old" not in api.lists[RLIST])
     glists = [t for t in api.lists[RLIST].values() if meal.is_grocery(t["title"]) and meal.parse_title(t["title"]) and t["status"] == 0]
     check("one list per meal as SUBTASKS of the 🛒 Groceries task, due its day",
-          sorted(t["parentId"] for t in glists) == ["groc_tue", "groc_tue"]
+          sorted(t["parentId"] for t in glists) == ["groc_tue"] * 3
           and all(t["dueDate"] == meal.api_day(date(2026, 9, 22), BER) and t.get("timeZone") == "Europe/Berlin" for t in glists), glists)
     check("… the loose library-list lists are gone, the ticked one survives",
           groceries(api) == {} and "g_keep" not in api.lists[LIST] and "g_done" in api.lists[LIST])
-    check("… the toast names the cook day", "cook Tue 22 Sep: 🍳 Oats · 🍛 Beef Bulgogi · 2 grocery lists" in res.msg, res.msg)
+    check("… the toast names the cook day, no Mela bracket (the batch is the day's own week)",
+          "cook Tue 22 Sep: 🍳 Oats · 🍛 Beef Bulgogi · 🌮 Pockets · 3 grocery lists" in res.msg, res.msg)
+    led = mw._batches()
+    check("… the batch ledger remembers the press: the prep and 🛒 tasks, their days, the meals",
+          led.get("2026-09-20", {}).get("prep_tid") == "prep_tue" and led["2026-09-20"]["prep_day"] == "2026-09-22"
+          and led["2026-09-20"]["groc_tid"] == "groc_tue" and set(led["2026-09-20"]["meals"]) == {U1, U2, U3}
+          and "cooked_at" not in led["2026-09-20"], led)
+    check("batch_status: pulled while the prep task is open, done once it is gone, none for a week never pulled",
+          mw.batch_status(date(2026, 9, 20), list(api.lists[RLIST].values()))[0] == "pulled"
+          and mw.batch_status(date(2026, 9, 20), [t for t in api.lists[RLIST].values() if t["id"] != "prep_tue"])[0] == "done"
+          and mw.batch_status(date(2026, 9, 20), [])[0] == "pulled"
+          and mw.batch_status(date(2026, 10, 11), list(api.lists[RLIST].values()))[0] == "none")
     check("… the note went to the week the batch feeds (Mon 21 Sep)", NOTE_CALLS and NOTE_CALLS[-1][1] == date(2026, 9, 20), NOTE_CALLS[-1:])
     check("the trashed pointer id is remembered", "p_old" in mw._gone_ids(), mw._gone_ids())
     res2 = mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
     check("a second press keeps the lists (in place), re-mints the pointers",
-          "2 grocery lists" in res2.msg and len(pointers(api)) == 2 and len([t for t in api.lists[RLIST].values() if meal.is_grocery(t["title"]) and meal.parse_title(t["title"]) and t["status"] == 0]) == 2, res2.msg)
+          "3 grocery lists" in res2.msg and len(pointers(api)) == 3 and len([t for t in api.lists[RLIST].values() if meal.is_grocery(t["title"]) and meal.parse_title(t["title"]) and t["status"] == 0]) == 3, res2.msg)
     api.lists[RLIST][RID]["childIds"] = ["p_old", "step"]
     n_before = len(api.calls)
     mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
@@ -959,8 +975,8 @@ else:
           and [it["title"] for it in glists[U2]["items"]] == ["625 g chicken", "1 1/4 tbsp oil", "2 1/2 tsp soy"]
           and glists[U1]["content"] == NOTE7, {u: (t.get("parentId"), t.get("content")) for u, t in glists.items()})
     wl = mw.week_lists(today=TODAY)
-    check("week_lists off the caches after the sync: the two lists under the upcoming 🛒 task",
-          sorted(t["parentId"] for t in wl) == ["groc_tue", "groc_tue"] and {meal.link_uuid(t["title"]) for t in wl} == {U1, U2}, wl)
+    check("week_lists off the caches after the sync: the cook week's three lists under the upcoming 🛒 task",
+          sorted(t["parentId"] for t in wl) == ["groc_tue"] * 3 and {meal.link_uuid(t["title"]) for t in wl} == {U1, U2, U3}, wl)
 
 
     # ── prices: the book on the 🛒 lists (Vex 2026-09-22, D26) ───────────────────
@@ -1330,5 +1346,72 @@ else:
 
     import shutil
     shutil.rmtree(TMP, ignore_errors=True)
+    # ── D28 (2026-10-05): twins, the week cooked verb, the date floor, the cache ──
+    print("-- D28")
+    api = fresh()
+    api.lists[RLIST]["prep_tue"] = T("prep_tue", "🥘 Meal Prep", pid=RLIST, startDate="2026-09-22T07:00:00.000+0000", timeZone="Europe/Berlin")
+    api.lists[RLIST]["groc_tue"] = T("groc_tue", "🛒 Groceries", pid=RLIST, startDate="2026-09-22T06:00:00.000+0000", timeZone="Europe/Berlin")
+    api.lists[RLIST]["groc_sat"] = T("groc_sat", "🛒 Groceries", pid=RLIST, startDate="2026-09-26T06:00:00.000+0000", timeZone="Europe/Berlin")
+    # Oats three times over: in place under the upcoming 🛒 task, a dragged
+    # twin under the series' occurrence, and the loose library one fresh() plants
+    api.lists[RLIST]["g_in"] = T("g_in", meal.grocery_title("Oats", U2), pid=RLIST, tags=["🛒groceries"], kind="CHECKLIST",
+                                 parent="groc_tue", dueDate="2026-09-21T22:00:00+0000", timeZone="Europe/Berlin",
+                                 content="Scaled ×1.75: 4 → 7 portions", items=[{"title": "x", "status": 0}])
+    api.lists[RLIST]["g_twin"] = T("g_twin", meal.grocery_title("Oats", U2), pid=RLIST, tags=["🛒groceries"], kind="CHECKLIST",
+                                   parent="groc_sat", items=[{"title": "x", "status": 0}])
+    keep, extras = mw._grocery_index(list(api.lists[LIST].values()) + list(api.lists[RLIST].values()),
+                                     api.lists[RLIST]["groc_tue"], LIST)
+    check("_grocery_index: the in-place list is the keeper, the loose one and the dragged twin are extras",
+          keep[U2]["id"] == "g_in" and sorted(t["id"] for t in extras) == ["g_keep", "g_twin"]
+          and keep[U9]["id"] == "g_old", (keep.get(U2, {}).get("id"), [t["id"] for t in extras]))
+    out = mw.sync(today=TODAY, api=api, dry=True, planned=TUE, recipes=RECIPES)
+    check("dry run names the twins among the deletes", "2 twin list(s) among the deletes" in out and "g_twin" in out and "g_keep" in out, out)
+    res = mw.sync(today=TODAY, api=api, planned=TUE, recipes=RECIPES)
+    glists = [t for t in api.lists[RLIST].values() if meal.is_grocery(t["title"]) and t["status"] == 0]
+    check("sync: the twin and the loose list are deleted, the in-place list kept, one list per recipe remains",
+          "g_twin" not in api.lists[RLIST] and "g_keep" not in api.lists[LIST] and "g_in" in api.lists[RLIST]
+          and sorted(meal.link_uuid(t["title"]) for t in glists) == sorted([U1, U2, U3]) and "3 grocery lists" in res.msg,
+          ([t["id"] for t in glists], res.msg))
+
+    # mark_cooked_week: every meal of the week with a library task, one note on each, the ledger stamped
+    api = fresh()
+    lib_rows = list(api.lists[LIST].values())
+    n0 = len(api.calls)
+    res = mw.mark_cooked_week(api=api, sunday=SUN, comment="batch note", dry=True, planned=PLANNED, recipes=RECIPES, tasks=lib_rows, today=TODAY)
+    check("mark_cooked_week dry: the line, no call", "would tag 3 of 4" in res.msg and "note" in res.msg and len(api.calls) == n0, res.msg)
+    res = mw.mark_cooked_week(api=api, sunday=date(2026, 10, 1), comment="batch note", planned=PLANNED, recipes=RECIPES, tasks=lib_rows, today=TODAY)
+    tagged = [tid for tid in ("t1", "t2", "t3") if meal.COOKED_TAG in api.lists[LIST][tid]["tags"]]
+    check("mark_cooked_week: a weekday resolves to its cook Sunday; the three library meals tagged, the unknown one counted",
+          tagged == ["t1", "t2", "t3"] and res.msg.startswith(f"👨‍🍳 Cooked · {meal.week_label(SUN)} · 🍳 Oats · 🍛 Beef Bulgogi · 🌮 Pockets")
+          and "1 not in the library" in res.msg and "note saved ×3" in res.msg and sorted(res.ids) == ["t1", "t2", "t3"], (tagged, res.msg))
+    check("mark_cooked_week: the note sits on each recipe", all("batch note" in api.lists[LIST][t]["content"] for t in ("t1", "t2", "t3")))
+    check("mark_cooked_week: the ledger is stamped cooked, batch_status reads it",
+          mw._batches().get(SUN.isoformat(), {}).get("cooked_at") == TODAY.isoformat()
+          and mw.batch_status(SUN, list(api.lists[RLIST].values()))[0] == "cooked", mw._batches())
+    try:
+        mw.mark_cooked_week(api=api, sunday=date(2026, 12, 6), planned=PLANNED, recipes=RECIPES, tasks=lib_rows, today=TODAY)
+        check("mark_cooked_week: an empty week refuses", False)
+    except mw.Refusal as e:
+        check("mark_cooked_week: an empty week refuses", "Nothing planned" in str(e), str(e))
+    mw.sync(today=TODAY, api=api, planned=PLANNED, recipes=RECIPES)
+    check("a re-pull drops the cooked stamp (a new batch)", "cooked_at" not in mw._batches().get(SUN.isoformat(), {}), mw._batches())
+
+    # date_plan's floor (since=): a batch cooked on Monday keeps its Sunday
+    lib = [T("t2", f"[Beef Bulgogi](mela://recipe/{U1})", tags=["🍛lunch"], startDate="2026-09-20T00:00:00+0000", isAllDay=True)]
+    sun20 = [P(date(2026, 9, 20), U1, "Beef Bulgogi")]
+    check("date_plan: a past planned day clears the date by default…", [t["id"] for t in mw.date_plan(lib, sun20, TODAY)[1]] == ["t2"])
+    check("… and keeps it with since= the batch's Sunday", mw.date_plan(lib, sun20, TODAY, since=date(2026, 9, 20)) == ([], []),
+          mw.date_plan(lib, sun20, TODAY, since=date(2026, 9, 20)))
+    check("date_plan: since never moves the floor FORWARD", mw.date_plan(lib, sun20, TODAY, since=date(2026, 10, 1)) == ([], [lib[0]]))
+
+    # the hub's 45 s copy goes with every write that changes an open state
+    cache_store.set("meal_kids", {"rid": RID, "ts": 1, "routine": {}, "tasks": []})
+    mw._uncache(["whatever"])
+    check("_uncache drops meal_kids", cache_store.get("meal_kids") is None)
+    cache_store.set("meal_kids", {"rid": RID, "ts": 1, "routine": {}, "tasks": []})
+    import dispatch as _dispatch
+    _dispatch._drop_meal_kids()
+    check("dispatch._drop_meal_kids drops it (the complete / uncomplete / delete roads)", cache_store.get("meal_kids") is None)
+
     print(f"\nmeal_write: {COUNT[0] - len(FAILS)} passed, {len(FAILS)} failed")
     sys.exit(1 if FAILS else 0)

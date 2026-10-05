@@ -25,7 +25,7 @@ The slot of a meal (🍳 breakfast, 🍛 lunch, 🌮 snack) comes from the recip
 
 ## Weeks
 
-The cook day is whatever day your next **🥘 Meal Prep** task sits on in the Routines list. Usually that is Sunday, but when you move it to a Tuesday because of work, the hub and the sync follow the moved task, and they take the meals Mela has on that day. So plan the meals in Mela on the day you cook, then move the TickTick task to match if you need to; the time does not matter. For the week rows the hub still folds a cook day into the week it feeds: a meal cooked on Sun 27 Sep belongs to Week of 28 Sep, one cooked on Tue 22 Sep to Week of 21 Sep.
+The cook day is whatever day your next **🥘 Meal Prep** task sits on in the Routines list. Usually that is Sunday, but when you drag it to a Monday or a Tuesday because of work, the hub and the sync follow the moved task. The meals they take are the **batch**: everything Mela has in the cook week that task falls in, the Sunday on or before it through the Saturday after. A plan on Sun 4 Oct cooked on Mon 5 Oct is one batch, a day late; the time does not matter. A meal dropped on a Wednesday belongs to the Sunday before it, so a cook on Tue 22 Sep feeds Week of 21 Sep and a cook on Sun 27 Sep feeds Week of 28 Sep. When the week your prep task sits in has nothing planned, nothing is pulled and the hub says so; to pull some other week, pick it (see [Picking the week](#picking-the-week)).
 
 Groceries are not planned in Mela at all. The sync hangs one checklist per meal under your next **🛒 Groceries** task, dated its day, wherever you moved that one.
 
@@ -33,10 +33,10 @@ Groceries are not planned in Mela at all. The sync hangs one checklist per meal 
 
 | Row | ⏎ | Chords |
 |---|---|---|
-| 🥘 head | - | the next cook day (your 🥘 Meal Prep task, wherever you moved it), how many meals Mela has on it, the groceries day ("nothing planned in Mela on …" when empty) |
+| 🥘 head | - | the next cook day (your 🥘 Meal Prep task, wherever you moved it), the batch it cooks (`· batch Sun 4 Oct` when that is another day), how many meals, the groceries day, and whether the batch is in TickTick yet ("nothing planned in Mela in the week of …" when empty) |
 | 🍳 🍛 🌮 that day's meals | opens the recipe in **Mela** | the [meal row](#a-meal-row) chords |
-| 📆 Next 13 weeks | the quarter, one row per week | ⌥ same |
-| 🔄 Sync with Mela · n new · n to fill | recipes in, descriptions filled, the next cook's meals onto its prep task + groceries + note + every recipe dated as Mela has it | ⌥⇧ same |
+| 📆 This week + 12 | the quarter, one row per week | ⌥ same |
+| 🔄 Sync with Mela · n new · n to fill | pick the week to pull (see [Picking the week](#picking-the-week)) | ⌥ same · ⌥⇧ sync now with the week your prep task sits in |
 | 🛒 Groceries · n open lists · day | the checklists under your next 🛒 Groceries task | ⌥ same · ⌥⇧ portions per meal (a box per list, see [Portions](#portions)) |
 | 🏷 Prices · ≈ 42.10 € this week · n unpriced | the price book, this week's ingredients first (see [Prices](#prices)) | ⌥ same · ⌥⇧ refresh the prices from knuspr.de |
 | 📚 Breakfasts / Lunches / Snacks | that tag's library | ⌥ same |
@@ -44,7 +44,14 @@ Groceries are not planned in Mela at all. The sync hangs one checklist per meal 
 
 ### The quarter
 
-**📆 Next 13 weeks** lists one row per week from this week on: `⭐️ Week of 21 Sep · 🍳 Breakfast Bagels · 🌮 Chicken subs`, this week starred, several meals joined with a dot. A week with nothing in the calendar reads `Week of 5 Oct · nothing planned` and cannot be entered; its subtitle reminds you: plan it in Mela, ⌘⌥A. Type to filter on the week or a meal name. ⏎ (or ⌥) opens that week: its head row and its meal rows, the same shape as the hub. ⌃ steps back.
+**📆 This week + 12** lists one row per week from this week on: `⭐️ Week of 21 Sep · 🍳 Breakfast Bagels · 🌮 Chicken subs`, this week starred, several meals joined with a dot. The subtitle says the cook Sunday and what TickTick knows about that batch: `cook Sun 4 Oct · not in TickTick yet` until you pull it, `cook Sun 4 Oct · in TickTick · prep Mon 5 Oct` once it sits on your prep task, `cooked · prep Mon 5 Oct done` once that task is completed, `cooked Mon 5 Oct` once you marked the week cooked. A week ahead that nobody pulled reads bare `cook Sun 11 Oct`. A week with nothing in the calendar reads `Week of 5 Oct · nothing planned` and cannot be entered; its subtitle reminds you: plan it in Mela, ⌘⌥A. Type to filter on the week or a meal name.
+
+| Chord | Does |
+|---|---|
+| ⏎ or ⌥ | Open that week: its head row and its meal rows, the same shape as the hub |
+| ⇧⏎ | Pull this week's batch into TickTick: onto your next 🥘 Meal Prep and 🛒 Groceries tasks, wherever they sit (the subtitle names the days) |
+| ⌥⇧⏎ | All cooked: every meal of the week gets the 👨‍🍳cooked tag, one box asks a note for the batch (Esc for none), the week reads `cooked` from then on |
+| ⌃⏎ | Back |
 
 ### A meal row
 
@@ -67,7 +74,7 @@ Three things live on the recipe task itself, so they follow the recipe wherever 
 
 | What | Where it lands | How |
 |---|---|---|
-| **Cooked** | the 👨‍🍳cooked tag on the recipe task | ⌥⇧⏎ on any meal row, or **👨‍🍳 Cooked** in the recipe task's ⌘ menu. A box asks for a note first; Esc skips it, the tag goes on either way |
+| **Cooked** | the 👨‍🍳cooked tag on the recipe task | ⌥⇧⏎ on any meal row, or **👨‍🍳 Cooked** in the recipe task's ⌘ menu. A box asks for a note first; Esc skips it, the tag goes on either way. ⌥⇧⏎ on a week row in 📆 does it for every meal of that week in one go, one note for the batch, and marks the week cooked |
 | **Rating** | a quote line of stars right under the links at the top of the description | **⭐️ Rate…** in the ⌘ menu opens a picker: ⭐️ to ⭐️⭐️⭐️⭐️⭐️, and 🚫 No rating to clear. Rate whenever you like, a week after eating it is fine |
 | **Notes** | quote lines right under the stars, one per note, newest last | the box after Cooked, or **💬 Comment…** in the ⌘ menu any time later |
 
@@ -94,12 +101,18 @@ Notes are added, never replaced; edit or delete a line in TickTick when it has s
 1. Every recipe categorised in Mela that the library does not have yet becomes a library task with its tag and the recipe text (up to forty a run).
 2. Library tasks with an empty description get the recipe text (up to sixty a run).
 3. Recipes rated in Mela (a `Rating: ⭐️⭐️⭐️` line in the description field there) get the stars into TickTick when the task has none yet (up to twenty a run).
-4. The calendar is read, and the next cook is mirrored into TickTick: your next 🥘 Meal Prep task is found (the Sunday routine or the copy you moved to a weekday), every old pointer under any Meal Prep task goes (your own steps on it are never touched), one new pointer per meal Mela has on that day is minted under it dated that day, one 🛒 checklist per meal is made or kept under your next 🛒 Groceries task dated its day (a list already there stays, ticked items are never touched, lists for dropped meals go, a list sitting loose from an older press is remade under the task), and the 🥘 bullet is filled in the note of the week that cook feeds.
-5. Every recipe task takes the date Mela has it planned on next: the nearest day on or after today, all-day, the day itself rather than the cook Sunday. A recipe with no upcoming plan loses its date. So the recipe task itself shows when you eat it, in search rows and in TickTick's calendar, for the whole quarter. Groceries, pointers and anything you made by hand are never touched.
+4. The calendar is read, and the batch is mirrored into TickTick: your next 🥘 Meal Prep task is found (the Sunday routine or the copy you dragged to a weekday), the batch is the week you picked or the cook week that task sits in, every old pointer under any Meal Prep task goes (your own steps on it are never touched), one new pointer per meal of the batch is minted under it dated the task's day, one 🛒 checklist per meal is made or kept under your next 🛒 Groceries task dated its day (a list already there stays, ticked items are never touched, lists for dropped meals go, a list sitting loose from an older press is remade under the task, and a twin list left by dragging the 🛒 task in TickTick is deleted), and the 🥘 bullet is filled in the note of the week that cook feeds.
+5. Every recipe task takes the date Mela has it planned on next: the nearest day on or after today, all-day, the day itself rather than the cook Sunday. The recipes of the batch you just pulled keep that batch's day even once it has passed, until the week is cooked. A recipe with no upcoming plan loses its date. So the recipe task itself shows when you eat it, in search rows and in TickTick's calendar, for the whole quarter. Groceries, pointers and anything you made by hand are never touched.
 
-The toast says what happened: `🔄 Mela · +2 recipes · 3 filled · cook Tue 22 Sep: 🍳 Breakfast Bagels · 🌮 Chicken subs · 2 grocery lists · 41 recipes dated`. A cook day with nothing in the calendar clears the pointers and the open grocery lists, and the note bullet says "nothing planned in Mela". If TickTick's hundred-requests-a-minute limit stops the dating pass, the toast says how many dates are left; press the row again a minute later.
+The toast says what happened: `🔄 Mela · +2 recipes · 3 filled · cook Tue 22 Sep: 🍳 Breakfast Bagels · 🌮 Chicken subs · 2 grocery lists · 41 recipes dated`; when you picked a week other than the one your prep task sits in, the cook day carries it in brackets: `cook Sun 11 Oct (Mela Sun 4 Oct)`. A week with nothing in the calendar clears the pointers and the open grocery lists, and the note bullet says "nothing planned in Mela". If TickTick's hundred-requests-a-minute limit stops the dating pass, the toast says how many dates are left; press the row again a minute later.
 
-Only the next cook is mirrored onto its prep task. The cooks after it live on the recipe tasks' dates and in the hub's 📆 view until their day comes round; press the row again once a cook is done.
+Only one batch sits on the prep task at a time. The cooks after it live on the recipe tasks' dates and in the hub's 📆 view until their day comes round; pull the next one once a cook is done.
+
+### Picking the week
+
+⏎ on **🔄 Sync with Mela** opens the picker: one row per week that has meals in Mela, from last week to the end of next month, the week your prep task sits in starred and first. Each row names the Sunday and the meals, the subtitle says the week and whether it is in TickTick yet, and the head row says where a pick lands: `→ 🥘 Mon 5 Oct · 🛒 Mon 5 Oct`, your next Meal Prep and Groceries tasks wherever you dragged them. ⏎ (or ⌥⇧) on a row runs the whole sync with that week as the batch. Type to filter on a meal name. ⌥⇧ on the 🔄 row itself skips the picker and takes the starred week; so does ⇧⏎ on a week row in 📆.
+
+This is how a late cook works: the plan sits on Sunday in Mela, you cook on Monday, you drag 🥘 Meal Prep and 🛒 Groceries to Monday in TickTick, press 🔄, the Sunday is starred, ⏎. Three pointers land on Monday's prep task, three grocery lists on Monday's groceries task, and the week row reads `in TickTick · prep Mon 5 Oct` from then on.
 
 ## Portions
 
@@ -152,6 +165,7 @@ The earlier version planned the week inside TickAL. Gone: the 🎲 Plan the week
 ## Limitations
 
 - Sync is one way: Mela's calendar → TickTick. A meal moved or removed in TickTick does not move in Mela; change it in the calendar and sync again. The same for cooked, stars and notes: they stay on the TickTick task, Mela never learns them.
+- Dragging a repeating 🛒 Groceries or 🥘 Meal Prep task to another day in TickTick leaves a copy that carries copies of its subtasks, while the series keeps the originals. The hub shows such twin lists with a `twin` chip and counts them; the next 🔄 Sync deletes them. Pull the batch after you drag, not before.
 - The hub shows the calendar as it is on this Mac. An event added on the phone appears once iCloud has delivered it.
 - A recipe you rename in TickTick keeps working (the link is the key); a recipe deleted in Mela gets a grocery list with no items and a note saying so.
 - Groceries are TickTick checklists: tick items in the app; they carry no tags or dates of their own.

@@ -109,6 +109,7 @@ else:
     REAL_BOOK = os.path.expanduser("~/.ticktick_alfred/meal_prices.json")
     HAD_BOOK = os.path.exists(REAL_BOOK)
     mp.BOOK_PATH = os.path.join(TMP, "meal_prices.json")   # the temp path wins even unstubbed
+    mw.BATCH_LEDGER = os.path.join(TMP, "meal_batches.json")   # the batch ledger (D28) stays out of ~/.ticktick_alfred
 
     FAILS, COUNT = [], [0]
 
@@ -283,6 +284,7 @@ else:
               "mealw": lambda: browse.render_mealw(ids, q),
               "meallib": lambda: browse.render_meallib(ids, q),
               "mealgroc": lambda: browse.render_mealgroc(q),
+              "mealpick": lambda: browse.render_mealpick(ids, q),
               "mealrate": lambda: browse.render_mealrate(ids, q),
               "mealprice": lambda: browse.render_mealprice(ids, q)}[level]
         return fn()
@@ -388,15 +390,21 @@ else:
           x["title"].startswith("🍽️ Mystery Pie") and x["arg"] == f"open:mela://recipe/{U5}"
           and not x["mods"]["cmd"]["valid"] and not x["variables"].get("task_id"), x)
     meal_row_ok(x, U5, "", "hub mystery pie", tid=None)
-    check("hub: 📆 row → ctx:mealq by trampoline, ⌥ by variable, counts the calendar",
+    check("hub: 📆 row → ctx:mealq by trampoline, ⌥ by variable, counts the calendar, named 'This week + 12' (D28)",
           r["meal-next"]["arg"] == "xact:crmbrowse:ctx:mealq" and r["meal-next"]["mods"]["alt"]["variables"]["browse_ctx"] == "ctx:mealq"
-          and r["meal-next"]["title"] == f"📆 Next {HORIZON} weeks" and "5 planned meals" in r["meal-next"]["subtitle"], r["meal-next"])
+          and r["meal-next"]["title"] == f"📆 This week + {HORIZON - 1}" and "5 planned meals" in r["meal-next"]["subtitle"]
+          and "⇧ pulls a week" in r["meal-next"]["subtitle"], r["meal-next"])
     s = r["meal-sync"]
-    check("hub: 🔄 row = xact:meal_sync with the back payload, ⌥⇧ the same verb, counts new + to fill",
-          s["arg"].startswith("xact:meal_sync:") and payload(s) == {"back": "ctx:meal"} and s["valid"]
-          and s["mods"]["alt+shift"]["arg"] == s["arg"] and s["title"] == "🔄 Sync with Mela · 2 new · 14 to fill"
-          and "onto the prep task + groceries + note" in s["subtitle"], s)
-    check("hub: 🔄 never on ⌘ or ⌥", not s["mods"]["cmd"]["valid"] and not s["mods"]["alt"]["valid"])
+    check("hub: 🔄 row ⏎ = the picker (ctx:mealpick by trampoline, ⌥ by variable), ⌥⇧ = xact:meal_sync {back} for the prep's own week, counts new + to fill (D28)",
+          s["arg"] == "xact:crmbrowse:ctx:mealpick" and s["mods"]["alt"]["variables"]["browse_ctx"] == "ctx:mealpick" and s["valid"]
+          and s["mods"]["alt+shift"]["arg"].startswith("xact:meal_sync:") and mod_payload(s["mods"]["alt+shift"]) == {"back": "ctx:meal"}
+          and s["mods"]["alt+shift"]["subtitle"] == f"🔄 Sync now · batch {SUN:%a %-d %b}"
+          and s["title"] == "🔄 Sync with Mela · 2 new · 14 to fill"
+          and "onto the prep task + groceries + note" in s["subtitle"] and "⏎ pick the week" in s["subtitle"], s)
+    check("hub: 🔄 never an xact on ⌘ or ⌥", not s["mods"]["cmd"]["valid"] and s["mods"]["alt"]["arg"] == "")
+    check("hub: the head's state chip reads the ledger, not the date: nothing pulled = 'not in TickTick yet' once the cook Sunday is here, nothing before",
+          ("not in TickTick yet" in r["meal-head"]["subtitle"]) == (SUN <= TODAY) and "cooked" not in r["meal-head"]["subtitle"],
+          r["meal-head"]["subtitle"])
     g = r["meal-groc"]
     check("hub: groceries row counts, ⏎ the trampoline, ⌥ by variable",
           "1 open list" in g["title"] and g["arg"] == "xact:crmbrowse:ctx:mealgroc"
@@ -506,6 +514,22 @@ else:
     w2 = r[f"mq-{(SUN + timedelta(days=14)).isoformat()}"]
     check("quarter: a later planned week is live", w2["valid"] and "🌮 Pockets" in w2["title"] and "1 meal " in w2["subtitle"], w2)
     check("quarter: ⌃ backs to the hub", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows))
+    # D28: ⇧ pulls the week's batch (xact:meal_sync {batch}), ⌥⇧ marks every
+    # meal cooked (xact:meal_cooked {week}); the words read the ledger
+    check("quarter: ⇧ on a planned week = xact:meal_sync {batch: its Sunday, back: ctx:mealq}, the subtitle names where it lands",
+          mod_payload(wb["mods"]["shift"]) == {"back": "ctx:mealq", "batch": BW.isoformat()} and wb["mods"]["shift"]["valid"]
+          and wb["mods"]["shift"]["subtitle"] == f"🔄 Pull into TickTick → 🥘 {SUN:%a %-d %b}", wb["mods"]["shift"])
+    check("quarter: ⌥⇧ on a planned week = xact:meal_cooked {week, back: ctx:mealq}",
+          mod_payload(wb["mods"]["alt+shift"]) == {"week": BW.isoformat(), "back": "ctx:mealq"} and wb["mods"]["alt+shift"]["valid"]
+          and "All cooked" in wb["mods"]["alt+shift"]["subtitle"], wb["mods"]["alt+shift"])
+    check("quarter: the legend says ⇧🔄  ⌥⇧👨‍🍳, the words say cook + 'not in TickTick yet' only once the Sunday is here",
+          wb["subtitle"].endswith("  |  ⏎⤵️  ⌥⤵️  ⇧🔄  ⌥⇧👨‍🍳")
+          and wb["subtitle"].startswith(f"cook {BW:%a %-d %b}" + (" · not in TickTick yet" if BW <= TODAY else " · 3 meals")),
+          wb["subtitle"])
+    check("quarter: an empty week has no ⇧ and no ⌥⇧", not w1["mods"]["shift"]["valid"] and not w1["mods"]["alt+shift"]["valid"]
+          and w1["subtitle"].startswith(f"cook {EW:%a %-d %b} · Plan it"), w1)
+    check("quarter: a week ahead reads bare 'cook Sun …' (no state words)",
+          w2["subtitle"].startswith(f"cook {SUN + timedelta(days=14):%a %-d %b} · 1 meal"), w2["subtitle"])
     check("quarter: the bar filters on meal names", [x["uid"] for x in rows_for("ctx:mealq", "pockets")] == [f"mq-{(SUN + timedelta(days=14)).isoformat()}"])
     check("quarter: the bar filters on the week label",
           [x["uid"] for x in rows_for("ctx:mealq", meal.week_label(EW))][:1] == [f"mq-{EW.isoformat()}"])
@@ -812,6 +836,70 @@ else:
           [i.get("uid") for i in out.get("items", [])] == ["mp-head", "mp-egg", "mp-bacon", "mp-flour", "mp-rice", "mp-salt"],
           [i.get("uid") for i in out.get("items", [])])
     check("the real price book is never written by this file", os.path.exists(REAL_BOOK) == HAD_BOOK, REAL_BOOK)
+
+    # ── D28: the batch ledger drives the words; the picker; twins ───────────────
+    print("-- D28")
+    plant()
+    import json as _json
+    def write_ledger(weeks):
+        with open(mw.BATCH_LEDGER, "w", encoding="utf-8") as f:
+            _json.dump({"weeks": weeks}, f)
+    write_ledger({SUN.isoformat(): {"prep_tid": RID, "prep_day": SUN.isoformat(), "groc_tid": "", "groc_day": SUN.isoformat(),
+                                    "pulled_at": "2026-10-05T16:00", "meals": [U2, U1, U5], "pointers": ["p1"]}})
+    r = by_uid(rows_for("ctx:meal"))
+    check("hub: a pulled batch (its prep task open) says 'in TickTick · prep <day>' in the head",
+          f"in TickTick · prep {SUN:%a %-d %b}" in r["meal-head"]["subtitle"], r["meal-head"]["subtitle"])
+    wb = by_uid(rows_for("ctx:mealq"))[f"mq-{BW.isoformat()}"]
+    check("quarter: the pulled week reads 'cook <Sunday> · in TickTick · prep <day>'",
+          wb["subtitle"].startswith(f"cook {BW:%a %-d %b} · in TickTick · prep {SUN:%a %-d %b} · 3 meals"), wb["subtitle"])
+    wh = by_uid(rows_for(f"ctx:mealw:{BW.isoformat()}"))["mw-head"]
+    check("week: the head reads the same state", f"· in TickTick · prep {SUN:%a %-d %b} ·" in wh["title"], wh["title"])
+    write_ledger({SUN.isoformat(): {"prep_tid": "gone-prep", "prep_day": SUN.isoformat(), "meals": [U2]}})
+    wb = by_uid(rows_for("ctx:mealq"))[f"mq-{BW.isoformat()}"]
+    check("quarter: a pulled week whose prep task is no longer open reads 'cooked · prep <day> done'",
+          wb["subtitle"].startswith(f"cooked · prep {SUN:%a %-d %b} done · 3 meals"), wb["subtitle"])
+    mw._stamp_cooked(SUN, TODAY)
+    wb = by_uid(rows_for("ctx:mealq"))[f"mq-{BW.isoformat()}"]
+    check("quarter: ⌥⇧'s stamp reads 'cooked <day>'", wb["subtitle"].startswith(f"cooked {TODAY:%a %-d %b} · 3 meals"), wb["subtitle"])
+    r = by_uid(rows_for("ctx:meal"))
+    check("hub: the head says cooked too", f"· cooked {TODAY:%a %-d %b}" in r["meal-head"]["subtitle"], r["meal-head"]["subtitle"])
+    os.remove(mw.BATCH_LEDGER)
+    # the picker
+    rows = rows_for("ctx:mealpick")
+    r = by_uid(rows)
+    uids = [x["uid"] for x in rows]
+    check("picker: sealed", sealed(rows, "picker"))
+    check("picker: the head says where a pick lands (the upcoming prep task's day), dead",
+          uids[0] == "mk-head" and r["mk-head"]["title"] == f"🔄 Sync with Mela · pick the week → 🥘 {SUN:%a %-d %b}"
+          and not r["mk-head"]["valid"], r["mk-head"])
+    check("picker: the prep task's own week first and starred, ⏎ and ⌥⇧ = xact:meal_sync {batch, back: ctx:meal}",
+          uids[1] == f"mk-{SUN.isoformat()}" and r[uids[1]]["title"].startswith(f"⭐️ {SUN:%a %-d %b} · 🍳 Oats")
+          and payload(r[uids[1]]) == {"back": "ctx:meal", "batch": SUN.isoformat()}
+          and mod_payload(r[uids[1]]["mods"]["alt+shift"]) == {"back": "ctx:meal", "batch": SUN.isoformat()}
+          and r[uids[1]]["valid"], r[uids[1]])
+    pk = r.get(f"mk-{(SUN + timedelta(days=14)).isoformat()}")
+    check("picker: a later planned week is a plain row (no star), its label and words in the subtitle",
+          pk is not None and not pk["title"].startswith("⭐️") and pk["subtitle"].startswith(
+              f"{meal.week_label(SUN + timedelta(days=14))} · cook {SUN + timedelta(days=14):%a %-d %b} · 1 meal"), pk)
+    check("picker: only weeks WITH meals, and nothing older than the week before this one",
+          all(u.startswith("mk-") for u in uids) and len(uids) == 3
+          and f"mk-{(meal.cook_week_of(TODAY) - timedelta(days=14)).isoformat()}" not in r, uids)
+    check("picker: never an xact on ⌘ or ⌥", all(not x["mods"]["cmd"]["valid"] and not x["mods"]["alt"]["arg"] for x in rows))
+    check("picker: ⌃ backs to the hub", all(x["mods"]["ctrl"]["variables"]["browse_back"] == "ctx:meal" for x in rows))
+    check("picker: the bar filters on meal names", [x["uid"] for x in rows_for("ctx:mealpick", "pockets")] == ["mk-head", f"mk-{(SUN + timedelta(days=14)).isoformat()}"])
+    check("parse_ctx: the picker's ctx", render("ctx:mealpick") == ("mealpick", [], ""))
+    # twins on the groceries screen and the hub count
+    TWIN = T("g1b", meal.grocery_title("Oats", U2), pid=RLIST, tags=["🛒groceries"], kind="CHECKLIST", parent="someprep",
+             items=[{"title": "2 eggs", "status": 0}])
+    plant(kids=(PTR, TWIN))
+    rows = rows_for("ctx:mealgroc")
+    r = by_uid(rows)
+    check("groceries: a twin list is SHOWN (two open lists, one twin), each wearing the twin chip",
+          r["mg-head"]["title"] == "🛒 Groceries · 2 open lists · 1 twin (🔄 Sync removes)"
+          and "· twin" in r["mg-g1"]["subtitle"] and "· twin" in r["mg-g1b"]["subtitle"], (r["mg-head"]["title"], r["mg-g1"]["subtitle"]))
+    g = by_uid(rows_for("ctx:meal"))["meal-groc"]
+    check("hub: the 🛒 row counts the twin too", g["title"].startswith("🛒 Groceries · 2 open lists · 1 twin ·"), g["title"])
+    plant()
 
     import shutil
     shutil.rmtree(TMP, ignore_errors=True)

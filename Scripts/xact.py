@@ -249,14 +249,23 @@ complete road. The 2026-09 writers (okr_add, okr_addkr, okr_link, okr_tag,
 okr_carry, okr_upkeep) are gone with the copy model.
     xact:okr_setlist                ⚙️ Settings → OKR List dialog (blank = off,
                                     the list's view mode never touched)
-    xact:meal_sync:<b64 {back}>     🔄 Sync with Mela: new recipes in,
-                                    descriptions filled, the cook week's
-                                    meals from the Mela calendar mirrored
-                                    onto the routine + groceries + note
-                                    (Vex 2026-09-21: "only a row that says
-                                    sync TickTick with Mela"; nothing runs
-                                    in the background). {"dry": true} or
-                                    TICKAL_MEAL_DRY=1 prints the plan only
+    xact:meal_sync:<b64 {back[, batch]}>
+                                    🔄 Sync with Mela: new recipes in,
+                                    descriptions filled, the BATCH's meals
+                                    from the Mela calendar mirrored onto the
+                                    upcoming 🥘 Meal Prep task + 🛒 groceries
+                                    + note (Vex 2026-09-21: "only a row that
+                                    says sync TickTick with Mela"; nothing
+                                    runs in the background). `batch` (D28,
+                                    an ISO cook Sunday) comes from the
+                                    picker rows (ctx:mealpick) and ⇧ on a
+                                    week row; without it the cook week the
+                                    prep task's day falls in. {"dry": true}
+                                    or TICKAL_MEAL_DRY=1 prints the plan only
+    xact:meal_cooked:<b64 {pid,tid | week[, back]}>
+                                    👨‍🍳 Cooked: one recipe task (⌥⇧ on a
+                                    meal row), or every meal of a cook week
+                                    (⌥⇧ on a week row, D28), one note asked
     xact:meal_setlist               ⚙️ Settings → Meal Prep List dialog
 
 stdout → the End notification. task_title rides the env.
@@ -721,6 +730,10 @@ def _complete_cache_patch(pid, tid):
         _patch_project_data(tid, pid_old=pid, remove=True)
     except Exception:
         cache_store.invalidate("all_tasks")
+    try:
+        cache_store.invalidate("meal_kids")   # the 🥘 hub's 45 s copy (D28)
+    except Exception:
+        pass
     pn_done_nudge()          # the daily note's ticks follow (src/done_sync.py)
 
 
@@ -12955,13 +12968,15 @@ def _dry_meal(spec):
 
 def meal_sync(rest):
     """🔄 Sync with Mela (meal_write.sync): recipes in, descriptions filled,
-    the cook week's meals read from the Mela calendar and mirrored onto the
+    the batch's meals read from the Mela calendar and mirrored onto the
     routine's pointers + 🛒 groceries + the weekly note. The ONE meal verb -
     Vex 2026-09-21: "a row that says sync TickTick with Mela, that would do
-    that manually". {"dry": true} or TICKAL_MEAL_DRY=1 prints the plan and
-    writes nothing."""
+    that manually". {"batch": "<ISO Sunday>"} (D28) pins the cook week - the
+    picker rows and ⇧ on a week row; without it the cook week the prep task
+    sits in. {"dry": true} or TICKAL_MEAL_DRY=1 prints the plan and writes
+    nothing."""
     import meal_write as mw
-    _meal_run(rest, lambda spec: mw.sync(dry=_dry_meal(spec)))
+    _meal_run(rest, lambda spec: mw.sync(dry=_dry_meal(spec), batch=spec.get("batch") or None))
 
 
 def meal_setlist():
@@ -13009,12 +13024,40 @@ def meal_cooked(rest):
     import meal_write as mw
 
     def run(spec):
+        if spec.get("week"):
+            return _meal_cooked_week(spec, mw)
         name = _meal_name(spec.get("tid"))
         note = _ask(f"👨‍🍳 {name} cooked · a note for next time? (Esc = none)",
                     multiline=True)
         return mw.mark_cooked(pid=spec.get("pid"), tid=spec.get("tid"),
                               comment=note or None, dry=_dry_meal(spec))
     _meal_run(rest, run)
+
+
+def _meal_cooked_week(spec, mw):
+    """The week road of meal_cooked (D28 - Vex 2026-10-05: "adding ⌥⇧ for
+    cooked on the week row so I can mark all three cooked from one go"):
+    ONE dialog naming the week's meals asks a note for the batch (Esc =
+    none; the same note goes on each recipe task), then
+    meal_write.mark_cooked_week tags every meal with a library task and
+    stamps the batch ledger cooked, which the week row reads."""
+    import meal
+    from datetime import date as _date
+    try:
+        sunday = meal.cook_week_of(_date.fromisoformat(str(spec.get("week"))[:10]))
+    except (TypeError, ValueError):
+        raise mw.Refusal(f"🥘 Bad week {spec.get('week')!r}")
+    names = ""
+    try:
+        pv = mw.plan_view(n_weeks=1, first_sunday=sunday) or {}
+        week = next((w for w in pv.get("weeks") or [] if w.sunday == sunday), None)
+        names = " · ".join(f"{m.glyph} {m.name}" for m in (week.meals if week else []))
+    except Exception:
+        pass
+    label = meal.week_label(sunday)
+    note = _ask(f"👨‍🍳 {label} cooked" + (f" · {names}" if names else "")
+                + " · a note for the batch? (Esc = none)", multiline=True)
+    return mw.mark_cooked_week(sunday=sunday, comment=note or None, dry=_dry_meal(spec))
 
 
 def meal_rate(rest):

@@ -554,6 +554,33 @@ def week_label(sunday):
     return f"Week of {note_day(sunday):%-d %b}"
 
 
+def weeks_with_meals(planned):
+    """The cook Sundays the calendar has meals in (cook_week_of each planned
+    row's day), sorted, rows without a recipe id skipped."""
+    out = set()
+    for p in planned or []:
+        d = getattr(p, "date", None)
+        if d and _uuid_of(p):
+            out.add(cook_week_of(d))
+    return sorted(out)
+
+
+def batch_week(planned, prep_day):
+    """THE DEFAULT BATCH (D28, 2026-10-05): the cook week a press mirrors when
+    none was picked - the cook week the prep task's day falls in (a Sunday
+    plan and a prep dragged to Monday or Wednesday, the common case - Vex:
+    "Sunday is ideal, but lots of times it will be like this, day or two
+    later"), when that week has meals; None when it has none (the press
+    then clears the pointers and says nothing is planned that week - never
+    a silent pull of some other week; the picker is the road to one). The
+    exact-day rule it replaces read an EMPTY Monday under a Sunday plan and
+    would have deleted every pointer and list."""
+    if prep_day is None:
+        return None
+    own = cook_week_of(prep_day)
+    return own if own in weeks_with_meals(planned) else None
+
+
 PREP_TITLE = "🥘 Meal Prep"          # the routine, and any copy Vex moves
 GROCERIES_TITLE = "🛒 Groceries"     # the Saturday routine, moved the same way
 
@@ -879,19 +906,37 @@ def portions_payload(pid=None, tid=None, back=None):
 
 
 # ── the sync verb ────────────────────────────────────────────────────────────
-def sync_payload(back="ctx:meal"):
-    """The b64-able spec behind xact:meal_sync."""
-    return {"back": back}
+def sync_payload(back="ctx:meal", batch=None):
+    """The b64-able spec behind xact:meal_sync. `batch` (a cook Sunday: a
+    date or ISO text) pins the week to mirror - the picker rows and ⇧ on a
+    week row (D28); without it the verb takes batch_week's default."""
+    p = {"back": back}
+    if batch:
+        p["batch"] = batch.isoformat() if hasattr(batch, "isoformat") else str(batch)
+    return p
+
+
+def cooked_week_payload(sunday, back=None):
+    """The spec behind xact:meal_cooked for a WHOLE cook week (⌥⇧ on a week
+    row, D28 - Vex 2026-10-05: "mark all three cooked from one go"): every
+    meal of that week tagged, one note asked for the batch."""
+    p = {"week": sunday.isoformat() if hasattr(sunday, "isoformat") else str(sunday)}
+    if back:
+        p["back"] = back
+    return p
 
 
 def sync_text(day, n_meals, n_groceries, imported, filled, note_ok=True,
-              dated=0, dates_left=0, rated=0, ratings_left=0):
+              dated=0, dates_left=0, rated=0, ratings_left=0, batch=None):
     """The toast: '🔄 Mela · +2 recipes · 3 filled · cook Tue 22 Sep: 🍳 Hot
     Pockets · 2 grocery lists'. `day` is the cook day (the prep task's);
     `n_meals` is a count OR that day's meals (Meal objects, (slot, name)
     pairs or plain names) - names read better than a number. `rated` /
     `ratings_left` count Mela's own stars copied into unrated tasks (the
-    sync's rating pass, 2026-09-21), worded like dated / dates_left."""
+    sync's rating pass, 2026-09-21), worded like dated / dates_left.
+    `batch` (D28) is the cook Sunday the meals were read from: named in
+    brackets when it is not the cook day's own week ('cook Sun 11 Oct
+    (Mela Sun 4 Oct): …', a picked week), silent when the two agree."""
     parts = ["🔄 Mela"]
     if imported:
         parts.append(f"+{imported} recipe{'s' if imported != 1 else ''}")
@@ -912,7 +957,9 @@ def sync_text(day, n_meals, n_groceries, imported, filled, note_ok=True,
             else:
                 names.append(str(m))
         what = " · ".join(names) if names else "nothing planned in Mela"
-    parts.append(f"cook {day:%a %-d %b}: {what}")
+    mela = (f" (Mela {batch:%a %-d %b})"
+            if batch and cook_week_of(batch) != cook_week_of(day) else "")
+    parts.append(f"cook {day:%a %-d %b}{mela}: {what}")
     parts.append(f"{n_groceries} grocery list{'s' if n_groceries != 1 else ''}")
     if dated:                      # library tasks re-dated off the calendar
         parts.append(f"{dated} recipe{'s' if dated != 1 else ''} dated")

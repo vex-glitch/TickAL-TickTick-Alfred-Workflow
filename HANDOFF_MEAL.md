@@ -71,7 +71,9 @@ web".
   TickTick through the recipe tasks themselves (search rows, TickTick's
   calendar), while the routine still carries only the cook week (D13).
 - **D18 · The batch, not the Sunday** (2026-09-21 evening, after the first
-  real press). The sync and the hub anchor on the NEXT 🥘 Meal Prep task in
+  real press; the "meals ON its day" half is SUPERSEDED by D28 - the batch
+  is the cook WEEK the task falls in, or a picked one). The sync and the
+  hub anchor on the NEXT 🥘 Meal Prep task in
   the routines list, whatever day it sits on: the series, an occurrence
   TickTick split off (repeatTaskId), or the copy it leaves when Vex moves an
   occurrence to a weekday (Vex: "I will often move it because of work"). Found
@@ -201,6 +203,78 @@ web".
   ctx:mealgroc chip "≈ 8.24 € · till 12.90 €". The per-list till is that
   list alone (an upper bound); only the hub's figure shares packs.
 
+- **D28 · The batch is a cook WEEK, picked or the prep task's own; a ledger
+  says its state; twins die; "cooked" is never a date guess** (2026-10-05,
+  the Monday after a Sunday plan. Vex had dragged 🥘 Meal Prep and 🛒
+  Groceries to Mon 5 Oct, Mela's plan sat on Sun 4 Oct, and D18's
+  exact-day read found an EMPTY Monday: the dry run wanted to delete 3
+  pointers + 2 lists and create nothing. "Sunday is ideal, but lots of
+  times it will be like this, day or two later"; "I think we need 'This
+  month' row … offer all Sundays with recipes scheduled in Mela. Then I
+  could choose which Sundays groceries I want in TickTick. Then it should
+  look for the first Groceries and meal prep tasks and pull that there";
+  "adding ⌥⇧ for cooked on the week row so I can mark all three cooked from
+  one go".) Four pieces, zero canvas:
+  1. THE BATCH WEEK. `meal.batch_week(planned, prep_day)` = the cook week
+     the upcoming prep task's day falls in when it has meals, else None -
+     never a silent pull of another week. `meal_write.sync(batch=)` takes
+     a picked cook Sunday (payload key `batch`, `meal.sync_payload(back,
+     batch)`); the meals are that WEEK's (`meal.week_meals`, no longer
+     `meals_on`); pointers still take the prep day, the lists the 🛒 task's
+     day, the note bullet the week the prep day falls in; the toast says
+     "cook Sun 11 Oct (Mela Sun 4 Oct)" only for a picked OTHER week
+     (`sync_text(batch=)`). `date_plan(since=)` floors the library dates
+     at the batch's Sunday, so a batch cooked on Monday keeps its Sunday
+     on the recipes until it is cooked.
+  2. THE PICKER `ctx:mealpick` (`browse.render_mealpick`): ⏎ on the hub's
+     🔄 row (its ⌥⇧ syncs the prep's own week at once), one row per cook
+     week with meals from the week before this one to the end of next
+     month, the prep's own week ⭐️ first, every row ⏎ / ⌥⇧ =
+     `xact:meal_sync {batch, back: ctx:meal}`, the head names where a pick
+     lands (`_meal_target`: the upcoming 🥘 and 🛒 tasks' days). ⇧ on a 📆
+     week row is the same verb without the picker: the Browse SF's ⇧ edge
+     is junction 581BB8A1 → Call-ET modComplete → dispatch.py, whose
+     `xact:` branch fires ET XAct (`_fire_xact`), so a ⇧ arg may be an
+     xact (⌘ and ⌥ still never).
+  3. THE LEDGER `~/.ticktick_alfred/meal_batches.json` (`_batches`,
+     `_remember_batch`, `_stamp_cooked`, `batch_status`; `BATCH_LEDGER`,
+     overridden by both meal suites - the first run wrote fake rows into
+     the real file): every press with meals writes {prep_tid, prep_day,
+     groc_tid, groc_day, pulled_at, meals, pointers} under its cook Sunday;
+     a re-pull drops a cooked stamp. The 📆 week rows, the week head, the
+     hub head and the picker read it through `browse._meal_states` /
+     `_meal_week_words` / `_meal_state_chip`: 'cook Sun 4 Oct · not in
+     TickTick yet' (this week or earlier, nothing pulled), 'cook Sun 4 Oct
+     · in TickTick · prep Mon 5 Oct', 'cooked · prep Mon 5 Oct done' (that
+     prep task no longer open in the routines pool), 'cooked Mon 5 Oct';
+     a week ahead nobody pulled is bare 'cook Sun 11 Oct'. `_meal_cook`
+     (wrote "cooked" the moment the Sunday passed) is gone. ⌥⇧ on a 📆 week
+     row = `xact:meal_cooked {week, back}` → `xact._meal_cooked_week` (ONE
+     dialog naming the meals asks a batch note) → `meal_write
+     .mark_cooked_week` (every meal with a library task through
+     `mark_cooked`, the note on each, the ledger stamped; a rate limit
+     refuses with the count so far).
+  4. TWINS. TickTick's drag of a repeating 🛒 Groceries (and 🥘 Meal Prep)
+     occurrence leaves a COPY carrying copies of its subtasks while the
+     series keeps the originals (the 25 Sep and 3 Oct copies in the
+     completed history, each with its own three checklists). `_grocery
+     _lists` folded them by uuid, first seen wins, so a twin never reached
+     the delete list ("our groceries thing made duplicate last time").
+     `_grocery_index(tasks, groc, list_id)` keeps ONE list per recipe (the
+     in-place one, else the first seen) and hands every other open list to
+     `_write_groceries(extras=)`, deleted first; `_grocery_lists_all` feeds
+     the hub's 🛒 count and ctx:mealgroc, which show every open list with a
+     "twin" chip until the next press. `week_lists` (the portions road)
+     keeps its dedupe.
+  Also: every road that changes an open state drops the hub's 45 s
+  `meal_kids` copy - dispatch `_drop_meal_kids` (complete / uncomplete /
+  attr_delete), xact `_complete_cache_patch`, meal_write `_uncache` ("two
+  open, I did ⇧⏎ to complete them and they did not close": the server had
+  them closed at 16:32, the copy did not). "📆 Next 13 weeks" is "📆 This
+  week + 12" (it was this week plus twelve). Rulings kept: a prep on its
+  Sunday changes nothing; the picker is the road to any other week; nothing
+  runs in the background.
+
 ## 1. What it is (Vex's model)
 
 Every Sunday evening Vex cooks THREE meals for the week: one breakfast, one
@@ -282,14 +356,14 @@ for `meal` must never contain `{"do": "reset"}`.
 | File | Role |
 |---|---|
 | `src/mela_cal.py` | IMPURE, stdlib: the calendar reader. `STORE_PATH`, `MelaCalError` (one toast line), `Planned` (date · start · all_day · uuid UPPER · title · calendar · event_id · url), `store_present`, `snapshot` (the mela.py shape, PermissionError → the FDA toast), `parse_url`, `plan(since, until)` (every calendar, url LIKE `mela://calendar/%`, skips hidden / cancelled / phantom_master, local date from start_tz), `freshness` |
-| `src/meal.py` | PURE: title grammar, slots (b/l/s/x), week arithmetic (`cook_week_of`, `cook_sunday`, `week_label`), `Meal` / `Week`, `slot_for_recipe`, `weeks_plan` (every week present, meals b,l,s,x → date → name), `week_meals`, `last_cooked` / `next_planned` (over the calendar plan), `sort_for_lib`, `sync_payload`, `sync_text`; since D21/D22 `COOKED_TAG`, the rating/notes grammar (`header_block`, `read_rating`, `read_comments`, `set_rating`, `add_comment`, `strip_mela_rating`, `adopt_mela_rating`, `stars`, `parse_stars`, `mint_header`) and the `cooked_payload` / `rate_payload` / `comment_payload` helpers |
+| `src/meal.py` | PURE: title grammar, slots (b/l/s/x), week arithmetic (`cook_week_of`, `cook_sunday`, `week_label`), `Meal` / `Week`, `slot_for_recipe`, `weeks_plan` (every week present, meals b,l,s,x → date → name), `week_meals`, `last_cooked` / `next_planned` (over the calendar plan), `sort_for_lib`, `sync_payload(back, batch=)`, `sync_text(…, batch=)`, D28 `weeks_with_meals` / `batch_week` / `cooked_week_payload`; since D21/D22 `COOKED_TAG`, the rating/notes grammar (`header_block`, `read_rating`, `read_comments`, `set_rating`, `add_comment`, `strip_mela_rating`, `adopt_mela_rating`, `stars`, `parse_stars`, `mint_header`) and the `cooked_payload` / `rate_payload` / `comment_payload` helpers |
 | `src/meal_scale.py` | PURE: yield ladder (field → text → protein estimate → none), quantity parser, half-up scaling, grocery filter; `tick_key` / `carry_ticks` (D25: ticked state carried by ingredient name + ordinal when a list is re-cut; the key strips a price suffix) |
 | `src/meal_price.py` | D26, PURE except `load_book` / `save_book` (the book, `~/.ticktick_alfred/meal_prices.json`) and `knuspr_fetch` (the ONE network call): `ingredient_key`, `DEFAULT_SEARCH` / `search_term`, `lookup`, `line_cost` / `list_cost` / `cost_line` / `read_cost_line`, `price_suffix` / `strip_price`, `knuspr_search` / `pick` / `entry_from` / `refresh`, `manual_entry` / `parse_price_answer`, `keys_of`, `FREE`; D27 `DEFAULT_PANTRY` / `is_pantry`, `pack_need` / `list_till` / `week_till`, `cost_line(total, till=)`; CLI `python3 src/meal_price.py <term>` (the live probe) and `--cost <line>…` |
 | `src/mela.py` | Mela DB snapshot + loader, `render_markdown` (byte-identical to the mela2ticktick script for a recipe without a Rating line; with one, the stars go into the head block), `rating_of` / `strip_rating` (D23), `meal_tag_for`, `freshness` |
 | `src/meal_notes.py` | the weekly bullet (`write_block`, seed rule) |
-| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13; since D21/D22 `mark_cooked` / `rate` / `comment` (live read, ONE update each, never a dialog) and `mirror_ratings` (cap 20, inside `sync` right after the fills, a rate limit there never aborts the week); D25 `set_portions` (one list re-cut, live read, one update), `week_lists`, `grocery_body(recipe, portions, book=None)`, `_portions_of`; D26 `reprice_lists` (ids and ticks kept, suffixes + cost line rewritten), `refresh_prices` (the 🏷 verb: keys of the week's lists → `meal_price.refresh` → `save_book` → `reprice_lists`), `set_price` / `set_search` (the book screen's two dialogs; `set_price` also takes "pantry" / "not pantry"), `week_cost` (the hub's sum off the cached cost lines), `week_till` (D27, pooled packs across the cached week lists) |
-| `Scripts/browse.py` | `render_meal` (ctx:meal), `render_mealq` (ctx:mealq, the 13 weeks), `render_mealw` (ctx:mealw:<YYYY-MM-DD sunday>), `render_meallib` (ctx:meallib:<slot>), `render_mealgroc`, `render_mealrate` (ctx:mealrate:<pid>:<tid>[:<back level>], the star picker), `render_mealprice` (ctx:mealprice, the book: this week's keys first, ❓ unpriced on top, 🧾 knuspr / ✍️ manual / 📖 the rest; D26); the 🏷 Prices hub row; the 🥘 door row in `render_routines`; parse_ctx's alias guard covers `ctx:meal*` |
-| `Scripts/xact.py` | `_meal_run` (copy of `_okr_run`), `meal_sync`, `meal_setlist`, `_dry_meal`, `meal_cooked` (the one dialog), `meal_rate`, `meal_comment`, `meal_portions` (one dialog per list, D25), `meal_prices` (the refresh), `meal_price_set` / `meal_price_search` (one dialog each, D26) |
+| `src/meal_write.py` | THE writer: `sync` (under `_lock`: `import_new` cap 40 → `backfill_descriptions` cap 60 → calendar → LIVE routine → `week_meals` → pointers deleted-then-created → `_write_groceries` → `_write_note` → cache mirror; `dry` / `TICKAL_MEAL_DRY=1` prints and writes nothing), `plan_view` (the read side: never raises, `error` carries the toast line, injectable), `hub_counts`, `PACE` 1.0 s, `HORIZON_WEEKS` 13; since D21/D22 `mark_cooked` / `rate` / `comment` (live read, ONE update each, never a dialog) and `mirror_ratings` (cap 20, inside `sync` right after the fills, a rate limit there never aborts the week); D25 `set_portions` (one list re-cut, live read, one update), `week_lists`, `grocery_body(recipe, portions, book=None)`, `_portions_of`; D26 `reprice_lists` (ids and ticks kept, suffixes + cost line rewritten), `refresh_prices` (the 🏷 verb: keys of the week's lists → `meal_price.refresh` → `save_book` → `reprice_lists`), `set_price` / `set_search` (the book screen's two dialogs; `set_price` also takes "pantry" / "not pantry"), `week_cost` (the hub's sum off the cached cost lines), `week_till` (D27, pooled packs across the cached week lists); D28 `sync(batch=)` over `week_meals`, `BATCH_LEDGER` + `_batches` / `_remember_batch` / `_stamp_cooked` / `batch_status`, `_batch_arg`, `_grocery_lists_all` / `_grocery_index` + `_write_groceries(extras=)`, `mark_cooked_week`, `date_plan(since=)`, `_uncache` dropping `meal_kids` |
+| `Scripts/browse.py` | `render_meal` (ctx:meal; the batch week + its state in the head, 🔄 ⏎ → the picker), `render_mealq` (ctx:mealq, this week + 12; ⇧ pull, ⌥⇧ all cooked, the ledger's words), `render_mealpick` (ctx:mealpick, the batch picker, D28), `_meal_states` / `_meal_week_words` / `_meal_state_chip` / `_meal_target`, `render_mealw` (ctx:mealw:<YYYY-MM-DD sunday>), `render_meallib` (ctx:meallib:<slot>), `render_mealgroc` (every open list, twins chipped), `render_mealrate` (ctx:mealrate:<pid>:<tid>[:<back level>], the star picker), `render_mealprice` (ctx:mealprice, the book: this week's keys first, ❓ unpriced on top, 🧾 knuspr / ✍️ manual / 📖 the rest; D26); the 🏷 Prices hub row; the 🥘 door row in `render_routines`; parse_ctx's alias guard covers `ctx:meal*` |
+| `Scripts/xact.py` | `_meal_run`, `meal_sync` (`batch` key, D28), `meal_setlist`, `_dry_meal`, `meal_cooked` (the one dialog; the `week` key → `_meal_cooked_week`, D28), `meal_rate`, `meal_comment`, `meal_portions` (one dialog per list, D25), `meal_prices` (the refresh), `meal_price_set` / `meal_price_search` (one dialog each, D26) |
 | `Scripts/actions.py` | the recipe gate (`meal.is_library_title`): 👨‍🍳 Cooked · ⭐️ Rate… · 💬 Comment… lead the recipe task's ⌘ menu; generic verbs kept |
 | `src/routines.py` · `routine_runner.py` · `routine_link.py` (`view:meal`) · `link.py` (`VIEW_CTX["meal"]`) | the registry entry and its gates |
 | `Scripts/meal_migrate.py` | one-shot NOTE→TEXT + dates cleared: dry-run / `--probe TID` / `--apply` / `--rollback FILE` |
@@ -478,6 +552,24 @@ Makefile `test:` list. No network, never the real calendar.
     reads "≈ … € used · till ≈ … €" with the pantry share in the subtitle;
     a 🛒 list's first line carries "till ≈ … €"; ⏎ on a book row, type
     "pantry" → the row wears "· pantry" and the hub's pantry share moves.
+
+14. **The batch week, the picker, the ledger, the twins - 2026-10-05 (D28),
+    zero canvas.** `meal.py`: `weeks_with_meals`, `batch_week`,
+    `sync_payload(batch=)`, `cooked_week_payload`, `sync_text(batch=)`.
+    `meal_write.py`: `sync(batch=)` over `week_meals`, the batch ledger,
+    `_grocery_lists_all` / `_grocery_index` / `_write_groceries(extras=)`,
+    `mark_cooked_week`, `date_plan(since=)`, `_uncache` → `meal_kids`.
+    `browse.py`: `render_mealpick` + level, the state helpers, the hub
+    head / 📆 / 🔄 / 🛒 rows, the 📆 rows' ⇧ and ⌥⇧, `render_mealgroc`'s
+    twins. `xact.py`: `meal_sync`'s batch, `_meal_cooked_week`, the
+    completion patch. `dispatch.py`: `_drop_meal_kids` on complete /
+    uncomplete / attr_delete. Tests: test_meal (batch rules), test_meal
+    _write D28 block (257), test_meal_screens D28 block (215). Docs
+    51 / 95 / 00 mirrored to both vault surfaces. The same session found
+    the nine meal verbs deleted from xact.py by the OKR rewrite (a496ff3)
+    and restored them (08ffc4a) with tests/test_xact_dispatch.py pinning
+    every dispatched verb. First real press: the Sun 4 Oct batch pulled
+    onto the Mon 5 Oct tasks (see the bridge).
 
 ## 8. Open / next
 

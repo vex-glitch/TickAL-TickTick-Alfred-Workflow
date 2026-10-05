@@ -122,6 +122,8 @@ LOCK_FILE = os.path.join(cfg.CONFIG_DIR, "meal.lock")
 IMPORT_LEDGER = os.path.join(cfg.CONFIG_DIR, "meal_import.json")
 GONE_LEDGER = os.path.join(cfg.CONFIG_DIR, "meal_gone.json")    # pointer ids we trashed
 GONE_KEEP = 200
+BATCH_LEDGER = os.path.join(cfg.CONFIG_DIR, "meal_batches.json")  # what each press mirrored (D28)
+BATCH_KEEP = 60
 LOCK_WAIT = 60.0
 POST_GAP = 0.35            # seconds between our own POSTs (periodic_engine's rule)
 CAP_IMPORT = 40            # recipes imported per sync
@@ -240,10 +242,17 @@ def _imported_uuids(path):
 
 # ── the caches, mirrored ─────────────────────────────────────────────────────
 def _uncache(ids, pids=()):
-    """Drop deleted ids from every pool a screen reads. Never raises."""
+    """Drop deleted ids from every pool a screen reads, and the hub's own
+    45 s copy of the routines list (meal_kids: the verb reopens the hub at
+    once, which read the deleted lists off it - the "2 open" that would
+    not close, Vex 2026-10-05). Never raises."""
     ids = {i for i in ids if i}
     if not ids:
         return
+    try:
+        cache_store.invalidate("meal_kids")
+    except Exception:
+        pass
     try:
         for key in ("all_tasks", "all_notes"):
             cached = cache_store.get(key)
@@ -497,6 +506,131 @@ def _remember_gone(ids, path=None):
         pass
 
 
+# ── the batch ledger (D28) ───────────────────────────────────────────────────
+def _batches(path=None):
+    """{cook Sunday ISO: entry} - what each press mirrored: prep_tid /
+    prep_day, groc_tid / groc_day, pulled_at, the meals' uuids, and
+    cooked_at once ⌥⇧ on the week row said so. The week rows and the
+    picker read their state off it (batch_status) instead of guessing from
+    the date - a Sunday gone by was "cooked" before, while the batch sat
+    uncooked and unpulled on Monday (Vex 2026-10-05)."""
+    try:
+        with open(path or BATCH_LEDGER, encoding="utf-8") as f:
+            data = json.load(f)
+        weeks = data.get("weeks") if isinstance(data, dict) else None
+        return {k: dict(v) for k, v in (weeks or {}).items() if isinstance(v, dict)}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_batches(weeks, path=None):
+    path = path or BATCH_LEDGER
+    keys = sorted(weeks)[-BATCH_KEEP:]
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"weeks": {k: weeks[k] for k in keys}}, f, indent=1, sort_keys=True)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _remember_batch(sunday, entry, path=None):
+    """A press mirrored this cook week: the entry replaces the week's, and
+    a cooked stamp from an earlier pull is dropped (a re-pull is a new
+    batch)."""
+    weeks = _batches(path)
+    new = dict(entry)
+    new.pop("cooked_at", None)
+    weeks[sunday.isoformat()] = new
+    _save_batches(weeks, path)
+
+
+def _stamp_cooked(sunday, when=None, path=None):
+    weeks = _batches(path)
+    key = sunday.isoformat()
+    entry = dict(weeks.get(key) or {})
+    entry["cooked_at"] = (when or date.today()).isoformat()
+    weeks[key] = entry
+    _save_batches(weeks, path)
+
+
+def batch_status(sunday, open_tasks, ledger=None):
+    """(state, entry) of a cook week off the ledger and the OPEN routines
+    rows: 'cooked' (the week row's ⌥⇧ stamped it), 'pulled' (a press
+    mirrored it and its prep task is still open), 'done' (mirrored, and that
+    prep task is no longer open: finished in TickTick), 'none' (never
+    pulled). An empty pool of open rows cannot tell pulled from done, so it
+    reads pulled."""
+    weeks = ledger if ledger is not None else _batches()
+    entry = weeks.get(sunday.isoformat()) or {}
+    if not entry:
+        return "none", entry
+    if entry.get("cooked_at"):
+        return "cooked", entry
+    rows = [t for t in open_tasks or [] if isinstance(t, dict)]
+    if not rows or not entry.get("prep_tid"):
+        return "pulled", entry
+    open_ids = {t.get("id") for t in rows if t.get("status", 0) == 0 and not t.get("deleted")}
+    return ("pulled" if entry["prep_tid"] in open_ids else "done"), entry
+
+
+def _batch_arg(batch):
+    """A picked batch (date or ISO text) → its cook Sunday; None when none
+    was picked; a bad value refuses before any write."""
+    if batch in (None, ""):
+        return None
+    try:
+        d = batch if isinstance(batch, date) else date.fromisoformat(str(batch).strip()[:10])
+    except (TypeError, ValueError):
+        raise Refusal(f"🥘 Not synced · bad batch day {batch!r}")
+    return meal.cook_week_of(d)
+
+
+def _grocery_lists_all(tasks):
+    """EVERY open 🛒 list wherever it sits, twins included: a 🛒 Groceries
+    occurrence dragged to another day leaves a COPY carrying copies of its
+    checklists while the series keeps the originals (TickTick's drag, seen
+    2026-09-25 and 2026-10-03), so one recipe can have two open lists. By
+    task id, in the order given."""
+    seen, out = set(), []
+    for t in tasks or []:
+        if not isinstance(t, dict) or t.get("status", 0) != 0 or t.get("deleted"):
+            continue
+        if not t.get("id") or t["id"] in seen or not meal.is_grocery(t.get("title") or ""):
+            continue
+        seen.add(t["id"])
+        out.append(t)
+    return out
+
+
+def _grocery_index(tasks, groc, list_id):
+    """({UUID: the ONE list a press keeps}, [every other open list]). Per
+    recipe the first list IN PLACE (under the upcoming 🛒 task, or loose in
+    the library without one) is the keeper, else the first seen anywhere
+    (_write_groceries deletes and re-makes that one when its meal is
+    wanted); every other open list of the recipe is a twin and goes with
+    the press. _grocery_lists folded twins away (first seen wins), which is
+    how the dragged copies survived every sync (Vex 2026-10-05: "our
+    groceries thing made duplicate last time")."""
+    keep, extras = {}, []
+    for t in _grocery_lists_all(tasks):
+        parsed = meal.parse_title(t.get("title") or "")
+        if not parsed:
+            continue
+        u = parsed[1]
+        cur = keep.get(u)
+        if cur is None:
+            keep[u] = t
+        elif _grocery_in_place(t, groc, list_id) and not _grocery_in_place(cur, groc, list_id):
+            extras.append(cur)
+            keep[u] = t
+        else:
+            extras.append(t)
+    return keep, extras
+
+
 def _grocery_lists(tasks):
     """{UUID: open 🛒 list} wherever it sits (the library list, or under a
     🛒 Groceries occurrence in the routines list); the first seen wins."""
@@ -521,7 +655,8 @@ def _grocery_in_place(t, groc, list_id):
     return not t.get("parentId") and (t.get("projectId") or t.get("_projectId")) == list_id
 
 
-def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None, book=None):
+def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None, book=None,
+                     extras=()):
     """One 🛒 CHECKLIST per pick, as SUBTASKS of `groc` (the upcoming 🛒
     Groceries task - Vex 2026-09-21: "put those tasks as subtasks in the
     groceries task", "I do not schedule groceries in Mela, but I do in
@@ -531,13 +666,22 @@ def _write_groceries(api, list_id, picks, groc, gday, by_id, existing, rpid=None
     planned OR it sits elsewhere (a loose list from an earlier press: its
     ticks go with it, once), created when missing. `book` is the price
     book the sync loaded once (D26): a new list is priced on the way in.
-    -> (made, kept, deleted_ids)."""
+    `extras` (D28) = the twins _grocery_index set aside: every one of them
+    is deleted first, whatever its meal. -> (made, kept, deleted_ids)."""
     zone = meal.zone_of(groc) if groc else meal.local_zone()
     day = meal.api_day(gday, zone)
     pid = ((groc.get("projectId") or rpid or list_id) if groc else list_id)
     parent = groc["id"] if groc else None
     want = {p["uuid"]: p for p in picks.values() if p.get("uuid")}
     made, kept, gone = [], [], []
+    for t in extras or ():
+        try:
+            _pace()
+            api.delete_task(t.get("projectId") or list_id, t["id"])
+        except Exception as e:
+            if _rate_limited(e):
+                raise
+        gone.append(t["id"])
     for uuid, t in list(existing.items()):
         if uuid in want and _grocery_in_place(t, groc, list_id):
             continue
@@ -911,6 +1055,53 @@ def mark_cooked(api=None, pid=None, tid=None, comment=None, dry=False):
     api.update_task(tid, live.get("projectId") or pid, current=live, tags=merged, **fields)
     _cache_patch(tid, tags=merged, **fields)
     return Outcome(msg + (" · note saved" if fields else ""), None, [tid])
+
+
+def mark_cooked_week(api=None, sunday=None, comment=None, dry=False, planned=None,
+                     recipes=None, tasks=None, today=None):
+    """👨‍🍳 a WHOLE cook week (⌥⇧ on a week row, D28 - Vex 2026-10-05: "mark
+    all three cooked from one go"): every meal of that week with a library
+    task gets mark_cooked (the tag; the one batch note on each), then the
+    batch ledger is stamped cooked, which the week rows and the picker
+    read. A meal without a library task is counted, not written. A rate
+    limit mid-way refuses with the count so far (the tagged ones stay
+    tagged; press again). Nothing planned that week refuses."""
+    sunday = meal.cook_week_of(sunday)
+    pv = plan_view(today=today, n_weeks=1, planned=planned, recipes=recipes, tasks=tasks,
+                   first_sunday=sunday) or {}
+    week = next((w for w in pv.get("weeks") or [] if w.sunday == sunday),
+                meal.Week(sunday=sunday))
+    meals = list(week.meals)
+    if not meals:
+        raise Refusal(f"🥘 Nothing planned in Mela for {meal.week_label(sunday)}")
+    with_task = [m for m in meals if m.tid]
+    if dry:
+        return Outcome(f"🥘 Dry run · would tag {len(with_task)} of {len(meals)} "
+                       f"({meal.week_label(sunday)}) {meal.COOKED_TAG}"
+                       + (" · note" if (comment or "").strip() else ""), None, [])
+    api = _api(api)
+    done, noted, tids = 0, 0, []
+    for m in with_task:
+        try:
+            out = mark_cooked(api, pid=m.pid, tid=m.tid, comment=comment)
+        except Exception as e:
+            if _rate_limited(e):
+                raise Refusal(f"👨‍🍳 Rate limited · {done} of {len(with_task)} tagged "
+                              "· press again in a minute")
+            raise
+        done += 1
+        tids += list(out.ids or [])
+        if "note saved" in out.msg:
+            noted += 1
+    _stamp_cooked(sunday, today or date.today())
+    names = " · ".join(f"{m.glyph} {m.name}" for m in meals)
+    msg = f"👨‍🍳 Cooked · {meal.week_label(sunday)} · {names}"
+    skipped = len(meals) - len(with_task)
+    if skipped:
+        msg += f" · {skipped} not in the library"
+    if noted:
+        msg += f" · note saved ×{noted}"
+    return Outcome(msg, None, tids)
 
 
 def rate(api=None, pid=None, tid=None, stars=None, dry=False):
@@ -1450,7 +1641,7 @@ def _refuse_partial(what, imported, filled):
     raise Refusal(" · ".join(bits), reopen="ctx:meal")
 
 
-def sync(today=None, api=None, dry=False, planned=None, recipes=None):
+def sync(today=None, api=None, dry=False, planned=None, recipes=None, batch=None):
     """🔄 Sync with Mela, the one meal verb (module docstring). Under the
     lock: Mela library → import_new (CAP_IMPORT) → backfill_descriptions
     (CAP_FILL) → mirror_ratings (CAP_RATE, Mela's stars into unrated tasks;
@@ -1466,9 +1657,20 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
     text, nothing written. planned / recipes are injectable (tests). Raises
     Refusal when the list or routine id is blank, Mela's DB is missing, the
     calendar store is unreadable, another sync holds the lock, or TickTick
-    rate-limits mid-way (the toast says how far it got)."""
+    rate-limits mid-way (the toast says how far it got).
+
+    `batch` (D28, 2026-10-05): the cook Sunday to mirror - a date or ISO
+    text from the picker rows / ⇧ on a week row; None = meal.batch_week's
+    default, the cook week the prep task's day falls in. The meals are
+    that WEEK's (meal.week_meals), no longer the ones on the prep task's
+    exact day: Vex drags the prep to Monday or Tuesday after work while
+    the plan sits on Sunday in Mela. The pointers still take the prep
+    task's day, the lists the 🛒 task's, the note bullet the week the prep
+    day falls in; the batch ledger remembers the press; the library dates
+    keep the batch's day (date_plan since=)."""
     today = today or date.today()
     dry = bool(dry) or _dry_env()
+    picked = _batch_arg(batch)
     list_id = cfg.get_meal_list_id()
     rid = cfg.get_meal_routine_id()
     if not list_id or not rid:
@@ -1552,7 +1754,11 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
         groc = meal.upcoming(r_tasks, meal.GROCERIES_TITLE, today, ids=(gid,))
         gday = meal.task_date(groc) if groc else max(day - timedelta(days=1), today)
         entries = meal.library_entries(lib_tasks, list_id)
-        meals = meal.meals_on(planned, by_id, tag_map, entries, day)
+        # THE BATCH WEEK (D28): picked, else the cook week the prep day falls
+        # in (meal.batch_week), else - nothing planned anywhere - the prep's
+        # own week, which clears the pointers and says so
+        wk = picked or meal.batch_week(planned, day) or sunday
+        meals = list(meal.week_meals(planned, by_id, tag_map, entries, wk).meals)
         picks = _picks_of(meals)
         preps = meal.open_matching(r_tasks, meal.PREP_TITLE, (rid,))
         prep_ids = {t["id"] for t in preps}
@@ -1583,35 +1789,37 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
                         and not stray.get("deleted") and not stray.get("repeatTaskId")
                         and meal.is_pointer(stray.get("title") or "")):
                     old_ids.append(cid)
-        existing = _grocery_lists(lib_tasks + r_tasks)
+        existing, twins = _grocery_index(lib_tasks + r_tasks, groc, list_id)
         if dry:
             where = f"under {groc['id']} ({groc.get('title')})" if groc else f"loose in {list_id}"
-            lines = [f"🥘 DRY RUN · cook {day:%a %d %b} ({meal.week_label(sunday)}) · prep task "
+            lines = [f"🥘 DRY RUN · cook {day:%a %d %b} · batch {wk:%a %d %b}"
+                     f"{' (picked)' if picked else ''} ({meal.week_label(sunday)}) · prep task "
                      f"{prep['id']} ({prep.get('title')})",
                      f"Mela: {len(recipes)} recipes · import +{n_import} (cap {CAP_IMPORT})"
                      f" · fill {n_fill} (cap {CAP_FILL})",
                      f"ratings: would mirror {n_rate} Mela ratings (cap {CAP_RATE})"
                      + "".join(f" · {e['name'][:30]} {meal.stars(n)}" for e, n, _r in rate_cands[:8]),
                      f"calendar {', '.join(cal_names) or '(as given)'}: {len(planned)} planned row(s)"
-                     f" · on {day:%a %d %b}: {len(meals)} meal(s)",
+                     f" · batch {wk:%a %d %b}: {len(meals)} meal(s)",
                      f"pointers: delete {len(old_ids)} {old_ids}"]
             for m in meals:
                 src = "in the library" if m.tid else "NOT in the library"
                 lines.append(f"  create {m.glyph} {m.name} ({m.uuid}) under {prep['id']} due {day} · {src}")
             if not meals:
-                lines.append(f"  ({NOTHING_PLANNED} on {day:%a %d %b})")
+                lines.append(f"  ({NOTHING_PLANNED} in the week of {wk:%a %d %b})")
             keep = [u for u, t in existing.items() if u in picks and _grocery_in_place(t, groc, list_id)]
-            drop = [t["id"] for u, t in existing.items()
-                    if u not in picks or not _grocery_in_place(t, groc, list_id)]
+            drop = [t["id"] for t in twins] + [t["id"] for u, t in existing.items()
+                                               if u not in picks or not _grocery_in_place(t, groc, list_id)]
             lines.append(f"groceries {where} due {gday}: keep {len(keep)}, delete {drop}, "
-                         f"create {len(picks) - len(keep)}")
+                         f"create {len(picks) - len(keep)}"
+                         + (f" · {len(twins)} twin list(s) among the deletes" if twins else ""))
             for p in picks.values():
                 r = by_id.get(p["uuid"])
                 lines.append(f"  {p['name'][:30]}: {len(grocery_body(r)[0])} grocery lines"
                              if r else f"  {p['name'][:30]}: NOT in Mela")
             lines.append(f"weekly note: {meal.note_day(sunday)} (block: "
                          f"{len(note_lines(meals))} line(s))")
-            d_set, d_clear = date_plan(lib_tasks, planned, today)
+            d_set, d_clear = date_plan(lib_tasks, planned, today, since=min(today, wk))
             lines.append(f"library dates: set {len(d_set)}, clear {len(d_clear)}")
             for t, d in d_set[:8]:
                 lines.append(f"  {_name_of(t)[:30]} → {d}")
@@ -1647,7 +1855,7 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
             # the price book, read ONCE for the whole press and handed down
             # (a file, never the network: the sync does not fetch, D26)
             g_made, g_kept, g_gone = _write_groceries(api, list_id, picks, groc, gday,
-                                                      by_id, existing, rpid, _book())
+                                                      by_id, existing, rpid, _book(), extras=twins)
         except Exception as e:
             if _rate_limited(e):
                 _uncache(old_ids, [rpid])
@@ -1655,16 +1863,25 @@ def sync(today=None, api=None, dry=False, planned=None, recipes=None):
                 _refuse_partial("batch partly mirrored", imported, filled)
             raise
         _remember_gone(old_ids)
+        if meals:
+            _remember_batch(wk, {"prep_tid": prep["id"], "prep_day": day.isoformat(),
+                                 "groc_tid": groc["id"] if groc else "",
+                                 "groc_day": gday.isoformat(),
+                                 "pulled_at": datetime.now().isoformat(timespec="minutes"),
+                                 "meals": [m.uuid for m in meals],
+                                 "pointers": [t["id"] for t in made]})
         note_ok = _write_note(meals, sunday)
         _uncache(old_ids + g_gone, [rpid, list_id])
         _cache_add(made + g_made)
-        # last, so a rate limit here leaves the batch already mirrored
-        dated, dates_left = _date_library(api, lib_tasks, planned, today)
+        # last, so a rate limit here leaves the batch already mirrored; the
+        # batch's own day stays on its recipes until that week is cooked
+        dated, dates_left = _date_library(api, lib_tasks, planned, today, since=min(today, wk))
         ids = [t["id"] for t in made] + [t["id"] for t in g_made]
         return Outcome(meal.sync_text(day, meals, len(g_made) + len(g_kept),
                                       imported, filled, note_ok,
                                       dated=dated, dates_left=dates_left,
-                                      rated=rated, ratings_left=ratings_left),
+                                      rated=rated, ratings_left=ratings_left,
+                                      batch=wk),
                        "ctx:meal", ids)
 
 
@@ -1681,18 +1898,22 @@ def _task_day(t):
     return meal.task_date(t)
 
 
-def date_plan(lib_tasks, planned, today):
+def date_plan(lib_tasks, planned, today, since=None):
     """Pure: what every library entry's date should become -> (set, clear).
     A recipe takes its NEAREST planned day on or after today (all-day, the
     day Mela has it on, not the cook Sunday); a recipe with no upcoming plan
     loses its date. Entries already right are left out. `set` =
     [(task, day)], `clear` = [task]. Only library entries (meal.library_entries):
-    groceries, pointers and hand-made rows are never touched."""
+    groceries, pointers and hand-made rows are never touched. `since` (D28)
+    moves the floor back to the batch's cook Sunday, so the recipes of a
+    batch cooked on Monday keep their Sunday instead of losing it the
+    morning after."""
+    floor = min(today, since) if since else today
     upcoming = {}
     for p in planned or []:
         d = getattr(p, "date", None)
         u = (getattr(p, "uuid", "") or "").upper()
-        if d and u and d >= today and (u not in upcoming or d < upcoming[u]):
+        if d and u and d >= floor and (u not in upcoming or d < upcoming[u]):
             upcoming[u] = d
     by_id = {t.get("id"): t for t in lib_tasks or []}
     to_set, to_clear = [], []
@@ -1709,11 +1930,11 @@ def date_plan(lib_tasks, planned, today):
     return to_set, to_clear
 
 
-def _date_library(api, lib_tasks, planned, today):
+def _date_library(api, lib_tasks, planned, today, since=None):
     """Write date_plan: (dated, left). One paced full-object update per
     entry; the 100-a-minute limit stops the pass and `left` says how many
     wait for the next press (the toast: "N dates left · run again")."""
-    to_set, to_clear = date_plan(lib_tasks, planned, today)
+    to_set, to_clear = date_plan(lib_tasks, planned, today, since=since)
     todo = [(t, d) for t, d in to_set] + [(t, None) for t in to_clear]
     dated = 0
     for t, d in todo:
