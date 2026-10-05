@@ -12922,6 +12922,278 @@ def okr_setlist():
         print(f"🥅 OKR list set · {_list_name_of(val) or val}{tail}")
 
 
+# ── 🥘 Meal Prep verbs (HANDOFF_MEAL.md) - thin wrappers over src/meal_write ──
+def _meal_run(rest, fn):
+    """The meal verbs' one runner: decode, run the writer, print its one
+    toast, reopen the payload's back (or the Outcome's) through BrowseCtx
+    so the bar lands clean. A dry run prints the writer's plan text."""
+    import meal_write as mw
+    spec = _pn_decode(rest) if rest else None
+    spec = spec if isinstance(spec, dict) else {}
+    reopen = None
+    try:
+        msg = fn(spec)
+    except mw.Refusal as e:
+        msg, reopen = str(e), getattr(e, "reopen", None)
+    except Exception as e:
+        msg = f"🥘 Not written · {type(e).__name__}: {e}"
+    if isinstance(msg, mw.Outcome):
+        msg, reopen = msg.msg, msg.reopen
+    back = reopen if isinstance(reopen, str) and reopen.startswith("ctx:") else spec.get("back")
+    if isinstance(back, str) and back.startswith("ctx:") and not _dry_meal(spec):
+        try:
+            _run_trigger("BrowseCtx", back)
+        except Exception:
+            pass
+    if msg:
+        print(msg)
+
+
+def _dry_meal(spec):
+    return bool((spec or {}).get("dry")) or os.environ.get("TICKAL_MEAL_DRY") == "1"
+
+
+def meal_sync(rest):
+    """🔄 Sync with Mela (meal_write.sync): recipes in, descriptions filled,
+    the cook week's meals read from the Mela calendar and mirrored onto the
+    routine's pointers + 🛒 groceries + the weekly note. The ONE meal verb -
+    Vex 2026-09-21: "a row that says sync TickTick with Mela, that would do
+    that manually". {"dry": true} or TICKAL_MEAL_DRY=1 prints the plan and
+    writes nothing."""
+    import meal_write as mw
+    _meal_run(rest, lambda spec: mw.sync(dry=_dry_meal(spec)))
+
+
+def meal_setlist():
+    """⚙️ Settings → 🥘 Meal Prep list: paste the library list's id (⌘ Copy
+    id on any list row mints it). Saves config meal_list_id. PRINTED, not
+    _crm_say'd: its Settings road ends at ET End already (okr_setlist)."""
+    import re as _re
+    cur = cfg.get_meal_list_id()
+    a = _ask("🥘 Meal Prep list id (⌘ Copy id on any list · Esc cancels)", default=cur)
+    if a is None:
+        print("🥘 Cancelled")
+        return
+    a = a.strip()
+    if not _re.fullmatch(r"[0-9a-fA-F]{24}", a or ""):
+        print("🥘 That does not look like a list id · nothing saved")
+        return
+    data = cfg.load()
+    data["meal_list_id"] = a
+    cfg.save(data)
+    print(f"🥘 Meal Prep list set · {_list_name_of(a) or a}")
+
+
+def _meal_name(tid):
+    """The recipe's name off the cached library task (meal.parse_title), for
+    a dialog's first line; 'this recipe' when the cache does not hold it."""
+    import meal
+    try:
+        parsed = meal.parse_title((cache_store.find_task(tid) or {}).get("title") or "")
+    except Exception:
+        parsed = None
+    return parsed[0] if parsed else "this recipe"
+
+
+def meal_cooked(rest):
+    """👨‍🍳 Cooked (meal_write.mark_cooked): the 👨‍🍳cooked tag on the
+    library recipe and ONE note for next time, asked in one dialog (Esc or
+    an empty box = no note) - Vex 2026-09-21: "I would like to be able to
+    mark meal cooked via modifier", "know which meals I have cooked before,
+    so I am thinking a tag", "retrospectively I also should be able to add
+    a comment, like add less salt next time". Payload {"pid","tid"[,"back"]}:
+    ⌥⇧ on any meal row that resolves to a library task (the one chord
+    besides ⏎ that runs a row's xact arg) and the ⌘ Actions row, which
+    carries no back (toast only). The dialog is asked INSIDE the writer
+    call so a dry run and a Refusal still ride _meal_run."""
+    import meal_write as mw
+
+    def run(spec):
+        name = _meal_name(spec.get("tid"))
+        note = _ask(f"👨‍🍳 {name} cooked · a note for next time? (Esc = none)",
+                    multiline=True)
+        return mw.mark_cooked(pid=spec.get("pid"), tid=spec.get("tid"),
+                              comment=note or None, dry=_dry_meal(spec))
+    _meal_run(rest, run)
+
+
+def meal_rate(rest):
+    """⭐️ Rate (meal_write.rate): the stars line right under the link header
+    of the recipe's description ("a rating should be quote first liner
+    below links in recipe, stars"), 1 to 5, 0 clears. Payload
+    {"pid","tid","stars"[,"back"]} - the count is picked on the row, so no
+    dialog; a bad count is the writer's refusal."""
+    import meal_write as mw
+    _meal_run(rest, lambda spec: mw.rate(pid=spec.get("pid"), tid=spec.get("tid"),
+                                         stars=spec.get("stars"), dry=_dry_meal(spec)))
+
+
+def meal_comment(rest):
+    """💬 Comment (meal_write.comment): one quote line under the stars
+    ("comment should go below that also as quote"), appended after the
+    earlier ones - "add less salt next time", written after eating. Payload
+    {"pid","tid"[,"back"]}; the text is asked here, Esc cancels with
+    nothing written (an empty box is the writer's refusal)."""
+    import meal_write as mw
+
+    def run(spec):
+        name = _meal_name(spec.get("tid"))
+        text = _ask(f"💬 {name} · note (Esc cancels)", multiline=True)
+        if text is None:
+            return "💬 Cancelled"
+        return mw.comment(pid=spec.get("pid"), tid=spec.get("tid"), text=text,
+                          dry=_dry_meal(spec))
+    _meal_run(rest, run)
+
+
+def meal_portions(rest):
+    """🔢 Portions (meal_write.set_portions): how many portions of each meal
+    this week, ONE dialog per 🛒 list with the count it is cut for now as
+    the default, then that checklist re-cut with its ticks kept - Vex
+    2026-09-22: "can we have a row that would ask me how many portions of
+    each meal I would like to cook this week and then adjust groceries
+    accordingly? Like separate action. Maybe on groceries row for that
+    list under some modifier?" ("We can keep those calculations as are in
+    general", so the sync's own cut stays 7). Payload (meal.portions_payload)
+    {"pid","tid"[,"back"]} = one list (⌥⇧ on a ctx:mealgroc row) or
+    {"all": true[, "back"]} = every open list of the upcoming 🛒 Groceries
+    task (⌥⇧ on the hub's 🛒 Groceries row, meal_write.week_lists). Esc or
+    an empty box skips that list, never the rest; the answers land in ONE
+    toast. The dialogs are asked INSIDE the writer call so a dry run and a
+    Refusal still ride _meal_run."""
+    import meal
+    import meal_scale
+    import meal_write as mw
+    lo, hi = meal_scale.SANE
+
+    def run(spec):
+        if spec.get("tid"):
+            rows = [cache_store.find_task(spec["tid"])
+                    or {"id": spec["tid"], "projectId": spec.get("pid"), "title": ""}]
+        else:
+            rows = mw.week_lists()
+        if not rows:
+            return "🛒 No grocery lists this week · 🔄 Sync with Mela first"
+        results = []
+        for row in rows:
+            parsed = meal.parse_title(row.get("title") or "")
+            name = (parsed[0] if parsed else "") or "this list"
+            cur = mw._portions_of(row)
+            # the first lists were saved without their note: the count is
+            # unknown, not "unscaled" (the sync cut them to 7 all the same)
+            now = f"now {cur}" if cur else f"count unknown · default {meal.PORTIONS}"
+            ans = _ask(f"🛒 {name} · portions? ({now})", default=str(cur or meal.PORTIONS))
+            if ans is None or not ans.strip():
+                results.append(f"{name} skipped")
+                continue
+            try:
+                n = int(ans.strip())
+            except ValueError:
+                results.append(f"{name} skipped (not a number)")
+                continue
+            if n < lo or n > hi:
+                results.append(f"{name} skipped ({lo} to {hi})")
+                continue
+            try:
+                msg = mw.set_portions(pid=row.get("projectId") or row.get("_projectId")
+                                      or spec.get("pid"),
+                                      tid=row.get("id"), portions=n, dry=_dry_meal(spec)).msg
+            except mw.Refusal as e:
+                msg = str(e)
+            except Exception as e:
+                if mw._rate_limited(e):      # retrying inside the window deepens the lockout
+                    results.append(f"{name} · TickTick rate limit · the rest skipped")
+                    break
+                msg = f"{name} · not written · {type(e).__name__}: {e}"
+            results.append(msg[2:] if msg.startswith("🛒 ") else msg)
+        return "🔢 Portions · " + " · ".join(results)
+    _meal_run(rest, run)
+
+
+def meal_prices(rest):
+    """🏷 Prices (meal_write.refresh_prices): the week's ingredient keys
+    priced from knuspr.de into the book and every 🛒 list re-priced in
+    place, suffixes and cost line - Vex 2026-09-22: "how feasible is the
+    idea of price speculations? Like how much will each ingredient cost
+    and total per meal?", "Could we not scrape prices of that site, write
+    them in the pricebook and use that?", "Speculation is all I need."
+    One of the two roads to the network (the other: a book row's ⌥⇧ search term), and only when this row is pressed (⌥⇧
+    on the hub's 🏷 row): never a hitchhiker, never a LaunchAgent. Payload
+    {"back"}; {"dry": true} or TICKAL_MEAL_DRY=1 names the keys and
+    fetches nothing."""
+    import meal_write as mw
+    _meal_run(rest, lambda spec: mw.refresh_prices(dry=_dry_meal(spec)))
+
+
+def _price_default(entry):
+    """The dialog's default for a key the book already prices: the entry's
+    own "<price> / <pack amount> <pack unit>" ("3.19 / 10 pc"), so Return
+    keeps what it had; "" when the entry lacks one of the three."""
+    e = entry or {}
+    try:
+        if e.get("price") is None or e.get("pack_amount") is None or not e.get("pack_unit"):
+            return ""
+        return f"{float(e['price']):g} / {float(e['pack_amount']):g} {e['pack_unit']}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def meal_price_set(rest):
+    """✍️ A price by hand (meal_write.set_price): ⏎ on a ctx:mealprice
+    row asks "price / amount unit" in ONE dialog ("2.99 / 10 pc", "1.49 /
+    100 g", "7.97 / 1 l"), the entry's own pack as the default when the
+    book has one; Esc or an empty box cancels with nothing written, and
+    a text the writer cannot read is its refusal. A manual price wins
+    over knuspr's for good (the refresh never touches it). The same box
+    takes "pantry" / "not pantry" (D27, Vex 2026-09-23: "Let's do what
+    you pay at the till please."): the writer flips the entry's pantry
+    flag instead of parsing a price, so a staple the till should report
+    apart needs no second dialog. Payload {"key","back"}. Asked INSIDE
+    the writer call so a Refusal still rides _meal_run; a dry run never
+    opens the dialog."""
+    import meal_price as mp
+    import meal_write as mw
+
+    def run(spec):
+        key = (spec.get("key") or "").strip()
+        if not key:
+            return "🏷 No ingredient"
+        if _dry_meal(spec):
+            return f"🥘 Dry run · would ask a price for {key}"
+        entry = ((mp.load_book().get("entries") or {}).get(key))
+        ans = _ask(f"🏷 {key} · price? (e.g. 2.99 / 10 pc, 1.49 / 100 g · or: pantry / not pantry)",
+                   default=_price_default(entry if isinstance(entry, dict) else None))
+        if ans is None or not ans.strip():
+            return "🏷 Cancelled"
+        return mw.set_price(key, ans.strip())
+    _meal_run(rest, run)
+
+
+def meal_price_search(rest):
+    """🔍 A search term by hand (meal_write.set_search): ⌥⇧ on a
+    ctx:mealprice row asks what to type into knuspr.de, the term the
+    refresh would use as the default (meal_price.search_term: the entry's
+    own, else the English-to-German table, else the key), then that ONE
+    key is looked up at once - the second and last road to the network,
+    one call. Esc or an empty box cancels with nothing written. Payload
+    {"key","back"}; a dry run never asks and never fetches."""
+    import meal_price as mp
+    import meal_write as mw
+
+    def run(spec):
+        key = (spec.get("key") or "").strip()
+        if not key:
+            return "🏷 No ingredient"
+        if _dry_meal(spec):
+            return f"🥘 Dry run · would ask a search term for {key}"
+        ans = _ask(f"🏷 {key} · search term on knuspr.de",
+                   default=mp.search_term(key, mp.load_book()))
+        if ans is None or not ans.strip():
+            return "🏷 Cancelled"
+        return mw.set_search(key, ans.strip())
+    _meal_run(rest, run)
+
+
 def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else ""
     if not arg.startswith("xact:"):
