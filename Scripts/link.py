@@ -184,6 +184,13 @@ def _resolve(xact, tid, pid_hint):
     A completed/won't-do INSTANCE of a repeating task heals to its series.
     None when nothing knows the task."""
     cs = xact.cache_store
+    # a registry id that moved to a split successor (routines.py, "a
+    # routine's id can move"): the Finish link pasted under the old series
+    # completes the live one. BEFORE series_id: a series ended by a split is
+    # completed and carries repeatTaskId (its own predecessor), which
+    # series_id would read as an instance and heal the wrong way, backwards
+    import routines as rt
+    tid = rt.current_tid(tid)
     tid = rl.series_id(tid, cs.get("completed_tasks"), cs.get("wontdo_tasks")) or tid
     t = cs.find_task(tid)
     if t:

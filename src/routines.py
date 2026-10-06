@@ -1,4 +1,5 @@
-"""routines.py - the routine registry (PURE: stdlib only, no I/O).
+"""routines.py - the routine registry (PURE: stdlib only; the ONE file it
+reads is the id overlay, at import - see "a routine's id can move").
 
 Vex's routines are TickTick tasks whose steps are subtasks, and each has a
 Keyboard Maestro macro that opens the whole workspace for it ("… • Start":
@@ -23,7 +24,11 @@ ROUTINES_LIST = "6a268ea18f081f1de80eaeb5"      # 🌅 Routines
 # out of 🌓 Quarterly Retreat into 🌅 Routines hours after it was minted).
 ROUTINES = (
     {"key": "startup", "label": "🌅 Startup",
-     "tid": "6a9faa51635ed1022425af34", "pid": ROUTINES_LIST,
+     "tid": "6ac351e161562864d514cb67", "pid": ROUTINES_LIST,
+     # the ids this series had before TickTick split it (2026-09-05, then
+     # 2026-10-05 when Vex moved it to 05:30): a Finish link pasted under
+     # either still finds the routine, current_tid maps it to the live one
+     "was": ["6a9faa51635ed1022425af34", "6a9c0901b0db910232dea1bb"],
      "macro": "3BE75925-603A-4962-98B1-55686A7DDE6C",
      "habit": "6aa5379e8f081102b4f0d1ec"},          # 🌅 Startup (daily)
     {"key": "shutdown", "label": "🌆 Shutdown",
@@ -67,9 +72,19 @@ def by_key(key):
     return next((r for r in ROUTINES if r["key"] == key), None)
 
 
-def by_tid(tid):
-    """The routine whose task this is, or None."""
-    return next((r for r in ROUTINES if r["tid"] == tid), None)
+def by_tid(tid, routines=None):
+    """The routine whose task this is - by its live id OR any id it had
+    before a split (r["was"]) - or None."""
+    return next((r for r in (ROUTINES if routines is None else routines)
+                 if r["tid"] == tid or tid in (r.get("was") or ())), None)
+
+
+def current_tid(tid, routines=None):
+    """The live id of the routine this id belongs or belonged to, else the
+    id unchanged: a Finish link minted under an earlier series completes
+    the series that replaced it."""
+    r = by_tid(tid, routines)
+    return r["tid"] if r else tid
 
 
 def valid_macro(uid):
@@ -371,3 +386,221 @@ def due_state(task, today=None):
     state = "today" if day == today else ("ahead" if day > today else "overdue")
     return {"state": state, "date": day, "days": (day - today).days, "rule": rule,
             "prev": prev_occurrence(day, task.get("repeatFlag"))}
+
+
+# ── a routine's id can MOVE: the split series (2026-10-06) ──────────────────
+# TickTick keeps ONE id for a repeating task only until its rule is edited
+# for the future occurrences (a new time with "this and following" in the
+# app, Vex's way of moving a routine). Then it ENDS the old series - UNTIL=
+# that day, so the last Finish completes it for good instead of rolling it -
+# mints a NEW task for the rest with repeatTaskId = the old id, and copies
+# every step of the tree as a loose top-level task carrying the id of the
+# step it was copied from, with NO parent (the app's own bug: 2026-09-12 the
+# weekly, 2026-10-02 the reviews, 2026-10-05 the Startup, whose registry id
+# died with it and the morning after ran on a finished task with no steps).
+# So a routine's id is the constant above PLUS an overlay the heal writes,
+# routine_ids.json in the run dir: {"startup": {"tid": "<new>", "was":
+# ["<old>", ...]}}. by_tid answers for every id a routine ever had,
+# current_tid maps any of them to the live one, and xact._routine_adopt
+# (the ⌃ Start and the Finish roads) follows a split: the successor is
+# found by repeatTaskId, never by title, the steps go back under it, the
+# copies go. The helpers below are pure; only load/save touch the file.
+import json as _json
+import os as _os
+
+OVERLAY_NAME = "routine_ids.json"
+SPLIT_BATCH_S = 5          # the app writes a successor and its copies in one batch
+
+
+def _ok_id(s):
+    return isinstance(s, str) and len(s) == 24 and all(c in "0123456789abcdef" for c in s)
+
+
+def _when(iso):
+    """A TickTick stamp as an aware datetime (either tz format), or None."""
+    if not iso:
+        return None
+    try:
+        txt = str(iso).replace("Z", "+00:00")
+        if _re.search(r"[+-]\d{4}$", txt):
+            txt = txt[:-2] + ":" + txt[-2:]
+        return _dt.datetime.fromisoformat(txt)
+    except (ValueError, TypeError):
+        return None
+
+
+def run_dir():
+    """Where runtime state lives: TICKAL_RUN_DIR (the test gate's scratch
+    dir, script_base.RUN_DIR) else ~/.ticktick_alfred/run."""
+    return (_os.environ.get("TICKAL_RUN_DIR") or "").strip() or \
+        _os.path.join(_os.path.expanduser("~"), ".ticktick_alfred", "run")
+
+
+def overlay_path():
+    return _os.path.join(run_dir(), OVERLAY_NAME)
+
+
+def load_overlay(path=None):
+    """The overlay mapping, {} when absent or unreadable (the constants
+    then stand)."""
+    try:
+        with open(path or overlay_path()) as f:
+            raw = _json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def save_overlay(mapping, path=None):
+    """Write the overlay whole (tmp + rename). True when it landed."""
+    path = path or overlay_path()
+    try:
+        _os.makedirs(_os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            _json.dump(mapping, f, indent=1)
+        _os.replace(tmp, path)
+        return True
+    except OSError:
+        return False
+
+
+def apply_overlay(mapping, routines=None):
+    """Lay the overlay over the registry IN PLACE: an entry's tid becomes
+    the routine's, and every earlier id (the constant, the routine's own
+    was, the entry's was) joins r["was"]. Returns the keys whose live id
+    changed. A malformed entry is skipped, never half-applied."""
+    changed = []
+    for r in (ROUTINES if routines is None else routines):
+        e = (mapping or {}).get(r["key"])
+        if not isinstance(e, dict) or not _ok_id(e.get("tid")):
+            continue
+        new = e["tid"]
+        was = []
+        for w in [r["tid"]] + list(r.get("was") or ()) + list(e.get("was") or ()):
+            if _ok_id(w) and w != new and w not in was:
+                was.append(w)
+        if r["tid"] != new:
+            changed.append(r["key"])
+        r["tid"], r["was"] = new, was
+    return changed
+
+
+def adopt(mapping, key, new_tid, old_tid):
+    """The overlay after a routine moved to a split successor: a NEW
+    mapping (the caller saves it). The id it moved from, and every id the
+    entry already listed, stay in `was`."""
+    out = dict(mapping or {})
+    e = out.get(key) if isinstance(out.get(key), dict) else {}
+    was = []
+    for w in [old_tid] + ([e.get("tid")] if e.get("tid") else []) + list(e.get("was") or ()):
+        if _ok_id(w) and w != new_tid and w not in was:
+            was.append(w)
+    out[key] = {"tid": new_tid, "was": was}
+    return out
+
+
+def split_end(task):
+    """True when a series was ENDED by a split: completed, its rule carrying
+    UNTIL. A series TickTick ends this way completes for good at its last
+    Finish instead of rolling."""
+    t = task or {}
+    return t.get("status") == 2 and "UNTIL=" in (t.get("repeatFlag") or "").upper()
+
+
+def successor_candidates(old, tasks):
+    """Open, parentless, repeating tasks in the old series' list, born no
+    earlier than it, newest first: the few worth a v2 read (repeatTaskId
+    is a v2-only field; v1 strips it)."""
+    old = old or {}
+    pid, born = old.get("projectId"), _when(old.get("createdTime"))
+    out = []
+    for t in tasks or ():
+        if not t.get("id") or t.get("id") == old.get("id"):
+            continue
+        if t.get("parentId") or t.get("status", 0) != 0 or not t.get("repeatFlag"):
+            continue
+        if pid and t.get("projectId") and t.get("projectId") != pid:
+            continue
+        made = _when(t.get("createdTime"))
+        if born and made and made < born:
+            continue
+        out.append(t)
+    out.sort(key=lambda t: _when(t.get("createdTime")) or _dt.datetime.min.replace(tzinfo=_dt.timezone.utc),
+             reverse=True)
+    return out
+
+
+def is_successor(full, old_tid):
+    """The v2 read of a candidate IS the split successor of old_tid: it
+    points back at it, is open, kept, and repeats."""
+    f = full or {}
+    return (f.get("repeatTaskId") == old_tid and f.get("status", 0) == 0
+            and not f.get("deleted") and bool(f.get("repeatFlag")))
+
+
+def tree_ids(root_tid, tasks, cap=400):
+    """Every id under root (any status), read from childIds AND parentId,
+    root excluded, archived occurrences (repeatTaskId) skipped whole, the
+    way routine_runner.completed_descendants walks."""
+    by_id, kids = {}, {}
+    for t in tasks or ():
+        tid = t.get("id")
+        if not tid:
+            continue
+        by_id[tid] = t
+        if t.get("parentId"):
+            kids.setdefault(t["parentId"], []).append(tid)
+    seen, queue, out = {root_tid}, [root_tid], []
+    while queue and len(out) < cap:
+        cur = queue.pop(0)
+        for kid in list((by_id.get(cur) or {}).get("childIds") or []) + kids.get(cur, []):
+            if kid in seen:
+                continue
+            seen.add(kid)
+            if (by_id.get(kid) or {}).get("repeatTaskId"):
+                continue
+            out.append(kid)
+            queue.append(kid)
+    return set(out)
+
+
+def loose_copy_candidates(succ, tasks, within=SPLIT_BATCH_S):
+    """Open, parentless, non-repeating tasks in the successor's list born
+    within `within` seconds of it: the app writes the successor and the
+    copies of its steps in one batch. Each still needs the v2 read
+    (is_loose_copy) before anything is deleted."""
+    succ = succ or {}
+    at = _when(succ.get("createdTime"))
+    if at is None:
+        return []
+    out = []
+    for t in tasks or ():
+        if not t.get("id") or t.get("id") == succ.get("id"):
+            continue
+        if t.get("parentId") or t.get("status", 0) != 0 or t.get("repeatFlag"):
+            continue
+        if succ.get("projectId") and t.get("projectId") and t.get("projectId") != succ["projectId"]:
+            continue
+        made = _when(t.get("createdTime"))
+        if made is None or abs((made - at).total_seconds()) > within:
+            continue
+        out.append(t)
+    return out
+
+
+def is_loose_copy(full, tree):
+    """The v2 read of a candidate IS a copy of a step of the old tree:
+    repeatTaskId names a step in it, still open, still parentless."""
+    f = full or {}
+    return (bool(f.get("repeatTaskId")) and f.get("repeatTaskId") in (tree or ())
+            and not f.get("parentId") and f.get("status", 0) == 0 and not f.get("deleted"))
+
+
+def retitle(title, old_tid, new_tid):
+    """A step's title with the old series id swapped for the live one (the
+    Finish link carries it: done%3A<tid>%3A<pid>)."""
+    return (title or "").replace(old_tid, new_tid) if old_tid and new_tid else (title or "")
+
+
+apply_overlay(load_overlay())

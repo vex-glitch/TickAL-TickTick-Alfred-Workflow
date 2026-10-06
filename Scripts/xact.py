@@ -7407,17 +7407,186 @@ def _routine_reset_bg(key):
         pass
 
 
-def routine_task(r):
-    """The routine's task, LIVE when the API answers (the cache can be a
-    completion behind, and "which occurrence" is exactly what goes stale),
-    else the cached copy, else {}."""
+def _routine_adopt(r, old, dry=False):
+    """A routine whose series TickTick SPLIT: adopt the successor.
+
+    Vex 2026-10-05 moved 🌅 Startup to 05:30 for the days ahead. TickTick
+    does that as a split: the old series got UNTIL=that day (so his Finish
+    at 09:39 completed it for good), a new task took the rule from the next
+    day with repeatTaskId = the old id, and the twelve steps were copied as
+    loose top-level tasks with no parent, each carrying the id of the step
+    it was copied from (the app's bug, third time). The registry still
+    named the old id, so the next morning's ⌃ Start ran on a finished task
+    with no steps: "no subtasks in the list ... all subtasks are a mess".
+
+    Here, from the old series' list (v1) and the v2 reads that carry
+    repeatTaskId: (1) the successor = the open repeating parentless task
+    pointing back at the old id (never a title match); (2) the old tree's
+    ids (open rows + the completed feed, routines.tree_ids); (3) the loose
+    copies = parentless tasks born in the successor's batch whose
+    repeatTaskId is a step of that tree; (4) the old series' children.
+    Then, in this order: the titles carrying the old id (the Finish link)
+    get the new one - a v1 full-object write, so BEFORE the re-parent; the
+    children move under the successor (v2 taskParent, the only road that
+    moves a subtask); the copies are deleted; the overlay is written and
+    applied, so this process and every later one name the successor.
+    dry=True plans and writes nothing. Returns (successor row or None,
+    note) - "" when this is not a split we can follow (a series ended on
+    purpose, a deleted task): the caller then runs on what it has."""
+    import routines as rt
+    import api_v2
+    api, v2 = _api(), api_v2.TickTickV2()
+    old_tid = r["tid"]                     # apply_overlay below moves r["tid"]
+    pid = (old or {}).get("projectId") or r["pid"]
+    try:
+        bag = list((api.get_project_data(pid) or {}).get("tasks") or [])
+    except Exception as e:
+        return None, f"🔁 list unreadable ({type(e).__name__})"
+    if not v2.token:
+        return None, "🔁 needs the v2 login"
+    old_row = old or next((t for t in bag if t.get("id") == old_tid), None) \
+        or {"id": old_tid, "projectId": pid}
+    succ = None
+    for c in rt.successor_candidates(old_row, bag)[:12]:
+        if rt.is_successor(v2.get_task(c["id"]), old_tid):
+            succ = c
+            break
+    if not succ:
+        return None, ""
+    done = v2.project_completed(pid, days=120) or []
+    tree = rt.tree_ids(old_tid, bag + done)
+    copies = [c for c in rt.loose_copy_candidates(succ, bag)
+              if rt.is_loose_copy(v2.get_task(c["id"]), tree)]
+    kids = [t for t in bag if t.get("parentId") == old_tid and t.get("status", 0) == 0]
+    # the last occurrence's ticked steps too, so the reset step finds them
+    # under the new series (a split between a Finish and its reset)
+    kids_done = [t for t in done if t.get("parentId") == old_tid
+                 and not t.get("repeatTaskId") and t.get("id") not in {k["id"] for k in kids}]
+    relink = [t for t in bag if t.get("id") in tree and old_tid in (t.get("title") or "")]
+    plan = (f"successor {succ['id']} · {len(kids)} open + {len(kids_done)} done steps"
+            f" · {len(copies)} copies · {len(relink)} links")
+    if dry:
+        return succ, plan
+    n_link, titles = 0, {}
+    for t in relink:
+        try:
+            titles[t["id"]] = rt.retitle(t.get("title"), old_tid, succ["id"])
+            api.update_task(t["id"], pid, current=t, title=titles[t["id"]])
+            n_link += 1
+        except Exception:
+            titles.pop(t["id"], None)
+    ops = [{"taskId": k["id"], "projectId": pid, "parentId": succ["id"]}
+           for k in kids + kids_done]
+    ok_kids = v2.task_parent(ops) if ops else True
+    if not ok_kids and kids_done:          # a done step the server would not move
+        ok_kids = v2.task_parent(ops[:len(kids)]) if kids else True
+    n_del = 0
+    for c in copies:
+        try:
+            api.delete_task(pid, c["id"])
+            n_del += 1
+        except Exception:
+            pass
+    mapping = rt.adopt(rt.load_overlay(), r["key"], succ["id"], old_tid)
+    saved = rt.save_overlay(mapping)
+    rt.apply_overlay(mapping)              # this process names the successor from here on
+    # the cache follows IN PLACE: an invalidation would leave the 🌓 hub on
+    # "not synced yet" for every routine until the hourly sync (the cache
+    # has no TTL); the completed pool is untouched, the Finish guard reads it
+    try:
+        cached = cache_store.get("all_tasks")
+        if cached is not None:
+            gone = {c["id"] for c in copies} | {old_tid}
+            moved = {k["id"] for k in kids + kids_done}
+            rows = []
+            for t in cached:
+                if t.get("id") in gone:
+                    continue
+                if t.get("id") in moved:
+                    t = dict(t, parentId=succ["id"])
+                if t.get("id") in titles:
+                    t = dict(t, title=titles[t["id"]])
+                rows.append(t)
+            if all(t.get("id") != succ["id"] for t in rows):
+                rows.append(dict(succ))
+            cache_store.set("all_tasks", rows)
+        cache_store.invalidate(f"project_data_{pid}")
+    except Exception:
+        try:
+            cache_store.invalidate("all_tasks")
+        except Exception:
+            pass
+    try:
+        with open(ROUTINE_LOG, "a") as log:
+            log.write(f"{_op_iso()} split {r['label']}: {plan} -> steps moved "
+                      f"{'ok' if ok_kids else 'FAILED'}, {n_del} copies deleted, "
+                      f"{n_link} links renamed, overlay {'saved' if saved else 'NOT saved'}\n")
+    except OSError:
+        pass
+    note = f"🔁 new series adopted · {len(kids) + len(kids_done)} steps back under it"
+    if n_del:
+        note += f" · {n_del} copies removed"
+    if not ok_kids:
+        note += " · ⚠️ steps did not move"
+    if not saved:
+        note += " · ⚠️ overlay not saved"
+    return succ, note
+
+
+def _routine_live(r):
+    """(task, note): the routine's task LIVE when the API answers (the
+    cache can be a completion behind, and "which occurrence" is exactly
+    what goes stale), healed across a split (_routine_adopt) when the id
+    names a series TickTick ended or a task that is gone; else the cached
+    copy, else {}. The note is the heal's toast suffix, "" otherwise."""
+    import routines as rt
+    t, gone = None, False
     try:
         t = _api().get_task(r["pid"], r["tid"])
-        if t and t.get("id") == r["tid"]:
-            return t
+        if not t or t.get("id") != r["tid"]:
+            t = None
+    except Exception as e:
+        if getattr(getattr(e, "response", None), "status_code", None) == 404:
+            gone = True
+        else:
+            return cache_store.find_task(r["tid"]) or {}, ""
+    if t is not None and not rt.split_end(t):
+        return t, ""
+    if t is None and not gone:
+        return cache_store.find_task(r["tid"]) or {}, ""
+    succ, note = _routine_adopt(r, t)
+    if succ:
+        return succ, note
+    return (t or cache_store.find_task(r["tid"]) or {}), note
+
+
+def routine_task(r):
+    """The routine's task (see _routine_live)."""
+    return _routine_live(r)[0]
+
+
+def routine_heal(rest):
+    """xact:routine_heal:<key>[:dry] - follow a split by hand (the road
+    the ⌃ Start and the Finish take on their own). dry plans only."""
+    import routines as rt
+    key, _, flag = rest.partition(":")
+    r = rt.by_key(key.strip())
+    if not r:
+        print("🔁 Unknown routine")
+        return
+    try:
+        t = _api().get_task(r["pid"], r["tid"])
     except Exception:
-        pass
-    return cache_store.find_task(r["tid"]) or {}
+        t = None
+    if t and t.get("id") == r["tid"] and not rt.split_end(t):
+        print(f"🔁 {r['label']} · series live, nothing to adopt")
+        return
+    succ, note = _routine_adopt(r, t if t and t.get("id") == r["tid"] else None,
+                                dry=flag.strip() == "dry")
+    if not succ:
+        print(f"🔁 {r['label']} · no successor" + (f" · {note}" if note else ""))
+        return
+    print(f"🔁 {r['label']} · {note}")
 
 
 def routine_start(key):
@@ -7435,11 +7604,12 @@ def routine_start(key):
     if not r:
         print("▶️ Unknown routine")
         return
-    st = rt.due_state(routine_task(r))
+    t, note = _routine_live(r)          # healed across a split, note = its toast
+    st = rt.due_state(t)
     if st["state"] == "ahead":
         _run_trigger("BrowseCtx", f"ctx:rconfirm:{key}")   # clean bar, no arg
         return
-    routine_run(key)
+    routine_run(key, note)
 
 
 def routine_late(key):
@@ -7502,7 +7672,7 @@ def routine_late(key):
     routine_run(key)
 
 
-def routine_run(key):
+def routine_run(key, note=""):
     """🌓 Routines ⌃ and the routine:<key> link: open the whole workspace.
     DETACHED - a routine relaunches TickTick and runs 20-60 s while this node
     is sequential; the toast goes out at once, the log carries the rest.
@@ -7526,7 +7696,7 @@ def routine_run(key):
     except OSError as e:
         print(f"▶️ Start failed · {type(e).__name__}")
         return
-    print(f"▶️ {r['label']} started · {len(steps)} steps")
+    print(f"▶️ {r['label']} started · {len(steps)} steps" + (f" · {note}" if note else ""))
 
 
 def km_run(rest):
@@ -13616,6 +13786,8 @@ def main():
             routine_exec(rest)
         elif verb == "routine_reset_after":
             routine_reset_after(rest)
+        elif verb == "routine_heal":
+            routine_heal(rest)
         elif verb == "pn_journal":
             pn_journal(rest)
         elif verb == "u_append":

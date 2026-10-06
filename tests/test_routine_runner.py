@@ -276,6 +276,150 @@ else:
           rr.completed_descendants("root", []) == ([], [])
           and rr.completed_descendants("root", None) == ([], []))
 
+    # ── a routine's id can move: the split series (2026-10-06) ─────────────────
+    # Vex moved 🌅 Startup to 05:30 for the days ahead; TickTick ended the old
+    # series (UNTIL=that day), minted a successor with repeatTaskId = the old
+    # id, and copied the twelve steps as loose parentless tasks. The registry
+    # named the old id, and the next morning ran on a finished task.
+    import json as _json
+    import tempfile as _tf
+    OLD, NEW, PID = "6a9faa51635ed1022425af34", "6ac351e161562864d514cb67", "6a268ea18f081f1de80eaeb5"
+    GRAND = "6a9c0901b0db910232dea1bb"
+    check("split_end: completed + UNTIL",
+          rt.split_end({"status": 2, "repeatFlag": "RRULE:FREQ=DAILY;UNTIL=20261005;INTERVAL=1"}))
+    check("split_end: an open series with UNTIL is still running",
+          not rt.split_end({"status": 0, "repeatFlag": "RRULE:FREQ=DAILY;UNTIL=20261005"}))
+    check("split_end: a completed one-off is not a split",
+          not rt.split_end({"status": 2, "repeatFlag": None})
+          and not rt.split_end({"status": 2, "repeatFlag": "RRULE:FREQ=DAILY;INTERVAL=1"}))
+    check("split_end survives None", not rt.split_end(None))
+
+    OLD_T = {"id": OLD, "projectId": PID, "createdTime": "2026-09-05T14:20:17+0200",
+             "status": 2, "repeatFlag": "RRULE:FREQ=DAILY;UNTIL=20261005;INTERVAL=1",
+             "childIds": ["s1", "s2", "dead"]}
+    SUCC = {"id": NEW, "projectId": PID, "createdTime": "2026-10-05T09:29:37+0200",
+            "status": 0, "repeatFlag": "RRULE:FREQ=DAILY;INTERVAL=1"}
+    GYM = {"id": "6ac3527c61562864d514ce83", "projectId": PID, "createdTime": "2026-10-05T09:32:28+0200",
+           "status": 0, "repeatFlag": "RRULE:FREQ=DAILY;INTERVAL=1"}
+    SHUT = {"id": "6a268ea28f081f1de80eb10b", "projectId": PID, "createdTime": "2026-03-15T14:55:17+0100",
+            "status": 0, "repeatFlag": "RRULE:FREQ=DAILY;INTERVAL=1"}
+    STEP = {"id": "s1", "projectId": PID, "parentId": OLD, "status": 0,
+            "title": f"[Finish Startup](alfred://runtrigger/com.vex.tickal/Link/?argument=done%3A{OLD}%3A{PID})",
+            "createdTime": "2026-09-12T13:31:00+0200"}
+    STEP2 = {"id": "s2", "projectId": PID, "parentId": OLD, "status": 0, "title": "[Calendar](x)",
+             "createdTime": "2026-09-08T09:15:00+0200", "childIds": ["s2a"]}
+    GRANDKID = {"id": "s2a", "projectId": PID, "parentId": "s2", "status": 0, "title": "Check todays schedule"}
+    COPY1 = {"id": "c1", "projectId": PID, "status": 0, "title": STEP["title"],
+             "createdTime": "2026-10-05T09:29:37+0200"}
+    COPY2 = {"id": "c2", "projectId": PID, "status": 0, "title": "Check todays schedule",
+             "createdTime": "2026-10-05T09:29:38+0200"}
+    LATER = {"id": "l1", "projectId": PID, "status": 0, "title": "Buy milk",
+             "createdTime": "2026-10-05T09:31:00+0200"}
+    ELSEWHERE = {"id": "e1", "projectId": "other", "status": 0, "repeatFlag": "RRULE:FREQ=DAILY",
+                 "createdTime": "2026-10-05T09:29:37+0200"}
+    DONE_COPY = {"id": "a1", "projectId": PID, "status": 2, "repeatTaskId": OLD,
+                 "createdTime": "2026-10-04T08:40:56+0200", "childIds": ["a1s"]}
+    BAG = [OLD_T, SUCC, GYM, SHUT, STEP, STEP2, GRANDKID, COPY1, COPY2, LATER, ELSEWHERE, DONE_COPY]
+
+    cands = rt.successor_candidates(OLD_T, BAG)
+    check("successor candidates: open repeating parentless, same list, born after, newest first",
+          [c["id"] for c in cands] == [GYM["id"], NEW], [c["id"] for c in cands])
+    check("successor candidates: a series born before the old one is skipped (Shutdown)",
+          SHUT["id"] not in [c["id"] for c in cands])
+    check("successor candidates: an old task without a birth stamp keeps every series",
+          SHUT["id"] in [c["id"] for c in rt.successor_candidates({"id": OLD, "projectId": PID}, BAG)])
+    check("successor candidates: across tz formats",
+          [c["id"] for c in rt.successor_candidates(dict(OLD_T, createdTime="2026-09-05T12:20:17.000+0000"), BAG)]
+          == [GYM["id"], NEW])
+    check("successor candidates: None bag", rt.successor_candidates(OLD_T, None) == [])
+    check("is_successor: repeatTaskId points at the old id, open, kept, repeating",
+          rt.is_successor({"repeatTaskId": OLD, "status": 0, "deleted": 0, "repeatFlag": "RRULE:FREQ=DAILY"}, OLD))
+    check("is_successor: a deleted or completed or non-repeating pointer is not",
+          not rt.is_successor({"repeatTaskId": OLD, "status": 0, "deleted": 1, "repeatFlag": "RRULE:FREQ=DAILY"}, OLD)
+          and not rt.is_successor({"repeatTaskId": OLD, "status": 2, "repeatFlag": "RRULE:FREQ=DAILY"}, OLD)
+          and not rt.is_successor({"repeatTaskId": OLD, "status": 0, "repeatFlag": None}, OLD)
+          and not rt.is_successor({"repeatTaskId": GRAND, "status": 0, "repeatFlag": "RRULE:FREQ=DAILY"}, OLD)
+          and not rt.is_successor(None, OLD))
+
+    tree = rt.tree_ids(OLD, BAG)
+    check("tree_ids: childIds and parentId both walked, grandchildren in, root out, dead ids kept",
+          tree == {"s1", "s2", "s2a", "dead"}, tree)
+    check("tree_ids: an archived occurrence is skipped whole",
+          "a1" not in tree and "a1s" not in tree)
+    check("tree_ids: a cycle cannot hang the walk",
+          rt.tree_ids("r", [{"id": "r", "childIds": ["a"]}, {"id": "a", "parentId": "r", "childIds": ["r", "a"]}]) == {"a"})
+    check("tree_ids: empty", rt.tree_ids(OLD, []) == set() and rt.tree_ids(OLD, None) == set())
+
+    loose = rt.loose_copy_candidates(SUCC, BAG)
+    check("loose copies: parentless non-repeating open tasks born in the successor's batch",
+          sorted(c["id"] for c in loose) == ["c1", "c2"], [c["id"] for c in loose])
+    check("loose copies: a task made minutes later, a series, a step with a parent, another list are not",
+          not {LATER["id"], GYM["id"], "s1", "e1"} & {c["id"] for c in loose})
+    check("loose copies: a successor without a birth stamp yields nothing",
+          rt.loose_copy_candidates({"id": NEW}, BAG) == [])
+    check("is_loose_copy: repeatTaskId names a step of the old tree",
+          rt.is_loose_copy({"repeatTaskId": "s1", "status": 0}, tree)
+          and rt.is_loose_copy({"repeatTaskId": "s2a", "status": 0}, tree))
+    check("is_loose_copy: a copy of something else, a parented or completed or deleted one is not",
+          not rt.is_loose_copy({"repeatTaskId": "zzz", "status": 0}, tree)
+          and not rt.is_loose_copy({"repeatTaskId": "s1", "status": 0, "parentId": NEW}, tree)
+          and not rt.is_loose_copy({"repeatTaskId": "s1", "status": 2}, tree)
+          and not rt.is_loose_copy({"repeatTaskId": "s1", "status": 0, "deleted": 1}, tree)
+          and not rt.is_loose_copy({"status": 0}, tree) and not rt.is_loose_copy(None, tree))
+    check("retitle: the Finish link carries the live id",
+          rt.retitle(STEP["title"], OLD, NEW) == STEP["title"].replace(OLD, NEW)
+          and NEW in rt.retitle(STEP["title"], OLD, NEW) and OLD not in rt.retitle(STEP["title"], OLD, NEW))
+    check("retitle: no id, no change", rt.retitle("x", "", NEW) == "x" and rt.retitle(None, OLD, NEW) == "")
+
+    # the overlay: a private registry, never the module's
+    REG = [{"key": "startup", "label": "🌅", "tid": OLD, "pid": PID},
+           {"key": "shutdown", "label": "🌆", "tid": SHUT["id"], "pid": PID}]
+    m = rt.adopt({}, "startup", NEW, OLD)
+    check("adopt: the new mapping names the successor and keeps the old id",
+          m == {"startup": {"tid": NEW, "was": [OLD]}}, m)
+    m2 = rt.adopt(m, "startup", "6ad000000000000000000001", NEW)
+    check("adopt twice: every earlier id stays, newest first",
+          m2["startup"] == {"tid": "6ad000000000000000000001", "was": [NEW, OLD]}, m2)
+    check("adopt leaves the other entries", rt.adopt(m, "shutdown", NEW, SHUT["id"])["startup"] == m["startup"])
+    reg = [dict(r) for r in REG]
+    changed = rt.apply_overlay(m, reg)
+    check("apply_overlay: the live id moves, the constant joins was, the key is reported",
+          changed == ["startup"] and reg[0]["tid"] == NEW and reg[0]["was"] == [OLD], (changed, reg[0]))
+    check("apply_overlay: the other routine is untouched", reg[1]["tid"] == SHUT["id"] and "was" not in reg[1])
+    check("apply_overlay twice changes nothing more",
+          rt.apply_overlay(m, reg) == [] and reg[0]["was"] == [OLD])
+    reg = [dict(r) for r in REG]
+    check("apply_overlay: a malformed entry is skipped whole",
+          rt.apply_overlay({"startup": {"tid": "nope"}, "shutdown": "x"}, reg) == []
+          and reg[0]["tid"] == OLD and "was" not in reg[0])
+    check("apply_overlay: a constant that already carries was keeps it",
+          (lambda r: (rt.apply_overlay(m, [r]), r["was"])[1])(
+              {"key": "startup", "tid": OLD, "pid": PID, "was": [GRAND]}) == [OLD, GRAND])
+    check("apply_overlay: None mapping", rt.apply_overlay(None, [dict(r) for r in REG]) == [])
+    reg = [dict(r) for r in REG]
+    rt.apply_overlay(m, reg)
+    check("by_tid finds a routine by an id it had", rt.by_tid(OLD, reg)["key"] == "startup"
+          and rt.by_tid(NEW, reg)["key"] == "startup" and rt.by_tid(GRAND, reg) is None)
+    check("current_tid maps an old id to the live one, a stranger to itself",
+          rt.current_tid(OLD, reg) == NEW and rt.current_tid(NEW, reg) == NEW
+          and rt.current_tid(GRAND, reg) == GRAND)
+    check("the shipped registry: Startup's earlier ids still find it",
+          rt.by_tid("6a9faa51635ed1022425af34")["key"] == "startup"
+          and rt.current_tid("6a9faa51635ed1022425af34") == rt.by_key("startup")["tid"])
+    with _tf.TemporaryDirectory() as d:
+        path = os.path.join(d, "sub", rt.OVERLAY_NAME)
+        check("load_overlay: absent is {}", rt.load_overlay(path) == {})
+        check("save_overlay makes the dir and lands", rt.save_overlay(m, path) and os.path.exists(path))
+        check("load_overlay round trip", rt.load_overlay(path) == m)
+        with open(path, "w") as f:
+            f.write("[1, 2]")
+        check("load_overlay: not a dict is {}", rt.load_overlay(path) == {})
+        with open(path, "w") as f:
+            f.write("{broken")
+        check("load_overlay: unreadable is {}", rt.load_overlay(path) == {})
+        os.environ["TICKAL_RUN_DIR"] = d
+        check("overlay_path follows TICKAL_RUN_DIR", rt.overlay_path() == os.path.join(d, rt.OVERLAY_NAME))
+
     print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
     if __name__ == "__main__":
         sys.exit(1 if FAILS else 0)

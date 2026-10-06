@@ -385,6 +385,12 @@ class TickTickV2:
         except Exception:
             return False
 
+    def get_task(self, tid):
+        """GET /api/v2/task/<id>: the full v2 object - repeatTaskId, deleted,
+        the fields v1 strips - or None when the read fails (a deleted task
+        still answers, with deleted=1)."""
+        return self._v2_read("get", f"task/{tid}") if tid else None
+
     def task_parent(self, ops):
         """POST /api/v2/batch/taskParent - the ONLY channel that DETACHES a
         subtask (v1 silently ignores parentId=None - live-verified
