@@ -72,7 +72,8 @@ CRM records (customer notes + tattoo logbooks - src/crm_records.py):
     xact:crmnew_go:session::<logTid>  next session → Add prefilled S<n>
     xact:sessiondone:<pid>:<tid>    complete the session task (calendar keeps
                                     the record), dialogs log the entry,
-                                    Paid recomputed, clipboard 📷 attached,
+                                    Paid recomputed, its 🚗 commutes ticked
+                                    off (🚫 cancelled: trashed), 📷 attached,
                                     archive or chain S<n+1>
     xact:crmlog:<tid>               dialog → timestamped line under ## Notes
     xact:crmlink:<pid>:<tid>        🔗 adopt a hand-made calendar task: title
@@ -1906,6 +1907,20 @@ def crmnew_go(rest):
     _crmnew_continue(kind, cust)
 
 
+def _commute_tick(tid, row=None):
+    """🚗 The booking is done: its OPEN linked commutes are ticked off too
+    (src/commute.py done; Vex 2026-10-09). `row` = the task as the cache
+    held it BEFORE the completion dropped it - the near guard. Returns the
+    toast chip (' · 🚗 Commute ×2 ticked'), '' when nothing was linked; a
+    failure is a chip too, never a raise: the session is already done."""
+    try:
+        import commute
+        line, _n = commute.done(_api(), tid, ref=row or {})
+        return f" · {line}" if line else ""
+    except Exception as e:
+        return f" · 🚗 commute failed · {type(e).__name__}"
+
+
 def sessiondone(pid, tid, when=None):
     """The heart of the records flow: complete today's task (the calendar
     keeps the record - never reschedule), log the entry, recompute Paid,
@@ -1982,17 +1997,21 @@ def sessiondone(pid, tid, when=None):
             _crm_say(f"Complete failed: {type(e).__name__}: {e}")
             return
         # 🚗 a cancelled booking has nothing to commute to - its OPEN linked
-        # commutes go to Trash. A no-show keeps them: he travelled, the
-        # legs happened (src/commute.py).
-        commute_bit = ""
+        # commutes go to Trash. A no-show TICKS them off: he travelled, the
+        # legs happened (src/commute.py). `t` is the row as the cache held
+        # it before the completion dropped it - the near guard (find_task
+        # after _complete_cache_patch answered nothing, so the guard was
+        # void here until 2026-10-09).
         if kind_word == "cancelled":
+            commute_bit = ""
             try:
                 import commute
-                _cn, _n = commute.drop(_api(), tid,
-                                       ref=cache_store.find_task(tid) or {})
+                _cn, _n = commute.drop(_api(), tid, ref=t)
                 commute_bit = f" · {_cn}" if _cn else ""
             except Exception:
                 pass
+        else:
+            commute_bit = _commute_tick(tid, t)
         try:
             text = f"{marker} {kind_word}." + (f" {note.strip()}" if note.strip() else "")
             content, money, n, live_title = cr.append_session(
@@ -2087,12 +2106,16 @@ def sessiondone(pid, tid, when=None):
     except Exception as e:
         _crm_say(f"Complete failed: {type(e).__name__}: {e}")
         return
+    # 🚗 the session happened, so did its commutes: the OPEN linked legs
+    # are ticked off with it (Vex 2026-10-09). The chip rides every toast
+    # below beside the photo chip, as `tail`.
+    tail = photo + _commute_tick(tid, t)
     try:
         content, money, n, live_title = cr.append_session(
             log_pid, log_tid, marker, dur, charged, did, when=when)
         lb_title = live_title or lb_title   # renamed logbook → fresh title
     except Exception as e:
-        _crm_say(f"✅ done · logbook update FAILED: {type(e).__name__}: {e}")
+        _crm_say(f"✅ done · logbook update FAILED: {type(e).__name__}: {e}{tail}")
         return
 
     if not is_s:
@@ -2105,20 +2128,20 @@ def sessiondone(pid, tid, when=None):
         elif pick == "📁 Didn't book · archive":
             try:
                 cr.finish_logbook(log_pid, log_tid)
-                _crm_say(f"📁 Consultation logged · logbook archived{photo}")
+                _crm_say(f"📁 Consultation logged · logbook archived{tail}")
                 _eagle_archive_folder(log_tid)
                 return
             except Exception as e:
-                _crm_say(f"Archive FAILED: {type(e).__name__}{photo}")
+                _crm_say(f"Archive FAILED: {type(e).__name__}{tail}")
                 return
-        _crm_say(f"✅ consultation done · {money} / {n} total{photo}")
+        _crm_say(f"✅ consultation done · {money} / {n} total{tail}")
         return
 
     if final:
         try:
             cr.finish_logbook(log_pid, log_tid)
             _eagle_archive_folder(log_tid)
-            pick = _dialog(f"✅ {marker} done · {money} total · archived{photo}",
+            pick = _dialog(f"✅ {marker} done · {money} total · archived{tail}",
                            ["Healing check", "Open logbook", "Done"], "Done")
             if pick == "Open logbook":
                 subprocess.run(["open", lb_deeplink], check=False)
@@ -2128,7 +2151,7 @@ def sessiondone(pid, tid, when=None):
                 _run_trigger("Add", f"~l {areas.crm_list_name()} "
                              f"#{areas.PREPARE_TAG} [[{lb_title}]] Healing check ")
         except Exception as e:
-            _crm_say(f"✅ {marker} done · archive FAILED: {type(e).__name__}{photo}")
+            _crm_say(f"✅ {marker} done · archive FAILED: {type(e).__name__}{tail}")
         return
     nxt = cr.next_snum(content, log_tid)
     label = f"Schedule S{nxt}"
@@ -2138,7 +2161,7 @@ def sessiondone(pid, tid, when=None):
         _crm_session_prefill(lb_title, f"S{nxt}")
     elif pick == "Open logbook":
         subprocess.run(["open", lb_deeplink], check=False)
-    _crm_say(f"✅ {marker} done · {money} / {n} total{photo}")
+    _crm_say(f"✅ {marker} done · {money} / {n} total{tail}")
 
 
 def _photo_source():
@@ -2568,7 +2591,8 @@ def crmpast(log_tid):
                     tp = t.get("_projectId") or t.get("projectId")
                     _api().complete_task(tp, t["id"])
                     _complete_cache_patch(tp, t["id"])
-                    _crm_say(f"✅ {want_mk} task completed")
+                    # 🚗 its commutes happened too (src/commute.py done)
+                    _crm_say(f"✅ {want_mk} task completed{_commute_tick(t['id'], t)}")
                 except Exception as e:
                     _crm_say(f"Complete failed: {type(e).__name__}: {e}")
             break

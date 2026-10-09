@@ -35,8 +35,16 @@ exact first word). The link is the find-key for every later road:
     loses them
   * unschedule (attr_cleardate), 🚫 cancelled, 🗑 delete entry, ⌘ Delete
     (delete_action, attr_delete) → the OPEN linked legs go to TickTick
-    Trash. 👻 No-show KEEPS them: he travelled, the legs happened. A
-    completed commute is a commute that happened - no road touches it.
+    Trash. A completed commute is a commute that happened - no road
+    touches it.
+  * done (✅ Session done - Happened AND 👻 No-show, he travelled either
+    way; the 📕 backlog's "complete it too"; a plain ⇧ complete on a
+    booking row, dispatch complete:) → the OPEN linked legs are TICKED
+    OFF with the session (Vex 2026-10-09: "when I mark session as done,
+    commute that was added for that session is ticked off as well").
+    Only the legs within a day of the booking (`near`), each on its own;
+    a leg he ticked in the app is not in the live pool, so it is never
+    ticked twice.
   * 🚗 Sync commutes (the manual row under CRM > 📅 Calendar, `sweep`) →
     every upcoming open booking gets its legs, strays (legs whose
     booking is gone, undated or off the calendar) are removed. The road
@@ -568,6 +576,56 @@ def drop(api, booking_tid, pool=None, ref=None):
         bits.append(f"🚗 Commute ×{n} removed")
     if failed:
         bits.append(f"🚗 {failed} commute{'s' if failed > 1 else ''} not removed")
+    return " · ".join(bits), n
+
+
+def _cache_done(t, pid):
+    """A ticked leg leaves the open pools and joins the local completed log
+    (dispatch.record_completed, the mirror every completion road keeps), so
+    the calendar screens drop it at once."""
+    try:
+        import dispatch
+        snap = dict(t)
+        snap["status"] = 2
+        snap["completedTime"] = datetime.now(timezone.utc).strftime(ISO_OUT)
+        dispatch.record_completed(snap)
+    except Exception:
+        pass
+    _cache_drop(t["id"], pid)
+
+
+def done(api, booking_tid, pool=None, ref=None):
+    """The booking happened (✅ Session done, a ⇧ complete on the booking):
+    its OPEN linked commutes are ticked off too - he travelled, the legs
+    happened (Vex 2026-10-09). `ref` (the booking row or its (start, due))
+    guards the tick to legs within a day of it, like drop. Each leg on its
+    own, best-effort; a failed live read ticks nothing and says so. Returns
+    (summary, n_ticked)."""
+    if not enabled() or not booking_tid:
+        return "", 0
+    if pool is None:
+        try:
+            pool = live_pool(api)
+        except Exception:
+            return NOT_CHECKED, 0
+    legs = linked(pool, booking_tid)
+    if ref is not None:
+        legs = [t for t in legs if near(t, ref)]
+    n = failed = 0
+    for t in legs:
+        t_pid = t.get("_projectId") or t.get("projectId") or list_id()
+        try:
+            api.complete_task(t_pid, t["id"])
+        except Exception:
+            failed += 1
+            continue
+        _cache_done(t, t_pid)
+        n += 1
+    bits = []
+    if n:
+        bits.append(f"🚗 Commute ×{n} ticked")
+    if failed:
+        bits.append(f"🚗 {failed} commute{'s' if failed > 1 else ''} not ticked")
     return " · ".join(bits), n
 
 

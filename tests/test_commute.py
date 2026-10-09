@@ -6,7 +6,8 @@ after whatever duration is set ... same tags so my calendar is nicely color
 scheduled." Pure window math + a fake API for the writers; nothing reaches
 the network. The second half pins the review findings of the same day
 (live pool, date-only reschedule, midnight moves, the hand-made guard, the
-copied leg, the point booking, the zero setting, the sweep).
+copied leg, the point booking, the zero setting, the sweep). Section 11
+(2026-10-09): the session marked done ticks its legs off (`done`).
 
     python3 tests/test_commute.py
 """
@@ -55,9 +56,17 @@ else:
     class FakeAPI:
         def __init__(self, lists=None):
             self.created, self.updated, self.deleted, self.reads = [], [], [], []
+            self.completed = []
             self.fail_create = False
             self.fail_read = False
+            self.fail_complete = False
             self.lists = lists if lists is not None else {}
+
+        def complete_task(self, project_id, task_id, task_data=None):
+            if self.fail_complete:
+                raise RuntimeError("complete boom")
+            self.completed.append((project_id, task_id))
+            return True
 
         def get_project_data(self, pid):
             self.reads.append(pid)
@@ -358,6 +367,52 @@ else:
     api = FakeAPI(lists={LST: [to_ok, {**from_old, "startDate": "2026-09-30T13:00:00.000+0000",
                                        "dueDate": "2026-09-30T14:00:00.000+0000"}], CRM: [BOOK]})
     check("10.a booking already right counts as fine", cm.sweep(api, now=NOW) == "🚗 Sync · 1 booking fine")
+
+    # ── 11. done: the session marked done ticks its legs off (Vex 2026-10-09) ───
+    cache_store.set("all_tasks", [dict(to_ok), dict(from_old), dict(hand)])
+    cache_store.set("completed_tasks", [])
+    api = FakeAPI()
+    line, n = cm.done(api, B1, pool=[to_ok, from_old, done_to, hand, notmine])
+    check("11.only the OPEN linked legs are completed",
+          sorted(t for _p, t in api.completed) == sorted([to_ok["id"], from_old["id"]]), api.completed)
+    check("11.under the commute list", all(p == LST for p, _t in api.completed), api.completed)
+    check("11.count + toast", n == 2 and line == "🚗 Commute ×2 ticked", (n, line))
+    check("11.nothing deleted, nothing posted", not api.deleted and not api.updated and not api.created)
+    check("11.a ticked leg leaves the open cache",
+          [t["id"] for t in cache_store.get("all_tasks")] == [hand["id"]], cache_store.get("all_tasks"))
+    done_log = cache_store.get("completed_tasks") or []
+    check("11.…and joins the local completed log as done",
+          sorted(t["id"] for t in done_log) == sorted([to_ok["id"], from_old["id"]])
+          and all(t.get("status") == 2 and t.get("completedTime") for t in done_log), done_log)
+    api = FakeAPI()
+    line, n = cm.done(api, B1, pool=[hand, done_to, notmine])
+    check("11.nothing linked and open: silent, no write", n == 0 and line == "" and not api.completed)
+    api = FakeAPI()
+    line, n = cm.done(api, B1, pool=[to_ok, copy], ref=BOOK)
+    check("11.ref guard: a copied leg on another day stays open",
+          [t for _p, t in api.completed] == [to_ok["id"]], api.completed)
+    api = FakeAPI()
+    line, n = cm.done(api, B1, pool=[to_ok, copy], ref={})
+    check("11.no ref: no guard (the cache did not know the booking)", n == 2, api.completed)
+    api = FakeAPI(lists={LST: [to_ok, from_old]})
+    line, n = cm.done(api, B1)
+    check("11.pool=None reads the commute list live, once", api.reads == [LST] and n == 2, (api.reads, n))
+    api = FakeAPI()
+    api.fail_read = True
+    line, n = cm.done(api, B1)
+    check("11.a failed live read ticks nothing and says so",
+          line == cm.NOT_CHECKED and n == 0 and not api.completed, (line, api.completed))
+    api = FakeAPI()
+    api.fail_complete = True
+    line, n = cm.done(api, B1, pool=[to_ok, from_old])
+    check("11.a failed complete is a chip, never a raise",
+          n == 0 and line == "🚗 2 commutes not ticked", (n, line))
+    api = FakeAPI()
+    check("11.no booking id: nothing", cm.done(api, "", pool=[to_ok]) == ("", 0) and not api.completed)
+    os.environ["commute_list_id"] = ""
+    api = FakeAPI()
+    check("11.commutes off: nothing", cm.done(api, B1, pool=[to_ok]) == ("", 0) and not api.completed)
+    del os.environ["commute_list_id"]
 
     print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
     if FAILS:

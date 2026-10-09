@@ -622,8 +622,22 @@ def main():
                 _xact.pn_done_nudge()
             except Exception:
                 pass
+            # 🚗 a booking marked done from a plain row (⇧ Complete, the
+            # ✔️ row): its OPEN linked commutes are ticked off too, the
+            # Session-done rule (Vex 2026-10-09; src/commute.py done).
+            # `snap` is the row BEFORE the drop above: the booking gate
+            # (CRM list + booking tag, a cache read - a plain task costs no
+            # commute-list read) and the near guard. A chip, never a raise.
+            commute_line = ""
+            try:
+                import commute
+                if commute.is_booking(snap):
+                    _cn, _n = commute.done(api, tid, ref=snap)
+                    commute_line = f"\n{_cn}" if _cn else ""
+            except Exception as e:
+                commute_line = f"\n🚗 commute failed · {type(e).__name__}"
             # Vex 2026-09-20: raw md link in the ⇧ complete toast
-            print(f"{md_links_display(title)} completed{guard_note}{log_suffix}")
+            print(f"{md_links_display(title)} completed{guard_note}{log_suffix}{commute_line}")
 
         elif arg.startswith("attr_date:"):
             # attr_date:projectId:taskId:isoDate[;R:tok,tok]
