@@ -1005,10 +1005,21 @@ def day_label(d, today=None):
     return base if d.year == today.year else f"{base} {d.year}"
 
 
-def money_day_line(d, total):
-    # EXACT weekly line format: "- Sat 11 Jul 2026 • 485" - no zero-pad day
+def money_head(total, share=None):
+    """'🫵 200 · 400' - the artist's share FIRST, the total after (Vex
+    2026-11-05: "money summaries show totals, not my percentage. We can
+    keep total, but put my percentage first"); the bare total when no
+    share is known (the CRM's cut off, or a ledger without one)."""
+    if share is None:
+        return fmt_amount(total)
+    return f"🫵 {fmt_amount(share)} · {fmt_amount(total)}"
+
+
+def money_day_line(d, total, share=None):
+    # EXACT weekly line format: "- Sat 11 Jul 2026 • 485" - no zero-pad day;
+    # with a share known: "- Sat 11 Jul 2026 • 🫵 242.50 · 485"
     return (f"- {DAY_ABBR[d.weekday()]} {d.day} {MONTH_ABBR[d.month]} "
-            f"{d.year} • {fmt_amount(total)}")
+            f"{d.year} • {money_head(total, share)}")
 
 
 def section_money_sum(body_lines):
@@ -1020,9 +1031,10 @@ def section_money_sum(body_lines):
     return total
 
 
-def money_total_line(total, n=2):
-    """Canonical total line - indented bullet."""
-    return ("\t" * n) + f"- **Total = {fmt_amount(total)}**"
+def money_total_line(total, n=2, share=None):
+    """Canonical total line - indented bullet; the share first when known
+    ("- **Total = 🫵 325 · 650**")."""
+    return ("\t" * n) + f"- **Total = {money_head(total, share)}**"
 
 
 def recompute_money_body(body_lines):

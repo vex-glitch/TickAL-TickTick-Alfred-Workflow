@@ -841,6 +841,47 @@ def _day_sums(index):
         return None
 
 
+def _day_shares(index):
+    """{date: the artist's share} beside _day_sums (crm_money.day_shares:
+    every entry at ITS percentage), None when no share is known - the
+    lines then show the bare totals, the way they did before 2026-11-05
+    (Vex: "put my percentage first")."""
+    try:
+        import crm_money
+        return crm_money.day_shares()
+    except Exception as e:
+        _log(f"crm share: {e}")
+        return None
+
+
+def _share_at(shares, d):
+    """The day's share for a money line, None when no share is known."""
+    return shares.get(d, 0) if shares is not None else None
+
+
+def _income_head(day_sums, shares, p, prev):
+    """(head, chip, share_cur) for a 💰 Income header: his share first when
+    known (pm.money_head), the chip against the previous period on the
+    same figure - the share when it is known, the total otherwise - and
+    only when the CRM holds something in the previous period."""
+    inc_cur = pm.sum_in_period(day_sums, p)
+    inc_prev = pm.sum_in_period(day_sums, prev)
+    sh_cur = pm.sum_in_period(shares, p) if shares is not None else None
+    sh_prev = pm.sum_in_period(shares, prev) if shares is not None else None
+    ch = None
+    if any(prev.start <= d <= prev.end for d in day_sums):
+        ch = (pm.chip(sh_cur, sh_prev, "money") if shares is not None
+              else pm.chip(inc_cur, inc_prev, "money"))
+    return pm.money_head(inc_cur, sh_cur), ch, sh_cur
+
+
+def _income_line(day_sums, shares, span):
+    """'- Income: 🫵 150 · 300' for a ⏪ composite (the bare total when no
+    share is known)."""
+    sh = pm.sum_in_period(shares, span) if shares is not None else None
+    return f"- Income: {pm.money_head(pm.sum_in_period(day_sums, span), sh)}"
+
+
 def _money_known():
     """Can the CRM be read for money right now? False = write no money
     figure at all."""
@@ -1365,6 +1406,19 @@ def _day_money(day):
         return None
 
 
+def _day_share(day):
+    """A day's share of its money → float | None (no entry that day, or no
+    share known)."""
+    if day is None:
+        return None
+    try:
+        import crm_money
+        return crm_money.day_share(day)
+    except Exception as e:
+        _log(f"crm share: {e}")
+        return None
+
+
 def _people_logged(day):
     """[(name, text)] for every person card whose Log has an entry stamped
     `day` - the 👥 side of the house showing up in the daily note (Vex
@@ -1475,10 +1529,20 @@ def _recap_lines(day, t2, nday, tab, pday=None, pdoc=None, extra=None,
     if _money_known():
         money = _day_money(day)
         pmoney = _day_money(pday) if pday is not None else None
+        # 🫵 his share first, the total after (2026-11-05); the arrow on the
+        # share when both days know theirs, else on the totals. A day without
+        # a session reads "🫵 0 · 0" like the weekly's day lines do, as long
+        # as the CRM knows shares at all (an old ledger: the bare 0)
+        known = _day_shares(None) is not None
+        share = _day_share(day) if money is not None else (0 if known else None)
+        pshare = (_day_share(pday) if pmoney is not None else (0 if known else None)) \
+            if pday is not None else None
         if nday is not None or money is not None:
-            lines.append(f"{tab}- Money: {pm.fmt_amount(money or 0)}"
-                         + (dc(money, pmoney, "money")
-                            if money is not None and pmoney is not None else ""))
+            both = money is not None and pmoney is not None   # the arrow needs a session on both days
+            cur, prv = ((share, pshare) if both and share is not None and pshare is not None
+                        else (money, pmoney))
+            lines.append(f"{tab}- Money: {pm.money_head(money or 0, share)}"
+                         + (dc(cur, prv, "money") if both else ""))
     elif money_keep:
         lines.append(money_keep)
     fm = getattr(t2, "focus_minutes", lambda a, b: None)(day, day) if t2 else None
@@ -2003,6 +2067,7 @@ def _fill_weekly(doc, p, index):
     t2 = _tier2()
     prev = pm.prev_period(p)
     day_sums = _day_sums(index)
+    shares = _day_shares(index) if day_sums is not None else None
     projects = {pr.get("id"): pr.get("name")
                 for pr in (cache_store.get("projects") or [])}
     live_end = min(p.end, today)
@@ -2121,16 +2186,13 @@ def _fill_weekly(doc, p, index):
     # ── 💰 Income - header total+chip, day lines off the CRM, Total bullet.
     # A CRM that cannot be read (day_sums None) leaves the section as it is.
     if day_sums is not None:
-        inc_cur = pm.sum_in_period(day_sums, p)
-        inc_prev = pm.sum_in_period(day_sums, prev)
-        head = pm.fmt_amount(inc_cur)
-        ch = pm.chip(inc_cur, inc_prev, "money") \
-            if any(prev.start <= d <= prev.end for d in day_sums) else None
+        head, ch, sh_cur = _income_head(day_sums, shares, p, prev)
         _set_headed(doc, pm.SEC_INCOME, head + (f" · {ch}" if ch else ""),
                     pm.ind([pm.money_day_line(p.start + timedelta(days=i),
-                                              day_sums.get(p.start + timedelta(days=i), 0))
+                                              day_sums.get(p.start + timedelta(days=i), 0),
+                                              _share_at(shares, p.start + timedelta(days=i)))
                             for i in range(7)])
-                    + [pm.money_total_line(inc_cur, 3)],
+                    + [pm.money_total_line(pm.sum_in_period(day_sums, p), 3, sh_cur)],
                     _in(pm.SEC_INCOME))
 
     # ── 👽 People - birthdays inside 14d (countdowns) + stale cards
@@ -2157,7 +2219,7 @@ def _fill_weekly(doc, p, index):
         if pmood is not None:
             lw.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
-            lw.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+            lw.append(_income_line(day_sums, shares, prev))
         elif _old_line(doc, pm.SEC_LAST_WEEK, "- Income:"):
             lw.append(_old_line(doc, pm.SEC_LAST_WEEK, "- Income:").strip())
         # last week's own words: the 🔮 intention it set for THIS week (the
@@ -2331,7 +2393,7 @@ def _has_entries(day_sums, a, b):
     return any(a <= d <= b for d in day_sums)
 
 
-def _span_money_lines(day_sums, spans, kind, today):
+def _span_money_lines(day_sums, spans, kind, today, shares=None):
     """Money by child span: the amount where the CRM holds a session or a
     priced entry, an honest word where it holds none, and nothing at all for
     a span that has not happened yet. A span that ended before the CRM's
@@ -2351,7 +2413,9 @@ def _span_money_lines(day_sums, spans, kind, today):
         if not _has_entries(day_sums, a, b):
             out.append(f"- {label} • no sessions")
             continue
-        amt = pm.fmt_amount(sum(v for d, v in day_sums.items() if a <= d <= b))
+        sh = (sum(v for d, v in shares.items() if a <= d <= b)
+              if shares is not None else None)
+        amt = pm.money_head(sum(v for d, v in day_sums.items() if a <= d <= b), sh)
         tail = (f" · from {first.day} {pm.MONTH_ABBR[first.month]}"
                 if first is not None and a < first <= b else "")
         out.append(f"- {label} • {amt}{tail}")
@@ -2706,14 +2770,13 @@ def _fill_monthly(doc, p, index):
     # ── 💰 Income - week lines, month total, both off the CRM (None = the
     # CRM cannot be read: the section stays as it is)
     day_sums = _day_sums(index)
+    shares = _day_shares(index) if day_sums is not None else None
     if day_sums is not None:
-        inc_cur = pm.sum_in_period(day_sums, p)
-        ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
-              if any(prev.start <= d <= prev.end for d in day_sums) else None)
+        head, ch, sh_cur = _income_head(day_sums, shares, p, prev)
         _set_headed(doc, pm.SEC_INCOME,
-                    pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                    pm.ind(_span_money_lines(day_sums, spans, "monthly", today))
-                    + [pm.money_total_line(inc_cur, 3)],
+                    head + (f" · {ch}" if ch else ""),
+                    pm.ind(_span_money_lines(day_sums, spans, "monthly", today, shares))
+                    + [pm.money_total_line(pm.sum_in_period(day_sums, p), 3, sh_cur)],
                     _in(pm.SEC_INCOME))
 
     # ── 👽 People
@@ -2743,7 +2806,7 @@ def _fill_monthly(doc, p, index):
         if pmood is not None:
             lm.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
-            lm.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+            lm.append(_income_line(day_sums, shares, prev))
         elif _old_line(doc, pm.SEC_LAST_MONTH, "- Income:"):
             lm.append(_old_line(doc, pm.SEC_LAST_MONTH, "- Income:").strip())
         top_tasks = pm.count_task_lines(pm.merge_counts(*[st["top_tasks"]
@@ -2932,14 +2995,13 @@ def _fill_quarterly(doc, p, index):
     # ── 💰 Income - month lines, quarter total, both off the CRM (None = the
     # CRM cannot be read: the section stays as it is)
     day_sums = _day_sums(index)
+    shares = _day_shares(index) if day_sums is not None else None
     if day_sums is not None:
-        inc_cur = pm.sum_in_period(day_sums, p)
-        ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
-              if any(prev.start <= d <= prev.end for d in day_sums) else None)
+        head, ch, sh_cur = _income_head(day_sums, shares, p, prev)
         _set_headed(doc, pm.SEC_INCOME,
-                    pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                    pm.ind(_span_money_lines(day_sums, spans, "quarterly", today))
-                    + [pm.money_total_line(inc_cur, 3)],
+                    head + (f" · {ch}" if ch else ""),
+                    pm.ind(_span_money_lines(day_sums, spans, "quarterly", today, shares))
+                    + [pm.money_total_line(pm.sum_in_period(day_sums, p), 3, sh_cur)],
                     _in(pm.SEC_INCOME))
 
     # ── 👽 People + ⏳ Dates
@@ -2969,7 +3031,7 @@ def _fill_quarterly(doc, p, index):
         if pmood is not None:
             lq.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
-            lq.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+            lq.append(_income_line(day_sums, shares, prev))
         elif _old_line(doc, pm.SEC_LAST_QTR, "- Income:"):
             lq.append(_old_line(doc, pm.SEC_LAST_QTR, "- Income:").strip())
         # last quarter's own words: where it wanted to be by now (the
@@ -3179,14 +3241,13 @@ def _fill_yearly(doc, p, index):
     # ── 💰 Income - quarter lines, year total, both off the CRM (None = the
     # CRM cannot be read: the section stays as it is)
     day_sums = _day_sums(index)
+    shares = _day_shares(index) if day_sums is not None else None
     if day_sums is not None:
-        inc_cur = pm.sum_in_period(day_sums, p)
-        ch = (pm.chip(inc_cur, pm.sum_in_period(day_sums, prev), "money")
-              if any(prev.start <= d <= prev.end for d in day_sums) else None)
+        head, ch, sh_cur = _income_head(day_sums, shares, p, prev)
         _set_headed(doc, pm.SEC_INCOME,
-                    pm.fmt_amount(inc_cur) + (f" · {ch}" if ch else ""),
-                    pm.ind(_span_money_lines(day_sums, spans, "yearly", today))
-                    + [pm.money_total_line(inc_cur, 3)],
+                    head + (f" · {ch}" if ch else ""),
+                    pm.ind(_span_money_lines(day_sums, spans, "yearly", today, shares))
+                    + [pm.money_total_line(pm.sum_in_period(day_sums, p), 3, sh_cur)],
                     _in(pm.SEC_INCOME))
 
     # ── 👽 People + ⏳ Dates. The block the quarterly carries (his ruling):
@@ -3212,7 +3273,7 @@ def _fill_yearly(doc, p, index):
         if pmood is not None:
             ly.append(f"- Mood: {pmood:.1f} avg")
         if day_sums is not None:
-            ly.append(f"- Income: {pm.fmt_amount(pm.sum_in_period(day_sums, prev))}")
+            ly.append(_income_line(day_sums, shares, prev))
         elif _old_line(doc, pm.SEC_LAST_YEAR, "- Income:"):
             ly.append(_old_line(doc, pm.SEC_LAST_YEAR, "- Income:").strip())
         # last year's own words: where it wanted to be by now (the yearly

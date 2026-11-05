@@ -1078,14 +1078,17 @@ def _cust_row(cr, c, uid_prefix="crms", rate=False):
         lead_chip = f"🎣 lead · {age}d" if age is not None else "🎣 lead"
     bd = cr.bday_next(_b)
     g = cr.lifetime_gratis(c["id"])
-    rate_chip = ""
+    rate_chip, cut_chip = "", ""
     if rate and money != "-":
+        share = cr.lifetime_share(c["id"])
+        cut_chip = cr.cut_chip(cr.lifetime_raw(c["id"]), money, share=share)
         rate_chip = _rate_chip(cr, cr.lifetime_hours(c["id"]),
-                               cr.lifetime_raw(c["id"]), money).lstrip(" ·")
+                               cr.lifetime_raw(c["id"]), money,
+                               share=share).lstrip(" ·")
     bits = [b for b in (
         f"📞 {phone}" if phone else (f"📸 {insta}" if insta else ""),
         f"{k} tattoo{'s' if k != 1 else ''}" if k else "",
-        money if money != "-" else "",
+        (money + cut_chip) if money != "-" else "",
         rate_chip,
         f"🖤 {g}" if g else "",
         lead_chip,
@@ -1217,14 +1220,15 @@ def render_crmweek(query):
         content = (_lb_by_id.get(log_tid) or {}).get("content") or ""
         rem = cr.quote_remainder(content)
         if rem:
-            return f"{rem} open{cr.cut_chip(cr._num(rem), rem)}"
-        for segs in reversed(cr._entries(content)):
+            return (f"{rem} open"
+                    f"{cr.cut_chip(cr._num(rem), rem, percent=cr.last_cut(content))}")
+        for segs, pct in reversed(cr.entries_cut(content)):
             if len(segs) > 3 and cr.is_gratis(segs[3]):
                 continue
             amt, sym, pre = cr._amount_of(segs)
             if amt:
                 shown = cr._fmt_money(amt, sym or "€", pre)
-                return f"last {shown}{cr.cut_chip(amt, shown)}"
+                return f"last {shown}{cr.cut_chip(amt, shown, percent=pct)}"
         return ""
 
     for d, t in pool:
@@ -1282,8 +1286,10 @@ def render_crmweek(query):
     # still booked before Sunday (Vex tracks weekly cuts by hand).
     monday = today - _td(days=today.weekday())
     sunday = monday + _td(days=6)
+    _all = cr.all_entries()
     wk_money, wk_n, _wh, wk_raw = cr.sum_entries(
-        cr.all_entries(), monday.isoformat(), sunday.isoformat())
+        _all, monday.isoformat(), sunday.isoformat())
+    wk_share = cr.sum_share(_all, monday.isoformat(), sunday.isoformat())
     bk_n, bk_h = 0, 0.0
     for d, t in pool:
         if d.date() > sunday:
@@ -1300,7 +1306,7 @@ def render_crmweek(query):
     rows.append(alfred.item(
         uid="wk-money",
         title=f"💰 {wk_money if wk_money != '-' else '0€'}"
-              f"{cr.cut_chip(wk_raw, wk_money)} this week",
+              f"{cr.cut_chip(wk_raw, wk_money, share=wk_share)} this week",
         subtitle=f"Mon-Sun logged · ahead: {booked_bit}  |  ⏎⤵️",
         arg=f"xact:crmbrowse:ctx:crmmoney:wk:{monday.isoformat()}",
         mods=_picker_mods()))
@@ -1445,20 +1451,23 @@ def _month_bounds(y, m):
     return a, b
 
 
-def _rate_chip(cr, hours, raw, money=""):
+def _rate_chip(cr, hours, raw, money="", share=None):
     """' · 3h · ~200€/h · 🫵 ~100€/h' - the hours and the money per hour,
     ONE chip on every money row (Vex 2026-10-05: the month's week-by-week
     screen showed hours and no rate, and so did the week totals, the
     tattoo, customer and backfill rows). '' without hours; hours alone
     when nothing was charged. The currency symbol is read off the
-    formatted money it follows, € when there is none."""
+    formatted money it follows, € when there is none. `share` = the
+    artist's share of `raw` summed off the entries' own percentages
+    (2026-11-05); the 🫵 rate is share / hours, else the global cut."""
     if not hours:
         return ""
     out = f" · {hours:g}h"
     if raw:
         sym = re.sub(r"[-\d.,\s]", "", money or "") or "€"
         r = raw / hours
-        out += f" · ~{int(r)}{sym}/h" + cr.cut_rate_chip(r, sym)
+        out += f" · ~{int(r)}{sym}/h" + cr.cut_rate_chip(
+            r, sym, (share / hours) if share is not None else None)
     return out
 
 
@@ -1491,14 +1500,15 @@ def render_crmmoney(sub, query):
         None = unbounded. With a ctx the row drills on ⏎."""
         money, n, hours, raw = cr.sum_entries(e, a and a.isoformat(),
                                               b and b.isoformat())
-        extra = _rate_chip(cr, hours, raw, money)
+        share = cr.sum_share(e, a and a.isoformat(), b and b.isoformat())
+        extra = _rate_chip(cr, hours, raw, money, share=share)
         if hint is None:
             hint = (f"{a.isoformat() if a else '…'} → "
                     f"{b.isoformat() if b else 'today'}")
         kw = (dict(arg=f"xact:crmbrowse:{ctx}", mods=_picker_mods())
               if ctx else dict(valid=False))
         return alfred.item(
-            uid=uid, title=f"{label} · {money}{cr.cut_chip(raw, money)}"
+            uid=uid, title=f"{label} · {money}{cr.cut_chip(raw, money, share=share)}"
                            f" · {n} session{'s' if n != 1 else ''}{extra}",
             subtitle=hint + ("  |  ⏎⤵️" if ctx else ""), **kw)
 
@@ -1622,6 +1632,7 @@ def render_crmmoney(sub, query):
         for y, mo_ in mb.month_choices(today):
             a, b = _month_bounds(y, mo_)
             money, n, hours, raw = cr.sum_entries(e, a.isoformat(), b.isoformat())
+            share = cr.sum_share(e, a.isoformat(), b.isoformat())
             # a month already backfilled stays LIVE: ⏎ redoes it, the old
             # entries replaced (Vex 2026-11-05 - never a dead row)
             prev = done.get(mb.logbook_title(y, mo_).lower())
@@ -1630,8 +1641,9 @@ def render_crmmoney(sub, query):
             rows.append(alfred.item(
                 uid=f"bf-{a.strftime('%Y-%m')}",
                 title=f"📅 {a.strftime('%b %Y')} · {money}"
+                      f"{cr.cut_chip(raw, money, share=share)}"
                       f" · {n} session{'s' if n != 1 else ''}"
-                      + _rate_chip(cr, hours, raw, money)
+                      + _rate_chip(cr, hours, raw, money, share=share)
                       + (" · ✅ backfilled" if prev else ""),
                 subtitle=(f"✅ backfilled · ⏎ redo: total → rate, its {old_n} "
                           f"entr{'y' if old_n == 1 else 'ies'} replaced"
@@ -1682,7 +1694,8 @@ def render_crmmoney(sub, query):
         shown = _entry_money(x)
         if x["gratis"] or not x["amount"]:
             return shown
-        return shown + cr.cut_chip(x["amount"], shown)
+        return shown + cr.cut_chip(x["amount"], shown, share=x.get("share"),
+                                   percent=x.get("cut"))
 
     def _entry_rate(x):
         """' · 3h · ~200€/h · 🫵 ~100€/h' for ONE session row: its hours,
@@ -1693,7 +1706,7 @@ def render_crmmoney(sub, query):
         if x["gratis"] or not x["amount"]:
             return f" · {x['minutes'] / 60:g}h"
         return _rate_chip(cr, x["minutes"] / 60.0, x["amount"],
-                          _entry_money(x))
+                          _entry_money(x), share=x.get("share"))
 
     def _hub_alt(tid):
         return {"arg": "", "valid": True, "subtitle": "Logbook hub",
@@ -1716,15 +1729,16 @@ def render_crmmoney(sub, query):
             wend = w + _td(days=6)
             m2, n2, h2, r2 = cr.sum_entries(e, w.isoformat(),
                                             wend.isoformat())
+            s2 = cr.sum_share(e, w.isoformat(), wend.isoformat())
             rows.append(alfred.item(
                 uid=f"mw-{w.isoformat()}",
                 title=f"📆 wk {w.isocalendar()[1]} · "
                       + (f"{w.strftime('%d %b')}-{wend.strftime('%d %b')}"
                          if w.month != wend.month
                          else f"{w.strftime('%d')}-{wend.strftime('%d %b')}")
-                      + f" · {m2}{cr.cut_chip(r2, m2)}"
+                      + f" · {m2}{cr.cut_chip(r2, m2, share=s2)}"
                       f" · {n2} session{'s' if n2 != 1 else ''}"
-                      + _rate_chip(cr, h2, r2, m2),
+                      + _rate_chip(cr, h2, r2, m2, share=s2),
                 subtitle="The week's sessions  |  ⏎⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:wk:{w.isoformat()}",
                 mods=_picker_mods()))
@@ -1745,8 +1759,9 @@ def render_crmmoney(sub, query):
                             "ctx:crmmoney")
         w0 -= _td(days=w0.weekday())
         wend = w0 + _td(days=6)
-        m2, n2, h2, r2 = cr.sum_entries(cr.all_entries(), w0.isoformat(),
-                                        wend.isoformat())
+        _all = cr.all_entries()
+        m2, n2, h2, r2 = cr.sum_entries(_all, w0.isoformat(), wend.isoformat())
+        s2 = cr.sum_share(_all, w0.isoformat(), wend.isoformat())
         det = sorted((x for x in cr.entries_detailed()
                       if w0.isoformat() <= x["date"] <= wend.isoformat()
                       and (x["amount"] is not None or x["is_s"])),
@@ -1767,9 +1782,9 @@ def render_crmmoney(sub, query):
         # should be totals")
         rows.append(alfred.item(
             uid="wk-sum",
-            title=f"💰 {m2}{cr.cut_chip(r2, m2)}"
+            title=f"💰 {m2}{cr.cut_chip(r2, m2, share=s2)}"
                   f" · {n2} session{'s' if n2 != 1 else ''}"
-                  + _rate_chip(cr, h2, r2, m2),
+                  + _rate_chip(cr, h2, r2, m2, share=s2),
             subtitle=f"Mon {w0.strftime('%d %b')} → Sun "
                      f"{wend.strftime('%d %b')}",
             valid=False))
@@ -1794,13 +1809,17 @@ def render_crmmoney(sub, query):
             g = cr.gratis_count(content)
             # the symbol comes off the bare total, never off paid_summary
             # ("3490€ · 18 sessions" once read as the currency "€·sessions")
+            share = cr._share_raw(content)
             rows.append(alfred.item(
                 uid=f"mo-l-{lb['id']}",
                 title=lb.get("title") or "Untitled",
                 subtitle=cr.paid_summary(content)
+                         + cr.cut_chip(raws[lb["id"]], cr.totals(content)[0],
+                                       share=share)
                          + (f" · 🖤 {g}" if g else "")
                          + _rate_chip(cr, cr.chair_minutes(content) / 60.0,
-                                      raws[lb["id"]], cr.totals(content)[0])
+                                      raws[lb["id"]], cr.totals(content)[0],
+                                      share=share)
                          + "  |  ⏎⤵️  ⌥⤵️",
                 arg=f"xact:crmbrowse:ctx:crmmoney:lb:{lb['id']}",
                 mods={**_picker_mods(), "alt": _hub_alt(lb["id"])}))
@@ -1828,8 +1847,12 @@ def render_crmmoney(sub, query):
         mins = cr.chair_minutes(content)
         total, _n2, _sym2, _pre2 = cr._totals_raw(content)
         g = cr.gratis_count(content)
-        head = (cr.paid_summary(content) + (f" · 🖤 {g}" if g else "")
-                + _rate_chip(cr, mins / 60.0, total, cr.totals(content)[0]))
+        share = cr._share_raw(content)
+        head = (cr.paid_summary(content)
+                + cr.cut_chip(total, cr.totals(content)[0], share=share)
+                + (f" · 🖤 {g}" if g else "")
+                + _rate_chip(cr, mins / 60.0, total, cr.totals(content)[0],
+                             share=share))
         rows = []
         for x in det:
             rows.append(alfred.item(
@@ -1852,16 +1875,18 @@ def render_crmmoney(sub, query):
         return render_crmmoney("lbs", query)
     e = cr.all_entries()
     money, n, hours, raw = cr.sum_entries(e)
+    share_all = cr.sum_share(e)
     today = _date.today()
     monday = today - _td(days=today.weekday())
     m0 = today.replace(day=1)
-    rate = _rate_chip(cr, hours, raw, money)
+    rate = _rate_chip(cr, hours, raw, money, share=share_all)
 
     def _sumrow(uid, emoji, label, a, ctx, hint):
         m2, n2, h2, r2 = cr.sum_entries(e, a.isoformat(), None)
-        extra = _rate_chip(cr, h2, r2, m2)
+        s2 = cr.sum_share(e, a.isoformat(), None)
+        extra = _rate_chip(cr, h2, r2, m2, share=s2)
         return alfred.item(
-            uid=uid, title=f"{emoji} {label} · {m2}{cr.cut_chip(r2, m2)}"
+            uid=uid, title=f"{emoji} {label} · {m2}{cr.cut_chip(r2, m2, share=s2)}"
                            f" · {n2} session{'s' if n2 != 1 else ''}{extra}",
             subtitle=hint, arg=f"xact:crmbrowse:{ctx}",
             mods=_picker_mods())
@@ -1870,7 +1895,7 @@ def render_crmmoney(sub, query):
     q0, _qe = _quarter_bounds(today.year, cq)
     pinned = [
         alfred.item(uid="mo-total",
-                    title=f"💰 All time · {money}{cr.cut_chip(raw, money)}"
+                    title=f"💰 All time · {money}{cr.cut_chip(raw, money, share=share_all)}"
                           f" · {n} session{'s' if n != 1 else ''}{rate}",
                     subtitle="Weekly · monthly · quarterly · yearly  |  ⏎⤵️",
                     arg="xact:crmbrowse:ctx:crmmoney:periods",
@@ -1961,9 +1986,8 @@ def render_crmstats(sub, query):
         k = cr.period_kpis(a, b)
         p = cr.period_kpis(pa, pb) if (pa or pb) else None
         fm = lambda v: cr._fmt_money(v, k["sym"], k["pre"])
-        cut = cr.cut_percent()
-        cut_part = (f" · 🫵 {fm(k['money'] * cut / 100.0)}"
-                    if cut and k["money"] else "")
+        # 🫵 = the entries' own shares summed (each at its percentage)
+        cut_part = f" · 🫵 {fm(k['share'])}" if k.get("share") else ""
         rows = [alfred.item(uid="kp-money",
                             title=f"💰 {fm(k['money'])}"
                                   + _delta_chip(k["money"], p and p["money"])
@@ -1972,7 +1996,9 @@ def render_crmstats(sub, query):
                             valid=False)]
         if k["hours"]:
             rate = ((f" · ~{int(k['rate'])}{k['sym']}/h"
-                     + cr.cut_rate_chip(k["rate"], k["sym"]))
+                     + cr.cut_rate_chip(k["rate"], k["sym"],
+                                        (k["share"] / k["hours"])
+                                        if k.get("share") is not None else None))
                     if k["rate"] else "")
             rows.append(alfred.item(
                 uid="kp-hours", title=f"🧮 {k['hours']:g}h{rate}"
@@ -2015,14 +2041,13 @@ def render_crmstats(sub, query):
 
     # root: period picker with headline subtitles
     rows = []
-    cut = cr.cut_percent()
     for key in ("thism", "lastm", "quarter", "year", "all"):
         label, a, b, _pa, _pb = periods[key]
         k = cr.period_kpis(a, b)
         fmz = lambda v: cr._fmt_money(v, k["sym"], k["pre"])
         head = fmz(k["money"])
-        if cut and k["money"]:
-            head += f" · 🫵 {fmz(k['money'] * cut / 100.0)}"
+        if k.get("share"):
+            head += f" · 🫵 {fmz(k['share'])}"
         head += f" · {k['sessions']} session{'s' if k['sessions'] != 1 else ''}"
         if k["hours"]:
             head += f" · {k['hours']:g}h"
@@ -3183,9 +3208,11 @@ def _unified_logbook_row(cr, lb, uid_prefix="ulb", ret="", counts=None,
     rate_chip = ""
     if rate and money and money != "-":
         raw = cr._totals_raw(lb.get("content") or "")[0]
+        share = cr._share_raw(lb.get("content") or "")
+        money += cr.cut_chip(raw, money, share=share).replace(" · ", " • ")
         rate_chip = _rate_chip(
             cr, cr.chair_minutes(lb.get("content") or "") / 60.0,
-            raw, money).lstrip(" ·").replace(" · ", " • ")
+            raw, money, share=share).lstrip(" ·").replace(" · ", " • ")
     head = [b for b in (money if money and money != "-" else "",
                         f"{sess} Sess" if sess else "",
                         rate_chip,

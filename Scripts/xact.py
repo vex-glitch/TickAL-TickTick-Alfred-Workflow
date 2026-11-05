@@ -1927,6 +1927,28 @@ def _commute_tick(tid, row=None):
         return f" · 🚗 commute failed · {type(e).__name__}"
 
 
+def _cut_prompt(dflt):
+    """The 🫵 question (Vex 2026-11-05: "not every shop I work in has the
+    same percentage ... one of the pop up prompts after how much was
+    charged should be 'What is your percentage'")."""
+    return ("What is your percentage? "
+            + (f"(OK = {dflt:g}% · Esc cancels)" if dflt
+               else "(OK skips · Esc cancels)"))
+
+
+def _cut_default(dflt):
+    return f"{dflt:g}" if dflt else ""
+
+
+def _cut_wanted(answers):
+    """The 🫵 question follows a PRICED session only: answers[1] is the
+    price answer - blank (OK skipped) or a gift asks nothing, the entry
+    then inherits the logbook's percentage."""
+    import crm_records as cr
+    price = (answers[1] if len(answers) > 1 else "") or ""
+    return bool(price.strip()) and not cr.is_gratis(price)
+
+
 def _session_day(task, today=None):
     """The ISO day a session entry is dated on: the task's OWN day (its
     stamp read in its zone - dateutil.task_day) when that day is before
@@ -2106,27 +2128,41 @@ def sessiondone(pid, tid, when=None):
     d_chg = cr.quote_remainder(lb_content)
     d_setup = cr.last_setup(lb_content)
     d_next = cr.last_next(lb_content)
+    d_cut = cr.last_cut(lb_content)
     # Consultations skip duration/charged/setup (Vex 2026-07-26) - one
-    # question, prep-flavored; needle sessions keep the full five.
+    # question, prep-flavored; needle sessions keep the full five, plus
+    # 🫵 the percentage right after the price (Vex 2026-11-05: "not every
+    # shop I work in has the same percentage"), asked only when the
+    # session was priced - a gift or a skipped price asks nothing and the
+    # entry inherits the logbook's. Default = the logbook's last one.
     prompts = ((
-        (f"How long was the {word}? (OK skips · Esc cancels)", d_dur),
-        (_price_prompt(lb_content), d_chg),
-        ("What did you do? (OK skips · Esc cancels)", ""),
-        ("Setup? needles · inks · machine (OK skips)", d_setup),
-        ("What is next? (OK skips)", d_next),
+        (f"How long was the {word}? (OK skips · Esc cancels)", d_dur, None),
+        (_price_prompt(lb_content), d_chg, None),
+        (_cut_prompt(d_cut), _cut_default(d_cut), _cut_wanted),
+        ("What did you do? (OK skips · Esc cancels)", "", None),
+        ("Setup? needles · inks · machine (OK skips)", d_setup, None),
+        ("What is next? (OK skips)", d_next, None),
     ) if is_s else (
         ("What was discussed · anything to remember for the prep? "
-         "(OK skips · Esc cancels)", ""),
+         "(OK skips · Esc cancels)", "", None),
     ))
     answers = []
-    for prompt, dflt in prompts:
+    for prompt, dflt, gate in prompts:
+        if gate and not gate(answers):
+            answers.append(None)            # not asked
+            continue
         v = _ask(prompt, default=dflt)
         if v is None:
             _crm_say("Cancelled · task NOT completed, nothing logged")
             return
         answers.append(v)
+    cut = None
     if is_s:
-        dur, charged, did, setup, nxt_txt = answers
+        dur, charged, cut_raw, did, setup, nxt_txt = answers
+        # asked and left blank = the default it offered ("OK = 50%"); not
+        # asked = no segment, the entry inherits
+        cut = (None if cut_raw is None
+               else (cr.parse_cut(cut_raw) if cut_raw.strip() else d_cut))
         charged, did = _fold_entry_text(lb_content, charged, did, setup,
                                         nxt_txt)
     else:
@@ -2153,7 +2189,7 @@ def sessiondone(pid, tid, when=None):
     tail = photo + dated + _commute_tick(tid, t)
     try:
         content, money, n, live_title = cr.append_session(
-            log_pid, log_tid, marker, dur, charged, did, when=when)
+            log_pid, log_tid, marker, dur, charged, did, when=when, cut=cut)
         lb_title = live_title or lb_title   # renamed logbook → fresh title
     except Exception as e:
         _crm_say(f"✅ done · logbook update FAILED: {type(e).__name__}: {e}{tail}")
@@ -2502,6 +2538,18 @@ def moneybackfill(ym):
     if not total or total <= 0:
         _crm_say("Cancelled · no total")
         return
+    # 🫵 the shop's split for that month (a guest spot is exactly "another
+    # shop"): the redo prefills the logbook's own, else the global cut
+    cut_dflt = (cr.last_cut(prev.get("content") or "") if prev else None) \
+        or cr.cut_percent()
+    raw = _ask(f"{label} · what was your percentage?"
+               + (f" (OK = {cut_dflt:g}%)" if cut_dflt else " (OK skips)"),
+               default=f"{cut_dflt:g}" if cut_dflt else "")
+    if raw is None:
+        _crm_say("Cancelled")
+        return
+    cut = cr.parse_cut(raw) if raw.strip() else cut_dflt
+    cut_bit = f" · 🫵 {total * cut / 100.0:g}€ ({cut:g}%)" if cut else ""
     rate_dflt = prev_rate or mb.DEFAULT_RATE
     raw = _ask(f"{label} · about how much per hour? (OK = {rate_dflt:g}"
                + (" as backfilled)" if prev_rate else ")"),
@@ -2523,12 +2571,13 @@ def moneybackfill(ym):
         # the redo: the old entries go, the new plan lands, ONE write
         try:
             cr.replace_sessions(prev.get("projectId") or prev.get("_projectId"),
-                                prev["id"], mb.render_sessions(entries, first),
+                                prev["id"],
+                                mb.render_sessions(entries, first, cut=cut),
                                 started=entries[0][0], finished=entries[-1][0])
         except Exception as e:
             _crm_say(f"🕰 {label} redo FAILED: {type(e).__name__}: {e}")
             return
-        _crm_say(f"🕰 {label} backfilled again · {total:g}€ · {how} · "
+        _crm_say(f"🕰 {label} backfilled again · {total:g}€{cut_bit} · {how} · "
                  f"{hours:g}h · ~{rate:g}€/h · {prev_n} old "
                  f"entr{'y' if prev_n == 1 else 'ies'} replaced")
         return
@@ -2542,9 +2591,10 @@ def moneybackfill(ym):
     cr._patch_cache(lb["id"], content=content)
     for i, (day, marker, dur, amt) in enumerate(entries):
         cr.append_session(areas.RECORDS_ID, lb["id"], marker, duration=dur,
-                          charged=amt, text=first if i == 0 else "", when=day)
+                          charged=amt, text=first if i == 0 else "", when=day,
+                          cut=cut)
     cr.finish_logbook(areas.RECORDS_ID, lb["id"], when=entries[-1][0])
-    _crm_say(f"🕰 {label} backfilled · {total:g}€ · {how} · "
+    _crm_say(f"🕰 {label} backfilled · {total:g}€{cut_bit} · {how} · "
              f"{hours:g}h · ~{rate:g}€/h")
 
 
@@ -2636,21 +2686,29 @@ def crmpast(log_tid):
         want_import = pick == "Import"
         photo = "" if want_import else " · 📸 skipped"
     lb_content = lb.get("content") or ""
-    prompts = (("How long? (OK skips · Esc cancels)", ""),
-               (_price_prompt(lb_content), ""),
-               ("What did you do? (OK skips · Esc cancels)", ""),
-               ("What is next? (OK skips)", cr.last_next(lb_content)))
+    d_cut = cr.last_cut(lb_content)
+    prompts = (("How long? (OK skips · Esc cancels)", "", None),
+               (_price_prompt(lb_content), "", None),
+               (_cut_prompt(d_cut), _cut_default(d_cut), _cut_wanted),
+               ("What did you do? (OK skips · Esc cancels)", "", None),
+               ("What is next? (OK skips)", cr.last_next(lb_content), None))
     answers = []
-    for prompt, dflt in prompts:
+    for prompt, dflt, gate in prompts:
+        if gate and not gate(answers):
+            answers.append(None)            # not asked
+            continue
         v = _ask(prompt, default=dflt)
         if v is None:
             _crm_say("Cancelled · nothing logged")
             return
         answers.append(v)
-    dur, charged, did, nxt_txt = answers
+    dur, charged, cut_raw, did, nxt_txt = answers
+    cut = (None if cut_raw is None
+           else (cr.parse_cut(cut_raw) if cut_raw.strip() else d_cut))
     charged, did = _fold_entry_text(lb_content, charged, did, nxt=nxt_txt)
     content, money, n_total, live_title = cr.append_session(
-        areas.RECORDS_ID, log_tid, marker, dur, charged, did, when=when)
+        areas.RECORDS_ID, log_tid, marker, dur, charged, did, when=when,
+        cut=cut)
     if want_import:
         stage = "consult" if marker == "consultation" else f"s{n}"
         photo = (" · 📸 imported" if session_photos(log_tid, stage)
@@ -3095,7 +3153,7 @@ def crmcsv():
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["date", "customer", "tattoo", "entry", "duration_min",
-                    "amount", "currency"])
+                    "amount", "currency", "your_pct", "your_share"])
         for e in sorted(cr.entries_detailed(), key=lambda x: x["date"]):
             if (start and e["date"] < start) or (end and e["date"] > end):
                 continue
@@ -3104,7 +3162,9 @@ def crmcsv():
             w.writerow([e["date"], e["cust_title"],
                         (e["lb"].get("title") or ""), e["marker"],
                         e["minutes"] or "", e["amount"] if e["amount"] is not None else "",
-                        e["sym"] or "€"])
+                        e["sym"] or "€",
+                        f"{e['cut']:g}" if e.get("cut") else "",
+                        f"{e['share']:.2f}" if e.get("share") is not None else ""])
             n += 1
     subprocess.run(["open", "-R", path], check=False)
     _crm_say(f"🧾 {n} rows → {os.path.basename(path)}")

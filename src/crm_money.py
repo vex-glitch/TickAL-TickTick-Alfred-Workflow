@@ -18,6 +18,14 @@ session without a price (gratis, "-") is a 0 day: a session happened and
 no money came. A day with no session and no priced line is absent from
 the map, which is how the fillers tell "no sessions" from "made 0".
 
+His share rides beside the total (Vex 2026-11-05: "money summaries show
+totals, not my percentage. We can keep total, but put my percentage
+first"): day_shares / day_share / period_share are the same maps over the
+artist's share, every entry at its own percentage (the 🫵 segment an
+entry carries, else the logbook's, else crm_cut). The notes print
+"🫵 200 · 400" - his share first, the total after - and fall back to the
+bare total when no share is known.
+
 CRM records not set up here, or the cache unreadable: day_sums is None,
 not {} - the callers then write NO money figure at all (never a 0 that
 lies), and every money section keeps what it holds. Under launchd the
@@ -72,17 +80,16 @@ def _entries():
         return None
 
 
-def day_sums(start=None, end=None):
-    """{date: amount} for every day with a session or a priced entry, inside
-    [start, end] when given (dates, inclusive). None when the CRM cannot be
-    read: the caller leaves the note's money alone."""
+def _sums(start, end, share):
     rows = _entries()
     if rows is None:
         return None
-    out = {}
+    out, any_share, priced = {}, False, False
     for row in rows:
         d_s, is_s, amt = row[0], row[1], row[2]
-        if amt is None:
+        sh = row[6] if len(row) > 6 else None
+        unpriced = amt is None
+        if unpriced:
             if not is_s:
                 continue            # an unpriced deposit/payment line says nothing
             amt = 0.0               # a session with no price: a day that earned 0
@@ -92,8 +99,58 @@ def day_sums(start=None, end=None):
             continue
         if (start and d < start) or (end and d > end):
             continue
-        out[d] = out.get(d, 0.0) + amt
+        priced = priced or not unpriced
+        if share:
+            if sh is not None:
+                any_share = True
+            out[d] = out.get(d, 0.0) + (sh or 0.0)
+        else:
+            out[d] = out.get(d, 0.0) + amt
+    if share and not any_share:
+        # no entry carried a share: the cut is off, or an old six-field
+        # ledger - unless the range held nothing priced at all, which is a
+        # known 0 share while the cut is on
+        if priced or not out or not _cut_on():
+            return None
     return out
+
+
+def _cut_on():
+    try:
+        import crm_records as cr
+        return cr.cut_percent() is not None
+    except Exception:
+        return False
+
+
+def day_sums(start=None, end=None):
+    """{date: amount} for every day with a session or a priced entry, inside
+    [start, end] when given (dates, inclusive). None when the CRM cannot be
+    read: the caller leaves the note's money alone."""
+    return _sums(start, end, False)
+
+
+def day_shares(start=None, end=None):
+    """{date: the artist's share} over the same days as day_sums - every
+    entry at ITS percentage (crm_records.entries_cut: its own 🫵 segment,
+    else the logbook's, else crm_cut; Vex 2026-11-05: "put my percentage
+    first"). None when the CRM cannot be read OR no entry in the range
+    carries a share (the cut is off): the notes then show the totals alone,
+    the way they always have."""
+    return _sums(start, end, True)
+
+
+def day_share(day):
+    """That day's share, or None (nothing dated that day, or no share
+    known)."""
+    s = day_shares(day, day)
+    return s.get(day) if s is not None else None
+
+
+def period_share(start, end):
+    """Σ the share over [start, end]; None when no share is known."""
+    s = day_shares(start, end)
+    return sum(s.values()) if s is not None else None
 
 
 def day_sum(day):

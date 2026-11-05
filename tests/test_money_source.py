@@ -379,6 +379,62 @@ else:
           and not any(hasattr(pm, n) for n in ("parse_money_answer", "money_answer_update", "split_money_answer", "money_answer_line")))
     check("nothing reached the network", NET == [], NET[:3])
 
+    # ── 6. 🫵 his share first, the total after (Vex 2026-11-05: "money
+    # summaries show totals, not my percentage. We can keep total, but put
+    # my percentage first") - every money line reads "🫵 share · total" when
+    # the ledger carries shares, exactly as before when it does not ────────
+    for name in _REAL:
+        setattr(pe, name, lambda *a, **k: None)
+    pe._today = lambda: date(2026, 9, 28)
+    areas.records_configured = lambda: True
+    crm_money._cache_present = lambda: True
+    LEDGER7 = [("2026-09-15", True, 300.0, "€", False, 60, 150.0),
+               ("2026-09-22", True, 400.0, "€", False, 180, 200.0),
+               ("2026-09-24", True, 250.0, "€", False, 120, 125.0)]
+    cr.all_entries = lambda: list(LEDGER7)
+    crm_money._MEMO.update(fn=None, rows=None)
+    sh = crm_money.day_shares()
+    check("6.day_shares beside day_sums", sh == {date(2026, 9, 15): 150.0, date(2026, 9, 22): 200.0, date(2026, 9, 24): 125.0}, sh)
+    check("6.the engine reads them", pe._day_shares({}) == sh and pe._day_share(date(2026, 9, 22)) == 200.0 and pe._day_share(date(2026, 9, 23)) is None)
+    check("6.money_head: the share first, the total after; the bare total without one",
+          pm.money_head(650, 325) == "🫵 325 · 650" and pm.money_head(650) == "650" and pm.money_head(0, 0) == "🫵 0 · 0")
+    check("6.money_day_line / money_total_line carry it",
+          pm.money_day_line(date(2026, 9, 22), 400, 200) == "- Tue 22 Sep 2026 • 🫵 200 · 400"
+          and pm.money_total_line(650, 3, 325) == "\t\t\t- **Total = 🫵 325 · 650**" and pm.money_total_line(650) == "\t\t- **Total = 650**")
+    d = weekly_doc()
+    pe._fill_weekly(d, wk, {})
+    inc = ps.find_prefix(d, pm.SEC_INCOME, pm.scope_of("weekly", pm.SEC_INCOME))
+    check("6.the weekly 💰 Income head: his share first, the total after, the chip on the SHARE against last week",
+          inc.name == "💰 Income: 🫵 325 · 650 · 🟢 ▲ 175 (+117%)", inc.name)
+    check("6.the day lines and the Total line the same way",
+          any(l.strip() == "- Thu 24 Sep 2026 • 🫵 125 · 250" for l in inc.body) and any(l.strip() == "- Mon 21 Sep 2026 • 🫵 0 · 0" for l in inc.body)
+          and any(l.strip() == "- **Total = 🫵 325 · 650**" for l in inc.body), inc.body)
+    lw = ps.find(d, pm.SEC_LAST_WEEK)
+    check("6.⏪ Last week's Income the same way", lw is not None and any(l.strip() == "- Income: 🫵 150 · 300" for l in lw.body), lw.body if lw else None)
+    spans2 = [(3, None, date(2026, 9, 14), date(2026, 9, 20)), (4, None, date(2026, 9, 21), date(2026, 9, 27))]
+    lines = pe._span_money_lines(crm_money.day_sums(), spans2, "monthly", date(2026, 9, 28), sh)
+    check("6.the monthly / quarterly / yearly span lines (W3 keeps its 'from 15 Sep' tail)",
+          "• 🫵 150 · 300 · from 15 Sep" in lines[0] and lines[1].endswith("• 🫵 325 · 650"), lines)
+    check("6.without shares the span lines are the bare totals they were",
+          pe._span_money_lines(crm_money.day_sums(), spans2, "monthly", date(2026, 9, 28))[1].endswith("• 650"))
+    check("6.bullet_head and quarter_compare still read the head (his share is the figure compared)",
+          pm.bullet_head(["- 💰 Income: 🫵 325 · 650 · 🟢 ▲ 175 (+117%)"], "💰 Income") == "🫵 325 · 650 · 🟢 ▲ 175 (+117%)"
+          and pm.quarter_compare({"Income": "🫵 325 · 650 · 🟢 ▲ 175 (+117%)"}, {"Income": "🫵 150 · 300"}) == "Income 🫵 325 vs 🫵 150")
+    rec = pe._recap_lines(date(2026, 9, 24), None, doc, pm.T2, pday=date(2026, 9, 22), pdoc=doc)
+    money_line = next((l for l in rec if "Money" in l), "")
+    check("6.the daily summary: 🫵 125 · 250, the arrow on the share against the day before (200 → 125)",
+          money_line == pm.T2 + "- Money: 🫵 125 · 250  ▼ 75", money_line)
+    rec = pe._recap_lines(date(2026, 9, 23), None, doc, pm.T2, pday=date(2026, 9, 22), pdoc=doc)
+    money_line = next((l for l in rec if "Money" in l), "")
+    check("6.a day without a session reads 🫵 0 · 0 like the weekly's day lines, no arrow", money_line == pm.T2 + "- Money: 🫵 0 · 0", money_line)
+    cr.all_entries = lambda: list(LEDGER)
+    crm_money._MEMO.update(fn=None, rows=None)
+    rec = pe._recap_lines(date(2026, 9, 16), None, doc, pm.T2, pday=date(2026, 9, 15), pdoc=doc)
+    money_line = next((l for l in rec if "Money" in l), "")
+    check("6.an old six-field ledger: the summary reads exactly as before", money_line.startswith(pm.T2 + "- Money: 250") and "▼ 150" in money_line, money_line)
+    for name, fn in _REAL.items():
+        setattr(pe, name, fn)
+
     print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} ok")
     if FAILS:
         print("FAILED:", FAILS)

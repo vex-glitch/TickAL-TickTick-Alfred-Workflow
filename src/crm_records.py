@@ -344,8 +344,10 @@ def monthly_stats():
 
 def all_entries():
     """Every session-entry across every logbook (open + archived), flat:
-    [(date_str, is_needle_session, amount_or_None, sym, pre)] - the money
-    screens aggregate date ranges over this."""
+    [(date_str, is_needle_session, amount_or_None, sym, pre, minutes,
+    share)] - the money screens aggregate date ranges over this. `share` =
+    the artist's share of the amount at the entry's own percentage
+    (entries_cut), None when there is no amount or the cut is off."""
     out = []
     seen = set()
     for tag in (areas.LOGBOOK_TAG, areas.ARCHIVE_TAG):
@@ -353,8 +355,7 @@ def all_entries():
             if lb["id"] in seen:
                 continue
             seen.add(lb["id"])
-            for m in ENTRY_RE.finditer(lb.get("content") or ""):
-                segs = [s.strip() for s in m.group(1).split("·")]
+            for segs, pct in entries_cut(lb.get("content") or ""):
                 is_s = bool(len(segs) > 1
                             and re.fullmatch(r"S\d+", segs[1] or ""))
                 amt, sym, pre = None, "", False
@@ -370,7 +371,8 @@ def all_entries():
                 mins = dur_minutes(segs[2]) if len(segs) > 2 else None
                 if len(segs) > 3 and is_gratis(segs[3]):
                     mins = None   # gratis: hours invisible to rate math
-                out.append((segs[0], is_s, amt, sym, pre, mins))
+                out.append((segs[0], is_s, amt, sym, pre, mins,
+                            share_of(amt, pct)))
     return out
 
 
@@ -385,32 +387,46 @@ def cut_percent():
     return v if 0 < v < 100 else None
 
 
-def cut_chip(raw_total, money_str=""):
+def cut_chip(raw_total, money_str="", share=None, percent=None):
     """' · 🫵 3975€' - the artist's share, appended after money totals.
-    Currency symbol recovered from the formatted total it follows."""
-    p = cut_percent()
-    if not p or not raw_total:
-        return ""
+    `share` = the sum of the entries' own shares (sum_share / _share_raw:
+    each entry at ITS percentage, 2026-11-05) - the figure every money
+    screen passes now; without it the total at `percent` (a logbook's
+    percentage in force), else at the global crm_cut. Currency symbol
+    recovered from the formatted total it follows."""
     sym = re.sub(r"[-\d.,\s]", "", money_str or "") or "€"
     pre = bool(sym) and (money_str or "").strip().startswith(sym)
-    return f" · 🫵 {_fmt_money(raw_total * p / 100.0, sym, pre)}"
+    if share is None:
+        p = cut_percent() if percent is None else percent
+        if not p or not raw_total:
+            return ""
+        share = raw_total * p / 100.0
+    if not share:
+        return ""
+    return f" · 🫵 {_fmt_money(share, sym, pre)}"
 
 
-def cut_rate_chip(rate, sym="€"):
+def cut_rate_chip(rate, sym="€", share_rate=None):
     """' · 🫵 ~60€/h' - the artist's share of an hourly rate. Without it the
     €/h reads double what actually lands in the pocket (Vex catch
-    2026-07-21)."""
-    p = cut_percent()
-    if not p or not rate:
+    2026-07-21). `share_rate` = the share per hour computed off the
+    entries' own percentages; without it the global cut applies."""
+    if share_rate is None:
+        p = cut_percent()
+        if not p or not rate:
+            return ""
+        share_rate = rate * p / 100.0
+    if not share_rate:
         return ""
-    return f" · 🫵 ~{int(rate * p / 100.0)}{sym}/h"
+    return f" · 🫵 ~{int(share_rate)}{sym}/h"
 
 
 def sum_entries(entries, start=None, end=None):
     """(money_str, session_count, hours_float, raw_total) over entries whose
     date is in [start, end] (ISO date strings, inclusive; None = unbounded)."""
     total, n, sym, pre, mins = 0.0, 0, "", False, 0
-    for date, is_s, amt, s, p, mm in entries:
+    for row in entries:
+        date, is_s, amt, s, p, mm = row[:6]     # the 7th (share) is sum_share's
         if (start and date < start) or (end and date > end):
             continue
         if is_s:
@@ -427,6 +443,22 @@ def sum_entries(entries, start=None, end=None):
     return _fmt_money(total, sym or "€", pre), n, hours, total
 
 
+def sum_share(entries, start=None, end=None):
+    """Σ the artist's share over the entries dated in [start, end] (ISO
+    strings, inclusive, None = unbounded), each at ITS percentage
+    (all_entries' 7th field); None when none carries one (the cut is off,
+    or an old 6-tuple ledger)."""
+    total, any_ = 0.0, False
+    for row in entries:
+        if (start and row[0] < start) or (end and row[0] > end):
+            continue
+        share = row[6] if len(row) > 6 else None
+        if share is not None:
+            total += share
+            any_ = True
+    return total if any_ else None
+
+
 def lifetime_raw(cust_tid):
     """Numeric lifetime total for sorting the money-per-customer view."""
     total = 0.0
@@ -434,6 +466,18 @@ def lifetime_raw(cust_tid):
         t, _n, _s, _p = _totals_raw(lb.get("content") or "")
         total += t
     return total
+
+
+def lifetime_share(cust_tid):
+    """The artist's share across ALL the customer's logbooks, each entry at
+    its percentage; None when no entry carries one."""
+    total, any_ = 0.0, False
+    for lb in customer_logbooks(cust_tid):
+        sh = _share_raw(lb.get("content") or "")
+        if sh is not None:
+            total += sh
+            any_ = True
+    return total if any_ else None
 
 
 def note_created_date(note):
@@ -474,8 +518,7 @@ def entries_detailed():
             hit = parse_first_link(lb.get("content") or "")
             cust_tid = hit[2] if hit else ""
             cust_title = PERSON_RE.sub("", hit[0]).strip() if hit else ""
-            for m in ENTRY_RE.finditer(lb.get("content") or ""):
-                segs = [s.strip() for s in m.group(1).split("·")]
+            for segs, pct in entries_cut(lb.get("content") or ""):
                 marker = segs[1] if len(segs) > 1 else ""
                 amt, sym, pre = _amount_of(segs)
                 out.append({
@@ -484,6 +527,7 @@ def entries_detailed():
                     "amount": amt, "sym": sym, "pre": pre,
                     "minutes": dur_minutes(segs[2]) if len(segs) > 2 else None,
                     "gratis": len(segs) > 3 and is_gratis(segs[3]),
+                    "cut": pct, "share": share_of(amt, pct),
                     "lb": lb, "cust_tid": cust_tid, "cust_title": cust_title,
                 })
     return out
@@ -498,6 +542,7 @@ def period_kpis(start, end):
     def in_p(d):
         return d and (not start or d >= start) and (not end or d <= end)
     money, mins, sessions = 0.0, 0, 0
+    share, any_share = 0.0, False
     sym, pre = "", False
     per_cust, active, first_s = {}, set(), {}
     for e in ents:
@@ -510,6 +555,9 @@ def period_kpis(start, end):
             continue
         if e["amount"] is not None:
             money += e["amount"]
+            if e.get("share") is not None:
+                share += e["share"]
+                any_share = True
             if not sym and e["sym"]:
                 sym, pre = e["sym"], e["pre"]
             if e["cust_tid"]:
@@ -550,6 +598,7 @@ def period_kpis(start, end):
     top = max(per_cust.items(), key=lambda kv: kv[1][0]) if per_cust else None
     return {
         "money": money, "sym": sym or "€", "pre": pre, "hours": hours,
+        "share": share if any_share else None,
         "sessions": sessions, "rate": (money / hours) if hours else None,
         "new_customers": new_cust, "returning": returning,
         "active_customers": len(active), "finished": finished,
@@ -1049,6 +1098,85 @@ def is_gratis(seg):
     counted, but its hours stay OUT of the money-per-hour math (Vex ruling
     2026-07-20 - a friend tattoo must not drag the rate)."""
     return bool(seg and GRATIS_RE.fullmatch(seg.strip()))
+
+
+# ── 🫵 the percentage (Vex 2026-11-05: "not every shop I work in has the
+# same percentage") - an entry may carry its OWN share as a fifth segment,
+# "### 2026-10-31 · S1 · 2h · 400 · 🫵 60%"; every reader of the first four
+# segments is untouched by it. An entry without one inherits the latest
+# stated above it in the logbook (the shop for this tattoo, until it
+# changes), and before any the global crm_cut (cut_percent, 50 by default).
+CUT_SEG_RE = re.compile(r"^🫵\s*(\d+(?:[.,]\d+)?)\s*%?$")
+_NO_DEFAULT = object()
+
+
+def parse_cut(text):
+    """A typed percentage - '60', '60%', '62,5', '🫵 60%' - as a float in
+    (0, 100]; None for blank or anything else."""
+    s = (text or "").strip().lstrip("🫵").strip().rstrip("%").strip()
+    try:
+        v = float(s.replace(",", "."))
+    except ValueError:
+        return None
+    return v if 0 < v <= 100 else None
+
+
+def cut_seg(p):
+    """'🫵 60%' - the entry segment that carries the percentage."""
+    return f"🫵 {p:g}%"
+
+
+def entry_cut(segs):
+    """The entry's OWN percentage from its '🫵 60%' segment (the fifth on),
+    None when it carries none."""
+    for seg in segs[4:]:
+        m = CUT_SEG_RE.fullmatch((seg or "").strip())
+        if m:
+            return float(m.group(1).replace(",", "."))
+    return None
+
+
+def entries_cut(content, default=_NO_DEFAULT):
+    """[(segs, percent)] in note order, every entry with the percentage in
+    force for it: its own 🫵 segment, else the latest one stated above it,
+    else `default` (the global cut_percent() when not given; None = the cut
+    is off and such an entry has no share)."""
+    cur = cut_percent() if default is _NO_DEFAULT else default
+    out = []
+    for segs in _entries(content):
+        own = entry_cut(segs)
+        if own is not None:
+            cur = own
+        out.append((segs, cur))
+    return out
+
+
+def last_cut(content):
+    """The percentage in force after the last entry - the next session's
+    default - or the global one (None = off)."""
+    rows = entries_cut(content)
+    return rows[-1][1] if rows else cut_percent()
+
+
+def share_of(amount, percent):
+    """The artist's share of an amount at a percentage; None without
+    either."""
+    if amount is None or percent is None:
+        return None
+    return amount * percent / 100.0
+
+
+def _share_raw(content):
+    """Σ the artist's share over a logbook's priced entries, each at ITS
+    percentage; None when no entry carries one (the cut is off)."""
+    total, any_ = 0.0, False
+    for segs, p in entries_cut(content):
+        amt, _s, _p = _amount_of(segs)
+        sh = share_of(amt, p)
+        if sh is not None:
+            total += sh
+            any_ = True
+    return total if any_ else None
 
 
 def gratis_count(content):
@@ -1647,9 +1775,11 @@ def _fresher_content(log_tid, live_content):
 
 
 def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
-                   when=None):
+                   when=None, cut=None):
     """Log one entry: append under ## Sessions, recompute Paid, sync the
-    customer bullet. marker = 'S<n>' or 'consultation'.
+    customer bullet. marker = 'S<n>' or 'consultation'. `cut` = the
+    artist's percentage for THIS entry (the 🫵 fifth segment, 2026-11-05);
+    None = the entry inherits the logbook's (entries_cut).
     Returns (updated_content, money_str, session_count, live_logbook_title) -
     the title is the CURRENT one (a rename must not leave the S<n+1> prefill
     holding the stale link text frozen in the completed task's title)."""
@@ -1657,6 +1787,8 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
     lb, log_pid = locate(log_tid, log_pid)   # live - dialogs are slow, cache lags
     day = when or _today()
     entry = f"### {day} · {marker} · {_seg(duration)} · {_seg(charged)}"
+    if cut is not None:
+        entry += f" · {cut_seg(cut)}"
     if (text or "").strip():
         entry += f"\n{text.strip()}"
     base = _fresher_content(log_tid, lb.get("content") or "")

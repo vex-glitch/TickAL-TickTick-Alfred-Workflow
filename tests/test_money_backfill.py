@@ -107,7 +107,7 @@ else:
         return {"id": "lb1", "title": f"🎨 {cust['title'][2:]} • {tattoo}", "content": "👤 x · Started %s · Finished -\nPaid: - · 0 sessions\n\n## Sessions\n\n## Notes\n" % started}
     cr.create_logbook = _create_logbook
     cr._patch_cache = lambda tid, **f: LOG.append(("cache", tid))
-    cr.append_session = lambda pid, tid, marker, duration="", charged="", text="", when=None: (LOG.append(("entry", when, marker, duration, charged, bool(text))) or ("", "", 0, ""))
+    cr.append_session = lambda pid, tid, marker, duration="", charged="", text="", when=None, cut=None: (LOG.append(("entry", when, marker, duration, charged, bool(text), cut)) or ("", "", 0, ""))
     cr.finish_logbook = lambda pid, tid, when=None: LOG.append(("finish", tid, when))
     class _API:
         def update_task(self, tid, pid, current=None, **f):
@@ -121,33 +121,41 @@ else:
         xact.moneybackfill(ym)
         return list(LOG)
 
-    log = run("2026-08", ["", ""])          # OK through both questions
+    log = run("2026-08", ["", "", ""])      # OK through all three questions
     asks = [x for x in log if x[0] == "ask"]
     check("the total question is prefilled from the money note", asks[0][2] == "3490" and "3490" in asks[0][1], asks)
-    check("the rate question defaults to 75", asks[1][2] == "75", asks)
+    check("🫵 the percentage question comes second, prefilled with the global cut", "percentage" in asks[1][1] and asks[1][2] == "50" and "(OK = 50%)" in asks[1][1], asks)
+    check("the rate question defaults to 75", asks[2][2] == "75", asks)
     check("the Guest spot customer is created when missing", ("cust", "Guest spot") in log)
     check("the logbook is born 'August 2026' started on the first money day", ("logbook", "c1", "August 2026", "2026-08-01") in log, log)
     check("the 🎬 ➖ header is written", ("update", "lb1", True) in log)
     ents = [x for x in log if x[0] == "entry"]
     check("18 entries, one per money day, S1..S18", len(ents) == 18 and [e[2] for e in ents] == [f"S{i}" for i in range(1, 19)], ents[:3])
     check("only the first entry carries the explanation", [e[5] for e in ents] == [True] + [False] * 17)
-    check("the 22nd reads 6h30 · 490", ("entry", "2026-08-22", "S14", "6h30", "490", False) in log)
+    check("the 22nd reads 6h30 · 490, at the 50% answered", ("entry", "2026-08-22", "S14", "6h30", "490", False, 50.0) in log)
     check("finished on the last money day", ("finish", "lb1", "2026-08-30") in log)
     say = [x for x in log if x[0] == "say"][-1][1]
-    check("the toast says what landed", "Aug 2026 backfilled" in say and "3490€" in say and "18 days" in say and "46.5h" in say and "75€/h" in say, say)
+    check("the toast says what landed, his share beside the total", "Aug 2026 backfilled" in say and "3490€ · 🫵 1745€ (50%)" in say and "18 days" in say and "46.5h" in say and "75€/h" in say, say)
     check("no live read when the cache holds the note", not any(x[0] == "live" for x in log))
 
-    log = run("2026-08", ["2000", "100"])   # typed total disagrees with the note
+    log = run("2026-08", ["2000", "", "100"])   # typed total disagrees with the note
     ents = [x for x in log if x[0] == "entry"]
-    check("a total the note does not carry → one lump entry at the typed rate", ents == [("entry", "2026-08-31", "S1", "20h00", "2000", True)], ents)
+    check("a total the note does not carry → one lump entry at the typed rate", ents == [("entry", "2026-08-31", "S1", "20h00", "2000", True, 50.0)], ents)
 
     MONEY_NOTES.clear()
-    log = run("2026-07", ["1500", ""])     # no note anywhere
+    log = run("2026-07", ["1500", "", ""])     # no note anywhere
     check("no note: the cache miss is followed by ONE live read of the money list", [x for x in log if x[0] == "live"] == [("live", "6a4bd07e4e3c910368319b6d")])
     asks = [x for x in log if x[0] == "ask"]
     check("no note: the total question has no prefill", asks[0][2] == "", asks)
     ents = [x for x in log if x[0] == "entry"]
-    check("no note: one entry on the month's last day, 20h at 75", ents == [("entry", "2026-07-31", "S1", "20h00", "1500", True)], ents)
+    check("no note: one entry on the month's last day, 20h at 75", ents == [("entry", "2026-07-31", "S1", "20h00", "1500", True, 50.0)], ents)
+    log = run("2026-07", ["1500", "60", ""])  # a typed percentage
+    ents = [x for x in log if x[0] == "entry"]
+    say = [x for x in log if x[0] == "say"][-1][1]
+    check("a typed percentage lands on the entry and in the toast", ents and ents[0][6] == 60.0 and "🫵 900€ (60%)" in say, (ents, say))
+    log = run("2026-07", ["1500", "abc", ""])
+    ents = [x for x in log if x[0] == "entry"]
+    check("a percentage that does not parse → the entry inherits (no segment)", ents and ents[0][6] is None, ents)
 
     log = run("2026-07", [None])
     check("Esc on the total cancels, nothing written", ("say", "Cancelled") in log and not any(x[0] in ("cust", "logbook", "entry") for x in log))
@@ -160,42 +168,46 @@ else:
     # ── redo: a month already backfilled is done AGAIN, its entries replaced ──
     # (Vex 2026-11-05: "I need to be able to adjust the entry more than once")
     OLD = ("👤 [👤 Guest spot](https://ticktick.com/webapp/#p/x/tasks/c1) · Started 2026-07-31 · Finished 2026-07-31\n"
-           "Paid: 1500€ · 1 session\n🎬 ➖\n\n## Sessions\n\n### 2026-07-31 · S1 · 20h00 · 1500\n"
+           "Paid: 1500€ · 1 session\n🎬 ➖\n\n## Sessions\n\n### 2026-07-31 · S1 · 20h00 · 1500 · 🫵 60%\n"
            "Backfilled as one entry, hours set at ~75€/h.\n\n## Notes\n- kept line\n")
     NOTES.append({"id": "old", "projectId": "arch", "title": "🏛️ Guest spot • July 2026", "tags": [areas.ARCHIVE_TAG], "content": OLD})
     _REAL_REPLACE = cr.replace_sessions
     cr.replace_sessions = lambda pid, tid, body, started=None, finished=None: (LOG.append(("replace", pid, tid, body, started, finished)) or ("", "1800€", 1))
-    log = run("2026-07", ["1800", "90"])
+    log = run("2026-07", ["1800", "", "90"])
     asks = [x for x in log if x[0] == "ask"]
     check("redo: the total question is prefilled with what the logbook holds", asks[0][2] == "1500" and "as backfilled" in asks[0][1] and "money note" not in asks[0][1], asks)
-    check("redo: the rate question is prefilled with the logbook's own rate (1500 / 20h)", asks[1][2] == "75" and "as backfilled" in asks[1][1], asks)
+    check("redo: the percentage question is prefilled with the logbook's own 🫵", "percentage" in asks[1][1] and asks[1][2] == "60", asks)
+    check("redo: the rate question is prefilled with the logbook's own rate (1500 / 20h)", asks[2][2] == "75" and "as backfilled" in asks[2][1], asks)
     rep = [x for x in log if x[0] == "replace"]
-    check("redo: ONE write replaces the Sessions section, Started/Finished restamped",
-          rep == [("replace", "arch", "old", "### 2026-07-31 · S1 · 20h00 · 1800\nBackfilled as one entry, hours set at ~90€/h.", "2026-07-31", "2026-07-31")], rep)
+    check("redo: ONE write replaces the Sessions section, Started/Finished restamped, the 🫵 kept",
+          rep == [("replace", "arch", "old", "### 2026-07-31 · S1 · 20h00 · 1800 · 🫵 60%\nBackfilled as one entry, hours set at ~90€/h.", "2026-07-31", "2026-07-31")], rep)
     check("redo: nothing created, nothing appended, nothing re-finished", not any(x[0] in ("cust", "logbook", "entry", "finish") for x in log), log)
     say = [x for x in log if x[0] == "say"][-1][1]
     check("redo: the toast says again + what was replaced", "Jul 2026 backfilled again" in say and "1 old entry replaced" in say and "1800€" in say and "90€/h" in say, say)
-    log = run("2026-07", ["", ""])           # OK through both: the old figures again
+    log = run("2026-07", ["", "", ""])       # OK through all three: the old figures again
     rep = [x for x in log if x[0] == "replace"]
-    check("redo: OK-OK rewrites the same figures (a no-op redo is harmless)", rep and rep[0][3].startswith("### 2026-07-31 · S1 · 20h00 · 1500"), rep)
+    check("redo: OK-OK-OK rewrites the same figures (a no-op redo is harmless)", rep and rep[0][3].startswith("### 2026-07-31 · S1 · 20h00 · 1500 · 🫵 60%"), rep)
+    log = run("2026-07", ["", "70", ""])
+    rep = [x for x in log if x[0] == "replace"]
+    check("redo: a new percentage replaces the old one on the entries", rep and "· 🫵 70%" in rep[0][3] and "60%" not in rep[0][3], rep)
     MONEY_NOTES[:] = [{"id": "mn1", "kind": "NOTE", "projectId": "6a4bd07e4e3c910368319b6d",
                        "title": "2026 August • MT - 3490", "content": AUG}]
     NOTES.append({"id": "aug", "projectId": "arch", "title": "🏛️ Guest spot • August 2026", "tags": [areas.ARCHIVE_TAG],
-                  "content": OLD.replace("2026-07-31", "2026-08-31").replace("20h00 · 1500", "40h00 · 3000").replace("1500€", "3000€")})
-    log = run("2026-08", ["", ""])
+                  "content": OLD.replace("2026-07-31", "2026-08-31").replace("20h00 · 1500 · 🫵 60%", "40h00 · 3000").replace("1500€", "3000€")})
+    log = run("2026-08", ["", "", ""])
     asks = [x for x in log if x[0] == "ask"]
     check("redo: the money note's figure is named when it disagrees with the backfill", asks[0][2] == "3000" and "the money note says 3490" in asks[0][1], asks)
     rep = [x for x in log if x[0] == "replace"]
     check("redo: OK keeps the backfilled 3000 (the note's days do not add up to it → one lump)", rep and rep[0][3].startswith("### 2026-08-31 · S1 · 40h00 · 3000"), rep)
-    log = run("2026-08", ["3490", ""])
+    log = run("2026-08", ["3490", "", ""])
     rep = [x for x in log if x[0] == "replace"]
-    check("redo: typing the note's total gives the 18 days again", rep and rep[0][3].count("### ") == 18 and rep[0][4] == "2026-08-01" and rep[0][5] == "2026-08-30", rep and rep[0][3][:60])
+    check("redo: typing the note's total gives the 18 days again, each at the percentage (this logbook has none: the global 50)", rep and rep[0][3].count("### ") == 18 and rep[0][3].count("· 🫵 50%") == 18 and rep[0][4] == "2026-08-01" and rep[0][5] == "2026-08-30", rep and rep[0][3][:60])
     class _Boom(Exception):
         pass
     def _boom(*a, **k):
         raise _Boom("write boom")
     cr.replace_sessions = _boom
-    log = run("2026-07", ["1800", "90"])
+    log = run("2026-07", ["1800", "", "90"])
     check("redo: a failed write is a toast, nothing else written", any("redo FAILED" in x[1] for x in log if x[0] == "say") and not any(x[0] in ("cust", "logbook", "entry") for x in log), log)
     NOTES[:] = [n for n in NOTES if n["id"] != "aug"]
     MONEY_NOTES.clear()
@@ -238,6 +250,9 @@ else:
                               "Backfilled from the 💰 money note, hours set at ~75€/h.")
     check("render_sessions: blocks a blank line apart, the first carrying the text",
           body == "### 2026-08-01 · S1 · 0h15 · 20\nBackfilled from the 💰 money note, hours set at ~75€/h.\n\n### 2026-08-02 · S2 · 1h45 · 125", body)
+    check("render_sessions: a percentage rides every entry",
+          mb.render_sessions([("2026-08-01", "S1", "0h15", "20"), ("2026-08-02", "S2", "1h45", "125")], cut=62.5)
+          == "### 2026-08-01 · S1 · 0h15 · 20 · 🫵 62.5%\n\n### 2026-08-02 · S2 · 1h45 · 125 · 🫵 62.5%")
     new = cr._set_section(OLD, "## Sessions", body)
     check("_set_section: the old entries are gone, the new ones in, the header and ## Notes untouched",
           "20h00 · 1500" not in new and "S2 · 1h45 · 125" in new and new.startswith("👤 [") and new.endswith("## Notes\n- kept line\n"), new)

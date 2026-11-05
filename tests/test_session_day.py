@@ -129,8 +129,11 @@ else:
     xact.open = lambda *a, **k: io.StringIO()       # the act-again context file stays in /tmp's peace
 
 
-    def _append(log_pid, log_tid, marker, duration="", charged="", text="", when=None):
+    CUTS = []
+
+    def _append(log_pid, log_tid, marker, duration="", charged="", text="", when=None, cut=None):
         LOGGED.append((marker, when))
+        CUTS.append(cut)
         return ("content", "400€", 2, "🎨 Marko • Sleeve")
     cr.append_session = _append
     cr.finish_logbook = lambda pid, tid, when=None: FINISHED.append(when)
@@ -227,6 +230,38 @@ else:
           and du.task_day({"timeZone": "Europe/Berlin", "startDate": "2026-09-21T22:00:00.000+0000"}) == date(2026, 9, 22))
     check("dateutil.local_zone is a named zone (DST-aware for any date)",
           hasattr(du.local_zone(), "key") or du.local_zone() is not None)
+
+    # ── 🫵 the percentage question (Vex 2026-11-05: "one of the pop up
+    # prompts after how much was charged should be 'What is your
+    # percentage'") ─────────────────────────────────────────────────────────
+    ASKED = []
+
+    def _ask_by(prompt, *a, **k):
+        ASKED.append((prompt, k.get("default")))
+        if "Charged?" in prompt:
+            return "400"
+        if "percentage" in prompt:
+            return "60"
+        return ""
+    xact._ask = _ask_by
+    ASKED.clear(); run(SEP)
+    pct = [i for i, (p_, _d) in enumerate(ASKED) if "percentage" in p_]
+    check("a priced session asks the percentage RIGHT AFTER the price, prefilled with the logbook's (the global 50 here)",
+          pct == [2] and "Charged?" in ASKED[1][0] and ASKED[2][1] == "50" and "(OK = 50%" in ASKED[2][0], ASKED)
+    check("…and the entry carries the answer", CUTS[-1] == 60.0 and LOGGED == [("S2", "2026-09-28")], (CUTS, LOGGED))
+    xact._ask = lambda prompt, *a, **k: ASKED.append((prompt, None)) or ("gift" if "Charged?" in prompt else "")
+    ASKED.clear(); run(SEP)
+    check("a gift asks no percentage, the entry inherits the logbook's",
+          not any("percentage" in p_ for p_, _d in ASKED) and CUTS[-1] is None and LOGGED == [("S2", "2026-09-28")], (ASKED, CUTS))
+    xact._ask = lambda prompt, *a, **k: ASKED.append((prompt, None)) or ""
+    ASKED.clear(); run(SEP)
+    check("a skipped price asks no percentage either", not any("percentage" in p_ for p_, _d in ASKED) and CUTS[-1] is None, (ASKED, CUTS))
+    xact._ask = lambda prompt, *a, **k: ""
+    check("the prompt helpers", xact._cut_prompt(50.0) == "What is your percentage? (OK = 50% · Esc cancels)"
+          and xact._cut_prompt(None) == "What is your percentage? (OK skips · Esc cancels)"
+          and xact._cut_default(62.5) == "62.5" and xact._cut_default(None) == ""
+          and xact._cut_wanted(["2h", "400"]) is True and xact._cut_wanted(["2h", "gift"]) is False
+          and xact._cut_wanted(["2h", ""]) is False and xact._cut_wanted([]) is False)
 
     print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} passed")
     if FAILS:

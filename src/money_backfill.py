@@ -135,15 +135,18 @@ def plan_entries(year, month, total, rate, days=None, today=None):
     return [(end.isoformat(), "S1", duration_str(h), fmt_amount(total))], h, "lump"
 
 
-def render_sessions(entries, first_text=""):
+def render_sessions(entries, first_text="", cut=None):
     """The ## Sessions body for a plan, as one string: a '### day · S<n> ·
     <dur> · <amount>' block per entry (the shape crm_records.ENTRY_RE
-    reads), the first block carrying `first_text` under it, blocks a
-    blank line apart - exactly what append_session would have written
-    one entry at a time."""
+    reads), '· 🫵 60%' on every one when `cut` (the artist's percentage
+    at that shop) is given, the first block carrying `first_text` under
+    it, blocks a blank line apart - exactly what append_session would
+    have written one entry at a time."""
     blocks = []
     for i, (day, marker, dur, amt) in enumerate(entries):
         b = f"### {day} · {marker} · {dur or '-'} · {amt or '-'}"
+        if cut:
+            b += f" · 🫵 {cut:g}%"
         if i == 0 and (first_text or "").strip():
             b += f"\n{first_text.strip()}"
         blocks.append(b)
