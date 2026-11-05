@@ -263,9 +263,6 @@ def do_sync():
         okr_board.refresh_done()
     except Exception:
         pass
-    # 🥘 Meal Prep rides NO sync: Vex 2026-09-21, "this python script that
-    # runs in the background is unacceptable" - the 🔄 Sync with Mela row
-    # in the hub is the only meal writer (meal_write.sync).
     print(summary)
     return summary
 

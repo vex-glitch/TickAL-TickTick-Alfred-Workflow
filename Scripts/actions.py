@@ -603,25 +603,6 @@ def main():
         # point a project at the board instead of the work, 🎯 Add to focus
         # moves it under the focus task. Cheap gate: a list-id compare.
         _is_okr = bool(_okr_pid) and pid == _okr_pid and is_task_like and not is_note and bool(tid)
-        # 🥘 a recipe (HANDOFF_MEAL): a LIBRARY task, title
-        # "[Name](mela://recipe/<UUID>)" and nothing before the bracket - a
-        # 🍳 pointer under the routine or a 🛒 list is NOT one, the
-        # 👨‍🍳cooked tag, the ⭐️ rating and the comments live on the library
-        # task (Vex 2026-09-21: "mark meal cooked via modifier", "know
-        # which meals I have cooked before, so I am thinking a tag", "rate a
-        # meal and give a comment"). The title alone gates it, no list
-        # check: a library task carried into another list is still the
-        # record. The generic verbs stay (a recipe is a plain task otherwise),
-        # so _entity does not learn about it. Lazy import, the OKR gate's
-        # shape: a failed import costs the rows, never the menu.
-        _is_recipe = False
-        _meal = None
-        if is_task_like and not is_note and bool(tid):
-            try:
-                import meal as _meal
-                _is_recipe = bool(_meal.is_library_title(name))
-            except Exception:
-                _is_recipe, _meal = False, None
         _entity = _is_logbook or _is_customer or _sess_done or _is_content
         _generic = not _entity
 
@@ -708,29 +689,6 @@ def main():
                  f"xact:crmbrowse:ctx:crmbook:{_content_log}", "logbook hub crm", bool(_content_log)),
                 ("➖ Retire", "Row done · logbook 🎬 → ➖ · photos stay",
                  f"xact:cretire:{tid}", "retire remove content", True),
-            ]
-        elif _is_recipe:
-            # The verdict rows, first: 👨‍🍳 Cooked is the ⌥⇧ chord of every
-            # meal row too (the tag + ONE note asked, Esc = no note); ⭐️
-            # Rate… opens the hub's picker (ctx:mealrate, the same road every
-            # OKR drill takes, the bar clean); 💬 Comment… asks for the line
-            # and appends it under the rating ("retrospectively I also
-            # should be able to add a comment, like add less salt next
-            # time"). The payloads are browse._meal_b64's shape (base64 of
-            # json.dumps); the real projectId beats a view alias in pid.
-            _rtags = {str(x).lower() for x in ((task or {}).get("tags") or [])}
-            _rcooked = _meal.COOKED_TAG.lower() in _rtags
-            _rstars = _meal.stars(_meal.read_rating((task or {}).get("content")))
-            _rpid = (task or {}).get("projectId") or (task or {}).get("_projectId") or pid
-            _rpay = base64.b64encode(json.dumps({"pid": _rpid, "tid": tid}).encode("utf-8")).decode("ascii")
-            entity_rows = [
-                ("👨‍🍳 Cooked",
-                 "Cooked before · add a note" if _rcooked else "Tag 👨‍🍳cooked · a note asked",
-                 f"xact:meal_cooked:{_rpay}", "cooked cook done ate tag", True),
-                ("⭐️ Rate…", (f"{_rstars} · pick 1 to 5" if _rstars else "Not rated · pick 1 to 5"),
-                 f"xact:crmbrowse:ctx:mealrate:{_rpid}:{tid}", "rate rating stars", True),
-                ("💬 Comment…", "A quote under the rating · less salt next time",
-                 f"xact:meal_comment:{_rpay}", "comment note remark next time", True),
             ]
 
         # ☑️ TickTick Internals sub-list: every copy-a-link row lives HERE,

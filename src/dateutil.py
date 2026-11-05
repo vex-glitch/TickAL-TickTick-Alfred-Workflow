@@ -20,8 +20,8 @@ for _i, _mn in enumerate(MONTHS, 1):
 
 
 # ── The day a task sits on ───────────────────────────────────────────────────
-# ONE reading of a task's calendar day for every subsystem (the meal plan
-# since 2026-09-21, the CRM's session entries since 2026-11-05): the stamp
+# ONE reading of a task's calendar day for every subsystem (the CRM's
+# session entries since 2026-11-05; the meal plan had it first): the stamp
 # converted into the task's OWN zone. TickTick writes an all-day task as
 # midnight of its zone in UTC ("2026-09-26T22:00:00.000+0000" for a CEST
 # 27 Sep), so the Mac's zone is only right when it is the task's zone -

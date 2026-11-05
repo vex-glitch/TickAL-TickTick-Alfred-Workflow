@@ -111,9 +111,6 @@ def get_okr_list_id():
         return cfg["okr_list_id"] or ""
     return OKR_LIST_DEFAULT
 
-MEAL_LIST_DEFAULT = "6a8abb444e699108a4693fa5"     # 🍳Meal Prep (recipe library)
-MEAL_ROUTINE_DEFAULT = "6a9ed0dc0eecd103a69febee"  # 🥘 Meal Prep (Sunday routine)
-MEAL_GROCERIES_DEFAULT = "6a9ed12a3d3fd103a69fec48"  # 🛒 Groceries (Saturday routine)
 
 
 def _defaulted(key, default):
@@ -127,41 +124,6 @@ def _defaulted(key, default):
     if key in cfg:
         return cfg[key] or ""
     return default
-
-
-def get_meal_list_id():
-    """🥘 the recipe library list (🍳Meal Prep). Defaulted like okr_list_id:
-    Vex made the list first and the workflow second (2026-09-19)."""
-    return _defaulted("meal_list_id", MEAL_LIST_DEFAULT)
-
-
-def get_meal_routine_id():
-    """🥘 the repeating Sunday routine task the weekly plan hangs off."""
-    return _defaulted("meal_routine_id", MEAL_ROUTINE_DEFAULT)
-
-
-def get_meal_groceries_id():
-    """🛒 the repeating Groceries routine the shopping lists hang off (the
-    upcoming occurrence - Vex moves it - is found by TITLE too)."""
-    return _defaulted("meal_groceries_id", MEAL_GROCERIES_DEFAULT)
-
-
-def get_meal_calendars():
-    """The calendars the Mela plan is read from: config.json "meal_calendars"
-    (a list, or a comma-separated string of calendar names). [] = auto: the
-    one calendar Mela wrote to most recently (Vex 2026-09-21: two stale local
-    "Mela" calendars full of test events dated a recipe on the wrong day)."""
-    raw = load().get("meal_calendars") or ""
-    if isinstance(raw, list):
-        return [str(x).strip() for x in raw if str(x).strip()]
-    return [x.strip() for x in str(raw).split(",") if x.strip()]
-
-
-def get_meal_tag_map():
-    """Mela category → TickTick tag overrides ({"02 • Breakfast":
-    "🍳breakfast", …}); None = mela.DEFAULT_TAG_MAP. config.json only."""
-    m = load().get("meal_tag_map")
-    return m if isinstance(m, dict) and m else None
 
 
 def get_weekly_review_id():

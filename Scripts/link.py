@@ -459,9 +459,7 @@ VIEW_CTX = {"countdowns": "ctx:countdowns",   # the ⏳ hub
             "okrweekly": "ctx:okr:m:now",
             "okrmonthly": "ctx:okr:m:now",
             "okrquarterly": "ctx:okr",
-            "okrcarry": "ctx:okr",
-            # 🥘 the meal-prep hub (a routine step "[Plan the week]" can carry it)
-            "meal": "ctx:meal"}
+            "okrcarry": "ctx:okr"}
 
 
 def _money(xact, as_sticky=False, as_window=False):

@@ -43,7 +43,6 @@ All 35 are defaults - remap any of them in Configure Workflow. Hotkey nodes ship
 | `tde` | Log an entry to today | [Periodic notes](48-periodic.md) |
 | `tat` | Schedule a task today | [Periodic notes](48-periodic.md) |
 | `tok` | OKRs hub - the board's months, objectives, key results | [OKRs](50-okrs.md) |
-| `tml` | Meal prep hub - this week, the twelve after it, sync with Mela (pick the week), groceries, library | [Meal prep](51-meal-prep.md) |
 | `tha` | Habits view | [Views](45-views.md) |
 | `tpo` | Pomodoro / Focus view | [Views](45-views.md) |
 | `tmx` | Eisenhower Matrix view | [Views](45-views.md) |
@@ -72,9 +71,6 @@ Per row type (⌘⏎ = Actions and ⌃⏎ = back everywhere; - = nothing bound):
 | Note | Open | - | - | - | Copy link |
 | Completed task | Open | - | Uncomplete | - | - |
 | Won't Do task | Open | - | Reopen | - | - |
-| 🥘 Meal (hub, week, library) | Open in Mela | - / subtasks (library) | Open web page | Cooked (👨‍🍳 tag + a note) | Copy Mela link |
-| 🥘 Week (📆 This week + 12) | That week's meals | Same hop | Pull into TickTick | All cooked (👨‍🍳 tag on every meal + one note) | - |
-| 🛒 Grocery list (hub › Groceries) | Open in TickTick | - | Complete | Portions… (re-cut this list) | Copy link |
 | 🏷 Price book entry (hub › Prices) | Type a price | - | - | Search term… | Copy the product link |
 
 \* App-only smart lists (no in-Alfred view) open in TickTick instead. Inside the ⌘⏎ Actions menu, ⌃⏎ returns to the screen you came from.

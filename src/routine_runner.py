@@ -196,8 +196,9 @@ def default_steps(spec="daily", reset=True):
     gets something that works, and layout is what the config file adds.
 
     reset=False leaves the ticked children alone: a routine whose subtasks
-    are re-minted for every occurrence (🥘 Meal Prep's three meal pointers)
-    must never get last week's back (routines.py, "reset": False)."""
+    are re-minted for every occurrence must never get last week's back
+    (routines.py, "reset": False; no shipped routine uses it since the meal
+    prep retired on 2026-11-05)."""
     steps = [
         {"do": "reset", "tid": "{tid}", "pid": "{pid}"},
         {"do": "activate", "app": "com.TickTick.task.mac", "wait": True},

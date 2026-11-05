@@ -9,8 +9,8 @@ it is before today; a task dated today, ahead of today or undated lands
 today (None, append_session's default); an explicit `when` (the adopt
 chain's date dialog) wins; the Finished stamp of a final session follows
 the day; the toast carries ' · 📅 28 Sep' only when the day is not today.
-Plus dateutil.task_day over zones (the ONE reading, shared with the meal
-plan). Nothing reaches the network; HOME is a scratch dir before any repo
+Plus dateutil.task_day over zones (the ONE reading of a task's day).
+Nothing reaches the network; HOME is a scratch dir before any repo
 import, so the cache never touches ~/.ticktick_alfred.
 
     python3 tests/test_session_day.py

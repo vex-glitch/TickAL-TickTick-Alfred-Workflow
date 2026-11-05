@@ -639,7 +639,7 @@ else:
           and browse._before_birth({"createdTime": "2026-09-27T12:00:00+0000"}, date(2026, 12, 31)) is False
           and browse._before_birth({}, date(2025, 12, 31)) is False)
     check("10.the routine opens the yearly note", getattr(xact, "_ROUTINE_SPEC", {}).get("yearly") == "yearly"
-          and getattr(xact, "_ROUTINE_SPEC", {}).get("quarterly") == "quarterly" and getattr(xact, "_ROUTINE_SPEC", {}).get("meal") == "weekly",
+          and getattr(xact, "_ROUTINE_SPEC", {}).get("quarterly") == "quarterly",
           getattr(xact, "_ROUTINE_SPEC", None))
 
     print(f"yearly note: {P} passed, {F} failed")

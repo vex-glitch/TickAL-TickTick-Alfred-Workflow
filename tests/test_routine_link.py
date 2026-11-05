@@ -262,7 +262,7 @@ else:
     # ── the routine registry (src/routines.py) ─────────────────────────────────
     import routines as rt  # noqa: E402
 
-    N_ROUTINES = 7          # five workspace routines + 🎉 Yearly Review and 🥘 Meal Prep (no macro)
+    N_ROUTINES = 6          # five workspace routines + 🎉 Yearly Review (no macro); 🥘 Meal Prep retired 2026-11-05
     check("seven routines", len(rt.ROUTINES) == N_ROUTINES, len(rt.ROUTINES))
     check("the yearly review: no macro, its steps reset like the other reviews",
           rt.by_key("yearly") is not None and not rt.by_key("yearly")["macro"]
@@ -272,9 +272,7 @@ else:
     check("every routine is complete (a macro is optional)",
           all(r.get("tid") and r.get("pid") and r.get("habit") for r in rt.ROUTINES),
           [r["key"] for r in rt.ROUTINES if not r.get("habit")])
-    check("meal prep: no macro, reset off",
-          rt.by_key("meal") is not None and not rt.by_key("meal")["macro"]
-          and rt.by_key("meal").get("reset") is False)
+    check("meal prep is gone (retired 2026-11-05)", rt.by_key("meal") is None)
     check("every other routine keeps its reset",
           all(r.get("reset", True) for r in rt.ROUTINES if r["key"] != "meal"))
     check("task ids parse as link ids",

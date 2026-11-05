@@ -90,13 +90,6 @@ test:
 	@$(PYTHON) tests/test_day_shift.py
 	@$(PYTHON) tests/test_no_stale_revert.py
 	@$(PYTHON) tests/test_xact_dispatch.py
-	@$(PYTHON) tests/test_meal.py
-	@$(PYTHON) tests/test_meal_scale.py
-	@$(PYTHON) tests/test_meal_price.py
-	@$(PYTHON) tests/test_mela.py
-	@$(PYTHON) tests/test_meal_write.py
-	@$(PYTHON) tests/test_meal_screens.py
-	@$(PYTHON) tests/test_mela_cal.py
 	@$(PYTHON) tests/test_row_display.py
 	@$(PYTHON) tests/test_review_rebuild.py
 	@$(PYTHON) tests/test_commute.py
