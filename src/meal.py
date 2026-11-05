@@ -586,13 +586,10 @@ GROCERIES_TITLE = "🛒 Groceries"     # the Saturday routine, moved the same wa
 
 
 def local_zone():
-    """The Mac's zone (via /etc/localtime), DST-aware."""
-    try:
-        from zoneinfo import ZoneInfo
-        name = os.path.realpath("/etc/localtime").split("zoneinfo/")[-1]
-        return ZoneInfo(name)
-    except Exception:
-        return datetime.now().astimezone().tzinfo
+    """The Mac's zone (via /etc/localtime), DST-aware - dateutil.local_zone,
+    the ONE reading since 2026-11-05 (the CRM dates its entries by it too)."""
+    import dateutil as _du
+    return _du.local_zone()
 
 
 def zone_of(task):
@@ -600,15 +597,9 @@ def zone_of(task):
     the Mac's. TickTick shows an all-day task on the date its stamp has in
     THAT zone - Vex's account writes Europe/London on API-made tasks while
     the Mac sits on Europe/Berlin, so a Berlin-midnight stamp on a London
-    task showed the day before (2026-09-21)."""
-    name = ((task or {}).get("timeZone") or "").strip()
-    if name:
-        try:
-            from zoneinfo import ZoneInfo
-            return ZoneInfo(name)
-        except Exception:
-            pass
-    return local_zone()
+    task showed the day before (2026-09-21). dateutil.task_zone."""
+    import dateutil as _du
+    return _du.task_zone(task)
 
 
 def zone_name(zone):
@@ -616,17 +607,10 @@ def zone_name(zone):
 
 
 def task_date(task):
-    """The calendar day a task sits on, in its own zone (see zone_of)."""
-    raw = (task or {}).get("startDate") or (task or {}).get("dueDate")
-    if not raw:
-        return None
-    try:
-        txt = str(raw).replace("Z", "+00:00")
-        if re.search(r"[+-]\d{4}$", txt):
-            txt = txt[:-2] + ":" + txt[-2:]
-        return datetime.fromisoformat(txt).astimezone(zone_of(task)).date()
-    except (ValueError, TypeError, AttributeError):
-        return None
+    """The calendar day a task sits on, in its own zone (see zone_of) -
+    dateutil.task_day, shared with the CRM's session entries."""
+    import dateutil as _du
+    return _du.task_day(task)
 
 
 def api_day(d, zone=None):

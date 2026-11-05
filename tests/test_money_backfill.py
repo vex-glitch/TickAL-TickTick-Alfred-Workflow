@@ -157,9 +157,48 @@ else:
     check("a future month is refused", any("not happened" in x[1] for x in log if x[0] == "say"))
     log = run("2026-13", [])
     check("a bad month is refused", any("Bad month" in x[1] for x in log if x[0] == "say"))
-    NOTES.append({"id": "old", "title": "🏛️ Guest spot • July 2026", "tags": [areas.ARCHIVE_TAG]})
-    log = run("2026-07", ["1500", ""])
-    check("a month already backfilled is refused before any question", any("already backfilled" in x[1] for x in log if x[0] == "say") and not any(x[0] == "ask" for x in log))
+    # ── redo: a month already backfilled is done AGAIN, its entries replaced ──
+    # (Vex 2026-11-05: "I need to be able to adjust the entry more than once")
+    OLD = ("👤 [👤 Guest spot](https://ticktick.com/webapp/#p/x/tasks/c1) · Started 2026-07-31 · Finished 2026-07-31\n"
+           "Paid: 1500€ · 1 session\n🎬 ➖\n\n## Sessions\n\n### 2026-07-31 · S1 · 20h00 · 1500\n"
+           "Backfilled as one entry, hours set at ~75€/h.\n\n## Notes\n- kept line\n")
+    NOTES.append({"id": "old", "projectId": "arch", "title": "🏛️ Guest spot • July 2026", "tags": [areas.ARCHIVE_TAG], "content": OLD})
+    _REAL_REPLACE = cr.replace_sessions
+    cr.replace_sessions = lambda pid, tid, body, started=None, finished=None: (LOG.append(("replace", pid, tid, body, started, finished)) or ("", "1800€", 1))
+    log = run("2026-07", ["1800", "90"])
+    asks = [x for x in log if x[0] == "ask"]
+    check("redo: the total question is prefilled with what the logbook holds", asks[0][2] == "1500" and "as backfilled" in asks[0][1] and "money note" not in asks[0][1], asks)
+    check("redo: the rate question is prefilled with the logbook's own rate (1500 / 20h)", asks[1][2] == "75" and "as backfilled" in asks[1][1], asks)
+    rep = [x for x in log if x[0] == "replace"]
+    check("redo: ONE write replaces the Sessions section, Started/Finished restamped",
+          rep == [("replace", "arch", "old", "### 2026-07-31 · S1 · 20h00 · 1800\nBackfilled as one entry, hours set at ~90€/h.", "2026-07-31", "2026-07-31")], rep)
+    check("redo: nothing created, nothing appended, nothing re-finished", not any(x[0] in ("cust", "logbook", "entry", "finish") for x in log), log)
+    say = [x for x in log if x[0] == "say"][-1][1]
+    check("redo: the toast says again + what was replaced", "Jul 2026 backfilled again" in say and "1 old entry replaced" in say and "1800€" in say and "90€/h" in say, say)
+    log = run("2026-07", ["", ""])           # OK through both: the old figures again
+    rep = [x for x in log if x[0] == "replace"]
+    check("redo: OK-OK rewrites the same figures (a no-op redo is harmless)", rep and rep[0][3].startswith("### 2026-07-31 · S1 · 20h00 · 1500"), rep)
+    MONEY_NOTES[:] = [{"id": "mn1", "kind": "NOTE", "projectId": "6a4bd07e4e3c910368319b6d",
+                       "title": "2026 August • MT - 3490", "content": AUG}]
+    NOTES.append({"id": "aug", "projectId": "arch", "title": "🏛️ Guest spot • August 2026", "tags": [areas.ARCHIVE_TAG],
+                  "content": OLD.replace("2026-07-31", "2026-08-31").replace("20h00 · 1500", "40h00 · 3000").replace("1500€", "3000€")})
+    log = run("2026-08", ["", ""])
+    asks = [x for x in log if x[0] == "ask"]
+    check("redo: the money note's figure is named when it disagrees with the backfill", asks[0][2] == "3000" and "the money note says 3490" in asks[0][1], asks)
+    rep = [x for x in log if x[0] == "replace"]
+    check("redo: OK keeps the backfilled 3000 (the note's days do not add up to it → one lump)", rep and rep[0][3].startswith("### 2026-08-31 · S1 · 40h00 · 3000"), rep)
+    log = run("2026-08", ["3490", ""])
+    rep = [x for x in log if x[0] == "replace"]
+    check("redo: typing the note's total gives the 18 days again", rep and rep[0][3].count("### ") == 18 and rep[0][4] == "2026-08-01" and rep[0][5] == "2026-08-30", rep and rep[0][3][:60])
+    class _Boom(Exception):
+        pass
+    def _boom(*a, **k):
+        raise _Boom("write boom")
+    cr.replace_sessions = _boom
+    log = run("2026-07", ["1800", "90"])
+    check("redo: a failed write is a toast, nothing else written", any("redo FAILED" in x[1] for x in log if x[0] == "say") and not any(x[0] in ("cust", "logbook", "entry") for x in log), log)
+    NOTES[:] = [n for n in NOTES if n["id"] != "aug"]
+    MONEY_NOTES.clear()
 
     # ── the picker screen ──────────────────────────────────────────────
     import browse                        # noqa: E402
@@ -185,11 +224,46 @@ else:
     check("picker: a month shows what the CRM holds", "3490€" in aug["title"] and "1 session" in aug["title"] and "46.5h" in aug["title"], aug["title"])
     check("picker: ⏎ fires the verb for that month", aug["arg"] == "xact:moneybackfill:2026-08")
     jul = next(r for r in rows if r["uid"] == "bf-2026-07")
-    check("picker: a month already backfilled is marked and dead", "✅ backfilled" in jul["title"] and jul["valid"] is False, jul)
+    check("picker: a month already backfilled is marked, LIVE, and says what a redo replaces",
+          "✅ backfilled" in jul["title"] and jul["valid"] is True and "redo" in jul["subtitle"] and "its 1 entry replaced" in jul["subtitle"]
+          and jul["arg"] == "xact:moneybackfill:2026-07", jul)
+    check("picker: a month never backfilled says the first road", "backfilled" not in aug["title"] and aug["subtitle"] == "⏎ total → hourly rate → one archived logbook", aug)
     check("picker: dead chords pinned", all(r["mods"]["shift"]["valid"] is False and r["mods"]["alt"]["valid"] is False for r in rows))
     bf = next(r for r in home if r.get("uid") == "mo-backfill")
     last = [r for r in home if r.get("uid") != "back"][-1]
     check("home: 🕰 Backfill a month is the last row and drills the picker", last["uid"] == "mo-backfill" and bf["arg"] == "xact:crmbrowse:ctx:crmmoney:backfill", [r.get("uid") for r in home])
+
+    # ── the rewrite itself: pure, then over a fake api ─────────────────
+    body = mb.render_sessions([("2026-08-01", "S1", "0h15", "20"), ("2026-08-02", "S2", "1h45", "125")],
+                              "Backfilled from the 💰 money note, hours set at ~75€/h.")
+    check("render_sessions: blocks a blank line apart, the first carrying the text",
+          body == "### 2026-08-01 · S1 · 0h15 · 20\nBackfilled from the 💰 money note, hours set at ~75€/h.\n\n### 2026-08-02 · S2 · 1h45 · 125", body)
+    new = cr._set_section(OLD, "## Sessions", body)
+    check("_set_section: the old entries are gone, the new ones in, the header and ## Notes untouched",
+          "20h00 · 1500" not in new and "S2 · 1h45 · 125" in new and new.startswith("👤 [") and new.endswith("## Notes\n- kept line\n"), new)
+    check("_set_section: a note without the heading gets it appended", cr._set_section("head\n", "## Sessions", "### x").endswith("## Sessions\n\n### x\n"), cr._set_section("head\n", "## Sessions", "### x"))
+    check("_set_section: the last section is replaced cleanly", cr._set_section("head\n\n## Notes\n- a\n", "## Notes", "- b") == "head\n\n## Notes\n\n- b\n", cr._set_section("head\n\n## Notes\n- a\n", "## Notes", "- b"))
+    LIVE = {"id": "old", "projectId": "arch", "title": "🏛️ Guest spot • July 2026", "content": OLD, "tags": [areas.ARCHIVE_TAG]}
+    class _API2:
+        def __init__(self):
+            self.writes = []
+        def get_task(self, pid, tid):
+            return dict(LIVE)
+        def update_task(self, tid, pid, current=None, **f):
+            self.writes.append((tid, pid, f.get("content")))
+            return dict(LIVE, **f)
+    api2 = _API2()
+    cr._api = lambda: api2
+    cr.replace_sessions = _REAL_REPLACE
+    cr._fresher_content = lambda tid, live: live
+    cr.sync_customer_bullet = lambda lb: LOG.append(("bullet", lb.get("id"), lb.get("content")))
+    LOG.clear()
+    content, money, n = cr.replace_sessions("arch", "old", body, started="2026-08-01", finished="2026-08-02")
+    check("replace_sessions: one write, Paid recomputed, Started/Finished restamped, bullet synced off the new content",
+          len(api2.writes) == 1 and api2.writes[0][:2] == ("old", "arch") and "Paid: 145€ · 2 sessions" in content
+          and "Started 2026-08-01 · Finished 2026-08-02" in content and money == "145€" and n == 2
+          and ("bullet", "old", content) in LOG and ("cache", "old") in LOG, (content, money, n, LOG))
+    check("replace_sessions: the money the screens read is the new set", [e[2] for e in [[x.strip() for x in m.group(1).split("·")] for m in cr.ENTRY_RE.finditer(content)]] == ["0h15", "1h45"], content)
 
     print(f"\n{COUNT[0] - len(FAILS)}/{COUNT[0]} ok")
     if FAILS:

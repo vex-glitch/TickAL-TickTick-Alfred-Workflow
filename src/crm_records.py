@@ -993,6 +993,23 @@ def _append_under(content, heading, block, blank=True):
     return "\n".join(out + tail).rstrip("\n") + "\n"
 
 
+def _set_section(content, heading, body):
+    """PURE: the section under `heading` (a '## ' line) REPLACED by `body`
+    - everything up to the next '## ' goes, the rest of the note is
+    untouched; a note without the heading gets it appended. The 🕰
+    re-backfill rewrites ## Sessions this way (2026-11-05)."""
+    lines = (content or "").split("\n")
+    idx = next((i for i, l in enumerate(lines) if l.strip() == heading), None)
+    if idx is None:
+        return _append_under(content, heading, body)
+    end = idx + 1
+    while end < len(lines) and not lines[end].startswith("## "):
+        end += 1
+    tail = lines[end:]
+    out = lines[:idx + 1] + [""] + (body or "").rstrip("\n").split("\n") + [""]
+    return "\n".join(out + tail).rstrip("\n") + "\n"
+
+
 def _num(s):
     """First number in s as float. EU and US separators both tolerated:
     1.250,50 / 1,250.50 / 250,50 / 1.250 / 250.50 all parse right - with
@@ -1660,6 +1677,28 @@ def append_session(log_pid, log_tid, marker, duration="", charged="", text="",
     sync_customer_bullet({**lb, "content": content})
     money, n = totals(content)
     return content, money, n, (lb.get("title") or "")
+
+
+def replace_sessions(log_pid, log_tid, body, started=None, finished=None):
+    """Rewrite a logbook's WHOLE ## Sessions section in ONE write: the 🕰
+    re-backfill (Vex 2026-11-05: "I need to be able to adjust the entry
+    more than once") replaces the month's entries instead of appending a
+    second set (money would double). Paid recomputed, the Started /
+    Finished stamps rewritten when given, the customer bullet synced.
+    Returns (content, money_str, session_count)."""
+    api = _api()
+    lb, log_pid = locate(log_tid, log_pid)
+    content = _set_section(_fresher_content(log_tid, lb.get("content") or ""),
+                           "## Sessions", body)
+    content = _set_paid_line(content)
+    for word, day in (("Started", started), ("Finished", finished)):
+        if day:
+            content = re.sub(rf"{word} \S+", f"{word} {day}", content, count=1)
+    api.update_task(log_tid, log_pid, current=lb, content=content)
+    _patch_cache(log_tid, content=content)
+    sync_customer_bullet({**lb, "content": content})
+    money, n = totals(content)
+    return content, money, n
 
 
 def _plant_image_ref(content, heading, occurrence, ref):

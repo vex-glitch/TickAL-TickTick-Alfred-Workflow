@@ -16,8 +16,13 @@ The plan (plan_entries):
 Every entry is "### <day> · S<n> · <h>h<mm> · <amount>", the shape
 crm_records.ENTRY_RE already reads; the logbook is born under the
 "Guest spot" customer, titled "Guest spot • <Month YYYY>", archived on its
-last day. One logbook per month: a second backfill of the same month is
-refused by the verb (money would double).
+last day. One logbook per month: a second backfill of the same month
+REDOES it (Vex 2026-11-05: "I need to be able to adjust the entry more
+than once in case I did it wrong") - the verb prefills the two questions
+with what the logbook holds (its total, its total / hours as the rate)
+and replaces its whole ## Sessions section in one write
+(render_sessions here, crm_records.replace_sessions), so the money never
+doubles and the month can be corrected any number of times.
 """
 import calendar
 import re
@@ -128,6 +133,21 @@ def plan_entries(year, month, total, rate, days=None, today=None):
         return entries, hours, "days"
     h = quarter_hours(total, rate)
     return [(end.isoformat(), "S1", duration_str(h), fmt_amount(total))], h, "lump"
+
+
+def render_sessions(entries, first_text=""):
+    """The ## Sessions body for a plan, as one string: a '### day · S<n> ·
+    <dur> · <amount>' block per entry (the shape crm_records.ENTRY_RE
+    reads), the first block carrying `first_text` under it, blocks a
+    blank line apart - exactly what append_session would have written
+    one entry at a time."""
+    blocks = []
+    for i, (day, marker, dur, amt) in enumerate(entries):
+        b = f"### {day} · {marker} · {dur or '-'} · {amt or '-'}"
+        if i == 0 and (first_text or "").strip():
+            b += f"\n{first_text.strip()}"
+        blocks.append(b)
+    return "\n\n".join(blocks)
 
 
 def month_choices(today=None, back=24):

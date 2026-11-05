@@ -3,6 +3,7 @@
 Shared date/time parsing and display helpers.
 Single source of truth used by add_task.py, reschedule.py, and dispatch.py.
 """
+import os as _os
 import re
 import time as _time
 import calendar as _cal
@@ -16,6 +17,56 @@ _MONTH_MAP = {}
 for _i, _mn in enumerate(MONTHS, 1):
     _MONTH_MAP[_mn]      = _i
     _MONTH_MAP[_mn[:3]]  = _i   # jan, feb, mar …
+
+
+# ── The day a task sits on ───────────────────────────────────────────────────
+# ONE reading of a task's calendar day for every subsystem (the meal plan
+# since 2026-09-21, the CRM's session entries since 2026-11-05): the stamp
+# converted into the task's OWN zone. TickTick writes an all-day task as
+# midnight of its zone in UTC ("2026-09-26T22:00:00.000+0000" for a CEST
+# 27 Sep), so the Mac's zone is only right when it is the task's zone -
+# Vex's account writes Europe/London on API-made tasks while the Mac sits
+# on Europe/Berlin. The Mac's zone is read by NAME (DST-aware for any
+# date); a fixed offset taken from "now" is an hour off across a DST
+# edge, which is a day off on a midnight stamp.
+
+def local_zone():
+    """The Mac's zone (via /etc/localtime), DST-aware for any date."""
+    try:
+        from zoneinfo import ZoneInfo
+        name = _os.path.realpath("/etc/localtime").split("zoneinfo/")[-1]
+        return ZoneInfo(name)
+    except Exception:
+        return datetime.now().astimezone().tzinfo
+
+
+def task_zone(task):
+    """The zone a task's dates are READ in: its own timeZone field, else
+    the Mac's."""
+    name = ((task or {}).get("timeZone") or "").strip()
+    if name:
+        try:
+            from zoneinfo import ZoneInfo
+            return ZoneInfo(name)
+        except Exception:
+            pass
+    return local_zone()
+
+
+def task_day(task):
+    """The calendar day a task sits on - its startDate, else dueDate - as
+    a date in the task's own zone; None when it carries no (readable)
+    date."""
+    raw = (task or {}).get("startDate") or (task or {}).get("dueDate")
+    if not raw:
+        return None
+    try:
+        txt = str(raw).replace("Z", "+00:00")
+        if re.search(r"[+-]\d{4}$", txt):
+            txt = txt[:-2] + ":" + txt[-2:]
+        return datetime.fromisoformat(txt).astimezone(task_zone(task)).date()
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 # ── Normaliser ────────────────────────────────────────────────────────────────

@@ -101,6 +101,7 @@ test:
 	@$(PYTHON) tests/test_review_rebuild.py
 	@$(PYTHON) tests/test_commute.py
 	@$(PYTHON) tests/test_commute_done.py
+	@$(PYTHON) tests/test_session_day.py
 	@$(PYTHON) tests/test_unreachable.py
 	@$(PYTHON) tests/test_harness.py
 

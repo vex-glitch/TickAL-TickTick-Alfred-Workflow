@@ -1614,25 +1614,31 @@ def render_crmmoney(sub, query):
         import money_backfill as mb
         e = cr.all_entries()
         today = _date.today()
-        done = set()
+        done = {}            # lower title → the backfill logbook it has
         for lb in cr.records_notes():
             t = re.sub(r"^(?:🎨|🏛️)\s*", "", (lb.get("title") or "").strip())
-            done.add(t.strip().lower())
+            done[t.strip().lower()] = lb
         rows = []
         for y, mo_ in mb.month_choices(today):
             a, b = _month_bounds(y, mo_)
             money, n, hours, raw = cr.sum_entries(e, a.isoformat(), b.isoformat())
-            have = mb.logbook_title(y, mo_).lower() in done
+            # a month already backfilled stays LIVE: ⏎ redoes it, the old
+            # entries replaced (Vex 2026-11-05 - never a dead row)
+            prev = done.get(mb.logbook_title(y, mo_).lower())
+            old_n = (len(cr.ENTRY_RE.findall(prev.get("content") or ""))
+                     if prev else 0)
             rows.append(alfred.item(
                 uid=f"bf-{a.strftime('%Y-%m')}",
                 title=f"📅 {a.strftime('%b %Y')} · {money}"
                       f" · {n} session{'s' if n != 1 else ''}"
                       + _rate_chip(cr, hours, raw, money)
-                      + (" · ✅ backfilled" if have else ""),
-                subtitle=("Already has a backfill logbook" if have else
+                      + (" · ✅ backfilled" if prev else ""),
+                subtitle=(f"✅ backfilled · ⏎ redo: total → rate, its {old_n} "
+                          f"entr{'y' if old_n == 1 else 'ies'} replaced"
+                          if prev else
                           "⏎ total → hourly rate → one archived logbook"),
                 arg=f"xact:moneybackfill:{a.strftime('%Y-%m')}",
-                valid=not have, mods=_picker_mods()))
+                valid=True, mods=_picker_mods()))
         return _done(rows)
 
     if sub == "cust":

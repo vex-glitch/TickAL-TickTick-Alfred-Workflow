@@ -71,10 +71,16 @@ CRM records (customer notes + tattoo logbooks - src/crm_records.py):
                                     logbook (dialogs) → Add window prefilled
     xact:crmnew_go:session::<logTid>  next session → Add prefilled S<n>
     xact:sessiondone:<pid>:<tid>    complete the session task (calendar keeps
-                                    the record), dialogs log the entry,
-                                    Paid recomputed, its 🚗 commutes ticked
-                                    off (🚫 cancelled: trashed), 📷 attached,
-                                    archive or chain S<n+1>
+                                    the record), dialogs log the entry DATED
+                                    ON THE TASK'S DAY (a late tick is still
+                                    that day's money), Paid recomputed, its
+                                    🚗 commutes ticked off (🚫 cancelled:
+                                    trashed), 📷 attached, archive or chain
+                                    S<n+1>
+    xact:moneybackfill:<YYYY-MM>    🕰 a month's money as one archived Guest
+                                    spot logbook (total → rate); a month
+                                    already backfilled is REDONE, its
+                                    entries replaced in one write
     xact:crmlog:<tid>               dialog → timestamped line under ## Notes
     xact:crmlink:<pid>:<tid>        🔗 adopt a hand-made calendar task: title
                                     → [logbook](link) S<n>/Consult, then the
@@ -1921,13 +1927,39 @@ def _commute_tick(tid, row=None):
         return f" · 🚗 commute failed · {type(e).__name__}"
 
 
+def _session_day(task, today=None):
+    """The ISO day a session entry is dated on: the task's OWN day (its
+    stamp read in its zone - dateutil.task_day) when that day is before
+    today, else None (= today, append_session's default): the task's day
+    IS today, or the task sits ahead of today - money never lands on a
+    day that has not happened - or it carries no date at all. Vex
+    2026-11-05: a September session ticked a few days into October
+    counted as October money."""
+    import dateutil as du
+    d = du.task_day(task)
+    today = today or datetime.now().date()
+    return d.isoformat() if d and d < today else None
+
+
+def _dated_chip(when):
+    """' · 📅 28 Sep' when an entry lands on another day than today, ''
+    otherwise - the toast says where the money went."""
+    if not when or when == datetime.now().date().isoformat():
+        return ""
+    try:
+        return " · 📅 " + datetime.fromisoformat(when).strftime("%-d %b")
+    except ValueError:
+        return f" · 📅 {when}"
+
+
 def sessiondone(pid, tid, when=None):
     """The heart of the records flow: complete today's task (the calendar
     keeps the record - never reschedule), log the entry, recompute Paid,
     then archive or chain the next session. Photos land through ONE
     verb (session_photos: Eagle + planted hero + dedupe) - a Photos
     selection OR a clipboard image is caught BEFORE the questions.
-    when = ISO date for backdated entries (the adopt chain asks); None = today."""
+    when = ISO date for backdated entries (the adopt chain asks); None = the
+    task's own day when that is before today, else today (_session_day)."""
     if not _records_ready():
         return
     import areas
@@ -1936,7 +1968,8 @@ def sessiondone(pid, tid, when=None):
     title = t.get("title") or ""
     if not title:
         try:
-            title = (cr._api().get_task(pid, tid) or {}).get("title") or ""
+            t = cr._api().get_task(pid, tid) or {}
+            title = t.get("title") or ""
         except Exception:
             pass
     # Shape gate: S<n>/Consult prefix AND a records link. Prepare follow-ups
@@ -1951,6 +1984,14 @@ def sessiondone(pid, tid, when=None):
     marker = mk if is_s else "consultation"
     word   = "session" if is_s else "consultation"
     lb_deeplink = f"ticktick:///webapp/#p/{log_pid}/tasks/{log_tid}"
+    # The entry is dated on the SESSION's day - the task's own date - not
+    # the day he ticks it (Vex 2026-11-05: a September session ticked in
+    # October read as October money). An explicit `when` (the adopt
+    # chain's date dialog) wins; the day rides every road below (the
+    # trace, the no-show, the entry, the Finished stamp) and every toast
+    # says it when it is not today.
+    when = when or _session_day(t)
+    dated = _dated_chip(when)
 
     # What happened? Esc = abort with nothing touched.
     outcome = _choose(f"{lb_title} - what happened?",
@@ -1969,7 +2010,7 @@ def sessiondone(pid, tid, when=None):
         except Exception as e:
             _crm_say(f"Trace failed: {type(e).__name__}: {e}")
             return
-        _crm_say(f"🔁 {marker} rescheduled · pick the new date")
+        _crm_say(f"🔁 {marker} rescheduled{dated} · pick the new date")
         # Straight onto the DATE picker (attributeScheduling recovers the ids
         # from the act-again context file) - not the full ⌘ menu.
         try:
@@ -2029,7 +2070,7 @@ def sessiondone(pid, tid, when=None):
         elif pick == "Open logbook":
             subprocess.run(["open", lb_deeplink], check=False)
         _crm_say(f"{'👻' if kind_word == 'no-show' else '🚫'} {marker} "
-                 f"{kind_word} logged · {money} / {n} total{commute_bit}")
+                 f"{kind_word} logged · {money} / {n} total{dated}{commute_bit}")
         return
 
     # ✅ Happened - Esc aborts before anything is completed or written.
@@ -2108,8 +2149,8 @@ def sessiondone(pid, tid, when=None):
         return
     # 🚗 the session happened, so did its commutes: the OPEN linked legs
     # are ticked off with it (Vex 2026-10-09). The chip rides every toast
-    # below beside the photo chip, as `tail`.
-    tail = photo + _commute_tick(tid, t)
+    # below beside the photo chip and the 📅 day chip, as `tail`.
+    tail = photo + dated + _commute_tick(tid, t)
     try:
         content, money, n, live_title = cr.append_session(
             log_pid, log_tid, marker, dur, charged, did, when=when)
@@ -2127,7 +2168,7 @@ def sessiondone(pid, tid, when=None):
             _crm_session_prefill(lb_title, "S1")
         elif pick == "📁 Didn't book · archive":
             try:
-                cr.finish_logbook(log_pid, log_tid)
+                cr.finish_logbook(log_pid, log_tid, when=when)
                 _crm_say(f"📁 Consultation logged · logbook archived{tail}")
                 _eagle_archive_folder(log_tid)
                 return
@@ -2139,7 +2180,7 @@ def sessiondone(pid, tid, when=None):
 
     if final:
         try:
-            cr.finish_logbook(log_pid, log_tid)
+            cr.finish_logbook(log_pid, log_tid, when=when)
             _eagle_archive_folder(log_tid)
             pick = _dialog(f"✅ {marker} done · {money} total · archived{tail}",
                            ["Healing check", "Open logbook", "Done"], "Done")
@@ -2382,8 +2423,14 @@ def moneybackfill(ym):
     under the Guest spot customer: an entry per day from the note when its
     days add up to the total, else one entry on the month's last day.
     Hours per entry = amount / rate to the quarter hour, so the month reads
-    that rate. A month already backfilled is refused (money would double).
-    Vex 2026-10-02, the August guest spot without the Mac."""
+    that rate. A month already backfilled is REDONE, never refused (Vex
+    2026-11-05: "I need to be able to adjust the entry more than once in
+    case I did it wrong"): both questions come prefilled with what its
+    logbook holds (the total; total / hours as the rate; the money note's
+    figure named when it disagrees) and the logbook's whole ## Sessions
+    section is replaced in one write (crm_records.replace_sessions), so
+    the money never doubles. Vex 2026-10-02, the August guest spot
+    without the Mac."""
     if not _records_ready():
         return
     import re as _re
@@ -2406,11 +2453,20 @@ def moneybackfill(ym):
         return
     label = mb.month_label(year, month)
     want = mb.logbook_title(year, month).lower()
-    for lb in cr.records_notes():
-        t = (lb.get("title") or "").strip()
-        if _re.sub(r"^(?:🎨|🏛️)\s*", "", t).strip().lower() == want:
-            _crm_say(f"🕰 {label} already backfilled · {t}")
-            return
+    # the month's earlier backfill, when there is one: its figures are the
+    # defaults and its entries get replaced below
+    prev = next((lb for lb in cr.records_notes()
+                 if _re.sub(r"^(?:🎨|🏛️)\s*", "", (lb.get("title") or "")
+                            .strip()).strip().lower() == want), None)
+    prev_total = prev_rate = None
+    prev_n = 0
+    if prev:
+        pc = prev.get("content") or ""
+        prev_total = cr._totals_raw(pc)[0] or None
+        prev_n = len(cr.ENTRY_RE.findall(pc))
+        mins = cr.chair_minutes(pc)
+        if mins and prev_total:
+            prev_rate = round(prev_total / (mins / 60.0))
     # the month's money note: cache first, then a live read of the list
     pid = rl.MONEY_LIST
     pool = [t for k in ("all_tasks", "all_notes")
@@ -2427,26 +2483,55 @@ def moneybackfill(ym):
         days = mb.parse_day_amounts(note.get("content") or "", year, month)
         hint = mb.note_total(note.get("title"), note.get("content") or "") \
             or (sum(days.values()) if days else None)
+    if prev_total:
+        dflt = prev_total
+        why = "as backfilled" + (f" · the money note says {hint:g}"
+                                 if hint and abs(hint - prev_total) >= 0.005
+                                 else "")
+    elif hint:
+        dflt, why = hint, "from the money note"
+    else:
+        dflt, why = None, ""
     raw = _ask(f"{label} · total money made?"
-               + (f" (OK = {hint:g} from the money note)" if hint else ""),
-               default=f"{hint:g}" if hint else "")
+               + (f" (OK = {dflt:g} {why})" if dflt else ""),
+               default=f"{dflt:g}" if dflt else "")
     if raw is None:
         _crm_say("Cancelled")
         return
-    total = mb.parse_amount(raw) if raw.strip() else hint
+    total = mb.parse_amount(raw) if raw.strip() else dflt
     if not total or total <= 0:
         _crm_say("Cancelled · no total")
         return
-    raw = _ask(f"{label} · about how much per hour? (OK = {mb.DEFAULT_RATE})",
-               default=str(mb.DEFAULT_RATE))
+    rate_dflt = prev_rate or mb.DEFAULT_RATE
+    raw = _ask(f"{label} · about how much per hour? (OK = {rate_dflt:g}"
+               + (" as backfilled)" if prev_rate else ")"),
+               default=f"{rate_dflt:g}")
     if raw is None:
         _crm_say("Cancelled")
         return
-    rate = mb.parse_amount(raw) if raw.strip() else mb.DEFAULT_RATE
+    rate = mb.parse_amount(raw) if raw.strip() else rate_dflt
     if not rate or rate <= 0:
         rate = mb.DEFAULT_RATE
     entries, hours, mode = mb.plan_entries(year, month, total, rate,
                                            days=days, today=today)
+    first = (f"Backfilled from the 💰 money note, hours set at ~{rate:g}€/h."
+             if mode == "days" else
+             f"Backfilled as one entry, hours set at ~{rate:g}€/h.")
+    how = (f"{len(entries)} days from the money note" if mode == "days"
+           else "one entry")
+    if prev:
+        # the redo: the old entries go, the new plan lands, ONE write
+        try:
+            cr.replace_sessions(prev.get("projectId") or prev.get("_projectId"),
+                                prev["id"], mb.render_sessions(entries, first),
+                                started=entries[0][0], finished=entries[-1][0])
+        except Exception as e:
+            _crm_say(f"🕰 {label} redo FAILED: {type(e).__name__}: {e}")
+            return
+        _crm_say(f"🕰 {label} backfilled again · {total:g}€ · {how} · "
+                 f"{hours:g}h · ~{rate:g}€/h · {prev_n} old "
+                 f"entr{'y' if prev_n == 1 else 'ies'} replaced")
+        return
     cust = next((c for c in cr.records_notes(areas.CUSTOMER_TAG)
                  if (c.get("title") or "").strip() == f"👤 {mb.CUSTOMER_NAME}"),
                 None) or cr.create_customer(mb.CUSTOMER_NAME)
@@ -2455,17 +2540,12 @@ def moneybackfill(ym):
     content = cr.set_content_dest(lb.get("content") or "", "-")
     cr._api().update_task(lb["id"], areas.RECORDS_ID, current=lb, content=content)
     cr._patch_cache(lb["id"], content=content)
-    first = (f"Backfilled from the 💰 money note, hours set at ~{rate:g}€/h."
-             if mode == "days" else
-             f"Backfilled as one entry, hours set at ~{rate:g}€/h.")
     for i, (day, marker, dur, amt) in enumerate(entries):
         cr.append_session(areas.RECORDS_ID, lb["id"], marker, duration=dur,
                           charged=amt, text=first if i == 0 else "", when=day)
     cr.finish_logbook(areas.RECORDS_ID, lb["id"], when=entries[-1][0])
-    _crm_say(f"🕰 {label} backfilled · {total:g}€ · "
-             + (f"{len(entries)} days from the money note" if mode == "days"
-                else "one entry")
-             + f" · {hours:g}h · ~{rate:g}€/h")
+    _crm_say(f"🕰 {label} backfilled · {total:g}€ · {how} · "
+             f"{hours:g}h · ~{rate:g}€/h")
 
 
 def _media_selected():
