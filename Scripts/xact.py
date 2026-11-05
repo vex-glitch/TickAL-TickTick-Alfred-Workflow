@@ -7550,9 +7550,11 @@ def routine_reset_after(key):
         return
     pid = (routine_task(r) or {}).get("projectId") or r["pid"]
     verdict = _routine_reset(r["tid"], pid)
+    _n, swept = _routine_sweep(r)       # a drag's loose copies go with the reset
     try:
         with open(ROUTINE_LOG, "a") as log:
-            log.write(f"{_op_iso()} finished {r['label']} -> steps back: {verdict}\n")
+            log.write(f"{_op_iso()} finished {r['label']} -> steps back: {verdict}"
+                      + (f" · {swept}" if swept else "") + "\n")
     except OSError:
         pass
 
@@ -7697,6 +7699,92 @@ def _routine_adopt(r, old, dry=False):
     return succ, note
 
 
+def _routine_sweep(r, task=None, bag=None, dry=False):
+    """🧹 The loose copies of a routine's steps go (Vex 2026-11-05: "subtasks
+    are getting out of the review box ... one monthly review that is like it
+    should be and subtasks from another ungrouped randomly").
+
+    A calendar drag of ONE occurrence (2026-10-02 both reviews, 2026-10-30
+    the monthly) makes the app copy every step of the tree as a loose
+    top-level task with no parent, each carrying repeatTaskId = the step it
+    came from, beside a detached copy of the occurrence without steps; the
+    tree itself stays whole. _routine_adopt only runs for a split (a
+    successor), so a drag's 64 copies lay on the board for a week. Here:
+    candidates = open parentless non-repeating tasks of the routine's list
+    wearing a step's title (routines.copy_candidates, off `bag` or the
+    cache - no live read when there are none, the usual case); each is
+    confirmed by its v2 read against the tree (open rows + the completed
+    feed, so a ticked step's copy is known too) before anything is deleted;
+    the confirmed copies go (v1), the cache follows in place, one log line.
+    The dragged occurrence itself is left alone: it points at nothing
+    (repeatTaskId None) and it is his calendar entry - ⏪ on the confirm
+    screen runs the missed one. Returns (n, note): the toast chip
+    "🧹 64 copies removed", "" when nothing was there. dry plans only.
+    Never raises: a routine must still start."""
+    import routines as rt
+    try:
+        pid = (task or {}).get("projectId") or r["pid"]
+        tid = r["tid"]
+        rows = bag if bag is not None else [
+            t for t in (cache_store.get("all_tasks") or [])
+            if (t.get("projectId") or t.get("_projectId")) == pid]
+        tree = rt.tree_ids(tid, rows)
+        cands = rt.copy_candidates({"id": tid, "projectId": pid}, rows, tree)
+        if not cands:
+            return 0, ""
+        import api_v2
+        v2 = api_v2.TickTickV2()
+        if not v2.token:
+            return 0, ""
+        # a drag happened: the census again WITH the completed feed, so a
+        # step ticked at that moment names its copy too (its title is not
+        # among the open rows)
+        done = v2.project_completed(pid, days=120) or []
+        full = list(rows) + list(done)
+        tree = rt.tree_ids(tid, full)
+        cands = rt.copy_candidates({"id": tid, "projectId": pid}, full, tree) or cands
+        copies = []
+        for c in cands:
+            try:
+                if rt.is_loose_copy(v2.get_task(c["id"]), tree):
+                    copies.append(c)
+            except Exception:
+                continue
+        if not copies:
+            return 0, ""
+        word = "copy" if len(copies) == 1 else "copies"
+        if dry:
+            return len(copies), f"🧹 {len(copies)} {word} to remove"
+        api, n, gone = _api(), 0, set()
+        pace = 0.3 if len(copies) > 10 else 0     # the v1 limit: 100 a minute
+        for c in copies:
+            try:
+                api.delete_task(pid, c["id"])
+                n += 1
+                gone.add(c["id"])
+            except Exception:
+                pass                       # the next sweep finds what stayed
+            if pace:
+                time.sleep(pace)
+        try:
+            cached = cache_store.get("all_tasks")
+            if cached is not None and gone:
+                cache_store.set("all_tasks", [t for t in cached if t.get("id") not in gone])
+            cache_store.invalidate(f"project_data_{pid}")
+        except Exception:
+            pass
+        try:
+            with open(ROUTINE_LOG, "a") as log:
+                log.write(f"{_op_iso()} sweep {r['label']}: {len(cands)} candidates, "
+                          f"{len(copies)} copies, {n} deleted\n")
+        except OSError:
+            pass
+        word = "copy" if n == 1 else "copies"
+        return n, (f"🧹 {n} {word} removed" if n else "⚠️ copies not removed")
+    except Exception:
+        return 0, ""
+
+
 def _routine_live(r):
     """(task, note): the routine's task LIVE when the API answers (the
     cache can be a completion behind, and "which occurrence" is exactly
@@ -7743,7 +7831,13 @@ def routine_heal(rest):
     except Exception:
         t = None
     if t and t.get("id") == r["tid"] and not rt.split_end(t):
-        print(f"🔁 {r['label']} · series live, nothing to adopt")
+        # no split to follow: the sweep is still worth a look (a drag)
+        try:
+            bag = list((_api().get_project_data(r["pid"]) or {}).get("tasks") or [])
+        except Exception:
+            bag = None
+        _n, swept = _routine_sweep(r, t, bag=bag, dry=flag.strip() == "dry")
+        print(f"🔁 {r['label']} · series live · {swept or 'nothing to sweep'}")
         return
     succ, note = _routine_adopt(r, t if t and t.get("id") == r["tid"] else None,
                                 dry=flag.strip() == "dry")
@@ -7769,6 +7863,8 @@ def routine_start(key):
         print("▶️ Unknown routine")
         return
     t, note = _routine_live(r)          # healed across a split, note = its toast
+    _n, swept = _routine_sweep(r, t)    # a drag's loose copies go with it
+    note = " · ".join(x for x in (note, swept) if x)
     st = rt.due_state(t)
     if st["state"] == "ahead":
         _run_trigger("BrowseCtx", f"ctx:rconfirm:{key}")   # clean bar, no arg
@@ -7832,8 +7928,9 @@ def routine_late(key):
     if after.get("date") != day:
         print(f"⏪ Series did not land on {day:%a %d %b} · reads {after.get('date')}")
         return
+    _n, swept = _routine_sweep(r, back)   # the drag that made this mess left copies too
     print(f"⏪ {day:%a %d %b} · ", end="")
-    routine_run(key)
+    routine_run(key, swept)
 
 
 def routine_run(key, note=""):

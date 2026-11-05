@@ -366,6 +366,37 @@ else:
           and not rt.is_loose_copy({"repeatTaskId": "s1", "status": 2}, tree)
           and not rt.is_loose_copy({"repeatTaskId": "s1", "status": 0, "deleted": 1}, tree)
           and not rt.is_loose_copy({"status": 0}, tree) and not rt.is_loose_copy(None, tree))
+    # ── a calendar drag copies the tree loose too (2026-11-05): the tree stays,
+    # the copies lie beside it in the column, and the census is by title
+    SERIES = {"id": "m1", "projectId": PID, "status": 0, "repeatFlag": "RRULE:FREQ=MONTHLY;BYMONTHDAY=-1",
+              "title": "🗓️ Monthly Review", "childIds": ["ms1", "ms2"]}
+    MS1 = {"id": "ms1", "projectId": PID, "parentId": "m1", "status": 0, "title": "[Money](kmtrigger://x)"}
+    MS2 = {"id": "ms2", "projectId": PID, "parentId": "m1", "status": 0, "title": "TickTick", "childIds": ["ms2a"]}
+    MS2A = {"id": "ms2a", "projectId": PID, "parentId": "ms2", "status": 0, "title": "MindSweep"}
+    DRAG1 = {"id": "d1", "projectId": PID, "status": 0, "title": "[Money](kmtrigger://x)"}
+    DRAG2 = {"id": "d2", "projectId": PID, "status": 0, "title": "MindSweep "}
+    DRAGP = {"id": "dp", "projectId": PID, "status": 0, "title": "🗓️ Monthly Review"}   # the dragged occurrence: no step's title
+    PARENTED = {"id": "d3", "projectId": PID, "status": 0, "parentId": "dp", "title": "TickTick"}
+    DONE_D = {"id": "d4", "projectId": PID, "status": 2, "title": "TickTick"}
+    OTHER = {"id": "d5", "projectId": "other", "status": 0, "title": "TickTick"}
+    REPEATER = {"id": "d6", "projectId": PID, "status": 0, "repeatFlag": "RRULE:FREQ=DAILY", "title": "TickTick"}
+    STRANGER = {"id": "d7", "projectId": PID, "status": 0, "title": "Buy milk"}
+    MBAG = [SERIES, MS1, MS2, MS2A, DRAG1, DRAG2, DRAGP, PARENTED, DONE_D, OTHER, REPEATER, STRANGER]
+    cc = rt.copy_candidates(SERIES, MBAG)
+    check("copy candidates: open parentless non-repeating tasks of the list wearing a step's title (whitespace ignored)",
+          sorted(c["id"] for c in cc) == ["d1", "d2"], [c["id"] for c in cc])
+    check("copy candidates: the steps, the dragged occurrence, a parented, done, repeating or other-list task, a stranger: none",
+          not {"ms1", "ms2", "ms2a", "dp", "d3", "d4", "d5", "d6", "d7", "m1"} & {c["id"] for c in cc})
+    check("copy candidates: a tree handed in is used as is; an empty tree or root finds nothing",
+          [c["id"] for c in rt.copy_candidates(SERIES, MBAG, tree={"ms2a"})] == ["d2"]
+          and rt.copy_candidates(SERIES, MBAG, tree=set()) == [] and rt.copy_candidates(None, MBAG) == []
+          and rt.copy_candidates(SERIES, None) == []
+          and sorted(c["id"] for c in rt.copy_candidates({"id": "m1"}, MBAG)) == ["d1", "d2", "d5"])   # no list known: every list
+    check("norm_title", rt.norm_title("  Mind  Sweep ") == "Mind Sweep" and rt.norm_title(None) == "")
+    check("is_loose_copy confirms a drag's copy the same way (repeatTaskId = the step)",
+          rt.is_loose_copy({"repeatTaskId": "ms2a", "status": 0, "deleted": 0}, rt.tree_ids("m1", MBAG))
+          and not rt.is_loose_copy({"repeatTaskId": None, "status": 0}, rt.tree_ids("m1", MBAG)))
+
     check("retitle: the Finish link carries the live id",
           rt.retitle(STEP["title"], OLD, NEW) == STEP["title"].replace(OLD, NEW)
           and NEW in rt.retitle(STEP["title"], OLD, NEW) and OLD not in rt.retitle(STEP["title"], OLD, NEW))

@@ -597,6 +597,53 @@ def is_loose_copy(full, tree):
             and not f.get("parentId") and f.get("status", 0) == 0 and not f.get("deleted"))
 
 
+# ── a calendar DRAG copies the tree loose too (2026-11-05) ──────────────────
+# Dragging ONE occurrence of a review in the calendar (2026-10-02 both
+# reviews, 2026-10-30 the monthly) makes the app mint a detached copy for
+# that day WITHOUT steps, copy every step of the tree as a loose top-level
+# task carrying repeatTaskId = the step it came from, and roll the series on
+# - the tree itself stays whole. Vex: "subtasks are getting out of the review
+# box ... one monthly review that is like it should be and subtasks from
+# another ungrouped randomly". The split heal above never ran for a drag
+# (there is no successor), so those copies lay on the board until a hand
+# repair. The census below is title-based and cheap (the cache, no live
+# read); each hit is confirmed by its v2 read (is_loose_copy) before
+# xact._routine_sweep deletes it.
+
+def norm_title(title):
+    """A title as the copy census compares it: whitespace collapsed."""
+    return _re.sub(r"\s+", " ", title or "").strip()
+
+
+def copy_candidates(root, tasks, tree=None):
+    """Open, parentless, non-repeating tasks in root's list, other than root
+    and its tree, wearing the title of a step of root's tree: the app's loose
+    copies of a dragged occurrence's steps, before the v2 read that confirms
+    each (is_loose_copy). `tree` = tree_ids(root) when the caller has it."""
+    root = root or {}
+    rid, pid = root.get("id"), root.get("projectId")
+    if not rid:
+        return []
+    tree = tree_ids(rid, tasks) if tree is None else set(tree or ())
+    by_id = {t.get("id"): t for t in tasks or () if t.get("id")}
+    titles = {norm_title(by_id[i].get("title")) for i in tree if i in by_id}
+    titles.discard("")
+    if not titles:
+        return []
+    out = []
+    for t in tasks or ():
+        tid = t.get("id")
+        if not tid or tid == rid or tid in tree:
+            continue
+        if t.get("parentId") or t.get("status", 0) != 0 or t.get("repeatFlag"):
+            continue
+        if pid and t.get("projectId") and t.get("projectId") != pid:
+            continue
+        if norm_title(t.get("title")) in titles:
+            out.append(t)
+    return out
+
+
 def retitle(title, old_tid, new_tid):
     """A step's title with the old series id swapped for the live one (the
     Finish link carries it: done%3A<tid>%3A<pid>)."""

@@ -4862,6 +4862,7 @@ def render_routines(query):
     screen, and this screen hangs off the main menu."""
     import routines as rt
     tasks = cache_store.get("all_tasks") or []
+    completed = cache_store.get("completed_tasks") or []
     by_id = {t.get("id"): t for t in tasks}
     kids = {}
     for t in tasks:
@@ -4883,6 +4884,18 @@ def render_routines(query):
                 "ahead": f"next {st['date']:%a %d %b}" if st["date"] else ""}.get(st["state"], "")
         if st["state"] == "overdue" and st["date"]:
             chip = f"overdue since {st['date']:%a %d %b}"
+        # a calendar drag's leftovers, said on the row before ⌃ acts on them
+        # (2026-11-05): the occurrence the series skipped (⏪ on the confirm
+        # screen runs it) and the loose copies of this routine's steps lying
+        # in its column (⌃ Start sweeps them)
+        if t:
+            missed = rt.missed_occurrence(t, rt.finished_days(r["tid"], completed))
+            if missed:
+                chip = (chip + " · " if chip else "") + f"⏪ missed {missed:%a %d %b}"
+            loose = rt.copy_candidates({"id": r["tid"], "projectId": pid}, tasks)
+            if loose:
+                chip = (chip + " · " if chip else "") + \
+                    f"🧹 {len(loose)} loose cop{'y' if len(loose) == 1 else 'ies'}"
         # NATIVE since 2026-09-12: the step list in routines.json, no
         # Keyboard Maestro. The macro uid stays in the registry as the
         # fallback road while Vex smokes this.
