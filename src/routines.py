@@ -616,12 +616,16 @@ def norm_title(title):
 
 
 def copy_candidates(root, tasks, tree=None):
-    """Open, parentless, non-repeating tasks in root's list, other than root
-    and its tree, wearing the title of a step of root's tree: the app's loose
-    copies of a dragged occurrence's steps, before the v2 read that confirms
-    each (is_loose_copy). `tree` = tree_ids(root) when the caller has it."""
+    """Open, parentless, non-repeating tasks in root's list - and in root's
+    COLUMN when the root row carries one: the app parks the copies where the
+    series sits, and "TickTick", "Money", "Work" are step titles of every
+    review tree, so a list-wide census read the monthly's 64 copies as the
+    weekly's 29 - other than root and its tree, wearing the title of a step
+    of root's tree: the app's loose copies of a dragged occurrence's steps,
+    before the v2 read that confirms each (is_loose_copy). `tree` =
+    tree_ids(root) when the caller has it."""
     root = root or {}
-    rid, pid = root.get("id"), root.get("projectId")
+    rid, pid, col = root.get("id"), root.get("projectId"), root.get("columnId")
     if not rid:
         return []
     tree = tree_ids(rid, tasks) if tree is None else set(tree or ())
@@ -638,6 +642,8 @@ def copy_candidates(root, tasks, tree=None):
         if t.get("parentId") or t.get("status", 0) != 0 or t.get("repeatFlag"):
             continue
         if pid and t.get("projectId") and t.get("projectId") != pid:
+            continue
+        if col and t.get("columnId") and t.get("columnId") != col:
             continue
         if norm_title(t.get("title")) in titles:
             out.append(t)

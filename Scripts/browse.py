@@ -4888,11 +4888,15 @@ def render_routines(query):
         # (2026-11-05): the occurrence the series skipped (⏪ on the confirm
         # screen runs it) and the loose copies of this routine's steps lying
         # in its column (⌃ Start sweeps them)
-        if t:
+        if t and r.get("reset", True):      # 🥘 Meal Prep's dates are the sync's
+            # the cache's completed window is days, not months: a miss older
+            # than a month is the window, not a miss (the quarterly read
+            # "missed 30 Sep" for a review finished on 2 Oct)
+            import dayroll                 # the 04:00 day, the guards' today
             missed = rt.missed_occurrence(t, rt.finished_days(r["tid"], completed))
-            if missed:
+            if missed and (dayroll.today() - missed).days <= 35:
                 chip = (chip + " · " if chip else "") + f"⏪ missed {missed:%a %d %b}"
-            loose = rt.copy_candidates({"id": r["tid"], "projectId": pid}, tasks)
+            loose = rt.copy_candidates(dict(t, projectId=pid), tasks)
             if loose:
                 chip = (chip + " · " if chip else "") + \
                     f"🧹 {len(loose)} loose cop{'y' if len(loose) == 1 else 'ies'}"

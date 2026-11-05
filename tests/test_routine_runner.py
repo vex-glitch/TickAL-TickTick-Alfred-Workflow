@@ -393,6 +393,11 @@ else:
           and rt.copy_candidates(SERIES, None) == []
           and sorted(c["id"] for c in rt.copy_candidates({"id": "m1"}, MBAG)) == ["d1", "d2", "d5"])   # no list known: every list
     check("norm_title", rt.norm_title("  Mind  Sweep ") == "Mind Sweep" and rt.norm_title(None) == "")
+    COLROOT = dict(SERIES, columnId="colM")
+    COLBAG = [COLROOT, MS1, MS2, MS2A, dict(DRAG1, columnId="colM"), dict(DRAG2, columnId="colW"), dict(STRANGER, columnId="colM")]
+    check("copy candidates: a root row with a column scopes the census to it (the weekly must not count the monthly's copies); a bare root reads the list",
+          [c["id"] for c in rt.copy_candidates(COLROOT, COLBAG)] == ["d1"]
+          and sorted(c["id"] for c in rt.copy_candidates(SERIES, COLBAG)) == ["d1", "d2"])
     check("is_loose_copy confirms a drag's copy the same way (repeatTaskId = the step)",
           rt.is_loose_copy({"repeatTaskId": "ms2a", "status": 0, "deleted": 0}, rt.tree_ids("m1", MBAG))
           and not rt.is_loose_copy({"repeatTaskId": None, "status": 0}, rt.tree_ids("m1", MBAG)))

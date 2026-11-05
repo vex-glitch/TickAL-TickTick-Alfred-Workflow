@@ -7548,9 +7548,10 @@ def routine_reset_after(key):
     r = rt.by_key(key)
     if not r:
         return
-    pid = (routine_task(r) or {}).get("projectId") or r["pid"]
+    live = routine_task(r) or {}
+    pid = live.get("projectId") or r["pid"]
     verdict = _routine_reset(r["tid"], pid)
-    _n, swept = _routine_sweep(r)       # a drag's loose copies go with the reset
+    _n, swept = _routine_sweep(r, live)  # a drag's loose copies go with the reset
     try:
         with open(ROUTINE_LOG, "a") as log:
             log.write(f"{_op_iso()} finished {r['label']} -> steps back: {verdict}"
@@ -7728,8 +7729,12 @@ def _routine_sweep(r, task=None, bag=None, dry=False):
         rows = bag if bag is not None else [
             t for t in (cache_store.get("all_tasks") or [])
             if (t.get("projectId") or t.get("_projectId")) == pid]
+        # the series row itself as the root when the caller has it: its
+        # column scopes the census (a bare id + list reads the whole list)
+        root = dict(task) if (task or {}).get("id") == tid else {"id": tid, "projectId": pid}
+        root["projectId"] = pid
         tree = rt.tree_ids(tid, rows)
-        cands = rt.copy_candidates({"id": tid, "projectId": pid}, rows, tree)
+        cands = rt.copy_candidates(root, rows, tree)
         if not cands:
             return 0, ""
         import api_v2
@@ -7742,7 +7747,7 @@ def _routine_sweep(r, task=None, bag=None, dry=False):
         done = v2.project_completed(pid, days=120) or []
         full = list(rows) + list(done)
         tree = rt.tree_ids(tid, full)
-        cands = rt.copy_candidates({"id": tid, "projectId": pid}, full, tree) or cands
+        cands = rt.copy_candidates(root, full, tree) or cands
         copies = []
         for c in cands:
             try:
